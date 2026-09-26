@@ -34,18 +34,18 @@ The indexer is reporting unavailable. Search queries fail; ingestion is paused.
 
 2. Check `/api/health` and `/api/debug/state` for the lifecycle envelope. Look at `WORKER_CONTROL_PLANE` and `INDEX_SERVING` dimensions and their reason codes.
 
-3. Look for stack traces in `worker.log`:
+3. Look for stack traces in the Engine log — since lane F stage A there is no separate `worker.log`; the index half logs into the one Engine log:
 
    ```powershell
-   Get-Content (Join-Path $env:LOCALAPPDATA 'JustSearch\logs\worker.log') -Tail 200
+   Get-Content (Join-Path $env:LOCALAPPDATA 'JustSearch\logs\engine.log') -Tail 200
    ```
 
 ## Remediation
 
 - **`WorkerStarting`** — wait. If it doesn't clear within a minute, treat as `WorkerCrashed`.
-- **`WorkerCrashed`** — read the last `worker.log` stack trace; if startup is failing repeatedly, see [`index-start-error.md`](index-start-error.md).
+- **`WorkerCrashed`** — read the last stack trace in `engine.log`; if startup is failing repeatedly, see [`index-start-error.md`](index-start-error.md).
 - **`IndexCorrupted`** — trigger a full reindex from the Health view, or in dev with `jseval run --reset`.
-- **Worker unreachable, no reason** — check loopback port reachability; verify the Worker gRPC port is bound.
+- **Worker unreachable, no reason** — there is no Worker port to check: the index half runs in the Engine JVM behind in-process ports (ADR-0049), so "unreachable" means the knowledge client is unset because the index half has not composed. Read `engine.log` for the composition failure.
 
 ## Related
 

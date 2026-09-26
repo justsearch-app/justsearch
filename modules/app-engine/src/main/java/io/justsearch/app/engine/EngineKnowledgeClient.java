@@ -1,0 +1,1590 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.app.engine;
+
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineExecutorSpec.Kind;
+import io.justsearch.core.execution.EngineExecutorSpec.Mode;
+
+import io.justsearch.app.services.worker.CancelToken;
+import io.justsearch.app.services.worker.HealthServiceCalls;
+import io.justsearch.app.services.worker.IngestServiceCalls;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
+import io.justsearch.app.services.worker.IpcTelemetry;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.app.services.worker.SearchServiceCalls;
+import io.justsearch.indexerworker.server.WorkerAppServices;
+import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.services.WorkerServiceException;
+import io.justsearch.ipc.IndexingJobsFrame;
+import io.justsearch.ipc.ScanRootProgress;
+import io.justsearch.ipc.ScanMode;
+import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.services.WorkerIngestService;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import io.justsearch.ipc.ScanRootRequest;
+import io.justsearch.ipc.SubscribeIndexingJobsRequest;
+import java.util.Objects;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * The {@link KnowledgeClient} whose calls are method calls (lane F stage A item A6).
+ *
+ * <p>Every call goes straight to the converted worker service in this JVM. What that removes is
+ * the channel: no serialisation, no port, no reconnect, no circuit breaker, no retry policy.
+ * What it must NOT remove is the four operation contracts design §6 names, and each of them has an
+ * explicit home here:
+ *
+ * <ul>
+ *   <li><b>Deadlines.</b> {@code RpcDeadlineCategory} still multiplies the configured base
+ *       deadline; the resulting budget arms a scheduled cancel that flips the call's
+ *       {@link CallContext.CancelSignal} — the same signal the streaming methods already poll —
+ *       and, if the call returns after the budget elapsed, the client raises
+ *       {@link WorkerServiceException.Status#DEADLINE_EXCEEDED}. Before A6 the transport did this;
+ *       the categories would otherwise have become decoration.
+ *   <li><b>Cancellation.</b> A {@link CancelToken} supplied to {@code scanRoot} is wired to the
+ *       same signal, so abandoning an HTTP request still stops the scan.
+ *   <li><b>Bounded work.</b> The {@code FetchDocuments} result-size cap and the batch-size clamp
+ *       stay on {@link KnowledgeClient}, which is where they always belonged.
+ *   <li><b>Flow control.</b> The two streams hand back a handle whose close stops production;
+ *       items A7 and A8 state their bound and its policy.
+ * </ul>
+ *
+ * <p><b>The foreground gauge.</b> {@link ForegroundLoadGate} reads explicit work urgency at the
+ * common unary and streaming lifecycle boundaries. A search that internally reranks is wrapped
+ * once. Work ownership outlives a released caller until every asynchronous owner exits; durable
+ * foreground work holds one increment until completion or waiting-client detachment.
+ */
+public final class EngineKnowledgeClient extends KnowledgeClient {
+
+  private static final Logger log = LoggerFactory.getLogger(EngineKnowledgeClient.class);
+
+  /**
+   * How long a finished scan waits for its already-accepted progress frames to reach the consumer.
+   * Generous on purpose: the alternative to waiting is dropping the terminal event, and a scan ends
+   * once.
+   */
+  private static final long SCAN_DRAIN_TIMEOUT_MS = 30_000L;
+
+  private final java.util.function.Supplier<WorkerAppServices> services;
+  private final ForegroundLoadGate foregroundLoad;
+  private final Runnable requestedRestartAction;
+  private final EngineExecutorRegistry.Registration deadlineRegistration;
+  private final EngineExecutorRegistry.Registration foregroundCallRegistration;
+  private final EngineExecutorRegistry.Registration backgroundCallRegistration;
+  private final EngineExecutorRegistry.Registration foregroundStreamRegistration;
+  private final EngineExecutorRegistry.Registration backgroundStreamRegistration;
+  private final ScheduledExecutorService deadlines;
+  private final ExecutorService foregroundCallThreads;
+  private final ExecutorService backgroundCallThreads;
+  private final ExecutorService foregroundStreamThreads;
+  private final ExecutorService backgroundStreamThreads;
+  private final java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
+      servingLeaseSupplier;
+  private final ThreadLocal<WorkerAppServices> taskServices = new ThreadLocal<>();
+  private final ThreadLocal<CallView> taskServingView = new ThreadLocal<>();
+  private final ThreadLocal<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
+      parentServingLease = new ThreadLocal<>();
+
+  /**
+   * @param services the composed index half supplier: {@code KnowledgeServer} REPLACES its
+   *     {@code WorkerAppServices} on a deferred-runtime upgrade and on dev hot-reload; each
+   *     operation captures one exact serving view before asynchronous work is queued
+   * @param foregroundLoad the gate over the process-wide {@code ForegroundLoad} gauge
+   * @param deadlineMs the base deadline the categories multiply
+   * @param batchSize the per-batch submission clamp
+   * @param telemetry carried through to the status-poll metric; may be null
+   */
+  public EngineKnowledgeClient(
+      EngineExecutorRegistry executors,
+      java.util.function.Supplier<WorkerAppServices> services,
+      ForegroundLoadGate foregroundLoad,
+      long deadlineMs,
+      int batchSize,
+      IpcTelemetry telemetry) {
+    this(executors, services, foregroundLoad, deadlineMs, batchSize, telemetry, () -> {});
+  }
+
+  EngineKnowledgeClient(
+      EngineExecutorRegistry executors,
+      java.util.function.Supplier<WorkerAppServices> services,
+      ForegroundLoadGate foregroundLoad,
+      long deadlineMs,
+      int batchSize,
+      IpcTelemetry telemetry,
+      Runnable requestedRestartAction) {
+    this(executors, services, foregroundLoad, deadlineMs, batchSize, telemetry, requestedRestartAction,
+        new EngineAdmissionController(EngineResourcePolicy.load()));
+  }
+
+  EngineKnowledgeClient(
+      EngineExecutorRegistry executors,
+      java.util.function.Supplier<WorkerAppServices> services,
+      ForegroundLoadGate foregroundLoad, long deadlineMs, int batchSize, IpcTelemetry telemetry,
+      Runnable requestedRestartAction, io.justsearch.app.api.EngineAdmissionService admission) {
+    this(executors, services, foregroundLoad, deadlineMs, batchSize, telemetry, requestedRestartAction,
+        admission, io.justsearch.app.services.worker.WatchedRootsState.load(
+            io.justsearch.configuration.PlatformPaths.resolveDataDir()));
+  }
+
+  EngineKnowledgeClient(EngineExecutorRegistry executors,
+      java.util.function.Supplier<WorkerAppServices> services, ForegroundLoadGate foregroundLoad,
+      long deadlineMs, int batchSize, IpcTelemetry telemetry, Runnable requestedRestartAction,
+      io.justsearch.app.api.EngineAdmissionService admission,
+      io.justsearch.app.services.worker.WatchedRootsState roots) {
+    this(executors, services, foregroundLoad, deadlineMs, batchSize, telemetry,
+        requestedRestartAction, admission, roots, null);
+  }
+
+  EngineKnowledgeClient(EngineExecutorRegistry executors,
+      java.util.function.Supplier<WorkerAppServices> services, ForegroundLoadGate foregroundLoad,
+      long deadlineMs, int batchSize, IpcTelemetry telemetry, Runnable requestedRestartAction,
+      io.justsearch.app.api.EngineAdmissionService admission,
+      io.justsearch.app.services.worker.WatchedRootsState roots,
+      java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
+          servingLeaseSupplier) {
+    super(executors, deadlineMs, batchSize, telemetry, roots);
+    Objects.requireNonNull(executors, "executors");
+    this.admission = Objects.requireNonNull(admission, "admission");
+    this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
+    this.services = Objects.requireNonNull(services, "services");
+    this.servingLeaseSupplier = servingLeaseSupplier;
+    this.foregroundLoad = Objects.requireNonNull(foregroundLoad, "foregroundLoad");
+    ExecutorOwners owners;
+    try {
+      owners = openExecutorOwners(executors);
+    } catch (RuntimeException | Error failure) {
+      closeBaseExecutors();
+      throw failure;
+    }
+    this.deadlineRegistration = owners.deadlineRegistration();
+    this.foregroundCallRegistration = owners.foregroundCallRegistration();
+    this.backgroundCallRegistration = owners.backgroundCallRegistration();
+    this.foregroundStreamRegistration = owners.foregroundStreamRegistration();
+    this.backgroundStreamRegistration = owners.backgroundStreamRegistration();
+    this.deadlines = owners.deadlines();
+    this.foregroundCallThreads = owners.foregroundCallThreads();
+    this.backgroundCallThreads = owners.backgroundCallThreads();
+    this.foregroundStreamThreads = owners.foregroundStreamThreads();
+    this.backgroundStreamThreads = owners.backgroundStreamThreads();
+  }
+
+  private record ExecutorOwners(
+      EngineExecutorRegistry.Registration deadlineRegistration,
+      EngineExecutorRegistry.Registration foregroundCallRegistration,
+      EngineExecutorRegistry.Registration backgroundCallRegistration,
+      EngineExecutorRegistry.Registration foregroundStreamRegistration,
+      EngineExecutorRegistry.Registration backgroundStreamRegistration,
+      ScheduledExecutorService deadlines,
+      ExecutorService foregroundCallThreads,
+      ExecutorService backgroundCallThreads,
+      ExecutorService foregroundStreamThreads,
+      ExecutorService backgroundStreamThreads) {}
+
+  private static ExecutorOwners openExecutorOwners(EngineExecutorRegistry executors) {
+    EngineExecutorRegistry.Limits foreground = executors.limits(Kind.FOREGROUND);
+    EngineExecutorRegistry.Limits background = executors.limits(Kind.BACKGROUND);
+    var registrations = new java.util.ArrayList<EngineExecutorRegistry.Registration>();
+    try {
+      var deadline =
+          scheduled(
+              executors,
+              "engine-knowledge-deadlines",
+              Kind.BACKGROUND,
+              1,
+              background.maxQueue());
+      registrations.add(deadline);
+      var foregroundCall =
+          platform(executors, "engine-knowledge-call-foreground", Kind.FOREGROUND, foreground);
+      registrations.add(foregroundCall);
+      var backgroundCall =
+          platform(executors, "engine-knowledge-call-background", Kind.BACKGROUND, background);
+      registrations.add(backgroundCall);
+      var foregroundStream =
+          platform(executors, "engine-knowledge-stream-foreground", Kind.FOREGROUND, foreground);
+      registrations.add(foregroundStream);
+      var backgroundStream =
+          platform(executors, "engine-knowledge-stream-background", Kind.BACKGROUND, background);
+      registrations.add(backgroundStream);
+
+      ScheduledExecutorService deadlineExecutor =
+          deadline.openScheduled(daemonFactory("engine-call-deadlines"));
+      ExecutorService foregroundCallExecutor =
+          foregroundCall.open(daemonFactory("engine-call-foreground"));
+      ExecutorService backgroundCallExecutor =
+          backgroundCall.open(daemonFactory("engine-call-background"));
+      ExecutorService foregroundStreamExecutor =
+          foregroundStream.open(daemonFactory("engine-stream-foreground"));
+      ExecutorService backgroundStreamExecutor =
+          backgroundStream.open(daemonFactory("engine-stream-background"));
+      return new ExecutorOwners(
+          deadline,
+          foregroundCall,
+          backgroundCall,
+          foregroundStream,
+          backgroundStream,
+          deadlineExecutor,
+          foregroundCallExecutor,
+          backgroundCallExecutor,
+          foregroundStreamExecutor,
+          backgroundStreamExecutor);
+    } catch (RuntimeException | Error failure) {
+      for (int i = registrations.size() - 1; i >= 0; i--) {
+        try {
+          registrations.get(i).close();
+        } catch (RuntimeException cleanupFailure) {
+          failure.addSuppressed(cleanupFailure);
+        }
+      }
+      throw failure;
+    }
+  }
+
+  private static EngineExecutorRegistry.Registration platform(
+      EngineExecutorRegistry executors,
+      String name,
+      Kind kind,
+      EngineExecutorRegistry.Limits limits) {
+    return executors.register(
+        new EngineExecutorSpec(
+            name, kind, Mode.PLATFORM, limits.maxThreads(), limits.maxQueue(), 1));
+  }
+
+  private static EngineExecutorRegistry.Registration scheduled(
+      EngineExecutorRegistry executors, String name, Kind kind, int threads, int queue) {
+    return executors.register(
+        new EngineExecutorSpec(name, kind, Mode.SCHEDULED, threads, queue, 1));
+  }
+
+  private static java.util.concurrent.ThreadFactory daemonFactory(String name) {
+    return runnable -> {
+      Thread thread = new Thread(runnable, name);
+      thread.setDaemon(true);
+      return thread;
+    };
+  }
+
+  private static boolean foreground(EngineContext context) {
+    return context.urgency() == EngineContext.Urgency.FOREGROUND;
+  }
+
+  private ExecutorService callThreads(EngineContext context) {
+    return foreground(context) ? foregroundCallThreads : backgroundCallThreads;
+  }
+
+  private ExecutorService streamThreads(EngineContext context) {
+    return foreground(context) ? foregroundStreamThreads : backgroundStreamThreads;
+  }
+
+  @Override
+  public io.justsearch.app.api.IndexingService.MigrationOutcome startMigration(String reason, EngineContext engineContext) {
+    var outcome = super.startMigration(reason, engineContext);
+    if (outcome.accepted() && outcome.restartRequired()) requestedRestartAction.run();
+    return outcome;
+  }
+
+  @Override
+  public io.justsearch.app.api.IndexingService.MigrationOutcome rollbackMigration(EngineContext engineContext) {
+    var outcome = super.rollbackMigration(engineContext);
+    if (outcome.accepted() && outcome.restartRequired()) requestedRestartAction.run();
+    return outcome;
+  }
+
+  /**
+   * The in-process equivalent of what {@code WorkerServiceCalls.callContext} read off the two
+   * server interceptors. Capture on the entering thread before dispatching a unary worker; its
+   * executor thread does not inherit the caller's OTel span or logging MDC.
+   */
+  private static String currentTraceId() {
+    io.opentelemetry.api.trace.SpanContext spanCtx =
+        io.opentelemetry.api.trace.Span.current().getSpanContext();
+    return spanCtx.isValid() ? spanCtx.getTraceId() : null;
+  }
+
+  /** See {@link #currentTraceId()}. */
+  private static String currentRequestId() {
+    return org.slf4j.MDC.get("request_id");
+  }
+
+  /**
+   * A unary call's deadline: a cancellation signal that flips when the budget elapses, plus the
+   * means to tell afterwards whether it did. The streaming calls do not use this — their deadline
+   * is a cancel with no retro-thrown status, wired through {@link FlowCancelSignal}.
+   */
+  /**
+   * One call's outcome, decided exactly once (review B3).
+   *
+   * <p>The first cut had a race that turned successes into failures: the alarm could fire between
+   * {@code body.apply(...)} returning and {@code expired()} being read, so a call that finished
+   * inside its budget was reported as DEADLINE_EXCEEDED. The states are now a single CAS —
+   * whichever of "the body completed" and "the budget elapsed" gets there first wins, and the other
+   * is a no-op.
+   */
+  private enum Outcome {
+    RUNNING,
+    COMPLETED,
+    EXPIRED,
+    CANCELLED
+  }
+
+  private final io.justsearch.app.api.EngineAdmissionService admission;
+
+  private final class Budget implements AutoCloseable {
+    private final AtomicReference<Outcome> outcome = new AtomicReference<>(Outcome.RUNNING);
+    private final FlowCancelSignal signal = new FlowCancelSignal();
+    private final String traceId = currentTraceId();
+    private final String requestId = currentRequestId();
+    private final io.justsearch.app.api.EngineWorkHandle work;
+    private final Consumer<Throwable> fail;
+    private final io.justsearch.app.api.EngineWorkHandle.Registration cancellation;
+    private final AtomicReference<OwnedCallTask> submission = new AtomicReference<>();
+    private final ScheduledFuture<?> alarm;
+
+    Budget(long budgetMs, io.justsearch.app.api.EngineWorkHandle work, Consumer<Throwable> fail) {
+      this.work = work;
+      this.fail = fail;
+      this.alarm = scheduleDeadline(this::expire, budgetMs);
+      try {
+        this.cancellation = work.onCancel(this::cancel);
+      } catch (RuntimeException | Error failure) {
+        alarm.cancel(false);
+        throw failure;
+      }
+    }
+
+    /** Flips the budget to EXPIRED and signals the worker to unwind. Idempotent. */
+    void expire() {
+      if (outcome.compareAndSet(Outcome.RUNNING, Outcome.EXPIRED)) {
+        fail.accept(new KnowledgeClientException(KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+            "Engine call exceeded its deadline"));
+        signalCancellation();
+        cancelQueuedSubmission();
+      }
+    }
+
+    boolean cancel(String reason) {
+      if (outcome.compareAndSet(Outcome.RUNNING, Outcome.CANCELLED)) {
+        fail.accept(new io.justsearch.app.api.EngineWorkCancelledException(reason));
+        signalCancellation();
+        cancelQueuedSubmission();
+        return true;
+      }
+      return false;
+    }
+
+    private void signalCancellation() {
+      // Lucene may validate its native file lock while a cancelled call releases a searcher.
+      // Interrupting that worker can invalidate the process writer lock on Windows. The caller
+      // receives its terminal result immediately; the issued work retains its view until exit.
+      signal.cancel();
+    }
+
+    boolean startWork() {
+      return outcome.get() == Outcome.RUNNING;
+    }
+
+    void submitted(OwnedCallTask task) {
+      submission.set(task);
+      if (outcome.get() != Outcome.RUNNING) {
+        task.cancelBeforeStart();
+      }
+    }
+
+    private void cancelQueuedSubmission() {
+      OwnedCallTask task = submission.get();
+      if (task != null) task.cancelBeforeStart();
+    }
+
+    /** @return true if this call completed before the budget elapsed. */
+    boolean complete() {
+      return outcome.compareAndSet(Outcome.RUNNING, Outcome.COMPLETED);
+    }
+
+    private io.justsearch.core.execution.EngineTaskLifetime childLifetime;
+
+    CallContext context() {
+      EngineContext engineContext = work.context();
+      return new CallContext(
+          traceId,
+          requestId,
+          signal, engineContext, enqueueProvenance(engineContext),
+          Objects.requireNonNull(childLifetime, "unary childLifetime"));
+    }
+
+    @Override
+    public void close() {
+      alarm.cancel(false);
+      cancellation.close();
+    }
+  }
+
+  /**
+   * A queued call remains an owner of admitted work, even though no worker thread has started it.
+   * The registry cancels queued {@link Future}s during owner shutdown, so this task makes that
+   * cancellation close the work reference immediately. Once {@link #run()} wins, only its actual
+   * exit closes the reference.
+   */
+  private static final class OwnedCallTask implements Runnable, Future<Void> {
+    private static final int QUEUED = 0;
+    private static final int RUNNING = 1;
+    private static final int FINISHED = 2;
+    private static final int CANCELLED = 3;
+
+    private final AtomicInteger state = new AtomicInteger(QUEUED);
+    private final CompletableFuture<Void> completion =
+        new CompletableFuture<>();
+    private final Budget budget;
+    private final io.justsearch.app.api.EngineWorkHandle work;
+    private final Runnable body;
+    private final Runnable releaseServingView;
+    private final AtomicBoolean servingReleased = new AtomicBoolean();
+    private ExecutorService queueOwner;
+
+    private OwnedCallTask(
+        Budget budget, io.justsearch.app.api.EngineWorkHandle work, Runnable body,
+        Runnable releaseServingView) {
+      this.budget = budget;
+      this.work = work;
+      this.body = body;
+      this.releaseServingView = releaseServingView;
+    }
+
+    synchronized void executeOn(ExecutorService executor) {
+      this.queueOwner = executor;
+      if (!isCancelled()) executor.execute(this);
+    }
+
+    @Override
+    public void run() {
+      if (!state.compareAndSet(QUEUED, RUNNING)) return;
+      try {
+        body.run();
+        completion.complete(null);
+      } catch (Throwable failure) {
+        completion.completeExceptionally(failure);
+        if (failure instanceof RuntimeException runtime) throw runtime;
+        if (failure instanceof Error error) throw error;
+        throw new IllegalStateException(failure);
+      } finally {
+        state.set(FINISHED);
+        releaseServingView();
+      }
+    }
+
+    synchronized boolean cancelBeforeStart() {
+      if (!state.compareAndSet(QUEUED, CANCELLED)) return false;
+      try {
+        if (queueOwner instanceof java.util.concurrent.ThreadPoolExecutor pool) {
+          pool.remove(this);
+        }
+        try { work.close(); }
+        finally { releaseServingView(); }
+      } finally {
+        completion.cancel(false);
+      }
+      return true;
+    }
+
+    private void releaseServingView() {
+      if (servingReleased.compareAndSet(false, true)) releaseServingView.run();
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      budget.cancel("engine_shutdown");
+      return cancelBeforeStart() || isCancelled();
+    }
+
+    @Override
+    public boolean isCancelled() {
+      return state.get() == CANCELLED;
+    }
+
+    @Override
+    public boolean isDone() {
+      return completion.isDone();
+    }
+
+    @Override
+    public Void get() throws InterruptedException, java.util.concurrent.ExecutionException {
+      return completion.get();
+    }
+
+    @Override
+    public Void get(long timeout, TimeUnit unit)
+        throws InterruptedException,
+            java.util.concurrent.ExecutionException,
+            java.util.concurrent.TimeoutException {
+      return completion.get(timeout, unit);
+    }
+  }
+
+  /**
+   * Translates the index half's failure vocabulary into the port's (review B1).
+   *
+   * <p>{@code WorkerServiceException} is the right home for the vocabulary — it is a property of
+   * the work — but it lives behind an {@code implementation} edge that {@code ui} cannot name, and
+   * {@code ui} is where the status has to arrive to become an HTTP code. Before this, every worker
+   * error reached the API front as a bare {@code RuntimeException} and fell through to a 500: an
+   * invalid cursor stopped being a 400, a deadline a 504, an unavailable index a 503. Nothing
+   * failed; the answers silently got worse.
+   *
+   * <p>Anything that is NOT a {@code WorkerServiceException} is left alone: a bug in the index half
+   * is not a client-facing status, and dressing it as one would hide it.
+   */
+  private static RuntimeException translate(RuntimeException e) {
+    if (e instanceof WorkerServiceException w) {
+      return new KnowledgeClientException(
+          KnowledgeClientException.Status.valueOf(w.status().name()), w.getMessage(), w);
+    }
+    return e;
+  }
+
+  /** Resolve once per call; runtime replacement briefly publishes no composed services. */
+  private <T> T requireService(Function<WorkerAppServices, T> selector) {
+    return requireService(currentServices(), selector);
+  }
+
+  private <T> T requireService(WorkerAppServices current, Function<WorkerAppServices, T> selector) {
+    if (current == null) {
+      throw translate(WorkerServiceException.unavailable("Index services are being replaced"));
+    }
+    T service = selector.apply(current);
+    if (service == null) {
+      throw translate(WorkerServiceException.unavailable("Index service is unavailable"));
+    }
+    return service;
+  }
+
+  private WorkerAppServices currentServices() {
+    CallView view = taskServingView.get();
+    if (view != null && !view.deferredServices) return view.services();
+    WorkerAppServices captured = taskServices.get();
+    return captured != null ? captured : services.get();
+  }
+
+  private <T> T withTaskView(CallView view, java.util.function.Supplier<T> action) {
+    WorkerAppServices previousServices = taskServices.get();
+    CallView previousView = taskServingView.get();
+    taskServices.set(view.services());
+    taskServingView.set(view);
+    try {
+      return action.get();
+    } finally {
+      if (previousServices == null) taskServices.remove();
+      else taskServices.set(previousServices);
+      if (previousView == null) taskServingView.remove();
+      else taskServingView.set(previousView);
+    }
+  }
+
+  /** Exact physical services captured for one logical operation or asynchronous child. */
+  private static final class CallView {
+    private final WorkerAppServices services;
+    private final io.justsearch.indexerworker.server.KnowledgeServer.ServingLease lease;
+    private final boolean deferredServices;
+    private final AtomicBoolean released = new AtomicBoolean();
+
+    private CallView(WorkerAppServices services) {
+      this(services, false);
+    }
+
+    private CallView(WorkerAppServices services, boolean deferredServices) {
+      this.services = services;
+      this.lease = null;
+      this.deferredServices = deferredServices;
+    }
+
+    private CallView(io.justsearch.indexerworker.server.KnowledgeServer.ServingLease lease) {
+      this.services = Objects.requireNonNull(lease, "lease").services();
+      this.lease = lease;
+      this.deferredServices = false;
+    }
+
+    WorkerAppServices services() { return services; }
+
+    CallView fork() {
+      return lease == null ? new CallView(services, deferredServices) : new CallView(lease.fork());
+    }
+
+    void release() {
+      if (released.compareAndSet(false, true) && lease != null) lease.close();
+    }
+
+    Runnable onRetirement(Runnable listener) {
+      return lease == null ? () -> {} : lease.onRetirement(listener);
+    }
+  }
+
+  <T> T withServingLease(io.justsearch.indexerworker.server.KnowledgeServer.ServingLease lease,
+      java.util.function.Supplier<T> action) {
+    var previous = parentServingLease.get();
+    parentServingLease.set(Objects.requireNonNull(lease, "lease"));
+    try {
+      return action.get();
+    } finally {
+      if (previous == null) parentServingLease.remove();
+      else parentServingLease.set(previous);
+    }
+  }
+
+  private CallView captureCallView() {
+    var parent = parentServingLease.get();
+    if (parent != null) {
+      var child = parent.fork();
+      return new CallView(child);
+    }
+    var task = taskServingView.get();
+    if (task != null) {
+      return task.fork();
+    }
+    if (servingLeaseSupplier == null) return new CallView(services.get());
+    var lease = servingLeaseSupplier.get();
+    return new CallView(lease);
+  }
+
+  @Override
+  public EncoderRuntimeSnapshot getEncoderRuntimeSnapshot(EngineContext engineContext) {
+    CallView view = captureCallView();
+    try {
+      return withTaskView(view, () -> super.getEncoderRuntimeSnapshot(engineContext));
+    } finally {
+      view.release();
+    }
+  }
+
+  /** Coherent committed inputs for the composition root, with the normal call ownership/budget. */
+  io.justsearch.app.api.operations.AppliedIndexGeneration captureAppliedGeneration(
+      EngineContext engineContext) {
+    return withBudget("captureAppliedGeneration", deadline(RpcDeadlineCategory.STANDARD),
+        engineContext, budget -> {
+          WorkerAppServices owner = currentServices();
+          WorkerIngestService ingest = owner == null ? null : owner.ingestService();
+          if (ingest == null) {
+            throw WorkerServiceException.unavailable("Applied generation services are unavailable");
+          }
+          var generation = ingest.captureAppliedGeneration(budget.context());
+          // A real serving lease retains the selected view through actual task exit. Supplier-only
+          // fixture/compatibility calls have no such owner and must still reject a stale rebound.
+          if (taskServingView.get().lease == null && services.get() != owner) {
+            throw WorkerServiceException.aborted("Index runtime changed during applied generation capture");
+          }
+          return generation;
+        });
+  }
+
+  private io.justsearch.app.api.EngineAdmissionException engineLimit() {
+    return new io.justsearch.app.api.EngineAdmissionException(
+        io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
+        admission.retryAfterSeconds());
+  }
+
+  private ScheduledFuture<?> scheduleDeadline(Runnable task, long delayMs) {
+    try {
+      return deadlines.schedule(task, delayMs, TimeUnit.MILLISECONDS);
+    } catch (java.util.concurrent.RejectedExecutionException failure) {
+      throw engineLimit();
+    }
+  }
+
+  /**
+   * Runs one unary call under its budget, and <b>returns at the budget</b> (review B3).
+   *
+   * <p>The first cut armed a cancel and then checked, after the fact, whether the budget had
+   * elapsed — so the CALLER was never released early: a slow search ran to completion and only then
+   * reported DEADLINE_EXCEEDED. That is not what the deadline meant on the wire, where gRPC
+   * completed the caller's call at the deadline while the server unwound on its own. So the body
+   * runs on a call thread and the caller waits with the budget as its timeout; on timeout the
+   * caller is released immediately and the budget's cancel signal tells the worker to stop, which
+   * {@code CallContext.cancelled()} is polled for at every stage boundary.
+   *
+   * <p>The thread hop is the cost of the property. Its foreground/background thread and queue
+   * bounds come from the Engine executor registry; saturation is reported as RESOURCE_EXHAUSTED.
+   */
+  private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
+      Function<Budget, T> body) {
+    var work = admission.attach(engineContext);
+    CallView view;
+    try {
+      view = captureCallView();
+    } catch (RuntimeException | Error failure) {
+      work.close();
+      throw failure;
+    }
+    var pending = new CompletableFuture<T>();
+    var viewReleased = new AtomicBoolean();
+    Runnable releaseView = () -> {
+      if (viewReleased.compareAndSet(false, true)) view.release();
+    };
+    Budget budget;
+    try {
+      budget = new Budget(budgetMs, work, pending::completeExceptionally);
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      work.close();
+      throw failure;
+    }
+    try {
+      OwnedCallTask task = new OwnedCallTask(budget, work, () -> {
+        WorkerAppServices prior = taskServices.get();
+        CallView priorView = taskServingView.get();
+        taskServices.set(view.services());
+        taskServingView.set(view);
+        T result = null;
+        Throwable failure = null;
+        try {
+          if (budget.startWork()) {
+            result = foregroundLoad.callOwned(work, lifetime -> {
+              var childOwnership = lifetime.and(() -> view.fork()::release);
+              budget.childLifetime = new io.justsearch.core.execution.EngineTaskLifetime() {
+                @Override public Runnable retain() { return childOwnership.retain(); }
+                @Override public void onCancel(Runnable handler) {
+                  budget.signal.onCancel(handler);
+                }
+              };
+              return body.apply(budget);
+            });
+          }
+        } catch (Throwable cause) {
+          failure = cause;
+        } finally {
+          try {
+            work.close();
+          } catch (Throwable cleanupFailure) {
+            if (failure == null) failure = cleanupFailure;
+            else failure.addSuppressed(cleanupFailure);
+          } finally {
+            if (prior == null) taskServices.remove();
+            else taskServices.set(prior);
+            if (priorView == null) taskServingView.remove();
+            else taskServingView.set(priorView);
+          }
+        }
+        try {
+          // A successful result must not become visible before its serving-view owner releases A.
+          // A cancelled caller was already completed by Budget and still keeps this view until
+          // the issued worker and its children have actually exited.
+          releaseView.run();
+        } catch (Throwable cleanupFailure) {
+          if (failure == null) failure = cleanupFailure;
+          else failure.addSuppressed(cleanupFailure);
+        }
+        if (budget.complete()) {
+          if (failure == null) pending.complete(result);
+          else pending.completeExceptionally(failure);
+        } else if (failure != null) {
+          log.error("Engine {} worker failed after caller completion", operation, failure);
+        }
+        if (failure instanceof Error error) throw error;
+      }, releaseView);
+      ExecutorService executor = callThreads(work.context());
+      budget.submitted(task);
+      task.executeOn(executor);
+    } catch (java.util.concurrent.RejectedExecutionException e) {
+      OwnedCallTask task = budget.submission.get();
+      if (task == null || !task.isCancelled()) {
+        budget.close();
+        if (task == null) {
+          try { work.close(); }
+          finally { view.release(); }
+        }
+        else task.cancelBeforeStart();
+        throw engineLimit();
+      }
+    }
+    try {
+      // The scheduled budget completes this future before signalling the worker. The work
+      // reference stays with the runnable until it actually exits, even after caller release.
+      return pending.get(budgetMs, TimeUnit.MILLISECONDS);
+    } catch (java.util.concurrent.TimeoutException e) {
+      // An independent wait bound survives scheduler shutdown or a delayed timer thread.
+      budget.expire();
+      return decidedResult(operation, pending);
+    } catch (java.util.concurrent.CancellationException cancelled) {
+      throw cancellationReason(cancelled);
+    } catch (java.util.concurrent.ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException re) {
+        throw translate(re);
+      }
+      if (cause instanceof Error err) {
+        throw err;
+      }
+      throw new KnowledgeClientException(
+          KnowledgeClientException.Status.INTERNAL, operation + " failed: " + cause, cause);
+    } catch (InterruptedException e) {
+      budget.cancel("caller_interrupted");
+      Thread.currentThread().interrupt();
+      // A caller interrupt cannot overwrite an outcome whose CAS already won. join preserves
+      // the interrupt flag while projecting that winner, including a concurrently completed result.
+      return decidedResult(operation, pending);
+    } finally {
+      budget.close();
+    }
+  }
+
+  private static <T> T decidedResult(String operation, CompletableFuture<T> pending) {
+    try {
+      return pending.join();
+    } catch (java.util.concurrent.CancellationException cancelled) {
+      throw cancellationReason(cancelled);
+    } catch (java.util.concurrent.CompletionException failure) {
+      Throwable cause = failure.getCause();
+      if (cause instanceof RuntimeException runtime) throw translate(runtime);
+      if (cause instanceof Error error) throw error;
+      throw new KnowledgeClientException(KnowledgeClientException.Status.INTERNAL,
+          operation + " failed: " + cause, cause);
+    }
+  }
+
+  private static java.util.concurrent.CancellationException cancellationReason(
+      java.util.concurrent.CancellationException cancelled) {
+    // CompletableFuture may copy a CancellationException across threads, retaining the typed
+    // original only as its cause. Preserve the work owner's first reason at the port boundary.
+    if (cancelled.getCause() instanceof io.justsearch.app.api.EngineWorkCancelledException reason) {
+      return reason;
+    }
+    return cancelled;
+  }
+
+  @Override
+  protected <T> T executeSearchRpc(
+      String operation, RpcDeadlineCategory category, Function<SearchServiceCalls, T> rpc,
+      EngineContext engineContext) {
+    // The gate wraps the WORKER's work, not the caller's wait (review B3): when a call times out
+    // the caller is released immediately, and the gauge must not drop until the worker actually
+    // unwinds — otherwise a timed-out search would read as "no foreground load" while it is still
+    // burning CPU, and indexing would un-throttle at exactly the wrong moment. One layer still: a
+    // Search that internally reranks counts once.
+    return withBudget(
+        operation,
+        deadline(category),
+        engineContext,
+        budget -> rpc.apply(new WorkerSearchCalls(requireService(WorkerAppServices::searchService), budget.context())));
+  }
+
+  @Override
+  protected <T> T executeIngestRpc(
+      String operation, RpcDeadlineCategory category, Function<IngestServiceCalls, T> rpc,
+      EngineContext engineContext) {
+    return withBudget(
+        operation,
+        deadline(category),
+        engineContext,
+        budget -> rpc.apply(new WorkerIngestCalls(requireService(WorkerAppServices::ingestService), budget.context())));
+  }
+
+  @Override
+  protected <T> T executeHealthRpc(
+      String operation, long callDeadlineMs, Function<HealthServiceCalls, T> rpc,
+      EngineContext engineContext) {
+    // Review B3: the health call was the one that passed no context at all. WorkerHealthService
+    // does not read one today, but a call that cannot be cancelled is a call the budget cannot
+    // bound, and the health poll is exactly the call a wedged index half hangs.
+    return withBudget(
+        operation,
+        callDeadlineMs,
+        engineContext,
+        budget -> rpc.apply(new WorkerHealthCalls(requireService(WorkerAppServices::healthService), budget.context())));
+  }
+
+  /**
+   * Turns a saturated urgency-specific stream pool into an answer.
+   *
+   * <p>Bounding the pool (S4) is only half the change: a {@code RejectedExecutionException} escaping
+   * as itself would reach the API front as a bare runtime failure and become a 500 with a stack
+   * trace about thread pools. RESOURCE_EXHAUSTED is the same status the call pool already reports
+   * for the same condition, it maps to 429, and it tells the caller the true thing — try again,
+   * this engine is already carrying as many streams as it will carry.
+   */
+  private <T> T refuseIfSaturated(java.util.function.Supplier<T> body) {
+    try {
+      return body.get();
+    } catch (java.util.concurrent.RejectedExecutionException e) {
+      throw engineLimit();
+    }
+  }
+
+  /**
+   * Submits a stream's producer, closing the flow if the pool has no room for it. Separate from
+   * {@link #refuseIfSaturated} because the failure has a side effect to undo, not just a status to
+   * report.
+   */
+  private void submitProducerOrClose(BoundedHandoff<?> flow, Runnable producer,
+      io.justsearch.app.api.EngineWorkHandle work, CallView view) {
+    try {
+      executeOwnedStream(work, producer, false, view);
+    } catch (java.util.concurrent.RejectedExecutionException e) {
+      flow.close();
+      throw engineLimit();
+    }
+  }
+
+  @Override
+  public void reindexPersistedRoots(EngineContext engineContext) {
+    try (var batch = admission.attach(engineContext)) {
+      super.reindexPersistedRoots(batch.context());
+    }
+  }
+
+  @Override
+  public void reindexWatchedRoots(boolean force, EngineContext engineContext) {
+    try (var batch = admission.attach(engineContext)) {
+      super.reindexWatchedRoots(force, batch.context());
+    }
+  }
+
+  @Override
+  protected void executeRootWalk(ExecutorService executor, Consumer<EngineContext> body,
+      EngineContext engineContext) {
+    scheduleRootWalk(executor, body, engineContext, null);
+  }
+
+  private CompletionStage<Void> scheduleRootWalk(ExecutorService executor, Consumer<EngineContext> body,
+      EngineContext engineContext, CancelToken cancellation) {
+    CallView view = captureCallView();
+    try {
+      return scheduleRootWalk(executor, body, engineContext, cancellation, view);
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
+  }
+
+  private CompletionStage<Void> scheduleRootWalk(ExecutorService executor, Consumer<EngineContext> body,
+      EngineContext engineContext, CancelToken cancellation, CallView view) {
+    io.justsearch.app.api.EngineWorkHandle owner = null;
+    OwnedStreamTask task = null;
+    try {
+      owner = admission.attach(engineContext);
+      var acceptedOwner = owner;
+      var trace = io.opentelemetry.context.Context.current();
+      String requestId = currentRequestId();
+      task = new OwnedStreamTask(owner, owner, () -> {
+        String previousRequest = currentRequestId();
+        try (var _ = trace.makeCurrent()) {
+          if (requestId == null) org.slf4j.MDC.remove("request_id");
+          else org.slf4j.MDC.put("request_id", requestId);
+          body.accept(acceptedOwner.context());
+        } finally {
+          if (previousRequest == null) org.slf4j.MDC.remove("request_id");
+          else org.slf4j.MDC.put("request_id", previousRequest);
+        }
+      }, false, view);
+      task.armCancellation();
+      var scheduledTask = task;
+      if (cancellation != null) cancellation.onCancel(() -> scheduledTask.cancel(false));
+      task.executeOn(executor);
+      return task.completion.minimalCompletionStage();
+    } catch (RuntimeException | Error failure) {
+      if (task != null) task.cancelAfterSchedulingFailure(failure);
+      else {
+        if (owner != null) owner.close();
+        view.release();
+      }
+      if (failure instanceof java.util.concurrent.RejectedExecutionException) throw engineLimit();
+      throw failure;
+    }
+  }
+
+  private CompletionStage<Void> executeOwnedStream(io.justsearch.app.api.EngineWorkHandle work, Runnable body,
+      boolean countForeground) {
+    return executeOwnedStream(work, body, countForeground, captureCallView());
+  }
+
+  private CompletionStage<Void> executeOwnedStream(io.justsearch.app.api.EngineWorkHandle work, Runnable body,
+      boolean countForeground, CallView view) {
+    final io.justsearch.app.api.EngineWorkHandle owner;
+    try {
+      owner = work.retain();
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
+    var task = new OwnedStreamTask(work, owner, body, countForeground, view);
+    try {
+      ExecutorService executor = streamThreads(work.context());
+      task.armCancellation();
+      task.executeOn(executor);
+    } catch (RuntimeException | Error failure) {
+      task.cancelAfterSchedulingFailure(failure);
+      throw failure;
+    }
+    return task.completion.minimalCompletionStage();
+  }
+
+  /** A queued stream or root walk releases its retained work if it never starts. */
+  private final class OwnedStreamTask implements Runnable, Future<Void> {
+    private static final int QUEUED = 0;
+    private static final int RUNNING = 1;
+    private static final int FINISHED = 2;
+    private static final int CANCELLED = 3;
+
+    private final AtomicInteger state = new AtomicInteger(QUEUED);
+    private final CompletableFuture<Void> completion =
+        new CompletableFuture<>();
+    private final io.justsearch.app.api.EngineWorkHandle work;
+    private final io.justsearch.app.api.EngineWorkHandle owner;
+    private final Runnable body;
+    private final boolean countForeground;
+    private final CallView view;
+    private ExecutorService queueOwner;
+    private final AtomicReference<io.justsearch.app.api.EngineWorkHandle.Registration> cancellation =
+        new AtomicReference<>();
+
+    private OwnedStreamTask(
+        io.justsearch.app.api.EngineWorkHandle work,
+        io.justsearch.app.api.EngineWorkHandle owner,
+        Runnable body,
+        boolean countForeground,
+        CallView view) {
+      this.work = work;
+      this.owner = owner;
+      this.body = body;
+      this.countForeground = countForeground;
+      this.view = Objects.requireNonNull(view, "view");
+    }
+
+    synchronized void executeOn(ExecutorService executor) {
+      this.queueOwner = executor;
+      if (!isCancelled()) executor.execute(this);
+    }
+
+    void armCancellation() {
+      var registration = work.onCancel(reason -> cancel(false));
+      cancellation.set(registration);
+      if (isDone()) registration.close();
+    }
+
+    @Override
+    public void run() {
+      if (!state.compareAndSet(QUEUED, RUNNING)) return;
+      Throwable failure = null;
+      WorkerAppServices priorServices = taskServices.get();
+      CallView priorView = taskServingView.get();
+      taskServices.set(view.services());
+      taskServingView.set(view);
+      try {
+        if (countForeground) foregroundLoad.run(owner, body);
+        else body.run();
+      } catch (Throwable cause) {
+        failure = cause;
+      } finally {
+        if (priorServices == null) taskServices.remove();
+        else taskServices.set(priorServices);
+        if (priorView == null) taskServingView.remove();
+        else taskServingView.set(priorView);
+        state.set(FINISHED);
+        failure = cleanup(failure);
+      }
+      if (failure == null) {
+        completion.complete(null);
+      } else {
+        completion.completeExceptionally(failure);
+        if (failure instanceof Error error) throw error;
+        // This Future owns task failure and cleanup. Re-throwing an operation-level failure
+        // would also reach the process-wide uncaught handler and kill unrelated Engine work.
+        log.error("Owned Engine task failed; its completion retains the failure", failure);
+      }
+    }
+
+    private Throwable cleanup(Throwable failure) {
+      var registration = cancellation.getAndSet(null);
+      try {
+        if (registration != null) registration.close();
+      } catch (Throwable cause) {
+        failure = combineCleanupFailure(failure, cause);
+      }
+      try {
+        owner.close();
+      } catch (Throwable cause) {
+        failure = combineCleanupFailure(failure, cause);
+      }
+      try {
+        view.release();
+      } catch (Throwable cause) {
+        failure = combineCleanupFailure(failure, cause);
+      }
+      return failure;
+    }
+
+    private Throwable combineCleanupFailure(Throwable failure, Throwable cause) {
+      if (failure == null) return cause;
+      if (failure == cause) return failure;
+      if (cause instanceof Error && !(failure instanceof Error)) {
+        cause.addSuppressed(failure);
+        return cause;
+      }
+      failure.addSuppressed(cause);
+      return failure;
+    }
+
+    @Override
+    public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+      if (!state.compareAndSet(QUEUED, CANCELLED)) return false;
+      Throwable failure = null;
+      try {
+        if (queueOwner instanceof java.util.concurrent.ThreadPoolExecutor pool) pool.remove(this);
+      } catch (Throwable cause) {
+        failure = cause;
+      }
+      failure = cleanup(failure);
+      if (failure == null) completion.cancel(false);
+      else completion.completeExceptionally(failure);
+      return true;
+    }
+
+    void cancelAfterSchedulingFailure(Throwable schedulingFailure) {
+      cancel(false);
+      if (!completion.isCompletedExceptionally() || completion.isCancelled()) return;
+      try {
+        completion.join();
+      } catch (java.util.concurrent.CompletionException stopped) {
+        Throwable cleanupFailure = stopped.getCause();
+        if (cleanupFailure != schedulingFailure) cleanupFailure.addSuppressed(schedulingFailure);
+        if (cleanupFailure instanceof RuntimeException runtime) throw runtime;
+        if (cleanupFailure instanceof Error error) throw error;
+        throw new IllegalStateException(cleanupFailure);
+      }
+    }
+
+    @Override
+    public boolean isCancelled() {
+      return state.get() == CANCELLED;
+    }
+
+    @Override
+    public boolean isDone() {
+      return completion.isDone();
+    }
+
+    @Override
+    public Void get() throws InterruptedException, java.util.concurrent.ExecutionException {
+      return completion.get();
+    }
+
+    @Override
+    public Void get(long timeout, TimeUnit unit)
+        throws InterruptedException,
+            java.util.concurrent.ExecutionException,
+            java.util.concurrent.TimeoutException {
+      return completion.get(timeout, unit);
+    }
+  }
+
+  /** One accepted child on the existing bounded walker; completion means both owned tasks exited. */
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
+      String childKey, long epoch, EngineContext context, CancelToken cancellation) {
+    CallView view = captureCallView();
+    try {
+      return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
+          WorkerIngestService.RecordedScanMode.STREAMING, view);
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
+  }
+
+  /** One captured epoch spans every frozen root; each stage waits for its actual walk and delivery exit. */
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateCapturedRoots(RecordedRootPlan plan,
+      String operationKey, long epoch, EngineContext context, CancelToken cancellation) {
+    Objects.requireNonNull(plan, "plan");
+    Objects.requireNonNull(cancellation, "cancellation");
+    var owner = admission.attach(context);
+    final CallView parentView;
+    try {
+      parentView = captureCallView();
+    } catch (RuntimeException | Error failure) {
+      try { owner.close(); }
+      catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+      throw failure;
+    }
+    try {
+      CompletionStage<JobQueue.WalkEnumerationOutcome> result = CompletableFuture.completedFuture(
+          cancellation.isCancelled() ? JobQueue.WalkEnumerationOutcome.CANCELLED : JobQueue.WalkEnumerationOutcome.COMPLETE);
+      for (var root : plan.roots()) {
+        var singleRoot = new RecordedRootPlan(plan.generation(), List.of(root));
+        result = result.thenCompose(outcome -> {
+          if (outcome != JobQueue.WalkEnumerationOutcome.COMPLETE) return CompletableFuture.completedFuture(outcome);
+          if (cancellation.isCancelled()) return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
+          return enumerateRecordedRoot(singleRoot, operationKey, epoch, owner.context(), cancellation,
+              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork());
+        });
+      }
+      return result.whenComplete((ignored, failure) -> {
+        try {
+          owner.close();
+        } finally {
+          parentView.release();
+        }
+      });
+    } catch (RuntimeException | Error failure) {
+      try { owner.close(); }
+      catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+      parentView.release();
+      throw failure;
+    }
+  }
+
+  private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
+      String childKey, long epoch, EngineContext context, CancelToken cancellation,
+      WorkerIngestService.RecordedScanMode mode, CallView view) {
+    try {
+    Objects.requireNonNull(plan, "plan");
+    Objects.requireNonNull(cancellation, "cancellation");
+    if (plan.roots().size() != 1) {
+      view.release();
+      throw new IllegalArgumentException("Recorded producer requires one root");
+    }
+    var root = plan.roots().getFirst();
+    var builder = ScanRootRequest.newBuilder().setRootPath(root.path().toString())
+        .setMode(root.force() ? ScanMode.SCAN_MODE_FORCE_REINDEX : ScanMode.SCAN_MODE_INITIAL)
+        .addAllExcludeGlobs(root.excludePatterns());
+    if (root.collection() != null) builder.setCollection(root.collection());
+    var request = builder.build();
+    var recorded = new WorkerIngestService.RecordedRootScan(request, childKey, epoch,
+        plan.generation(), root.singleFile(), root.excludedSubtrees(), mode);
+    var delivery = new AtomicReference<CompletionStage<Void>>(CompletableFuture.completedFuture(null));
+    var outcome = new AtomicReference<>(JobQueue.WalkEnumerationOutcome.FAILED);
+    var walk = scheduleRootWalk(rootWalkExecutor(), ownedContext -> {
+      try (var work = admission.attach(ownedContext)) {
+        var terminal = foregroundLoad.call(work, () ->
+            scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery));
+        outcome.set(cancellation.isCancelled() || "CLIENT_CANCELLED".equals(terminal.getTerminalReasonCode())
+            ? JobQueue.WalkEnumerationOutcome.CANCELLED
+            : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
+                ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
+      }
+    }, context, cancellation, view);
+    // handle + thenCompose waits for delivery even when the walk failed; allOf with a separately
+    // captured default would miss a delivery task scheduled after the producer returned.
+    return walk.handle((ignored, failure) -> failure).thenCompose(walkFailure ->
+        delivery.get().handle((ignored, deliveryFailure) -> {
+          if (walkFailure != null) {
+            if (deliveryFailure != null && walkFailure != deliveryFailure) walkFailure.addSuppressed(deliveryFailure);
+            throw new java.util.concurrent.CompletionException(walkFailure);
+          }
+          if (deliveryFailure != null) throw new java.util.concurrent.CompletionException(deliveryFailure);
+          return outcome.get();
+        }));
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
+  }
+
+  @Override
+  protected ScanRootProgress executeScanRoot(
+      ScanRootRequest request, CancelToken cancelToken, Consumer<ScanRootProgress> progressConsumer,
+      EngineContext engineContext) {
+    try (var work = admission.attach(engineContext)) {
+      CallView view = captureCallView();
+      try {
+        return withTaskView(view,
+            () -> foregroundLoad.call(work,
+                () -> scanRootWork(request, cancelToken, progressConsumer, work)));
+      } finally {
+        view.release();
+      }
+    }
+  }
+
+  private ScanRootProgress scanRootWork(ScanRootRequest request, CancelToken cancelToken,
+      Consumer<ScanRootProgress> progressConsumer, io.justsearch.app.api.EngineWorkHandle work) {
+    return scanRootWork(request, cancelToken, progressConsumer, work, null, null);
+  }
+
+  private ScanRootProgress scanRootWork(ScanRootRequest request, CancelToken cancelToken,
+      Consumer<ScanRootProgress> progressConsumer, io.justsearch.app.api.EngineWorkHandle work,
+      WorkerIngestService.RecordedRootScan recorded,
+      AtomicReference<CompletionStage<Void>> deliveryExit) {
+    String traceId = currentTraceId();
+    String requestId = currentRequestId();
+    // Keep progress delivery outside the walker thread. The recorded operation coordinator
+    // persists progress at the sink; the bounded handoff controls backpressure and exposes
+    // delivery completion separately from producer exit.
+    AtomicReference<ScanRootProgress> last = new AtomicReference<>();
+    AtomicReference<Throwable> deliveryFailure = new AtomicReference<>();
+    BoundedHandoff<ScanRootProgress> flow =
+        refuseIfSaturated(
+            () ->
+                new BoundedHandoff<>(
+                    "scan-root-flow",
+                    event -> {
+                      last.set(event);
+                      progressConsumer.accept(event);
+                    },
+                    deliveryFailure::set,
+                    body -> {
+                      var exit = executeOwnedStream(work, body, false);
+                      if (deliveryExit != null) deliveryExit.set(exit);
+                    },
+                    // BLOCK: the producer is the walker thread, which holds a directory iterator
+                    // and nothing else. Pausing it pauses this scan and nothing else — the
+                    // backpressure the wire used to apply. Compare subscribeIndexingJobs, whose
+                    // producer holds a lock somebody else needs.
+                    BoundedHandoff.Backpressure.BLOCK));
+
+    // Cancellation, in the shape WorkerScanOps already polls: it checks `ctx.cancelled()` per file
+    // and per directory, so a cancel lands within a file — well inside the 100-file progress tick
+    // the item asks for.
+    FlowCancelSignal cancel = new FlowCancelSignal();
+    var deadlineExpired = new AtomicBoolean();
+    try (flow) {
+      flow.onClose(cancel::cancel);
+      try (var _ = work.onCancel(reason -> cancel.cancel())) {
+        if (cancelToken != null) {
+          cancelToken.onCancel(cancel::cancel);
+          if (cancelToken.isCancelled()) {
+            cancel.cancel();
+          }
+        }
+
+        // The scan's deadline is a cancel, not a retro-thrown status: a stream that outruns its budget
+        // has to STOP, and the terminal event the walker then emits is the honest answer. This is the
+        // same LONG_RUNNING category the wire applied.
+        ScheduledFuture<?> alarm =
+            scheduleDeadline(() -> {
+              deadlineExpired.set(true);
+              cancel.cancel();
+            }, deadline(RpcDeadlineCategory.LONG_RUNNING));
+        try {
+          Consumer<ScanRootProgress> sink = event -> {
+            if (!flow.publish(event)) cancel.cancel();
+          };
+          var call = new CallContext(traceId, requestId, cancel, work.context(),
+              enqueueProvenance(work.context()), () -> work.retain()::close);
+          var service = requireService(WorkerAppServices::ingestService);
+          try {
+            if (recorded == null) service.scanRoot(request, sink, call);
+            else service.scanRecordedRoot(recorded, sink, call);
+          } catch (WorkerServiceException cancelled) {
+            // The alarm can fire before service entry. Preserve the direct service's CANCELLED
+            // refusal, but let this recorded deadline reach the normal actual-exit projection.
+            if (recorded == null || !deadlineExpired.get()
+                || cancelled.status() != WorkerServiceException.Status.CANCELLED) throw cancelled;
+          }
+        } finally {
+          alarm.cancel(false);
+          // The walk has ended; let the frames it already handed over reach the consumer before the
+          // flow closes, or the terminal event is exactly what gets dropped.
+          if (!flow.drainAndClose(SCAN_DRAIN_TIMEOUT_MS)) {
+            // Review S3: the return value was being discarded, so a scan whose tail was dropped
+            // reported the same success as one that delivered everything — and the frames most likely
+            // to be in that tail are the terminal event and the final counts, i.e. exactly the ones the
+            // caller reasons about. Recorded as a delivery failure, which the check below raises.
+            deliveryFailure.compareAndSet(
+                null,
+                new IllegalStateException(
+                    "scan progress did not drain within " + SCAN_DRAIN_TIMEOUT_MS + "ms"));
+          }
+        }
+      }
+    }
+
+    work.cancellationReason().ifPresent(reason -> {
+      throw new io.justsearch.app.api.EngineWorkCancelledException(reason);
+    });
+
+    Throwable failed = deliveryFailure.get();
+    if (failed != null) {
+      io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(failed);
+      io.justsearch.core.execution.EngineFutures.rethrowCancellation(failed);
+      throw WorkerServiceException.internal("scanRoot progress delivery failed: " + failed);
+    }
+    // Recorded completion cannot turn a late clean frame into success after its deadline fired.
+    if (recorded != null && deadlineExpired.get()) return scanCancelledEvent();
+    ScanRootProgress terminal = last.get();
+    if (terminal != null) {
+      // The worker already stamps CLIENT_CANCELLED on its own terminal event when it observes the
+      // cancel, so a synthetic one here would be a second terminal event for the same scan.
+      return terminal;
+    }
+    ScanRootProgress synthesised =
+        cancel.isCancelled() ? scanCancelledEvent() : scanEmptyStreamEvent();
+    progressConsumer.accept(synthesised);
+    return synthesised;
+  }
+
+  @Override
+  public IndexingJobsStream subscribeIndexingJobs(
+      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted, EngineContext engineContext) {
+    try (var work = admission.attach(engineContext)) {
+      return subscribeIndexingWork(onFrame, onError, work);
+    }
+  }
+
+  private IndexingJobsStream subscribeIndexingWork(Consumer<IndexingJobsFrame> onFrame,
+      Consumer<Throwable> onError, io.justsearch.app.api.EngineWorkHandle work) {
+    // Legacy supplier-only clients may block during service selection. Do that on the producer
+    // thread, after cancellation is registered. Production serving leases are captured here.
+    CallView view = servingLeaseSupplier == null
+        ? new CallView(null, true) : captureCallView();
+    String traceId = currentTraceId();
+    String requestId = currentRequestId();
+    // Item A7: a bounded hand-off between the change feed's dispatch thread and the SSE fan-out.
+    // Without it the fan-out would run on the queue writer's thread, so a slow HTTP client
+    // would pace the indexing loop — the backpressure the Netty send buffer used to absorb.
+    // FAIL_FAST, and this is the review's B4 finding rather than a tuning choice. The producer
+    // that ends up inside publish() is not a thread of ours: IndexingJobsChangeStream dispatches
+    // deltas after JDBC commit and claim bookkeeping, on the thread that mutated the jobs table, and
+    // it is holding SqliteJobQueue's single write lock for the whole call. A blocking offer there
+    // stops the job queue outright — no enqueue, no dequeue, no markDone — so one browser tab that
+    // stopped reading its SSE stream would halt indexing for the entire machine for five seconds
+    // per frame. The flow fails instead; the bridge re-subscribes and gets a fresh snapshot.
+    final BoundedHandoff<IndexingJobsFrame> flow;
+    try {
+      flow =
+          refuseIfSaturated(
+              () ->
+                  indexingJobsHandoff(
+                      onFrame,
+                      onError,
+                      body -> executeOwnedStream(work, body, true, view.fork())));
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
+    try {
+      FlowCancelSignal cancel = new FlowCancelSignal();
+      var subscriptionOwner = work.retain();
+      var registration = new AtomicReference<io.justsearch.app.api.EngineWorkHandle.Registration>();
+      var retirementListener = new AtomicReference<Runnable>();
+      Runnable closedListener = () -> {};
+      flow.onClose(() -> {
+        try {
+          cancel.cancel();
+        } finally {
+          try {
+            var callback = registration.get();
+            if (callback != null) callback.close();
+          } finally {
+            try { subscriptionOwner.close(); }
+            finally {
+              try {
+                Runnable remove = retirementListener.getAndSet(closedListener);
+                if (remove != null) remove.run();
+              } finally { view.release(); }
+            }
+          }
+        }
+      });
+      Runnable removeRetirementListener = view.onRetirement(() ->
+          flow.fail(WorkerServiceException.unavailable("Index serving view retired")));
+      if (!retirementListener.compareAndSet(null, removeRetirementListener)) {
+        removeRetirementListener.run();
+      }
+      var cancellation = work.onCancel(reason ->
+          flow.fail(new io.justsearch.app.api.EngineWorkCancelledException(reason)));
+      registration.set(cancellation);
+      if (cancel.isCancelled()) cancellation.close();
+      if (cancel.isCancelled()) return flow::close;
+      CallContext ctx = new CallContext(traceId, requestId, cancel,
+          work.context(), enqueueProvenance(work.context()), () -> work.retain()::close);
+      // If the pool refuses the PRODUCER after the flow's delivery thread was accepted, the flow
+      // must be closed on the way out: leaving it open would leak a delivery thread that polls an
+      // empty queue for the life of the process, for a subscription that never started.
+      submitProducerOrClose(
+          flow,
+          () -> {
+            try {
+              WorkerIngestService ingest = requireService(WorkerAppServices::ingestService);
+              ingest.subscribeIndexingJobs(
+                      SubscribeIndexingJobsRequest.newBuilder().build(),
+                      frame -> {
+                        if (!flow.publish(frame)) {
+                          // Closed, or the consumer stopped draining: stop the producer. The worker
+                          // reads this through ctx.cancelled() on its next delta and closes its
+                          // change-feed subscription.
+                          cancel.cancel();
+                        }
+                      },
+                      ctx);
+              // subscribeIndexingJobs RETURNS WHILE THE STREAM IS STILL OPEN — it registers a
+              // change-feed subscription whose deltas arrive later, on the feed's own threads. So a
+              // normal return is NOT completion, and calling onCompleted here would tell the bridge
+              // the producer had closed the stream while frames were still arriving.
+            } catch (RuntimeException | Error e) {
+              flow.fail(e);
+              if (e instanceof Error error) throw error;
+            }
+          }, work, view.fork());
+      // onCompleted has no producer in process, deliberately: the change-feed subscription lives
+      // until it is cancelled, so "the producer closed the stream" is a wire-only event (a server
+      // shutting down its call). The caller's close() is the only way this flow ends, and the caller
+      // already knows it closed it.
+      return () -> {
+        flow.close();
+        cancel.cancel();
+      };
+    } catch (RuntimeException | Error failure) {
+      flow.close();
+      view.release();
+      throw failure;
+    }
+  }
+
+  static BoundedHandoff<IndexingJobsFrame> indexingJobsHandoff(
+      Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError,
+      java.util.concurrent.Executor delivery) {
+    return new BoundedHandoff<>("indexing-jobs-flow", onFrame, onError, delivery,
+        BoundedHandoff.Backpressure.FAIL_FAST, EngineKnowledgeClient::indexingJobsPath,
+        (previous, latest) -> {
+          // An unobserved INSERT followed by UPDATE must still introduce the row to listeners.
+          if (previous.getDelta().hasInsert() && latest.getDelta().hasUpdate()) {
+            return latest.toBuilder().setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder()
+                .setInsert(latest.getDelta().getUpdate())).build();
+          }
+          return latest;
+        });
+  }
+
+  private static String indexingJobsPath(IndexingJobsFrame frame) {
+    if (!frame.hasDelta()) return null;
+    return switch (frame.getDelta().getChangeCase()) {
+      case INSERT -> frame.getDelta().getInsert().getPathHash();
+      case UPDATE -> frame.getDelta().getUpdate().getPathHash();
+      case DELETE_PATH_HASH -> frame.getDelta().getDeletePathHash();
+      case CHANGE_NOT_SET -> null;
+    };
+  }
+
+  private static JobQueue.EnqueueProvenance enqueueProvenance(
+      EngineContext context) {
+    return new JobQueue.EnqueueProvenance(
+        io.justsearch.app.services.intent.EngineProvenance.originator(context), context.transport());
+  }
+
+  @Override
+  protected void closeTransport() {
+    Throwable failure = null;
+    for (var registration : List.of(foregroundStreamRegistration,
+        backgroundStreamRegistration, foregroundCallRegistration, backgroundCallRegistration,
+        deadlineRegistration)) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        if (failure == null) failure = cleanupFailure;
+        else if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
+      }
+    }
+    if (failure instanceof Error error) throw error;
+    if (failure instanceof RuntimeException runtime) throw runtime;
+    log.debug("Engine knowledge client call scheduler stopped");
+  }
+}

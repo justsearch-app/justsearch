@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.ipc.FetchDocumentSliceRequest;
 import io.justsearch.ipc.FetchDocumentSliceResponse;
 import io.justsearch.ipc.FetchDocumentsRequest;
@@ -31,7 +33,7 @@ import java.util.Set;
  * Search, suggest, fetch, and RAG context RPC operations.
  *
  * <p>Each method builds a proto request and delegates to the {@link SearchRpcExecutor} for circuit
- * breaker, deadline, and transport handling. Extracted from {@link RemoteKnowledgeClient}.
+ * breaker, deadline, and transport handling. Extracted from {@link KnowledgeClient}.
  */
 final class SearchRpcOps {
 
@@ -50,8 +52,8 @@ final class SearchRpcOps {
      * @param limit maximum results to return
      * @return search response
      */
-    SearchResponse search(String query, int limit) {
-        return search(query, limit, PipelineConfigs.TEXT);
+    SearchResponse search(String query, int limit, EngineContext engineContext) {
+        return search(query, limit, PipelineConfigs.TEXT, engineContext);
     }
 
     /**
@@ -62,13 +64,13 @@ final class SearchRpcOps {
      * @param pipeline the pipeline configuration
      * @return search response
      */
-    SearchResponse search(String query, int limit, PipelineConfig pipeline) {
+    SearchResponse search(String query, int limit, PipelineConfig pipeline, EngineContext engineContext) {
         SearchRequest request = SearchRequest.newBuilder()
                 .setQuery(query)
                 .setLimit(limit)
                 .setPipeline(pipeline)
                 .build();
-        return search(request);
+        return search(request, engineContext);
     }
 
     /**
@@ -77,12 +79,12 @@ final class SearchRpcOps {
      * <p>This is used by the Head HTTP API to forward structured filters/facets/projection to the
      * Worker.
      */
-    SearchResponse search(SearchRequest request) {
+    SearchResponse search(SearchRequest request, EngineContext engineContext) {
         SearchRequest req = request == null ? SearchRequest.newBuilder().build() : request;
         return rpc.execute(
                 "search",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.search(req));
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                stub -> stub.search(req), engineContext);
     }
 
     /**
@@ -92,7 +94,7 @@ final class SearchRpcOps {
      * @param limit maximum results to return
      * @return search response
      */
-    SearchResponse searchVector(List<Float> queryVector, int limit) {
+    SearchResponse searchVector(List<Float> queryVector, int limit, EngineContext engineContext) {
         SearchRequest request = SearchRequest.newBuilder()
                 .addAllVector(queryVector)
                 .setLimit(limit)
@@ -100,8 +102,8 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "searchVector",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.search(request));
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                stub -> stub.search(request), engineContext);
     }
 
     /**
@@ -111,15 +113,15 @@ final class SearchRpcOps {
      * @param limit maximum suggestions to return
      * @return suggest response
      */
-    SuggestResponse suggest(String query, int limit) {
+    SuggestResponse suggest(String query, int limit, EngineContext engineContext) {
         SuggestRequest request = SuggestRequest.newBuilder()
                 .setQuery(query)
                 .setLimit(limit)
                 .build();
         return rpc.execute(
                 "suggest",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.suggest(request));
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                stub -> stub.suggest(request), engineContext);
     }
 
     // ========== Document Fetching ==========
@@ -144,12 +146,12 @@ final class SearchRpcOps {
      * @param limit max IDs to return (0 → default 1000 on the Worker)
      * @return response with doc IDs, total count, and timing
      */
-    ListAllDocumentIdsResponse listAllDocumentIds(int offset, int limit) {
-        return listAllDocumentIds(offset, limit, "");
+    ListAllDocumentIdsResponse listAllDocumentIds(int offset, int limit, EngineContext engineContext) {
+        return listAllDocumentIds(offset, limit, "", engineContext);
     }
 
     ListAllDocumentIdsResponse listAllDocumentIds(
-            int offset, int limit, String snapshotToken) {
+            int offset, int limit, String snapshotToken, EngineContext engineContext) {
         ListAllDocumentIdsRequest request =
                 ListAllDocumentIdsRequest.newBuilder()
                         .setOffset(offset)
@@ -158,27 +160,27 @@ final class SearchRpcOps {
                         .build();
         return rpc.execute(
                 "listAllDocumentIds",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.listAllDocumentIds(request));
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                stub -> stub.listAllDocumentIds(request), engineContext);
     }
 
-    FetchDocumentsResponse fetchDocuments(List<String> docIds) {
+    FetchDocumentsResponse fetchDocuments(List<String> docIds, EngineContext engineContext) {
         FetchDocumentsRequest request = FetchDocumentsRequest.newBuilder()
                 .addAllDocIds(docIds)
                 .build();
         return rpc.execute(
                 "fetchDocuments",
-                RemoteKnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
-                stub -> stub.fetchDocuments(request));
+                KnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
+                stub -> stub.fetchDocuments(request), engineContext);
     }
 
     /**
      * Fetches a slice of extracted/indexed document text from the Worker via gRPC.
      *
-     * <p>Unlike {@link #fetchDocuments(List)}, this does not apply a fixed-size trim; instead it
+     * <p>Unlike {@link #fetchDocuments(List, EngineContext)}, this does not apply a fixed-size trim; instead it
      * pages by (offsetChars, maxChars) with a server-side cap.
      */
-    FetchDocumentSliceResponse fetchDocumentSlice(String docId, int offsetChars, int maxChars) {
+    FetchDocumentSliceResponse fetchDocumentSlice(String docId, int offsetChars, int maxChars, EngineContext engineContext) {
         FetchDocumentSliceRequest request = FetchDocumentSliceRequest.newBuilder()
                 .setDocId(docId == null ? "" : docId)
                 .setOffsetChars(Math.max(0, offsetChars))
@@ -186,8 +188,8 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "fetchDocumentSlice",
-                RemoteKnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
-                stub -> stub.fetchDocumentSlice(request));
+                KnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
+                stub -> stub.fetchDocumentSlice(request), engineContext);
     }
 
     // ========== RAG Context ==========
@@ -203,8 +205,8 @@ final class SearchRpcOps {
      * @param topK number of chunks/docs to retrieve
      * @return response containing formatted context and metadata
      */
-    RetrieveContextResponse retrieveContext(String question, Set<String> docIds, int topK) {
-        return retrieveContext(question, docIds, topK, 0);
+    RetrieveContextResponse retrieveContext(String question, Set<String> docIds, int topK, EngineContext engineContext) {
+        return retrieveContext(question, docIds, topK, 0, engineContext);
     }
 
     /**
@@ -224,7 +226,7 @@ final class SearchRpcOps {
      * @return response containing formatted context and metadata
      */
     RetrieveContextResponse retrieveContext(
-            String question, Set<String> docIds, int topK, int maxContextTokens) {
+            String question, Set<String> docIds, int topK, int maxContextTokens, EngineContext engineContext) {
         RetrieveContextRequest.Builder builder = RetrieveContextRequest.newBuilder()
                 .setQuestion(question)
                 .addAllDocIds(docIds)
@@ -240,14 +242,14 @@ final class SearchRpcOps {
                 // the cost the RERANK category was created for ("20 docs x 2048 seq on CPU takes ~42s").
                 // Round 12's cold-reranker Document Q&A answered in ~9.5s -- under the 10s ceiling by
                 // 0.5s. The caller's own 20s budget (RAGContext.DEFAULT_TIMEOUT) is the real ceiling now.
-                RemoteKnowledgeClient.RpcDeadlineCategory.RERANK,
-                stub -> stub.retrieveContext(request));
+                KnowledgeClient.RpcDeadlineCategory.RERANK,
+                stub -> stub.retrieveContext(request), engineContext);
     }
 
     /**
      * Retrieves relevant context using the rich parameter set (entity/temporal/content filters).
      */
-    RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params) {
+    RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
         RetrieveContextRequest.Builder builder = RetrieveContextRequest.newBuilder()
                 .setQuestion(params.question())
                 .addAllDocIds(params.docIds())
@@ -329,8 +331,8 @@ final class SearchRpcOps {
                 "retrieveContext",
                 // Tempdoc 806 B.2 — see the sibling overload above: this RPC reranks, so it takes the
                 // RERANK budget rather than CONTENT_FETCH's 10s.
-                RemoteKnowledgeClient.RpcDeadlineCategory.RERANK,
-                stub -> stub.retrieveContext(request));
+                KnowledgeClient.RpcDeadlineCategory.RERANK,
+                stub -> stub.retrieveContext(request), engineContext);
     }
 
     /**
@@ -358,18 +360,18 @@ final class SearchRpcOps {
 
     // ========== Folder Browse ==========
 
-    ListFoldersResponse listFolders(String parentPath, int maxFolders) {
+    ListFoldersResponse listFolders(String parentPath, int maxFolders, EngineContext engineContext) {
         ListFoldersRequest request = ListFoldersRequest.newBuilder()
                 .setParentPath(parentPath == null ? "" : parentPath)
                 .setMaxFolders(maxFolders)
                 .build();
         return rpc.execute(
                 "listFolders",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.listFolders(request));
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                stub -> stub.listFolders(request), engineContext);
     }
 
-    ListFolderFilesResponse listFolderFiles(String folderPath, int limit, List<String> projection) {
+    ListFolderFilesResponse listFolderFiles(String folderPath, int limit, List<String> projection, EngineContext engineContext) {
         ListFolderFilesRequest.Builder builder = ListFolderFilesRequest.newBuilder()
                 .setFolderPath(folderPath == null ? "" : folderPath)
                 .setLimit(limit);
@@ -378,8 +380,8 @@ final class SearchRpcOps {
         }
         return rpc.execute(
                 "listFolderFiles",
-                RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.listFolderFiles(builder.build()));
+                KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                stub -> stub.listFolderFiles(builder.build()), engineContext);
     }
 
     // ========== Reranking (360) ==========
@@ -392,7 +394,7 @@ final class SearchRpcOps {
      * @param deadlineMs budget for inference (0 = server default)
      * @return rerank response with sorted indices and scores
      */
-    RerankResponse rerank(String query, List<String> documentTexts, long deadlineMs) {
+    RerankResponse rerank(String query, List<String> documentTexts, long deadlineMs, EngineContext engineContext) {
         RerankRequest request = RerankRequest.newBuilder()
                 .setQuery(query)
                 .addAllDocumentTexts(documentTexts)
@@ -400,8 +402,8 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "rerank",
-                RemoteKnowledgeClient.RpcDeadlineCategory.RERANK,
-                stub -> stub.rerank(request));
+                KnowledgeClient.RpcDeadlineCategory.RERANK,
+                stub -> stub.rerank(request), engineContext);
     }
 
     // ========== Citation Matching ==========
@@ -422,7 +424,7 @@ final class SearchRpcOps {
             List<String> chunkDocIds,
             List<Integer> chunkIndices,
             List<String> passageTexts,
-            double threshold) {
+            double threshold, EngineContext engineContext) {
         MatchCitationsRequest request = MatchCitationsRequest.newBuilder()
                 .setAnswerText(answerText)
                 .addAllChunkDocIds(chunkDocIds)
@@ -432,7 +434,7 @@ final class SearchRpcOps {
                 .build();
         return rpc.execute(
                 "matchCitations",
-                RemoteKnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
-                stub -> stub.matchCitations(request));
+                KnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
+                stub -> stub.matchCitations(request), engineContext);
     }
 }

@@ -1,0 +1,290 @@
+{
+  "date": "2026-09-14",
+  "baseRevision": "128a0c945e60fe1ba3d1afb4d30869d8242ea6d9",
+  "environment": "Windows/PowerShell; lane-f-pr1-verify",
+  "scope": "C2-8d.1 root/child binding WIP; no actual producer or scoped recovery activation",
+  "runs": {
+    "child-binding-focused1535": {
+      "revision": "128a0c945-dirty",
+      "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-services:spotlessApply :modules:app-launcher:spotlessApply :modules:ui:spotlessApply :modules:app-api:test --tests *RecordedRootPlanTest --tests *RecordedIngestChildTest :modules:app-observability:test --tests *OperationIngestChildAcceptanceTest :modules:app-services:test --tests *RecordedIngestPlanResolverTest :modules:app-launcher:test --tests *OperationStoreArchitectureTest :modules:ui:test --tests *InferenceHandlersTest --tests *McpOperationKeyTest",
+      "summary": {
+        "tests": 124,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 31
+      },
+      "tasks": [
+        {
+          "module": "app-api",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 23,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 41,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 15
+        }
+      ]
+    },
+    "child-binding-negative1536": {
+      "revision": "128a0c945-controlled-negative",
+      "command": "./gradlew.bat :modules:app-observability:test --tests *OperationIngestChildAcceptanceTest",
+      "summary": {
+        "tests": 7,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 7,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "child-binding-integrated1537": {
+      "revision": "128a0c945-dirty",
+      "command": "./gradlew.bat :modules:app-observability:spotlessApply :modules:app-api:test :modules:app-observability:test :modules:app-services:test :modules:app-launcher:test :modules:ui:test :modules:app-api:pmdMain :modules:app-api:pmdTest :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-launcher:pmdMain :modules:app-launcher:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest spotlessCheck",
+      "summary": {
+        "tests": 5013,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 4,
+        "suites": 774
+      },
+      "tasks": [
+        {
+          "module": "app-api",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 227,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 45
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 93,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 23
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2876,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3,
+          "suites": 430
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 572,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 85
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1245,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 191
+        }
+      ]
+    },
+    "child-gap-negative1538": {
+      "revision": "128a0c945-controlled-negative",
+      "command": "./gradlew.bat :modules:app-observability:test --tests *OperationIngestChildAcceptanceTest.terminalChildSurvivesClockAdvancePruneAndParentReopenRetry",
+      "summary": {
+        "tests": 3,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 3,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "child-binding-final1539": {
+      "revision": "128a0c945-restored",
+      "command": "./gradlew.bat :modules:app-observability:test :modules:app-observability:pmdMain :modules:app-observability:pmdTest spotlessCheck",
+      "summary": {
+        "tests": 572,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 85
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "FROM-CACHE",
+          "tests": 572,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 85
+        }
+      ]
+    }
+  },
+  "integratedStaticTasks": [
+    ":spotlessCheck UP-TO-DATE",
+    ":modules:app-observability:spotlessCheck",
+    ":modules:app-api:spotlessCheck UP-TO-DATE",
+    ":modules:api-contract-projection-java:spotlessCheck UP-TO-DATE",
+    ":modules:ai-backend:spotlessCheck UP-TO-DATE",
+    ":modules:app-agent:spotlessCheck UP-TO-DATE",
+    ":modules:app-agent-api:spotlessCheck UP-TO-DATE",
+    ":modules:app-config:spotlessCheck UP-TO-DATE",
+    ":modules:adapters-lucene:spotlessCheck UP-TO-DATE",
+    ":modules:app-launcher:spotlessCheck UP-TO-DATE",
+    ":modules:app-api-tck:spotlessCheck UP-TO-DATE",
+    ":modules:app-engine:spotlessCheck UP-TO-DATE",
+    ":modules:app-inference:spotlessCheck UP-TO-DATE",
+    ":modules:core:spotlessCheck UP-TO-DATE",
+    ":modules:gpu-bridge:spotlessCheck UP-TO-DATE",
+    ":modules:app-util:spotlessCheck UP-TO-DATE",
+    ":modules:indexing:spotlessCheck UP-TO-DATE",
+    ":modules:dead-code-audit:spotlessCheck UP-TO-DATE",
+    ":modules:extension-substrate:spotlessCheck UP-TO-DATE",
+    ":modules:benchmarks:spotlessCheck UP-TO-DATE",
+    ":modules:ort-common:spotlessCheck UP-TO-DATE",
+    ":modules:prompt-support:spotlessCheck UP-TO-DATE",
+    ":modules:core-contracts:spotlessCheck UP-TO-DATE",
+    ":modules:ipc-common:spotlessCheck UP-TO-DATE",
+    ":modules:configuration:spotlessCheck UP-TO-DATE",
+    ":modules:reranker:spotlessCheck UP-TO-DATE",
+    ":modules:indexer-worker:spotlessCheck UP-TO-DATE",
+    ":modules:test-support:spotlessCheck UP-TO-DATE",
+    ":modules:telemetry:spotlessCheck UP-TO-DATE",
+    ":modules:ssot-tools:spotlessCheck UP-TO-DATE",
+    ":modules:system-tests:spotlessCheck UP-TO-DATE",
+    ":modules:app-services:spotlessCheck UP-TO-DATE",
+    ":modules:worker-core:spotlessCheck UP-TO-DATE",
+    ":modules:infra-core:spotlessCheck UP-TO-DATE",
+    ":modules:worker-services:spotlessCheck UP-TO-DATE",
+    ":modules:ui:spotlessCheck UP-TO-DATE",
+    ":modules:app-api:pmdTest",
+    ":modules:app-api:pmdMain",
+    ":modules:app-launcher:pmdMain",
+    ":modules:app-launcher:pmdTest",
+    ":modules:app-observability:pmdMain",
+    ":modules:ui:pmdMain",
+    ":modules:app-observability:pmdTest",
+    ":modules:ui:pmdTest",
+    ":modules:app-services:pmdTest",
+    ":modules:app-services:pmdMain"
+  ],
+  "sourceSha256": {
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java": "bef5eb72e56fde47189c02162ec8e9c367ad79f1f22eae46a5b6bee8a01cc93c",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java": "e86a66d2a7219fb6cac6607708aa008682cbf482263f356881c57f1435d71a26",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java": "120344741969c59c1d8447bb139f7f235d8271336c8e4f2615dc8479194086b8",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedIngestChild.java": "b1d9624d90ab044bec728905263c9a4e0a04353f01b23d5d84d6eaf10aa27667",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedRootPlan.java": "ca65c53f5807d15ce5628acbe71d3492d764366388fb12f96d890c318b7b9c6c",
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/RootPlanReplayProjection.java": "c6d9245892c2e868064468ea43bd2ef4cc3994b7222c6a7c2d02de01356cbb76",
+    "modules/app-api/src/main/java/io/justsearch/app/api/registry/OperationInvocationResponse.java": "306328732c21638ecd9108fe34b25c874dd9c7a925c62b59233d1cfacfddcb66",
+    "modules/app-api/src/test/java/io/justsearch/app/api/operations/RecordedIngestChildTest.java": "a656fa49b366d5f2aa22b9b09d827b11f1e935689c6f255eb4f67ac3cba98b80",
+    "modules/app-api/src/test/java/io/justsearch/app/api/operations/RecordedRootPlanTest.java": "1ee8b61ab7fb2b9b137e4b456593570ef3882538633d4b4fd95ef5ea59cc723b",
+    "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java": "8b08fe0763c0dd3a7e779a40be61acdbf9e5025a1e3475513d1d34b6b5da5872",
+    "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java": "3ed385ad4b4f412d98b7c080287ce9c91406fa59e3c43c0930a8064bc7d719f5",
+    "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java": "152de594475260b9282971f3b08e36331bd57446d4b46cfe43e6be325b6343ff",
+    "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationIngestChildAcceptanceTest.java": "de205a8c2f9d74a1f579de5576868beb18c392ce6dae213dfd09873c5d8cbcd5",
+    "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/RecordedIngestPlanResolver.java": "690283e91025f616d1dfadd12f5500e2b488c6c873d8409e4269d21a11bb54af",
+    "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/RecordedIngestPlanResolverTest.java": "e77658ae626881b98a7b391e3778f04bf22221a756569cd52c9e06ce07073658",
+    "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java": "17a6400cf95a88a910a04139b0640aabff0adffda0e2510d170d37399a8e4be7",
+    "modules/ui/src/test/java/io/justsearch/ui/api/InferenceHandlersTest.java": "c71bc4a403d7b13a963dc933bad8a723aa0a5e185603c5fe1ce8378d60406818"
+  },
+  "negative1536": {
+    "removed": [
+      "exact parent preparation comparison",
+      "both terminal child retention predicates"
+    ],
+    "expectedFailures": [
+      "directStoreRequiresRunningParentAndExactPreparationWitness",
+      "terminalChildSurvivesClockAdvancePruneAndParentReopenRetry"
+    ],
+    "restoredStoreSha256": "2e785c6f0ef56ff7de20694a30e40273b43bec1363bb65e3fca033a43427c537",
+    "laterChanges": "Independent review added COMPLETE_WITH_GAPS retention and positive retention release proof before integrated1537."
+  },
+  "retention": "2026-10-14 or acceptance plus30 days, whichever later",
+  "rawEvidenceRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp",
+  "independentReview": "Refute-first source review: COMPLETE_WITH_GAPS retention finding corrected; second pass found no further substantive defect. Full production resolver-to-runner-to-store composition proof remains required in C2-8d.3.",
+  "gapNegative1538": {
+    "mutation": "retain only ACCEPTED/RUNNING parents",
+    "expectedFailure": "[2] COMPLETE_WITH_GAPS retention assertion",
+    "restoredStoreSha256": "152de594475260b9282971f3b08e36331bd57446d4b46cfe43e6be325b6343ff"
+  }
+}

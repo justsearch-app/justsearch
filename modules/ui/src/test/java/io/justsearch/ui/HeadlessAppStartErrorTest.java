@@ -26,11 +26,29 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @DisplayName("915 R1: the start error names the refusal, not the crash")
 final class HeadlessAppStartErrorTest {
+  private final io.justsearch.core.component.TestEngineComponents components =
+      io.justsearch.core.component.TestEngineComponents.fourComponents();
+  private final io.justsearch.core.execution.TestEngineExecutors executors =
+      new io.justsearch.core.execution.TestEngineExecutors();
+
+  @org.junit.jupiter.api.AfterEach
+  void closeOwners() {
+    executors.close();
+    components.close();
+  }
+
+  private KnowledgeServerBootstrap bootstrap(Path dir) {
+    return new KnowledgeServerBootstrap(executors, configFor(dir), null, components,
+        new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(components.handle("index")),
+        io.justsearch.app.services.worker.WorkerHost.unavailable(),
+        new java.util.concurrent.locks.ReentrantReadWriteLock());
+  }
+
 
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
-        false, dir, dir, dir, dir, dir.resolve("worker_signal.lock"),
-        5_000L, 1_000L, 3, "256m", 1_000L, 1_000L, 300_000L, 100, 0L, 0);
+        false, dir, dir, dir,
+        5_000L, 1_000L, 3, 1_000L, 1_000L, 300_000L, 100, 0L, 0);
   }
 
   @Test
@@ -38,7 +56,7 @@ final class HeadlessAppStartErrorTest {
   @DisplayName("a latched schema mismatch replaces the crash message with its remedy")
   void refusalDetailReplacesTheSpawnSymptom(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = bootstrap(tempDir);
     Exception boom =
         assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
 
@@ -56,7 +74,7 @@ final class HeadlessAppStartErrorTest {
   @Timeout(180)
   @DisplayName("an ordinary failure is untouched — the exception message is still the truth there")
   void plainFailureKeepsTheExceptionMessage(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = bootstrap(tempDir);
     Exception boom = assertThrows(Exception.class, () -> bootstrap.startWithRetry(3, 0));
 
     assertEquals(boom.getMessage(), HeadlessApp.startErrorFor(bootstrap, boom));

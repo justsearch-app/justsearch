@@ -10,14 +10,16 @@ import ai.onnxruntime.OnnxValue;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
 import io.justsearch.configuration.resolved.ConfigStore;
 
-import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.NativeSessionHandle;
+import io.justsearch.ort.OrtCudaStatus;
+import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import java.io.Closeable;
 import java.io.IOException;
@@ -96,7 +98,8 @@ public final class SpladeEncoder implements Closeable {
 
   // --- Pinned output state (accessed only from indexing-loop thread via encodeBatch) ---
   // Query-time encode(String) uses runOnnxInferenceSingle() which bypasses these fields.
-  // Do NOT access these from any method reachable by gRPC Netty threads.
+  // Do NOT access these from any method reachable by a query-serving caller thread (before lane F
+  // stage A item A9 those were the gRPC Netty threads; now they are the Head's request threads).
   private final String outputName;
   private OnnxTensor pinnedOutputTensor;
   private FloatBuffer pinnedOutputBuffer;
@@ -189,12 +192,21 @@ public final class SpladeEncoder implements Closeable {
    */
   public static SpladeAssembly buildAssembly(SessionHandle sessions, SpladeConfig config)
       throws OrtException {
+    return buildAssembly(sessions, config, null);
+  }
+
+  /** Uses the generation's exact ONNX file for probing, with metadata from its own directory. */
+  public static SpladeAssembly buildAssembly(
+      SessionHandle sessions, SpladeConfig config, Path exactModelFile) throws OrtException {
+    if (exactModelFile != null && !config.modelPath().equals(exactModelFile.getParent())) {
+      throw new IllegalArgumentException("SPLADE model file and metadata directory differ");
+    }
     // Tempdoc 397 §14.24 FD-ProbeDeletion: probe input + output names via the assembler helper.
     // Tempdoc 374 sandbox round 4 issue H: resolve via ModelManifest so the probe
     // hits whichever variant Install AI actually placed on disk (FP32 model.onnx
     // vs FP16 model_fp16.onnx).
-    Path probeModel =
-        io.justsearch.ort.ModelManifest.loadOrDefault(config.modelPath())
+    Path probeModel = exactModelFile != null ? exactModelFile
+        : io.justsearch.ort.ModelManifest.loadOrDefault(config.modelPath())
             .resolveExistingModelFile(config.modelPath());
     io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
         io.justsearch.ort.OrtSessionAssembler.probeModelNames(
@@ -534,7 +546,8 @@ public final class SpladeEncoder implements Closeable {
   private List<Map<String, Float>> runOnnxInference(
       long[][] allInputIds, long[][] allAttentionMask, long[][] allTokenTypeIds, int batch, int len)
       throws OrtException {
-    try (var lease = sessions.acquire()) {
+    var acquisition = LocalSessionAcquisition.background();
+    try (var lease = sessions.acquire(acquisition)) {
       if (!firstEncodeLogged) {
         firstEncodeLogged = true;
         log.info(
@@ -547,7 +560,7 @@ public final class SpladeEncoder implements Closeable {
 
       if (outputFormat == OutputFormat.PRESPARSE) {
         return runSparseOutputInference(
-            lease, allInputIds, allAttentionMask, allTokenTypeIds, batch);
+            lease, allInputIds, allAttentionMask, allTokenTypeIds, batch, acquisition);
       }
 
       // When using pinned outputs, pad inputs to the bucketed seqLen so model output shape matches
@@ -607,7 +620,7 @@ public final class SpladeEncoder implements Closeable {
               // Tempdoc 400 LR2-c: emit cpu_fallback.triggered event on the
               // active encoder.ort_run span.
               EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
-              try (var cpuLease = sessions.acquireCpu()) {
+              try (var cpuLease = sessions.acquireCpu(acquisition)) {
                 buf = runHeapFallback(cpuLease, inputs, batch, inferLen);
               }
             } else {
@@ -629,7 +642,7 @@ public final class SpladeEncoder implements Closeable {
               // Tempdoc 400 LR2-c: emit cpu_fallback.triggered event on the
               // active encoder.ort_run span.
               EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
-              try (var cpuLease = sessions.acquireCpu()) {
+              try (var cpuLease = sessions.acquireCpu(acquisition)) {
                 buf = runHeapFallback(cpuLease, inputs, batch, inferLen);
               }
             } else {
@@ -678,7 +691,8 @@ public final class SpladeEncoder implements Closeable {
 
   /**
    * Runs single-text ONNX inference using heap-allocated output only. Thread-safe: no pinned output
-   * state is touched. Used by {@link #encode(String)} for query-time SPLADE from gRPC Netty threads.
+   * state is touched. Used by {@link #encode(String)} for query-time SPLADE, which runs on whichever
+   * caller thread entered the search port (the gRPC Netty threads, before item A9).
    *
    * <p>This method exists to avoid the data race on pinned output fields ({@code pinnedOutputTensor},
    * {@code pinnedOutputBuffer}, etc.) which are only safe for single-threaded access from the
@@ -687,7 +701,8 @@ public final class SpladeEncoder implements Closeable {
    */
   private Map<String, Float> runOnnxInferenceSingle(
       long[] inputIds, long[] attentionMask, long[] tokenTypeIds) throws OrtException {
-    try (var lease = sessions.acquire()) {
+    var acquisition = LocalSessionAcquisition.foreground();
+    try (var lease = sessions.acquire(acquisition)) {
       if (!firstEncodeLogged) {
         firstEncodeLogged = true;
         log.info(
@@ -730,7 +745,7 @@ public final class SpladeEncoder implements Closeable {
                 seqLen);
             // Tempdoc 400 LR2-c.
             EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
-            try (var cpuLease = sessions.acquireCpu()) {
+            try (var cpuLease = sessions.acquireCpu(acquisition)) {
               buf = runHeapFallback(cpuLease, inputs, 1, seqLen);
             }
           } else {
@@ -780,7 +795,8 @@ public final class SpladeEncoder implements Closeable {
       long[][] allInputIds,
       long[][] allAttentionMask,
       long[][] allTokenTypeIds,
-      int batch)
+      int batch,
+      SessionAcquisitionRequest acquisition)
       throws OrtException {
     if (batch == 0) {
       return new ArrayList<>(0);
@@ -898,9 +914,9 @@ public final class SpladeEncoder implements Closeable {
             batch, maxLen, e.getMessage());
         // Tempdoc 400 LR2-c.
         EncoderOrtRunSpans.emitCpuFallbackEvent("gpu_bfc_arena", "splade");
-        try (var cpuLease = sessions.acquireCpu()) {
+        try (var cpuLease = sessions.acquireCpu(acquisition)) {
           return runSparseOutputInference(
-              cpuLease, allInputIds, allAttentionMask, allTokenTypeIds, batch);
+              cpuLease, allInputIds, allAttentionMask, allTokenTypeIds, batch, acquisition);
         }
       }
       throw e;

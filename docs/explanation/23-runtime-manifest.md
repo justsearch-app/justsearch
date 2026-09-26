@@ -1,6 +1,6 @@
 ---
 status: stable
-description: Producer-published runtime manifest at <dataDir>/runtime/manifest.json (filesystem) and GET /api/runtime/manifest (HTTP). Canonical answer for "how does a non-JVM consumer find the running JustSearch instance?" — tempdoc 501 §6 closure rule.
+description: Producer-published runtime manifest at <dataDir>/runtime/manifest.json and GET /api/runtime/manifest, projected from the Engine component registry.
 ---
 
 # Runtime manifest — non-JVM service discovery
@@ -48,22 +48,36 @@ document with these fields:
   `ProcessHandle.of(pid)` / `OpenProcess` / `kill -0` before trusting
   any other field.
 - `startedAt`, `dataDir`.
-- `lifecycle` (string) — `STARTING` | `READY` | `DEGRADED` | `ERROR`.
-  Projection of `LifecycleProjection.derive(WorkerCapability,
-  InferenceCapability)`. Updated whenever either capability transitions.
+- `lifecycle` (string) — `LIFECYCLE_STATE_STARTING` |
+  `LIFECYCLE_STATE_READY` | `LIFECYCLE_STATE_DEGRADED` |
+  `LIFECYCLE_STATE_ERROR`. It is the aggregate from
+  `LifecycleProjection.project(...)` over one immutable Engine component
+  registry snapshot and updates on component publications.
 - `head` — `apiPort`, `apiBaseUrl`, `sessionToken` (filesystem only;
-  see below), `readyAt`. Always present.
+  see below), `readyAt`. Always present. The pre-bind ownership seed has
+  these binding fields absent; the API-bind publication fills all three together.
 - `worker` — `state` (`"pending"` | `"ready"` | `"failed"`),
-  `grpcPort`, `indexBasePath`, `readyAt`, `spawnError`. Null until
-  the first worker-state publish; the `state` discriminator is the
-  authoritative tri-state surface (state=`failed` carries
-  `spawnError` with the upstream reason). Updates on every
-  `WorkerCapability` transition.
+  `indexBasePath`, `readyAt`, `spawnError`. Null until the first
+  index-component projection. The `state` discriminator remains the
+  manifest's compatibility tri-state surface: registry `index=STARTING`
+  publishes pending, `index=READY` publishes ready with the component's
+  `stateSince`, and other states publish failed with retained reason or evidence.
+- `children` — filesystem-only managed child records containing child id,
+  kind, PID, process start instant, executable identity, endpoint, and
+  declared/realized configuration hashes. The successor carries predecessor
+  records forward before child-capable bootstrap and reconciles them by all
+  three OS identity axes before adoption or termination.
+- `shutdownHandoff` — filesystem-only `pending`, `ready`, or `incomplete`
+  disposition. The ordered shutdown marks pending early and completes the
+  handoff only after all close outcomes are known. Restart/hang retains live
+  ownership; quit/upgrade deletes the canonical manifest only after registered
+  children are confirmed gone and the index reports `GRACEFUL`.
 - `ai` — `phase` (`CapabilityHealth.name()` — `PENDING` / `READY` /
   `DEGRADED` / `OFFLINE` / `RECOVERING`), `required` (boolean —
   is inference configured?), `pendingReason` (string), `readyAt`
-  (set when phase first reaches `READY`). Projection of
-  `InferenceCapability`; updates on every transition.
+  (set when phase first reaches `READY`). It is a compatibility projection of
+  the registry's `generative` component through `RegistryBackedCapability`;
+  the adapter is read-only and the registry remains authoritative.
 - `reachability` — typed transport list (tempdoc 501 §13.4.2 / Phase
   30). Each entry: `kind` (`http-rest` | `sse` | `well-known` |
   `filesystem` | `mcp` | `probe`), `url` (URL for HTTP-class kinds;
@@ -77,7 +91,7 @@ document with these fields:
   manifest-schema / lifecycle-schema / MCP-protocol / MCP-tool-surface
   versions. A projection over existing version single-sources
   (`RuntimeContract.current()` in `app-api`), nullable and `NON_NULL`, so it
-  is additive at schema v1. This is the field an external agent reads to learn
+  is carried at schema v2. This is the field an external agent reads to learn
   "what is promised, at what version." Full definition, compatibility matrix,
   stability policy, and surface classification:
   [The Runtime Contract](28-runtime-contract.md) +
@@ -100,9 +114,12 @@ Retention: by-count default 50 instance directories, pruned on
 publisher construction.
 
 Producer-owned primitives (`instanceId`, `pid`, `dataDir`, `startedAt`,
-history) live in the manifest because they're identity facts; everything
-else is a projection of `LifecycleProjection.derive` /
-`WorkerCapability` / `InferenceCapability` per tempdoc 501 §12.1.
+history) live in the manifest because they are identity facts. Lifecycle,
+worker, AI, and realized-mode fields are sibling projections of the same Engine
+component-registry publication. `RuntimeManifestPublisher.observeComponents`
+subscribes before its bootstrap read, filters stale registry revisions, and
+publishes the aggregate and sibling projections without creating lifecycle
+state of its own.
 
 ### HTTP transport
 
@@ -116,8 +133,7 @@ or stdout drain (the Tauri sidecar's redaction-aware reader).
 Change notification rides a dedicated SSE stream:
 `GET /api/runtime/manifest/stream` with `streamId
 registry:runtime-manifest`. UPDATE frames fire on each manifest
-rewrite (HTTP bind, Worker connect, Worker post-boot transition,
-Inference transition).
+rewrite (HTTP bind and Engine component-registry transitions).
 
 A standard-discovery mirror is served at
 `GET /.well-known/justsearch/manifest.json` (RFC 8615). Same
@@ -144,7 +160,7 @@ into memory per request.
 #### Readiness / liveness probes (k8s pattern)
 
 `GET /api/runtime/ready` → 200 with `{ready: true, lifecycle, instanceId}`
-when `lifecycle === "READY"`; 503 with `{ready: false, lifecycle,
+when `lifecycle === "LIFECYCLE_STATE_READY"`; 503 with `{ready: false, lifecycle,
 instanceId}` otherwise. `HEAD` returns the same status with no body.
 
 `GET /api/runtime/live` → 200 with `{alive: true, pid, instanceId}`
@@ -168,14 +184,21 @@ site, not at a single static helper.
 ### Multi-instance enforcement
 
 `<dataDir>/app.lock` — OS-level `FileChannel.tryLock` with PID +
-start-timestamp metadata and stale recovery. Held by HeadlessApp for
+actual process-start metadata (when available). Metadata is diagnostic only; OS
+locks release on process exit and refusal never deletes the lock file. Same-JVM
+contenders are refused before a second channel can disturb the native lock. Held by HeadlessApp for
 the life of the process; a second Head against the same dataDir exits
 with a structured diagnostic and code 2.
 
 ## What stays unchanged
 
-- **MMF** (`MmfWorkerSignalLayoutV1`) — intra-JVM Head ↔ Worker IPC.
-  Different domain. The manifest does not replace it.
+- **MMF** (`MmfWorkerSignalLayoutV1`) — this no longer exists. Lane F stage A
+  (item A10) deleted the memory-mapped Head ↔ Worker signal bus along with
+  the Worker process itself (item A11); the scheduling signals it carried
+  now live in the in-process `GpuSchedulingGauge`
+  (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`).
+  Different domain from this manifest either way — this bullet is retained
+  only to record that the mechanism it once named is gone, not replaced.
 - **`/api/status`** — cheap readiness probe. Kept for sandboxes and
   remote callers where PID inspection is awkward.
 - **`JUSTSEARCH_API_PORT` env var as configuration** — "try to bind
@@ -222,12 +245,12 @@ Step-by-step when a non-JVM consumer needs runtime fact F:
    relevant record's `publicProjection()` method. The type system
    enforces that adding a new sensitive field forces an update at
    the record's declaration site, not at a single static helper.
-5. Wire a listener on the authoritative source (Capability or
-   equivalent) so the projection stays current after boot —
+5. Wire a listener on the authoritative source so the projection stays current
+   after boot. Engine lifecycle facts use the component registry;
    `RuntimeManifestListenerWiring.wire(...)` in
-   `modules/ui/src/main/java/io/justsearch/ui/runtime/` is the
-   established collector for these. Add a clause there if the new
-   field needs its own transition source.
+   `modules/ui/src/main/java/io/justsearch/ui/runtime/` is the established
+   collector. Do not add a mutable `Capability` writer or a second lifecycle
+   state to feed the manifest.
 6. Bump `RuntimeManifest.CURRENT_SCHEMA_VERSION` if the addition is
    a breaking change for older readers (rare — new optional fields
    don't break, per `RuntimeManifestSchemaCompatibilityTest`).

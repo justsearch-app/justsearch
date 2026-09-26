@@ -4,14 +4,15 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.app.api.lifecycle.ReadinessDimension;
 import io.justsearch.app.api.status.ReadinessComponentView;
 import io.justsearch.app.api.status.ReadinessEnvelopeView;
 import io.justsearch.app.observability.health.ConditionStore;
 import io.justsearch.app.observability.health.HealthEventChangeRegistry;
 import io.justsearch.app.observability.health.Source;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
@@ -24,7 +25,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tempdoc 876 §B.2a — the trigger's own mechanics, over a stand-in envelope supplier.
  *
- * <p><b>Scope, precisely.</b> What this file proves is that a {@link WorkerCapability} transition
+ * <p><b>Scope, precisely.</b> What this file proves is that a component-registry transition
  * drives {@link LifecycleSnapshotTap#accept} through a {@link ReadinessReconciliationTrigger}, on a
  * graph that contains no request handler: the trigger's subscription, its {@code attach} self-seed,
  * and the resulting assert/clear of {@code index.unavailable} in the {@link ConditionStore}. The
@@ -53,8 +54,9 @@ final class ReadinessReconciledWithoutRequestTest {
 
   private static ReadinessEnvelopeView indexServing(String state, String reasonCode) {
     return new ReadinessEnvelopeView(
-        1,
+        2,
         T0.toString(),
+        Map.of(),
         Map.of(
             ReadinessDimension.INDEX_SERVING.key(),
             new ReadinessComponentView(state, reasonCode, "test", T0.toString(), false, 0L)),
@@ -82,9 +84,11 @@ final class ReadinessReconciledWithoutRequestTest {
     CountDownLatch seeded = new CountDownLatch(1);
     CountDownLatch seedPlusTransition = new CountDownLatch(2);
 
-    WorkerCapability worker = new WorkerCapability();
-    try (ReadinessReconciliationTrigger trigger = new ReadinessReconciliationTrigger()) {
-      trigger.wireTo(worker, null);
+    try (var components = TestEngineComponents.fourComponents();
+        TestEngineExecutors processExecutors = new TestEngineExecutors();
+        ReadinessReconciliationTrigger trigger =
+            new ReadinessReconciliationTrigger(processExecutors)) {
+      trigger.wireTo(components);
       trigger.attach(
           () -> {
             reconciles.incrementAndGet();
@@ -100,7 +104,7 @@ final class ReadinessReconciledWithoutRequestTest {
 
       // The worker comes back. Nothing calls /api/status — there is no handler in this graph.
       envelope.set(indexServing("READY", null));
-      worker.transition(CapabilityHealth.READY, "worker.ready");
+      components.handle("index").transition(ComponentState.READY, "worker.ready", null);
 
       assertTrue(
           seedPlusTransition.await(5, SECONDS),

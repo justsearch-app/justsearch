@@ -112,7 +112,7 @@ final class ConfirmedDeletionMarkerTest {
 
   @Test
   void readsTheCurrentAuthorityFromItsSupplierRatherThanCapturingTheSentinel() throws Exception {
-    // GrpcIngestService wires its identity store AFTER constructing the marker, so a marker that
+    // WorkerIngestService wires its identity store AFTER constructing the marker, so a marker that
     // captured the field at construction would hold UNAVAILABLE forever and silently mark nothing.
     Path file = tempDir.resolve("late-wired.txt");
     Files.writeString(file, "body");

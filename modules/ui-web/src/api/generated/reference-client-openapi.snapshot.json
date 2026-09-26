@@ -14,10 +14,13 @@
         "$ref": "/api/schemas/knowledge-search-response.v1.json"
       },
       "lifecycle-snapshot": {
-        "$ref": "/api/schemas/lifecycle-snapshot.v1.json"
+        "$ref": "/api/schemas/lifecycle-snapshot.v2.json"
       },
       "operation-history-entry": {
         "$ref": "/api/schemas/operation-history-entry.v1.json"
+      },
+      "operation-outcome-view": {
+        "$ref": "/api/schemas/operation-outcome-view.v1.json"
       },
       "resource": {
         "$ref": "/api/schemas/resource.v1.json"
@@ -29,7 +32,7 @@
         "$ref": "/api/schemas/runtime-live-response.v1.json"
       },
       "runtime-manifest-public": {
-        "$ref": "/api/schemas/runtime-manifest-public.v1.json"
+        "$ref": "/api/schemas/runtime-manifest-public.v2.json"
       },
       "runtime-ready-response": {
         "$ref": "/api/schemas/runtime-ready-response.v1.json"
@@ -106,19 +109,6 @@
           "resource"
         ],
         "x-owning-module": "ResourceApiModule"
-      }
-    },
-    "/api/admin/inference/reload": {
-      "post": {
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "POST /api/admin/inference/reload",
-        "tags": [
-          "other"
-        ]
       }
     },
     "/api/admin/runtime/reload": {
@@ -775,6 +765,19 @@
         "summary": "POST /api/chat/agent/{sessionId}/attach",
         "tags": [
           "agent"
+        ]
+      }
+    },
+    "/api/chat/approval": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "GET /api/chat/approval",
+        "tags": [
+          "conversation"
         ]
       }
     },
@@ -1613,6 +1616,32 @@
         ]
       }
     },
+    "/api/debug/engine-log": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "GET /api/debug/engine-log",
+        "tags": [
+          "debug"
+        ]
+      }
+    },
+    "/api/debug/eval/document-ids": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/debug/eval/document-ids",
+        "tags": [
+          "debug"
+        ]
+      }
+    },
     "/api/debug/events": {
       "get": {
         "responses": {
@@ -1729,27 +1758,14 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
-    "/api/debug/worker-log": {
+    "/api/diagnostic-channels/engine-log/stream": {
       "get": {
         "responses": {
           "200": {
             "description": "Successful response."
           }
         },
-        "summary": "GET /api/debug/worker-log",
-        "tags": [
-          "debug"
-        ]
-      }
-    },
-    "/api/diagnostic-channels/head-log/stream": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "GET /api/diagnostic-channels/head-log/stream",
+        "summary": "GET /api/diagnostic-channels/engine-log/stream",
         "tags": [
           "resource"
         ],
@@ -2063,6 +2079,23 @@
         ]
       }
     },
+    "/api/indexing/migration/accept-gaps": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/indexing/migration/accept-gaps",
+        "tags": [
+          "indexing"
+        ],
+        "x-owning-module": "ResourceApiModule",
+        "x-required-capabilities": [
+          "WORKER"
+        ]
+      }
+    },
     "/api/indexing/migration/cutover": {
       "post": {
         "responses": {
@@ -2138,6 +2171,7 @@
         "tags": [
           "indexing"
         ],
+        "x-owning-module": "ResourceApiModule",
         "x-required-capabilities": [
           "WORKER"
         ]
@@ -2154,6 +2188,7 @@
         "tags": [
           "indexing"
         ],
+        "x-owning-module": "ResourceApiModule",
         "x-required-capabilities": [
           "WORKER"
         ]
@@ -2281,19 +2316,6 @@
         ]
       }
     },
-    "/api/inference/reload": {
-      "post": {
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "POST /api/inference/reload",
-        "tags": [
-          "inference"
-        ]
-      }
-    },
     "/api/inference/status": {
       "get": {
         "responses": {
@@ -2393,6 +2415,7 @@
         "tags": [
           "knowledge"
         ],
+        "x-owning-module": "ResourceApiModule",
         "x-required-capabilities": [
           "WORKER"
         ]
@@ -2972,6 +2995,38 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
+    "/api/operation-history/{operationKey}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operationKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/operation-outcome-view"
+                }
+              }
+            },
+            "description": "Successful response."
+          }
+        },
+        "summary": "GET /api/operation-history/{operationKey}",
+        "tags": [
+          "resource"
+        ],
+        "x-justsearch-stability": "reference-client",
+        "x-owning-module": "ResourceApiModule"
+      }
+    },
     "/api/operations/{id}/invoke": {
       "post": {
         "parameters": [
@@ -3482,29 +3537,6 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
-    "/api/scans/{scanId}/progress": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "scanId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "GET /api/scans/{scanId}/progress",
-        "tags": [
-          "other"
-        ]
-      }
-    },
     "/api/schemas/{name}": {
       "get": {
         "parameters": [
@@ -3880,8 +3912,8 @@
     }
   },
   "x-justsearch-route-source": {
-    "routeCount": 243,
-    "routeDigest": "sha256:d282c68bf759eccfa48d472b5fcd6dfde1fca4be6dbcb00606213985fd1dcde8"
+    "routeCount": 244,
+    "routeDigest": "sha256:c153c1e7f03f9ead391e957100a350d243cdbd0ed328aac0b2602ed4a91c7c6a"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

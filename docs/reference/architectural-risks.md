@@ -85,7 +85,7 @@ this mechanism exists to end.
 
 **Last reviewed:** 2026-09-02
 
-**Notes:** Reconciled 2026-09-02. [ADR-0004](../decisions/0004-single-tenant-gpu-policy.md) is now `status: superseded` — the GGUF/FFM embedding stack it framed the trade-off around was deleted in March 2026 — but the **mechanism** survives: the MMF `main_gpu_active` byte (`modules/ipc-common/src/main/java/io/justsearch/ipc/mmf/MmfWorkerSignalLayoutV1.java:19`) still coordinates ORT GPU sessions against `llama-server`, and `LoopPacingPolicy.shouldRunBackfill` (`modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/LoopPacingPolicy.java:58`) is the decision site. The 2026-03 wording ("the embedding model is unloaded during chat sessions, forcing vector search to fall back to BM25", `NO_EMBEDDING_SERVICE`) described the deleted GGUF path and has been rewritten above.
+**Notes:** Reconciled 2026-09-07 (lane F stage A). [ADR-0004](../decisions/0004-single-tenant-gpu-policy.md) is now `status: superseded` — the GGUF/FFM embedding stack it framed the trade-off around was deleted in March 2026 — but the **mechanism** survives in a new form: lane F item A10 deleted the memory-mapped Head↔Worker signal bus (`MmfWorkerSignalLayoutV1` no longer exists) along with the Worker process itself (item A11), so `main_gpu_active` is no longer a cross-process byte. It is now the `mainGpuActive` field of the single in-process `GpuSchedulingGauge` (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`), written by the inference mode-change listener (`InferenceWiring.wireGpuStatusBroadcast`, `modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/InferenceWiring.java`) and read by `LoopPacingPolicy.shouldRunBackfill` (`modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/LoopPacingPolicy.java:53`) in the same JVM. The mutual-exclusion trade-off itself is unchanged — this is a mechanism update only, not a resolution.
 
 ## RISK-002: SQLite job queue write contention under high-throughput ingestion
 
@@ -215,11 +215,11 @@ See [Agent System Architecture](../explanation/22-agent-system-architecture.md) 
 
 **Reassess when:** A new production JVM spawn site is added, or the JDK changes the default for restricted native access again.
 
-**Instrument:** `test:modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerSpawnerJvmFlagsTest.java#argvEnablesNativeAccessWithNoAddOpensOrIncubatorVector`
+**Instrument:** none — see the note below. The Worker-spawn instrument, `WorkerSpawnerJvmFlagsTest#argvEnablesNativeAccessWithNoAddOpensOrIncubatorVector`, was deleted with `WorkerSpawner` at lane F stage A item A11. The surviving spawn site that this risk applies to is the extraction sandbox child, covered by `test:modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionSandboxCommandTest.java`.
 
-**Owner tempdoc:** tempdoc 882 item 4 (decision review, lane 0) — shipped.
+**Owner tempdoc:** tempdoc 882 item 4 (decision review, lane 0) — shipped. Re-instrumenting the remaining JVM spawn sites belongs to tempdoc 936 lane F (item A13, where the spawn paths are collapsed).
 
-**Last reviewed:** 2026-09-02
+**Last reviewed:** 2026-09-07 (lane F stage A sweep: the Worker is no longer a spawned JVM, so this row now covers only the inference and extraction-sandbox spawn sites).
 
 **Notes:** Closed by decision-review lane 0. Both production spawn sites now pass `--enable-native-access=ALL-UNNAMED`; the pre-Lucene-10 `--add-opens java.base/java.nio` line is gone (Lucene 10 no longer needs it); and the argv is pinned by the named test, which asserts the flag is present and that no `--add-opens` or `jdk.incubator.vector` argument survives. Kept as history because the instrument is what stops a new spawn site from re-opening it.
 
@@ -241,25 +241,36 @@ See [Agent System Architecture](../explanation/22-agent-system-architecture.md) 
 
 **Notes:** New row, 2026-09-02, opened by the decision review. Lane A owns the measurement and the design; it also owns the neighbouring item on constants sized against the window. The instrument is a `tempdoc:` reference because the budget authority does not exist yet — when it ships, this row's instrument becomes the test that pins it, and lane A closing without one is exactly what the unresolved-instrument rule would surface.
 
-## RISK-010: The extraction sandbox is unreachable
+## RISK-010: Extraction isolation and native-descendant containment
 
 **Category:** reliability | **Status:** Monitoring
 
-**Trade-off:** Content extraction runs in-process behind a timeout, which is fast and simple. The out-of-process sandbox exists in the tree but has no shipped argv, so the default is `in_process` and the isolation is not reachable in production.
+**Trade-off:** The default `auto` mode uses persistent child JVMs for process-routed document
+families and retains in-process decoding for simple text families. The child startup command and
+probe are shipped. On Windows, each parser self-assigns to a kill-on-close Job Object before any
+request, so forced recycling also terminates native descendants. This requires a small FFM binding
+and mandatory native access; setup failure leaves process-routed extraction unavailable.
 
-**Impact:** A wedged native parser (PDFBox/POI) ignores the interrupt, so `future.cancel(true)` does not free the thread. Extraction runs on a single-thread executor, so one wedged file stops **all** extraction until the Worker restarts — a whole-subsystem stall from one malformed document.
+**Impact:** A wedged parser is killed at its deadline. Native OCR children cannot escape parser
+recycling on the supported Windows platform. An operator-supplied parser command must invoke the
+production bootstrap; unsupported platforms have only the parent-PID watchdog, without native-tree
+containment. In-process OCR still depends on its bounded component cleanup and retained owners.
 
-**Reassess when:** A wedged-parser stall is observed in the field, or lane C ships the persistent sandbox child.
+**Reassess when:** Adding a supported OS, changing parser bootstrap/launch ownership, or changing
+Windows native bindings or job inheritance.
 
-**Instrument:** `tempdoc:885#Item 14 — extraction`
+**Instrument:** `test:modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/WindowsParserContainmentTest.java#killingParserReapsAlreadyLiveNativeDescendant`
 
-**Owner tempdoc:** tempdoc 885 item 14 (decision review, lane C).
+**Owner tempdoc:** lane F, C1-7/C1-11.
 
-**Last reviewed:** 2026-09-02
+**Last reviewed:** 2026-09-09
 
-**Notes:** New row, 2026-09-02, opened by the decision review. The child entry point and the process sandbox both exist; what is missing is a shipped command, and the per-file JVM start is why nobody enabled it. Lane C's evidence also records that a nested Windows job object is blocked on a module-boundary change (`WindowsJobObject` lives in `app-util`, which `worker-services` does not depend on).
-
-A second, independent obstacle was measured on 2026-09-02 while running the full suite for tempdoc 884 PR 2, and it is worth recording because it is not the one the row was opened for: **all six `ProcessExtractionSandboxTest` cases fail inside a deep worktree path** with `java.io.IOException: Cannot run program java.exe: CreateProcess error=206, The filename or extension is too long`. The sandbox passes the whole Worker classpath on the child's command line, so every entry inherits the checkout prefix; under `.claude/worktrees/<name>/...` the command line crosses the Windows 32k limit. It is not load-dependent (it reproduces isolated) and is expected to pass in the shorter main checkout, which is why it has not surfaced before. So the sandbox is unreachable for a second reason beyond the missing argv: as currently invoked it cannot start at all on a long path. Any fix that ships an argv must also shorten the child's command line (an argfile or a pathing jar). It was pinned meanwhile as `process-extraction-sandbox-classpath-too-long`; tempdoc 930 retired the expected-state pin mechanism, so this paragraph is now the record.
+**Notes:** The original 2026-09-02 risk concerned an unreachable per-file sandbox. The persistent
+pool resolved that reachability issue. The former `app-util.WindowsJobObject` was deleted with its
+sole Worker-spawner caller at stage A. The native-descendant correction restores the necessary FFM
+mechanism locally as `WindowsParserContainment`, with mandatory bootstrap instead of best-effort
+assignment and no new module dependency. `ExtractionSandboxOrphanE2ETest` additionally witnesses
+both parser and native child alive before forcibly killing an isolated Engine.
 
 ## RISK-011: The reindex mechanism has a single honest detector
 
@@ -283,7 +294,9 @@ A second, independent obstacle was measured on 2026-09-02 while running the full
 
 **Category:** reliability | **Status:** Monitoring
 
-**Trade-off:** `SqliteJobQueue` holds one JDBC `Connection` guarded by one `ReentrantLock`, which makes correctness easy to reason about and makes the SQLite update/commit hooks (which back the live job stream) trivially consistent. In exchange, every enqueue and dequeue serializes through one lock on one connection.
+**Trade-off:** `SqliteJobQueue` holds one JDBC `Connection` guarded by one `ReentrantLock`. Queue writes, snapshot reads, and subscriptions share that lock. SQLite hooks collect provisional row identities; the queue materializes deltas only after JDBC commit returns and delivers them after claim bookkeeping. Rollback discards provisional changes, and subscriber-triggered writes are delivered after the current batch. This projects committed queue state; it does not prove a Lucene commit. Every enqueue, dequeue, and synchronous subscriber callback serializes through the same lock.
+
+**Failure boundary:** SQL/runtime errors and `Error` roll back before auto-commit can be restored. An uncertain rollback or failed reset makes the queue unavailable until successful close; the primary cause retains cleanup failures. A confirmed commit still attempts its projection after reset failure. Under the queue lock, frozen committed deltas drain, native listeners detach, and the failed connection closes in that order. Queue writes and captured feed subscriptions reject reuse while cleanup is unresolved. A failed close retains the connection handle for retry.
 
 **Impact:** Structural, not load-dependent: the single connection is a single point of failure and a hard serialization point. One slow statement blocks every other queue caller, and a connection-level fault takes the whole queue down rather than one caller's work.
 
@@ -293,7 +306,7 @@ A second, independent obstacle was measured on 2026-09-02 while running the full
 
 **Owner tempdoc:** tempdoc 885 item 21 (decision review, lane C).
 
-**Last reviewed:** 2026-09-02
+**Last reviewed:** 2026-09-13
 
 **Notes:** New row, 2026-09-02. **Distinct from [RISK-002](#risk-002-sqlite-job-queue-write-contention-under-high-throughput-ingestion):** that row is about SQLite *write contention under load* (a throughput property, measured by a metric that does not exist yet); this row is about the *structural single-connection design* (a shape property, true at zero load). A throughput metric would not detect this one, and moving off SQLite would not by itself fix that one.
 

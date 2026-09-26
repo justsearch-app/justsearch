@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
+import io.justsearch.indexerworker.embed.EmbeddingFingerprint;
 import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
@@ -14,9 +15,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -40,6 +46,190 @@ import org.junit.jupiter.api.io.TempDir;
 class KnowledgeServerTest {
 
   private static final ObjectMapper JSON = new ObjectMapper();
+
+  @Test
+  void cutoverDefersWhenPendingEmbeddingCountCannotBeRead() throws Exception {
+    var server = createServerWithJobQueue(new StubJobQueue());
+    var runtime = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.RunningRuntime.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    var controller = org.mockito.Mockito.mock(EmbeddingCompatibilityController.class);
+    org.mockito.Mockito.when(controller.currentFingerprint()).thenReturn("current-model");
+    org.mockito.Mockito.when(controller.reconcileStampEvidence()).thenReturn(true);
+    org.mockito.Mockito.when(controller.fingerprintToStamp()).thenReturn(Optional.of("current-model"));
+    setField(server, "ingestLifecycle", runtime);
+    setField(server, "embeddingCompatController", controller);
+    var counts = runtime.indexCountOps();
+    org.mockito.Mockito.when(counts.countByFieldOrThrow(
+        io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS,
+        io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS_PENDING))
+        .thenThrow(new IOException("reader unavailable"))
+        .thenReturn(0);
+    Method method = KnowledgeServer.class.getDeclaredMethod("finalizeEmbeddingRebuildBeforeCutover");
+    method.setAccessible(true);
+
+    assertEquals(false, method.invoke(server), "unreadable is not drained");
+    org.mockito.Mockito.verify(controller, org.mockito.Mockito.never())
+        .checkRebuildCompletion(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt());
+    assertEquals(true, method.invoke(server), "a subsequent zero read with earned fingerprint permits certification");
+    org.mockito.Mockito.verify(controller).checkRebuildCompletion(0L, 0);
+  }
+
+  @Nested
+  class CutoverAttestationTests {
+    private final AtomicLong documents = new AtomicLong();
+    private final AtomicInteger completed = new AtomicInteger();
+    private final AtomicBoolean readable = new AtomicBoolean(true);
+    private EmbeddingCompatibilityController controller;
+    private KnowledgeServer server;
+    private io.justsearch.adapters.lucene.runtime.RunningRuntime runtime;
+    private Method finalizeCutover;
+
+    @BeforeEach
+    void setUp() throws Exception {
+      EmbeddingFingerprint.setForTesting("cutover-current-model");
+      controller = new EmbeddingCompatibilityController(Map::of, documents::get, () -> {
+        if (!readable.get()) throw new IllegalStateException("completed reader unavailable");
+        return completed.get();
+      });
+      controller.refresh();
+      server = createServerWithJobQueue(new StubJobQueue());
+      runtime = org.mockito.Mockito.mock(
+          io.justsearch.adapters.lucene.runtime.RunningRuntime.class,
+          org.mockito.Mockito.RETURNS_DEEP_STUBS);
+      setField(server, "ingestLifecycle", runtime);
+      setField(server, "embeddingCompatController", controller);
+      finalizeCutover = KnowledgeServer.class.getDeclaredMethod("finalizeEmbeddingRebuildBeforeCutover");
+      finalizeCutover.setAccessible(true);
+    }
+
+    @AfterEach
+    void clearFingerprint() {
+      EmbeddingFingerprint.invalidate();
+    }
+
+    @Test
+    void freshGreenBackfillEarnsStampBeforeFinalCommitWithoutAnIdleTick() throws Exception {
+      assertEquals(EmbeddingCompatibilityController.State.COMPATIBLE, controller.state());
+      documents.set(1);
+      completed.set(1);
+      assertTrue(controller.fingerprintToStamp().isEmpty(), "backfill has not signalled the idle loop");
+
+      assertEquals(true, finalizeCutover.invoke(server));
+      assertEquals(Optional.of("cutover-current-model"), controller.fingerprintToStamp(),
+          "the COMPLETE commit must already be able to stamp the fingerprint");
+      assertEquals(true, finalizeCutover.invoke(server), "already certified remains eligible");
+    }
+
+    @Test
+    void zeroOrUnreadableSuccessEvidenceDefersFreshGreenAndCanRecover() throws Exception {
+      documents.set(1);
+      assertEquals(false, finalizeCutover.invoke(server), "zero pending is not proof of success");
+      readable.set(false);
+      completed.set(1);
+      assertEquals(false, finalizeCutover.invoke(server), "unreadable completed count is not evidence");
+      assertTrue(controller.fingerprintToStamp().isEmpty());
+      readable.set(true);
+      assertEquals(true, finalizeCutover.invoke(server));
+      assertEquals(Optional.of("cutover-current-model"), controller.fingerprintToStamp());
+    }
+
+    @Test
+    void pendingEmbeddingsDeferEvenWithAnEarnedStamp() throws Exception {
+      controller.noteSuccessfulEmbeddingObserved();
+      org.mockito.Mockito.when(runtime.indexCountOps().countByFieldOrThrow(
+          io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS,
+          io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS_PENDING)).thenReturn(1);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    private void restoreCorruptionGreen(Path base, String source, long documentCount,
+        boolean readableCount, boolean matchingPath) throws Exception {
+      var original = new io.justsearch.indexerworker.index.IndexGenerationManager(base);
+      var state = original.startMigration(source);
+      var reopened = new io.justsearch.indexerworker.index.IndexGenerationManager(base);
+      reopened.initializeOrLoad();
+      setField(server, "indexGenerationManager", reopened);
+      setField(server, "buildingIndexPath", matchingPath
+          ? reopened.resolveGenerationPathStrict(state.building_generation()) : base.resolve("another-generation"));
+      setField(server, "appServices", org.mockito.Mockito.mock(WorkerAppServices.class));
+      if (readableCount) {
+        org.mockito.Mockito.when(runtime.indexCountOps().docCountOrThrow()).thenReturn(documentCount);
+      } else {
+        org.mockito.Mockito.when(runtime.indexCountOps().docCountOrThrow())
+            .thenThrow(new IOException("green reader unavailable"));
+      }
+      var initialize = KnowledgeServer.class.getDeclaredMethod("initEmbeddingCompatibilityController");
+      initialize.setAccessible(true);
+      initialize.invoke(server);
+      var controllerField = KnowledgeServer.class.getDeclaredField("embeddingCompatController");
+      controllerField.setAccessible(true);
+      controller = (EmbeddingCompatibilityController) controllerField.get(server);
+      controller.onForcedReindexRequested();
+    }
+
+    @Test
+    void resumedEmptyCorruptionGreenRetainsItsStructuralAttestation(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "corrupt_index_rebuild", 0, true, true);
+      assertEquals(true, finalizeCutover.invoke(server), "reopened empty recovery has no old-model vectors");
+    }
+
+    @Test
+    void normalEmptyMigrationCannotBorrowCorruptionWaiver(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "schema_mismatch", 0, true, true);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void nonemptyResumedCorruptionGreenCannotBorrowOldModelAuthority(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "corrupt_index_rebuild", 1, true, true);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void unreadableResumedGreenDoesNotCountAsEmpty(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "corrupt_index_rebuild", 0, false, true);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void waiverRequiresTheActuallyOpenedBuildingGeneration(@TempDir Path base) throws Exception {
+      restoreCorruptionGreen(base, "corrupt_index_rebuild", 0, true, false);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void rebuildingGreenWithCompletedVectorsCanCutOver() throws Exception {
+      documents.set(2);
+      controller.refresh();
+      controller.onForcedReindexRequested();
+      completed.set(2);
+      assertEquals(true, finalizeCutover.invoke(server));
+      assertEquals(EmbeddingCompatibilityController.State.COMPATIBLE, controller.state());
+      assertEquals(Optional.of("cutover-current-model"), controller.fingerprintToStamp());
+    }
+
+    @Test
+    void currentModelMustMatchTheOfferedStamp() throws Exception {
+      var mismatched = org.mockito.Mockito.mock(EmbeddingCompatibilityController.class);
+      org.mockito.Mockito.when(mismatched.currentFingerprint()).thenReturn("current-model");
+      org.mockito.Mockito.when(mismatched.reconcileStampEvidence()).thenReturn(true);
+      org.mockito.Mockito.when(mismatched.fingerprintToStamp()).thenReturn(Optional.of("another-model"));
+      setField(server, "embeddingCompatController", mismatched);
+      assertEquals(false, finalizeCutover.invoke(server));
+    }
+
+    @Test
+    void failedRebuildCannotCutOverWithoutVectors() throws Exception {
+      documents.set(2);
+      controller.refresh();
+      controller.onForcedReindexRequested();
+      assertEquals(EmbeddingCompatibilityController.State.REBUILDING, controller.state());
+      assertEquals(false, finalizeCutover.invoke(server));
+      assertTrue(controller.fingerprintToStamp().isEmpty());
+      assertEquals(EmbeddingCompatibilityController.State.REBUILDING, controller.state());
+    }
+  }
 
   // ==================== Phase 1: Safe Gauge Methods ====================
 
@@ -202,38 +392,10 @@ class KnowledgeServerTest {
 
   // ==================== Phase 2: State Getters ====================
 
-  @Nested
-  @DisplayName("getPort()")
-  class GetPortTests {
-
-    @Test
-    @DisplayName("returns -1 when grpcServer is null")
-    void nullServer_returnsMinusOne() throws Exception {
-      KnowledgeServer server = createEmptyServer();
-      assertEquals(-1, server.getPort());
-    }
-  }
-
-  @Nested
-  @DisplayName("isRunning()")
-  class IsRunningTests {
-
-    @Test
-    @DisplayName("returns false when grpcServer is null")
-    void nullServer_returnsFalse() throws Exception {
-      KnowledgeServer server = createEmptyServer();
-      setField(server, "running", true);
-      assertFalse(server.isRunning());
-    }
-
-    @Test
-    @DisplayName("returns false when running is false")
-    void notRunning_returnsFalse() throws Exception {
-      KnowledgeServer server = createEmptyServer();
-      setField(server, "running", false);
-      assertFalse(server.isRunning());
-    }
-  }
+  // Lane F stage A item A13 deleted KnowledgeServer#getPort() along with its last caller (the
+  // standalone IndexerWorker.main log line). It had returned a constant -1 since A9 removed the
+  // gRPC server, so the nested GetPortTests block that pinned "-1, there is no socket" went with
+  // it: inside one JVM there is no port to be wrong about.
 
   @Nested
   @DisplayName("embeddingCompatController()")
@@ -265,14 +427,14 @@ class KnowledgeServerTest {
   // connections and WAL files which are difficult to test in isolation.
 
   @Nested
-  @DisplayName("loadWatchedRootsBestEffort()")
+  @DisplayName("loadMigrationRoots()")
   class LoadWatchedRootsTests {
 
     @Test
     @DisplayName("returns empty list when no roots file and no config")
     void noRootsFile_noConfig_returnsEmpty(@TempDir Path tempDir) throws Exception {
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
+      List<Path> roots = invokeLoadMigrationRoots(server, null);
       assertTrue(roots.isEmpty());
     }
 
@@ -290,7 +452,7 @@ class KnowledgeServerTest {
       Files.writeString(rootsFile, json);
 
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
+      List<Path> roots = invokeLoadMigrationRoots(server, null);
 
       assertEquals(2, roots.size());
       assertTrue(roots.contains(root1.toAbsolutePath().normalize()));
@@ -314,15 +476,15 @@ class KnowledgeServerTest {
       Files.writeString(rootsFile, json);
 
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
+      List<Path> roots = invokeLoadMigrationRoots(server, null);
 
       assertEquals(1, roots.size());
       assertEquals(root1.toAbsolutePath().normalize(), roots.get(0));
     }
 
     @Test
-    @DisplayName("skips non-existent directories")
-    void nonExistentDirs_areSkipped(@TempDir Path tempDir) throws Exception {
+    @DisplayName("refuses incomplete declared root coverage")
+    void nonExistentDirs_areRefused(@TempDir Path tempDir) throws Exception {
       Path rootsFile = tempDir.resolve("watched_roots.json");
       Path existingRoot = tempDir.resolve("exists");
       Files.createDirectories(existingRoot);
@@ -333,23 +495,68 @@ class KnowledgeServerTest {
       Files.writeString(rootsFile, json);
 
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
-
-      assertEquals(1, roots.size());
-      assertEquals(existingRoot.toAbsolutePath().normalize(), roots.get(0));
+      var failure = assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> invokeLoadMigrationRoots(server, null));
+      assertInstanceOf(IOException.class, failure.getCause());
+      assertTrue(Files.exists(rootsFile));
     }
 
     @Test
-    @DisplayName("handles malformed JSON gracefully")
-    void malformedJson_returnsEmpty(@TempDir Path tempDir) throws Exception {
+    @DisplayName("malformed JSON cannot certify an empty migration")
+    void malformedJson_isRefused(@TempDir Path tempDir) throws Exception {
       Path rootsFile = tempDir.resolve("watched_roots.json");
       Files.writeString(rootsFile, "{ invalid json }}}");
 
       KnowledgeServer server = createServerWithDataDir(tempDir);
-      List<Path> roots = invokeLoadWatchedRootsBestEffort(server, null);
+      assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> invokeLoadMigrationRoots(server, null));
+      assertEquals("{ invalid json }}}", Files.readString(rootsFile));
+    }
+  }
 
-      // Should return empty (or fallback to config roots)
-      assertTrue(roots.isEmpty());
+  @Nested
+  @DisplayName("migration enumeration terminal coverage")
+  class MigrationEnumerationTerminalTests {
+    @Test
+    void genuineEmptyRootsCompleteButMalformedRootsLatchFailure(@TempDir Path tempDir) throws Exception {
+      for (boolean malformed : new boolean[] {false, true}) {
+        Path data = Files.createDirectory(tempDir.resolve(Boolean.toString(malformed)));
+        if (malformed) Files.writeString(data.resolve("watched_roots.json"), "{broken");
+        KnowledgeServer server = createServerWithDataDir(data);
+        var generations = new io.justsearch.indexerworker.index.IndexGenerationManager(
+            data.resolve("index"));
+        generations.initializeOrLoad();
+        var candidate = generations.startMigration("enumeration-test", List.of());
+        setField(server, "indexGenerationManager", generations);
+        setField(server, "buildingIndexPath", generations.resolveGenerationPathStrict(
+            candidate.building_generation()));
+        setField(server, "jobQueue", org.mockito.Mockito.mock(JobQueue.class));
+        setField(server, "running", true);
+        setField(server, "modelReadyLatch", new java.util.concurrent.CountDownLatch(0));
+        Method start = KnowledgeServer.class.getDeclaredMethod("startMigrationEnumeratorBestEffort",
+            io.justsearch.configuration.resolved.ResolvedConfig.class);
+        start.setAccessible(true);
+        start.invoke(server, io.justsearch.configuration.resolved.ResolvedConfig.builder().build());
+        Field threadField = findField(KnowledgeServer.class, "migrationEnumeratorThread");
+        threadField.setAccessible(true);
+        Thread thread = (Thread) threadField.get(server);
+        thread.join(5_000);
+        try {
+          assertFalse(thread.isAlive(), "enumeration must terminate for empty and malformed roots");
+          MigrationProgressSnapshot snapshot = invokeMigrationProgressSnapshot(server);
+          assertEquals(!malformed, snapshot.enumeratorDone());
+          assertFalse(snapshot.enumeratorRunning());
+          assertEquals(0, snapshot.filesEnqueued());
+          Field failure = findField(KnowledgeServer.class, "migrationEnumeratorFailure");
+          failure.setAccessible(true);
+          assertEquals(malformed, failure.get(server) != null);
+        } finally {
+          if (thread.isAlive()) {
+            thread.interrupt();
+            thread.join(5_000);
+          }
+        }
+      }
     }
   }
 
@@ -436,7 +643,7 @@ class KnowledgeServerTest {
       Path dbPath = tempDir.resolve("jobs.db");
       try (SqliteJobQueue queue = new SqliteJobQueue(dbPath)) {
         queue.open();
-        KnowledgeServer server = createServerWithJobQueue(queue);
+        KnowledgeServer server = createServerWithJobQueueAndRunning(queue, true);
 
         int count = invokeEnqueueAllFilesUnderRoots(server, List.of());
         assertEquals(0, count);
@@ -444,11 +651,12 @@ class KnowledgeServerTest {
     }
 
     @Test
-    @DisplayName("returns 0 when jobQueue is null")
-    void nullQueue_returnsZero() throws Exception {
-      KnowledgeServer server = createServerWithJobQueue(null);
-      int count = invokeEnqueueAllFilesUnderRoots(server, List.of(Path.of("/some/path")));
-      assertEquals(0, count);
+    @DisplayName("missing queue cannot certify coverage")
+    void nullQueue_isRefused() throws Exception {
+      KnowledgeServer server = createServerWithJobQueueAndRunning(null, true);
+      var failure = assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> invokeEnqueueAllFilesUnderRoots(server, List.of(Path.of("/some/path"))));
+      assertInstanceOf(IOException.class, failure.getCause());
     }
 
     @Test
@@ -475,8 +683,8 @@ class KnowledgeServerTest {
     }
 
     @Test
-    @DisplayName("skips non-directory roots")
-    void nonDirectoryRoots_areSkipped(@TempDir Path tempDir) throws Exception {
+    @DisplayName("single-file roots are admitted")
+    void singleFileRoots_areAdmitted(@TempDir Path tempDir) throws Exception {
       Path dbPath = tempDir.resolve("jobs.db");
       Path file = tempDir.resolve("not_a_dir.txt");
       Files.writeString(file, "content");
@@ -486,7 +694,8 @@ class KnowledgeServerTest {
         KnowledgeServer server = createServerWithJobQueueAndRunning(queue, true);
 
         int count = invokeEnqueueAllFilesUnderRoots(server, List.of(file));
-        assertEquals(0, count);
+        assertEquals(1, count);
+        assertEquals(1L, queue.queueDepth());
       }
     }
   }
@@ -536,10 +745,10 @@ class KnowledgeServerTest {
   }
 
   @SuppressWarnings("unchecked")
-  private static List<Path> invokeLoadWatchedRootsBestEffort(
+  private static List<Path> invokeLoadMigrationRoots(
       KnowledgeServer server, Object ignored) throws Exception {
     Method method = KnowledgeServer.class.getDeclaredMethod(
-        "loadWatchedRootsBestEffort",
+        "loadMigrationRoots",
         io.justsearch.configuration.resolved.ResolvedConfig.class);
     method.setAccessible(true);
     // Build a minimal ResolvedConfig with empty collections
@@ -572,6 +781,9 @@ class KnowledgeServerTest {
 
     // Initialize atomic fields that are final and need values
     initializeAtomicFields(server);
+    // CALLS_REAL_METHODS bypasses field initializers; preserve the empty source registry invariant.
+    setField(server, "projectionSeedSources", List.of());
+    setField(server, "completedProjectionSeeds", java.util.concurrent.ConcurrentHashMap.newKeySet());
 
     return server;
   }
@@ -608,10 +820,10 @@ class KnowledgeServerTest {
 
   /** Creates a minimal EmbeddingCompatibilityController for testing. */
   private static EmbeddingCompatibilityController createEmbeddingCompatController() {
-    return new EmbeddingCompatibilityController(java.util.Map::of, () -> 0L);
+    return new EmbeddingCompatibilityController(Map::of, () -> 0L);
   }
 
-  /** Initializes final atomic fields that require non-null values. */
+  /** Initializes final fields that require non-null values. */
   private static void initializeAtomicFields(KnowledgeServer server) throws Exception {
     setField(server, "migrationEnumeratorRunning", new AtomicBoolean(false));
     setField(server, "migrationEnumeratorRootsTotal", new AtomicLong(0L));
@@ -624,8 +836,8 @@ class KnowledgeServerTest {
     setField(
         server,
         "embeddingFingerprintSupplier",
-        new AtomicReference<java.util.function.Supplier<java.util.Optional<String>>>(
-            java.util.Optional::empty));
+        new AtomicReference<java.util.function.Supplier<Optional<String>>>(
+            Optional::empty));
   }
 
   private static Field findField(Class<?> clazz, String name) throws NoSuchFieldException {
@@ -694,6 +906,9 @@ class KnowledgeServerTest {
 
     @Override
     public void open() throws SQLException, IOException {}
+
+    @Override
+    public void returnUnfinishedClaims(java.util.Collection<IndexJob> claims) {}
 
     @Override
     public int enqueue(List<Path> paths, String collection) {

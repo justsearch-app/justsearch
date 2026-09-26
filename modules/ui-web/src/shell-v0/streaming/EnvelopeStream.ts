@@ -6,7 +6,7 @@
  *
  * Tracks four hook-owned signals:
  *  - `seq` — most recent envelope.seq seen.
- *  - `resumeToken` — most recent envelope.resumeToken seen.
+ *  - `resumeToken` — checkpoint of the most recently applied frame; cleared on reducer failure.
  *  - `isConnected` — true while EventSource readyState is OPEN.
  *  - `payload` — consumer-supplied accumulator updated by reducer.
  *
@@ -83,8 +83,8 @@ export interface EnvelopeStreamConfig<T> {
   /**
    * Tempdoc 662 — optional override for the `?since=` value used on every (re)connect. When
    * set, this REPLACES the single auto-tracked `resumeToken` for URL construction (a `null`
-   * return omits `?since=` entirely); the single-token field is still updated from incoming
-   * frames as before (harmless — just unused for the URL). The sole consumer is
+   * return omits `?since=` entirely); the single-token field still checkpoints successfully
+   * applied frames and clears on reducer failure (unused for this URL). The sole consumer is
    * `MultiplexedStream`, which needs the resume value to be a comma-joined BUNDLE of several
    * logical streams' tokens (one per demuxed `streamId`), not the single last-seen token a
    * one-channel-per-connection stream tracks. Single-channel consumers never set this — their
@@ -246,9 +246,15 @@ export class EnvelopeStream<T> {
     try {
       nextPayload = this.reducer(this.payload, envelope);
     } catch {
-      // Reducer error — keep prior payload, advance seq + resumeToken
-      // anyway so the consumer doesn't reconnect from a stale token.
-      nextPayload = this.payload;
+      // An unapplied frame cannot be acknowledged. Preserve the visible payload,
+      // record the observed sequence, and ask the existing reconnect owner for a
+      // fresh snapshot. Detach before notifying so late frames cannot advance the cursor.
+      this.seq = envelope.seq;
+      this.resumeToken = null;
+      this.isConnected = false;
+      this.scheduleReconnect();
+      this.notify();
+      return;
     }
     this.payload = nextPayload;
     this.seq = envelope.seq;
@@ -340,16 +346,20 @@ export class EnvelopeStream<T> {
 
   /**
    * FE-owned re-establishment. Tears down the dead/silent source and reopens it after bounded
-   * exponential backoff (capped, jittered, infinite at the cap per the 604 decision). Idempotent:
-   * a no-op while a reconnect is already pending or after an intentional stop(). `start()` re-reads
+   * exponential backoff (capped, jittered, infinite at the cap per the 604 decision). Reuses a
+   * pending timer, but always detaches a failed source, including one reopened by a listener.
+   * Does nothing after an intentional stop(). `start()` re-reads
    * the freshest `resumeToken`, so the replay is gap-free.
    */
   private scheduleReconnect(): void {
-    if (this.closedByUs || this.reconnectTimer !== null) {
+    if (this.closedByUs) {
       return;
     }
     this.detachSource();
     this.clearWatchdog();
+    if (this.reconnectTimer !== null) {
+      return;
+    }
     const exp = Math.min(this.reconnectCapMs, this.reconnectBaseMs * 2 ** this.reconnectAttempt);
     const jitter = Math.random() * Math.min(this.reconnectBaseMs / 2, exp);
     const delay = Math.min(this.reconnectCapMs, exp + jitter);

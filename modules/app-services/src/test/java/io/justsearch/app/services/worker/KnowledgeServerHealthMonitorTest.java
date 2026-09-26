@@ -8,10 +8,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.execution.TestEngineExecutors;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -23,89 +24,41 @@ import org.junit.jupiter.api.Test;
  */
 final class KnowledgeServerHealthMonitorTest {
 
-  @Test
-  void tickTriggersInitializationOnErrorToReadyTransition() {
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void healthArmDelegatesPhysicalObservationAndInitializationToBootstrap(boolean healthy) {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    cap.transition(CapabilityHealth.DEGRADED, "error");
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    when(bootstrap.checkHealth())
-        .thenAnswer(
-            inv -> {
-              cap.transition(CapabilityHealth.READY, null);
-              return true;
-            });
-
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
+    when(bootstrap.checkHealth()).thenReturn(healthy);
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
+    var reconciles = new java.util.concurrent.atomic.AtomicInteger();
+    monitor.onTick(reconciles::incrementAndGet);
     monitor.tick();
-
-    verify(bootstrap).checkHealth();
-    verify(bootstrap, times(1)).completeReadyInitializationFromMonitor();
+    monitor.tick();
+    verify(bootstrap, times(2)).checkHealth();
+    verify(bootstrap, never()).workerCapability();
+    assertEquals(2, reconciles.get());
   }
 
   @Test
-  void tickTriggersInitializationOnPendingToReadyTransition() {
+  void tickSwallowsExceptionsAndStillRequestsReadinessReconciliation() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    when(bootstrap.checkHealth())
-        .thenAnswer(
-            inv -> {
-              cap.transition(CapabilityHealth.READY, null);
-              return true;
-            });
-
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
-    monitor.tick();
-
-    verify(bootstrap, times(1)).completeReadyInitializationFromMonitor();
-  }
-
-  @Test
-  void tickDoesNotTriggerInitializationWhenAlreadyReady() {
-    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    cap.transition(CapabilityHealth.READY, null);
-    when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    when(bootstrap.checkHealth()).thenReturn(true);
-
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
-    monitor.tick();
-
-    verify(bootstrap, never()).completeReadyInitializationFromMonitor();
-  }
-
-  @Test
-  void tickDoesNotTriggerInitializationWhenStillDegraded() {
-    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    cap.transition(CapabilityHealth.DEGRADED, "error");
-    when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    when(bootstrap.checkHealth()).thenReturn(false);
-
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
-    monitor.tick();
-
-    verify(bootstrap, never()).completeReadyInitializationFromMonitor();
-  }
-
-  @Test
-  void tickSwallowsExceptionsSoExecutorSurvives() {
-    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
-    doThrow(new RuntimeException("transient gRPC failure")).when(bootstrap).checkHealth();
-
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
-
+    doThrow(new RuntimeException("direct health failure")).when(bootstrap).checkHealth();
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
+    var reconciles = new java.util.concurrent.atomic.AtomicInteger();
+    monitor.onTick(reconciles::incrementAndGet);
     assertDoesNotThrow(monitor::tick);
     verify(bootstrap).checkHealth();
-    verify(bootstrap, never()).completeReadyInitializationFromMonitor();
+    verify(bootstrap, never()).workerCapability();
+    assertEquals(1, reconciles.get());
   }
 
   // ---- Tempdoc 630: resume detection + eager re-validation -------------------------------------
@@ -113,79 +66,91 @@ final class KnowledgeServerHealthMonitorTest {
   @Test
   void firstTickSeedsClockAndDoesNotReValidate() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L, () -> clock[0]);
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L, () -> clock[0]);
     monitor.tick(); // first tick: no prior wall stamp → never a resume
 
-    verify(bootstrap, never()).client();
-    verify(client, never()).reconnect();
-    verify(client, never()).reindexPersistedRoots();
+    verify(bootstrap, never()).captureClient();
+    verify(client, never()).reindexPersistedRoots(org.mockito.ArgumentMatchers.any());
   }
 
   @Test
   void normalCadenceTickDoesNotReValidate() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L, () -> clock[0]);
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L, () -> clock[0]);
     monitor.tick(); // seed
     clock[0] += 10_500L; // a normal ~10s tick (with jitter), under the 30s threshold
     monitor.tick();
 
+    // Review S6: a `verify(client, never()).reconnect()` stood here. The method is gone, and the
+    // property it asserted is stronger on the line above it — the monitor never even asks the
+    // bootstrap for a client, so there is nothing it could have called on one.
     verify(bootstrap, never()).client();
-    verify(client, never()).reconnect();
-    verify(client, never()).reindexPersistedRoots();
+    verify(client, never()).reindexPersistedRoots(org.mockito.ArgumentMatchers.any());
   }
 
-  @Test
-  void largeGapTriggersEagerReconnectAndReconcile() {
+  /**
+   * Lane F stage A item A11: the post-resume actuator used to be two calls, a channel reconnect
+   * and a watcher re-register + reconcile. There is no channel, so the reconnect is gone.
+   *
+   * <p>A11 replaced the dropped assertion with its negative, {@code verify(client,
+   * never()).reconnect()}. Review S6 then deleted the method itself, which makes that negative
+   * unwritable — and unnecessary: {@code verifyNoMoreInteractions} below asserts the same thing
+   * over the whole client surface rather than one method of it, so "a resume must do the reconcile
+   * and nothing else" survives the deletion in a stronger form than it had.
+   */
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void largeGapTriggersReconcileAndNoReconnectUnlessFaultFixtureIsolated(boolean isolated) {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    KnowledgeServerBootstrap.ClientLease lease = mock(KnowledgeServerBootstrap.ClientLease.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(new WorkerCapability());
     when(bootstrap.checkHealth()).thenReturn(true);
-    when(bootstrap.client()).thenReturn(client);
+    when(bootstrap.captureClient()).thenReturn(lease);
+    when(lease.client()).thenReturn(client);
+    when(lease.withClient(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0))
+            .apply(client));
+    when(bootstrap.automaticRootProducersSuppressed()).thenReturn(isolated);
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L, () -> clock[0]);
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L, () -> clock[0]);
     monitor.tick(); // seed
     clock[0] += 3_600_000L; // a 1-hour gap → suspend/resume
     monitor.tick();
 
-    verify(client, times(1)).reconnect();
-    verify(client, times(1)).reindexPersistedRoots();
+    verify(client, times(isolated ? 0 : 1)).reindexPersistedRoots(org.mockito.ArgumentMatchers.any());
+    verifyNoMoreInteractions(client);
   }
 
   @Test
   void resumeReValidationSurvivesUnavailableClient() {
-    // A resume while the worker client is not available (client() throws) must not abort the tick or
+    // A resume while the worker client is not available (captureClient() throws) must not abort the tick or
     // flip the capability to DEGRADED. Post-825 this is the narrow race rather than the steady state:
-    // hasClient() and client() are two reads of the same volatile field, so a concurrent
+    // hasClient() and captureClient() can straddle a concurrent
     // closeForUpgrade can null it between them. The steady "no client at all" state is the
     // boot-recovery arm's, tested over a real bootstrap.
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    WorkerCapability cap = new WorkerCapability();
-    cap.transition(CapabilityHealth.READY, null);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.workerCapability()).thenReturn(cap);
     when(bootstrap.checkHealth()).thenReturn(true);
-    when(bootstrap.client()).thenThrow(new IllegalStateException("Knowledge Server not started"));
+    when(bootstrap.captureClient()).thenThrow(new IllegalStateException("Knowledge Server not started"));
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L, () -> clock[0]);
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L, () -> clock[0]);
     monitor.tick(); // seed
     clock[0] += 3_600_000L;
     assertDoesNotThrow(monitor::tick);
@@ -195,13 +160,13 @@ final class KnowledgeServerHealthMonitorTest {
 
   @Test
   void constructorRejectsNullBootstrap() {
-    assertThrows(IllegalArgumentException.class, () -> new KnowledgeServerHealthMonitor(null));
+    assertThrows(IllegalArgumentException.class, () -> new KnowledgeServerHealthMonitor(processExecutors, null));
   }
 
   @Test
   void closeIsIdempotent() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap);
+    KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
     monitor.close();
     assertDoesNotThrow(monitor::close);
   }
@@ -209,8 +174,8 @@ final class KnowledgeServerHealthMonitorTest {
   @Test
   void nonPositivePollIntervalFallsBackToDefault() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
-    assertDoesNotThrow(() -> new KnowledgeServerHealthMonitor(bootstrap, 0L).close());
-    assertDoesNotThrow(() -> new KnowledgeServerHealthMonitor(bootstrap, -1L).close());
+    assertDoesNotThrow(() -> new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 0L).close());
+    assertDoesNotThrow(() -> new KnowledgeServerHealthMonitor(processExecutors, bootstrap, -1L).close());
   }
 
   /**
@@ -223,7 +188,7 @@ final class KnowledgeServerHealthMonitorTest {
   void tickIntervalSupplierIsClampedToTheConfiguredInterval() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     try (KnowledgeServerHealthMonitor monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000L)) {
+        new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L)) {
       assertEquals(
           10_000L, monitor.nextTickDelayMs(), "no supplier keeps the configured fixed cadence");
 

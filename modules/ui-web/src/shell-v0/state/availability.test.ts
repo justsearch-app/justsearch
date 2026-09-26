@@ -109,7 +109,9 @@ describe('projectAvailability (tempdoc 596)', () => {
     expect(isUnavailable(a) && a.transient).toBeFalsy();
     expect(isUnavailable(a) && /offline/i.test(a.reason)).toBe(true);
     // §17 Move A — the affordance now carries the SAME remedy the banner does (no fork).
-    expect(isUnavailable(a) && a.remedy).toEqual({ kind: 'operation', operationId: 'core.reload-inference' });
+    expect(isUnavailable(a) && a.remedy).toEqual({
+      kind: 'navigate', target: 'core.brain-surface', label: 'Open Brain',
+    });
   });
 
   it('documents with zero indexed docs (idle) → settled "No documents indexed" + onboarding remedy', () => {

@@ -2,6 +2,8 @@ package io.justsearch.app.services.bootstrap.phases;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.registry.Audience;
@@ -15,8 +17,11 @@ import io.justsearch.agent.api.registry.I18nKey;
 import io.justsearch.agent.api.registry.Interface;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationAvailability;
+import io.justsearch.agent.api.registry.OperationCatalog;
+import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationLineage;
 import io.justsearch.agent.api.registry.OperationPolicy;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationRef;
 import io.justsearch.agent.api.registry.Plugin;
 import io.justsearch.agent.api.registry.PluginContributions;
@@ -27,11 +32,19 @@ import io.justsearch.agent.api.registry.RequiredCapability;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.api.registry.TrustTier;
+import io.justsearch.agent.api.registry.Workflow;
+import io.justsearch.agent.api.registry.WorkflowCatalog;
+import io.justsearch.agent.api.registry.WorkflowNode;
+import io.justsearch.agent.api.registry.WorkflowRef;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
+import io.justsearch.app.api.operations.RecordedIngestionService;
+import io.justsearch.app.services.conversation.WorkflowOperationProjection;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
+import io.justsearch.core.context.EngineContext;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -152,7 +165,7 @@ final class OperationCatalogCompositionTest {
             registry, core.namespace(), agentTools.namespace());
 
     List<Operation> all =
-        java.util.stream.Stream.concat(
+        Stream.concat(
                 composed.operationCatalog().definitions().stream(),
                 composed.agentToolsCatalog().definitions().stream())
             .toList();
@@ -221,5 +234,82 @@ final class OperationCatalogCompositionTest {
         composed.agentToolsCatalog().definitions().stream()
             .anyMatch(op -> op.id().equals(CoreOperationCatalog.RESTART_WORKER)),
         "core ops must not leak into the agent-tools partition");
+  }
+
+  @Test
+  void absentRecordedIngestionOwnerRemovesItsOperationsAndDependentWorkflow() {
+    OperationCatalog core = new CoreOperationCatalog();
+    OperationCatalog agentTools = new AgentToolsOperationCatalog();
+    assertTrue(
+        core.definitions().stream().anyMatch(op -> op.id().equals(CoreOperationCatalog.REINDEX)));
+    assertTrue(
+        agentTools.definitions().stream()
+            .anyMatch(op -> op.id().equals(AgentToolsOperationCatalog.INGEST_FILES)));
+
+    OperationCatalog availableCore =
+        OperationCatalogComposition.forRecordedIngestionOwner(
+            core, RecordedIngestionService.unavailable());
+    OperationCatalog availableAgentTools =
+        OperationCatalogComposition.forRecordedIngestionOwner(
+            agentTools, RecordedIngestionService.unavailable());
+
+    assertFalse(
+        availableCore.definitions().stream()
+            .anyMatch(op -> op.id().equals(CoreOperationCatalog.REINDEX)),
+        "the tooling facade must not offer reindex without its recorded-ingestion owner");
+    assertFalse(
+        availableAgentTools.definitions().stream()
+            .anyMatch(op -> op.id().equals(AgentToolsOperationCatalog.INGEST_FILES)),
+        "the tooling facade must not offer ingest without its recorded-ingestion owner");
+    assertTrue(
+        availableCore.definitions().stream()
+            .anyMatch(op -> op.id().equals(CoreOperationCatalog.RESTART_WORKER)),
+        "unrelated core operations remain offered");
+
+    Workflow reindexWorkflow =
+        new Workflow(
+            new WorkflowRef("core.reindex-workflow"),
+            Presentation.of(
+                new I18nKey("test.reindex-workflow"),
+                new I18nKey("test.reindex-workflow.desc")),
+            Provenance.core("1.0"),
+            Audience.AGENT,
+            List.of(new WorkflowNode.ToolStep("reindex", CoreOperationCatalog.REINDEX)),
+            List.of(new ConsumerHook.Realized("test.workflow", Audience.AGENT)));
+    List<Operation> offeredOperations =
+        Stream.concat(
+                availableCore.definitions().stream(), availableAgentTools.definitions().stream())
+            .toList();
+    assertTrue(
+        WorkflowOperationProjection.project(
+                WorkflowCatalog.of("core", List.of(reindexWorkflow)), offeredOperations)
+            .isEmpty(),
+        "a workflow depending on an omitted owner operation must not be projected as an agent tool");
+  }
+
+  @Test
+  void aRealButTemporarilyOfflineRecordedIngestionOwnerKeepsItsCatalogs() {
+    OperationCatalog core = new CoreOperationCatalog();
+    OperationCatalog agentTools = new AgentToolsOperationCatalog();
+    RecordedIngestionService temporarilyOffline =
+        new RecordedIngestionService() {
+          @Override
+          public OperationExecution execute(OperationRecordHandle parent, EngineContext context) {
+            throw new UnsupportedOperationException("fixture runtime is offline");
+          }
+
+          @Override
+          public void maintain() {}
+        };
+
+    assertTrue(
+        temporarilyOffline.hasOwner(), "runtime availability does not change owner presence");
+    assertThrows(
+        UnsupportedOperationException.class, () -> temporarilyOffline.execute(null, null));
+    assertSame(
+        core, OperationCatalogComposition.forRecordedIngestionOwner(core, temporarilyOffline));
+    assertSame(
+        agentTools,
+        OperationCatalogComposition.forRecordedIngestionOwner(agentTools, temporarilyOffline));
   }
 }

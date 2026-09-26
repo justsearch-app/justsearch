@@ -186,6 +186,48 @@ class CombinedEnrichmentBackfillOpsTest {
       boolean lateChunkingEnabled,
       boolean chunkVectorsEnabled,
       boolean chunkSpladeEnabled) {
+    return context(
+        embedEnabled,
+        spladeEnabled,
+        nerEnabled,
+        lateChunkingEnabled,
+        chunkVectorsEnabled,
+        chunkSpladeEnabled,
+        () -> false,
+        () -> false,
+        new WindowedEmbedProgress());
+  }
+
+  private CombinedEnrichmentBackfillOps.BackfillContext context(
+      boolean embedEnabled,
+      boolean spladeEnabled,
+      boolean nerEnabled,
+      boolean lateChunkingEnabled,
+      boolean chunkVectorsEnabled,
+      boolean chunkSpladeEnabled,
+      java.util.function.BooleanSupplier stopRequested) {
+    return context(
+        embedEnabled,
+        spladeEnabled,
+        nerEnabled,
+        lateChunkingEnabled,
+        chunkVectorsEnabled,
+        chunkSpladeEnabled,
+        stopRequested,
+        () -> false,
+        new WindowedEmbedProgress());
+  }
+
+  private CombinedEnrichmentBackfillOps.BackfillContext context(
+      boolean embedEnabled,
+      boolean spladeEnabled,
+      boolean nerEnabled,
+      boolean lateChunkingEnabled,
+      boolean chunkVectorsEnabled,
+      boolean chunkSpladeEnabled,
+      java.util.function.BooleanSupplier stopRequested,
+      java.util.function.BooleanSupplier embedShareSpent,
+      WindowedEmbedProgress progress) {
     return new CombinedEnrichmentBackfillOps.BackfillContext(
         documentFieldOps,
         indexingCoordinator,
@@ -205,10 +247,10 @@ class CombinedEnrichmentBackfillOpsTest {
         new ArrayDeque<>(),
         new ArrayDeque<>(),
         new int[] {0},
+        stopRequested,
         () -> false,
-        () -> false,
-        () -> false,
-        new WindowedEmbedProgress());
+        embedShareSpent,
+        progress);
   }
 
   private CombinedEnrichmentBackfillOps.BackfillContext embedOnlyContext() {
@@ -630,6 +672,342 @@ class CombinedEnrichmentBackfillOpsTest {
 
     verify(indexingCoordinator, times(1)).updateDocumentsBatch(anyList());
     verify(indexingCoordinator, never()).updateDocument(anyString(), anyMap());
+  }
+
+  @Test
+  @DisplayName(
+      "parent COMPLETED SPLADE is re-derived with pending embedding before the bundled RMW")
+  void completedParentSplade_withPendingEmbedding_isReencodedInSameWrite() throws Exception {
+    seedDoc(
+        "parent-embed",
+        "parent content",
+        Map.of(
+            SchemaFields.EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_PENDING,
+            SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_COMPLETED));
+    when(spladeEncoder.encodeBatch(anyList()))
+        .thenReturn(List.of(Map.of("parent", 1.0f)));
+
+    var outcome =
+        CombinedEnrichmentBackfillOps.processCombinedBackfill(context(true, true, false));
+
+    assertTrue(outcome.wroteAnything());
+    verify(spladeEncoder).encodeBatch(List.of("parent content"));
+    Map<String, Object> state = fakeIndex.get("parent-embed");
+    assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED, state.get(SchemaFields.EMBEDDING_STATUS));
+    assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
+    assertEquals(Map.of("parent", 1.0f), state.get(SchemaFields.SPLADE));
+    verify(indexingCoordinator, times(1)).updateDocumentsBatch(anyList());
+  }
+
+  @Test
+  @DisplayName("parent COMPLETED SPLADE is re-derived with pending NER before the bundled RMW")
+  void completedParentSplade_withPendingNer_isReencodedInSameWrite() throws Exception {
+    seedDoc(
+        "parent-ner",
+        "parent content",
+        Map.of(
+            SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_COMPLETED,
+            SchemaFields.NER_STATUS,
+            SchemaFields.NER_STATUS_PENDING));
+    when(spladeEncoder.encodeBatch(anyList())).thenReturn(List.of(Map.of("parent", 1.0f)));
+    when(nerService.extractEntitiesBatch(anyList())).thenReturn(List.of(NerResult.EMPTY));
+
+    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(false, true, true));
+
+    verify(spladeEncoder).encodeBatch(List.of("parent content"));
+    Map<String, Object> state = fakeIndex.get("parent-ner");
+    assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
+    assertEquals(Map.of("parent", 1.0f), state.get(SchemaFields.SPLADE));
+    assertEquals(SchemaFields.NER_STATUS_COMPLETED_EMPTY, state.get(SchemaFields.NER_STATUS));
+  }
+
+  @Test
+  @DisplayName(
+      "a stop before the re-derived SPLADE stage withholds the parent's unrelated update")
+  void completedParentSplade_stopBeforeSplade_preservesExistingRmwInputs() throws Exception {
+    seedDoc(
+        "parent-stop",
+        "parent content",
+        Map.of(
+            SchemaFields.EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_PENDING,
+            SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_COMPLETED));
+    fakeIndex.get("parent-stop").put(SchemaFields.SPLADE, Map.of("old", 2.0f));
+    java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();
+    when(embeddingProvider.embedDocumentBatch(anyList()))
+        .thenAnswer(
+            inv -> {
+              stop.set(true);
+              return List.of(new float[] {3f, 4f});
+            });
+
+    var outcome =
+        CombinedEnrichmentBackfillOps.processCombinedBackfill(
+            context(true, true, false, false, false, false, stop::get));
+
+    assertTrue(outcome.aborted());
+    assertFalse(outcome.progressed());
+    verify(spladeEncoder, never()).encodeBatch(anyList());
+    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+    Map<String, Object> state = fakeIndex.get("parent-stop");
+    assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING, state.get(SchemaFields.EMBEDDING_STATUS));
+    assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
+    assertEquals(Map.of("old", 2.0f), state.get(SchemaFields.SPLADE));
+  }
+
+  @Test
+  @DisplayName("a stop after re-derived SPLADE but before NER withholds SPLADE-only churn")
+  void completedParentSplade_stopBeforeNer_requiresNerOutcome() throws Exception {
+    seedDoc(
+        "parent-stop-ner",
+        "parent content",
+        Map.of(
+            SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_COMPLETED,
+            SchemaFields.NER_STATUS,
+            SchemaFields.NER_STATUS_PENDING));
+    java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();
+    when(spladeEncoder.encodeBatch(anyList()))
+        .thenAnswer(
+            ignored -> {
+              stop.set(true);
+              return List.of(Map.of("fresh", 1.0f));
+            });
+
+    var outcome =
+        CombinedEnrichmentBackfillOps.processCombinedBackfill(
+            context(false, true, true, false, false, false, stop::get));
+
+    assertTrue(outcome.aborted());
+    assertFalse(outcome.progressed());
+    verify(nerService, never()).extractEntitiesBatch(anyList());
+    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+  }
+
+  @Test
+  @DisplayName("preservation-only SPLADE does not reserve the embedding share")
+  void completedParentPreservationDoesNotDeferItsOwnPendingEmbedding() throws Exception {
+    for (String id : List.of("first", "second")) {
+      seedDoc(id, id + " content", Map.of(
+          SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING,
+          SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_COMPLETED));
+    }
+    when(embeddingProvider.documentWindowCount(anyString())).thenReturn(2);
+    when(embeddingProvider.embedDocumentWindows(anyString(), anyInt(), anyInt()))
+        .thenReturn(new EmbeddingProvider.WindowSlice(
+            List.of(new float[] {1f, 0f}, new float[] {0f, 1f}), 0, 2));
+    when(spladeEncoder.encodeBatch(anyList()))
+        .thenReturn(List.of(Map.of("fresh", 1.0f), Map.of("fresh", 1.0f)));
+
+    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+        context(true, true, false, false, false, false,
+            () -> false, () -> true, new WindowedEmbedProgress()));
+
+    assertTrue(outcome.progressed());
+    verify(embeddingProvider).embedDocumentWindows(eq("first content"), eq(0), anyInt());
+    verify(embeddingProvider).embedDocumentWindows(eq("second content"), eq(0), anyInt());
+    assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED,
+        fakeIndex.get("second").get(SchemaFields.EMBEDDING_STATUS));
+    assertTrue(fakeIndex.get("second").containsKey(SchemaFields.SPLADE));
+  }
+
+  @Test
+  @DisplayName("real pending SPLADE reserves its share while deferring a completed-parent bundle")
+  void realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate() throws Exception {
+    seedDoc("window-first", "first content", Map.of(
+        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING));
+    seedDoc("parent-deferred", "deferred content", Map.of(
+        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING,
+        SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_COMPLETED));
+    seedDoc("real-pending", "pending content", Map.of(
+        SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_PENDING));
+    when(embeddingProvider.documentWindowCount(anyString())).thenReturn(2);
+    when(embeddingProvider.embedDocumentWindows(anyString(), anyInt(), anyInt()))
+        .thenReturn(new EmbeddingProvider.WindowSlice(List.of(new float[] {1f, 0f}), 0, 2));
+    when(spladeEncoder.encodeBatch(anyList()))
+        .thenReturn(List.of(Map.of("fresh", 1.0f), Map.of("fresh", 1.0f)));
+
+    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+        context(true, true, false, false, false, false,
+            () -> false, () -> true, new WindowedEmbedProgress()));
+
+    assertTrue(outcome.progressed(), "real pending SPLADE advanced durably");
+    verify(indexingCoordinator).updateDocumentsBatch(argThat(batch ->
+        batch.size() == 1 && batch.getFirst().getKey().equals("real-pending")));
+    assertFalse(fakeIndex.get("parent-deferred").containsKey(SchemaFields.SPLADE));
+    assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
+        fakeIndex.get("parent-deferred").get(SchemaFields.EMBEDDING_STATUS));
+  }
+
+  @Test
+  @DisplayName("partial aggregate write retains completed windows and cannot claim progress")
+  void partialWriteRetainsCompletedWindowsUntilTheirActualRetryWrite() throws Exception {
+    for (String id : List.of("first", "second")) {
+      seedDoc(id, id + " content", Map.of(
+          SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING,
+          SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_COMPLETED));
+    }
+    when(embeddingProvider.documentWindowCount(anyString())).thenReturn(2);
+    when(embeddingProvider.embedDocumentWindows(anyString(), anyInt(), anyInt()))
+        .thenReturn(new EmbeddingProvider.WindowSlice(
+            List.of(new float[] {1f, 0f}, new float[] {0f, 1f}), 0, 2));
+    when(spladeEncoder.encodeBatch(anyList())).thenAnswer(invocation -> {
+      List<String> content = invocation.getArgument(0);
+      return content.stream().map(ignored -> Map.of("fresh", 1.0f)).toList();
+    });
+    var writes = new java.util.concurrent.atomic.AtomicInteger();
+    when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(invocation -> {
+      List<Map.Entry<String, Map<String, Object>>> batch = invocation.getArgument(0);
+      boolean partial = writes.getAndIncrement() == 0;
+      int written = 0;
+      for (var entry : batch) {
+        if (!partial || entry.getKey().equals("first")) {
+          fakeIndex.get(entry.getKey()).putAll(entry.getValue());
+          written++;
+        }
+      }
+      return new LuceneRuntimeTypes.BatchUpdateResult(written, batch.size() - written);
+    });
+    var progress = new WindowedEmbedProgress();
+    var context = context(true, true, false, false, false, false,
+        () -> false, () -> false, progress);
+
+    var partial = CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
+    assertTrue(partial.wroteAnything());
+    assertFalse(partial.progressed());
+    assertEquals(2, progress.trackedDocuments(), "aggregate count cannot identify the skipped doc");
+    assertTrue(progress.isComplete("second"));
+    assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
+        fakeIndex.get("second").get(SchemaFields.EMBEDDING_STATUS));
+
+    var retried = CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
+    assertTrue(retried.progressed());
+    verify(embeddingProvider, times(1)).embedDocumentWindows(eq("second content"), eq(0), anyInt());
+    assertFalse(progress.isComplete("second"));
+    assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED,
+        fakeIndex.get("second").get(SchemaFields.EMBEDDING_STATUS));
+  }
+
+  @Test
+  @DisplayName("a withheld completed window is reused without another encoder call")
+  void completedWindowWithheld_thenRetryUsesCachedPooledVector() throws Exception {
+    seedDoc(
+        "parent-window",
+        "window content",
+        Map.of(
+            SchemaFields.EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_PENDING,
+            SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_COMPLETED));
+    WindowedEmbedProgress progress = new WindowedEmbedProgress();
+    java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();
+    when(embeddingProvider.documentWindowCount("window content")).thenReturn(2);
+    when(embeddingProvider.embedDocumentWindows("window content", 0, 32))
+        .thenAnswer(
+            ignored -> {
+              stop.set(true);
+              return new EmbeddingProvider.WindowSlice(
+                  List.of(new float[] {1f, 0f}, new float[] {0f, 1f}), 0, 2);
+            });
+    when(spladeEncoder.encodeBatch(anyList())).thenReturn(List.of(Map.of("fresh", 1.0f)));
+
+    var withheld =
+        CombinedEnrichmentBackfillOps.processCombinedBackfill(
+            context(
+                true, true, false, false, false, false, stop::get, () -> false, progress));
+    assertFalse(withheld.progressed());
+    assertEquals(1, progress.trackedDocuments());
+    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+
+    stop.set(false);
+    var committed =
+        CombinedEnrichmentBackfillOps.processCombinedBackfill(
+            context(
+                true, true, false, false, false, false, stop::get, () -> false, progress));
+
+    assertTrue(committed.progressed());
+    assertEquals(0, progress.trackedDocuments());
+    verify(embeddingProvider, times(1)).embedDocumentWindows("window content", 0, 32);
+    assertEquals(
+        SchemaFields.EMBEDDING_STATUS_COMPLETED,
+        fakeIndex.get("parent-window").get(SchemaFields.EMBEDDING_STATUS));
+  }
+
+  @Test
+  @DisplayName("a re-derived parent SPLADE failure writes a truthful retry outcome")
+  void completedParentSplade_encoderFailure_writesRetryOutcome() throws Exception {
+    seedDoc(
+        "parent-failure",
+        "parent content",
+        Map.of(
+            SchemaFields.EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_PENDING,
+            SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_COMPLETED));
+    when(spladeEncoder.encodeBatch(anyList())).thenThrow(new RuntimeException("encoder boom"));
+
+    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(true, true, false));
+
+    verify(spladeEncoder).encodeBatch(List.of("parent content"));
+    Map<String, Object> state = fakeIndex.get("parent-failure");
+    assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED, state.get(SchemaFields.EMBEDDING_STATUS));
+    assertEquals("1", state.get(SchemaFields.SPLADE_RETRY_COUNT));
+    // This map fixture does not implement Lucene's RMW reset policy. Assert the writer input
+    // here; the real-index regression asserts the resulting PENDING status and absent postings.
+    verify(indexingCoordinator)
+        .updateDocumentsBatch(
+            argThat(
+                batch ->
+                    batch.stream()
+                        .anyMatch(
+                            entry ->
+                                entry.getKey().equals("parent-failure")
+                                    && "1"
+                                        .equals(
+                                            entry
+                                                .getValue()
+                                                .get(SchemaFields.SPLADE_RETRY_COUNT))
+                                    && !entry.getValue().containsKey(SchemaFields.SPLADE_STATUS)
+                                    && !entry.getValue().containsKey(SchemaFields.SPLADE))));
+  }
+
+  @Test
+  @DisplayName("absent, FAILED, and COMPLETED_EMPTY SPLADE states are never falsely encoded")
+  void parentSpladeNonCompletedStates_areNotReencoded() throws Exception {
+    seedDoc(
+        "parent-absent",
+        "content absent",
+        Map.of(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING));
+    seedDoc(
+        "parent-failed",
+        "content failed",
+        Map.of(
+            SchemaFields.EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_PENDING,
+            SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_FAILED));
+    seedDoc(
+        "parent-empty",
+        "content empty",
+        Map.of(
+            SchemaFields.EMBEDDING_STATUS,
+            SchemaFields.EMBEDDING_STATUS_PENDING,
+            SchemaFields.SPLADE_STATUS,
+            SchemaFields.SPLADE_STATUS_COMPLETED_EMPTY));
+    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(true, true, false));
+
+    verify(spladeEncoder, never()).encodeBatch(anyList());
+    assertNull(fakeIndex.get("parent-absent").get(SchemaFields.SPLADE));
+    assertEquals(
+        SchemaFields.SPLADE_STATUS_FAILED,
+        fakeIndex.get("parent-failed").get(SchemaFields.SPLADE_STATUS));
+    assertEquals(
+        SchemaFields.SPLADE_STATUS_COMPLETED_EMPTY,
+        fakeIndex.get("parent-empty").get(SchemaFields.SPLADE_STATUS));
   }
 
   // ---------------------------------------------------------------------------------------

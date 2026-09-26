@@ -12,9 +12,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Dev-only service restart manager for hot-reloading Worker application services.
  *
- * <p>On reload signal (MMF byte at offset 29): quiesces the IndexingLoop, reconstructs
+ * <p>On reload signal — the existence of {@code <dataDir>/runtime/dev-reload.request}, polled by
+ * {@link io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus#isReloadRequested()} and
+ * consumed by deleting the file ({@code clearReloadSignal()}); it was a byte in the memory-mapped
+ * file until lane F stage A item A10 deleted that bus — quiesces the IndexingLoop, reconstructs
  * {@link DefaultWorkerAppServices} from the same {@link InfraContext}, re-wires models,
- * swaps gRPC delegates, and starts the new indexing loop.
+ * publishes the new instance, and starts the new indexing loop. Until lane F stage A item A9 the
+ * publish step was two: re-point the three {@code Delegating*Service} gRPC delegates, then update
+ * the field. The delegates are gone, so the volatile write IS the swap — see
+ * {@link #performReload()}.
  *
  * <p>This works in tandem with JBR + HotSwapPush (Phase 1): class bytecode is updated by
  * HotSwap, then Phase 2 restarts services so constructors, static initializers, and field
@@ -32,10 +38,15 @@ final class DevReloadManager {
 
   private final KnowledgeServer server;
   private final AtomicBoolean reloadInProgress = new AtomicBoolean(false);
+  private volatile boolean closeRetryPending;
 
   DevReloadManager(KnowledgeServer server) {
     this.server = server;
     log.info("DevReloadManager initialized");
+  }
+
+  boolean isReloadRequested() {
+    return closeRetryPending || server.signalBus.isReloadRequested();
   }
 
   void performReload() {
@@ -54,41 +65,52 @@ final class DevReloadManager {
       // 2. Await deferred model init completion — get the ModelContext
       ModelContext modelCtx = awaitDeferredInit();
 
-      // 3. Close old application services (stops IndexingLoop, up to 5s join)
-      WorkerAppServices oldServices = server.appServices;
-      if (oldServices != null) {
-        log.info("Closing old application services...");
-        oldServices.close();
+      // The initializer may itself upgrade the runtime. Do not hold runtimeSwapLock while
+      // awaiting it; acquire the same owner lock as admin reload and shutdown afterward.
+      try (var owner = server.beginDevReplacement()) {
+        owner.assertOwned();
+        boolean published = false;
+        try {
+          // The incumbent may have stopped its watcher while its indexing owner drains. Retain
+          // this request in the sentinel so a refused close retries without another compile.
+          WorkerAppServices oldServices = server.appServices;
+          if (oldServices != null) {
+            log.info("Closing old application services...");
+            closeRetryPending = true;
+            server.retireServingView();
+            oldServices.close();
+          }
+
+          // HotSwap has updated class bytecode. Retain B as an explicit pending owner from
+          // construction through model wiring and producer startup, including every failure cut.
+          server.closeFailedPendingAppServices();
+          WorkerAppServices newServices = server.newAppServices();
+          server.retainPendingAppServices(newServices);
+          rewireModels(newServices, modelCtx);
+          newServices.startIndexingLoop();
+          server.publishServingView(newServices);
+          server.releasePendingAppServices(newServices);
+          published = true;
+          closeRetryPending = false;
+          server.notifyRecordedServicesPublished();
+
+          // The stamp is diagnostic; failure after publication cannot roll back B.
+          updateBuildStampFromReloadFile();
+          long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
+          log.info("=== DEV HOT-RELOAD: complete ({}ms) ===", elapsedMs);
+
+        } catch (Exception e) {
+          if (!published) {
+            closeRetryPending = true;
+            try {
+              server.closeFailedPendingAppServices();
+            } catch (RuntimeException cleanup) {
+              if (cleanup != e) e.addSuppressed(cleanup);
+            }
+          }
+          throw e;
+        }
       }
-
-      // 4. Construct new services from the same InfraContext.
-      // Class bytecode was already updated by HotSwap (Phase 1). Reconstruction
-      // re-evaluates constructors, static initializers, and field defaults.
-      // 516 P3 FINAL CUT: use the KS helper that pre-wires migrationActiveSupplier +
-      // embeddingTelemetry at ctor time (replaces the old rewireEmbeddingTelemetry shim
-      // and the wireMigrationActiveSupplier post-ctor call).
-      WorkerAppServices newServices = server.newAppServices();
-
-      // 5. Re-wire models from ModelContext (typed, no scattered field reads)
-      rewireModels(newServices, modelCtx);
-
-      // 6. Swap gRPC delegates (volatile write — atomic for new requests)
-      server.searchWrapper.setDelegate(newServices.grpcSearchService());
-      server.ingestWrapper.setDelegate(newServices.grpcIngestService());
-      server.healthWrapper.setDelegate(newServices.grpcHealthService());
-
-      // 7. Update KnowledgeServer's appServices reference
-      server.appServices = newServices;
-
-      // 8. Start new indexing loop
-      newServices.startIndexingLoop();
-
-      // 9. 371: Update build stamp from reload-build-stamp.txt (written by MCP reload tool).
-      //    This prevents false-positive "stale JVM" warnings from jseval after a successful reload.
-      updateBuildStampFromReloadFile();
-
-      long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
-      log.info("=== DEV HOT-RELOAD: complete ({}ms) ===", elapsedMs);
 
     } catch (Exception e) {
       log.error("DEV HOT-RELOAD failed", e);
@@ -204,8 +226,11 @@ final class DevReloadManager {
   /**
    * 371: Reads the build stamp left by the MCP reload tool and updates the system property.
    * The MCP tool writes the on-disk stamp to {@code <dataDir>/reload-build-stamp.txt} after
-   * a successful HotSwapPush. We read it here so the next {@code IndexStatus} RPC reports
-   * the correct stamp, preventing false-positive "stale JVM" warnings from jseval.
+   * a successful HotSwapPush. We read it here so the next status projection reports the correct
+   * stamp, preventing false-positive "stale JVM" warnings from jseval. (It reached the Head over
+   * the {@code IndexStatus} RPC until lane F stage A item A9 deleted the wire; the stamp itself
+   * now describes the Engine distribution — item A13 re-homed {@code generateBuildStamp} onto
+   * {@code modules/ui/build/install/ui/build-stamp.txt}.)
    */
   private void updateBuildStampFromReloadFile() {
     try {

@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.DoubleSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +55,8 @@ public final class StreamingCitationMatcher implements StreamConsumer {
 
   private final DocumentService documents;
   private final Duration timeout;
-  private final double threshold;
+  private final DoubleSupplier threshold;
+  private final ConversationConfigProvider configProvider;
 
   public StreamingCitationMatcher(DocumentService documents) {
     this(documents, MATCH_TIMEOUT, DEFAULT_THRESHOLD);
@@ -68,13 +70,38 @@ public final class StreamingCitationMatcher implements StreamConsumer {
     this(documents, MATCH_TIMEOUT, threshold);
   }
 
+  public StreamingCitationMatcher(DocumentService documents, DoubleSupplier threshold) {
+    this(documents, MATCH_TIMEOUT, threshold);
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public StreamingCitationMatcher(
+      DocumentService documents, ConversationConfigProvider configProvider) {
+    this(documents, MATCH_TIMEOUT, configProvider);
+  }
+
   public StreamingCitationMatcher(
       DocumentService documents, Duration timeout, double threshold) {
+    this(documents, timeout, () -> threshold);
+  }
+
+  public StreamingCitationMatcher(
+      DocumentService documents, Duration timeout, DoubleSupplier threshold) {
     this.documents = Objects.requireNonNull(documents, "documents");
     this.timeout = Objects.requireNonNull(timeout, "timeout");
-    // Tempdoc 799 Q: the ONE normaliser, shared with the agent path. A local clamp here is what
-    // let a configured 0 mean 0.01 on this path and 0.5 on the other.
-    this.threshold = DocumentService.effectiveCitationThreshold(threshold);
+    this.threshold = Objects.requireNonNull(threshold, "threshold");
+    this.configProvider = null;
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public StreamingCitationMatcher(
+      DocumentService documents,
+      Duration timeout,
+      ConversationConfigProvider configProvider) {
+    this.documents = Objects.requireNonNull(documents, "documents");
+    this.timeout = Objects.requireNonNull(timeout, "timeout");
+    this.threshold = () -> DEFAULT_THRESHOLD;
+    this.configProvider = Objects.requireNonNull(configProvider, "configProvider");
   }
 
   @Override
@@ -125,6 +152,7 @@ public final class StreamingCitationMatcher implements StreamConsumer {
 
   @Override
   public StreamConsumerResult onDone(String fullText, ConversationContext ctx) {
+    var engineContext = ctx.engineContext();
     if (fullText == null || fullText.isBlank()) {
       return StreamConsumerResult.empty();
     }
@@ -133,9 +161,14 @@ public final class StreamingCitationMatcher implements StreamConsumer {
       return StreamConsumerResult.empty();
     }
     try {
+      double effectiveThreshold =
+          DocumentService.effectiveCitationThreshold(
+              configProvider == null
+                  ? threshold.getAsDouble()
+                  : configProvider.resolve(engineContext).rag().citationMatchThreshold());
       CitationMatchResult result =
           documents
-              .matchCitationsAgainst(fullText, sources, threshold)
+              .matchCitationsAgainst(fullText, sources, effectiveThreshold, engineContext)
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       if (result == null) {

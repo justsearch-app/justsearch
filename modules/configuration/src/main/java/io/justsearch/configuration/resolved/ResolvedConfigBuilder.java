@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
  * <table>
  * <tr><th>Ordinal</th><th>Source</th><th>Rationale</th></tr>
  * <tr><td>500</td><td>{@code -D} JVM argument</td><td>Operator override — always wins</td></tr>
- * <tr><td>450</td><td>Worker config snapshot</td><td>Head→Worker propagation</td></tr>
  * <tr><td>400</td><td>Environment variable</td><td>Scripting/CI override (12-factor)</td></tr>
  * <tr><td>350</td><td>CI profile overrides</td><td>CI-specific config file</td></tr>
  * <tr><td>300</td><td>{@code settings.json}</td><td>User preference (GUI-set)</td></tr>
@@ -54,9 +53,6 @@ public final class ResolvedConfigBuilder {
 
   /** {@code -D} JVM argument — operator override, always wins. */
   public static final int ORDINAL_JVM_ARG = 500;
-
-  /** Worker config snapshot — Head→Worker propagation. */
-  public static final int ORDINAL_WORKER_SNAPSHOT = 450;
 
   /** Environment variable — scripting/CI override (12-factor). */
   public static final int ORDINAL_ENV_VAR = 400;
@@ -107,59 +103,11 @@ public final class ResolvedConfigBuilder {
    */
   public static final int ENGINE_DEFAULT_MAX_TOKENS = 1024;
 
-  // ==================== Static Factories ====================
-
-  /**
-   * Builds a worker-side {@link ResolvedConfig} from the Head→Worker config snapshot sysprop.
-   *
-   * <p>Reads the {@code justsearch.worker.config_snapshot} system property. If set, loads the
-   * snapshot at ordinal 450 and contributes EnvRegistry entries. Returns null if the sysprop is
-   * not set or blank.
-   *
-   * <p>This method centralizes the sysprop read in {@code modules/configuration}, keeping
-   * {@code modules/indexer-worker} free of direct {@code System.getProperty} calls.
-   *
-   * @return a resolved config from the worker snapshot, or null if no snapshot path is configured
-   */
-  public static ResolvedConfig loadWorkerSnapshotFromSysprop() {
-    return loadWorkerSnapshotFromSysprop(Map.of());
-  }
-
-  /**
-   * Builds a worker-side {@link ResolvedConfig} with optional auto-detected values.
-   *
-   * @param autoDetected auto-detected hardware values (ordinal 150), or empty map to skip
-   * @return a resolved config from the worker snapshot, or null if no snapshot path is configured
-   */
-  public static ResolvedConfig loadWorkerSnapshotFromSysprop(Map<String, String> autoDetected) {
-    String snapshotProp = System.getProperty("justsearch.worker.config_snapshot"); // SYS-PROP-LEGACY-COMPAT
-    if (snapshotProp == null || snapshotProp.isBlank()) return null;
-    ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
-    builder.contributeAutoDetected(autoDetected);  // 347: ordinal 150
-    builder.contributeWorkerSnapshot(Path.of(snapshotProp));  // ordinal 450 (wins over 150)
-    builder.contributeEnvRegistry();
-    LOG.info("Worker config snapshot loaded from {}", snapshotProp);
-    return builder.build();
-  }
-
-  /**
-   * Loads the raw Head→Worker config snapshot as a flat key→value map.
-   *
-   * <p>Reads the {@code justsearch.worker.config_snapshot} system property. If set, loads the
-   * JSON snapshot file and returns its contents. Returns an empty map if the sysprop is unset,
-   * blank, or the file cannot be read.
-   *
-   * <p>This is used for startup validation (item 4 of tempdoc 331) to compare the raw snapshot
-   * values against the Worker's fully resolved {@link ResolvedConfig}, detecting any divergence
-   * caused by JVM arg overrides at ordinal 500.
-   *
-   * @return raw snapshot key-value map, or empty map if no snapshot is available
-   */
-  public static Map<String, String> loadRawWorkerSnapshotFromSysprop() {
-    String snapshotProp = System.getProperty("justsearch.worker.config_snapshot"); // SYS-PROP-LEGACY-COMPAT
-    if (snapshotProp == null || snapshotProp.isBlank()) return Map.of();
-    return ResolvedConfig.loadWorkerSnapshot(Path.of(snapshotProp));
-  }
+  // Lane F item A19 emptied the "Static Factories" section. It held only the worker-snapshot
+  // loaders — loadWorkerSnapshotFromSysprop (twice) and loadRawWorkerSnapshotFromSysprop — which
+  // read `justsearch.worker.config_snapshot` so a second JVM could inherit the Head's resolved
+  // config at ordinal 450. There is no second JVM, so the tier, the ordinal and the sysprop are
+  // gone; the banner goes with them rather than standing over nothing.
 
   // ==================== Internal State ====================
 
@@ -264,30 +212,12 @@ public final class ResolvedConfigBuilder {
   }
 
   /**
-   * Contributes values from a Head→Worker config snapshot at ordinal 450.
-   *
-   * <p>The snapshot is a JSON file written by {@link ResolvedConfig#toWorkerSnapshot(Path)} on the
-   * Head process. The Worker loads it during startup to inherit the Head's resolved configuration
-   * without relying on env var forwarding.
-   *
-   * @param snapshotPath path to the snapshot file (null or nonexistent files are ignored)
-   * @return this builder for chaining
-   */
-  public ResolvedConfigBuilder contributeWorkerSnapshot(Path snapshotPath) {
-    if (snapshotPath == null) return this;
-    Map<String, String> snapshot = ResolvedConfig.loadWorkerSnapshot(snapshotPath);
-    for (Map.Entry<String, String> entry : snapshot.entrySet()) {
-      put(entry.getKey(), ORDINAL_WORKER_SNAPSHOT, "worker_snapshot", snapshotPath.toString(),
-          entry.getValue());
-    }
-    return this;
-  }
-
-  /**
    * Contributes auto-detected hardware values at ordinal 150.
    *
    * <p>Auto-detected values have the lowest explicit-override priority. They are overridden by
-   * YAML (200), settings.json (300), env vars (400), worker snapshots (450), and sysprops (500).
+   * YAML (200), settings.json (300), env vars (400) and sysprops (500). (Lane F item A19 removed
+   * the ordinal-450 worker-snapshot tier: it existed to carry the Head's resolved config across a
+   * process boundary that no longer exists.)
    * This is the intended slot for GPU auto-detection: when CUDA DLLs are found on the filesystem,
    * the caller probes and feeds the result here so the master GPU switch defaults to {@code true}
    * without requiring explicit env var configuration.
@@ -322,7 +252,6 @@ public final class ResolvedConfigBuilder {
     contributeYamlHybridSearch(root);
     contributeYamlSearch(root);
     contributeYamlIndexComposite(root);
-    contributeYamlWorkers(root);
     contributeYamlCollections(root);
     contributeYamlInfra(root);
     // YAML key app.data_dir -> justsearch.data.dir (a yaml-tier source for paths resolution; the
@@ -545,13 +474,6 @@ public final class ResolvedConfigBuilder {
   private void contributeYamlSearch(JsonNode root) {
     JsonNode searchRoot = root.path("search");
     if (searchRoot.isMissingNode()) return;
-    // Tempdoc 883 decision 5: `search.pipeline.profile` shipped in config/application.yaml with a
-    // value (`desktop-default`) that reached nothing — the resolver only ever resolved the
-    // env/sysprop spelling `justsearch.search.pipeline.profile`, so editing the YAML did nothing,
-    // silently. Note the key here carries the `justsearch.` prefix while the yamlPath does not;
-    // that mismatch is exactly why it was missed, and why the new yaml-reader gate resolves the
-    // relative path against `searchRoot` instead of trusting the two spellings to match.
-    putYamlFromNode("justsearch.search.pipeline.profile", searchRoot, "pipeline.profile");
     putYamlIntFromNode("search.hybrid.bm25_k", searchRoot, "hybrid.bm25_k");
     putYamlIntFromNode("search.hybrid.ann_k", searchRoot, "hybrid.ann_k");
     putYamlFromNode("search.hybrid.auto_embed", searchRoot, "hybrid.auto_embed");
@@ -661,27 +583,10 @@ public final class ResolvedConfigBuilder {
     }
   }
 
-  private void contributeYamlWorkers(JsonNode root) {
-    // workers.indexer.*
-    putYamlBoolean("workers.indexer.enabled", root, "workers.indexer.enabled");
-    putYaml("justsearch.indexer.host", root, "workers.indexer.host");
-    putYamlInt("justsearch.indexer.port", root, "workers.indexer.port");
-    putYamlLong("justsearch.indexer.deadlineMs", root, "workers.indexer.deadlineMs");
-    putYamlInt("justsearch.indexer.queueSize", root, "workers.indexer.queueSize");
-    putYamlInt("justsearch.indexer.maxInFlightBytes", root, "workers.indexer.maxInFlightBytes");
-    putYaml("workers.indexer.backpressure_mode", root, "workers.indexer.backpressure_mode");
-  }
-
   private void contributeYamlCollections(JsonNode root) {
     JsonNode colsNode = root.path("index").path("collections");
     if (colsNode.isArray() && !colsNode.isEmpty()) {
       put("index.collections", ORDINAL_YAML, "yaml", "index.collections", colsNode.toString());
-      // Contribute first collection's name to Search.collection at ordinal 200
-      JsonNode firstName = colsNode.path(0).path("name");
-      if (firstName.isTextual() && !firstName.asText().isBlank()) {
-        put("justsearch.index.collection", ORDINAL_YAML, "yaml",
-            "index.collections[0].name", firstName.asText());
-      }
     }
   }
 
@@ -693,8 +598,6 @@ public final class ResolvedConfigBuilder {
         "infra.health.thresholds.translator_handshake_stale_ms");
     putYamlInt("infra.health.thresholds.ann_cache_ready_percent", root,
         "infra.health.thresholds.ann_cache_ready_percent");
-    putYaml(EnvRegistry.INFRA_HEALTH_HOST.sysProp(), root, "infra.health.grpc.host");
-    putYaml(EnvRegistry.INFRA_HEALTH_PORT.sysProp(), root, "infra.health.grpc.port");
   }
 
   // ==================== YAML Read Helpers ====================
@@ -934,7 +837,8 @@ public final class ResolvedConfigBuilder {
     }
 
     // Build sub-records from resolved values
-    ResolvedConfig.Paths paths = buildPaths();
+    ResolvedConfig.Collections collections = buildCollections();
+    ResolvedConfig.Paths paths = buildPaths(collections);
     ResolvedConfig.Ports ports = buildPorts();
     ResolvedConfig.Ai ai = buildAi();
     ResolvedConfig.Agent agent = buildAgent();
@@ -945,22 +849,21 @@ public final class ResolvedConfigBuilder {
     ResolvedConfig.Ui ui = buildUi();
     ResolvedConfig.Watcher watcher = buildWatcher();
     ResolvedConfig.Ocr ocr = buildOcr();
+    ResolvedConfig.Extraction extraction = buildExtraction();
     ResolvedConfig.Index index = buildIndex();
     ResolvedConfig.Rag rag = buildRag();
     ResolvedConfig.HybridSearch hybridSearch = buildHybridSearch();
     ResolvedConfig.Worker worker = buildWorker();
-    ResolvedConfig.Collections collections = buildCollections();
     ResolvedConfig.WorkerIndexer workerIndexer = buildWorkerIndexer();
     ResolvedConfig.InfraHealth infraHealth = buildInfraHealth();
-    ResolvedConfig.InfraGrpc infraGrpc = buildInfraGrpc();
 
     ResolvedConfig config =
         new ResolvedConfig(
             paths, ports, ai, agent, summary,
             search, telemetry, policy, ui,
-            watcher, ocr, index, rag, hybridSearch, worker,
+            watcher, ocr, extraction, index, rag, hybridSearch, worker,
             collections, workerIndexer,
-            infraHealth, infraGrpc,
+            infraHealth,
             allResolutions);
 
     buildPhaseActive = false;
@@ -973,12 +876,12 @@ public final class ResolvedConfigBuilder {
 
   // ==================== Sub-record Builders ====================
 
-  private ResolvedConfig.Paths buildPaths() {
+  private ResolvedConfig.Paths buildPaths(ResolvedConfig.Collections collections) {
     Path dataDir = resolvePath("justsearch.data.dir", null);
     Path indexBasePath = resolvePath("justsearch.index.base_path", null);
     // Derive indexBasePath from dataDir + primary collection name if not explicitly set
     if (indexBasePath == null && dataDir != null) {
-      String collection = resolveString("justsearch.index.collection", "default");
+      String collection = collections.items().isEmpty() ? "default" : collections.items().get(0).name();
       indexBasePath = dataDir.resolve("index").resolve(collection);
     }
     return new ResolvedConfig.Paths(
@@ -988,7 +891,8 @@ public final class ResolvedConfigBuilder {
         resolvePath("justsearch.models.dir", null),
         resolvePath("justsearch.ssot.path", null),
         resolvePath("justsearch.repo.root", null),
-        resolvePath("justsearch.onnxruntime.native_path", null));
+        resolvePath("justsearch.onnxruntime.native_path", null),
+        Math.max(1, resolveInt("justsearch.path_resolution.retention_days", 90)));
   }
 
   private ResolvedConfig.Ports buildPorts() {
@@ -1092,7 +996,6 @@ public final class ResolvedConfigBuilder {
         resolveBoolean("justsearch.llm.use_thinking", true),
         resolveReasoningBudget(),
         resolveString("justsearch.onnxruntime.variantId", ""),
-        resolveString("justsearch.server.exe.source", ""),
         resolveLong("justsearch.vram.threshold.12gb", 0L),
         resolveLong("justsearch.vram.threshold.8gb", 0L),
         resolveLong("justsearch.vram.threshold.4gb", 0L),
@@ -1110,7 +1013,12 @@ public final class ResolvedConfigBuilder {
         resolveBoolean("justsearch.models.capability_contract_strict", false),
         // Tempdoc 883 decision 2 — append region; keep new resolve lines last.
         resolveLlmSlots(),
-        resolveLlmKvType());
+        resolveLlmKvType(),
+        resolveMasterGpuEnabled(),
+        resolvePolicyGpuAllowed(),
+        // D1-14: absent leaves the GPU capability line unchanged; zero is an explicit floor
+        // forcing cap, so preserve it rather than treating it as missing.
+        resolveNonNegativeNullableLong("justsearch.gpu.device_memory_ceiling_mb"));
   }
 
   /**
@@ -1215,8 +1123,9 @@ public final class ResolvedConfigBuilder {
         resolveInt("justsearch.backfill.bge_m3_batch_size", 50),
         resolveInt("justsearch.backfill.bge_m3_interleave_batch_size", 10),
         // Tempdoc 885 item 3: foreground-contention duty cycle. Resolved here (not read as a raw
-        // EnvRegistry sysprop in the Worker) so the value reaches the Worker through the ordinal-450
-        // config snapshot — the [R1] defect was a Worker-side key that only ever existed on the Head.
+        // EnvRegistry sysprop at the point of use) so it stays on the declared config surface. It used
+        // to reach a separate Worker through the ordinal-450 snapshot — [R1] was a Worker-side key
+        // that only ever existed on the Head — but item A19 deleted that tier: one JVM, one config.
         resolveInt("justsearch.indexing.foreground_duty_pct", 20),
         resolveLong("justsearch.indexing.foreground_cooldown_ms", 500L));
   }
@@ -1442,15 +1351,14 @@ public final class ResolvedConfigBuilder {
 
   private ResolvedConfig.Summary buildSummary() {
     return new ResolvedConfig.Summary(
-        resolveString("justsearch.summary.pipeline", ""),
-        resolveInt("justsearch.summary.max_tokens", 0));
+        Math.max(
+            1,
+            resolveInt(
+                "justsearch.summary.max_tokens", ResolvedConfig.Summary.DEFAULT_MAX_TOKENS)));
   }
 
   private ResolvedConfig.Search buildSearch() {
     return new ResolvedConfig.Search(
-        resolveString("justsearch.search.pipeline.profile", null),
-        resolveString("justsearch.search.pipeline", null),
-        resolveString("justsearch.index.collection", "default"),
         resolveBoolean("justsearch.search.query_classification.enabled", true),
         resolveDouble("justsearch.search.title_boost", 3.0),
         resolveBoolean("search.chunk_aware.enabled", true),
@@ -1467,7 +1375,9 @@ public final class ResolvedConfigBuilder {
             ResolvedConfig.Search.DEFAULT_MCP_DELIVERY_BUDGET_BYTES),
         buildSearchMcpFraming(),
         buildSearchEntityCarriage(),
-        buildSearchCorrections());
+        buildSearchCorrections(),
+        resolveBoolean("justsearch.qu.enabled", false),
+        resolveBoolean("justsearch.filter_norm.enabled", false));
   }
 
   /**
@@ -1545,6 +1455,18 @@ public final class ResolvedConfigBuilder {
         resolveNullableInt("index.ocr.workers"));
   }
 
+  private ResolvedConfig.Extraction buildExtraction() {
+    return new ResolvedConfig.Extraction(
+        resolveString("justsearch.extraction.sandbox.mode", null),
+        resolveString("justsearch.extraction.sandbox.command", null),
+        resolveString("justsearch.extraction.sandbox.heap", null),
+        resolveNullableInt("justsearch.extraction.sandbox.pool"),
+        resolveNullableInt("justsearch.extraction.sandbox.max_requests"),
+        resolveString("justsearch.ingestion.skip.patterns", null),
+        resolveString("justsearch.ingestion.skip.extensions", null),
+        resolveString("justsearch.ingestion.skip.directory_names", null));
+  }
+
   private ResolvedConfig.Index buildIndex() {
     return new ResolvedConfig.Index(
         resolveNullableInt("index.writer.ram_buffer_mb"),
@@ -1583,9 +1505,9 @@ public final class ResolvedConfigBuilder {
         parseIndexSort(resolveString("index.sort", null)),
         parseBoosts(resolveString("index.boosts", null)),
         // Tempdoc 885 item 19: NRT/commit cadence candidate. Resolved here (not read as a raw
-        // sysprop in the Worker) so the values reach the Worker through the ordinal-450 config
-        // snapshot, the channel the item-3 forwarding defect [R1] proved is the only one that
-        // crosses the process boundary.
+        // sysprop at the point of use) so they stay on the declared config surface. The ordinal-450
+        // snapshot that used to carry them across the process boundary was deleted at item A19;
+        // there is no boundary left to cross.
         resolveString("index.nrt.mode", ResolvedConfig.Index.NRT_MODE_CONTINUOUS),
         resolveInt("index.nrt.background_reopen_ms", 2000),
         resolveInt("index.nrt.on_demand_max_stale_ms", 1000),
@@ -1598,7 +1520,8 @@ public final class ResolvedConfigBuilder {
         // never see a Head-side value.
         resolveLong(
             "index.identity.deletion_grace_ms",
-            ResolvedConfig.Index.DEFAULT_IDENTITY_DELETION_GRACE_MS));
+            ResolvedConfig.Index.DEFAULT_IDENTITY_DELETION_GRACE_MS),
+        resolveString("justsearch.index.tracing_level", "none").toLowerCase(Locale.ROOT));
   }
 
   private ResolvedConfig.Collections buildCollections() {
@@ -1632,14 +1555,7 @@ public final class ResolvedConfigBuilder {
   }
 
   private ResolvedConfig.WorkerIndexer buildWorkerIndexer() {
-    return new ResolvedConfig.WorkerIndexer(
-        resolveBoolean("workers.indexer.enabled", false),
-        resolveString("justsearch.indexer.host", "127.0.0.1"),
-        resolveInt("justsearch.indexer.port", 50071),
-        resolveLong("justsearch.indexer.deadlineMs", 5_000L),
-        Math.max(1, resolveInt("justsearch.indexer.queueSize", 64)),
-        Math.max(1, resolveInt("justsearch.indexer.maxInFlightBytes", 512 * 1024 * 1024)),
-        resolveString("workers.indexer.backpressure_mode", null));
+    return new ResolvedConfig.WorkerIndexer(resolveString("indexer.worker.version", "0.1.0-dev"));
   }
 
   private ResolvedConfig.InfraHealth buildInfraHealth() {
@@ -1649,13 +1565,6 @@ public final class ResolvedConfigBuilder {
         resolveLong("infra.health.thresholds.translator_handshake_stale_ms", 120_000L),
         Math.max(0, Math.min(100, resolveInt(
             "infra.health.thresholds.ann_cache_ready_percent", 75))));
-  }
-
-  private ResolvedConfig.InfraGrpc buildInfraGrpc() {
-    return new ResolvedConfig.InfraGrpc(
-        resolveString(EnvRegistry.INFRA_HEALTH_HOST.sysProp(), "127.0.0.1"),
-        Math.max(0, Math.min(65535, resolveInt(
-            EnvRegistry.INFRA_HEALTH_PORT.sysProp(), 7443))));
   }
 
   private static List<ResolvedConfig.Index.IndexSortItem> parseIndexSort(String json) {
@@ -1829,6 +1738,21 @@ public final class ResolvedConfigBuilder {
       return Integer.parseInt(v.trim());
     } catch (NumberFormatException e) {
       LOG.debug("Invalid integer for '{}': '{}'", key, v);
+      return null;
+    }
+  }
+
+  /** Resolves an optional long that may not be negative; invalid values are treated as absent. */
+  private Long resolveNonNegativeNullableLong(String key) {
+    String v = resolveString(key, null);
+    if (v == null) return null;
+    try {
+      long value = Long.parseLong(v.trim());
+      if (value >= 0) return value;
+      LOG.debug("Negative value for '{}': '{}'; treating it as absent", key, value);
+      return null;
+    } catch (NumberFormatException e) {
+      LOG.debug("Invalid long for '{}': '{}'; treating it as absent", key, v);
       return null;
     }
   }

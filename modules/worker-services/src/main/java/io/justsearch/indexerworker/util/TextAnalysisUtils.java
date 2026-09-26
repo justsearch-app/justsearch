@@ -16,7 +16,7 @@ import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 /**
  * Utility methods for text analysis and query term processing.
  *
- * <p>Extracted from GrpcSearchService for reusability and testability.
+ * <p>Extracted from WorkerSearchService for reusability and testability.
  */
 public final class TextAnalysisUtils {
 

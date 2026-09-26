@@ -10,6 +10,7 @@ import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.agent.api.registry.TransportTag;
 import io.justsearch.app.api.registry.OperationInvocationRequest;
 import io.justsearch.app.api.registry.OperationInvocationResponse;
+import io.justsearch.app.api.status.MigrationSource;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
@@ -32,8 +33,8 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <ul>
  *   <li>Request body: {@link OperationInvocationRequest} with {@code args},
- *       {@code idempotencyKey} (deferred per §A.5), {@code confirmationToken} (FE-trust
- *       in V1; backend enforcement is a follow-up).
+ *       {@code idempotencyKey} (durable UUIDv7 identity), {@code confirmationToken} (backend-verified
+ *       single-use consent capsule).
  *   <li>Success response (HTTP 200): {@link OperationInvocationResponse} with
  *       {@code success=true} carrying handler {@code message} + optional
  *       {@code executionId} + {@code structuredData}.
@@ -47,12 +48,36 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>Handler threw uncaught (HTTP 500): {@code errorClass=HANDLER_ERROR}.
  * </ul>
  *
- * <p>HIGH-risk confirmation enforcement is the FE ActionButton's responsibility in V1
- * (per slice 3a-1-2 §A.7); the controller forwards {@code confirmationToken} unchanged
- * to the dispatcher (which currently ignores it). Backend defense-in-depth lands in a
- * future slice.
+ * <p>The dispatcher enforces the backend trust lattice and consumes bound consent capsules.
+ * A known operation key returns its metadata receipt without authorizing a second effect.
  */
 public final class OperationsController {
+  static final String INVOKE_PATH = "/api/operations/{id}/invoke";
+  static final String INGEST_PATH = "/api/knowledge/ingest";
+  static final String REINDEX_PATH = "/api/indexing/reindex";
+  static final String MIGRATION_START_PATH = "/api/indexing/migration/start";
+  static final String ACCEPT_GAPS_PATH = "/api/indexing/migration/accept-gaps";
+  static final String SETTINGS_PATH = "/api/settings/v2";
+  static final String UNDO_PATH = "/api/undo/{id}";
+
+  private enum InputForm { ENVELOPE, INGEST, REINDEX, MIGRATION_START, ACCEPT_GAPS }
+
+  /** Matched-route classification shares the dispatch catalog; it grants no authority. */
+  Optional<Operation> admissionOperation(Context ctx) {
+    if (!"POST".equals(ctx.method().name())) return Optional.empty();
+    return switch (ctx.matchedPath()) {
+      case INGEST_PATH -> resolveOperation("core.ingest-files");
+      case REINDEX_PATH -> resolveOperation("core.reindex");
+      case MIGRATION_START_PATH -> resolveOperation(
+          io.justsearch.app.services.registry.operations.CoreOperationCatalog.REBUILD_INDEX.value());
+      case ACCEPT_GAPS_PATH -> resolveOperation(
+          io.justsearch.app.services.registry.operations.CoreOperationCatalog.ACCEPT_GAPS.value());
+      case SETTINGS_PATH -> resolveOperation(
+          io.justsearch.app.services.registry.operations.CoreOperationCatalog.RECONFIGURE.value());
+      case INVOKE_PATH, UNDO_PATH -> resolveOperation(ctx.pathParam("id"));
+      default -> Optional.empty();
+    };
+  }
 
   private static final Logger log = LoggerFactory.getLogger(OperationsController.class);
 
@@ -115,7 +140,40 @@ public final class OperationsController {
 
   /** Handles {@code POST /api/operations/{id}/invoke}. */
   public void handleInvoke(Context ctx) {
-    String idValue = ctx.pathParam("id");
+    handleInvocation(ctx, ctx.pathParam("id"), InputForm.ENVELOPE);
+  }
+
+  /** Flat-input HTTP alias for the same prepared ingestion operation used by MCP. */
+  public void handleIngest(Context ctx) {
+    handleInvocation(ctx, io.justsearch.agent.tools.AgentToolsOperationCatalog.INGEST_FILES.value(), InputForm.INGEST);
+  }
+
+  /** Query-force HTTP alias for the same prepared reindex operation used by the Library. */
+  public void handleReindex(Context ctx) {
+    handleInvocation(ctx, io.justsearch.app.services.registry.operations.CoreOperationCatalog.REINDEX.value(), InputForm.REINDEX);
+  }
+
+  /** Flat legacy-reason alias for the prepared, durable {@code core.rebuild-index} operation. */
+  public void handleMigrationStart(Context ctx) {
+    handleInvocation(
+        ctx,
+        io.justsearch.app.services.registry.operations.CoreOperationCatalog.REBUILD_INDEX.value(),
+        InputForm.MIGRATION_START,
+        202);
+  }
+
+  /** Flat-input alias for the recorded, webview-only gap decision. */
+  public void handleAcceptGaps(Context ctx) {
+    handleInvocation(ctx,
+        io.justsearch.app.services.registry.operations.CoreOperationCatalog.ACCEPT_GAPS.value(),
+        InputForm.ACCEPT_GAPS);
+  }
+
+  private void handleInvocation(Context ctx, String idValue, InputForm inputForm) {
+    handleInvocation(ctx, idValue, inputForm, 200);
+  }
+
+  private void handleInvocation(Context ctx, String idValue, InputForm inputForm, int acceptedStatus) {
     if (idValue == null || idValue.isBlank()) {
       writeError(ctx, 400, "Missing operation id in path", "BAD_REQUEST");
       return;
@@ -135,7 +193,7 @@ public final class OperationsController {
 
     OperationInvocationRequest request;
     try {
-      request = parseRequest(ctx);
+      request = parseRequest(ctx, inputForm);
     } catch (Exception e) {
       writeError(
           ctx,
@@ -174,12 +232,18 @@ public final class OperationsController {
             ? Optional.empty()
             : Optional.of(request.confirmationToken());
     try {
-      result = dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken);
+      result = request.preparationNonce() != null
+          ? dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken, RequestEngineContext.get(ctx),
+              request.idempotencyKey(), request.preparationNonce())
+          : request.idempotencyKey() == null
+          ? dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken, RequestEngineContext.get(ctx))
+          : dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken,
+              RequestEngineContext.get(ctx), request.idempotencyKey());
     } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException e) {
       // Slice 487 §4.4: the lattice produced a non-AUTO gate and no token was supplied.
       // Surface the gate behavior + the destination's ConfirmStrategy so the FE can
       // render trust-aware elicitation UX and re-invoke with the token.
-      writeConfirmationRequired(ctx, op, e, argumentsJson, provenance.transport());
+      writeConfirmationRequired(ctx, op, e, argumentsJson, provenance, request.idempotencyKey(), false);
       return;
     } catch (io.justsearch.agent.api.registry.TrustGateDeniedException e) {
       writeError(
@@ -187,6 +251,12 @@ public final class OperationsController {
           403,
           "Trust gate denied operation " + op.id().value() + ": " + e.getMessage(),
           io.justsearch.app.api.ApiErrorCode.TRUST_DENIED.name());
+      return;
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException e) {
+      writeResponse(ctx, 423, OperationInvocationResponse.fromLockedStore());
+      return;
+    } catch (io.justsearch.app.api.operations.OperationStoreException e) {
+      writeStoreFailure(ctx, e);
       return;
     } catch (RuntimeException e) {
       log.warn("Operation handler threw for id={}", op.id().value(), e);
@@ -198,7 +268,7 @@ public final class OperationsController {
       return;
     }
 
-    writeResponse(ctx, 200, OperationInvocationResponse.fromResult(result));
+    writeResponse(ctx, result.success() ? acceptedStatus : 200, OperationInvocationResponse.fromResult(result));
   }
 
   /**
@@ -217,24 +287,14 @@ public final class OperationsController {
    * operator triage.
    */
   private InvocationProvenance resolveProvenance(Context ctx) {
-    String header = ctx.header("X-JustSearch-Transport");
-    java.time.Instant now = clock.instant();
-    if (header == null || header.isBlank()) {
-      return InvocationProvenance.uiButton(now);
-    }
-    TransportTag tag;
-    try {
-      tag = TransportTag.valueOf(header.trim().toUpperCase(java.util.Locale.ROOT));
-    } catch (IllegalArgumentException e) {
-      log.warn(
-          "Unknown X-JustSearch-Transport header value '{}'; falling back to BUTTON",
-          header);
-      return InvocationProvenance.uiButton(now);
-    }
-    return InvocationProvenance.fromTransport(tag, Optional.empty(), now);
+    var engineContext = RequestEngineContext.get(ctx);
+    var transport = TransportTag.valueOf(engineContext.transport());
+    var executor = InvocationProvenance.fromTransport(transport, Optional.empty(), clock.instant()).executor();
+    return io.justsearch.app.services.intent.EngineProvenance.invocation(
+        engineContext, executor, clock.instant(), Optional.empty());
   }
 
-  /** Handles {@code POST /api/operations/{id}/undo}. */
+  /** Handles {@code POST /api/undo/{id}}. */
   public void handleUndo(Context ctx) {
     String idValue = ctx.pathParam("id");
     if (idValue == null || idValue.isBlank()) {
@@ -249,6 +309,8 @@ public final class OperationsController {
     }
 
     String executionId;
+    String operationKey;
+    java.util.UUID preparationNonce;
     Optional<String> confirmationToken;
     try {
       String body = ctx.body();
@@ -263,6 +325,19 @@ public final class OperationsController {
         return;
       }
       executionId = eidNode.asText();
+      var keyNode = parsed.get("idempotencyKey");
+      if (keyNode != null && !keyNode.isNull() && !keyNode.isTextual()) {
+        writeError(ctx, 400, "idempotencyKey must be a string", "BAD_REQUEST");
+        return;
+      }
+      operationKey = keyNode == null || keyNode.isNull() ? null : keyNode.asText();
+      var nonceNode = parsed.get("preparationNonce");
+      preparationNonce = nonceNode == null || nonceNode.isNull() ? null
+          : MAPPER.treeToValue(nonceNode, java.util.UUID.class);
+      if (preparationNonce != null && (operationKey == null || operationKey.isBlank())) {
+        writeError(ctx, 400, "A preparation nonce requires its operation key", "BAD_REQUEST");
+        return;
+      }
       // Tempdoc 875 §C.7: undo now meets the trust lattice, so it accepts the same
       // confirmationToken the invoke path does — the FE re-posts with a minted capsule
       // after the 428 below.
@@ -280,7 +355,12 @@ public final class OperationsController {
     InvocationProvenance provenance = resolveProvenance(ctx);
     OperationResult result;
     try {
-      result = dispatcher.undo(op, executionId, provenance, confirmationToken);
+      result = preparationNonce != null
+          ? dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx),
+              operationKey, preparationNonce)
+          : operationKey == null
+          ? dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx))
+          : dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx), operationKey);
     } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException e) {
       // Same typed 428 the invoke path emits — the capsule the FE mints must bind to the
       // reversal's canonical arguments, which is what is echoed here.
@@ -289,7 +369,7 @@ public final class OperationsController {
           op,
           e,
           OperationDispatcher.undoArguments(executionId),
-          provenance.transport());
+          provenance, operationKey, true);
       return;
     } catch (io.justsearch.agent.api.registry.TrustGateDeniedException e) {
       writeError(
@@ -297,6 +377,12 @@ public final class OperationsController {
           403,
           "Trust gate denied undo of operation " + op.id().value() + ": " + e.getMessage(),
           io.justsearch.app.api.ApiErrorCode.TRUST_DENIED.name());
+      return;
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException e) {
+      writeResponse(ctx, 423, OperationInvocationResponse.fromLockedStore());
+      return;
+    } catch (io.justsearch.app.api.operations.OperationStoreException e) {
+      writeStoreFailure(ctx, e);
       return;
     } catch (RuntimeException e) {
       log.warn("Undo handler threw for id={}, executionId={}", op.id().value(), executionId, e);
@@ -323,13 +409,43 @@ public final class OperationsController {
     return Optional.empty();
   }
 
-  private OperationInvocationRequest parseRequest(Context ctx) throws Exception {
+  private OperationInvocationRequest parseRequest(Context ctx, InputForm inputForm) throws Exception {
     String body = ctx.body();
     if (body == null || body.isBlank()) {
-      // Empty body is valid; treated as zero-args invocation.
-      return new OperationInvocationRequest(null, null, null);
+      body = "{}";
     }
-    return MAPPER.readValue(body, OperationInvocationRequest.class);
+    if (inputForm == InputForm.ENVELOPE) return MAPPER.readValue(body, OperationInvocationRequest.class);
+    var parsed = MAPPER.readTree(body);
+    if (!(parsed instanceof tools.jackson.databind.node.ObjectNode arguments)) {
+      throw new IllegalArgumentException("Alias arguments must be a JSON object");
+    }
+    var request = MAPPER.createObjectNode();
+    for (String control : List.of("idempotencyKey", "confirmationToken", "preparationNonce")) {
+      var value = arguments.remove(control);
+      if (value != null) request.set(control, value);
+    }
+    if (inputForm == InputForm.REINDEX) {
+      // Preserve the existing alias's query contract; a body force value never overrides it.
+      arguments.put("force", Boolean.parseBoolean(ctx.queryParam("force")));
+    } else if (inputForm == InputForm.MIGRATION_START) {
+      // Preserve the legacy start endpoint's closed source write: recognized values pass through,
+      // while a missing or unknown reason is recorded as a manual migration.
+      var reason = arguments.remove("reason");
+      String requestedReason = reason == null ? "" : reason.isTextual() ? reason.textValue() : reason.toString();
+      MigrationSource source = MigrationSource.fromWire(requestedReason);
+      if (source == MigrationSource.UNKNOWN) {
+        if (!requestedReason.isBlank()) {
+          log.warn(
+              "Migration start requested with an unrecognized reason \"{}\" — recording it as \"{}\"",
+              requestedReason,
+              MigrationSource.MANUAL.wire());
+        }
+        source = MigrationSource.MANUAL;
+      }
+      arguments.put("source", source.wire());
+    }
+    request.set("args", arguments);
+    return MAPPER.treeToValue(request, OperationInvocationRequest.class);
   }
 
   private void writeResponse(Context ctx, int status, OperationInvocationResponse response) {
@@ -344,6 +460,17 @@ public final class OperationsController {
 
   private void writeError(Context ctx, int status, String message, String errorClass) {
     writeResponse(ctx, status, OperationInvocationResponse.error(message, errorClass));
+  }
+
+  private void writeStoreFailure(Context ctx, io.justsearch.app.api.operations.OperationStoreException failure) {
+    var response = OperationInvocationResponse.fromStoreFailure(failure);
+    int status = switch (response.errorClass()) {
+      case "BAD_REQUEST" -> 400;
+      case "CONFLICT" -> 409;
+      case "UNAVAILABLE" -> 503;
+      default -> 500;
+    };
+    writeResponse(ctx, status, response);
   }
 
   /**
@@ -368,7 +495,7 @@ public final class OperationsController {
       Operation op,
       io.justsearch.agent.api.registry.ConfirmationRequiredException e,
       String argumentsJson,
-      TransportTag transport) {
+      InvocationProvenance provenance, String operationKey, boolean undo) {
     java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
     body.put("success", false);
     body.put("errorClass", io.justsearch.app.api.ApiErrorCode.CONFIRMATION_REQUIRED.name());
@@ -377,13 +504,17 @@ public final class OperationsController {
     body.put("sourceTier", e.sourceTier().name());
     body.put("confirmStrategy", confirmStrategyName(e.declaredStrategy()));
     body.put("operationId", op.id().value());
+    String stableKey = e.operationKey() == null ? operationKey : e.operationKey();
+    if (stableKey != null) body.put("operationKey", stableKey);
+    if (e.preparationNonce() != null) body.put("preparationNonce", e.preparationNonce().toString());
     // Tempdoc 550 P1: surface the decision context the ceremony should show — the op's risk,
     // whether the action is reversible (undo-supported), and a short args summary — all already
     // known at gate time. Lets the prompt say "Reindex everything? (HIGH risk, can't be undone)"
     // instead of just the operation id.
     body.put("riskTier", op.policy().risk().name());
     body.put("undoSupported", op.policy().undoSupported());
-    body.put("argsSummary", ArgsSummary.summarize(argumentsJson));
+    body.put("argsSummary", e.approvalPreview() == null
+        ? ArgsSummary.summarize(argumentsJson) : e.approvalPreview().summary());
     // Tempdoc 550 C3: register a pending authorization and hand the FE its id. The FE
     // approves by this id (POST /api/authorizations/approve {pendingId}); the capsule is
     // then minted against the STORED (operationId, argsJson), so the approve gesture cannot
@@ -398,7 +529,7 @@ public final class OperationsController {
               e.gateBehavior(),
               e.getMessage(),
               null,
-              transport);
+              provenance.transport(), RequestEngineContext.get(ctx), provenance, stableKey, undo, e.preparationNonce(), e.approvalPreview());
       body.put("pendingId", pendingId);
       // Tempdoc 655: also broadcast on the pending-authorization SSE stream, so the shell
       // (already open, potentially on a different view than whatever triggered this 428) has one

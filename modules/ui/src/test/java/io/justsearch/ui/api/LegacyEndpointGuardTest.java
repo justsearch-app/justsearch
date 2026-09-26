@@ -101,6 +101,12 @@ class LegacyEndpointGuardTest {
   }
 
   @Test
+  void reindexCannotFallBackToIndexingRoutesWithoutRecordedComposition() {
+    assertFalse(registeredRoutes.contains("POST /api/indexing/reindex"),
+        "ResourceApiModule owns recorded reindex; IndexingRoutes must not provide a direct-service fallback");
+  }
+
+  @Test
   @DisplayName("GET /api/settings is absent (removed — use GET /api/settings/v2)")
   void legacySettingsGetIsAbsent() {
     assertFalse(
@@ -199,7 +205,6 @@ class LegacyEndpointGuardTest {
         mock(TimeSeriesController.class),
         mock(SessionPoliciesController.class),
         noop,
-        noop,
         noop);
     ChatController chatControllerMock = mock(ChatController.class);
     when(chatControllerMock.handler(any(), any())).thenReturn(noop);
@@ -212,7 +217,7 @@ class LegacyEndpointGuardTest {
         mock(AiRuntimeController.class),
         mock(AiModelsController.class),
         chatControllerMock);
-    InferenceRoutes.register(app, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    InferenceRoutes.register(app, noop, noop, noop, noop, noop, noop, noop, noop);
     KnowledgeRoutes.register(
         app, mock(KnowledgeSearchController.class), LoggerFactory.getLogger("test"));
     AgentRoutes.register(

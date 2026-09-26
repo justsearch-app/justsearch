@@ -1,7 +1,7 @@
 # Phase 9 smoke profile for launcher --smoke runs.
 app:
   package_base: io.justsearch
-  data_dir: ${JUSTSEARCH_DATA_DIR:${user.home}/.justsearch-smoke}
+  # LauncherEnvironment contributes the isolated smoke default; DATA_DIR overrides use EnvRegistry.
   timezone: UTC
 
 egress:
@@ -17,13 +17,6 @@ workers:
     host: 127.0.0.1
     port: 50061
     deadlineMs: 1500
-  indexer:
-    enabled: false
-    host: 127.0.0.1
-    port: 50071
-    deadlineMs: 5000
-    queueSize: 64
-
 telemetry:
   metrics:
     flush_ms: 15000
@@ -53,8 +46,6 @@ infra:
       port: 0
 
 search:
-  pipeline:
-    profile: desktop-default
   tiebreak_field: doc_uid
   paging:
     strategy: pit
@@ -82,8 +73,6 @@ search:
 index:
   language_detection:
     enabled: true
-  commit:
-    debounce_ms: 0
   pipeline:
     profile: desktop-default
   soft_deletes:
@@ -91,9 +80,6 @@ index:
     retention:
       enabled: true
       days: 7
-  watcher:
-    overflow:
-      rescan_on_overflow: true
   ocr:
     enabled: false
     languages: []

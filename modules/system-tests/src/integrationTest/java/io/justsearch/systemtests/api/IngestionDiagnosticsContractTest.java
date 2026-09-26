@@ -253,9 +253,9 @@ class IngestionDiagnosticsContractTest {
     String body = MAPPER.writeValueAsString(Map.of("paths", List.of(absPath)));
     String response = httpPost("/api/knowledge/ingest", body);
     JsonNode parsed = MAPPER.readTree(response);
-    String error = parsed.path("error").asText("");
-    if (!error.isBlank()) {
-      throw new IllegalStateException("Ingest reported error: " + error + " (body: " + response + ")");
+    if (!parsed.path("success").asBoolean()
+        || parsed.path("structuredData").path("operationKey").asText("").isBlank()) {
+      throw new IllegalStateException("Ingest operation was not accepted: " + response);
     }
     return parsed;
   }

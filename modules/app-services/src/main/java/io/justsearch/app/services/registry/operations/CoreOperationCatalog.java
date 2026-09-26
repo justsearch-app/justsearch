@@ -21,6 +21,7 @@ import io.justsearch.agent.api.registry.RequiredCapability;
 import io.justsearch.agent.api.registry.ResourceRef;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
+import io.justsearch.core.context.EngineContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -71,6 +72,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
 
   public static final OperationRef RESTART_WORKER = new OperationRef("core.restart-worker");
   public static final OperationRef BULK_REINDEX = new OperationRef("core.bulk-reindex");
+  public static final OperationRef ACCEPT_GAPS = new OperationRef("core.accept-gaps");
   /**
    * Slice 447-followup-bulk-reindex-recovery (Option A) + §X.11.5 Phase 7: parameterless
    * full-corpus rebuild wrapper. {@link #BULK_REINDEX} requires a {@code corpusIds}
@@ -190,8 +192,6 @@ public final class CoreOperationCatalog implements OperationCatalog {
    * (restarts llama-server when in ONLINE mode). No args. Returns
    * {@code structuredData.mode} (post-apply current mode).
    */
-  public static final OperationRef RELOAD_INFERENCE =
-      new OperationRef("core.reload-inference");
 
   /**
    * Slice 3a-2-c BrainRuntimeSection Switch-to-Online / Switch-to-Indexing
@@ -274,6 +274,14 @@ public final class CoreOperationCatalog implements OperationCatalog {
       new OperationRef("core.start-ai-install");
 
   /**
+   * D1 installer-generation amendment: activate the staged model candidate through the recorded
+   * generation owner. Download/acquisition remains owned by {@link #START_AI_INSTALL}; this
+   * operation is the separately approved durable activation boundary.
+   */
+  public static final OperationRef ACTIVATE_INSTALLED_MODELS =
+      new OperationRef("core.activate-installed-models");
+
+  /**
    * Slice 3a-2-c BrainInstallSection Cancel Install. MEDIUM risk (cancels
    * a running install). No args. Idempotent if no install is running.
    */
@@ -314,7 +322,14 @@ public final class CoreOperationCatalog implements OperationCatalog {
    * response.
    */
   public static final OperationRef RESET_SETTINGS =
-      new OperationRef("core.reset-settings");
+      new OperationRef(io.justsearch.app.services.settings.SettingsResetPreparation.OPERATION_ID);
+
+  /**
+   * D1-4: the accepted settings transaction. The HTTP settings front supplies the complete
+   * {@code SettingsV2} witness and optional UI mode intent as one typed operation envelope;
+   * the operation runner owns acceptance and terminal persistence.
+   */
+  public static final OperationRef RECONFIGURE = new OperationRef("core.reconfigure");
 
   /**
    * Slice 491 §9.D Phase E (C4 / E3) — agent navigation tool. Gives the agent loop a
@@ -337,6 +352,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
   private final List<Operation> definitions = List.of(
       restartWorker(),
       bulkReindex(),
+      acceptGaps(),
       rebuildIndex(),
       pingBackend(),
       clearFailedJobs(),
@@ -348,7 +364,6 @@ public final class CoreOperationCatalog implements OperationCatalog {
       removeWatchedRoot(),
       previewExcludes(),
       applyExcludes(),
-      reloadInference(),
       switchInferenceMode(),
       setChatEnabled(),
       triggerOfflineProcessing(),
@@ -357,11 +372,13 @@ public final class CoreOperationCatalog implements OperationCatalog {
       preflightAiPack(),
       importAiPack(),
       startAiInstall(),
+      activateInstalledModels(),
       cancelAiInstall(),
       repairAiInstall(),
       createUserPolicy(),
       allowlistAddDigest(),
       resetSettings(),
+      reconfigure(),
       cancelIndexingJob(),
       retryIndexingJob(),
       resolvePathHash(),
@@ -399,20 +416,31 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Audience.OPERATOR);
   }
 
+  private static String bulkArgumentsSchema(boolean corpusLabels) {
+    var sources = java.util.Arrays.stream(io.justsearch.app.api.status.MigrationSource.values())
+        .filter(source -> source != io.justsearch.app.api.status.MigrationSource.UNKNOWN
+            && source != io.justsearch.app.api.status.MigrationSource.INSTALLER_MODEL_ACTIVATION)
+        .map(source -> "\"" + source.wire() + "\"")
+        .collect(java.util.stream.Collectors.joining(","));
+    return "{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{"
+        + "\"source\":{\"type\":\"string\",\"enum\":[" + sources + "]}"
+        + (corpusLabels ? ",\"corpusIds\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":256}}" : "")
+        + "}" + (corpusLabels ? ",\"required\":[\"corpusIds\"]" : "") + "}";
+  }
+
   private static Operation bulkReindex() {
     return new Operation(
         BULK_REINDEX,
         Presentation.forId(BULK_REINDEX),
-        Interface.inputsOnly(
-            "{\"type\":\"object\",\"properties\":{\"corpusIds\":{\"type\":\"array\","
-                + "\"items\":{\"type\":\"string\"}}},\"required\":[\"corpusIds\"]}"),
+        Interface.inputsOnly(bulkArgumentsSchema(true)),
         new OperationPolicy(
             RiskTier.HIGH,
             ConfirmStrategy.Inline.INSTANCE,
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(RequiredCapability.WorkerOnline.INSTANCE),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(BULK_REINDEX),
@@ -422,25 +450,43 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Audience.OPERATOR);
   }
 
+  private static Operation acceptGaps() {
+    return new Operation(
+        ACCEPT_GAPS,
+        Presentation.forId(ACCEPT_GAPS, Optional.of("warning"), Optional.of("destructive")),
+        Interface.inputsOnly("""
+            {"type":"object","additionalProperties":false,"properties":{
+              "reindexKey":{"type":"string","minLength":36,"maxLength":36},
+              "gapListHash":{"type":"string","pattern":"^[0-9a-f]{64}$"}},
+             "required":["reindexKey","gapListHash"]}
+            """),
+        new OperationPolicy(RiskTier.HIGH, ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(ACCEPT_GAPS),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.OPERATOR);
+  }
+
   /**
    * Slice 447-followup-bulk-reindex-recovery (Option A) + §X.11.5 Phase 7:
-   * parameterless full-corpus rebuild wrapper. Same backend behavior as
-   * {@link #bulkReindex} (delegates to {@code IndexingService.startMigration}) but
-   * declares zero arguments — usable as the static recovery target for
+   * full-corpus rebuild using the same recorded lifecycle as {@link #bulkReindex},
+   * with no required arguments — usable as the static recovery target for
    * {@code index.unavailable + index.not_healthy} via {@link OperationInvocation}.
    */
   private static Operation rebuildIndex() {
     return new Operation(
         REBUILD_INDEX,
         Presentation.forId(REBUILD_INDEX),
-        Interface.inputsOnly("{\"type\":\"object\"}"),
+        Interface.inputsOnly(bulkArgumentsSchema(false)),
         new OperationPolicy(
             RiskTier.HIGH,
             ConfirmStrategy.Inline.INSTANCE,
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(RequiredCapability.WorkerOnline.INSTANCE),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         OperationAvailability.empty(),
         // Slice 447-followup-live-wiring §X.12.8 Item 2.1: a full rebuild affects the
         // three indexing-related Resources (clears the indexing-jobs queue, restarts
@@ -666,7 +712,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(RequiredCapability.WorkerOnline.INSTANCE),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(REINDEX),
@@ -843,27 +890,6 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Set.of(ExecutorTag.UI));
   }
 
-  private static Operation reloadInference() {
-    return new Operation(
-        RELOAD_INFERENCE,
-        Presentation.forId(RELOAD_INFERENCE),
-        Interface.of(
-            "{\"type\":\"object\",\"properties\":{}}",
-            "{\"type\":\"object\",\"properties\":{\"mode\":{\"type\":\"string\"}}}"),
-        new OperationPolicy(
-            RiskTier.MEDIUM,
-            ConfirmStrategy.Inline.INSTANCE,
-            AuditPolicy.METADATA_ONLY,
-            RetryPolicy.noRetry(),
-            Set.of(RequiredCapability.InferenceOnline.INSTANCE),
-            false),
-        OperationAvailability.empty(),
-        OperationLineage.empty(),
-        Binding.of(RELOAD_INFERENCE),
-        Provenance.core("1.0"),
-        Set.of(ExecutorTag.UI));
-  }
-
   private static Operation switchInferenceMode() {
     return new Operation(
         SWITCH_INFERENCE_MODE,
@@ -880,7 +906,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             // online-bound direction of this op requires the postcondition it
             // establishes. Validation of the requested mode is internal to the handler.
             Set.of(),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(SWITCH_INFERENCE_MODE),
@@ -905,7 +931,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(),
         // Tempdoc 737 §12b: the superseding op declares what it supersedes (OperationLineage
         // javadoc — supersedes lives on the newer Operation, favored by discovery/retrospection).
@@ -1050,6 +1076,33 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Set.of(ExecutorTag.UI));
   }
 
+  private static Operation activateInstalledModels() {
+    String source = io.justsearch.app.api.status.MigrationSource.INSTALLER_MODEL_ACTIVATION.wire();
+    String argumentsSchema =
+        "{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{"
+            + "\"source\":{\"type\":\"string\",\"enum\":[\""
+            + source
+            + "\"]}},\"required\":[\"source\"]}";
+    return new Operation(
+        ACTIVATE_INSTALLED_MODELS,
+        Presentation.forId(ACTIVATE_INSTALLED_MODELS),
+        Interface.inputsOnly(argumentsSchema),
+        new OperationPolicy(
+            RiskTier.HIGH,
+            ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY,
+            RetryPolicy.noRetry(),
+            Set.of(RequiredCapability.WorkerOnline.INSTANCE),
+            false)
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.REINDEX)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
+        OperationAvailability.empty(),
+        OperationLineage.empty(),
+        Binding.of(ACTIVATE_INSTALLED_MODELS),
+        Provenance.core("1.0"),
+        Set.of(ExecutorTag.UI));
+  }
+
   private static Operation cancelAiInstall() {
     return new Operation(
         CANCEL_AI_INSTALL,
@@ -1145,7 +1198,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(),
-            false),
+            false).withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(),
         OperationLineage.empty(),
         Binding.of(RESET_SETTINGS),
@@ -1153,6 +1206,34 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Set.of(ExecutorTag.UI),
         // Slice 481 §7 step 2: factory-reset; admin-class destructive operation.
         Audience.OPERATOR);
+  }
+
+  private static final String RECONFIGURE_INPUT_SCHEMA =
+      "{\"type\":\"object\",\"additionalProperties\":false,"
+          + "\"required\":[\"settings\",\"modeIntent\"],\"properties\":{"
+          + "\"settings\":{\"type\":\"object\",\"required\":[\"witness\",\"operationKey\"]},"
+          + "\"modeIntent\":{\"type\":[\"string\",\"null\"]},"
+          + "\"refreshInference\":{\"type\":\"boolean\"}}}";
+
+  private static Operation reconfigure() {
+    return new Operation(
+        RECONFIGURE,
+        Presentation.forId(RECONFIGURE),
+        Interface.of(RECONFIGURE_INPUT_SCHEMA, "{\"type\":\"object\"}"),
+        new OperationPolicy(
+            RiskTier.MEDIUM,
+            ConfirmStrategy.None.INSTANCE,
+            AuditPolicy.METADATA_ONLY,
+            RetryPolicy.noRetry(),
+            Set.of(),
+            false)
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.RECONFIGURE),
+        OperationAvailability.empty(),
+        OperationLineage.empty(),
+        Binding.of(RECONFIGURE),
+        Provenance.core("1.0"),
+        Set.of(ExecutorTag.UI),
+        Audience.USER);
   }
 
   // Tempdoc 560 WS4 (catalog collapse): the core.navigate-to-surface DEFINITION moved to

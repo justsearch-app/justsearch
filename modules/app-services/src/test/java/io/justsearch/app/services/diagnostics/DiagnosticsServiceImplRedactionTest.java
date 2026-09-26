@@ -6,7 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
+import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.contract.wire.LifecycleState;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -54,7 +55,8 @@ final class DiagnosticsServiceImplRedactionTest {
     Files.writeString(settings, input);
 
     Path zip =
-        new DiagnosticsServiceImpl(null, null, () -> null, () -> null).exportDiagnostics();
+        new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+            .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
     String redacted;
     try (ZipFile zipFile = new ZipFile(zip.toFile())) {
       ZipEntry entry = zipFile.getEntry("ui/settings.json");
@@ -72,21 +74,20 @@ final class DiagnosticsServiceImplRedactionTest {
 
   @Test
   void summaryUsesTypedLifecycleWithoutDebugStateOrOptionalProcesses() {
-    LifecycleSnapshotV1 lifecycle =
-        LifecycleSnapshotV1.now(
-            new LifecycleSnapshotV1.Lifecycle(LifecycleState.LIFECYCLE_STATE_DEGRADED),
-            new LifecycleSnapshotV1.Components(
-                new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY),
-                new LifecycleSnapshotV1.Component(
-                    LifecycleState.LIFECYCLE_STATE_STOPPED, "worker.shut_down"),
-                new LifecycleSnapshotV1.Component(
-                    LifecycleState.LIFECYCLE_STATE_STOPPED, "inference.deactivated")));
+    LifecycleSnapshotV2 lifecycle =
+        new LifecycleSnapshotV2(2, java.time.Instant.EPOCH.toString(),
+            new LifecycleSnapshotV2.Lifecycle(LifecycleState.LIFECYCLE_STATE_DEGRADED, null, null),
+            new LifecycleSnapshotV2.Components(
+                component(ComponentState.READY, null),
+                component(ComponentState.ABSENT, "worker.shut_down"),
+                component(ComponentState.ABSENT, null),
+                component(ComponentState.ABSENT, "inference.deactivated")));
 
     String summary = service(() -> () -> lifecycle).buildDiagnosticSummary();
 
     assertTrue(summary.contains("app.version: 1.2.3-test"));
-    assertTrue(summary.contains("lifecycle.worker.reason: worker.shut_down"));
-    assertTrue(summary.contains("lifecycle.inference.reason: inference.deactivated"));
+    assertTrue(summary.contains("lifecycle.index.reason: worker.shut_down"));
+    assertTrue(summary.contains("lifecycle.generative.reason: inference.deactivated"));
     assertFalse(summary.contains("debug-state"));
     assertTrue(summary.endsWith("note: " + DiagnosticSummaryComposer.LOCAL_ONLY_NOTE + "\n"));
   }
@@ -109,4 +110,8 @@ final class DiagnosticsServiceImplRedactionTest {
       System.setProperty(name, previous);
     }
   }
+  private static LifecycleSnapshotV2.Component component(ComponentState state, String reason) {
+    return new LifecycleSnapshotV2.Component(state, reason, java.time.Instant.EPOCH.toString());
+  }
+
 }

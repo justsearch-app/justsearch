@@ -80,6 +80,8 @@ final class ApiSecurityFilters {
   private final ExecutorService slowRequestExecutor;
   private final HeadAssembly headAssembly;
   private final OperationLeaseService operationLeases;
+  private final io.justsearch.app.api.EngineAdmissionService engineAdmission;
+  private final java.util.function.Function<Context, java.util.Optional<io.justsearch.agent.api.registry.Operation>> admissionOperation;
 
   // Rate-limit bookkeeping for deny / slow-dump logging.
   private final AtomicLong lastCorsDenyUiReadyAtMs = new AtomicLong(0);
@@ -105,12 +107,28 @@ final class ApiSecurityFilters {
       ExecutorService slowRequestExecutor,
       HeadAssembly headAssembly,
       OperationLeaseService operationLeases) {
+    this(prodMode, sessionToken, eventBuffer, slowRequestExecutor, headAssembly, operationLeases, null);
+  }
+
+  ApiSecurityFilters(boolean prodMode, String sessionToken, EventBuffer eventBuffer,
+      ExecutorService slowRequestExecutor, HeadAssembly headAssembly,
+      OperationLeaseService operationLeases, io.justsearch.app.api.EngineAdmissionService engineAdmission) {
+    this(prodMode, sessionToken, eventBuffer, slowRequestExecutor, headAssembly, operationLeases,
+        engineAdmission, ignored -> java.util.Optional.empty());
+  }
+
+  ApiSecurityFilters(boolean prodMode, String sessionToken, EventBuffer eventBuffer,
+      ExecutorService slowRequestExecutor, HeadAssembly headAssembly,
+      OperationLeaseService operationLeases, io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      java.util.function.Function<Context, java.util.Optional<io.justsearch.agent.api.registry.Operation>> admissionOperation) {
     this.prodMode = prodMode;
     this.sessionToken = sessionToken;
     this.eventBuffer = eventBuffer;
     this.slowRequestExecutor = slowRequestExecutor;
     this.headAssembly = headAssembly;
     this.operationLeases = operationLeases;
+    this.engineAdmission = engineAdmission;
+    this.admissionOperation = java.util.Objects.requireNonNull(admissionOperation, "admissionOperation");
 
     // Tempdoc 884 item 23: FAIL CLOSED. This combination used to disable token enforcement with a
     // WARN and serve the API anyway — fail-open on the one control that gates mutation.
@@ -147,12 +165,51 @@ final class ApiSecurityFilters {
 
   /** Installs the Host-allowlist, CORS, session-token, and capability-gate before-filters on the app. */
   void install(Javalin app) {
+    install(app, ignored -> java.util.Optional.empty());
+  }
+
+  void install(Javalin app, java.util.function.Function<String, java.util.Optional<String>> mcpClientIdentity) {
     setupHostValidation(app);
     setupMcpOriginValidation(app);
     setupCors(app, prodMode);
     setupSessionTokenEnforcement(app);
+    app.before(ctx -> RequestEngineContext.get(ctx, mcpClientIdentity));
     setupOperationAdmission(app);
+    setupEngineAdmission(app);
     setupCapabilityGates(app);
+  }
+
+  private void setupEngineAdmission(Javalin app) {
+    if (engineAdmission == null) return;
+    app.exception(io.justsearch.app.api.EngineAdmissionException.class,
+        (failure, ctx) -> RequestEngineWork.writeRefusal(ctx, failure));
+    app.beforeMatched(ctx -> {
+      if ("OPTIONS".equals(ctx.method().name()) || "/api/health".equals(ctx.path())) return;
+      if (ctx.attribute(RequestEngineWork.REFUSAL_ATTRIBUTE) != null) return;
+      // The native protocol parses once, resolves its operation binding and admits the message.
+      if ("/mcp".equals(ctx.path()) && "POST".equals(ctx.method().name())) return;
+      try {
+        var incoming = RequestEngineContext.get(ctx);
+        var operation = admissionOperation.apply(ctx);
+        var selected = operation.map(op -> io.justsearch.app.services.intent.EngineProvenance.forOperation(incoming, op.policy()))
+            .orElse(incoming);
+        if (operation.isPresent()) ctx.attribute(RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE, true);
+        var work = engineAdmission.admit(selected,
+            ctx.path().startsWith("/api/upgrade/"));
+        ctx.attribute(RequestEngineWork.ATTRIBUTE, work);
+        ctx.attribute(RequestEngineContext.ATTRIBUTE, work.context());
+      } catch (io.justsearch.app.api.EngineAdmissionException refused) {
+        ctx.attribute(RequestEngineWork.REFUSAL_ATTRIBUTE, refused);
+        throw refused;
+      }
+    });
+    app.after(ctx -> {
+      var work = RequestEngineWork.get(ctx);
+      if (work != null) {
+        if (Boolean.TRUE.equals(ctx.attribute(RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE))) work.waitingClientGone();
+        work.close();
+      }
+    });
   }
 
   private void setupOperationAdmission(Javalin app) {
@@ -171,11 +228,21 @@ final class ApiSecurityFilters {
                     Map.of("method", method, "path", ctx.path()));
             ctx.attribute(MUTATION_LEASE_ATTRIBUTE, handle);
           } catch (OperationAdmissionClosedException e) {
+            if (engineAdmission != null && "/mcp".equals(ctx.path()) && "POST".equals(method)) {
+              // Preserve the earlier lease refusal even if freeze is released before the next
+              // filter. The protocol owner must parse the id before emitting a JSON-RPC error.
+              ctx.attribute(RequestEngineWork.REFUSAL_ATTRIBUTE,
+                  new io.justsearch.app.api.EngineAdmissionException(
+                      io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN,
+                      engineAdmission.retryAfterSeconds()));
+              return;
+            }
             ctx.status(503)
                 .json(
                     Map.of(
                         "error", "Application upgrade preparation has frozen mutating operations",
                         "errorCode", "UPGRADE_PREPARING",
+                        "retrySafe", true,
                         "preparationId", e.preparationId()));
             throw new io.javalin.http.HttpResponseException(503, "Upgrade preparing");
           }
@@ -386,7 +453,7 @@ final class ApiSecurityFilters {
       }
       ctx.header("Access-Control-Allow-Origin", origin);
       ctx.header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-      ctx.header("Access-Control-Expose-Headers", "Deprecation, Sunset, Link");
+      ctx.header("Access-Control-Expose-Headers", "Deprecation, Sunset, Link, Retry-After");
       ctx.res().addHeader("Vary", "Origin");
     });
 

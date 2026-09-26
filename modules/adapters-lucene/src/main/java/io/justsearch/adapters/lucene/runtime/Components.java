@@ -30,4 +30,5 @@ record Components(
     NrtMode nrtMode,
     long nrtOnDemandMaxStaleMs,
     long reopenTargetMs,
-    long reopenHardMs) {}
+    long reopenHardMs,
+    IndexRuntimeConfiguration runtimeConfiguration) {}

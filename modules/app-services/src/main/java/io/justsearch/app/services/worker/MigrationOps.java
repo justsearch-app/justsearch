@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
+import io.justsearch.app.api.IndexingService.MigrationOutcome;
 import io.justsearch.ipc.IndexGcRequest;
 import io.justsearch.ipc.MigrationCutoverRequest;
 import io.justsearch.ipc.MigrationPauseRequest;
@@ -18,7 +21,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>All methods follow the same pattern: build proto request, call RPC via {@link
  * IngestRpcExecutor}, log result, swallow circuit breaker and general errors. Extracted from {@link
- * RemoteKnowledgeClient}.
+ * KnowledgeClient}.
  */
 final class MigrationOps {
     private static final Logger log = LoggerFactory.getLogger(MigrationOps.class);
@@ -29,40 +32,74 @@ final class MigrationOps {
         this.rpc = Objects.requireNonNull(rpc, "rpc");
     }
 
-    boolean startMigration(String reason) {
-        try {
-            MigrationStartRequest req =
+    MigrationOutcome startMigration(String reason, java.util.List<String> projectionSourceIds,
+            EngineContext engineContext) {
+        return startMigration(
                     MigrationStartRequest.newBuilder()
                             .setReason(reason == null ? "" : reason)
                             .setRestartWorker(true)
-                            .build();
+                            .addAllProjectionSourceIds(projectionSourceIds)
+                            .setProjectionSourceIdsPresent(true)
+                            .build(), engineContext);
+    }
+
+    MigrationOutcome startRecordedMigration(String operationKey, String reason,
+            String targetIndexFingerprint, String expectedSourceGeneration, EngineContext engineContext) {
+        return startRecordedMigration(operationKey, reason, targetIndexFingerprint,
+                expectedSourceGeneration, null, engineContext);
+    }
+
+    MigrationOutcome startRecordedMigration(String operationKey, String reason,
+            String targetIndexFingerprint, String expectedSourceGeneration,
+            java.util.List<String> projectionSourceIds, EngineContext engineContext) {
+        if (operationKey == null || operationKey.isEmpty()
+                || targetIndexFingerprint == null || targetIndexFingerprint.isEmpty()
+                || expectedSourceGeneration == null || expectedSourceGeneration.isBlank()) {
+            return new MigrationOutcome(false, false);
+        }
+        var request = MigrationStartRequest.newBuilder()
+                .setReason(reason == null ? "" : reason)
+                .setRestartWorker(true)
+                .setRecordedOperationKey(operationKey)
+                .setTargetIndexFingerprint(targetIndexFingerprint)
+                .setExpectedSourceGeneration(expectedSourceGeneration);
+        if (projectionSourceIds != null) {
+            request.addAllProjectionSourceIds(projectionSourceIds)
+                    .setProjectionSourceIdsPresent(true);
+        }
+        return startMigration(request.build(), engineContext);
+    }
+
+    private MigrationOutcome startMigration(MigrationStartRequest req, EngineContext engineContext) {
+        try {
             var resp =
                     rpc.execute(
                             "startMigration",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.startMigration(req));
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            stub -> stub.startMigration(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("startMigration rejected: {}", resp.getError());
             } else {
                 log.info(
                         "startMigration accepted: state={} active={} building={}"
-                                + " restartScheduled={}",
+                                + " restartRequired={}",
                         resp.getMigrationState(),
                         resp.getActiveGenerationId(),
                         resp.getBuildingGenerationId(),
-                        resp.getRestartScheduled());
+                        resp.getRestartRequired());
             }
-            return resp.getAccepted();
+            return new MigrationOutcome(resp.getAccepted(), resp.getRestartRequired(),
+                    resp.getActiveGenerationId(), resp.getBuildingGenerationId(), resp.getMigrationState());
         } catch (CircuitBreakerOpenException e) {
             log.debug("startMigration rejected by circuit breaker");
-            return false;
+            return new MigrationOutcome(false, false);
         } catch (Exception e) {
             log.error("startMigration RPC failed", e);
-            return false;
+            return new MigrationOutcome(false, false);
         }
     }
 
-    boolean requestCutover(boolean forceSwitching) {
+    MigrationOutcome requestCutover(boolean forceSwitching, EngineContext engineContext) {
         try {
             MigrationCutoverRequest req =
                     MigrationCutoverRequest.newBuilder()
@@ -71,52 +108,52 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "requestCutover",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.requestCutover(req));
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            stub -> stub.requestCutover(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("requestCutover rejected: {}", resp.getError());
             } else {
                 log.info("requestCutover accepted: state={}", resp.getMigrationState());
             }
-            return resp.getAccepted();
+            return new MigrationOutcome(resp.getAccepted(), resp.getRestartRequired());
         } catch (CircuitBreakerOpenException e) {
             log.debug("requestCutover rejected by circuit breaker");
-            return false;
+            return new MigrationOutcome(false, false);
         } catch (Exception e) {
             log.error("requestCutover RPC failed", e);
-            return false;
+            return new MigrationOutcome(false, false);
         }
     }
 
-    boolean rollbackMigration() {
+    MigrationOutcome rollbackMigration(EngineContext engineContext) {
         try {
             MigrationRollbackRequest req =
                     MigrationRollbackRequest.newBuilder().setRestartWorker(true).build();
             var resp =
                     rpc.execute(
                             "rollbackMigration",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.rollbackMigration(req));
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            stub -> stub.rollbackMigration(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("rollbackMigration rejected: {}", resp.getError());
             } else {
                 log.info(
-                        "rollbackMigration accepted: active={} previous={} restartScheduled={}",
+                        "rollbackMigration accepted: active={} previous={} restartRequired={}",
                         resp.getActiveGenerationId(),
                         resp.getPreviousGenerationId(),
-                        resp.getRestartScheduled());
+                        resp.getRestartRequired());
             }
-            return resp.getAccepted();
+            return new MigrationOutcome(resp.getAccepted(), resp.getRestartRequired());
         } catch (CircuitBreakerOpenException e) {
             log.debug("rollbackMigration rejected by circuit breaker");
-            return false;
+            return new MigrationOutcome(false, false);
         } catch (Exception e) {
             log.error("rollbackMigration RPC failed", e);
-            return false;
+            return new MigrationOutcome(false, false);
         }
     }
 
-    boolean pauseMigration(String reason) {
+    boolean pauseMigration(String reason, EngineContext engineContext) {
         try {
             MigrationPauseRequest req =
                     MigrationPauseRequest.newBuilder()
@@ -125,8 +162,8 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "pauseMigration",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.pauseMigration(req));
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            stub -> stub.pauseMigration(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("pauseMigration rejected: {}", resp.getError());
             } else {
@@ -142,14 +179,14 @@ final class MigrationOps {
         }
     }
 
-    boolean resumeMigration() {
+    boolean resumeMigration(EngineContext engineContext) {
         try {
             MigrationResumeRequest req = MigrationResumeRequest.newBuilder().build();
             var resp =
                     rpc.execute(
                             "resumeMigration",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.STANDARD,
-                            stub -> stub.resumeMigration(req));
+                            KnowledgeClient.RpcDeadlineCategory.STANDARD,
+                            stub -> stub.resumeMigration(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("resumeMigration rejected: {}", resp.getError());
             } else {
@@ -172,7 +209,7 @@ final class MigrationOps {
      * body both surface these counts.
      */
     io.justsearch.app.api.IndexingService.IndexGcOutcome runIndexGc(
-            int keepLatest, boolean pruneMarkedOnly) {
+            int keepLatest, boolean pruneMarkedOnly, EngineContext engineContext) {
         try {
             IndexGcRequest req =
                     IndexGcRequest.newBuilder()
@@ -182,8 +219,8 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "runIndexGc",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.INDEX_GC,
-                            stub -> stub.runIndexGc(req));
+                            KnowledgeClient.RpcDeadlineCategory.INDEX_GC,
+                            stub -> stub.runIndexGc(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("runIndexGc rejected: {}", resp.getError());
                 return new io.justsearch.app.api.IndexingService.IndexGcOutcome(
@@ -215,7 +252,7 @@ final class MigrationOps {
      * generation prune, and both are far past the standard RPC budget.
      */
     io.justsearch.app.api.IndexingService.SettleIndexOutcome settleIndex(
-            boolean expungeDeletesOnly, int maxSegments) {
+            boolean expungeDeletesOnly, int maxSegments, EngineContext engineContext) {
         try {
             SettleIndexRequest req =
                     SettleIndexRequest.newBuilder()
@@ -225,8 +262,8 @@ final class MigrationOps {
             var resp =
                     rpc.execute(
                             "settleIndex",
-                            RemoteKnowledgeClient.RpcDeadlineCategory.INDEX_GC,
-                            stub -> stub.settleIndex(req));
+                            KnowledgeClient.RpcDeadlineCategory.INDEX_GC,
+                            stub -> stub.settleIndex(req), engineContext);
             if (!resp.getAccepted()) {
                 log.warn("settleIndex rejected: {}", resp.getError());
                 return io.justsearch.app.api.IndexingService.SettleIndexOutcome.refused(

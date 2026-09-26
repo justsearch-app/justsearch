@@ -11,39 +11,44 @@ import tools.jackson.databind.SerializationFeature;
 import io.justsearch.gpu.GpuCapabilities;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.gpu.VramFlagsUtil;
-import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.OpCriticality;
 import io.justsearch.app.api.OpLeaseOutcome;
 import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.api.inference.EncoderRuntimeView;
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.observability.EncoderRuntimeCache;
 import io.justsearch.app.services.observability.EncoderRuntimeExplainer;
 import io.justsearch.ort.EncoderRole;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
-import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
+import io.justsearch.app.api.SettingsService;
+import io.justsearch.app.api.settings.SettingsWitness;
+import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.services.intent.EngineProvenance;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.worker.OnnxModelStatus;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.configuration.EnvRegistry;
-import io.justsearch.configuration.ModelPathSource;
 import io.justsearch.app.api.inference.RealizedChatIdentity;
 import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.configuration.model.InstallContract;
 import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedPathResolver;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
-import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.RepoRootLocator;
 import io.justsearch.app.api.EnterprisePolicyService;
 import io.justsearch.app.api.EffectivePolicy;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -65,6 +70,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -76,7 +84,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Important: install ≠ activate. Runtime packs can be imported safely without changing any runtime pointers.
  */
-public final class RuntimeActivationService implements io.justsearch.app.api.RuntimeActivationService {
+public final class RuntimeActivationService
+    implements io.justsearch.app.api.RuntimeActivationService, AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(RuntimeActivationService.class);
 
   private static final ObjectMapper MAPPER =
@@ -85,8 +94,8 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
           .enable(SerializationFeature.INDENT_OUTPUT)
           .build();
 
-  private static final HttpClient HTTP =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+  private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(3);
+  private static final String HTTP_EXECUTOR_NAME = "head.runtime-activation.http";
 
   private static final String STATUS_FILE = "runtime-activation-state.json";
 
@@ -97,34 +106,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    */
   private static final String CHAT_PACKAGE_ID = "chat";
 
-  // Mirror SettingsController behavior for server exe sysprop ownership.
-  private static final String SERVER_EXE_SYS_PROP = "justsearch.server.exe";
-  private static final String SERVER_EXE_SOURCE_PROP = "justsearch.server.exe.source";
-
-  /**
-   * Ownership markers this service recognizes on the server-executable sysprop.
-   *
-   * <p>Tempdoc 842: these were two private string literals here, a third private copy in
-   * {@code EffectiveConfigController}, and the writers' own literals elsewhere — four copies of one
-   * vocabulary. They now name the shared {@link ModelPathSource} constants (tempdoc 374 alpha.16
-   * fix A's finding was exactly that a divergent copy silently reclassified the boot-time
-   * CUDA auto-select as a third-party operator lock and rejected every activation).
-   *
-   * <p>Deliberately NOT {@link ModelPathSource#isSystemOwned}: that predicate also admits
-   * {@link ModelPathSource#PROFILE_RESOLVED}, which is a claim about the <em>model path</em> and
-   * says nothing about who owns the server executable. Widening this gate for free is how an
-   * ownership check quietly stops being a check.
-   */
-  private static final String SOURCE_UI_SETTINGS = ModelPathSource.UI_SETTINGS;
-
-  private static final String SOURCE_AUTO_SELECTED_CUDA12 = ModelPathSource.AUTO_SELECTED_CUDA12;
-
-  /**
-   * Chat-profile selection key (tempdoc 842 §2.3). A profile activation writes it so a later
-   * same-JVM {@code InferenceConfig} rebuild resolves the same (model, mmproj) pair the engine was
-   * just switched to, instead of falling back to the standard pair and half-reverting the switch.
-   */
-  private static final String CHAT_PROFILE_SYS_PROP = EnvRegistry.CHAT_PROFILE.sysProp();
+  private static final String SERVER_EXE_KEY = "justsearch.server.exe";
 
   // Tempdoc 374 alpha.17 R1: route through the same sysprop as
   // LlamaServerOps.HEALTH_CHECK_TIMEOUT_MS so the activation self-test honours operator
@@ -141,14 +123,13 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
   // Self-test VRAM delta threshold (best-effort; noisy environments should produce INCONCLUSIVE).
   private static final long MIN_VRAM_DELTA_BYTES = 64L * 1024 * 1024; // 64 MiB
 
-  private final OnlineAiService onlineAi;
   private final UiSettingsStore settingsStore;
   // Tempdoc 374 alpha.27: VramDetector dependency removed; routes through
   // GpuCapabilitiesService (NVML-first) + VramRequirements helpers.
   private final GpuCapabilitiesService gpuCapabilitiesService;
   private final EnterprisePolicyService policyService;
   private final WorkerFeatureCache workerFeatureCache; // nullable
-  private final InferenceCapability inferenceCapability; // nullable — tempdoc 656 Task 2
+  private final ComponentHandle generativeComponent; // nullable for compositions without a registry
   private final AiInstallService aiInstallService; // nullable — tempdoc 727 F-3
   // Tempdoc 737 fix pack (fix 2): the single-writer runtime authority. When present, runActivate
   // brackets the engine-online + desired-state-write window in an ACTIVATION procedure so the
@@ -156,9 +137,13 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
   // persisted the intent — and nudges specChanged() so the persisted intent is honored
   // deterministically, not via a racy mode-drift event. Nullable for graceful degradation / tests.
   private final RuntimeReconciler runtimeReconciler;
+  private final SettingsService settingsService;
 
   private final Path aiHome;
   private final Path statusPath;
+  private final EngineExecutorRegistry.Registration httpRegistration;
+  private final HttpClient http;
+  private boolean closed;
 
   /** Memo for {@link #variantsRoot()}; re-derived when it stops naming a directory (913 H1). */
   private volatile Path variantsRoot;
@@ -168,6 +153,23 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
 
   private final Object lock = new Object();
   private final AtomicBoolean running = new AtomicBoolean(false);
+
+  /** Settings identity accepted when one activation attempt starts, advanced only by its writes. */
+  private static final class AttemptPublication {
+    private SettingsWitness expectedSettings;
+
+    private AttemptPublication(SettingsWitness expectedSettings) {
+      this.expectedSettings = Objects.requireNonNull(expectedSettings, "expectedSettings");
+    }
+
+    private SettingsWitness expectedSettings() {
+      return expectedSettings;
+    }
+
+    private void advancedTo(SettingsWitness witness) {
+      expectedSettings = Objects.requireNonNull(witness, "witness");
+    }
+  }
 
   /**
    * Op-lease SPI (tempdoc 617). Activation/deactivation rewrite the GPU runtime under
@@ -254,33 +256,70 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    *
    * <p>The lease is registered on the CALLING thread, before {@code start()}: registering inside
    * the thread leaves a window in which upgrade prepare observes no blocker while the work is about
-   * to write. Same race-window closure as {@code BulkReindexHandler}.
+   * to write. Registration must precede asynchronous work publication.
    */
-  private void startLeasedThread(String opClass, String threadName, Runnable body) {
-    OperationLeaseHandle lease =
-        operationLeases.register(
-            opClass, OpCriticality.INTERRUPTIBLE_WITH_LOSS, 600L, Map.of("source", opClass));
-    Thread t =
-        new Thread(
-            () -> {
-              boolean ok = false;
-              try {
-                body.run();
-                ok = true;
-              } finally {
-                running.set(false);
-                lease.release(ok ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
-              }
-            },
-            threadName);
-    t.setDaemon(true);
+  private CompletionStage<AiRuntimeActivationStatus> startLeasedThread(
+      String opClass, String threadName, Runnable body) {
+    var completion = new CompletableFuture<AiRuntimeActivationStatus>();
+    OperationLeaseHandle lease;
     try {
-      t.start();
-    } catch (RuntimeException e) {
-      // The thread never ran, so its finally block will not release the lease.
-      running.set(false);
-      lease.release(OpLeaseOutcome.FAILURE);
-      throw e;
+      lease = operationLeases.register(
+          opClass, OpCriticality.INTERRUPTIBLE_WITH_LOSS, 600L, Map.of("source", opClass));
+    } catch (RuntimeException | Error failure) {
+      startFailed(failure);
+      throw failure;
+    }
+    try {
+      Thread thread = new Thread(() -> {
+        Throwable failure = null;
+        try {
+          body.run();
+        } catch (RuntimeException | Error thrown) {
+          failure = thrown;
+          if (thrown instanceof RuntimeException) {
+            updateState("failed", "done", "Runtime activation owner failed: " + safeMsg(thrown),
+                "RUNTIME_ACTIVATION_FAILED");
+          }
+        }
+        AiRuntimeActivationStatus outcome;
+        // Keep running true until cleanup is done, then freeze this attempt's status before
+        // allowing another caller to overwrite it. Completion callbacks run outside the lock.
+        try {
+          lease.release(failure == null && "completed".equals(getActivationStatus().state)
+              ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
+        } catch (RuntimeException | Error cleanup) {
+          if (failure == null) failure = cleanup;
+          else failure.addSuppressed(cleanup);
+        }
+        synchronized (lock) {
+          outcome = copyStatus(status);
+          running.set(false);
+        }
+        if (failure != null) {
+          completion.completeExceptionally(failure);
+          if (failure instanceof Error fatal) throw fatal;
+          log.warn("Runtime activation owner failed", failure);
+        } else {
+          completion.complete(outcome);
+        }
+      }, threadName);
+      thread.setDaemon(true);
+      thread.start();
+    } catch (RuntimeException | Error failure) {
+      // No owner thread ran. Refusal must release the lease and the single-flight guard.
+      try { lease.release(OpLeaseOutcome.FAILURE); }
+      catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      startFailed(failure);
+      throw failure;
+    }
+    return completion.minimalCompletionStage();
+  }
+  private void startFailed(Throwable failure) {
+    synchronized (lock) {
+      try {
+        updateState("failed", "done", "Runtime activation could not start: " + safeMsg(failure),
+            "RUNTIME_ACTIVATION_START_FAILED");
+      } finally { running.set(false); }
     }
   }
   private final AiRuntimeActivationStatus status = new AiRuntimeActivationStatus();
@@ -295,43 +334,46 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
   private volatile List<String> lastSelfTestEffectiveFlags = List.of();
 
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService) {
-    this(onlineAi, settingsStore, gpuCapabilitiesService, policyService, null, null);
+    this(processExecutors, onlineAi, settingsStore, gpuCapabilitiesService, policyService, null, null);
   }
 
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService,
       WorkerFeatureCache workerFeatureCache) {
-    this(onlineAi, settingsStore, gpuCapabilitiesService, policyService, workerFeatureCache, null);
+    this(processExecutors, onlineAi, settingsStore, gpuCapabilitiesService, policyService, workerFeatureCache, null);
   }
 
   /**
-   * Tempdoc 656 Task 2: {@code inferenceCapability} lets this service's already-precise failure
-   * detection (see {@link #fail}) reach {@link InferenceCapability#pendingReason()} — and therefore
-   * the runtime manifest's {@code ai.pendingReason} — instead of staying scoped to the immediate
-   * {@code ai_activate} RPC response. Nullable for graceful degradation and existing test
-   * compatibility, matching {@code workerFeatureCache}.
+   * The {@code generativeComponent} lets this service's already-precise failure
+   * detection (see {@link #fail}) reach the Engine's generative component instead of staying scoped
+   * to the immediate {@code ai_activate} RPC response. Nullable for compositions without a process
+   * component registry, matching {@code workerFeatureCache}.
    */
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService,
       WorkerFeatureCache workerFeatureCache,
-      InferenceCapability inferenceCapability) {
+      ComponentHandle generativeComponent) {
     this(
+        processExecutors,
         onlineAi,
         settingsStore,
         gpuCapabilitiesService,
         policyService,
         workerFeatureCache,
-        inferenceCapability,
+        generativeComponent,
         null);
   }
 
@@ -343,20 +385,22 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    * for graceful degradation and existing test compatibility, matching {@code workerFeatureCache}.
    */
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService,
       WorkerFeatureCache workerFeatureCache,
-      InferenceCapability inferenceCapability,
+      ComponentHandle generativeComponent,
       AiInstallService aiInstallService) {
     this(
+        processExecutors,
         onlineAi,
         settingsStore,
         gpuCapabilitiesService,
         policyService,
         workerFeatureCache,
-        inferenceCapability,
+        generativeComponent,
         aiInstallService,
         null);
   }
@@ -365,29 +409,85 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    * Tempdoc 737 fix pack (fix 2): adds the nullable {@link RuntimeReconciler} so {@link
    * #runActivate} can bracket the engine-online + intent-write window in an {@code ACTIVATION}
    * procedure and nudge {@code specChanged()}. Nullable for graceful degradation / existing test
-   * compatibility, matching {@code workerFeatureCache}/{@code inferenceCapability}.
+   * compatibility, matching {@code workerFeatureCache}/{@code generativeComponent}.
    */
   public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
       OnlineAiService onlineAi,
       UiSettingsStore settingsStore,
       GpuCapabilitiesService gpuCapabilitiesService,
       EnterprisePolicyService policyService,
       WorkerFeatureCache workerFeatureCache,
-      InferenceCapability inferenceCapability,
+      ComponentHandle generativeComponent,
       AiInstallService aiInstallService,
       RuntimeReconciler runtimeReconciler) {
-    this.onlineAi = Objects.requireNonNull(onlineAi, "onlineAi");
+    this(processExecutors, onlineAi, settingsStore, gpuCapabilitiesService, policyService,
+        workerFeatureCache, generativeComponent, aiInstallService, runtimeReconciler, null);
+  }
+
+  public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
+      OnlineAiService onlineAi,
+      UiSettingsStore settingsStore,
+      GpuCapabilitiesService gpuCapabilitiesService,
+      EnterprisePolicyService policyService,
+      WorkerFeatureCache workerFeatureCache,
+      ComponentHandle generativeComponent,
+      AiInstallService aiInstallService,
+      RuntimeReconciler runtimeReconciler,
+      SettingsService settingsService) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    Objects.requireNonNull(onlineAi, "onlineAi");
     this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
     this.gpuCapabilitiesService = gpuCapabilitiesService == null ? new GpuCapabilitiesService() : gpuCapabilitiesService;
     this.policyService = policyService; // may be null (best-effort)
     this.workerFeatureCache = workerFeatureCache; // may be null (graceful degradation)
-    this.inferenceCapability = inferenceCapability; // may be null (graceful degradation)
+    this.generativeComponent = generativeComponent; // may be null (no process registry)
     this.aiInstallService = aiInstallService; // may be null (graceful degradation)
     this.runtimeReconciler = runtimeReconciler; // may be null (graceful degradation)
+    this.settingsService = settingsService;
     this.aiHome = resolveAiHome();
     this.statusPath = aiHome.resolve("ai").resolve(STATUS_FILE);
     loadStatusBestEffort();
+    HttpResources resources = openHttpResources(processExecutors);
+    this.httpRegistration = resources.registration();
+    this.http = resources.client();
   }
+
+  private static HttpResources openHttpResources(EngineExecutorRegistry processExecutors) {
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                HTTP_EXECUTOR_NAME,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.PLATFORM,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ExecutorService executor =
+          registration.open(
+              runnable -> {
+                Thread thread = new Thread(runnable, "head-runtime-activation-http");
+                thread.setDaemon(true);
+                return thread;
+              });
+      HttpClient client = HttpClient.newBuilder().connectTimeout(HTTP_TIMEOUT).executor(executor).build();
+      return new HttpResources(registration, client);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record HttpResources(
+      EngineExecutorRegistry.Registration registration, HttpClient client) {}
 
   public AiRuntimeActivationStatus getActivationStatus() {
     synchronized (lock) {
@@ -400,10 +500,10 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
     List<AiRuntimeStatusResponse.InstalledVariant> installed = listInstalledVariants();
 
     UiSettings s = settingsStore.load();
-    String activeExe = System.getProperty(SERVER_EXE_SYS_PROP, "");
-    if (activeExe == null || activeExe.isBlank()) {
-      activeExe = s.getServerExecutablePath();
-    }
+    var configStore = ConfigStore.globalOrNull();
+    var resolvedConfig = configStore != null ? configStore.get() : null;
+    Path configuredExe = resolvedConfig == null ? null : resolvedConfig.ai().serverExe();
+    String activeExe = configuredExe == null ? s.getServerExecutablePath() : configuredExe.toString();
     String activeVariantId = resolveVariantIdFromExePath(activeExe);
     // Tempdoc 374 alpha.14 fix P1-B: read gpu_layers from the resolved config
     // (which integrates auto-populate at ord 150 + env vars at 400 + sysprops
@@ -414,8 +514,6 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
     // not the running value. Falls back to UiSettings only when ConfigStore
     // is absent (shouldn't happen post-boot, but defensive).
     Integer gpuLayers;
-    var configStore = ConfigStore.globalOrNull();
-    var resolvedConfig = configStore != null ? configStore.get() : null;
     if (resolvedConfig != null && resolvedConfig.ai() != null) {
       gpuLayers = resolvedConfig.ai().gpuLayers();
     } else {
@@ -497,6 +595,8 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
   }
 
   private List<FeatureRow> resolveOnnxFeatureRows() {
+    ConfigStore store = ConfigStore.globalOrNull();
+    ResolvedConfig config = store == null ? null : store.get();
     return List.of(
         new FeatureRow(
             EncoderRole.RERANKER,
@@ -507,6 +607,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
                 EnvRegistry.RERANK_ENABLED.sysProp(),
                 EnvRegistry.RERANK_MODEL_PATH.envVar(),
                 EnvRegistry.RERANK_MODEL_PATH.sysProp(),
+                resolvedPath(config, EnvRegistry.RERANK_MODEL_PATH.sysProp()),
                 EncoderRole.RERANKER)),
         new FeatureRow(
             EncoderRole.CITATION,
@@ -517,6 +618,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
                 EnvRegistry.CITATION_SCORER_ENABLED.sysProp(),
                 EnvRegistry.CITATION_SCORER_MODEL_PATH.envVar(),
                 EnvRegistry.CITATION_SCORER_MODEL_PATH.sysProp(),
+                resolvedPath(config, EnvRegistry.CITATION_SCORER_MODEL_PATH.sysProp()),
                 EncoderRole.CITATION)),
         new FeatureRow(
             EncoderRole.EMBEDDING,
@@ -563,6 +665,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
       String enabledProp,
       String pathEnv,
       String pathProp,
+      String configuredPath,
       EncoderRole role) {
     // The Worker's model name for this feature IS the registry package id carried by the role —
     // one identity, not a second hardcoded pair (EncoderRole.packageId).
@@ -580,8 +683,8 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
       return onnxFeature(id, label, "inactive", "disabled", null, sessionActive, observed);
     }
 
-    // 2. Explicit model path (Head-owned: uses Head-side env vars)
-    String explicitPath = resolveEnvOrProp(pathEnv, pathProp);
+    // 2. Published configuration includes the accepted installer settings at their true ordinal.
+    String explicitPath = configuredPath == null ? resolveEnvOrProp(pathEnv, pathProp) : configuredPath;
     if (explicitPath != null && !explicitPath.isBlank()) {
       return onnxFeature(id, label, "active", "explicit_path", explicitPath, sessionActive, observed);
     }
@@ -657,6 +760,12 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
     return false;
   }
 
+  private static String resolvedPath(ResolvedConfig config, String key) {
+    var resolution = config == null ? null : config.resolution(key);
+    return resolution == null || resolution.value() == null || resolution.value().isBlank()
+        ? null : resolution.value();
+  }
+
   /** Resolves a value from system property first, then environment variable. */
   private static String resolveEnvOrProp(String envVar, String sysProp) {
     String val = System.getProperty(sysProp);
@@ -671,8 +780,8 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
   }
 
   @Override
-  public void startActivate(String variantId) {
-    startActivate(variantId, null);
+  public Attempt startActivate(String variantId) {
+    return startActivate(variantId, null);
   }
 
   /**
@@ -681,19 +790,22 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    *
    * @param variantId the GPU runtime variant to activate (unchanged semantics)
    * @param chatProfile optional {@code ChatModelProfile} id ({@code "standard"} | {@code
-   *     "compact"} | ...). A null/blank value means "do not touch the chat model" and the flow is
-   *     byte-for-byte the pre-842 one — every existing caller keeps its exact behavior.
+   *     "compact"} | ...). A null/blank value retains the settings-selected model path. Both
+   *     variants compose through the accepted settings owner before its file commitment.
    */
-  public void startActivate(String variantId, String chatProfile) {
+  public Attempt startActivate(String variantId, String chatProfile) {
     String v = variantId == null ? "" : variantId.trim();
     if (v.isBlank()) {
       throw new IllegalArgumentException("variantId is required");
     }
     String profileRaw = chatProfile == null || chatProfile.isBlank() ? null : chatProfile.trim();
+    AiRuntimeActivationStatus started;
+    AttemptPublication publication;
     synchronized (lock) {
       if (running.get()) {
         throw new IllegalStateException("Runtime activation already running");
       }
+      publication = new AttemptPublication(settingsStore.inspect().witness());
       running.set(true);
       status.startedAtEpochMs = System.currentTimeMillis();
       updateState("running", "validate", "Starting runtime activation…", null);
@@ -704,24 +816,37 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
       status.vramUsedDeltaBytes = null;
       status.selfTestPort = null;
       touch();
+      started = copyStatus(status);
     }
-    startLeasedThread(
-        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(v, profileRaw));
+    try {
+      publishStarting(publication);
+    } catch (RuntimeException | Error failure) {
+      startFailed(failure);
+      throw failure;
+    }
+    return new Attempt(started, startLeasedThread(
+        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(v, profileRaw, publication)));
   }
 
-  public void startDeactivate() {
+  public Attempt startDeactivate() {
+    AiRuntimeActivationStatus started;
+    AttemptPublication publication;
     synchronized (lock) {
       if (running.get()) {
         throw new IllegalStateException("Runtime activation already running");
       }
+      publication = new AttemptPublication(settingsStore.inspect().witness());
       running.set(true);
       status.startedAtEpochMs = System.currentTimeMillis();
       updateState("running", "apply", "Deactivating GPU runtime…", null);
       status.variantId = "";
       status.result = "";
       touch();
+      started = copyStatus(status);
     }
-    startLeasedThread("ai.runtime-deactivate", "ai-runtime-deactivate", this::runDeactivate);
+    return new Attempt(started,
+        startLeasedThread("ai.runtime-deactivate", "ai-runtime-deactivate",
+            () -> runDeactivate(publication)));
   }
 
   // -------------------- Implementation --------------------
@@ -758,13 +883,14 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
     // snapshot() already bridged policy sysprops to app-services enforcement points.
   }
 
-  private void runActivate(String variantId, String chatProfileRaw) {
+  private void runActivate(
+      String variantId, String chatProfileRaw, AttemptPublication publication) {
     try {
       enforceActivationPolicy();
     } catch (IllegalStateException e) {
       String msg = e.getMessage() == null ? "" : e.getMessage();
       String code = msg.contains("GPU acceleration") ? "POLICY_GPU_DISABLED" : "POLICY_ONLINE_AI_DISABLED";
-      fail(code, msg, null);
+      fail(code, msg, null, publication);
       return;
     }
 
@@ -781,24 +907,32 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
         }
       }
       if (!Files.isRegularFile(exe)) {
-        fail("RUNTIME_VARIANT_NOT_INSTALLED", "Variant not installed: " + variantId, null);
+        fail("RUNTIME_VARIANT_NOT_INSTALLED", "Variant not installed: " + variantId, null,
+            publication);
         return;
       }
     }
 
-    UiSettings current = settingsStore.load();
+    UiSettingsStore.Snapshot base = settingsStore.inspect();
+    requireMutableServerExecutable(exe);
+    UiSettings current = base.settings();
 
     // Tempdoc 842 §2.4: a named profile selects the (model, mmproj) pair as one unit. It is
     // resolved BEFORE the settings/contract chain and short-circuits it — a stored llmModelPath is
     // a system-owned, re-derivable copy of the standard model on every installed and dev data dir,
     // so consulting it here would make every profile switch silently inert (§2.3 precedence rule).
     ChatModelProfile profile = chatProfileRaw == null ? null : ChatModelProfile.resolve(chatProfileRaw);
+    if (profile != null && operatorOwnsChatModel()) {
+      fail("MODEL_OVERRIDE_LOCKED", "An operator-selected chat model path cannot be replaced by a profile.",
+          null, publication);
+      return;
+    }
     Path model;
     boolean modelPathFromContract = false;
     if (profile != null) {
       Path resolved = resolveProfileModelPath(profile);
       if (!Files.isRegularFile(resolved)) {
-        fail("MODEL_NOT_FOUND", missingProfileModelMessage(profile, resolved), null);
+        fail("MODEL_NOT_FOUND", missingProfileModelMessage(profile, resolved), null, publication);
         return;
       }
       model = resolved;
@@ -812,12 +946,13 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
         fail(
             "MODEL_PATH_REQUIRED",
             "No chat model configured. Run Install AI to download one, or import a models pack.",
-            null);
+            null,
+            publication);
         return;
       }
       model = Path.of(modelPath.trim());
       if (!Files.isRegularFile(model)) {
-        fail("MODEL_NOT_FOUND", "Configured model does not exist: " + model, null);
+        fail("MODEL_NOT_FOUND", "Configured model does not exist: " + model, null, publication);
         return;
       }
     }
@@ -825,7 +960,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
     updateState("running", "self_test", "Running GPU self-test…", null);
     SelfTestResult selfTest = runSelfTest(exe, model, current);
     if (selfTest == null) {
-      fail("SELF_TEST_FAILED", "Self-test failed.", null);
+      fail("SELF_TEST_FAILED", "Self-test failed.", null, publication);
       return;
     }
 
@@ -850,171 +985,82 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
 
     updateState("running", "apply", "Activating runtime variant…", null);
 
-    // Capture previous state for rollback.
-    UiSettings prevSettings = settingsStore.load();
-    String prevSys = System.getProperty(SERVER_EXE_SYS_PROP, "");
-    String prevSysSource = System.getProperty(SERVER_EXE_SOURCE_PROP, "");
-    // Tempdoc 842: the profile sysprop joins the rollback bracket. It is captured as null-vs-value
-    // (not "" for absent) because clearing it and setting it to "" are different states to
-    // InferenceConfig: absent falls back to the STANDARD default, blank would too, but a rollback
-    // must restore *absence* rather than invent a blank claim.
-    String prevChatProfileProp = System.getProperty(CHAT_PROFILE_SYS_PROP);
-
-    try {
-      // Persist settings (so activation survives restart) AND apply sysprop (so reload works immediately).
-      UiSettings next = settingsStore.load();
-      next.setServerExecutablePath(exe.toAbsolutePath().toString());
-      if (next.getGpuLayers() <= 0) {
-        next.setGpuLayers(99);
-      }
-      // The engine is started from settings (applyRuntimeOverridesBestEffort reads
-      // next.getLlmModelPath()), so a model path recovered from the install contract has to land in
-      // settings or the activation would bring the engine up with no model.
-      //
-      // Tempdoc 842 §2.3: a PROFILE activation deliberately does NOT write llmModelPath. A profile
-      // choice is a claim about which bundle to resolve, not a stored user path; persisting the
-      // resolved file here would turn one session's dev profile into a permanent operator-looking
-      // setting that outlives it. Boot-time resolution (InferenceConfig + the chat-profile key)
-      // owns persistence semantics for profiles.
-      if (modelPathFromContract) {
-        next.setLlmModelPath(model.toAbsolutePath().toString());
-      }
-      settingsStore.save(next);
-
-      if (!applyServerExeSysProp(exe.toAbsolutePath().toString())) {
-        throw new IllegalStateException("Server executable override is locked by operator config");
-      }
-
-      // Tempdoc 737 fix pack (fix 2): bracket the engine-online + intent-write window in an
-      // ACTIVATION procedure. applyRuntimeOverrides(RESTART_ALWAYS) brings the engine ONLINE (its
-      // mode listener fires) BEFORE recordUserEnabled persists the intent; without the bracket the
-      // reconciler would see mode-up with spec still false and drift-converge the engine straight
-      // back DOWN. The procedure suppresses that drift; recordUserEnabled writes the intent;
-      // specChanged() nudges; endProcedure returns to the now-true spec — deterministically online,
-      // no spurious down/up flicker.
-      boolean activationProcedureBegun = false;
-      if (runtimeReconciler != null) {
-        runtimeReconciler.beginProcedure(
-            RuntimeStatus.ProcedureKind.ACTIVATION, "runtime-variant-activation");
-        activationProcedureBegun = true;
-      }
-      try {
-        if (profile != null) {
-          // Publish the selection BEFORE the apply: applyChatProfile restarts the engine, and any
-          // config rebuild racing that restart in this JVM must already agree on the profile.
-          System.setProperty(CHAT_PROFILE_SYS_PROP, profile.id());
-          applyChatProfileOrThrow(profile);
-        } else {
-          applyRuntimeOverridesBestEffort(next);
-        }
-
-        // Rebuild ConfigStore so readers see updated server EXE / GPU layers.
-        ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), next);
-
-        // Tempdoc 737 Phase 1: a user who successfully activated a GPU runtime wants AI on across
-        // restarts — persist the desired-state so the reconciler brings it back at boot (fixes the
-        // documented "AI offline after reopen" confusion). Null-safe; idempotent.
-        if (settingsStore != null) {
-          new RuntimeSpecStore(settingsStore).recordUserEnabled();
-        }
-        // Nudge the reconciler so the persisted intent is honored via specChanged (an explicit
-        // convergence), not only via the racy mode-drift event. Deferred while the procedure is
-        // active; applied at endProcedure below.
-        if (runtimeReconciler != null) {
-          runtimeReconciler.specChanged();
-        }
-      } finally {
-        if (activationProcedureBegun) {
-          runtimeReconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
-        }
-      }
-
-      updateState("completed", "done", "GPU runtime activated.", null);
-    } catch (Exception e) {
-      log.warn("Runtime activation failed; attempting rollback", e);
-      updateState("running", "rollback", "Activation failed; rolling back…", null);
-      restoreChatProfileProp(prevChatProfileProp);
-      boolean rolledBack = rollback(prevSettings, prevSys, prevSysSource);
-      if (!rolledBack) {
-        fail("RUNTIME_ROLLBACK_FAILED", "Rollback failed after activation error: " + safeMsg(e), e);
-        return;
-      }
-      fail("RUNTIME_ACTIVATION_FAILED", "Activation failed: " + safeMsg(e), e);
-    }
+    UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(current), UiSettings.class);
+    next.setServerExecutablePath(exe.toAbsolutePath().toString());
+    if (next.getGpuLayers() <= 0) next.setGpuLayers(99);
+    if (modelPathFromContract) next.setLlmModelPath(model.toAbsolutePath().toString());
+    next.setChatEnabled(true);
+    applyCandidate(base, next, profile, true, publication);
   }
 
-  private void runDeactivate() {
-    // Best-effort: choose CPU baseline from native-bin/llama-server (excluding variants/).
+  private void runDeactivate(AttemptPublication publication) {
+    UiSettingsStore.Snapshot base = settingsStore.inspect();
     Path baselineExe = resolveCpuBaselineExe(aiHome);
     if (baselineExe == null || !Files.isRegularFile(baselineExe)) {
-      fail("RUNTIME_BASELINE_NOT_FOUND", "CPU baseline llama-server.exe not found.", null);
+      fail("RUNTIME_BASELINE_NOT_FOUND", "CPU baseline llama-server.exe not found.", null,
+          publication);
       return;
     }
+    requireMutableServerExecutable(baselineExe);
+    UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(base.settings()), UiSettings.class);
+    // A blank value would expose the remembered CUDA auto-detection source again.
+    next.setServerExecutablePath(baselineExe.toAbsolutePath().toString());
+    next.setGpuLayers(0);
+    applyCandidate(base, next, null, false, publication);
+  }
 
-    UiSettings prevSettings = settingsStore.load();
-    String prevSys = System.getProperty(SERVER_EXE_SYS_PROP, "");
-    String prevSysSource = System.getProperty(SERVER_EXE_SOURCE_PROP, "");
-
+  private void applyCandidate(UiSettingsStore.Snapshot base, UiSettings next,
+      ChatModelProfile profile, boolean activating, AttemptPublication publication) {
+    boolean procedureBegun = false;
     try {
-      UiSettings next = settingsStore.load();
-      next.setServerExecutablePath(""); // revert to default discovery on restart
-      next.setGpuLayers(0);
-      settingsStore.save(next);
-
-      // Force immediate switch to baseline for this process.
-      forceServerExeSysProp(baselineExe.toAbsolutePath().toString());
-      applyRuntimeOverridesBestEffort(next);
-
-      // Rebuild ConfigStore so readers see reverted server EXE / GPU layers.
-      ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), next);
-
-      updateState("completed", "done", "GPU runtime deactivated (CPU baseline).", null);
-    } catch (Exception e) {
-      log.warn("Runtime deactivation failed; attempting rollback", e);
-      updateState("running", "rollback", "Deactivation failed; rolling back…", null);
-      boolean rolledBack = rollback(prevSettings, prevSys, prevSysSource);
-      if (!rolledBack) {
-        fail("RUNTIME_ROLLBACK_FAILED", "Rollback failed after deactivation error: " + safeMsg(e), e);
-        return;
+      if (runtimeReconciler != null) {
+        runtimeReconciler.beginProcedure(RuntimeStatus.ProcedureKind.ACTIVATION,
+            activating ? "runtime-variant-activation" : "runtime-variant-deactivation");
+        procedureBegun = true;
       }
-      fail("RUNTIME_DEACTIVATION_FAILED", "Deactivation failed: " + safeMsg(e), e);
+      SettingsWitness committed = commitCandidate(next, base.witness(),
+          "runtime-variant-apply", profile);
+      publication.advancedTo(committed);
+    } catch (Exception failure) {
+      fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
+          "Runtime apply failed: " + safeMsg(failure), failure, publication);
+      return;
+    } finally {
+      if (procedureBegun) runtimeReconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
+    }
+    if (runtimeReconciler != null) runtimeReconciler.specChanged();
+    updateState("completed", "done", activating ? "GPU runtime activated."
+        : "GPU runtime deactivated (CPU baseline).", null);
+  }
+
+  private SettingsWitness commitCandidate(UiSettings candidate, SettingsWitness expected,
+      String owner, ChatModelProfile profile) {
+    if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
+    var result = settingsService.applyInternal(candidate, expected,
+        EngineProvenance.internal(owner, EngineContext.Survival.INTERACTIVE,
+            EngineContext.Urgency.FOREGROUND),
+        new io.justsearch.app.api.settings.SettingsCandidateContext(profile));
+    if (!result.response().success()) throw new SettingsCommitOwner.Refused(result.response());
+    if (result.record().state() != OperationState.COMPLETE) {
+      throw new IllegalStateException("Settings commitment is unresolved");
+    }
+    return new SettingsWitness(Math.addExact(expected.acceptedRevision(), 1), result.record().key());
+  }
+
+  private static void requireMutableServerExecutable(Path requested) {
+    ConfigStore config = ConfigStore.globalOrNull();
+    var resolution = config == null ? null : config.get().resolution(SERVER_EXE_KEY);
+    if (resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400
+        && !Path.of(resolution.value()).toAbsolutePath().normalize()
+            .equals(requested.toAbsolutePath().normalize())) {
+      throw new IllegalStateException("Server executable override is locked by operator config");
     }
   }
 
-  private boolean rollback(UiSettings prevSettings, String prevSys, String prevSysSource) {
-    try {
-      if (prevSettings != null) {
-        settingsStore.save(prevSettings);
-      }
-
-      // Restore sysprop if it was previously set; otherwise force baseline.
-      if (prevSys != null && !prevSys.isBlank()) {
-        System.setProperty(SERVER_EXE_SYS_PROP, prevSys);
-        if (prevSysSource != null && !prevSysSource.isBlank()) {
-          System.setProperty(SERVER_EXE_SOURCE_PROP, prevSysSource);
-        } else {
-          System.clearProperty(SERVER_EXE_SOURCE_PROP);
-        }
-      } else {
-        Path baselineExe = resolveCpuBaselineExe(aiHome);
-        if (baselineExe != null && Files.isRegularFile(baselineExe)) {
-          forceServerExeSysProp(baselineExe.toAbsolutePath().toString());
-        } else {
-          System.clearProperty(SERVER_EXE_SYS_PROP);
-          System.clearProperty(SERVER_EXE_SOURCE_PROP);
-        }
-      }
-
-      applyRuntimeOverridesBestEffort(prevSettings);
-
-      // Rebuild ConfigStore so readers see restored sysprops.
-      ConfigStoreRebuilder.rebuild(ConfigStore.globalOrNull(), prevSettings);
-
-      return true;
-    } catch (Exception e) {
-      log.warn("Rollback failed", e);
-      return false;
-    }
+  private static boolean operatorOwnsChatModel() {
+    ConfigStore config = ConfigStore.globalOrNull();
+    var resolution = config == null ? null : config.get().resolution("justsearch.llm.model_path");
+    return resolution != null && resolution.isResolved() && resolution.sourceOrdinal() >= 400;
   }
 
   /**
@@ -1055,87 +1101,6 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
             ? " Run `node scripts/dev/fetch-compact-model.mjs` to download it."
             : " Run Install AI to download it.";
     return "Chat profile '" + profile.id() + "' model does not exist: " + resolved + "." + remedy;
-  }
-
-  /**
-   * Applies a profile as one atomic (model, mmproj, profile-id) unit.
-   *
-   * <p>Deliberately NOT {@link #applyRuntimeOverridesBestEffort}: that routes through the bare-path
-   * {@code applyRuntimeOverrides}, which clears the profile claim and nulls the projector — the
-   * exact defect (dev stacks running silently text-only) tempdoc 842 §2.3 exists to fix. A control
-   * surface that cannot apply pairs throws {@link UnsupportedOperationException} rather than
-   * half-applying, and that propagates into the rollback bracket.
-   */
-  private void applyChatProfileOrThrow(ChatModelProfile profile) {
-    OnlineAiService onlineAi = this.onlineAi;
-    if (!(onlineAi instanceof OnlineAiRuntimeControl control)) {
-      // Same graceful degradation as applyRuntimeOverridesBestEffort: no control surface means
-      // there is no engine to switch, and activation of the GPU variant still succeeded.
-      return;
-    }
-    try {
-      control.applyChatProfile(profile, OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to apply chat profile '" + profile.id() + "'", e);
-    }
-  }
-
-  /**
-   * Restores the chat-profile sysprop to its pre-activation state. Absent stays absent: a rollback
-   * that wrote "" would leave a blank claim behind that no writer ever creates.
-   */
-  private static void restoreChatProfileProp(String previous) {
-    if (previous == null) {
-      System.clearProperty(CHAT_PROFILE_SYS_PROP);
-    } else {
-      System.setProperty(CHAT_PROFILE_SYS_PROP, previous);
-    }
-  }
-
-  private void applyRuntimeOverridesBestEffort(UiSettings settings) {
-    OnlineAiService onlineAi = this.onlineAi;
-    if (!(onlineAi instanceof OnlineAiRuntimeControl control)) {
-      return;
-    }
-    try {
-      control.applyRuntimeOverrides(
-          settings == null ? null : settings.getLlmModelPath(),
-          settings == null ? null : settings.getContextLength(),
-          settings == null ? null : settings.getGpuLayers(),
-          OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to apply runtime overrides", e);
-    }
-  }
-
-  private boolean applyServerExeSysProp(String exePath) {
-    String source = System.getProperty(SERVER_EXE_SOURCE_PROP, "");
-    String existing = System.getProperty(SERVER_EXE_SYS_PROP, "");
-    // Tempdoc 374 alpha.16 fix A: treat both ui_settings and auto_selected_cuda12 as
-    // system-owned so the activation flow can overwrite them. The pre-alpha.16 check only
-    // matched ui_settings, so HeadlessApp's boot-time auto-select (and AiInstallService's
-    // applyCudaServerExe follow-up) registered as third-party operator locks and rejected
-    // every POST /api/ai/runtime/activate even when the self-test passed.
-    boolean owned =
-        SOURCE_UI_SETTINGS.equalsIgnoreCase(source)
-            || SOURCE_AUTO_SELECTED_CUDA12.equalsIgnoreCase(source);
-    boolean unset = existing == null || existing.isBlank();
-    if (!owned && !unset) {
-      // Respect explicit operator overrides.
-      return false;
-    }
-    forceServerExeSysProp(exePath);
-    return true;
-  }
-
-  private static void forceServerExeSysProp(String exePath) {
-    if (exePath == null || exePath.isBlank()) {
-      System.clearProperty(SERVER_EXE_SYS_PROP);
-      System.clearProperty(SERVER_EXE_SOURCE_PROP);
-      return;
-    }
-    System.setProperty(SERVER_EXE_SYS_PROP, exePath.trim());
-    System.setProperty(SERVER_EXE_SOURCE_PROP, SOURCE_UI_SETTINGS);
   }
 
   private SelfTestResult runSelfTest(Path exe, Path model, UiSettings settings) {
@@ -1314,7 +1279,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
               .timeout(Duration.ofSeconds(2))
               .GET()
               .build();
-      HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> resp = http.send(request, HttpResponse.BodyHandlers.ofString());
       return resp.statusCode() == 200;
     } catch (Exception e) {
       return false;
@@ -1337,7 +1302,7 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
               .timeout(Duration.ofSeconds(20))
               .POST(HttpRequest.BodyPublishers.ofString(json))
               .build();
-      HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> resp = http.send(request, HttpResponse.BodyHandlers.ofString());
       if (resp.statusCode() != 200) {
         throw new SelfTestException("Chat request failed: status=" + resp.statusCode());
       }
@@ -1389,12 +1354,16 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
     }
   }
 
-  private void fail(String errorCode, String message, Exception e) {
+  private void fail(
+      String errorCode, String message, Exception e, AttemptPublication publication) {
     if (e != null) {
       log.warn("Runtime activation failed: {} {}", errorCode, message, e);
     } else {
       log.warn("Runtime activation failed: {} {}", errorCode, message);
     }
+    // A precise terminal failure follows its component observation (or intentional stale-attempt
+    // fence). If publication itself throws, the owner reports a generic activation failure.
+    reportToComponent(errorCode, publication);
     synchronized (lock) {
       status.state = "failed";
       status.phase = "done";
@@ -1403,27 +1372,70 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
       status.updatedAtEpochMs = System.currentTimeMillis();
       touch();
     }
-    reportToCapability(errorCode);
   }
 
   /**
-   * Tempdoc 656 Task 2: project this failure onto {@link InferenceCapability} so the runtime
-   * manifest's {@code ai.pendingReason} carries the same precise cause this class already computed,
-   * instead of the generic default reason. Deliberately does NOT force the capability OFFLINE when
-   * it is currently READY — {@code runActivate}/{@code runDeactivate} can be invoked while a
-   * *different*, already-working variant is online (e.g. an attempted variant switch), and a naive
-   * wire-through would incorrectly regress a working capability's reported state for an unrelated
-   * attempt's failure.
+   * Projects this attempt's precise failure only while its accepted settings identity is still
+   * current. The revision plus operation key fences same-value disable/re-enable ABA, and the
+   * component CAS prevents an older attempt from overwriting a newer physical observation.
    */
-  private void reportToCapability(String errorCode) {
-    if (inferenceCapability == null) {
+  private void reportToComponent(String errorCode, AttemptPublication publication) {
+    if (generativeComponent == null || publication == null) {
       return;
     }
-    if (inferenceCapability.health() == CapabilityHealth.READY) {
+    while (true) {
+      var expected = generativeComponent.snapshot();
+      UiSettingsStore.Snapshot settings = settingsStore.inspect();
+      if (!publication.expectedSettings().equals(settings.witness())
+          || !Boolean.TRUE.equals(settings.settings().getChatEnabled())
+          || expected.state() == ComponentState.ABSENT
+          || expected.state() == ComponentState.READY) {
+        return;
+      }
+      LifecycleReasonCode reason = mapToLifecycleReason(errorCode);
+      ComponentState state = prerequisiteFailure(errorCode)
+          ? ComponentState.UNAVAILABLE : ComponentState.FAILED;
+      if (generativeComponent.transitionIfUnchanged(
+          expected, state, reason.code(), "runtime activation failed: " + errorCode)) {
+        return;
+      }
+    }
+  }
+
+  private void publishStarting(AttemptPublication publication) {
+    if (generativeComponent == null) {
       return;
     }
-    LifecycleReasonCode reason = mapToLifecycleReason(errorCode);
-    inferenceCapability.transition(CapabilityHealth.OFFLINE, reason.code());
+    while (true) {
+      var expected = generativeComponent.snapshot();
+      UiSettingsStore.Snapshot settings = settingsStore.inspect();
+      if (!publication.expectedSettings().equals(settings.witness())
+          || !Boolean.TRUE.equals(settings.settings().getChatEnabled())
+          || expected.state() == ComponentState.READY
+          || expected.state() == ComponentState.STARTING
+          || expected.state() == ComponentState.RELOADING) {
+        return;
+      }
+      if (generativeComponent.transitionIfUnchanged(
+          expected,
+          ComponentState.STARTING,
+          LifecycleReasonCode.INFERENCE_STARTING.code(),
+          "runtime activation attempt accepted")) {
+        return;
+      }
+    }
+  }
+
+  private static boolean prerequisiteFailure(String errorCode) {
+    return switch (errorCode) {
+      case "MODEL_PATH_REQUIRED",
+          "MODEL_NOT_FOUND",
+          "RUNTIME_VARIANT_NOT_INSTALLED",
+          "RUNTIME_BASELINE_NOT_FOUND",
+          "POLICY_ONLINE_AI_DISABLED",
+          "POLICY_GPU_DISABLED" -> true;
+      default -> false;
+    };
   }
 
   /** Tempdoc 656 Task 2: maps this service's existing activation error codes onto the closed,
@@ -1739,7 +1751,9 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
    * The server exe the config layer resolved, or null before {@code ConfigStore.setGlobal} has run
    * (unit tests, very early boot). Read through the store rather than {@code System.getenv} — a
    * direct env read of {@code JUSTSEARCH_SERVER_EXE} is what {@code EnvRegistryDirectReadTest}
-   * forbids, and the store is also where a JVM-arg or worker-snapshot override outranks the env.
+   * forbids, and the store is also where a JVM-arg override outranks the env. (There was a
+   * worker-snapshot tier at ordinal 450 between the two until lane F item A19; it existed to carry
+   * the Head's resolved config across a process boundary that no longer exists.)
    */
   private static Path resolvedServerExeOrNull() {
     try {
@@ -1895,6 +1909,31 @@ public final class RuntimeActivationService implements io.justsearch.app.api.Run
       return t.getClass().getSimpleName();
     }
     return m;
+  }
+
+  /** Stops the self-test client within a bounded window and releases its owned registration. */
+  @Override
+  public synchronized void close() {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    try {
+      http.shutdownNow();
+      boolean terminated = false;
+      try {
+        terminated = http.awaitTermination(HTTP_TIMEOUT);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+      }
+      // HttpClient.close() waits indefinitely in the JDK when the client is not terminated. Only
+      // call it after the bounded shutdown has completed; the registration owns the supplied pool.
+      if (terminated || http.isTerminated()) {
+        http.close();
+      }
+    } finally {
+      httpRegistration.close();
+    }
   }
 
   record SelfTestResult(

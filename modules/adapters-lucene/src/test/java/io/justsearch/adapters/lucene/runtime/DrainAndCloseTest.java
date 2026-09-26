@@ -13,6 +13,8 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -25,10 +27,9 @@ import org.junit.jupiter.api.io.TempDir;
  * attempted after {@code session.draining=true} fail with a typed
  * {@link IndexRuntimeIOException} carrying {@link IndexRuntimeIOException.Reason#DRAINING}
  * so callers can retry on the upgraded holder reference (tempdoc 410 V1 promoted this from
- * IllegalStateException); (3) close runs even if the queue does not drain in time
- * (best-effort).
+ * IllegalStateException); (3) a failed drain retains resources for a later bounded retry.
  */
-class DrainAndCloseTest {
+class DrainAndCloseTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -41,9 +42,10 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
+    assertTrue(runtime.isAcceptingWrites());
     // Index 5 docs without committing (so they're pending).
     for (int i = 0; i < 5; i++) {
       runtime
@@ -60,6 +62,7 @@ class DrainAndCloseTest {
     long before = runtime.indexCountOps().docCount();
 
     runtime.drainAndClose(Duration.ofSeconds(5));
+    assertFalse(runtime.isAcceptingWrites(), "closed runtime must remain unavailable after the swap lock releases");
 
     // Reopen and verify the 5 docs are committed (final drain commit ran).
     var reopened =
@@ -67,7 +70,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     try {
       reopened.commitOps().maybeRefreshBlocking();
@@ -87,7 +90,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     try {
       // Set the drain flag manually (drainAndClose does this then awaits queue → 0).
@@ -95,6 +98,7 @@ class DrainAndCloseTest {
       // IndexRuntimeIOException(DRAINING) so the IndexingLoop can defer the path with
       // WRITE_UNAVAILABLE_DRAINING instead of failing it.
       runtime.session().draining = true;
+      assertFalse(runtime.isAcceptingWrites(), "draining fences new work even before close completes");
       IndexRuntimeIOException ex =
           assertThrows(
               IndexRuntimeIOException.class,
@@ -114,6 +118,7 @@ class DrainAndCloseTest {
     } finally {
       runtime.session().draining = false; // reset so close path doesn't re-trigger
       runtime.close();
+      assertFalse(runtime.isAcceptingWrites(), "ordinary close also fences writes without a drain flag");
     }
   }
 
@@ -126,7 +131,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     long commitsBefore = runtime.session().commitCount.get();
     // No pending writes. drainAndClose should be a fast no-op + close (no commit, item 6).
@@ -145,13 +150,13 @@ class DrainAndCloseTest {
   /**
    * Item 14: drainAndClose acquires the writeBarrier write lock — blocks until in-flight writers
    * release the read lock. Validates that a write started before drain completes successfully and
-   * lands in the final commit; a write started after drain returns throws ISE.
+   * lands in the final commit; a write started after drain returns throws ISE. The writer is paused
+   * through the existing post-admission write-path supplier seam, so the test observes the
+   * production-owned read lease without acquiring a test-owned barrier lock.
    */
   @Test
-  // Timing-sensitive: signals writerStarted before indexSingle, then relies on a fixed 10ms
-  // sleep to assume the writer holds the readLock when drain runs. Deterministic only with a
-  // production pause-hook mid-critical-section; on Linux CI the writer can arrive after draining
-  // starts and (correctly) get runtime_draining. Runs on the windows-native lane (tempdoc 668).
+  // Windows-native exercises the real Lucene directory and waits for production admission before
+  // drain begins, so the earlier write and its read lease are observable.
   @Tag("windows")
   void drainAndCloseWaitsForInFlightWriter() throws Exception {
     Path indexPath = tempDir.resolve("drain-inflight");
@@ -161,21 +166,34 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
-    // Start a writer that holds the readLock for ~200ms by simulating slow validation
-    // via a tight loop that submits one doc then sleeps. The drainAndClose call must wait
-    // for the writer's readLock to release before acquiring its writeLock.
-    CountDownLatch writerStarted = new CountDownLatch(1);
+    CountDownLatch writePathSupplierEntered = new CountDownLatch(1);
+    CountDownLatch releaseWriter = new CountDownLatch(1);
+    AtomicInteger writerReadHoldCount = new AtomicInteger(-1);
     AtomicReference<Throwable> writerError = new AtomicReference<>();
+    IndexingCoordinator writerCoordinator =
+        new IndexingCoordinator(
+            runtime.session(),
+            () -> {
+              writerReadHoldCount.set(runtime.session().writeBarrier.getReadHoldCount());
+              writePathSupplierEntered.countDown();
+              try {
+                if (!releaseWriter.await(10, TimeUnit.SECONDS)) {
+                  throw new AssertionError("test did not release the paused write-path admission");
+                }
+              } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("paused write-path admission was interrupted", interrupted);
+              }
+              return runtime.session().writePathOps;
+            });
     Thread writer =
         new Thread(
             () -> {
               try {
-                writerStarted.countDown();
-                runtime
-                    .indexingCoordinator()
+                writerCoordinator
                     .indexSingle(
                         new IndexDocument(
                             Map.of(
@@ -188,20 +206,68 @@ class DrainAndCloseTest {
             },
             "drain-test-writer");
     writer.start();
+    AtomicReference<Throwable> drainError = new AtomicReference<>();
+    AtomicBoolean drainCompleted = new AtomicBoolean();
+    Thread drainer = new Thread(() -> {
+      try {
+        runtime.drainAndClose(Duration.ofSeconds(10));
+        drainCompleted.set(true);
+      } catch (Throwable failure) {
+        drainError.set(failure);
+      }
+    }, "drain-test-closer");
+    Throwable primaryFailure = null;
+    try {
+      assertTrue(
+          writePathSupplierEntered.await(10, TimeUnit.SECONDS),
+          "the writer must reach the existing post-admission write-path seam");
+      assertEquals(
+          1,
+          writerReadHoldCount.get(),
+          "production indexSingle must hold the write-barrier read lease before write-path admission");
+      drainer.start();
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while ((!runtime.session().draining
+              || !runtime.session().writeBarrier.hasQueuedThread(drainer))
+          && System.nanoTime() < deadline) {
+        Thread.onSpinWait();
+      }
+      assertTrue(runtime.session().draining, "drain must enter while the writer retains its lease");
+      assertTrue(
+          runtime.session().writeBarrier.hasQueuedThread(drainer),
+          "drain must queue on the write barrier behind the production writer lease");
+    } catch (Throwable failure) {
+      primaryFailure = failure;
+      throw failure;
+    } finally {
+      releaseWriter.countDown();
+      writer.join(10_000L);
+      drainer.join(10_000L);
+      if (writer.isAlive()) writer.interrupt();
+      if (drainer.isAlive()) drainer.interrupt();
+      if (writer.isAlive()) writer.join(1_000L);
+      if (drainer.isAlive()) drainer.join(1_000L);
+      if (!writer.isAlive() && !drainer.isAlive() && !drainCompleted.get()) {
+        try {
+          // The closed admission bit can precede a failed resource close. Retry after both
+          // test threads exit unless their drain actually completed.
+          runtime.drainAndClose(Duration.ofSeconds(3));
+        } catch (RuntimeException | Error cleanupFailure) {
+          if (primaryFailure != null) primaryFailure.addSuppressed(cleanupFailure);
+          else throw cleanupFailure;
+        }
+      }
+    }
 
-    // Wait until the writer thread has started (so its lock-acquire is in flight).
-    assertTrue(
-        writerStarted.await(5, TimeUnit.SECONDS), "writer thread should start within 5s");
-    // Tiny pause to let writer reach indexSingle. The writeBarrier readLock is acquired before
-    // the index call returns; drainAndClose's writeLock will block until writer releases.
-    Thread.sleep(10);
-
-    runtime.drainAndClose(Duration.ofSeconds(5));
-    writer.join(5_000L);
+    assertFalse(writer.isAlive(), "the held writer must release its lease");
+    assertFalse(drainer.isAlive(), "drain must complete after the writer releases its lease");
+    assertNull(drainError.get(), "drain failed: " + drainError.get());
 
     assertNull(
         writerError.get(),
         "writer that started before drain should complete cleanly; got: " + writerError.get());
+    assertThrows(IndexRuntimeIOException.class, () -> runtime.indexingCoordinator().indexSingle(
+        new IndexDocument(Map.of(SchemaFields.DOC_ID, "late", SchemaFields.DOC_UID, "late#0"))));
 
     // Reopen and verify the doc landed in the final commit.
     var reopened =
@@ -209,7 +275,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     try {
       reopened.commitOps().maybeRefreshBlocking();
@@ -223,12 +289,11 @@ class DrainAndCloseTest {
   }
 
   /**
-   * Item 13: drainAndClose with a timeout that expires before in-flight writes complete still
-   * closes the runtime (best-effort) and logs a warn. Asserts close runs and any post-close
-   * write attempt sees a closed-runtime ISE.
+   * C1 close correction supersedes item 13's close-anyway contract: a timed-out write keeps
+   * its writer alive and the retained runtime can be closed after actual write exit.
    */
   @Test
-  void drainAndCloseTimeoutClosesAnyway() throws Exception {
+  void drainAndCloseTimeoutRetainsWriterUntilRetry() throws Exception {
     Path indexPath = tempDir.resolve("drain-timeout");
     Files.createDirectories(indexPath);
     var runtime =
@@ -236,11 +301,11 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
     // Acquire the readLock manually from another thread and hold it longer than the drain timeout.
-    // drainAndClose must give up waiting for the writeLock, log a warn, and still close.
+    // drainAndClose must give up waiting without invalidating the live writer.
     CountDownLatch lockHeld = new CountDownLatch(1);
     CountDownLatch releaseLock = new CountDownLatch(1);
     Thread lockHolder =
@@ -262,17 +327,35 @@ class DrainAndCloseTest {
     assertTrue(lockHeld.await(2, TimeUnit.SECONDS), "lock holder should acquire readLock");
 
     long startNanos = System.nanoTime();
-    runtime.drainAndClose(Duration.ofMillis(100));
+    var snapshot = runtime.session().snapshot;
+    var starts = new AtomicInteger();
+    var completions = new AtomicInteger();
+    var timeouts = new AtomicInteger();
+    runtime.session().telemetryEvents = new LuceneRuntimeTypes.TelemetryEvents() {
+      @Override public void onSwapStart(SwapReason reason) { starts.incrementAndGet(); }
+      @Override public void onSwapComplete(long durationMs, SwapReason reason) { completions.incrementAndGet(); }
+      @Override public void onDrainTimeout(long elapsedMs, long writesStillPending) { timeouts.incrementAndGet(); }
+    };
+    assertThrows(IllegalStateException.class, () -> runtime.drainAndClose(Duration.ofMillis(100)));
     long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
 
-    // Drain returned within ~timeout (with some slack); close ran best-effort.
+    // Drain returned within its timeout, retaining ownership for the next close attempt.
     assertTrue(
         elapsedMs < 1000,
         "drainAndClose should return promptly after timeout, took: " + elapsedMs + "ms");
-    // Snapshot is now null (close ran).
-    assertNull(runtime.session().snapshot, "snapshot should be null after best-effort close");
+    assertSame(snapshot, runtime.session().snapshot);
+    assertTrue(snapshot.writer().isOpen(), "the in-flight write still owns the writer");
+    assertFalse(runtime.isAcceptingWrites(), "failed drain retains resources without accepting new work");
+    assertEquals(1, starts.get());
+    assertEquals(1, completions.get(), "a failed drain still terminates its telemetry attempt");
+    assertEquals(1, timeouts.get());
 
     releaseLock.countDown();
     lockHolder.join(2_000L);
+    runtime.drainAndClose(Duration.ofSeconds(1));
+    assertNull(runtime.session().snapshot);
+    assertFalse(snapshot.writer().isOpen());
+    assertEquals(2, starts.get());
+    assertEquals(2, completions.get());
   }
 }

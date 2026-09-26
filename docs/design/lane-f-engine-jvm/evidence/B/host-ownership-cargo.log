@@ -1,0 +1,208 @@
+Lane F production host ownership — Cargo and mutation output
+Captured 2026-09-08 in F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri
+
+COMMAND (unoverridden clean-worktree attempt)
+cargo test --lib
+OUTPUT
+   Compiling shell v0.3.0 (F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri)
+error: failed to run custom build command for `shell v0.3.0 (F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri)`
+
+Caused by:
+  process didn't exit successfully: `F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri\target\debug\build\shell-7787d7e5245f3fb8\build-script-build` (exit code: 1)
+  --- stdout
+  cargo:rerun-if-env-changed=TAURI_CONFIG
+  cargo:rustc-check-cfg=cfg(desktop)
+  cargo:rustc-cfg=desktop
+  cargo:rustc-check-cfg=cfg(mobile)
+  cargo:rerun-if-changed=F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri\tauri.conf.json
+  cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_APP_NAME=shell
+  cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_PREFIX=io_justsearch
+  cargo:rustc-check-cfg=cfg(dev)
+  cargo:rustc-cfg=dev
+  cargo:PERMISSION_FILES_PATH=F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri\target\debug\build\shell-eef70023ffb65128\out\app-manifest\__app__-permission-files
+  cargo:rerun-if-changed=capabilities
+  cargo:rerun-if-env-changed=REMOVE_UNUSED_COMMANDS
+  cargo:rustc-env=TAURI_ENV_TARGET_TRIPLE=x86_64-pc-windows-msvc
+  glob pattern resources/headless/**/* path not found or didn't match any files.
+
+COMMAND (mutation: suppress observe_manifest_with_sinks restart callback)
+$env:TAURI_CONFIG='{"bundle":{"resources":[]}}'; cargo test --lib real_reset_rejects_stale_manifests_and_emits_once_for_successor
+OUTPUT
+   Compiling shell v0.3.0 (F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri)
+warning: function `resolve_manifest_path` is never used
+  --> src\platform_paths.rs:92:8
+   |
+92 | pub fn resolve_manifest_path() -> PathBuf {
+   |        ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+warning: `shell` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.64s
+     Running unittests src\lib.rs (target\debug\deps\shell_lib-77187e4671c680c8.exe)
+
+running 1 test
+test engine_host::tests::real_reset_rejects_stale_manifests_and_emits_once_for_successor ... FAILED
+
+failures:
+---- engine_host::tests::real_reset_rejects_stale_manifests_and_emits_once_for_successor stdout ----
+thread 'engine_host::tests::real_reset_rejects_stale_manifests_and_emits_once_for_successor' (7916) panicked at src\engine_host.rs:587:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    engine_host::tests::real_reset_rejects_stale_manifests_and_emits_once_for_successor
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 58 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+
+COMMAND (mutation: suppress publish_initial_spawn_failure event callback)
+$env:TAURI_CONFIG='{"bundle":{"resources":[]}}'; cargo test --lib initial_launch_failure_uses_shared_terminal_disk_event_writer
+OUTPUT
+   Compiling shell v0.3.0 (F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri)
+warning: unused variable: `event`
+   --> src\engine_host.rs:391:9
+    |
+391 |         event: impl FnOnce(&StateRecord),
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+warning: function `resolve_manifest_path` is never used
+  --> src\platform_paths.rs:92:8
+   |
+92 | pub fn resolve_manifest_path() -> PathBuf {
+   |        ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+warning: `shell` (lib test) generated 2 warnings (run `cargo fix --lib -p shell --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.27s
+     Running unittests src\lib.rs (target\debug\deps\shell_lib-77187e4671c680c8.exe)
+
+running 1 test
+test engine_host::tests::initial_launch_failure_uses_shared_terminal_disk_event_writer ... FAILED
+
+failures:
+---- engine_host::tests::initial_launch_failure_uses_shared_terminal_disk_event_writer stdout ----
+thread 'engine_host::tests::initial_launch_failure_uses_shared_terminal_disk_event_writer' (33432) panicked at src\engine_host.rs:616:51:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    engine_host::tests::initial_launch_failure_uses_shared_terminal_disk_event_writer
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 58 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+
+COMMAND (mutation: remove replacement-spawn transition to State::Exhausted)
+$env:TAURI_CONFIG='{"bundle":{"resources":[]}}'; cargo test --lib replacement_launch_failure_traverses_shared_loop_and_real_writer
+OUTPUT
+   Compiling shell v0.3.0 (F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri)
+warning: function `resolve_manifest_path` is never used
+  --> src\platform_paths.rs:92:8
+   |
+92 | pub fn resolve_manifest_path() -> PathBuf {
+   |        ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+warning: `shell` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.84s
+     Running unittests src\lib.rs (target\debug\deps\shell_lib-77187e4671c680c8.exe)
+
+running 1 test
+test engine_host::tests::replacement_launch_failure_traverses_shared_loop_and_real_writer ... FAILED
+
+failures:
+---- engine_host::tests::replacement_launch_failure_traverses_shared_loop_and_real_writer stdout ----
+thread 'engine_host::tests::replacement_launch_failure_traverses_shared_loop_and_real_writer' (45092) panicked at src\engine_host.rs:705:9:
+assertion `left == right` failed
+  left: "starting"
+ right: "exhausted"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    engine_host::tests::replacement_launch_failure_traverses_shared_loop_and_real_writer
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 58 filtered out; finished in 0.02s
+error: test failed, to rerun pass `--lib`
+
+COMMAND (mutations restored; final green)
+rustfmt --edition 2021 src/engine_host.rs; rustfmt --edition 2021 --check src/engine_host.rs; $env:TAURI_CONFIG='{"bundle":{"resources":[]}}'; cargo test --lib; git diff --check
+OUTPUT
+   Compiling shell v0.3.0 (F:\justsearch-public\.claude\worktrees\lane-F-host-ownership\modules\shell\src-tauri)
+warning: function `resolve_manifest_path` is never used
+  --> src\platform_paths.rs:92:8
+   |
+92 | pub fn resolve_manifest_path() -> PathBuf {
+   |        ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+warning: `shell` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.66s
+     Running unittests src\lib.rs (target\debug\deps\shell_lib-77187e4671c680c8.exe)
+
+running 59 tests
+test engine_host::tests::incarnation_reset_never_reopens_a_closed_host ... ok
+test engine_host::tests::watcher_can_cancel_from_its_own_thread_without_self_join ... ok
+test engine_host::tests::close_before_admission_refuses_launch ... ok
+test tests::backend_restart_event_is_untouched_by_the_supervisor ... ok
+test platform_paths::tests::resolve_data_dir_matches_contract_spec ... ok
+test platform_paths::tests::expand_user_home_returns_input_when_no_placeholder ... ok
+test tests::test_delete_token_rejects_wrong ... ok
+test tests::test_delete_token_roundtrip ... ok
+test supervisor::tests::the_budget_is_spent_exactly_once_per_counted_death ... ok
+test tests::test_delete_token_single_use ... ok
+test supervisor::tests::a_hang_recovery_exits_zero_and_is_still_charged ... ok
+test supervisor::tests::a_requested_restart_is_free_and_an_unrequested_one_is_not ... ok
+test supervisor::tests::the_state_record_serialises_with_the_shared_field_names ... ok
+test tests::test_validate_path_allows_exe_when_not_blocked ... ok
+test tests::test_validate_path_allows_normal_files ... ok
+test tests::test_validate_path_rejects_executables ... ok
+test supervisor::tests::decision_table_matches_the_register ... ok
+test tests::test_validate_path_rejects_traversal ... ok
+test tests::test_validate_path_rejects_unc ... ok
+test updater::tests::cancelled_terminal_state_allows_future_update_checks ... ok
+test supervisor::tests::policy_comes_from_the_register ... ok
+test updater::tests::concrete_target_oracle_commits_exact_owner_set ... ok
+test updater::tests::durable_phase_names_are_stable ... ok
+test updater::tests::final_shutdown_receipt_is_nonce_and_process_bound ... ok
+test updater::tests::head_unavailable_reconciliation_requires_repair ... ok
+test tests::test_read_capped_errors_on_missing_file ... ok
+test supervisor::tests::overrides_are_inert_without_the_harness_flag ... ok
+test updater::tests::qualification_attempts_only_when_no_intent_exists ... ok
+test updater::tests::qualification_never_retries_over_an_existing_intent ... ok
+test updater::tests::qualification_reports_pass_only_from_committed ... ok
+test tests::test_read_capped_honors_exact_boundary ... ok
+test tests::test_read_capped_returns_none_for_oversized_file ... ok
+test updater::tests::shutdown_receipt_is_nonce_and_preparation_bound ... ok
+test tests::test_read_capped_returns_some_for_under_cap_file ... ok
+test tests::test_read_manifest_parses_top_level_pid ... ok
+test updater::tests::strategy_aware_compatibility_rejects_role_change ... ok
+test updater::tests::target_oracle_rejects_owner_set_mismatch ... ok
+test tests::test_copy_dir_recursive_skips_existing_when_not_forced ... ok
+test updater::tests::transition_table_rejects_skipping_launch_witness ... ok
+test updater::tests::the_sandbox_gate_is_compile_time_not_runtime ... ok
+test updater::tests::sequence_state_refuses_unknown_schema ... ok
+test tests::test_read_manifest_parses_top_level_instance_id ... ok
+test engine_host::tests::initial_launch_failure_uses_shared_terminal_disk_event_writer ... ok
+test tests::test_copy_dir_recursive_copies_empty_files_when_not_forced ... ok
+test tests::test_copy_dir_recursive_copies_subdirectories ... ok
+test updater::tests::stage_rehash_detects_tampering_and_path_escape ... ok
+test engine_host::tests::replacement_launch_failure_traverses_shared_loop_and_real_writer ... ok
+test updater::tests::receipt_bearing_phase_without_recorded_pid_cannot_reconcile ... ok
+test updater::tests::head_receipt_must_match_independently_recorded_pid ... ok
+test updater::tests::prepared_source_boot_is_durably_cancelled_not_deleted ... ok
+test updater::tests::committed_terminal_state_survives_staged_payload_cleanup ... ok
+test updater::tests::install_launching_boot_is_ambiguous_and_requires_repair ... ok
+test updater::tests::target_equality_only_advances_to_reconciling ... ok
+test updater::tests::witness_must_match_separate_durable_copy ... ok
+test engine_host::tests::admitted_child_is_visible_to_close_and_reaped ... ok
+test engine_host::tests::repeated_identical_manifest_tooltip_reaches_native_sink_once ... ok
+test engine_host::tests::watcher_starts_once_joins_and_refuses_after_close ... ok
+test engine_host::tests::delayed_old_stdout_eof_cannot_poison_successor ... ok
+test engine_host::tests::real_reset_rejects_stale_manifests_and_emits_once_for_successor ... ok
+
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+rustfmt --check exit: 0
+git diff --check exit: 0

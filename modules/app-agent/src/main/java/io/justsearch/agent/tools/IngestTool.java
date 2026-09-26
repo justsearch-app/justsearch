@@ -1,286 +1,268 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
-import tools.jackson.databind.JsonNode;
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.OperationApprovalPreview;
+import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationHandler;
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationPreparationRefused;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
-import io.justsearch.app.api.knowledge.KnowledgeIngestResponse;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
+import io.justsearch.app.api.operations.RecordedIngestionService;
+import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.core.context.EngineContext;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
 
-/**
- * Tool for ingesting files into the knowledge index. Requires user approval (WRITE safety level).
- *
- * <p>Accepts file or folder paths. Folders are expanded recursively to individual files. After
- * ingestion, the Worker processes files for indexing, text extraction, and embedding.
- */
-/**
- * Write-tier ingest tool. It is its own
- * {@link io.justsearch.agent.api.registry.OperationHandler}: the substrate dispatches
- * {@code execute(String): OperationResult} directly against this class.
- */
+/** Prepared, recorded ingestion operation. */
 public final class IngestTool implements OperationHandler {
-  private static final Logger LOG = LoggerFactory.getLogger(IngestTool.class);
-  static final int MAX_PATHS = 100;
+  private static final int MAX_PATHS = 100;
 
-  private final IngestCallback ingestCallback;
-  private final ScanRootCallback scanRootCallback;
-  private final AgentToolPaths.RootsView rootsView;
-  private final Supplier<List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier;
+  private final RecordedIngestionService ingestion;
+  private final Function<EngineContext, List<RootBinding>> roots;
+  private final Function<EngineContext, String> generation;
+  private final Supplier<List<String>> exclusions;
 
-  /**
-   * Constructs the agent ingest tool. Tempdoc 418 Phase B made the {@link ScanRootCallback}
-   * mandatory; tempdoc 418 Phase C sub-commit A (Slice D, 2026-04-25) deleted the legacy 1- and
-   * 2-arg back-compat constructors that defaulted the callback to a local-walk fallback.
-   * Production wiring lives in {@code HeadAssembly}; tests pass a stub directly.
-   */
-  public IngestTool(
-      IngestCallback ingestCallback,
-      ScanRootCallback scanRootCallback,
-      Supplier<List<BrowseTool.RootInfo>> rootsSupplier) {
-    this(ingestCallback, scanRootCallback, rootsSupplier, List::of);
+  /** Creates an ingestion handler whose preparation dependencies are supplied by the server. */
+  public IngestTool(RecordedIngestionService ingestion,
+      Function<EngineContext, List<RootBinding>> roots,
+      Function<EngineContext, String> generation,
+      Supplier<List<String>> exclusions) {
+    this.ingestion = Objects.requireNonNull(ingestion, "ingestion");
+    this.roots = Objects.requireNonNull(roots, "roots");
+    this.generation = Objects.requireNonNull(generation, "generation");
+    this.exclusions = Objects.requireNonNull(exclusions, "exclusions");
   }
 
-  /**
-   * Tempdoc 811 (C-2a) — adds the watched-root containment authority so an ad-hoc ingest inherits an
-   * in-root path's collection instead of writing an unlabeled document. The 3-arg constructor keeps
-   * the pre-811 shape for tests that do not exercise tagging (every path then resolves out-of-root).
-   */
-  public IngestTool(
-      IngestCallback ingestCallback,
-      ScanRootCallback scanRootCallback,
-      Supplier<List<BrowseTool.RootInfo>> rootsSupplier,
-      Supplier<List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier) {
-    this(
-        ingestCallback,
-        scanRootCallback,
-        AgentToolPaths.RootsView.of(rootsSupplier),
-        rootBindingsSupplier);
-  }
-
-  /** Tempdoc 877 §2.4 — the shared roots view {@code AgentToolFactory.assemble} builds once. */
-  public IngestTool(
-      IngestCallback ingestCallback,
-      ScanRootCallback scanRootCallback,
-      AgentToolPaths.RootsView rootsView,
-      Supplier<List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier) {
-    this.ingestCallback = ingestCallback;
-    this.scanRootCallback = scanRootCallback;
-    this.rootsView = rootsView == null ? AgentToolPaths.RootsView.of(null) : rootsView;
-    this.rootBindingsSupplier = rootBindingsSupplier;
+  /** Direct invocation is not an execution authority for a recorded operation. */
+  @Override
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
+    throw new IllegalStateException("Ingest requires an accepted prepared invocation");
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
-    if (argumentsJson == null || argumentsJson.isBlank()) {
-      return OperationResult.failure("No arguments provided");
+  public OperationPreparation prepare(String argumentsJson, InvocationProvenance provenance,
+      EngineContext engineContext) {
+    JsonNode args = parseArguments(argumentsJson);
+    List<String> rawPaths = pathsOf(args);
+    String requestedCollection = collectionOf(args);
+
+    // These are captured once. A supplier failure is a preparation failure, never an empty-root
+    // degradation that could turn an unavailable authorization view into a different operation.
+    List<RootBinding> bindings = List.copyOf(Objects.requireNonNull(roots.apply(engineContext), "roots"));
+    List<String> patterns = List.copyOf(Objects.requireNonNull(exclusions.get(), "exclusions"));
+    List<BrowseTool.RootInfo> rootInfos = rootInfos(bindings);
+
+    List<RecordedRootPlan.Root> requested = new ArrayList<>();
+    for (String rawPath : rawPaths) {
+      Path input = resolvePath(rawPath, bindings, rootInfos);
+      if (input == null) {
+        throw badInput("Path could not be resolved: " + rawPath);
+      }
+      BasicFileAttributes attributes = attributes(input);
+      String collection = requestedCollection == null
+          ? IngestCollectionPolicy.resolve(null, input, bindings)
+          : requestedCollection;
+      requested.add(new RecordedRootPlan.Root(input, collection, false, attributes.isRegularFile(),
+          patterns, List.of()));
+
+      // A directory preparation records every watched nested root so the deepest label is frozen.
+      if (attributes.isDirectory()) {
+        for (RootBinding binding : bindings) {
+          Path nested = binding.path().toAbsolutePath().normalize();
+          if (nested.equals(input) || !nested.startsWith(input)) {
+            continue;
+          }
+          String nestedCollection = requestedCollection == null
+              ? IngestCollectionPolicy.resolve(null, nested, bindings)
+              : requestedCollection;
+          requested.add(new RecordedRootPlan.Root(nested, nestedCollection, false, false,
+              patterns, List.of()));
+        }
+      }
     }
+
+    String targetGeneration = Objects.requireNonNull(generation.apply(engineContext), "generation");
+    RecordedRootPlan plan = RecordedRootPlan.partition(targetGeneration, requested);
+    if (plan.roots().isEmpty()) {
+      throw badInput("At least one valid ingest path is required");
+    }
+    return new OperationPreparation(argumentsJson, RecordedRootPlan.SCHEMA, plan.toReplayPayload());
+  }
+
+  @Override
+  public void validatePreparation(OperationPreparation prepared) {
+    Objects.requireNonNull(prepared, "prepared");
+    JsonNode args = parseArguments(prepared.argumentsJson());
+    List<String> paths = pathsOf(args);
+    String requestedCollection = collectionOf(args);
+    RecordedRootPlan plan = frozenPlan(prepared);
+    if (paths.isEmpty() || plan.roots().isEmpty()) {
+      throw new IllegalArgumentException("Prepared ingest must contain paths and roots");
+    }
+    if (requestedCollection != null
+        && plan.roots().stream().anyMatch(root -> !requestedCollection.equals(root.collection()))) {
+      throw new IllegalArgumentException("Prepared ingest collection does not match its root plan");
+    }
+  }
+
+  @Override
+  public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+    validatePreparation(prepared);
+    RecordedRootPlan plan = frozenPlan(prepared);
+    StringBuilder summary = new StringBuilder("Ingest ");
+    summary.append(plan.roots().size()).append(" prepared root(s): ");
+    int shown = Math.min(6, plan.roots().size());
+    for (int i = 0; i < shown; i++) {
+      if (i > 0) summary.append(", ");
+      String path = plan.roots().get(i).path().toString();
+      summary.append(path, 0, Math.min(path.length(), 256));
+    }
+    if (plan.roots().size() > shown) {
+      summary.append(" (+").append(plan.roots().size() - shown).append(" more)");
+    }
+    return new OperationApprovalPreview(summary.toString());
+  }
+
+  @Override
+  public OperationExecution executePrepared(OperationPreparation prepared,
+      InvocationProvenance provenance, EngineContext engineContext, OperationRecordHandle record) {
+    validatePreparation(prepared);
+    Objects.requireNonNull(record, "Accepted ingest record");
+    return ingestion.execute(record, engineContext);
+  }
+
+  private static RecordedRootPlan frozenPlan(OperationPreparation prepared) {
+    if (prepared.replaySchema() == null
+        || !RecordedRootPlan.SCHEMA.equals(prepared.replaySchema())
+        || prepared.replayPayloadJson() == null
+        || prepared.content() != OperationPreparation.Content.METADATA) {
+      throw new IllegalArgumentException("Unsupported ingest preparation");
+    }
+    RecordedRootPlan plan = RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson());
+    if (plan.roots().isEmpty()
+        || plan.roots().stream().anyMatch(root -> root.force())) {
+      throw new IllegalArgumentException("Ingest preparation must contain non-forced roots");
+    }
+    return plan;
+  }
+
+  private static JsonNode parseArguments(String argumentsJson) {
     try {
       JsonNode args = ToolArgs.parse(argumentsJson);
-      JsonNode pathsNode = args.get("paths");
-      if (pathsNode == null || !pathsNode.isArray() || pathsNode.isEmpty()) {
-        return OperationResult.failure("Paths array is required and must not be empty");
+      if (args == null || !args.isObject()) {
+        throw badInput("Ingest arguments must be a JSON object");
       }
-      if (pathsNode.size() > MAX_PATHS) {
-        return OperationResult.failure(
-            "Too many paths: "
-                + pathsNode.size()
-                + " exceeds limit of "
-                + MAX_PATHS
-                + ". Split into smaller batches.");
-      }
+      return args;
+    } catch (OperationPreparationRefused e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw badInput("Invalid ingest arguments");
+    }
+  }
 
-      // Tempdoc 811 (C-2a) — optional caller-supplied collection, validated HERE (server side of the
-      // MCP boundary) rather than relying on the advertised tool schema.
-      String requestedCollection;
-      try {
-        requestedCollection =
-            IngestCollectionPolicy.normalizeRequested(ToolArgs.stringArg(args, "collection"));
-      } catch (IllegalArgumentException e) {
-        return OperationResult.failure(e.getMessage());
+  private static List<String> pathsOf(JsonNode args) {
+    JsonNode node = args.get("paths");
+    if (node == null || !node.isArray() || node.size() == 0 || node.size() > MAX_PATHS) {
+      throw badInput("paths must contain between 1 and 100 entries");
+    }
+    List<String> paths = new ArrayList<>();
+    for (JsonNode value : node) {
+      if (!value.isTextual() || value.asString().isBlank()) {
+        throw badInput("Each ingest path must be a non-empty string");
       }
-      List<IngestCollectionPolicy.RootBinding> rootBindings = rootBindings();
+      paths.add(value.asString());
+    }
+    return List.copyOf(paths);
+  }
 
-      // Tempdoc 418 Phase B — directories dispatch to Worker-side ScanRoot RPC; only single
-      // files keep the local submitBatch path. Worker-side WorkerIngestionAuthority applies
-      // the same skip rules + caller exclude_globs (empty for the agent — agent has no exclude
-      // policy).
-      // Tempdoc 811 (C-2a): single files are grouped by resolved collection ("" = index default) so
-      // one call can mix in-root and out-of-root paths. Pre-811 documents ingested through this tool
-      // carry no collection field and are not backfilled; they acquire a tag on re-index.
-      Map<String, List<Path>> singleFilesByCollection = new LinkedHashMap<>();
-      int singleFileCount = 0;
-      int skippedCount = 0;
-      int directoryAccepted = 0;
-      List<String> directoryErrors = new ArrayList<>();
-
-      for (JsonNode pathNode : pathsNode) {
-        Path input = resolvePath(pathNode.asText());
-        if (input == null || !Files.exists(input)) {
-          skippedCount++;
-          continue;
-        }
-        String collection = IngestCollectionPolicy.resolve(requestedCollection, input, rootBindings);
-        if (Files.isDirectory(input)) {
-          // Tempdoc 877 §2.8 — bounded; an unresponsive Worker used to hold the agent loop thread
-          // here indefinitely. Sized by toolScanMs, not toolFetchMs: this call blocks until a whole
-          // directory tree has been walked Worker-side.
-          KnowledgeIngestResponse scanResp =
-              io.justsearch.agent.AgentTimeouts.call(
-                  "core_ingest_files",
-                  io.justsearch.agent.AgentTimeouts.toolScanMs(),
-                  () -> scanRootCallback.scanRoot(input.toString(), collection, List.of()));
-          directoryAccepted += scanResp.accepted();
-          if (scanResp.error() != null && !scanResp.error().isEmpty()) {
-            directoryErrors.add(input + ":" + scanResp.error());
-          }
-        } else if (Files.isRegularFile(input) && Files.isReadable(input)) {
-          singleFilesByCollection
-              .computeIfAbsent(collection == null ? "" : collection, k -> new ArrayList<>())
-              .add(input);
-          singleFileCount++;
-        } else {
-          skippedCount++;
-        }
+  private static String collectionOf(JsonNode args) {
+    JsonNode node = args.get("collection");
+    if (node == null || node.isNull()) {
+      return null;
+    }
+    if (!node.isTextual()) {
+      throw badInput("collection must be a string");
+    }
+    try {
+      String collection = IngestCollectionPolicy.normalizeRequested(node.asString());
+      if (collection.length() > RecordedRootPlan.MAX_COLLECTION_LENGTH) {
+        throw badInput("collection must contain at most "
+            + RecordedRootPlan.MAX_COLLECTION_LENGTH + " characters");
       }
+      return collection;
+    } catch (IllegalArgumentException e) {
+      throw badInput(e.getMessage());
+    }
+  }
 
-      if (singleFileCount == 0 && directoryAccepted == 0 && directoryErrors.isEmpty()) {
-        return OperationResult.failure("No readable files found in the provided paths");
+  private static List<BrowseTool.RootInfo> rootInfos(List<RootBinding> bindings) {
+    List<BrowseTool.RootInfo> infos = new ArrayList<>();
+    for (RootBinding binding : bindings) {
+      if (binding == null || binding.path() == null) {
+        throw new IllegalStateException("Recorded root binding is incomplete");
       }
-      int singleAccepted = 0;
-      List<String> singleErrors = new ArrayList<>();
-      for (Map.Entry<String, List<Path>> group : singleFilesByCollection.entrySet()) {
-        String collection = group.getKey().isEmpty() ? null : group.getKey();
-        KnowledgeIngestResponse fileResp = ingestCallback.ingest(group.getValue(), collection);
-        singleAccepted += fileResp.accepted();
-        if (fileResp.error() != null && !fileResp.error().isEmpty()) {
-          singleErrors.add(fileResp.error());
+      Path path = binding.path().toAbsolutePath().normalize();
+      Path fileName = path.getFileName();
+      infos.add(new BrowseTool.RootInfo(path.toString(), fileName == null ? path.toString() : fileName.toString()));
+    }
+    return List.copyOf(infos);
+  }
+
+  private static Path resolvePath(String rawPath, List<RootBinding> bindings,
+      List<BrowseTool.RootInfo> rootInfos) {
+    try {
+      Path candidate = Path.of(rawPath);
+      if (candidate.isAbsolute()) {
+        return candidate.normalize();
+      }
+      String named = AgentToolPaths.resolveRelativePath(rawPath, rootInfos);
+      if (named != null && Files.exists(Path.of(named), LinkOption.NOFOLLOW_LINKS)) {
+        return Path.of(named).toAbsolutePath().normalize();
+      }
+      for (RootBinding binding : bindings) {
+        Path underRoot = binding.path().toAbsolutePath().normalize().resolve(candidate).normalize();
+        if (underRoot.startsWith(binding.path().toAbsolutePath().normalize())
+            && Files.exists(underRoot, LinkOption.NOFOLLOW_LINKS)) {
+          return underRoot;
         }
       }
-      String singleError = String.join("; ", singleErrors);
+      return null;
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
 
-      String combinedError =
-          directoryErrors.isEmpty()
-              ? singleError
-              : (singleError.isEmpty()
-                  ? String.join("; ", directoryErrors)
-                  : singleError + "; " + String.join("; ", directoryErrors));
-      KnowledgeIngestResponse response =
-          new KnowledgeIngestResponse(directoryAccepted + singleAccepted, combinedError);
-
-      return OperationResult.success(formatResult(response, skippedCount));
-
+  private static BasicFileAttributes attributes(Path input) {
+    try {
+      BasicFileAttributes attributes = Files.readAttributes(input, BasicFileAttributes.class,
+          LinkOption.NOFOLLOW_LINKS);
+      if (attributes.isSymbolicLink() || (!attributes.isDirectory() && !attributes.isRegularFile())
+          || !Files.isReadable(input)) {
+        throw badInput("Path is not a readable regular file or directory: " + input);
+      }
+      return attributes;
+    } catch (OperationPreparationRefused e) {
+      throw e;
     } catch (Exception e) {
-      return AgentToolErrors.classify("core_ingest_files", "Ingest error", e);
+      throw badInput("Path is missing or unreadable: " + input);
     }
   }
 
-  /**
-   * Resolves a path string to an absolute Path: absolute input is normalized; a root-relative one
-   * goes through the ONE relative→absolute algorithm ({@code AgentToolPaths.RootsView#resolveRelative}
-   * — first component matched against a root NAME), and whatever that misses falls back to the
-   * existence-probe of resolving under each root in turn. {@code null} when nothing resolves, which
-   * {@link #execute} reports as a skipped path.
-   *
-   * <p>Tempdoc 877 §2.4 — this used to end in {@code p.toAbsolutePath().normalize()}, resolving an
-   * unmatched relative path against the JVM's working directory. That is never what the model meant
-   * (it has no idea what the Head's cwd is) and it is the one behaviour in this cluster that could
-   * address a file outside every indexed root. Removed: fail closed and say "skipped" instead.
-   *
-   * <p><b>Every arm is existence-checked, including the name-match one.</b>
-   * {@code resolveRelative} matches the first component against a root NAME and returns WITHOUT
-   * touching the filesystem, so its answer is a candidate, not a verdict. Returning it
-   * unconditionally lets a root-name collision beat a path that actually exists: with roots
-   * {@code ("C:\A\docs","docs")} and {@code ("C:\B","B")}, the input {@code "docs/x.md"} names the
-   * first root while the file lives at {@code C:\B\docs\x.md} — the model's file is real, addressed
-   * correctly, and reported as "1 paths skipped". So the name match is probed like any other
-   * candidate and falls through when it misses.
-   */
-  private Path resolvePath(String raw) {
-    try {
-      Path p = Path.of(raw);
-      if (p.isAbsolute()) {
-        return p.normalize();
-      }
-      String resolved = rootsView.resolveRelative(raw);
-      if (resolved != null) {
-        Path named = Path.of(resolved).normalize();
-        if (Files.exists(named)) {
-          return named;
-        }
-      }
-      for (BrowseTool.RootInfo root : rootsView.roots()) {
-        Path candidate = Path.of(root.path()).resolve(p).normalize();
-        if (Files.exists(candidate)) {
-          return candidate;
-        }
-      }
-      return null;
-    } catch (RuntimeException e) {
-      LOG.warn("Invalid path: '{}'", raw, e);
-      return null;
-    }
-  }
-
-  private String formatResult(KnowledgeIngestResponse response, int skippedPaths) {
-    var sb = new StringBuilder();
-
-    if (response.error() == null || response.error().isEmpty()) {
-      sb.append(
-          String.format("Ingested %d files successfully.", response.accepted()));
-    } else {
-      sb.append(
-          String.format(
-              "Ingest completed: %d accepted. Error: %s",
-              response.accepted(), response.error()));
-    }
-
-    if (skippedPaths > 0) {
-      sb.append(String.format(" (%d paths skipped — not found or not readable)", skippedPaths));
-    }
-
-    return sb.toString();
-  }
-
-  /**
-   * Best-effort watched-root lookup for collection inheritance (tempdoc 811 C-2a). A failure here
-   * means every path resolves out-of-root, which is a real tag rather than the pre-811 {@code null}.
-   */
-  private List<IngestCollectionPolicy.RootBinding> rootBindings() {
-    try {
-      List<IngestCollectionPolicy.RootBinding> bindings = rootBindingsSupplier.get();
-      return bindings == null ? List.of() : bindings;
-    } catch (RuntimeException e) {
-      LOG.debug("watched-root lookup for ingest tagging failed", e);
-      return List.of();
-    }
-  }
-
-  /**
-   * Callback for ingesting files into the knowledge index. Tempdoc 811 (C-2a) added the {@code
-   * collection} tag ({@code null} = the index default).
-   */
-  @FunctionalInterface
-  public interface IngestCallback {
-    KnowledgeIngestResponse ingest(List<Path> files, String collection);
-  }
-
-  /**
-   * Callback for dispatching a directory scan to the Worker. Tempdoc 418 Phase B —
-   * production wiring delegates to {@code KnowledgeHttpApiAdapter.scanRoot}, which calls
-   * the server-streaming {@code IngestService.ScanRoot} RPC. Tests can pass a
-   * local-fallback. Tempdoc 811 (C-2a) added the {@code collection} tag.
-   */
-  @FunctionalInterface
-  public interface ScanRootCallback {
-    KnowledgeIngestResponse scanRoot(String rootPath, String collection, List<String> excludeGlobs);
+  private static OperationPreparationRefused badInput(String message) {
+    return new OperationPreparationRefused(
+        OperationResult.failure(message, "BAD_REQUEST", Map.of(), false));
   }
 }

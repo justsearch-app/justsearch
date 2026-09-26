@@ -26,7 +26,7 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.MMapDirectory;
 import org.junit.jupiter.api.Test;
 
-class IndexingIntegrationTest {
+class IndexingIntegrationTest extends LuceneExecutorTestBase {
 
   @Test
   void reindexReplacesExistingDocument() throws Exception {
@@ -38,7 +38,7 @@ class IndexingIntegrationTest {
         + "      days: 7\n";
     withConfig(config, () -> {
       RunningRuntime runtime =
-          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).open();
+          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
       runtime.indexingCoordinator().indexSingle(new IndexDocument(document("doc-1", "doc-1#0", "first")));
       runtime.commitOps().commitAndTrack();
 
@@ -67,7 +67,7 @@ class IndexingIntegrationTest {
         + "      days: 7\n";
     withConfig(config, () -> {
       RunningRuntime runtime =
-          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).open();
+          IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
       runtime.indexingCoordinator().indexSingle(new IndexDocument(document("doc-1", "doc-1#0", "visible")));
       runtime.commitOps().commitAndTrack();
       runtime.commitOps().maybeRefreshBlocking();

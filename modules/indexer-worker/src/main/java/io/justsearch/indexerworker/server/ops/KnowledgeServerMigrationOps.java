@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.server.ops;
 
-import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.core.JacksonException;
+import io.justsearch.configuration.persistence.WatchedRootsFormat;
 import tools.jackson.databind.ObjectMapper;
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.adapters.lucene.runtime.CleanShutdownMarker;
@@ -19,8 +20,10 @@ import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
-import io.justsearch.indexerworker.rag.ChunkDocumentWriter;
-import io.justsearch.indexerworker.services.GrpcIngestService;
+import io.justsearch.indexerworker.server.RecordedIngestionLifecycle;
+import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.services.WorkerIngestService;
+import io.justsearch.indexerworker.services.WorkerServiceException;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.RecoverVduProcessingRequest;
 import io.justsearch.ipc.RecoverVduProcessingResponse;
@@ -29,6 +32,8 @@ import io.justsearch.ipc.SyncDirectoryResponse;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -49,11 +54,34 @@ import org.slf4j.Logger;
 public final class KnowledgeServerMigrationOps {
   private KnowledgeServerMigrationOps() {}
 
+  @FunctionalInterface
+  public interface CheckedSwitchingTransition {
+    void run(IndexGenerationManager.State observed) throws IOException, InterruptedException;
+  }
+
+  @FunctionalInterface
+  public interface CheckedLiveCutover {
+    IndexGenerationManager.State promote() throws IOException, InterruptedException;
+
+    default boolean recorded() { return false; }
+
+    default RecordedIngestionLifecycle.GapDecision gapDecision() {
+      return RecordedIngestionLifecycle.GapDecision.NONE;
+    }
+
+    default boolean enterGapWait() throws IOException, InterruptedException { return false; }
+
+    default boolean resumeAcceptedGapBuild() throws IOException, InterruptedException { return false; }
+
+    default void transition(String point) throws IOException, InterruptedException {}
+  }
+
   public record CutoverContext(
       IndexGenerationManager indexGenerationManager,
       JobQueue jobQueue,
       BooleanSupplier runningSupplier,
       BooleanSupplier migrationEnumeratorDoneSupplier,
+      Supplier<Throwable> migrationEnumeratorFailureSupplier,
       long migrationSwitchingQueueDepthThreshold,
       long migrationSwitchingMaxDurationMs,
       int migrationCutoverMaxFailedJobs,
@@ -61,18 +89,68 @@ public final class KnowledgeServerMigrationOps {
       // Tempdoc 598 review Fix E: deterministically finalize the embedding rebuild (flip the ECC to
       // COMPATIBLE iff the green is fully embedded) BEFORE the COMPLETE commit, so that commit stamps
       // the embedding fingerprint deterministically rather than racing the indexing-loop thread.
-      Runnable finalizeEmbeddingRebuildAction,
+      BooleanSupplier finalizeEmbeddingRebuildAction,
       BooleanSupplier verifyGreenCommitMetadataSupplier,
       Runnable drainSwitchBufferAction,
-      Runnable initiateShutdownAction,
       // Tempdoc 915 (live validation D4): flush the worker metrics snapshot before the cutover
       // restart. The snapshot cadence is 60s and the cutover restarts the worker roughly 20s after
       // the migration starts, so the session that performed the cutover was discarded before any
       // snapshot was written - and commit_by_reason therefore never carried migration/cutover in a
       // live run, though both emit sites are production code.
       Runnable flushTelemetryAction,
+      Runnable requestedRestartAction,
       Path dataDir,
-      Logger log) {}
+      Logger log,
+      RecordedIngestionLifecycle.CheckedPromotion promotion,
+      CheckedSwitchingTransition switchingTransition,
+      CheckedLiveCutover liveCutover) {
+    public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
+        BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
+        Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
+        long migrationSwitchingMaxDurationMs, int migrationCutoverMaxFailedJobs,
+        Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
+        BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
+        Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log,
+        RecordedIngestionLifecycle.CheckedPromotion promotion,
+        CheckedSwitchingTransition switchingTransition) {
+      this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
+          migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
+          migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
+          finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
+          flushTelemetryAction, requestedRestartAction, dataDir, log, promotion,
+          switchingTransition, null);
+    }
+    public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
+        BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
+        Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
+        long migrationSwitchingMaxDurationMs, int migrationCutoverMaxFailedJobs,
+        Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
+        BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
+        Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log,
+        RecordedIngestionLifecycle.CheckedPromotion promotion) {
+      this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
+          migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
+          migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
+          finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
+          flushTelemetryAction, requestedRestartAction, dataDir, log, promotion,
+          observed -> indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING), null);
+    }
+
+    public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
+        BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
+        Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
+        long migrationSwitchingMaxDurationMs, int migrationCutoverMaxFailedJobs,
+        Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
+        BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
+        Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log) {
+      this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
+          migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
+          migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
+          finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
+          flushTelemetryAction, requestedRestartAction, dataDir, log,
+          indexGenerationManager::promoteBuildingGenerationToActive);
+    }
+  }
 
   public record DrainSwitchBufferContext(
       JobQueue jobQueue,
@@ -87,7 +165,50 @@ public final class KnowledgeServerMigrationOps {
       // Tempdoc 931 §E item 8: rag.chunk_splade.enabled, read from the LIVE resolved config each
       // time a buffered VDU_UPDATE regenerates chunks — a drain can span a config change.
       BooleanSupplier chunkSpladeEnabledSupplier,
-      Logger log) {}
+      BooleanSupplier vduReplayAllowed,
+      Logger log,
+      long deadlineNanos,
+      String replayGeneration,
+      java.util.function.Predicate<String> projectionSourceReady,
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> approvedGapVersions) {
+    public DrainSwitchBufferContext {
+      approvedGapVersions = Set.copyOf(approvedGapVersions);
+    }
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log, long deadlineNanos,
+        String replayGeneration, java.util.function.Predicate<String> projectionSourceReady) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath,
+          activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, replayGeneration, projectionSourceReady, Set.of());
+    }
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log, long deadlineNanos,
+        String replayGeneration) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath,
+          activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, replayGeneration, ignored -> false);
+    }
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log, long deadlineNanos) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath,
+          activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          deadlineNanos, null);
+    }
+    public DrainSwitchBufferContext(JobQueue jobQueue, RunningRuntime ingestLifecycle,
+        WorkerSignalBus signalBus, IndexingPacing indexingPacing, Path indexBasePath,
+        Path activeIndexPath, ObjectMapper json, BooleanSupplier chunkSpladeEnabledSupplier,
+        BooleanSupplier vduReplayAllowed, Logger log) {
+      this(jobQueue, ingestLifecycle, signalBus, indexingPacing, indexBasePath,
+          activeIndexPath, json, chunkSpladeEnabledSupplier, vduReplayAllowed, log,
+          Long.MAX_VALUE);
+    }
+  }
 
   public record EnqueueContext(
       List<Path> roots,
@@ -121,16 +242,39 @@ public final class KnowledgeServerMigrationOps {
     }
     while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
       try {
+        Throwable enumerationFailure = context.migrationEnumeratorFailureSupplier().get();
+        if (enumerationFailure != null) {
+          context.log().warn("Migration enumeration incomplete; keeping Blue active", enumerationFailure);
+          context.indexGenerationManager().updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+          context.drainSwitchBufferAction().run();
+          return;
+        }
         IndexGenerationManager.State state = context.indexGenerationManager().readStateBestEffort();
         IndexGenerationManager.MigrationState ms =
             parseMigrationState(state == null ? null : state.migration_state());
+        if (ms == IndexGenerationManager.MigrationState.IDLE
+            || ms == IndexGenerationManager.MigrationState.FAILED) {
+          return;
+        }
+
         if (state != null && Boolean.TRUE.equals(state.migration_paused())) {
           Thread.sleep(1_000);
           continue;
         }
-        if (ms == IndexGenerationManager.MigrationState.IDLE
-            || ms == IndexGenerationManager.MigrationState.FAILED) {
-          return;
+
+        if (ms == IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE) {
+          if (context.liveCutover() != null && !context.liveCutover().enterGapWait()) {
+            Thread.sleep(1_000);
+            continue;
+          }
+          if (context.liveCutover() != null
+              && context.liveCutover().gapDecision()
+                  == RecordedIngestionLifecycle.GapDecision.ACCEPTED) {
+            context.liveCutover().resumeAcceptedGapBuild();
+          } else {
+            Thread.sleep(1_000);
+          }
+          continue;
         }
 
         if (!context.migrationEnumeratorDoneSupplier().getAsBoolean()) {
@@ -147,9 +291,10 @@ public final class KnowledgeServerMigrationOps {
           context.log().info(
               "Migration nearing completion (queueDepth={}). Entering SWITCHING cutover fence...",
               depth);
-          context
-              .indexGenerationManager()
-              .updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+          if (context.liveCutover() != null) {
+            context.liveCutover().transition("migration-before-switching");
+          }
+          context.switchingTransition().run(state);
           Thread.sleep(250);
           continue;
         }
@@ -191,25 +336,32 @@ public final class KnowledgeServerMigrationOps {
             "Migration drain criteria met in SWITCHING (queueDepth={}). Finalizing cutover...",
             depth);
 
-        long failedJobs = 0L;
-        try {
-          failedJobs = context.jobQueue().failureSummary().failedCount();
-        } catch (Exception e) {
-          context.log().warn(
-              "Failed to query failed jobs count for cutover guardrail (proceeding with 0): {}",
-              e.getMessage());
-        }
-        if (context.migrationCutoverMaxFailedJobs() >= 0
-            && failedJobs > context.migrationCutoverMaxFailedJobs()) {
-          context.log().warn(
-              "Migration cutover blocked: failedJobs={} exceeds maxFailedJobs={} (keeping Blue active)",
-              failedJobs,
-              context.migrationCutoverMaxFailedJobs());
-          context
-              .indexGenerationManager()
-              .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
-          context.drainSwitchBufferAction().run();
-          return;
+        if (context.liveCutover() == null || !context.liveCutover().recorded()) {
+          long failedJobs;
+          try {
+            failedJobs = context.jobQueue().failureSummary().failedCount();
+          } catch (Exception e) {
+            context.log().warn(
+                "Migration cutover blocked: failed jobs count is unreadable (keeping Blue active): {}",
+                e.getMessage());
+            context
+                .indexGenerationManager()
+                .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+            context.drainSwitchBufferAction().run();
+            return;
+          }
+          if (context.migrationCutoverMaxFailedJobs() >= 0
+              && failedJobs > context.migrationCutoverMaxFailedJobs()) {
+            context.log().warn(
+                "Migration cutover blocked: failedJobs={} exceeds maxFailedJobs={} (keeping Blue active)",
+                failedJobs,
+                context.migrationCutoverMaxFailedJobs());
+            context
+                .indexGenerationManager()
+                .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+            context.drainSwitchBufferAction().run();
+            return;
+          }
         }
 
         LuceneRuntime ingestLifecycle = context.ingestLifecycleSupplier().get();
@@ -222,6 +374,29 @@ public final class KnowledgeServerMigrationOps {
           return;
         }
 
+        if (!context.finalizeEmbeddingRebuildAction().getAsBoolean()) {
+          // Startup root scanning can enqueue before deferred embeddings are ready. A drained
+          // primary queue therefore does not imply that Green's embedding backfill has drained.
+          // Keep the existing SWITCHING deadline and verification; pending work is not failure.
+          Thread.sleep(500);
+          continue;
+        }
+
+        if (context.liveCutover() != null) {
+          IndexGenerationManager.State promoted = context.liveCutover().promote();
+          if (promoted == null) {
+            if (context.liveCutover().gapDecision()
+                == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) {
+              context.liveCutover().enterGapWait();
+            }
+            Thread.sleep(250);
+            continue;
+          }
+          context.log().info("Migration promoted generation {} without restarting the Engine",
+              promoted.active_generation());
+          return;
+        }
+
         try {
           // Tempdoc 598 review Fix E: finalize the embedding rebuild on this (drained) green BEFORE
           // the COMPLETE commit. This deterministically flips the ECC to COMPATIBLE iff the green is
@@ -229,7 +404,6 @@ public final class KnowledgeServerMigrationOps {
           // than racing the indexing-loop thread that would otherwise flip rebuildCompleted. A green
           // that is genuinely not fully embedded is NOT flipped, so its commit lacks the fingerprint
           // and the verification below correctly blocks promotion (no false promote-into-BLOCKED).
-          context.finalizeEmbeddingRebuildAction().run();
           // Phase 5 (folded into Phase 2-3 Step C): commitWithBuildState replaces the
           // setBuildState + commit two-step. Updates ctx.buildState then commits, so
           // the final commit (and any subsequent timer commit) stamps build_state=COMPLETE.
@@ -256,15 +430,19 @@ public final class KnowledgeServerMigrationOps {
           return;
         }
 
-        IndexGenerationManager.State promoted =
-            context.indexGenerationManager().promoteBuildingGenerationToActive();
+        IndexGenerationManager.State promoted = context.promotion().promote();
+        if (promoted == null) {
+          Thread.sleep(250);
+          continue;
+        }
         try { Files.deleteIfExists(context.dataDir().resolve(".help-ingested-version")); }
         catch (IOException ignored) {
           // Best-effort cleanup of stale marker; failure is non-fatal to cutover.
         }
         preserveEvidenceBeforeRestart(context, promoted);
-        context.log().info("Migration cutover complete. Restarting worker to open new active generation...");
-        context.initiateShutdownAction().run();
+        context.log().info("Migration promoted generation {}; requesting Engine restart",
+            promoted == null ? "(unknown)" : promoted.active_generation());
+        context.requestedRestartAction().run();
         return;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -302,6 +480,12 @@ public final class KnowledgeServerMigrationOps {
    */
   public static boolean verifyGreenCommitMetadataBestEffort(
       LuceneRuntime ingestLifecycle, String expectedEmbeddingFp, Logger log) {
+    return verifyGreenCommitMetadataBestEffort(ingestLifecycle, null, expectedEmbeddingFp, log);
+  }
+
+  /** A recorded Green verifies against its frozen candidate target, not A's global providers. */
+  public static boolean verifyGreenCommitMetadataBestEffort(
+      LuceneRuntime ingestLifecycle, String expectedIndexFp, String expectedEmbeddingFp, Logger log) {
     try {
       if (ingestLifecycle == null) {
         return false;
@@ -311,7 +495,7 @@ public final class KnowledgeServerMigrationOps {
         return true;
       }
       return verifyGreenMetadata(
-          ingestLifecycle.latestCommitUserDataBestEffort(), expectedEmbeddingFp, log);
+          ingestLifecycle.latestCommitUserDataBestEffort(), expectedIndexFp, expectedEmbeddingFp, log);
     } catch (Exception e) {
       log.warn("Green verification failed (best-effort): {}", e.getMessage());
       return false;
@@ -324,14 +508,16 @@ public final class KnowledgeServerMigrationOps {
    * index-fingerprint / embedding-fp rules can be unit-tested without a (sealed) {@link LuceneRuntime} double.
    */
   static boolean verifyGreenMetadata(
-      Map<String, String> ud, String expectedEmbeddingFp, Logger log) {
+      Map<String, String> ud, String expectedIndexFp, String expectedEmbeddingFp, Logger log) {
     String buildState = ud.get("build_state");
     if (!"COMPLETE".equalsIgnoreCase(buildState)) {
       log.warn("Green verification failed: build_state={} (expected COMPLETE)", buildState);
       return false;
     }
     String committedFingerprint = ud.get(IndexFingerprint.COMMIT_META_KEY);
-    Object expectedRaw = new SsotCommitMetadataSource().build().get(IndexFingerprint.COMMIT_META_KEY);
+    Object expectedRaw = expectedIndexFp == null
+        ? new SsotCommitMetadataSource().build().get(IndexFingerprint.COMMIT_META_KEY)
+        : expectedIndexFp;
     String expectedFingerprint = expectedRaw == null ? null : String.valueOf(expectedRaw);
     if (committedFingerprint == null || committedFingerprint.isBlank()) {
       log.warn("Green verification failed: committed index_fingerprint is missing");
@@ -416,30 +602,311 @@ public final class KnowledgeServerMigrationOps {
   }
 
   public static void drainSwitchBufferBestEffort(DrainSwitchBufferContext context) {
-    if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
-      return;
+    // A candidate may need this revision after a crash or an aborted promotion. In particular,
+    // a no-file DELETE is the only retained ordering witness for a delayed older UPSERT.
+    drainSwitchBuffer(context, false, context.replayGeneration() == null);
+  }
+
+  /** Record the registered source before streaming its complete set into the existing journal. */
+  public static void seedProjectionSource(SwitchBufferCapableQueue queue, String generation,
+      io.justsearch.app.api.indexing.ProjectionSeedSource source) throws IOException {
+    String sourceId = Objects.requireNonNull(source.sourceId(), "sourceId");
+    if (sourceId.isBlank() || sourceId.length() > 256 || generation == null
+        || generation.isBlank()) {
+      throw new IOException("Projection seed source or candidate identity is invalid");
     }
-    List<SwitchBufferCapableQueue.SwitchBufferOp> ops = sbq.listSwitchBufferOps();
+    String marker = "projection-source:" + sourceId.length() + ":" + sourceId;
+    if (!queue.putSwitchBufferForGeneration(generation, marker, "PROJECTION_SOURCE", sourceId)) {
+      throw new IOException("Projection source marker was not durable: " + sourceId);
+    }
+    try {
+      source.enumerate(projection -> {
+        try {
+          if (!sourceId.equals(projection.sourceId())) {
+            throw new IllegalArgumentException("Projection seed crossed source ownership");
+          }
+          var admission = queue.admitProjectionForGeneration(generation, projection.encode());
+          if (admission == SwitchBufferCapableQueue.ProjectionAdmission.CONFLICT) {
+            throw new IllegalStateException("Projection seed conflicts with an accepted revision");
+          }
+        } catch (RuntimeException admissionFailure) {
+          throw new ProjectionAdmissionFailure(admissionFailure);
+        }
+      });
+    } catch (ProjectionAdmissionFailure fatal) {
+      throw new IOException("Projection seed admission failed: " + sourceId, fatal.getCause());
+    } catch (IOException | RuntimeException incomplete) {
+      throw new ProjectionSeedIncompleteException(sourceId, incomplete);
+    }
+  }
+
+  private static final class ProjectionAdmissionFailure extends RuntimeException {
+    private ProjectionAdmissionFailure(Throwable cause) { super(cause); }
+  }
+
+  /** Marker was durable, but the source could not certify its complete enumeration. */
+  public static final class ProjectionSeedIncompleteException extends IOException {
+    public ProjectionSeedIncompleteException(String sourceId, Throwable cause) {
+      super("Projection source enumeration incomplete: " + sourceId, cause);
+    }
+  }
+
+  /** The final fence must observe an exact, wholly applied replay before it may promote. */
+  public static boolean drainSwitchBufferStrict(DrainSwitchBufferContext context) {
+    return drainSwitchBuffer(context, true, true).applied();
+  }
+
+  /**
+   * A refused pre-pointer candidate must settle only its own accepted mutations on surviving A.
+   * Source completeness belongs to B's seed witness; an unreadable source cannot prevent
+   * abandonment once exact journal versions are committed and verified on A.
+   */
+  public static boolean drainRefusedCandidateOnSource(DrainSwitchBufferContext context) {
+    if (context.replayGeneration() == null || context.replayGeneration().isBlank()) return false;
+    return drainSwitchBuffer(context, true, true, false, () -> {}, true).applied();
+  }
+
+  /** Replay remains durable until the generation pointer commits, so abandonment can replay on A. */
+  public record StrictReplay(List<SwitchBufferCapableQueue.SwitchBufferOp> versions) {
+    public StrictReplay { versions = List.copyOf(versions); }
+  }
+
+  private record ReplayOutcome(boolean applied, List<SwitchBufferCapableQueue.SwitchBufferOp> versions) {}
+
+  public static java.util.Optional<StrictReplay> prepareSwitchReplayForPromotion(
+      DrainSwitchBufferContext context) {
+    return prepareSwitchReplayForPromotion(context, () -> {});
+  }
+
+  /** Only the candidate promotion caller supplies a harness cut inside its ordered replay. */
+  public static java.util.Optional<StrictReplay> prepareSwitchReplayForPromotion(
+      DrainSwitchBufferContext context, Runnable firstCandidateProjectionApplied) {
+    var result = drainSwitchBuffer(context, true, false, true,
+        Objects.requireNonNull(firstCandidateProjectionApplied, "firstCandidateProjectionApplied"));
+    return result.applied() ? java.util.Optional.of(new StrictReplay(result.versions()))
+        : java.util.Optional.empty();
+  }
+
+  /** Remove only the exact applied versions after B is durably committed. */
+  public static boolean finishPromotedSwitchReplay(JobQueue queue, StrictReplay replay) {
+    if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
+    if (replay.versions().isEmpty()) return true;
+    try { return sbq.removeReplayedSwitchBufferOps(replay.versions()) == replay.versions().size(); }
+    catch (RuntimeException unavailable) { return false; }
+  }
+
+  /**
+   * A strict PROMOTED boot proves the pre-pointer replay and Green commit already completed.
+   * Admission stayed fenced until cleanup was certified, so retained versions need only exact
+   * deletion; re-enqueueing them would create new, untracked work after the recorded settlement.
+   */
+  public static boolean finishCommittedBootSwitchReplay(JobQueue queue) {
+    return finishCommittedBootSwitchReplay(queue, null);
+  }
+
+  public static boolean finishCommittedBootSwitchReplay(JobQueue queue, String generation) {
+    if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
+    try {
+      return finishPromotedSwitchReplay(queue,
+          new StrictReplay(strictReplayOps(sbq, generation)))
+          && switchBufferEmptyStrict(queue, generation);
+    } catch (RuntimeException unreadable) {
+      return false;
+    }
+  }
+
+  /**
+   * A native pointer-before-publication cut can leave exact file witnesses after B is committed.
+   * Verify the already-completed queue row and B's indexed source identity before removing only
+   * those file rows. Other operation kinds still fence predecessor retirement for full replay.
+   */
+  public static boolean settleCommittedNativeFileWitnesses(
+      JobQueue queue, RunningRuntime active, String generation, Logger log) {
+    if (!(queue instanceof SwitchBufferCapableQueue scoped) || active == null
+        || generation == null || generation.isBlank()) return false;
+    try {
+      List<SwitchBufferCapableQueue.SwitchBufferOp> selected = scoped.listSwitchBufferOpsStrict()
+          .stream().filter(op -> generation.equals(op.generation())).toList();
+      for (var op : selected) {
+        if (!"UPSERT".equals(op.op())) return false;
+        var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload());
+        if (upsert.sourceSha256() == null
+            || !scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
+                upsert.sourceSha256())
+            || !upsert.sourceSha256().equals(active.documentFieldOps()
+                .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256))) return false;
+      }
+      if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
+        return false;
+      }
+      return switchBufferEmptyStrict(queue, generation);
+    } catch (RuntimeException unavailable) {
+      log.warn("Committed native file witnesses remain unresolved", unavailable);
+      return false;
+    }
+  }
+
+  /** No post-snapshot versions may remain while the final mutation admission fence is held. */
+  public static boolean switchBufferEmptyStrict(JobQueue queue) {
+    return switchBufferEmptyStrict(queue, null);
+  }
+
+  public static boolean switchBufferEmptyStrict(JobQueue queue, String generation) {
+    if (!(queue instanceof SwitchBufferCapableQueue sbq)) return false;
+    try { return strictReplayOps(sbq, generation).isEmpty(); }
+    catch (RuntimeException unreadable) { return false; }
+  }
+
+  private static List<SwitchBufferCapableQueue.SwitchBufferOp> strictReplayOps(
+      SwitchBufferCapableQueue queue, String generation) {
+    return queue.listSwitchBufferOpsStrict().stream()
+        .filter(op -> op.generation() == null || op.generation().isEmpty()
+            || (generation != null && generation.equals(op.generation()))).toList();
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay) {
+    return drainSwitchBuffer(context, exactRead, removeAfterReplay, true);
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped) {
+    return drainSwitchBuffer(context, exactRead, removeAfterReplay, includeUnscoped, () -> {});
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped,
+      Runnable firstCandidateProjectionApplied) {
+    return drainSwitchBuffer(context, exactRead, removeAfterReplay, includeUnscoped,
+        firstCandidateProjectionApplied, false);
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped,
+      Runnable firstCandidateProjectionApplied, boolean refusedSourceRecovery) {
+    if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
+      return new ReplayOutcome(false, List.of());
+    }
+    boolean allowVdu = context.vduReplayAllowed().getAsBoolean();
+    List<SwitchBufferCapableQueue.SwitchBufferOp> allOps;
+    try {
+      allOps = exactRead ? strictReplayOps(sbq, context.replayGeneration()).stream()
+              .filter(op -> includeUnscoped || context.replayGeneration().equals(op.generation()))
+              .toList()
+          : sbq.listSwitchBufferOps().stream()
+              .filter(op -> (includeUnscoped && (op.generation() == null || op.generation().isEmpty()))
+                  || (context.replayGeneration() != null
+                      && context.replayGeneration().equals(op.generation()))).toList();
+    } catch (RuntimeException unreadable) {
+      context.log().warn("Switch buffer cannot certify final replay", unreadable);
+      return new ReplayOutcome(false, List.of());
+    }
+    boolean deferredVdu = !allowVdu && allOps.stream().anyMatch(op -> isVduBufferKind(op.op()));
+    List<SwitchBufferCapableQueue.SwitchBufferOp> ops = allOps.stream()
+        .filter(op -> allowVdu || !isVduBufferKind(op.op())).toList();
     if (ops.isEmpty()) {
-      return;
+      return new ReplayOutcome(!deferredVdu, List.of());
     }
     context.log().info("Draining {} buffered ops from durable switch buffer...", ops.size());
 
-    ArrayList<Path> toEnqueue = new ArrayList<>();
+    ArrayList<io.justsearch.indexerworker.queue.SwitchBufferUpsert> toEnqueue = new ArrayList<>();
     boolean mutatedLucene = false;
     boolean allApplied = true;
+    boolean firstCandidateProjectionObserved = false;
 
     for (SwitchBufferCapableQueue.SwitchBufferOp op : ops) {
-      if (op == null || op.op() == null || op.payload() == null) {
+      if (op.op() == null || op.payload() == null) {
+        allApplied = false;
         continue;
       }
       String kind = op.op().trim().toUpperCase(Locale.ROOT);
       String payload = op.payload();
+      // Enqueue a preceding UPSERT before applying a later delete or prefix mutation. The
+      // switch buffer is version ordered; delaying every UPSERT until the end resurrects paths
+      // that a later DELETE_PREFIX removed.
+      if (!"UPSERT".equals(kind) && !toEnqueue.isEmpty()) {
+        if (!enqueueBufferedUpserts(context, toEnqueue)
+            || (exactRead && (!awaitQueuedUpserts(context)
+                || !verifyBufferedUpserts(context, toEnqueue)))) {
+          context.log().warn("Buffered UPSERT did not settle before a later {}", kind);
+          return new ReplayOutcome(false, List.of());
+        }
+        toEnqueue.clear();
+      }
+      // These exact row revisions and gap reasons were accepted from the current full Green
+      // witness under the final fence. Keep their versions for post-pointer deletion only.
+      if (context.approvedGapVersions().contains(op)) continue;
+      if (payload.isBlank() || (!"UPSERT".equals(kind) && context.ingestLifecycle() == null)) {
+        allApplied = false;
+        continue;
+      }
+      boolean appliedProjection = false;
       switch (kind) {
+        case "PROJECTION_SOURCE" -> {
+          String marker = "projection-source:" + payload.length() + ":" + payload;
+          if (op.generation() == null || op.generation().isBlank()
+              || !marker.equals(op.key())
+              || (!refusedSourceRecovery && !context.projectionSourceReady().test(payload))) {
+            allApplied = false;
+            context.log().warn("Projection source is missing or incomplete: {}", payload);
+          }
+        }
+        case "PROJECTION" -> {
+          try {
+            var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(payload);
+            if (op.generation() == null || op.generation().isBlank()
+                || !op.key().equals(projection.journalKey())
+                || context.ingestLifecycle() == null) {
+              throw new IllegalStateException("Projection replay lacks its exact candidate or key");
+            }
+            var fields = context.ingestLifecycle().documentFieldOps();
+            String currentId = fields.getDocumentField(projection.indexId(), SchemaFields.DOC_ID);
+            String currentSource = fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID);
+            String currentRevision = fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION);
+            if (currentId != null && (!projection.indexId().equals(currentId)
+                || !projection.sourceId().equals(currentSource) || currentRevision == null)) {
+              throw new IllegalStateException("Projection replay found an unowned candidate document");
+            }
+            long candidateRevision = currentRevision == null ? -1 : Long.parseLong(currentRevision);
+            if (candidateRevision > projection.sourceRevision()) break;
+            if (candidateRevision == projection.sourceRevision()
+                && projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT) {
+              String digest = fields.getDocumentField(
+                  projection.indexId(), SchemaFields.PROJECTION_DIGEST);
+              if (!projection.fieldsDigest().equals(digest)) {
+                throw new IllegalStateException("Equal projection revision has different fields");
+              }
+              break;
+            }
+            if (projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
+              context.ingestLifecycle().indexingCoordinator()
+                  .deleteByIdAndChunks(projection.indexId());
+            } else {
+              context.ingestLifecycle().indexingCoordinator().indexSingle(
+                  io.justsearch.indexerworker.services.ProjectionDocumentMapper
+                      .toIndexDocument(projection));
+            }
+            mutatedLucene = true;
+            // A delete of an already-absent document has no physical write to witness.
+            appliedProjection = projection.kind()
+                == io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT;
+          } catch (Exception failure) {
+            allApplied = false;
+            context.log().warn("Buffered projection replay failed; retaining candidate journal key={}",
+                op.key(), failure);
+          }
+        }
         case "UPSERT" -> {
           if (!payload.isBlank()) {
             try {
-              toEnqueue.add(Path.of(payload));
+              var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(payload);
+              if (op.generation() != null && !op.generation().isEmpty()
+                  && upsert.sourceSha256() == null) {
+                throw new IllegalArgumentException("Scoped UPSERT has no exact source witness");
+              }
+              toEnqueue.add(upsert);
             } catch (Exception e) {
               allApplied = false;
               context
@@ -485,17 +952,33 @@ public final class KnowledgeServerMigrationOps {
             }
           }
         }
+        case "DELETE_COLLECTION" -> {
+          try {
+            context.ingestLifecycle().indexingCoordinator().deleteByCollection(payload);
+            mutatedLucene = true;
+          } catch (Exception e) {
+            allApplied = false;
+            context.log().warn("Failed to replay buffered DELETE_COLLECTION: key={} err={}",
+                op.key(), e.getMessage());
+          }
+        }
         case "VDU_MARK_PROCESSING" -> {
           if (context.ingestLifecycle() != null && !payload.isBlank()) {
             try {
               var node = context.json().readTree(payload);
               String docId = node.path("doc_id").asText();
-              int retryCount = node.path("retry_count").asInt();
+              if (docId.isBlank()) throw new IllegalArgumentException("Buffered VDU mark has no document id");
+              var retry = node.path("retry_count");
+              if (!retry.isIntegralNumber() || !retry.canConvertToInt() || retry.asInt() <= 0) {
+                throw new IllegalArgumentException("Buffered VDU mark has no positive retry count");
+              }
+              int retryCount = retry.asInt();
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
               updates.put(SchemaFields.VDU_RETRY_COUNT, String.valueOf(retryCount));
               boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
               if (!updated) {
+                allApplied = false;
                 context.log().warn("Buffered VDU_MARK_PROCESSING: document not found: {}", docId);
               }
               mutatedLucene = true;
@@ -515,11 +998,13 @@ public final class KnowledgeServerMigrationOps {
             try {
               var node = context.json().readTree(payload);
               String docId = node.path("doc_id").asText();
+              if (docId.isBlank()) throw new IllegalArgumentException("Buffered VDU mark has no document id");
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_FAILED);
               updates.put(SchemaFields.VDU_ENRICHMENT, "{\"error\": \"Max retries exceeded\"}");
               boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
               if (!updated) {
+                allApplied = false;
                 context.log().warn("Buffered VDU_MARK_FAILED: document not found: {}", docId);
               }
               mutatedLucene = true;
@@ -537,8 +1022,11 @@ public final class KnowledgeServerMigrationOps {
         case "VDU_RECOVER_PROCESSING" -> {
           if (context.ingestLifecycle() != null) {
             try {
-              GrpcIngestService tmp =
-                  new GrpcIngestService(
+              if (!context.json().readTree(payload).isObject()) {
+                throw new IllegalArgumentException("Buffered VDU recovery payload is not an object");
+              }
+              WorkerIngestService tmp =
+                  new WorkerIngestService(
                       context.jobQueue(),
                       null,
                       context.signalBus(),
@@ -546,39 +1034,26 @@ public final class KnowledgeServerMigrationOps {
                       context.indexBasePath(),
                       context.activeIndexPath(),
                       context.ingestLifecycle(),
+                      context.ingestLifecycle(),
                       null,
-                      null,
-                      0L,
-                      null);
-              AtomicReference<RecoverVduProcessingResponse> resp = new AtomicReference<>();
-              AtomicReference<Throwable> err = new AtomicReference<>();
-              tmp.recoverVduProcessing(
-                  RecoverVduProcessingRequest.getDefaultInstance(),
-                  new StreamObserver<>() {
-                    @Override
-                    public void onNext(RecoverVduProcessingResponse value) {
-                      resp.set(value);
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                      err.set(t);
-                    }
-
-                    @Override
-                    public void onCompleted() {}
-                  });
-              if (err.get() != null) {
+                      0L);
+              RecoverVduProcessingResponse resp;
+              try {
+                resp =
+                    tmp.recoverVduProcessing(
+                        RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none());
+              } catch (WorkerServiceException wse) {
                 allApplied = false;
                 context
                     .log()
                     .warn(
                         "Failed to replay buffered VDU_RECOVER_PROCESSING (will retry later): key={} err={}",
                         op.key(),
-                        err.get().getMessage());
+                        wse.getMessage());
                 break;
               }
-              int recovered = resp.get() == null ? 0 : resp.get().getRecoveredCount();
+              if (resp == null) throw new IllegalStateException("Buffered VDU recovery has no outcome");
+              int recovered = resp.getRecoveredCount();
               if (recovered > 0) {
                 mutatedLucene = true;
               }
@@ -610,100 +1085,20 @@ public final class KnowledgeServerMigrationOps {
               int pageCount = node.path("page_count").asInt(0);
               int outcomeNum = node.path("outcome").asInt(0);
 
-              io.justsearch.ipc.VduUpdateOutcome outcome =
-                  io.justsearch.ipc.VduUpdateOutcome.forNumber(outcomeNum);
-              if (outcome == null
-                  || outcome == io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED) {
-                if ("FAILED".equalsIgnoreCase(vduStatus)) {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED;
-                } else if ("COMPLETED_EMPTY".equalsIgnoreCase(vduStatus)) {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY;
-                } else if (hasExtracted && extracted != null && !extracted.isBlank()) {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT;
-                } else {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY;
-                }
-              }
-
-              Map<String, Object> updates = new HashMap<>();
-
-              switch (outcome) {
-                case VDU_UPDATE_OUTCOME_SUCCESS_TEXT -> {
-                  if (extracted != null && !extracted.isBlank()) {
-                    String preview =
-                        io.justsearch.indexerworker.services.LanguageUtils.contentPreview(extracted, 4096);
-                    updates.put(SchemaFields.CONTENT, extracted);
-                    // Tempdoc 931 §C.6: the content revision moves with the content it describes.
-                    updates.put(
-                        SchemaFields.CONTENT_SHA256,
-                        io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(extracted));
-                    updates.put(SchemaFields.CONTENT_PREVIEW, preview);
-                    updates.put(
-                        SchemaFields.LANGUAGE,
-                        io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage(preview));
-                    updates.put(SchemaFields.VDU_PROCESSED, "true");
-                    updates.put(SchemaFields.VDU_STATUS, "COMPLETED");
-                    updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-                  } else {
-                    updates.put(SchemaFields.VDU_STATUS, "COMPLETED_EMPTY");
-                    updates.put(SchemaFields.VDU_PROCESSED, "true");
-                  }
-                }
-                case VDU_UPDATE_OUTCOME_SUCCESS_EMPTY -> {
-                  updates.put(SchemaFields.VDU_STATUS, "COMPLETED_EMPTY");
-                  updates.put(SchemaFields.VDU_PROCESSED, "true");
-                }
-                case VDU_UPDATE_OUTCOME_FAILED -> {
-                  updates.put(SchemaFields.VDU_STATUS, "FAILED");
-                  updates.put(SchemaFields.VDU_PROCESSED, "true");
-                }
-                default -> {
-                  if (!vduStatus.isBlank()) {
-                    updates.put(SchemaFields.VDU_STATUS, vduStatus);
-                  }
-                  updates.put(SchemaFields.VDU_PROCESSED, "true");
-                }
-              }
-
-              if (!enrichment.isBlank()) {
-                updates.put(SchemaFields.VDU_ENRICHMENT, enrichment);
-              }
-              if (pageCount > 0) {
-                updates.put(SchemaFields.VDU_PAGE_COUNT, String.valueOf(pageCount));
-              }
-
-              boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
-              if (!updated) {
+              var request = io.justsearch.ipc.UpdateVduResultRequest.newBuilder()
+                  .setDocId(docId).setVduStatus(vduStatus).setVduEnrichment(enrichment)
+                  .setPageCount(pageCount).setOutcomeValue(outcomeNum);
+              if (hasExtracted && extracted != null) request.setExtractedContent(extracted);
+              boolean updated = io.justsearch.indexerworker.services.VduResultWriter.apply(
+                  context.ingestLifecycle(), request.build(),
+                  context.chunkSpladeEnabledSupplier().getAsBoolean());
+              if (updated) {
+                mutatedLucene = true;
+                context.log().debug("Replayed buffered VDU_UPDATE: docId={}", docId);
+              } else {
+                allApplied = false;
                 context.log().warn("Buffered VDU_UPDATE: document not found: {}", docId);
-              } else if (outcome == io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT
-                  && extracted != null
-                  && !extracted.isBlank()) {
-                try {
-                  int chunksRegenerated =
-                      ChunkDocumentWriter.regenerateChunksFromExistingParent(
-                          context.ingestLifecycle().documentFieldOps(),
-                          context.ingestLifecycle().indexingCoordinator(),
-                          docId, extracted,
-                          context.chunkSpladeEnabledSupplier().getAsBoolean());
-                  if (chunksRegenerated > 0) {
-                    context
-                        .log()
-                        .debug(
-                            "Buffered VDU_UPDATE: regenerated {} chunks for {}",
-                            chunksRegenerated,
-                            docId);
-                  }
-                } catch (Exception ce) {
-                  context
-                      .log()
-                      .warn(
-                          "Buffered VDU_UPDATE: chunk regeneration failed for {}: {}",
-                          docId,
-                          ce.getMessage());
-                }
               }
-              mutatedLucene = true;
-              context.log().debug("Replayed buffered VDU_UPDATE: docId={} outcome={}", docId, outcome);
             } catch (Exception e) {
               allApplied = false;
               context
@@ -713,21 +1108,22 @@ public final class KnowledgeServerMigrationOps {
                       op.key(),
                       e.getMessage());
             }
+          } else {
+            allApplied = false;
           }
         }
         case "SYNC_ROOT" -> {
-          if (context.ingestLifecycle() != null && !payload.isBlank()) {
+          if (context.ingestLifecycle() == null || payload.isBlank()) {
+            allApplied = false;
+          } else {
             try {
-              var node = context.json().readTree(payload);
-              String rootPath = node.path("root_path").asText();
-              boolean force = node.path("force").asBoolean(false);
-              if (rootPath == null || rootPath.isBlank()) {
-                context.log().warn("Buffered SYNC_ROOT missing root_path: key={}", op.key());
-                break;
-              }
+              var buffered = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(payload);
+              String rootPath = buffered.rootPath();
+              boolean force = buffered.force();
+              JobQueue.EnqueueProvenance provenance = buffered.provenance();
 
-              GrpcIngestService tmp =
-                  new GrpcIngestService(
+              WorkerIngestService tmp =
+                  new WorkerIngestService(
                       context.jobQueue(),
                       null,
                       context.signalBus(),
@@ -737,43 +1133,25 @@ public final class KnowledgeServerMigrationOps {
                       context.ingestLifecycle(),
                       null,
                       null,
-                      0L,
-                      null);
+                      0L);
               SyncDirectoryRequest req =
                   SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
 
-              AtomicReference<SyncDirectoryResponse> resp = new AtomicReference<>();
-              AtomicReference<Throwable> err = new AtomicReference<>();
-
-              tmp.syncDirectory(
-                  req,
-                  new StreamObserver<>() {
-                    @Override
-                    public void onNext(SyncDirectoryResponse value) {
-                      resp.set(value);
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                      err.set(t);
-                    }
-
-                    @Override
-                    public void onCompleted() {}
-                  });
-
-              if (err.get() != null) {
+              SyncDirectoryResponse r;
+              try {
+                r = exactRead ? tmp.syncDirectoryForFinalCutoverReplay(req, provenance)
+                    : tmp.syncDirectoryForReplay(req, provenance);
+              } catch (WorkerServiceException wse) {
                 allApplied = false;
                 context
                     .log()
                     .warn(
                         "Failed to replay buffered SYNC_ROOT (will retry later): key={} err={}",
                         op.key(),
-                        err.get().getMessage());
+                        wse.getMessage());
                 break;
               }
 
-              SyncDirectoryResponse r = resp.get();
               if (r != null && !r.getError().isBlank()) {
                 allApplied = false;
                 context
@@ -784,6 +1162,12 @@ public final class KnowledgeServerMigrationOps {
                         r.getError());
               } else {
                 context.log().info("Replayed buffered SYNC_ROOT: root={} force={}", rootPath, force);
+                // Enumeration may enqueue a file that the Green loop has already claimed. A
+                // subsequent direct DELETE_PREFIX must wait for that writer, not merely remove its
+                // queue row while it can still publish a late Lucene write.
+                if (exactRead && !awaitQueuedUpserts(context)) {
+                  return new ReplayOutcome(false, List.of());
+                }
               }
             } catch (Exception e) {
               allApplied = false;
@@ -824,17 +1208,24 @@ public final class KnowledgeServerMigrationOps {
             }
           }
         }
-        default -> context.log().warn("Unknown switch buffer op '{}': key={}", kind, op.key());
+        default -> {
+          allApplied = false;
+          context.log().warn("Unknown switch buffer op '{}': key={}", kind, op.key());
+        }
+      }
+      if (appliedProjection && exactRead && !removeAfterReplay
+          && !firstCandidateProjectionObserved) {
+        firstCandidateProjectionObserved = true;
+        // The harness cut lives after one physical write but before the remaining exact
+        // versions, commit, verification and journal cleanup. Ordinary runs invoke a no-op.
+        firstCandidateProjectionApplied.run();
       }
     }
 
     if (!toEnqueue.isEmpty()) {
-      // 813 Slice B: replayed buffer ops carry only a path — stat for the size (unknown on failure).
-      int enqueued =
-          context
-              .jobQueue()
-              .enqueueEntries(toEnqueue.stream().map(JobQueue.EnqueueEntry::stat).toList());
-      context.log().info("Enqueued {} buffered UPSERT ops back into the job queue", enqueued);
+      allApplied &= enqueueBufferedUpserts(context, toEnqueue)
+          && (!exactRead || (awaitQueuedUpserts(context)
+              && verifyBufferedUpserts(context, toEnqueue)));
     }
 
     if (mutatedLucene && context.ingestLifecycle() != null) {
@@ -855,63 +1246,225 @@ public final class KnowledgeServerMigrationOps {
     }
 
     if (allApplied) {
-      int cleared = sbq.clearSwitchBuffer();
-      context.log().info("Cleared {} buffered ops from durable switch buffer", cleared);
-    } else {
+      allApplied = verifyBufferedProjections(context, ops);
+    }
+
+    if (allApplied && ops.stream().anyMatch(op -> isVduBufferKind(op.op()))
+        && !context.vduReplayAllowed().getAsBoolean()) {
+      allApplied = false;
+      context.log().warn("Serving generation changed during VDU replay; retaining snapshot for retry");
+    }
+    boolean removed = false;
+    if (allApplied && removeAfterReplay) {
+      try {
+        int cleared = sbq.removeReplayedSwitchBufferOps(ops);
+        context.log().info("Removed {} replayed buffer versions; later admissions remain", cleared);
+        removed = cleared == ops.size();
+      } catch (IllegalStateException failure) {
+        context.log().warn("Failed to remove committed buffer versions; retaining for retry", failure);
+      }
+    } else if (!allApplied) {
       context.log().warn("Not clearing switch buffer because one or more buffered ops failed to replay");
+    }
+    return new ReplayOutcome(allApplied && (removed || !removeAfterReplay) && !deferredVdu,
+        allApplied ? ops : List.of());
+  }
+
+  /** A later direct Lucene delete cannot overtake a claimed UPSERT still writing on Green. */
+  private static boolean awaitQueuedUpserts(DrainSwitchBufferContext context) {
+    // All replay barriers consume the same SWITCHING budget. Returning early would re-enqueue
+    // retained UPSERT versions on the next attempt, possibly resetting a claimed write.
+    long deadline = context.deadlineNanos();
+    try {
+      while (true) {
+        JobQueue.JobStateCounts counts = context.jobQueue().jobStateCountsStrict();
+        if (counts.processingCount() == 0 && counts.pendingCount() == 0) return true;
+        if (System.nanoTime() >= deadline) return false;
+        Thread.sleep(50);
+      }
+    } catch (RuntimeException unavailable) {
+      context.log().warn("Cannot certify buffered UPSERT settlement", unavailable);
+      return false;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
     }
   }
 
-  /** Loads watched roots from persisted file + config collections. */
-  public static List<Path> loadWatchedRootsBestEffort(
-      Path dataDir, List<ResolvedConfig.CollectionCfg> collections, ObjectMapper json, Logger log) {
+  private static boolean enqueueBufferedUpserts(DrainSwitchBufferContext context,
+      List<io.justsearch.indexerworker.queue.SwitchBufferUpsert> upserts) {
+    boolean complete = true;
+    int enqueued = 0;
+    for (var upsert : upserts) {
+      try {
+        if (upsert.sourceSha256() != null) {
+          // A scoped file admission already owns a durable queue row and an exact source
+          // witness. Re-enqueueing would mint a new revision and read later filesystem bytes.
+          // The caller waits for that row and verifies Green's indexed source witness.
+          continue;
+        }
+        int accepted = context.jobQueue().enqueueEntries(List.of(upsert.entry()), upsert.collection());
+        enqueued += accepted;
+        if (accepted != 1) complete = false;
+      } catch (RuntimeException unavailable) {
+        complete = false;
+        context.log().warn("Buffered UPSERT enqueue failed; retaining replay versions", unavailable);
+      }
+    }
+    context.log().info("Enqueued {} buffered UPSERT ops back into the job queue", enqueued);
+    return complete;
+  }
+
+  private static boolean verifyBufferedUpserts(DrainSwitchBufferContext context,
+      List<io.justsearch.indexerworker.queue.SwitchBufferUpsert> upserts) {
+    if (context.ingestLifecycle() == null
+        || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
+    for (var upsert : upserts) {
+      if (upsert.sourceSha256() == null) continue; // Historical unscoped cutover payload.
+      boolean settled;
+      String indexed;
+      try {
+        settled = queue.matchesAcceptedFileProjection(
+            upsert.path(), upsert.unitRevision(), upsert.sourceSha256());
+        indexed = context.ingestLifecycle().documentFieldOps()
+            .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256);
+      } catch (RuntimeException unavailable) {
+        context.log().warn("Buffered UPSERT projection evidence is unreadable", unavailable);
+        return false;
+      }
+      if (!settled || !upsert.sourceSha256().equals(indexed)) {
+        context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Candidate journal rows clear only after exact reader-visible projection or absence. */
+  private static boolean verifyBufferedProjections(DrainSwitchBufferContext context,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> ops) {
+    if (ops.stream().noneMatch(op -> "PROJECTION".equalsIgnoreCase(op.op())
+        && !context.approvedGapVersions().contains(op))) return true;
+    if (context.ingestLifecycle() == null) return false;
+    try {
+      context.ingestLifecycle().commitOps().maybeRefreshBlocking();
+      var fields = context.ingestLifecycle().documentFieldOps();
+      for (var op : ops) {
+        if (!"PROJECTION".equalsIgnoreCase(op.op())) continue;
+        if (context.approvedGapVersions().contains(op)) continue;
+        var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(op.payload());
+        if (!projection.journalKey().equals(op.key())) return false;
+        String currentRevision = fields.getDocumentField(
+            projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION);
+        if (currentRevision != null
+            && Long.parseLong(currentRevision) > projection.sourceRevision()) continue;
+        if (projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
+          if (fields.getDocumentField(projection.indexId(), SchemaFields.DOC_ID) != null) return false;
+        } else if (!Long.toString(projection.sourceRevision()).equals(currentRevision)
+            || !projection.sourceId().equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID))
+            || !projection.fieldsDigest().equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_DIGEST))) {
+          return false;
+        }
+      }
+      return true;
+    } catch (RuntimeException unreadable) {
+      context.log().warn("Buffered projection evidence is unreadable; retaining replay versions",
+          unreadable);
+      return false;
+    }
+  }
+
+  private static boolean isVduBufferKind(String kind) {
+    return kind != null && kind.trim().toUpperCase(Locale.ROOT).startsWith("VDU_");
+  }
+
+  /** Loads complete declared coverage; an unreadable source cannot certify an empty migration. */
+  public static List<Path> loadMigrationRoots(
+      Path dataDir, List<ResolvedConfig.CollectionCfg> collections, ObjectMapper json) throws IOException {
     Set<Path> roots = new LinkedHashSet<>();
     Path rootsFile = dataDir.resolve("watched_roots.json");
+    String content;
     try {
-      if (Files.exists(rootsFile)) {
-        String content = Files.readString(rootsFile);
-        if (content.trim().startsWith("{")) {
-          var node = json.readTree(content);
-          var rootsArray = node.get("roots");
-          if (rootsArray != null && rootsArray.isArray()) {
-            for (var entry : rootsArray) {
-              String p = entry.has("path") ? entry.get("path").asText() : null;
-              if (p != null && !p.isBlank()) {
-                roots.add(Path.of(p).toAbsolutePath().normalize());
-              }
-            }
-          }
-        } else {
-          List<String> paths = json.readValue(content, new TypeReference<List<String>>() {});
-          for (String p : paths) {
-            if (p != null && !p.isBlank()) {
-              roots.add(Path.of(p).toAbsolutePath().normalize());
-            }
-          }
+      content = Files.readString(rootsFile);
+    } catch (NoSuchFileException absent) {
+      // A missing registry is valid only when the path itself is absent, not a dangling link.
+      if (!Files.notExists(rootsFile, java.nio.file.LinkOption.NOFOLLOW_LINKS)) throw absent;
+      content = null;
+    }
+    if (content != null) {
+      JsonNode document;
+      try {
+        document = json.readTree(content);
+      } catch (JacksonException malformed) {
+        throw new IOException("Invalid watched-roots JSON", malformed);
+      }
+      boolean object = document != null && document.isObject();
+      if (object) WatchedRootsFormat.requireReadableObject(document);
+      JsonNode entries = object ? document.get("roots") : document;
+      if (entries == null || !entries.isArray()) throw new IOException("Invalid watched-roots array");
+      for (JsonNode entry : entries) {
+        JsonNode path = object ? entry.get("path") : entry;
+        if (path == null || !path.isString() || path.asText().isBlank()) {
+          throw new IOException("Invalid watched-roots path");
+        }
+        roots.add(Path.of(path.asText()).toAbsolutePath().normalize());
+      }
+    }
+    if (collections != null) {
+      for (ResolvedConfig.CollectionCfg collection : collections) {
+        for (Path root : collection.roots()) {
+          if (root == null) throw new IOException("Null configured migration root");
+          roots.add(root.toAbsolutePath().normalize());
         }
       }
-    } catch (Exception e) {
-      log.warn("Failed to read watched_roots.json (falling back to config roots): {}", e.getMessage());
     }
-    try {
-      if (collections != null) {
-        for (ResolvedConfig.CollectionCfg c : collections) {
-          for (Path r : c.roots()) {
-            if (r != null) {
-              roots.add(r.toAbsolutePath().normalize());
-            }
-          }
-        }
+    for (Path root : roots) requireMigrationRoot(root);
+    return List.copyOf(roots);
+  }
+
+  private static void requireMigrationRoot(Path root) throws IOException {
+    if (root == null) throw new IOException("Null migration root");
+    BasicFileAttributes attributes = Files.readAttributes(root, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+    if ((!attributes.isDirectory() && !attributes.isRegularFile()) || !Files.isReadable(root)) {
+      throw new IOException("Unreadable migration root: " + root);
+    }
+  }
+
+  private static void requireEnumerationRunning(EnqueueContext context) throws IOException {
+    if (Thread.currentThread().isInterrupted() || !context.runningSupplier().getAsBoolean()) {
+      throw new IOException("Migration enumeration stopped before complete coverage");
+    }
+  }
+
+  private static int acceptMigrationBatch(EnqueueContext context, List<JobQueue.EnqueueEntry> batch)
+      throws IOException {
+    requireEnumerationRunning(context);
+    IndexGenerationManager manager = context.indexGenerationManagerSupplier().get();
+    int accepted;
+    if (manager == null) {
+      // Lightweight enumeration callers without a generation owner retain the ordinary queue
+      // seam. A live migration always supplies its manager and must record the exact candidate.
+      accepted = context.jobQueue().enqueueEntries(batch);
+    } else {
+      IndexGenerationManager.State state = manager.readStateBestEffort();
+      if (state == null || state.building_generation() == null
+          || !(context.jobQueue() instanceof SwitchBufferCapableQueue scoped)) {
+        throw new IOException("Migration enumeration has no atomic candidate admission");
       }
-    } catch (Exception e) {
-      log.warn("Failed to enumerate config roots", e);
+      accepted = scoped.enqueueEnumeratedFilesForGeneration(state.building_generation(), batch);
     }
-    return roots.stream().filter(Files::isDirectory).toList();
+    context.migrationEnumeratorFilesEnqueued().addAndGet(accepted);
+    if (accepted != batch.size()) throw new IOException("Incomplete migration batch admission");
+    batch.clear();
+    return accepted;
   }
 
   public static int enqueueAllFilesUnderRoots(EnqueueContext context) throws IOException {
-    if (context.jobQueue() == null || context.roots() == null || context.roots().isEmpty()) {
-      return 0;
+    requireEnumerationRunning(context);
+    if (context.jobQueue() == null || context.roots() == null) {
+      throw new IOException("Missing migration queue or roots");
     }
     int total = 0;
     int batchSize = 2_000;
@@ -919,9 +1472,7 @@ public final class KnowledgeServerMigrationOps {
     long lastPersistMs = 0L;
 
     for (Path root : context.roots()) {
-      if (Thread.currentThread().isInterrupted()) {
-        break;
-      }
+      requireEnumerationRunning(context);
       while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
         IndexGenerationManager manager = context.indexGenerationManagerSupplier().get();
         IndexGenerationManager.State state = manager == null ? null : manager.readStateBestEffort();
@@ -935,16 +1486,18 @@ public final class KnowledgeServerMigrationOps {
           break;
         }
       }
-      if (root == null || !Files.isDirectory(root)) {
-        continue;
-      }
+      requireEnumerationRunning(context);
+      requireMigrationRoot(root);
       context.log().info("Migration enumerator scanning root: {}", root);
       try (Stream<Path> walk = Files.walk(root)) {
-        var iterator = walk.filter(Files::isRegularFile).filter(Files::isReadable).iterator();
+        var iterator = walk.iterator();
         while (iterator.hasNext()) {
           Path path = iterator.next();
-          if (Thread.currentThread().isInterrupted()) {
-            break;
+          requireEnumerationRunning(context);
+          BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+          if (attributes.isDirectory()) continue;
+          if (!attributes.isRegularFile() || !Files.isReadable(path)) {
+            throw new IOException("Unreadable migration file: " + path);
           }
           context.migrationEnumeratorFilesSeen().incrementAndGet();
           try {
@@ -977,25 +1530,15 @@ public final class KnowledgeServerMigrationOps {
             }
           }
 
-          // 813 Slice B: this walk is a Stream, not a visitor, so no BasicFileAttributes are in
-          // hand — stat for the size (unknown on failure).
-          batch.add(JobQueue.EnqueueEntry.stat(path));
+          requireEnumerationRunning(context);
+          batch.add(new JobQueue.EnqueueEntry(path, attributes.size()));
           if (batch.size() >= batchSize) {
-            int enqueued = context.jobQueue().enqueueEntries(batch);
-            total += enqueued;
-            context.migrationEnumeratorFilesEnqueued().addAndGet(enqueued);
-            batch.clear();
+            total += acceptMigrationBatch(context, batch);
           }
         }
-      } catch (Exception e) {
-        context.log().warn("Migration enumerator failed walking {}: {}", root, e.getMessage());
       }
-      if (!batch.isEmpty()) {
-        int enqueued = context.jobQueue().enqueueEntries(batch);
-        total += enqueued;
-        context.migrationEnumeratorFilesEnqueued().addAndGet(enqueued);
-        batch.clear();
-      }
+      if (!batch.isEmpty()) total += acceptMigrationBatch(context, batch);
+      requireEnumerationRunning(context);
       context.migrationEnumeratorRootsDone().incrementAndGet();
 
       MigrationProgressStore store = context.migrationProgressStoreSupplier().get();
@@ -1012,6 +1555,7 @@ public final class KnowledgeServerMigrationOps {
     if (store != null) {
       persistMigrationProgressSnapshot(context, store);
     }
+    requireEnumerationRunning(context);
     return total;
   }
 

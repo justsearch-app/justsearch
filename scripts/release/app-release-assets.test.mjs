@@ -96,6 +96,55 @@ test('build and verify a closed descriptor/latest/artifact set', async () => {
   assert.equal(verified.descriptor.artifact.keyId, 'artifact-2026-01');
 });
 
+test('compatibility baseline preserves the frozen strategy while version 4 reads version 1', async () => {
+  const f = await fixture();
+  const register = JSON.parse(await readFile(f.compatibilityRegisterPath, 'utf8'));
+  register.durableStores[0].reconciliation = 'READ_V0_OR_V1_AND_WRITE_V1';
+  const compatibilityBaselinePath = path.join(path.dirname(f.outDir), 'baseline.json');
+  await writeFile(compatibilityBaselinePath, JSON.stringify(register));
+  register.durableStores[0].currentVersion = 4;
+  register.durableStores[0].readableLegacyVersions = [0, 1, 2, 3];
+  register.durableStores.push({ ...register.durableStores[0], id: 'operations-db' });
+  await writeFile(f.compatibilityRegisterPath, JSON.stringify(register));
+  const { descriptor } = await buildReleaseAssets({
+    ...f,
+    compatibilityBaselinePath,
+    version: '1.2.3',
+    sequence: 42,
+    installerUrl: 'https://example.invalid/JustSearch-setup.exe',
+    artifactKeyId: 'artifact-2026-01',
+    artifactPublicKey: TAURI_PUBLIC_KEY,
+    metadataKeyId: 'metadata-2026-01',
+  });
+  assert.deepEqual(descriptor.compatibility.map((row) => row.ownerId), ['preferences']);
+  assert.equal(descriptor.compatibility[0].formatVersion, 4);
+  assert.deepEqual(descriptor.compatibility[0].readableSourceVersions, [0, 1, 2, 3, 4]);
+  assert.equal(descriptor.compatibility[0].reconciliationStrategy,
+    'READ_V0_OR_V1_AND_WRITE_V1');
+  await verifyReleaseAssets({ ...f, releaseDir: f.outDir });
+});
+
+for (const field of ['owner', 'recoverability', 'reconciliation']) {
+  test(`compatibility baseline refuses changed ${field}`, async () => {
+    const f = await fixture();
+    const register = JSON.parse(await readFile(f.compatibilityRegisterPath, 'utf8'));
+    const compatibilityBaselinePath = path.join(path.dirname(f.outDir), 'baseline.json');
+    await writeFile(compatibilityBaselinePath, JSON.stringify(register));
+    register.durableStores[0][field] = 'CHANGED';
+    await writeFile(f.compatibilityRegisterPath, JSON.stringify(register));
+    await assert.rejects(buildReleaseAssets({
+      ...f,
+      compatibilityBaselinePath,
+      version: '1.2.3',
+      sequence: 42,
+      installerUrl: 'https://example.invalid/JustSearch-setup.exe',
+      artifactKeyId: 'artifact-2026-01',
+      artifactPublicKey: TAURI_PUBLIC_KEY,
+      metadataKeyId: 'metadata-2026-01',
+    }), /baseline.*preferences.*identity/);
+  });
+}
+
 test('tampered descriptor fails metadata verification', async () => {
   const f = await fixture();
   await buildReleaseAssets({

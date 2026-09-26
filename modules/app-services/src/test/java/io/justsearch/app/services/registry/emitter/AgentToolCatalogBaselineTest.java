@@ -21,6 +21,7 @@ import io.justsearch.agent.api.registry.ResourceRef;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
+import io.justsearch.core.context.EngineContext;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -189,7 +190,9 @@ final class AgentToolCatalogBaselineTest {
                 RetryPolicy.noRetry(),
                 Set.of(),
                 false)
-            .withCapabilityFamily("file-operations"),
+            .withCapabilityFamily("file-operations")
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.INGEST)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         Set.of(ExecutorTag.AGENT),
         Audience.USER,
         new OperationLineage(Set.of(new ResourceRef("core.indexing-jobs")), Set.of()),

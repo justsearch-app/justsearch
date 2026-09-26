@@ -7,6 +7,7 @@ import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import io.justsearch.ort.OnnxSessionCache;
 import io.justsearch.ort.OrtCudaStatus;
+import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import java.io.Closeable;
 import java.nio.LongBuffer;
@@ -147,7 +148,8 @@ public final class CitationScorer implements Closeable {
 
       try {
         BestOf best =
-            scoreSentence(chunksArray, deadlineNanos, sub -> scoreSentenceAgainstChunks(sentence, sub));
+            scoreSentence(chunksArray, deadlineNanos,
+                sub -> scoreSentenceAgainstChunks(sentence, sub, deadlineNanos));
         if (!best.complete()) {
           // The deadline cut this sentence's sweep short. It is NOT reported as scored, and it
           // mints no match: a partial sweep's "best" is the best of an arbitrary prefix of the
@@ -245,7 +247,8 @@ public final class CitationScorer implements Closeable {
    *
    * <p>Mirrors the reranker pattern: one query (sentence) scored against N documents (chunks).
    */
-  private List<Float> scoreSentenceAgainstChunks(String sentence, String[] chunks)
+  private List<Float> scoreSentenceAgainstChunks(String sentence, String[] chunks,
+      long deadlineNanos)
       throws OrtException {
 
     RerankerTokenizer.EncodedBatch batch = tokenizer.encodePairsStrict(sentence, chunks);
@@ -270,7 +273,12 @@ public final class CitationScorer implements Closeable {
         inputs.put("token_type_ids", tokenTypeIdsTensor);
       }
 
-      try (var lease = sessions.acquire()) {
+      long acquisitionDeadline = deadlineNanos == Long.MAX_VALUE
+          ? System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30)
+          : deadlineNanos;
+      var acquisition = new SessionAcquisitionRequest(
+          SessionAcquisitionRequest.Urgency.FOREGROUND, acquisitionDeadline, () -> false);
+      try (var lease = sessions.acquire(acquisition)) {
         // Tempdoc 710 Move 2: lease.run() is the ORT choke point — records elapsed time via
         // the recorder bound by the composition root (InferenceCompositionRoot).
         try (OrtSession.Result result = lease.run(inputs)) {

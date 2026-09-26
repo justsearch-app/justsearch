@@ -6,6 +6,7 @@ import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
 import io.justsearch.ort.ModelManifest;
 import io.justsearch.ort.OrtCudaStatus;
@@ -109,6 +110,16 @@ public final class BertNerInference implements Closeable {
   public static NerAssembly buildAssembly(
       SessionHandle sessions, Path modelDir, int maxSequenceLength, boolean capabilityContractStrict)
       throws OrtException {
+    return buildAssembly(sessions, modelDir, maxSequenceLength, capabilityContractStrict, null);
+  }
+
+  /** Uses the generation's exact ONNX file for probing, with metadata from its own directory. */
+  public static NerAssembly buildAssembly(
+      SessionHandle sessions, Path modelDir, int maxSequenceLength,
+      boolean capabilityContractStrict, Path exactModelFile) throws OrtException {
+    if (exactModelFile != null && !modelDir.equals(exactModelFile.getParent())) {
+      throw new IllegalArgumentException("NER model file and metadata directory differ");
+    }
     ModelManifest manifest = ModelManifest.loadOrDefault(modelDir);
     Path tokenizerPath = modelDir.resolve(manifest.tokenizer());
     HuggingFaceTokenizer tokenizer;
@@ -141,7 +152,8 @@ public final class BertNerInference implements Closeable {
     // matches alpha.16 Bug C (EmbeddingFingerprint), alpha.19 Bug J-2 (OnnxModelDiscovery
     // fp16 fallback), alpha.20 Bug L (EmbeddingFingerprint cold-restart). Migration now
     // complete across all known encoder sites.
-    Path probePath = manifest.resolveExistingModelFile(modelDir);
+    Path probePath = exactModelFile != null ? exactModelFile
+        : manifest.resolveExistingModelFile(modelDir);
     io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
         io.justsearch.ort.OrtSessionAssembler.probeModelNames(sessions.environment(), probePath);
     boolean needsTokenTypeIds = probed.inputs().contains("token_type_ids");
@@ -204,7 +216,7 @@ public final class BertNerInference implements Closeable {
 
     long[] shape = {1, seqLen};
 
-    try (var lease = sessions.acquire()) {
+    try (var lease = sessions.acquire(LocalSessionAcquisition.foreground())) {
       try (OnnxTensor inputIdsTensor =
               OnnxTensor.createTensor(sessions.environment(), LongBuffer.wrap(inputIds), shape);
           OnnxTensor attentionMaskTensor =
@@ -330,6 +342,8 @@ public final class BertNerInference implements Closeable {
       return List.of(infer(texts.get(0)));
     }
 
+    var acquisition = LocalSessionAcquisition.background();
+
     // Tokenize in memory-bounded groups (tempdoc 686/710 crash-fix port — see
     // TOKENIZE_GROUP_CHAR_BUDGET). Groups are processed in original order and written into the
     // same per-index arrays a single upfront scan would have produced, so grouping changes only
@@ -399,7 +413,7 @@ public final class BertNerInference implements Closeable {
 
       long[] shape = {batchSize, padLen};
 
-      try (var lease = sessions.acquire()) {
+      try (var lease = sessions.acquire(acquisition)) {
         try (OnnxTensor inputIdsTensor =
                 OnnxTensor.createTensor(sessions.environment(), LongBuffer.wrap(flatIds), shape);
             OnnxTensor attentionMaskTensor =

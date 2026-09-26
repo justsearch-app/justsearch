@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -43,6 +44,29 @@ import org.slf4j.LoggerFactory;
 // PERMANENT COMPAT - DO NOT REMOVE (generation layout is an on-disk contract)
 public final class IndexGenerationManager {
   private static final Logger log = LoggerFactory.getLogger(IndexGenerationManager.class);
+  // Several manager instances share one Engine's generation pointers. Serialize control and
+  // fallback repair without a persistent lock or an alias-sensitive/unbounded path registry.
+  private static final java.util.concurrent.locks.ReentrantLock STATE_CONTROL =
+      new java.util.concurrent.locks.ReentrantLock();
+
+  private static StateControlGuard stateControl() {
+    STATE_CONTROL.lock();
+    return new StateControlGuard();
+  }
+
+  private static final class StateControlGuard implements AutoCloseable {
+    private boolean released;
+
+    @Override public void close() {
+      if (released) return;
+      STATE_CONTROL.unlock();
+      released = true;
+    }
+  }
+  private static final ObjectMapper RECORDED_JSON = JsonMapper.builder()
+      .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+      .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+      .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
   private static final ObjectMapper JSON =
       JsonMapper.builder()
           .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
@@ -54,6 +78,9 @@ public final class IndexGenerationManager {
 
   private static final int STATE_FORMAT_VERSION = 2;
   private static final int MANIFEST_FORMAT_VERSION = 1;
+  private static final int PROJECTION_MANIFEST_FORMAT_VERSION = 2;
+  private static final int RECORDED_MANIFEST_FORMAT_VERSION = 2;
+  private static final int RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION = 3;
 
   private static final String STATE_FILE = "state.json";
   private static final String STATE_TMP_FILE = "state.json.tmp";
@@ -102,6 +129,7 @@ public final class IndexGenerationManager {
     IDLE,
     MIGRATING,
     SWITCHING,
+    AWAITING_ACCEPTANCE,
     FAILED
   }
 
@@ -110,26 +138,147 @@ public final class IndexGenerationManager {
       int format_version,
       String generation_id,
       String source,
-      long created_at_ms) {}
+      long created_at_ms,
+      String target_index_fingerprint,
+      @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, ModelArtifact> models,
+      @JsonInclude(JsonInclude.Include.NON_NULL) String sparse_model,
+      @JsonInclude(JsonInclude.Include.NON_NULL) Integer vector_dimension,
+      @JsonInclude(JsonInclude.Include.NON_NULL) List<String> projection_source_ids) {
+    public GenerationManifest {
+      models = models == null ? Map.of() : Map.copyOf(models);
+      projection_source_ids = projection_source_ids == null ? null
+          : checkedProjectionSourceIds(projection_source_ids);
+      if (models.size() > 128 || models.keySet().stream().anyMatch(role ->
+          !role.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}"))) {
+        throw new IllegalArgumentException("Invalid generation model roles");
+      }
+      if (sparse_model != null && !sparse_model.matches("[a-z0-9-]{1,64}")) {
+        throw new IllegalArgumentException("Invalid generation sparse model mode");
+      }
+      if (vector_dimension != null && (vector_dimension <= 0 || vector_dimension > 16_384)) {
+        throw new IllegalArgumentException("Invalid generation vector dimension");
+      }
+    }
+
+    public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs) {
+      this(formatVersion, generationId, source, createdAtMs, null, Map.of(), null, null, null);
+    }
+
+    public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs,
+        String targetIndexFingerprint) {
+      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, Map.of(), null, null, null);
+    }
+
+    public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs,
+        String targetIndexFingerprint, Map<String, ModelArtifact> models) {
+      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, models, null, null, null);
+    }
+
+    public GenerationManifest(int formatVersion, String generationId, String source, long createdAtMs,
+        String targetIndexFingerprint, Map<String, ModelArtifact> models, String sparseModel,
+        Integer vectorDimension) {
+      this(formatVersion, generationId, source, createdAtMs, targetIndexFingerprint, models,
+          sparseModel, vectorDimension, null);
+    }
+  }
+
+  /** The explicit source set is a bounded, canonical generation identity. Null means legacy. */
+  public static List<String> checkedProjectionSourceIds(List<String> sourceIds) {
+    Objects.requireNonNull(sourceIds, "projection source IDs");
+    if (sourceIds.size() > 64) throw new IllegalArgumentException("Too many projection sources");
+    var ordered = new ArrayList<String>(sourceIds);
+    int totalLength = 0;
+    for (String id : ordered) {
+      if (id == null || id.isBlank() || id.length() > 256
+          || id.chars().anyMatch(Character::isISOControl)) {
+        throw new IllegalArgumentException("Invalid projection source identity");
+      }
+      totalLength += id.length();
+    }
+    if (totalLength > 4_096) {
+      throw new IllegalArgumentException("Projection sources exceed manifest budget");
+    }
+    ordered.sort(String::compareTo);
+    if (Set.copyOf(ordered).size() != ordered.size()) {
+      throw new IllegalArgumentException("Duplicate projection source identity");
+    }
+    return List.copyOf(ordered);
+  }
+
+  /** Exact installed file selected for one encoder role in a generation. */
+  public record ModelArtifact(String id, String sha256) {
+    public ModelArtifact {
+      Path selected;
+      try {
+        selected = Path.of(id);
+      } catch (java.nio.file.InvalidPathException | NullPointerException invalid) {
+        throw new IllegalArgumentException("Invalid generation model artifact path", invalid);
+      }
+      if (!selected.isAbsolute() || !selected.normalize().toString().equals(id)
+          || sha256 == null || !sha256.matches("[0-9a-f]{64}")) {
+        throw new IllegalArgumentException("Invalid generation model artifact identity");
+      }
+    }
+  }
 
   private final Path basePath;
   private final Path indicesDir;
   private final Path statePath;
   private final Path stateTmpPath;
   private final Path statePrevPath;
+  private final StateMoveProbe stateMoveProbe;
+
+  @FunctionalInterface
+  interface StateMoveProbe {
+    void afterMove(State state) throws IOException;
+  }
 
   // Read-cache for readStateBestEffort(): avoids re-parsing state.json on every RPC when nothing has
   // changed. The cached State is published atomically through ONE volatile reference, so a reader on
   // a gRPC handler thread can never observe a torn version/state pair while a migration thread writes;
   // writeState() invalidates by nulling it. (tempdoc 589 — replaces a non-volatile lastReadVersion +
   // a non-atomic stateVersion++ counter, which together formed a data race.)
+  //
+  // Lane F stage A item A12: the cache also carries a stamp identifying the state.json revision it
+  // was parsed from, and a hit is only a hit while that stamp still matches. Invalidating on THIS
+  // instance's own writes is not enough, because one state.json has several managers over it in one
+  // JVM — KnowledgeServer builds one (KnowledgeServer.java:611) for the migration enumerator and the
+  // cutover monitor, WorkerIngestService builds its own from the same indexBasePath
+  // (WorkerIngestService.java:177) for the migration control calls, and the switch-buffer replay
+  // builds two more temporaries (KnowledgeServerMigrationOps.java:542, :718). A write through one
+  // left every other instance serving its own stale parse forever. The concrete defect that found
+  // this: `resumeMigration` wrote through the service's manager, the enumerator kept reading
+  // `migration_paused=true` out of the server's manager, and the migration never resumed.
+  //
+  // The stamp is a CONTENT HASH, not (mtime, size). The review pass caught that pair colliding on
+  // precisely the writes this cache has to notice: state.json's fields are mostly fixed-width, so
+  // an active/previous generation-id swap, a migration_state transition between two equal-length
+  // names, or a `migration_paused` true->... flip through a rewrite lands at the SAME byte length,
+  // and two writes inside one filesystem timestamp tick then produce the same (mtime, size) for
+  // different content. Windows makes that likely rather than theoretical — NTFS updates the
+  // last-write time lazily, so back-to-back writes routinely share a stamp. A collision here is not
+  // a missed refresh; it is the stale read the stamp exists to prevent, restored silently. Hashing
+  // the bytes has no such window. It costs a read of a file measured in hundreds of bytes plus one
+  // SHA-256 where the miss costs a full Jackson parse, so the cache still does the job tempdoc 589
+  // gave it.
   private volatile CachedState cache = null;
 
-  /** Atomically-published read-cache entry; only PRESENT states are cached (null == "re-read"). */
-  private record CachedState(State value) {}
+  /**
+   * Atomically-published read-cache entry; only PRESENT states are cached (null == "re-read").
+   *
+   * @param value the parsed, normalized state
+   * @param contentHash hex SHA-256 of the state.json bytes it was parsed from, or {@code null} if
+   *     the file was unreadable at that moment
+   */
+  private record CachedState(State value, String contentHash) {}
 
   public IndexGenerationManager(Path indexBasePath) {
+    this(indexBasePath, ignored -> {});
+  }
+
+  IndexGenerationManager(Path indexBasePath, StateMoveProbe stateMoveProbe) {
     this.basePath = normalize(Objects.requireNonNull(indexBasePath, "indexBasePath"));
+    this.stateMoveProbe = Objects.requireNonNull(stateMoveProbe, "stateMoveProbe");
     if (this.basePath.getParent() == null) {
       throw new IllegalArgumentException(
           "indexBasePath must not be a filesystem root: " + this.basePath);
@@ -152,24 +301,229 @@ public final class IndexGenerationManager {
    * </ul>
    */
   public IndexLayout initializeOrLoad() throws IOException {
-    Files.createDirectories(basePath);
+    try (var ignored = stateControl()) {
+      Files.createDirectories(basePath);
 
-    State state = loadStateBestEffort();
-    if (state != null) {
-      return resolveFromState(state);
+      State state = loadStateBestEffort();
+      if (state != null) {
+        return resolveFromState(state);
+      }
+
+      // No state.json: decide between legacy import, adoption, or new generation.
+      if (looksLikeLegacyIndexInBasePath(basePath)) {
+        return importLegacyIndex();
+      }
+
+      IndexLayout adopted = tryAdoptSingleExistingGeneration();
+      if (adopted != null) {
+        return adopted;
+      }
+
+      return createFreshGeneration("new");
     }
+  }
 
-    // No state.json: decide between legacy import, adoption, or new generation.
-    if (looksLikeLegacyIndexInBasePath(basePath)) {
-      return importLegacyIndex();
+  /** One application-owned boot observation, projected before any generation repair or allocation. */
+  public sealed interface BootOwnership {
+    record Native() implements BootOwnership {}
+    record Fenced() implements BootOwnership {}
+    record Recorded(String operationKey, String sourceGeneration, String source,
+        String targetFingerprint, boolean captureComplete, boolean continuationAuthorized,
+        List<String> projectionSourceIds)
+        implements BootOwnership {
+      public Recorded(String operationKey, String sourceGeneration, String source,
+          String targetFingerprint, boolean captureComplete) {
+        this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete, true, null);
+      }
+      public Recorded(String operationKey, String sourceGeneration, String source,
+          String targetFingerprint, boolean captureComplete, boolean continuationAuthorized) {
+        this(operationKey, sourceGeneration, source, targetFingerprint, captureComplete,
+            continuationAuthorized, null);
+      }
+      public Recorded {
+        Objects.requireNonNull(operationKey, "operationKey");
+        Objects.requireNonNull(sourceGeneration, "sourceGeneration");
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(targetFingerprint, "targetFingerprint");
+        projectionSourceIds = projectionSourceIds == null ? null
+            : checkedProjectionSourceIds(projectionSourceIds);
+      }
     }
+  }
 
-    IndexLayout adopted = tryAdoptSingleExistingGeneration();
-    if (adopted != null) {
-      return adopted;
+  public enum BootDisposition { NATIVE, CAPTURING, BUILDING, PROMOTED, FENCED }
+
+  /** Runtime observation only; no second persisted generation state. */
+  public record BootLayout(IndexLayout layout, BootDisposition disposition) {}
+
+  /**
+   * Resolve boot ownership before native fallback, import, adoption or normalization can write.
+   * Recorded/fenced layouts are read-only observations; callers must honor their disposition.
+   */
+  public BootLayout initializeForBoot(BootOwnership ownership, String effectiveFingerprint) throws IOException {
+    Objects.requireNonNull(ownership, "ownership");
+    try (var ignored = stateControl()) {
+      if (ownership instanceof BootOwnership.Native) {
+        State observed = null;
+        try { observed = readRecordedState(); }
+        catch (IOException unreadable) {
+          if (hasRecordedFallbackEvidence()) throw unreadable;
+        }
+        if (observed != null && isRecordedIdentity(observed.active_generation())) {
+          boolean noBuilding = observed.building_generation() == null || observed.building_generation().isBlank();
+          boolean nativeMigration = !noBuilding && !isRecordedIdentity(observed.building_generation())
+              && observed.migration_state() != null && Set.of("MIGRATING", "SWITCHING", "AWAITING_ACCEPTANCE", "FAILED").contains(observed.migration_state());
+          boolean completed = noBuilding && MigrationState.IDLE.name().equals(observed.migration_state());
+          if (observed.format_version() != STATE_FORMAT_VERSION || !completed && !nativeMigration) {
+            return new BootLayout(strictBootLayout(observed), BootDisposition.FENCED);
+          }
+        }
+        if (observed == null || !isRecordedIdentity(observed.building_generation())
+            && !hasPristineRecordedOrphan(observed)) {
+          return new BootLayout(initializeOrLoad(), BootDisposition.NATIVE);
+        }
+        return new BootLayout(strictBootLayout(observed), BootDisposition.FENCED);
+      }
+      IndexLayout layout = strictBootLayout(readRecordedState());
+      if (ownership instanceof BootOwnership.Fenced) {
+        return new BootLayout(layout, BootDisposition.FENCED);
+      }
+      var recorded = (BootOwnership.Recorded) ownership;
+      String target = recordedGenerationId(recorded.operationKey());
+      State state = layout.state();
+      String building = state.building_generation();
+      boolean idle = MigrationState.IDLE.name().equals(state.migration_state())
+          && (building == null || building.isBlank());
+      if (!recorded.targetFingerprint().matches("[0-9a-f]{64}")
+          || !recorded.targetFingerprint().equals(effectiveFingerprint)) {
+        return new BootLayout(layout, BootDisposition.FENCED);
+      }
+      if (idle && target.equals(layout.activeGenerationId())) {
+        requireRecordedGeneration(layout.activeGenerationPath(), target, recorded.source(),
+            recorded.targetFingerprint(), false, true, recorded.projectionSourceIds());
+        return new BootLayout(layout, recorded.captureComplete()
+            && recorded.sourceGeneration().equals(state.previous_generation())
+            ? BootDisposition.PROMOTED : BootDisposition.FENCED);
+      }
+      if (!recorded.continuationAuthorized()) return new BootLayout(layout, BootDisposition.FENCED);
+      if (!recorded.sourceGeneration().equals(layout.activeGenerationId())) {
+        return new BootLayout(layout, BootDisposition.FENCED);
+      }
+      if (idle) return new BootLayout(layout, BootDisposition.CAPTURING);
+      if (target.equals(building) && recorded.captureComplete()
+          && (MigrationState.MIGRATING.name().equals(state.migration_state())
+              || MigrationState.SWITCHING.name().equals(state.migration_state())
+              || MigrationState.AWAITING_ACCEPTANCE.name().equals(state.migration_state()))) {
+        requireRecordedGeneration(resolveGenerationPathReadOnly(target), target, recorded.source(),
+            recorded.targetFingerprint(), false, true, recorded.projectionSourceIds());
+        return new BootLayout(layout, BootDisposition.BUILDING);
+      }
+      return new BootLayout(layout, BootDisposition.FENCED);
     }
+  }
 
-    return createFreshGeneration("new");
+  private State readRecordedState() throws IOException {
+    try {
+      State state = RECORDED_JSON.readValue(
+          io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePath), State.class);
+      if (state == null) throw new IOException("Authoritative generation state is empty");
+      return state;
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Authoritative generation state is invalid", malformed);
+    }
+  }
+
+  private IndexLayout strictBootLayout(State state) throws IOException {
+    if (state.format_version() != STATE_FORMAT_VERSION) {
+      throw new IOException("Recorded boot requires current generation state format");
+    }
+    String active = requireSafeGenerationId(state.active_generation(), "state.json active_generation");
+    try { MigrationState.valueOf(state.migration_state()); }
+    catch (IllegalArgumentException | NullPointerException invalid) {
+      throw new IOException("Authoritative generation phase is invalid", invalid);
+    }
+    if (active.equals(state.building_generation())) {
+      throw new IOException("Serving and building generation identities must be distinct");
+    }
+    Path activePath = resolveGenerationPathReadOnly(active);
+    if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || !Files.isDirectory(activePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Authoritative active generation directory is unavailable");
+    }
+    return new IndexLayout(basePath, indicesDir, statePath, state, active, activePath);
+  }
+
+  /**
+   * Inspects the current generation pointer for boot recovery without repairing it.
+   *
+   * <p>An absent {@code state.json} is represented by {@link java.util.Optional#empty()} so a
+   * caller can distinguish a store that has never published state from a damaged store. A present
+   * but malformed or structurally invalid state is reported as {@link IOException}; {@code
+   * state.json.prev} is never consulted and no directory or state file is created or rewritten.
+   * When present and valid, the returned layout has passed the same current-format, pointer and
+   * active-directory checks used by strict recorded boot recovery.
+   */
+  public java.util.Optional<IndexLayout> inspectCurrentLayoutForBoot() throws IOException {
+    try (var ignored = stateControl()) {
+      if (Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        return java.util.Optional.empty();
+      }
+      if (!Files.isRegularFile(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException("Authoritative generation state is not a regular file: " + statePath);
+      }
+      return java.util.Optional.of(strictBootLayout(readRecordedState()));
+    }
+  }
+
+  private static boolean isRecordedIdentity(String generation) {
+    if (generation == null || !generation.startsWith("g-")) return false;
+    try { return generation.equals(recordedGenerationId(generation.substring(2))); }
+    catch (IOException invalid) { return false; }
+  }
+
+  /** Generation identity only; callers still verify its operation's terminal receipt. */
+  public static boolean isRecordedGenerationIdentity(String generation) {
+    return isRecordedIdentity(generation);
+  }
+
+  private boolean hasPristineRecordedOrphan(State state) throws IOException {
+    if (!Files.isDirectory(indicesDir)) return false;
+    try (var entries = Files.list(indicesDir)) {
+      for (Path directory : entries.toList()) {
+        String identity = directory.getFileName().toString();
+        if (!isRecordedIdentity(identity) || identity.equals(state.active_generation())
+            || identity.equals(state.previous_generation())
+            || !Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
+        try (var contents = Files.list(directory)) {
+          // A crash-created target can have either metadata file missing. Completed empty
+          // generations have Lucene commit files; GC-retained archives must not fence native boot.
+          if (contents.allMatch(path -> Set.of(GENERATION_SENTINEL, GENERATION_MANIFEST)
+              .contains(path.getFileName().toString()))) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Evidence may fence fallback; it never supplies a serving or writable identity. */
+  private boolean hasRecordedFallbackEvidence() throws IOException {
+    if (Files.isDirectory(indicesDir)) {
+      try (var entries = Files.list(indicesDir)) {
+        if (entries.anyMatch(path -> isRecordedIdentity(path.getFileName().toString()))) return true;
+      }
+    }
+    if (Files.isRegularFile(statePrevPath)) {
+      try {
+        State previous = RECORDED_JSON.readValue(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePrevPath), State.class);
+        return previous != null && (isRecordedIdentity(previous.active_generation())
+            || isRecordedIdentity(previous.building_generation()));
+      } catch (tools.jackson.core.JacksonException malformed) {
+        // An undecodable backup cannot establish either kind of generation authority.
+        return false;
+      }
+    }
+    return false;
   }
 
   /**
@@ -180,6 +534,40 @@ public final class IndexGenerationManager {
   public Path resolveGenerationPathStrict(String generationId) throws IOException {
     String genId = requireSafeGenerationId(generationId, "generationId");
     return resolveGenerationPath(genId);
+  }
+
+  /** Identity of the generation directory an already-open runtime actually uses. */
+  public String generationIdForOpenedPath(Path openedPath) throws IOException {
+    return manifestForOwnedPath(openedPath).generation_id();
+  }
+
+  /** Exact model binding recorded with an owned generation. Empty means a legacy manifest. */
+  public GenerationManifest manifestForOwnedPath(Path openedPath) throws IOException {
+    if (openedPath == null) throw new IOException("Opened generation path is unavailable");
+    Path exact = normalize(openedPath);
+    if (exact.getFileName() == null) throw new IOException("Opened generation path has no identity");
+    String generationId = requireSafeGenerationId(exact.getFileName().toString(), "opened generation");
+    if (!exact.equals(resolveGenerationPathReadOnly(generationId))
+        || !Files.isDirectory(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Opened runtime is outside the owned generation directory");
+    }
+    Path manifestPath = exact.resolve(GENERATION_MANIFEST);
+    if (!Files.isRegularFile(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || Files.size(manifestPath) > 16_384) {
+      throw new IOException("Opened generation manifest is unavailable");
+    }
+    final GenerationManifest manifest;
+    try {
+      manifest = JSON.readValue(
+          io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath),
+          GenerationManifest.class);
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Opened generation manifest is invalid", malformed);
+    }
+    if (manifest == null || !generationId.equals(manifest.generation_id())) {
+      throw new IOException("Opened generation manifest names another directory");
+    }
+    return manifest;
   }
 
   /**
@@ -213,43 +601,312 @@ public final class IndexGenerationManager {
    * @return the updated normalized state (format_version=2)
    */
   public State startMigration(String source) throws IOException {
-    IndexLayout layout = initializeOrLoad();
-    State current = layout.state();
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    MigrationState ms = parseMigrationStateOrDefault(normalized.migration_state(), MigrationState.IDLE);
-    if (ms == MigrationState.MIGRATING || ms == MigrationState.SWITCHING) {
-      return normalized;
-    }
-    // If a prior migration failed but a building generation exists, don't create a new one implicitly.
-    // This avoids generation churn; operators can decide whether to retry or discard the failed build.
-    if (ms == MigrationState.FAILED
-        && normalized.building_generation() != null
-        && !normalized.building_generation().isBlank()) {
-      return normalized;
-    }
+    return startMigration(source, false, List.of());
+  }
 
-    String active = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
-    String genId = newUniqueGenerationId();
-    Path genPath = resolveGenerationPath(genId);
-    Files.createDirectories(genPath);
-    writeGenerationFiles(genPath, genId, source == null || source.isBlank() ? "migration" : source.trim());
+  /** Start a distinct caller-requested candidate; never report a retained one as newly accepted. */
+  public State startFreshMigration(String source) throws IOException {
+    return startMigration(source, true, List.of());
+  }
 
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            active,
-            genId,
-            active,
-            MigrationState.MIGRATING.name(),
-            false,
-            null,
-            null,
-            System.currentTimeMillis(),
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
-    return next;
+  /** Freeze the registered no-file sources before the new candidate pointer becomes visible. */
+  public State startMigration(String source, List<String> projectionSourceIds) throws IOException {
+    return startMigration(source, false, projectionSourceIds);
+  }
+
+  public State startFreshMigration(String source, List<String> projectionSourceIds) throws IOException {
+    return startMigration(source, true, projectionSourceIds);
+  }
+
+  private State startMigration(String source, boolean requireFreshCandidate,
+      List<String> projectionSourceIds) throws IOException {
+    List<String> expectedSources = checkedProjectionSourceIds(projectionSourceIds);
+    try (var ignored = stateControl()) {
+      IndexLayout layout = initializeOrLoad();
+      State current = layout.state();
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      MigrationState ms = parseMigrationStateOrDefault(normalized.migration_state(), MigrationState.IDLE);
+      if (requireFreshCandidate && (ms != MigrationState.IDLE
+          || (normalized.building_generation() != null && !normalized.building_generation().isBlank()))) {
+        throw new IOException("A migration candidate is already active or retained; resolve it before starting another");
+      }
+      if (ms == MigrationState.MIGRATING || ms == MigrationState.SWITCHING
+          || ms == MigrationState.AWAITING_ACCEPTANCE) {
+        return normalized;
+      }
+      // If a prior migration failed but a building generation exists, don't create a new one implicitly.
+      // This avoids generation churn; operators can decide whether to retry or discard the failed build.
+      if (ms == MigrationState.FAILED
+          && normalized.building_generation() != null
+          && !normalized.building_generation().isBlank()) {
+        return normalized;
+      }
+
+      String active = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
+      // A discarded build has already been marked for deletion. Reclaim that exact owned
+      // representation before asking whether another Green can fit; a locked payload still
+      // occupies capacity and is refused by the check below.
+      pruneMarkedForDeletionBestEffort();
+      requireBuildCapacity(normalized, null, true);
+      String genId = newUniqueGenerationId();
+      Path genPath = resolveGenerationPath(genId);
+      Files.createDirectories(genPath);
+      writeMigrationGenerationFilesStrict(genPath, genId,
+          source == null || source.isBlank() ? "migration" : source.trim(), expectedSources);
+
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              active,
+              genId,
+              active,
+              MigrationState.MIGRATING.name(),
+              false,
+              null,
+              null,
+              System.currentTimeMillis(),
+              normalized.auto_rebuild_key(),
+              normalized.auto_rebuild_count(),
+              normalized.auto_rebuild_first_ms());
+      writeState(next);
+      return next;
+    }
+  }
+
+  /**
+   * Starts the one generation derived from an already accepted operation. The current pointer
+   * and recorded metadata must be authoritative; this path never allocates a fallback identity.
+   * The caller persists its response witness before requesting the first Engine restart.
+   */
+  public State startRecordedMigration(String operationKey, String source, String targetIndexFingerprint)
+      throws IOException {
+    return startRecordedMigration(operationKey, source, targetIndexFingerprint, null);
+  }
+
+  /** Bind source comparison and generation creation under the same control lock. */
+  public State startRecordedMigration(String operationKey, String source, String targetIndexFingerprint,
+      String expectedSourceGeneration) throws IOException {
+    return startRecordedMigration(operationKey, source, targetIndexFingerprint,
+        expectedSourceGeneration, null);
+  }
+
+  /** Null source set preserves legacy accepted plans; an explicit empty set is a new plan. */
+  public State startRecordedMigration(String operationKey, String source, String targetIndexFingerprint,
+      String expectedSourceGeneration, List<String> projectionSourceIds) throws IOException {
+    List<String> expectedSources = projectionSourceIds == null ? null
+        : checkedProjectionSourceIds(projectionSourceIds);
+    try (var ignored = stateControl()) {
+      String target = recordedGenerationId(operationKey);
+      if (source == null || source.isBlank() || source.length() > 256
+          || source.chars().anyMatch(Character::isISOControl)
+          || targetIndexFingerprint == null || !targetIndexFingerprint.matches("[0-9a-f]{64}")) {
+        throw new IOException("Recorded generation source or target fingerprint is invalid");
+      }
+      final State raw;
+      try {
+        raw = RECORDED_JSON.readValue(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePath), State.class);
+      } catch (tools.jackson.core.JacksonException malformed) {
+        throw new IOException("Authoritative generation state is invalid", malformed);
+      }
+      if (raw == null || raw.migration_state() == null || raw.migration_state().isBlank()) {
+        throw new IOException("Authoritative generation state is unavailable");
+      }
+      State current = expectedSourceGeneration == null ? normalizeAndUpgradeStateIfNeeded(raw)
+          : strictBootLayout(raw).state();
+      String active = requireSafeGenerationId(current.active_generation(), "state.json active_generation");
+      if (expectedSourceGeneration != null) {
+        String expected = requireSafeGenerationId(expectedSourceGeneration, "accepted source generation");
+        String observedSource = target.equals(active) ? current.previous_generation() : active;
+        if (!expected.equals(expectedSourceGeneration) || !expected.equals(observedSource)) {
+          throw new IOException("Recorded generation source differs from the accepted preparation");
+        }
+      }
+      if (!Files.isDirectory(resolveGenerationPathReadOnly(active), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException("Active generation directory is unavailable");
+      }
+      MigrationState phase = parseMigrationStateOrDefault(current.migration_state(), MigrationState.FAILED);
+      String building = current.building_generation();
+      if (active.equals(building)) {
+        throw new IOException("Serving and building generation identities must be distinct");
+      }
+      Path targetPath = resolveGenerationPathReadOnly(target);
+      if (phase == MigrationState.IDLE && target.equals(active) && (building == null || building.isBlank())) {
+        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false,
+            true, expectedSources);
+        return current;
+      }
+      if ((phase == MigrationState.MIGRATING || phase == MigrationState.SWITCHING
+          || phase == MigrationState.AWAITING_ACCEPTANCE) && target.equals(building)) {
+        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, false,
+            true, expectedSources);
+        return current;
+      }
+      if (phase != MigrationState.IDLE || building != null && !building.isBlank()) {
+        throw new IOException("Recorded generation conflicts with the current migration state");
+      }
+      requireBuildCapacity(current, target, false);
+      if (Files.exists(targetPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, true,
+            true, expectedSources);
+      } else {
+        Files.createDirectories(indicesDir);
+        Files.createDirectory(targetPath);
+        long created = System.currentTimeMillis();
+        var manifest = new GenerationManifest(expectedSources == null
+            ? RECORDED_MANIFEST_FORMAT_VERSION : RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION,
+            target, source, created, targetIndexFingerprint, Map.of(), null, null,
+            expectedSources);
+        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+            targetPath.resolve(GENERATION_SENTINEL), recordedSentinel(target, created).getBytes(StandardCharsets.UTF_8));
+        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+            targetPath.resolve(GENERATION_MANIFEST), RECORDED_JSON.writeValueAsBytes(manifest));
+      }
+      State next = new State(STATE_FORMAT_VERSION, active, target, active, MigrationState.MIGRATING.name(),
+          false, null, null, System.currentTimeMillis(), current.auto_rebuild_key(),
+          current.auto_rebuild_count(), current.auto_rebuild_first_ms());
+      writeState(next);
+      return next;
+    }
+  }
+
+  /** Stable target identity; only canonical accepted UUIDv7 keys belong to this namespace. */
+  public static String recordedGenerationId(String operationKey) throws IOException {
+    try {
+      var key = java.util.UUID.fromString(operationKey);
+      if (key.version() != 7 || key.variant() != 2 || !key.toString().equals(operationKey)) {
+        throw new IllegalArgumentException("Noncanonical operation key");
+      }
+      return "g-" + operationKey;
+    } catch (IllegalArgumentException | NullPointerException invalid) {
+      throw new IOException("Recorded generation requires a canonical UUIDv7 operation key", invalid);
+    }
+  }
+
+  private static String recordedSentinel(String target, long created) {
+    return "justsearch_generation_sentinel_v1\ngeneration_id=" + target + "\ncreated_at_ms=" + created + "\n";
+  }
+
+  /** Bind the accepted installer files to an existing recorded Green before any runtime opens. */
+  public GenerationManifest bindRecordedModels(String operationKey, String source,
+      String targetFingerprint, Map<String, ModelArtifact> models) throws IOException {
+    return bindRecordedModels(operationKey, source, targetFingerprint, models, null, null);
+  }
+
+  /** Bind the accepted files and effective index-model mode to recorded Green. */
+  public GenerationManifest bindRecordedModels(String operationKey, String source,
+      String targetFingerprint, Map<String, ModelArtifact> models, String sparseModel,
+      Integer vectorDimension) throws IOException {
+    if (models == null || models.isEmpty() || models.size() > 128
+        || models.keySet().stream().anyMatch(role -> role == null
+            || !role.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}"))) {
+      throw new IOException("Recorded generation model binding is invalid");
+    }
+    if ((sparseModel == null) != (vectorDimension == null)) {
+      throw new IOException("Recorded generation model mode is incomplete");
+    }
+    Map<String, ModelArtifact> accepted = Map.copyOf(models);
+    try (var ignored = stateControl()) {
+      String target = recordedGenerationId(operationKey);
+      State state = readRecordedState();
+      boolean building = target.equals(state.building_generation());
+      boolean promoted = target.equals(state.active_generation())
+          && MigrationState.IDLE.name().equals(state.migration_state());
+      if (!building && !promoted) {
+        throw new IOException("Recorded generation is not the accepted building or active target");
+      }
+      Path targetPath = resolveGenerationPathReadOnly(target);
+      requireRecordedGeneration(targetPath, target, source, targetFingerprint, false);
+      Path manifestPath = targetPath.resolve(GENERATION_MANIFEST);
+      GenerationManifest manifest;
+      try {
+        manifest = RECORDED_JSON.readValue(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath),
+            GenerationManifest.class);
+      } catch (tools.jackson.core.JacksonException malformed) {
+        throw new IOException("Recorded generation manifest is invalid", malformed);
+      }
+      if (!manifest.models().isEmpty()) {
+        if (!accepted.equals(manifest.models())) {
+          throw new IOException("Recorded generation models differ from accepted preparation");
+        }
+        if (sparseModel == null || (sparseModel.equals(manifest.sparse_model())
+            && vectorDimension.equals(manifest.vector_dimension()))) return manifest;
+        if (manifest.sparse_model() != null || manifest.vector_dimension() != null) {
+          throw new IOException("Recorded generation model mode differs from accepted preparation");
+        }
+      }
+      GenerationManifest bound = new GenerationManifest(manifest.format_version(),
+          manifest.generation_id(), manifest.source(), manifest.created_at_ms(),
+          manifest.target_index_fingerprint(), accepted, sparseModel, vectorDimension,
+          manifest.projection_source_ids());
+      byte[] bytes = RECORDED_JSON.writeValueAsBytes(bound);
+      if (bytes.length > 16_384) {
+        throw new IOException("Recorded generation model manifest exceeds its ownership limit");
+      }
+      io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(manifestPath,
+          bytes);
+      return bound;
+    }
+  }
+
+  private static void requireRecordedGeneration(Path directory, String target, String source,
+      String targetFingerprint, boolean pristine) throws IOException {
+    requireRecordedGeneration(directory, target, source, targetFingerprint, pristine, null);
+  }
+
+  private static void requireRecordedGeneration(Path directory, String target, String source,
+      String targetFingerprint, boolean pristine, List<String> expectedSources) throws IOException {
+    requireRecordedGeneration(directory, target, source, targetFingerprint, pristine,
+        false, expectedSources);
+  }
+
+  private static void requireRecordedGeneration(Path directory, String target, String source,
+      String targetFingerprint, boolean pristine, boolean enforceSourceSet,
+      List<String> expectedSources) throws IOException {
+    if (!Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Recorded generation directory is not an owned regular directory");
+    }
+    Path manifestPath = directory.resolve(GENERATION_MANIFEST);
+    Path sentinelPath = directory.resolve(GENERATION_SENTINEL);
+    if (!Files.isRegularFile(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || !Files.isRegularFile(sentinelPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || Files.size(manifestPath) > 16_384 || Files.size(sentinelPath) > 1_024) {
+      throw new IOException("Recorded generation ownership metadata is unavailable");
+    }
+    final GenerationManifest manifest;
+    try {
+      manifest = RECORDED_JSON.readValue(
+          io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath), GenerationManifest.class);
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Recorded generation manifest is invalid", malformed);
+    }
+    if (manifest == null || (manifest.format_version() != RECORDED_MANIFEST_FORMAT_VERSION
+        && manifest.format_version() != RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION)
+        || (manifest.format_version() == RECORDED_MANIFEST_FORMAT_VERSION
+            && manifest.projection_source_ids() != null)
+        || (manifest.format_version() == RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION
+            && manifest.projection_source_ids() == null)
+        || (enforceSourceSet
+            && !Objects.equals(expectedSources, manifest.projection_source_ids()))
+        || !target.equals(manifest.generation_id())
+        || !source.equals(manifest.source()) || !targetFingerprint.equals(manifest.target_index_fingerprint())
+        || manifest.created_at_ms() <= 0) {
+      throw new IOException("Recorded generation metadata does not match its accepted target");
+    }
+    String sentinel = new String(
+        io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinelPath), StandardCharsets.UTF_8);
+    if (!recordedSentinel(target, manifest.created_at_ms()).equals(sentinel)) {
+      throw new IOException("Recorded generation sentinel does not match its manifest");
+    }
+    if (pristine) {
+      try (var entries = Files.list(directory)) {
+        if (entries.anyMatch(path -> !Set.of(GENERATION_SENTINEL, GENERATION_MANIFEST)
+            .contains(path.getFileName().toString()))) {
+          throw new IOException("Unbound recorded generation is not pristine");
+        }
+      }
+    }
   }
 
   /**
@@ -271,78 +928,148 @@ public final class IndexGenerationManager {
    *     generation to abandon
    */
   public State abandonBuildingGeneration(String reason) throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      return null;
+    try (var ignored = stateControl()) {
+      State current = readStateBestEffort();
+      if (current == null) {
+        return null;
+      }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      String building = normalized.building_generation();
+      if (building == null || building.isBlank()) {
+        return normalized;
+      }
+      String safeBuilding = requireSafeGenerationId(building, "state.json building_generation");
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              normalized.active_generation(),
+              null,
+              normalized.previous_generation(),
+              MigrationState.IDLE.name(),
+              false,
+              null,
+              null,
+              System.currentTimeMillis(),
+              normalized.auto_rebuild_key(),
+              normalized.auto_rebuild_count(),
+              normalized.auto_rebuild_first_ms());
+      writeState(next);
+      log.warn(
+          "Abandoned building generation {} (reason={}); migration_state reset to IDLE",
+          safeBuilding,
+          reason == null || reason.isBlank() ? "unspecified" : reason.trim());
+      // Marked AFTER the pointer is gone, and best-effort: a crash between the two leaves an orphan
+      // directory the GC reaps, whereas marking first would leave state.json pointing at a directory
+      // already being deleted.
+      try {
+        SafeIndexPathOps.markForDeletion(resolveGenerationPath(safeBuilding), indicesDir);
+      } catch (Exception e) {
+        log.debug("Failed to mark abandoned generation {} for deletion: {}", safeBuilding, e.getMessage());
+      }
+      return next;
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    String building = normalized.building_generation();
-    if (building == null || building.isBlank()) {
-      return normalized;
+  }
+
+  /**
+   * Retires the exact target of a durably refused recorded operation after its writer has closed.
+   * The caller owns the refusal proof and must settle accepted mutations on the surviving source
+   * before clearing the building pointer. A retry can finish the pointer-before-mark crash cut.
+   */
+  public void retireRefusedRecordedGeneration(String operationKey, String sourceGeneration)
+      throws IOException {
+    try (var ignored = stateControl()) {
+      String target = recordedGenerationId(operationKey);
+      String source = requireSafeGenerationId(sourceGeneration, "recorded source generation");
+      State current = requireRefusedRecordedRetirementState(target, source);
+      // The durable operation key binds the exact target even after state.json lost its building
+      // pointer. A partial marked directory can be retried after Windows refused one payload file.
+      deleteExactRetiredRepresentation(target, true);
+      if (current.previous_generation() == null) return;
+      // The recorded build used A as its previous pointer, although it never promoted. Release
+      // that alias only after B is physically absent, or a fresh candidate sees false capacity.
+      State released = new State(STATE_FORMAT_VERSION, source, null, null,
+          MigrationState.IDLE.name(), current.migration_paused(), current.pause_reason(),
+          current.paused_at_ms(), System.currentTimeMillis(), current.auto_rebuild_key(),
+          current.auto_rebuild_count(), current.auto_rebuild_first_ms());
+      try {
+        writeState(released);
+      } catch (IOException ambiguous) {
+        try {
+          State observed = requireRefusedRecordedRetirementState(target, source);
+          if (observed.previous_generation() == null
+              && exactRetirementRepresentations(target, true).isEmpty()) return;
+        } catch (IOException unresolved) {
+          ambiguous.addSuppressed(unresolved);
+        }
+        throw ambiguous;
+      }
     }
-    String safeBuilding = requireSafeGenerationId(building, "state.json building_generation");
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            normalized.active_generation(),
-            null,
-            normalized.previous_generation(),
-            MigrationState.IDLE.name(),
-            false,
-            null,
-            null,
-            System.currentTimeMillis(),
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
-    log.warn(
-        "Abandoned building generation {} (reason={}); migration_state reset to IDLE",
-        safeBuilding,
-        reason == null || reason.isBlank() ? "unspecified" : reason.trim());
-    // Marked AFTER the pointer is gone, and best-effort: a crash between the two leaves an orphan
-    // directory the GC reaps, whereas marking first would leave state.json pointing at a directory
-    // already being deleted.
-    try {
-      SafeIndexPathOps.markForDeletion(resolveGenerationPath(safeBuilding), indicesDir);
-    } catch (Exception e) {
-      log.debug("Failed to mark abandoned generation {} for deletion: {}", safeBuilding, e.getMessage());
+  }
+
+  /** Read-only completion witness for the operation owner; no broad GC scan or second marker. */
+  public boolean refusedRecordedGenerationRetired(String operationKey, String sourceGeneration)
+      throws IOException {
+    try (var ignored = stateControl()) {
+      String target = recordedGenerationId(operationKey);
+      String source = requireSafeGenerationId(sourceGeneration, "recorded source generation");
+      State state = strictBootLayout(readRecordedState()).state();
+      if (source.equals(state.active_generation()) && target.equals(state.building_generation())) {
+        return false;
+      }
+      State retirement = requireRefusedRecordedRetirementState(target, source);
+      return retirement.previous_generation() == null
+          && exactRetirementRepresentations(target, true).isEmpty();
     }
-    return next;
+  }
+
+  private State requireRefusedRecordedRetirementState(String target, String source)
+      throws IOException {
+    State state = strictBootLayout(readRecordedState()).state();
+    if (!source.equals(state.active_generation())
+        || state.building_generation() != null
+        || !MigrationState.IDLE.name().equals(state.migration_state())
+        || state.previous_generation() != null
+            && !source.equals(state.previous_generation())
+        || protectedGenerationIds(state).contains(target)) {
+      throw new IOException("Refused recorded target is still protected or its source changed");
+    }
+    return state;
   }
 
   /** Sets operator pause intent for migration orchestration (best-effort). */
   public State setMigrationPaused(boolean paused, String reason) throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      // Ensure layout exists
-      initializeOrLoad();
-      current = readStateBestEffort();
+    try (var ignored = stateControl()) {
+      State current = readStateBestEffort();
       if (current == null) {
-        return null;
+        // Ensure layout exists
+        initializeOrLoad();
+        current = readStateBestEffort();
+        if (current == null) {
+          return null;
+        }
       }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      long now = System.currentTimeMillis();
+      Boolean nextPaused = paused;
+      String nextReason = paused ? (reason == null || reason.isBlank() ? "operator" : reason.trim()) : null;
+      Long nextPausedAt = paused ? now : null;
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              normalized.active_generation(),
+              normalized.building_generation(),
+              normalized.previous_generation(),
+              normalized.migration_state(),
+              nextPaused,
+              nextReason,
+              nextPausedAt,
+              now,
+              normalized.auto_rebuild_key(),
+              normalized.auto_rebuild_count(),
+              normalized.auto_rebuild_first_ms());
+      writeState(next);
+      return next;
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    long now = System.currentTimeMillis();
-    Boolean nextPaused = paused;
-    String nextReason = paused ? (reason == null || reason.isBlank() ? "operator" : reason.trim()) : null;
-    Long nextPausedAt = paused ? now : null;
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            normalized.active_generation(),
-            normalized.building_generation(),
-            normalized.previous_generation(),
-            normalized.migration_state(),
-            nextPaused,
-            nextReason,
-            nextPausedAt,
-            now,
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
-    return next;
   }
 
   /**
@@ -357,44 +1084,46 @@ public final class IndexGenerationManager {
    * Amendment B (Worker-side registration via Head SPI callback) should be implemented.
    */
   public void updateMigrationState(MigrationState state) throws IOException {
-    Objects.requireNonNull(state, "state");
-    State current = readStateBestEffort();
-    if (current == null) {
-      // Nothing to update; ensure layout exists.
-      initializeOrLoad();
-      current = readStateBestEffort();
-      if (current == null) return;
-    }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    // Tempdoc 542 Phase 4: audit Worker-autonomous state transitions. SWITCHING + FAILED are
-    // the long-op-relevant transitions; the log carries a stable marker string the future
-    // Amendment-B work can grep for.
-    if (state == MigrationState.SWITCHING || state == MigrationState.FAILED) {
-      log.info(
-          "tempdoc-542 phase-4 audit: Worker-autonomous migration state transition: "
-              + "{} -> {} (active_generation={}, building_generation={}). "
-              + "If this fires in production, consider implementing Amendment B "
-              + "(Worker-side op-lease registration via Head SPI callback).",
-          normalized.migration_state(),
-          state.name(),
-          normalized.active_generation(),
-          normalized.building_generation());
-    }
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            normalized.active_generation(),
-            normalized.building_generation(),
-            normalized.previous_generation(),
+    try (var ignored = stateControl()) {
+      Objects.requireNonNull(state, "state");
+      State current = readStateBestEffort();
+      if (current == null) {
+        // Nothing to update; ensure layout exists.
+        initializeOrLoad();
+        current = readStateBestEffort();
+        if (current == null) return;
+      }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      // Tempdoc 542 Phase 4: audit Worker-autonomous state transitions. SWITCHING + FAILED are
+      // the long-op-relevant transitions; the log carries a stable marker string the future
+      // Amendment-B work can grep for.
+      if (state == MigrationState.SWITCHING || state == MigrationState.FAILED) {
+        log.info(
+            "tempdoc-542 phase-4 audit: Worker-autonomous migration state transition: "
+                + "{} -> {} (active_generation={}, building_generation={}). "
+                + "If this fires in production, consider implementing Amendment B "
+                + "(Worker-side op-lease registration via Head SPI callback).",
+            normalized.migration_state(),
             state.name(),
-            normalized.migration_paused(),
-            normalized.pause_reason(),
-            normalized.paused_at_ms(),
-            System.currentTimeMillis(),
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
+            normalized.active_generation(),
+            normalized.building_generation());
+      }
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              normalized.active_generation(),
+              normalized.building_generation(),
+              normalized.previous_generation(),
+              state.name(),
+              normalized.migration_paused(),
+              normalized.pause_reason(),
+              normalized.paused_at_ms(),
+              System.currentTimeMillis(),
+              normalized.auto_rebuild_key(),
+              normalized.auto_rebuild_count(),
+              normalized.auto_rebuild_first_ms());
+      writeState(next);
+    }
   }
 
   /**
@@ -417,41 +1146,43 @@ public final class IndexGenerationManager {
    * @return the 1-based attempt number for this key
    */
   public int recordAutoRebuildAttempt(String targetKey) throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      initializeOrLoad();
-      current = readStateBestEffort();
+    try (var ignored = stateControl()) {
+      State current = readStateBestEffort();
       if (current == null) {
-        return 1;
+        initializeOrLoad();
+        current = readStateBestEffort();
+        if (current == null) {
+          return 1;
+        }
       }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
+      boolean sameTarget = key.equals(normalized.auto_rebuild_key());
+      int nextCount =
+          sameTarget && normalized.auto_rebuild_count() != null
+              ? normalized.auto_rebuild_count() + 1
+              : 1;
+      long now = System.currentTimeMillis();
+      Long firstMs =
+          sameTarget && normalized.auto_rebuild_first_ms() != null
+              ? normalized.auto_rebuild_first_ms()
+              : now;
+      writeState(
+          new State(
+              STATE_FORMAT_VERSION,
+              normalized.active_generation(),
+              normalized.building_generation(),
+              normalized.previous_generation(),
+              normalized.migration_state(),
+              normalized.migration_paused(),
+              normalized.pause_reason(),
+              normalized.paused_at_ms(),
+              now,
+              key,
+              nextCount,
+              firstMs));
+      return nextCount;
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    String key = targetKey == null || targetKey.isBlank() ? "<unknown>" : targetKey;
-    boolean sameTarget = key.equals(normalized.auto_rebuild_key());
-    int nextCount =
-        sameTarget && normalized.auto_rebuild_count() != null
-            ? normalized.auto_rebuild_count() + 1
-            : 1;
-    long now = System.currentTimeMillis();
-    Long firstMs =
-        sameTarget && normalized.auto_rebuild_first_ms() != null
-            ? normalized.auto_rebuild_first_ms()
-            : now;
-    writeState(
-        new State(
-            STATE_FORMAT_VERSION,
-            normalized.active_generation(),
-            normalized.building_generation(),
-            normalized.previous_generation(),
-            normalized.migration_state(),
-            normalized.migration_paused(),
-            normalized.pause_reason(),
-            normalized.paused_at_ms(),
-            now,
-            key,
-            nextCount,
-            firstMs));
-    return nextCount;
   }
 
   /**
@@ -469,6 +1200,208 @@ public final class IndexGenerationManager {
   }
 
   /**
+   * Holds the durable generation state owner while a recorded activation acquires the process
+   * publication lock. The owner must acquire this after its runtime lock and release it after
+   * installing the prepared serving view. No unbound promotion is available through this lease.
+   */
+  public RecordedPromotion beginRecordedPromotion(String operationKey, String source,
+      String targetIndexFingerprint, String expectedSourceGeneration) {
+    return beginRecordedPromotion(operationKey, source, targetIndexFingerprint,
+        expectedSourceGeneration, null);
+  }
+
+  public RecordedPromotion beginRecordedPromotion(String operationKey, String source,
+      String targetIndexFingerprint, String expectedSourceGeneration,
+      List<String> projectionSourceIds) {
+    Objects.requireNonNull(operationKey, "operationKey");
+    Objects.requireNonNull(source, "source");
+    Objects.requireNonNull(targetIndexFingerprint, "targetIndexFingerprint");
+    Objects.requireNonNull(expectedSourceGeneration, "expectedSourceGeneration");
+    return new RecordedPromotion(operationKey, source, targetIndexFingerprint,
+        expectedSourceGeneration, projectionSourceIds, stateControl());
+  }
+
+  public final class RecordedPromotion implements AutoCloseable {
+    /** Exact pointer witness while this lease still excludes competing generation writers. */
+    public enum CommitWitness { UNCHANGED, COMMITTED, UNRESOLVED }
+
+    private final String operationKey;
+    private final String source;
+    private final String targetIndexFingerprint;
+    private final String expectedSourceGeneration;
+    private final List<String> projectionSourceIds;
+    private final StateControlGuard guard;
+    private final Thread owner = Thread.currentThread();
+    private boolean attempted;
+    private boolean closed;
+
+    private RecordedPromotion(String operationKey, String source, String targetIndexFingerprint,
+        String expectedSourceGeneration, List<String> projectionSourceIds, StateControlGuard guard) {
+      this.operationKey = operationKey;
+      this.source = source;
+      this.targetIndexFingerprint = targetIndexFingerprint;
+      this.expectedSourceGeneration = expectedSourceGeneration;
+      this.projectionSourceIds = projectionSourceIds == null ? null
+          : checkedProjectionSourceIds(projectionSourceIds);
+      this.guard = guard;
+    }
+
+    /** Revalidates the exact accepted binding and replaces the durable pointer at most once. */
+    public State promote() throws IOException {
+      requireOwner();
+      if (attempted) throw new IllegalStateException("Recorded promotion already attempted");
+      attempted = true;
+      try {
+        return promoteRecordedGenerationToActive(operationKey, source,
+            targetIndexFingerprint, expectedSourceGeneration, projectionSourceIds);
+      } catch (IOException ambiguous) {
+        // A failed state.json move can be reported after the exact pointer is durable. Only the
+        // strict recorded boot witness may turn that ambiguous outcome into committed promotion.
+        try {
+          var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
+              expectedSourceGeneration, source, targetIndexFingerprint, true, true,
+              projectionSourceIds),
+              targetIndexFingerprint);
+          if (observed.disposition() == BootDisposition.PROMOTED) return observed.layout().state();
+        } catch (IOException unreadable) {
+          ambiguous.addSuppressed(unreadable);
+        }
+        throw ambiguous;
+      }
+    }
+
+    /** Resolve a failed promotion before the caller changes admission or serving references. */
+    public CommitWitness inspectCommitWitness() {
+      requireOwner();
+      try {
+        // A failed target/manifest validation can leave the exact source pointer untouched,
+        // even though initializeForBoot quite correctly calls the *candidate* fenced. Read the
+        // pointer first so that refusal does not unnecessarily close the healthy source view.
+        IndexLayout layout = strictBootLayout(readRecordedState());
+        if (expectedSourceGeneration.equals(layout.activeGenerationId())) {
+          return CommitWitness.UNCHANGED;
+        }
+        if (!recordedGenerationId(operationKey).equals(layout.activeGenerationId())) {
+          return CommitWitness.UNRESOLVED;
+        }
+        var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
+            expectedSourceGeneration, source, targetIndexFingerprint, true, true,
+            projectionSourceIds),
+            targetIndexFingerprint);
+        return switch (observed.disposition()) {
+          case BUILDING -> CommitWitness.UNCHANGED;
+          case PROMOTED -> CommitWitness.COMMITTED;
+          default -> CommitWitness.UNRESOLVED;
+        };
+      } catch (IOException | RuntimeException unreadable) {
+        return CommitWitness.UNRESOLVED;
+      }
+    }
+
+    private void requireOwner() {
+      if (closed || owner != Thread.currentThread()) {
+        throw new IllegalStateException("Recorded promotion requires its owning live thread");
+      }
+    }
+
+    @Override public void close() {
+      if (closed) return;
+      requireOwner();
+      guard.close();
+      closed = true;
+    }
+  }
+
+  /** Holds the same pointer guard for an unrecorded migration's exact live A/B pair. */
+  public NativePromotion beginNativePromotion(String expectedSourceGeneration,
+      String expectedBuildingGeneration) {
+    Objects.requireNonNull(expectedSourceGeneration, "expectedSourceGeneration");
+    Objects.requireNonNull(expectedBuildingGeneration, "expectedBuildingGeneration");
+    return new NativePromotion(expectedSourceGeneration, expectedBuildingGeneration, stateControl());
+  }
+
+  public final class NativePromotion implements AutoCloseable {
+    private final String source;
+    private final String building;
+    private final StateControlGuard guard;
+    private final Thread owner = Thread.currentThread();
+    private boolean attempted;
+    private boolean closed;
+
+    private NativePromotion(String source, String building, StateControlGuard guard) {
+      this.source = source;
+      this.building = building;
+      this.guard = guard;
+    }
+
+    /** Commit only the already-verified building generation selected under the live fence. */
+    public State promote() throws IOException {
+      requireOwner();
+      if (attempted) throw new IllegalStateException("Native promotion already attempted");
+      attempted = true;
+      State current = strictBootLayout(readRecordedState()).state();
+      if (!source.equals(current.active_generation())
+          || !building.equals(current.building_generation())
+          || !MigrationState.SWITCHING.name().equals(current.migration_state())) {
+        throw new IOException("Native migration source or building generation changed");
+      }
+      return promoteBuildingGenerationToActive();
+    }
+
+    /** Exact durable pointer evidence after an ambiguous write; never rewinds a committed B. */
+    public RecordedPromotion.CommitWitness inspectCommitWitness() {
+      requireOwner();
+      try {
+        State observed = strictBootLayout(readRecordedState()).state();
+        if (source.equals(observed.active_generation())
+            && building.equals(observed.building_generation())
+            && MigrationState.SWITCHING.name().equals(observed.migration_state())) {
+          return RecordedPromotion.CommitWitness.UNCHANGED;
+        }
+        if (building.equals(observed.active_generation())
+            && source.equals(observed.previous_generation())
+            && (observed.building_generation() == null
+                || observed.building_generation().isBlank())
+            && MigrationState.IDLE.name().equals(observed.migration_state())) {
+          return RecordedPromotion.CommitWitness.COMMITTED;
+        }
+      } catch (IOException | RuntimeException unreadable) {
+        return RecordedPromotion.CommitWitness.UNRESOLVED;
+      }
+      return RecordedPromotion.CommitWitness.UNRESOLVED;
+    }
+
+    private void requireOwner() {
+      if (closed || owner != Thread.currentThread()) {
+        throw new IllegalStateException("Native promotion requires its owning live thread");
+      }
+    }
+
+    @Override public void close() {
+      if (closed) return;
+      requireOwner();
+      guard.close();
+      closed = true;
+    }
+  }
+
+  /** Promote only the strict target/source binding validated by the recorded owner. */
+  State promoteRecordedGenerationToActive(String operationKey, String source,
+      String targetIndexFingerprint, String expectedSourceGeneration,
+      List<String> projectionSourceIds) throws IOException {
+    try (var ignored = stateControl()) {
+      var observed = initializeForBoot(new BootOwnership.Recorded(operationKey,
+          expectedSourceGeneration, source, targetIndexFingerprint, true, true,
+          projectionSourceIds), targetIndexFingerprint);
+      if (observed.disposition() == BootDisposition.PROMOTED) return observed.layout().state();
+      if (observed.disposition() != BootDisposition.BUILDING) {
+        throw new IOException("Recorded generation binding changed before promotion");
+      }
+      return promoteBuildingGenerationToActive();
+    }
+  }
+
+  /**
    * Promotes {@code building_generation} to {@code active_generation} and clears {@code building_generation}.
    *
    * <p>This is the Phase F cutover step (pointer swap). It does not delete any generations; it
@@ -477,76 +1410,301 @@ public final class IndexGenerationManager {
    * @return the updated normalized state, or null if no state exists
    */
   public State promoteBuildingGenerationToActive() throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      return null;
+    try (var ignored = stateControl()) {
+      State current = readStateBestEffort();
+      if (current == null) {
+        return null;
+      }
+      State normalized = normalizeAndUpgradeStateIfNeeded(current);
+      String building = normalized.building_generation();
+      if (building == null || building.isBlank()) {
+        return normalized;
+      }
+      String nextActive = requireSafeGenerationId(building, "state.json building_generation");
+      String prevActive = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              nextActive,
+              null,
+              prevActive,
+              MigrationState.IDLE.name(),
+              false,
+              null,
+              null,
+              System.currentTimeMillis(),
+              // A completed cutover is the proof the rebuild converged: release the brake so a
+              // future, unrelated upgrade starts with a full budget.
+              null,
+              null,
+              null);
+      writeState(next);
+      return next;
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    String building = normalized.building_generation();
-    if (building == null || building.isBlank()) {
-      return normalized;
-    }
-    String nextActive = requireSafeGenerationId(building, "state.json building_generation");
-    String prevActive = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            nextActive,
-            null,
-            prevActive,
-            MigrationState.IDLE.name(),
-            false,
-            null,
-            null,
-            System.currentTimeMillis(),
-            // A completed cutover is the proof the rebuild converged: release the brake so a
-            // future, unrelated upgrade starts with a full budget.
-            null,
-            null,
-            null);
-    writeState(next);
-    return next;
   }
 
   /**
-   * Rolls back {@code active_generation} to {@code previous_generation} (if present) and swaps
-   * {@code previous_generation} to the current active generation.
+   * Retires one exact predecessor after its process resources have been closed by the caller.
    *
-   * <p>This is an operator control used after a cutover when Green is unhealthy and we want to
-   * revert to the last known-good generation.
-   *
-   * <p>This method does not delete any generations; it only updates {@code state.json}.
-   *
-   * @return the updated normalized state, or null if no state exists
+   * <p>The predecessor remains capacity-owning until its original directory and any exact
+   * {@code .del-*} representation are both absent. A repeated call completes either crash cut:
+   * deletion with the pointer still present, or pointer removal with deletion still incomplete.
    */
-  public State rollbackToPreviousGeneration() throws IOException {
-    State current = readStateBestEffort();
-    if (current == null) {
-      return null;
+  public State retirePreviousGeneration(String expectedActive, String expectedPrevious)
+      throws IOException {
+    try (var ignored = stateControl()) {
+      String active = requireSafeGenerationId(expectedActive, "expected active generation");
+      String previous =
+          requireSafeGenerationId(expectedPrevious, "expected previous generation");
+      if (active.equals(previous)) {
+        throw new IOException("Active and previous generation identities must be distinct");
+      }
+
+      State current = requireExactIdleRetirementState(active);
+      String observedPrevious = current.previous_generation();
+      if (observedPrevious != null
+          && !observedPrevious.isBlank()
+          && !previous.equals(
+              requireSafeGenerationId(
+                  observedPrevious, "state.json previous_generation"))) {
+        throw new IOException("Previous generation differs from the expected retirement target");
+      }
+
+      boolean pointerBindsRetirement =
+          observedPrevious != null && !observedPrevious.isBlank();
+      deleteExactRetiredRepresentation(previous, pointerBindsRetirement);
+      if (observedPrevious == null || observedPrevious.isBlank()) {
+        return current;
+      }
+
+      State next =
+          new State(
+              STATE_FORMAT_VERSION,
+              active,
+              null,
+              null,
+              MigrationState.IDLE.name(),
+              current.migration_paused(),
+              current.pause_reason(),
+              current.paused_at_ms(),
+              System.currentTimeMillis(),
+              current.auto_rebuild_key(),
+              current.auto_rebuild_count(),
+              current.auto_rebuild_first_ms());
+      try {
+        writeState(next);
+        return next;
+      } catch (IOException ambiguous) {
+        try {
+          State observed = requireExactIdleRetirementState(active);
+          if (observed.previous_generation() == null
+              || observed.previous_generation().isBlank()) {
+            return observed;
+          }
+        } catch (IOException unresolved) {
+          ambiguous.addSuppressed(unresolved);
+        }
+        throw ambiguous;
+      }
     }
-    State normalized = normalizeAndUpgradeStateIfNeeded(current);
-    String prev = normalized.previous_generation();
-    if (prev == null || prev.isBlank()) {
-      return normalized;
+  }
+
+  private State requireExactIdleRetirementState(String expectedActive) throws IOException {
+    State state = strictBootLayout(readRecordedState()).state();
+    if (!expectedActive.equals(state.active_generation())
+        || !MigrationState.IDLE.name().equals(state.migration_state())
+        || state.building_generation() != null && !state.building_generation().isBlank()) {
+      throw new IOException("Generation state changed before predecessor retirement");
     }
-    String nextActive = requireSafeGenerationId(prev, "state.json previous_generation");
-    String curActive = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
-    State next =
-        new State(
-            STATE_FORMAT_VERSION,
-            nextActive,
-            null, // clear building on rollback (operators can start a new migration explicitly)
-            curActive,
-            MigrationState.IDLE.name(),
-            false,
-            null,
-            null,
-            System.currentTimeMillis(),
-            normalized.auto_rebuild_key(),
-            normalized.auto_rebuild_count(),
-            normalized.auto_rebuild_first_ms());
-    writeState(next);
-    return next;
+    return state;
+  }
+
+  private void deleteExactRetiredRepresentation(
+      String generationId, boolean durablyBound) throws IOException {
+    Path original = resolveGenerationPathReadOnly(generationId);
+    if (Files.exists(original, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      requireOwnedRetirementDirectory(original, generationId, false,
+          durablyBound && Files.exists(original.resolve(DELETE_MARKER),
+              java.nio.file.LinkOption.NOFOLLOW_LINKS));
+      SafeIndexPathOps.MarkResult marked = SafeIndexPathOps.markForDeletion(original, indicesDir);
+      Path effective = normalize(marked.effectivePath());
+      requireOwnedRetirementDirectory(
+          effective,
+          generationId,
+          !effective.getFileName().toString().equals(generationId),
+          durablyBound);
+    }
+
+    for (Path retired :
+        exactRetirementRepresentations(generationId, durablyBound)) {
+      deleteRetirementPayloadBeforeOwnership(retired);
+      io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(retired, log);
+    }
+    if (!exactRetirementRepresentations(generationId, durablyBound).isEmpty()) {
+      throw new IOException(
+          "Exact predecessor directory remains after deletion: " + generationId);
+    }
+  }
+
+  private List<Path> exactRetirementRepresentations(
+      String generationId, boolean durablyBound) throws IOException {
+    if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      return List.of();
+    }
+    List<Path> exact = new ArrayList<>();
+    try (var entries = Files.list(indicesDir)) {
+      for (Path entry : entries.toList()) {
+        String name = entry.getFileName().toString();
+        if (!name.equals(generationId) && !isMarkedRetirementName(name, generationId)) {
+          continue;
+        }
+        boolean markedName = !name.equals(generationId);
+        requireOwnedRetirementDirectory(
+            entry,
+            generationId,
+            markedName,
+            durablyBound && (markedName || Files.exists(entry.resolve(DELETE_MARKER),
+                java.nio.file.LinkOption.NOFOLLOW_LINKS)));
+        exact.add(entry);
+      }
+    }
+    exact.sort(Comparator.comparing(Path::toString));
+    return exact;
+  }
+
+  private void requireOwnedRetirementDirectory(
+      Path directory,
+      String generationId,
+      boolean markedName,
+      boolean allowPointerBoundPartialMetadata)
+      throws IOException {
+    Path exact = normalize(directory);
+    Path root = normalize(indicesDir);
+    String name = exact.getFileName().toString();
+    boolean exactName =
+        markedName ? isMarkedRetirementName(name, generationId) : name.equals(generationId);
+    if (!exact.startsWith(root)
+        || exact.equals(root)
+        || !exactName
+        || !Files.isDirectory(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Refusing unsafe predecessor retirement path: " + exact);
+    }
+    Path sentinel = exact.resolve(GENERATION_SENTINEL);
+    Path manifestPath = exact.resolve(GENERATION_MANIFEST);
+    boolean sentinelExists = Files.exists(sentinel, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+    boolean manifestExists = Files.exists(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+    // FileOps historically could delete both metadata files before a locked payload. In that
+    // recovery shape the strict previous_generation pointer plus SafeIndexPathOps' exact encoded
+    // rename is the durable ownership proof. Any surviving metadata must still agree.
+    if ((!sentinelExists || !manifestExists) && !allowPointerBoundPartialMetadata) {
+      throw new IOException("Predecessor ownership metadata is unavailable: " + exact);
+    }
+    if (sentinelExists) {
+      requireRetirementSentinel(sentinel, generationId, exact);
+    }
+    if (manifestExists) {
+      requireRetirementManifest(manifestPath, generationId, exact);
+    }
+  }
+
+  private static boolean isMarkedRetirementName(String name, String generationId) {
+    String prefix = generationId + ".del-";
+    if (!name.startsWith(prefix)) {
+      return false;
+    }
+    String suffix = name.substring(prefix.length());
+    return suffix.matches("[0-9]{8}-[0-9]{6}");
+  }
+
+  private static void requireRetirementSentinel(
+      Path sentinel, String generationId, Path directory) throws IOException {
+    if (!Files.isRegularFile(sentinel, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || Files.size(sentinel) > 1_024) {
+      throw new IOException("Predecessor sentinel is invalid: " + directory);
+    }
+    String body =
+        new String(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinel),
+            StandardCharsets.UTF_8);
+    if (body.lines().noneMatch(line -> line.equals("generation_id=" + generationId))) {
+      throw new IOException("Predecessor sentinel identifies another generation: " + directory);
+    }
+  }
+
+  private static void requireRetirementManifest(
+      Path manifestPath, String generationId, Path directory) throws IOException {
+    if (!Files.isRegularFile(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+        || Files.size(manifestPath) > 16_384) {
+      throw new IOException("Predecessor manifest is invalid: " + directory);
+    }
+    final GenerationManifest manifest;
+    try {
+      manifest =
+          JSON.readValue(
+              io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(
+                  manifestPath),
+              GenerationManifest.class);
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Predecessor manifest is invalid: " + directory, malformed);
+    }
+    if (manifest == null || !generationId.equals(manifest.generation_id())) {
+      throw new IOException("Predecessor manifest identifies another generation: " + directory);
+    }
+  }
+
+  private static void deleteRetirementPayloadBeforeOwnership(Path directory)
+      throws IOException {
+    List<Path> payload;
+    try (var entries = Files.list(directory)) {
+      payload =
+          entries
+              .filter(
+                  path ->
+                      !Set.of(GENERATION_SENTINEL, GENERATION_MANIFEST)
+                          .contains(path.getFileName().toString()))
+              .sorted(Comparator.comparing(Path::toString))
+              .toList();
+    }
+    for (Path entry : payload) {
+      io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(entry, log);
+    }
+    for (Path entry : payload) {
+      if (Files.exists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException(
+            "Predecessor payload remains locked after deletion: " + directory);
+      }
+    }
+  }
+
+  /** Count physical representations, including an abandoned but not yet deleted candidate. */
+  private void requireBuildCapacity(State state, String acceptedTarget, boolean allowActivePrevious)
+      throws IOException {
+    String active =
+        requireSafeGenerationId(state.active_generation(), "state.json active_generation");
+    if (state.previous_generation() != null && !state.previous_generation().isBlank()
+        && (!allowActivePrevious || !active.equals(state.previous_generation()))) {
+      throw new IOException("Previous generation still occupies build capacity");
+    }
+    if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      return;
+    }
+    try (var entries = Files.list(indicesDir)) {
+      for (Path entry : entries.toList()) {
+        if (!Files.isDirectory(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+          continue;
+        }
+        String name = entry.getFileName().toString();
+        // Backup-first corruption recovery retains the damaged index as a diagnostic backup.
+        // It is not a serving/building generation and must not block rebuilding its replacement.
+        if (name.matches("g-.+\\.bak-[0-9]{8}-[0-9]{6}")) {
+          continue;
+        }
+        if (!name.equals(active) && !name.equals(acceptedTarget)) {
+          throw new IOException(
+              "A retained generation representation still occupies build capacity");
+        }
+      }
+    }
   }
 
   private IndexLayout resolveFromState(State state) throws IOException {
@@ -647,6 +1805,54 @@ public final class IndexGenerationManager {
   }
 
   /**
+   * Fresh authoritative state check for a mutation targeting the captured serving generation.
+   * No cached state, backup recovery, normalization write or missing-state fallback is allowed.
+   * This is an observation, not a lease across a concurrent generation transition.
+   */
+  public boolean isIdleActiveGeneration(Path capturedTarget) throws IOException {
+    return idleActiveGeneration(capturedTarget).isPresent();
+  }
+
+  /**
+   * Returns the active identity from a strict authoritative-state read when it still names the
+   * captured runtime path. Unlike {@link #idleActiveGeneration}, an in-progress build does not make
+   * the serving Blue generation unobservable.
+   */
+  public java.util.Optional<String> activeGeneration(Path capturedTarget) throws IOException {
+    StrictActiveGeneration active = strictActiveGeneration(capturedTarget);
+    return active.matchesCapturedTarget() ? java.util.Optional.of(active.generationId())
+        : java.util.Optional.empty();
+  }
+
+  /** Return the identity from the same strict observation that validates the captured target. */
+  public java.util.Optional<String> idleActiveGeneration(Path capturedTarget) throws IOException {
+    StrictActiveGeneration active = strictActiveGeneration(capturedTarget);
+    State current = active.state();
+    boolean eligible = active.matchesCapturedTarget()
+        && MigrationState.IDLE.name().equals(current.migration_state())
+        && (current.building_generation() == null || current.building_generation().isBlank());
+    return eligible ? java.util.Optional.of(active.generationId()) : java.util.Optional.empty();
+  }
+
+  private StrictActiveGeneration strictActiveGeneration(Path capturedTarget) throws IOException {
+    Objects.requireNonNull(capturedTarget, "capturedTarget");
+    State current = JSON.readValue(
+        io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(statePath), State.class);
+    if (current == null || (current.format_version() != 1
+        && current.format_version() != STATE_FORMAT_VERSION)) {
+      throw new IOException("Unsupported or empty authoritative index state");
+    }
+    String active = requireSafeGenerationId(current.active_generation(), "state.json active_generation");
+    Path activePath = resolveGenerationPathReadOnly(active);
+    boolean matches = activePath.equals(capturedTarget.toAbsolutePath().normalize())
+        && Files.isDirectory(activePath);
+    return new StrictActiveGeneration(current, active, matches);
+  }
+
+  private record StrictActiveGeneration(
+      State state, String generationId, boolean matchesCapturedTarget) {}
+
+  /**
    * Reads the current state pointer best-effort, without performing legacy imports or creating new
    * generations.
    *
@@ -656,20 +1862,69 @@ public final class IndexGenerationManager {
    * never observes a torn version/state pair (tempdoc 589).
    */
   public State readStateBestEffort() {
-    CachedState cached = cache; // single volatile read — the (present?, value) pair is atomic
-    if (cached != null) {
-      return cached.value();
-    }
-    try {
-      State s = loadStateBestEffort();
-      if (s == null) {
-        // Absent state.json is NOT cached (matches prior behavior: re-read on the next call).
+    try (var ignored = stateControl()) {
+      String stamp = contentStampBestEffort();
+      CachedState cached = cache; // single volatile read — the whole entry is atomic
+      // A hit needs the stamp to be UNCHANGED, or unreadable. Unreadable is a hit on purpose:
+      // writeState replaces state.json by renaming (state.json -> state.json.prev, then tmp ->
+      // state.json), and on Windows a file being renamed over is briefly unopenable. Treating that
+      // window as "re-read" rather than "unchanged" would trade the stale read this stamp exists to
+      // fix for a transient NULL — which is worse, because every caller projects null as an empty
+      // migration state. A permanently missing state.json serves the last parse, which is exactly
+      // what the pre-stamp cache did.
+      if (cached != null && (stamp == null || stamp.equals(cached.contentHash()))) {
+        return cached.value();
+      }
+      try {
+        State s = loadStateBestEffort();
+        if (s == null) {
+          // Absent state.json is NOT cached (matches prior behavior: re-read on the next call).
+          return null;
+        }
+        State normalized = normalizeAndUpgradeStateIfNeeded(s);
+        // Stamp from BEFORE the read — the one taken at the top of this method — and not a fresh one
+        // taken after the parse. The two orders fail in opposite directions and only this one fails
+        // safe:
+        //
+        //   after-parse:  read stamp S1, parse V from revision R1, ANOTHER MANAGER WRITES (file
+        //                 becomes R2), stamp S2 = R2, cache (V-from-R1, stamp-of-R2). The next
+        //                 caller's stamp is R2, which MATCHES, so it is served R1's value — and goes
+        //                 on being served it until some later write moves the stamp again. That is
+        //                 the exact stale-read this stamp was added to prevent, reintroduced in a
+        //                 narrower window.
+        //   before-read:  cache (V, S1). If the file changed at any point during the read, the next
+        //                 caller's stamp is S2 != S1, so it misses and re-parses. The cost is one
+        //                 extra parse; there is no order in which a stale value can be served.
+        //
+        // The window is small either way. It is also exactly the window this whole change exists for
+        // — concurrent writes through a DIFFERENT manager instance over the same file — so sizing the
+        // fix to the common case rather than the racing one would have missed the point.
+        cache = new CachedState(normalized, stamp);
+        return normalized;
+      } catch (Exception e) {
         return null;
       }
-      State normalized = normalizeAndUpgradeStateIfNeeded(s);
-      cache = new CachedState(normalized); // single volatile publish
-      return normalized;
-    } catch (Exception e) {
+    }
+  }
+
+  /**
+   * Hex SHA-256 of state.json's bytes; {@code null} when the file is absent or unreadable.
+   *
+   * <p>Deliberately reads the whole file rather than sampling its attributes — see the cache comment
+   * on {@link #cache} for why (mtime, size) cannot identify a state.json revision. The file is a
+   * handful of fixed-width fields; SHA-256 over it is not the expensive part of anything.
+   *
+   * <p>{@code null} is a distinct answer from "hash of nothing", and callers treat it as "cannot
+   * tell, keep serving the last parse" rather than "changed": {@code writeState} replaces state.json
+   * by rename, and the brief window where the old name is gone must not be reported as a new
+   * revision.
+   */
+  private String contentStampBestEffort() {
+    try {
+      byte[] bytes = Files.readAllBytes(statePath);
+      return java.util.HexFormat.of()
+          .formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (Exception absentOrUnreadable) {
       return null;
     }
   }
@@ -790,6 +2045,23 @@ public final class IndexGenerationManager {
     }
   }
 
+  /** Candidate identity must be durable before state.json may point at it. */
+  private static void writeMigrationGenerationFilesStrict(Path genDir, String genId,
+      String source, List<String> projectionSourceIds) throws IOException {
+    long created = System.currentTimeMillis();
+    io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+        genDir.resolve(GENERATION_SENTINEL), recordedSentinel(genId, created)
+            .getBytes(StandardCharsets.UTF_8));
+    var manifest = new GenerationManifest(PROJECTION_MANIFEST_FORMAT_VERSION,
+        genId, source, created, null, Map.of(), null, null, projectionSourceIds);
+    byte[] bytes = JSON.writeValueAsBytes(manifest);
+    if (bytes.length > 16_384) {
+      throw new IOException("Projection source manifest exceeds its ownership limit");
+    }
+    io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+        genDir.resolve(GENERATION_MANIFEST), bytes);
+  }
+
   /**
    * Best-effort read of a generation's manifest {@code source} label (e.g. {@code
    * "corrupt_index_rebuild"}, {@code "schema_mismatch"}) — used by the status projection to tell the
@@ -813,7 +2085,7 @@ public final class IndexGenerationManager {
     }
   }
 
-  private State loadStateBestEffort() {
+  private State loadStateBestEffort() throws IOException {
     // state.json is authoritative; state.json.prev is a fallback if state.json is corrupted/partial.
     State s = tryReadState(statePath);
     if (s != null) {
@@ -832,12 +2104,13 @@ public final class IndexGenerationManager {
     return null;
   }
 
-  private State tryReadState(Path p) {
+  private State tryReadState(Path p) throws IOException {
+    if (!Files.exists(p)) return null;
+    // Unavailable bytes are not an absent/corrupt pointer. In particular, never adopt a new
+    // IDLE state or restore .prev merely because an external process holds the current file.
+    byte[] bytes = io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(p);
     try {
-      if (!Files.exists(p)) {
-        return null;
-      }
-      return JSON.readValue(p.toFile(), State.class);
+      return JSON.readValue(bytes, State.class);
     } catch (Exception e) {
       log.warn("Failed to read index state from {}", p, e);
       return null;
@@ -874,10 +2147,15 @@ public final class IndexGenerationManager {
 
     // 4) Invalidate the read cache so the next readStateBestEffort() re-reads from disk.
     cache = null;
+    stateMoveProbe.afterMove(state);
   }
 
   private Path resolveGenerationPath(String genId) throws IOException {
     Files.createDirectories(indicesDir);
+    return resolveGenerationPathReadOnly(genId);
+  }
+
+  private Path resolveGenerationPathReadOnly(String genId) throws IOException {
     Path p = indicesDir.resolve(genId).toAbsolutePath().normalize();
     if (!p.startsWith(indicesDir.toAbsolutePath().normalize())) {
       throw new IOException("Refusing generation path outside indicesDir. genId=" + genId + " path=" + p);
@@ -923,43 +2201,45 @@ public final class IndexGenerationManager {
 
   /**
    * Best-effort deletion helper for already-marked generations (directories named "*.del-*" or with
-   * a DELETEME marker). Not currently invoked by default; provided for future GC policies.
+   * a DELETEME marker). Called after recorded refusal and during generation startup/GC.
    */
   public void pruneMarkedForDeletionBestEffort() {
-    if (!Files.isDirectory(indicesDir)) {
-      return;
-    }
-    State state = readStateBestEffort();
-    if (state == null) {
-      // Safer to skip deletion when we don't know what's active/previous/building.
-      return;
-    }
-    Set<String> protectedIds = protectedGenerationIds(state);
-    try (var stream = Files.list(indicesDir)) {
-      stream
-          .filter(Files::isDirectory)
-          .filter(
-              p -> {
-                String name = p.getFileName().toString();
-                if (protectedIds.contains(name)) {
-                  return false;
-                }
-                boolean marked = name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER));
-                if (!marked) return false;
-                // Defense-in-depth: only delete dirs that look like JustSearch generations.
-                return Files.exists(p.resolve(GENERATION_SENTINEL));
-              })
-          .sorted(Comparator.comparing(Path::toString))
-          .forEach(
-              p -> {
-                try {
-                  io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(p, log);
-                } catch (Exception e) {
-                  log.debug("Failed to delete marked directory {}: {}", p, e.getMessage());
-                }
-              });
-    } catch (Exception e) {
-      log.debug("Error while pruning marked-for-deletion directories: {}", e.getMessage());
+    try (var ignored = stateControl()) {
+      if (!Files.isDirectory(indicesDir)) {
+        return;
+      }
+      State state = readStateBestEffort();
+      if (state == null) {
+        // Safer to skip deletion when we don't know what's active/previous/building.
+        return;
+      }
+      Set<String> protectedIds = protectedGenerationIds(state);
+      try (var stream = Files.list(indicesDir)) {
+        stream
+            .filter(Files::isDirectory)
+            .filter(
+                p -> {
+                  String name = p.getFileName().toString();
+                  if (protectedIds.contains(name)) {
+                    return false;
+                  }
+                  boolean marked = name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER));
+                  if (!marked) return false;
+                  // Defense-in-depth: only delete dirs that look like JustSearch generations.
+                  return Files.exists(p.resolve(GENERATION_SENTINEL));
+                })
+            .sorted(Comparator.comparing(Path::toString))
+            .forEach(
+                p -> {
+                  try {
+                    io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(p, log);
+                  } catch (Exception e) {
+                    log.debug("Failed to delete marked directory {}: {}", p, e.getMessage());
+                  }
+                });
+      } catch (Exception e) {
+        log.debug("Error while pruning marked-for-deletion directories: {}", e.getMessage());
+      }
     }
   }
 
@@ -971,57 +2251,59 @@ public final class IndexGenerationManager {
    * <p>This method is intended to be called via an explicit operator control, not automatically.
    */
   public GcResult gcBestEffort(int keepLatest, boolean pruneMarkedOnly) {
-    try {
-      if (!Files.isDirectory(indicesDir)) {
-        return new GcResult(0, 0);
-      }
-      State state = readStateBestEffort();
-      if (state == null) {
-        return new GcResult(0, 0);
-      }
-      Set<String> protectedIds = protectedGenerationIds(state);
-
-      int marked = 0;
-      if (!pruneMarkedOnly) {
-        List<Path> candidates = new ArrayList<>();
-        try (var stream = Files.list(indicesDir)) {
-          stream
-              .filter(Files::isDirectory)
-              .filter(p -> Files.exists(p.resolve(GENERATION_SENTINEL)))
-              .filter(
-                  p -> {
-                    String name = p.getFileName().toString();
-                    if (protectedIds.contains(name)) return false;
-                    // Never "mark" already-marked dirs; prune step handles them.
-                    if (name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER))) {
-                      return false;
-                    }
-                    return true;
-                  })
-              .forEach(candidates::add);
+    try (var ignored = stateControl()) {
+      try {
+        if (!Files.isDirectory(indicesDir)) {
+          return new GcResult(0, 0);
         }
-        candidates.sort(Comparator.comparing(p -> p.getFileName().toString()));
-        int keep = Math.max(0, keepLatest);
-        int cutoff = Math.max(0, candidates.size() - keep);
-        for (int i = 0; i < cutoff; i++) {
-          Path p = candidates.get(i);
-          try {
-            SafeIndexPathOps.markForDeletion(p, indicesDir);
-            marked++;
-          } catch (Exception e) {
-            log.debug("Failed to mark {} for deletion: {}", p, e.getMessage());
+        State state = readStateBestEffort();
+        if (state == null) {
+          return new GcResult(0, 0);
+        }
+        Set<String> protectedIds = protectedGenerationIds(state);
+
+        int marked = 0;
+        if (!pruneMarkedOnly) {
+          List<Path> candidates = new ArrayList<>();
+          try (var stream = Files.list(indicesDir)) {
+            stream
+                .filter(Files::isDirectory)
+                .filter(p -> Files.exists(p.resolve(GENERATION_SENTINEL)))
+                .filter(
+                    p -> {
+                      String name = p.getFileName().toString();
+                      if (protectedIds.contains(name)) return false;
+                      // Never "mark" already-marked dirs; prune step handles them.
+                      if (name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER))) {
+                        return false;
+                      }
+                      return true;
+                    })
+                .forEach(candidates::add);
+          }
+          candidates.sort(Comparator.comparing(p -> p.getFileName().toString()));
+          int keep = Math.max(0, keepLatest);
+          int cutoff = Math.max(0, candidates.size() - keep);
+          for (int i = 0; i < cutoff; i++) {
+            Path p = candidates.get(i);
+            try {
+              SafeIndexPathOps.markForDeletion(p, indicesDir);
+              marked++;
+            } catch (Exception e) {
+              log.debug("Failed to mark {} for deletion: {}", p, e.getMessage());
+            }
           }
         }
-      }
 
-      // Always try to prune already-marked directories (best-effort).
-      int before = countMarkedDeletableDirsBestEffort(state);
-      pruneMarkedForDeletionBestEffort();
-      int after = countMarkedDeletableDirsBestEffort(state);
-      int pruned = Math.max(0, before - after);
-      return new GcResult(marked, pruned);
-    } catch (Exception e) {
-      return new GcResult(0, 0);
+        // Always try to prune already-marked directories (best-effort).
+        int before = countMarkedDeletableDirsBestEffort(state);
+        pruneMarkedForDeletionBestEffort();
+        int after = countMarkedDeletableDirsBestEffort(state);
+        int pruned = Math.max(0, before - after);
+        return new GcResult(marked, pruned);
+      } catch (Exception e) {
+        return new GcResult(0, 0);
+      }
     }
   }
 

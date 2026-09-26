@@ -2,7 +2,6 @@
 package io.justsearch.ui.api.mcp;
 
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponse;
-import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -84,18 +83,10 @@ final class McpEntityCarriage {
         new Settings(false, ResolvedConfig.Search.DEFAULT_ENTITY_CARRIAGE_MAX_CHARS);
   }
 
-  /**
-   * Resolves carriage settings from the global {@link ConfigStore} snapshot, mirroring {@link
-   * McpDeliveryFraming#resolveSettings()}: falls back to {@link Settings#OFF} when the store is not
-   * yet initialized (test / early-boot paths), so an unconfigured process delivers exactly the
-   * pre-771 response.
-   */
-  static Settings resolveSettings() {
-    ConfigStore store = ConfigStore.globalOrNull();
-    if (store == null) {
-      return Settings.OFF;
-    }
-    ResolvedConfig.Search.EntityCarriage carriage = store.get().search().mcpEntityCarriage();
+  /** Resolves carriage from the same immutable config captured with the serving search. */
+  static Settings resolveSettings(ResolvedConfig snapshot) {
+    if (snapshot == null) return Settings.OFF;
+    ResolvedConfig.Search.EntityCarriage carriage = snapshot.search().mcpEntityCarriage();
     if (carriage == null) {
       return Settings.OFF;
     }

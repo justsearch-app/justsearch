@@ -168,10 +168,11 @@ public sealed interface ActionEvent
   }
 
   /**
-   * Tempdoc 812 D2 — a directory scan's ROLLUP: one record for "this scan indexed N documents".
+   * Historical directory-scan rollup retained for persisted journal decoding and rendering.
+   * Lane F retired its live producer; current ingestion progress belongs to the keyed operation row.
    *
    * <p>Per-document {@link Index} rows are operational telemetry (ring-only ephemera, evicted
-   * first under pressure); the scan they belong to is the audit fact, so it is recorded ONCE as an
+   * first under pressure); the legacy scan was the audit fact, recorded once as an
    * {@code OPERATION}-kind event — the durable tier. {@link #kind()} deliberately returns
    * {@code OPERATION} rather than minting a seventh kind: every kind-keyed consumer (the durable
    * journal, the {@code kind} API filter, the FE's tier split, the store's index-first eviction)
@@ -179,7 +180,7 @@ public sealed interface ActionEvent
    * added to each of them by hand. The typed variant exists so the summary's fields are a record,
    * not a stringly-typed detail blob.
    *
-   * <p>{@code docsDone}/{@code docsFailed} are counted from the REAL terminal job states
+   * <p>The legacy producer counted {@code docsDone}/{@code docsFailed} from terminal job states
    * ({@code DONE}/{@code FAILED} rows observed on the indexing-jobs bridge), never from the
    * enqueue-time admitted count — an audit row must state what happened, not what was attempted.
    * {@code outcome} ∈ {@code STARTED} (enumeration began) / {@code COMPLETED} (every admitted

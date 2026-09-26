@@ -63,12 +63,12 @@ function stateResource(): Resource {
   return { ...tabularResource(), category: 'STATE', primaryKey: '' };
 }
 
-function eventStreamResource(): Resource {
-  return { ...tabularResource(), category: 'EVENT_STREAM', primaryKey: '' };
+function eventStreamResource(primaryKey = ''): Resource {
+  return { ...tabularResource(), category: 'EVENT_STREAM', primaryKey };
 }
 
-function historyResource(): Resource {
-  return { ...tabularResource(), category: 'HISTORY', primaryKey: '' };
+function historyResource(primaryKey = ''): Resource {
+  return { ...tabularResource(), category: 'HISTORY', primaryKey };
 }
 
 describe('subscription strategy registry', () => {
@@ -139,6 +139,85 @@ describe('subscription strategy registry', () => {
       expect(events.map((e) => e.id)).toEqual(['a', 'b', 'c']);
     });
 
+    it('declared primaryKey deduplicates snapshot/live rows and keeps distinct invocations', () => {
+      const s = strategyFor(eventStreamResource('operationKey'))!;
+      let st = s.reducer(s.initialState, envelope('LIFECYCLE', 1, {
+        kind: 'snapshot',
+        entries: [
+          { operationId: 'core.x', operationKey: 'inv-a', status: 'RUNNING' },
+          { operationId: 'core.x', operationKey: 'inv-b', status: 'DONE' },
+          // Duplicate snapshot row: the later value for the declared key wins.
+          { operationId: 'core.x', operationKey: 'inv-a', status: 'RETRYING' },
+        ],
+      }));
+      st = s.reducer(st, envelope('UPDATE', 2, {
+        operationId: 'core.x', operationKey: 'inv-a', status: 'SUCCEEDED',
+      }));
+      st = s.reducer(st, envelope('UPDATE', 3, {
+        operationId: 'core.x', operationKey: 'inv-c', status: 'RUNNING',
+      }));
+
+      const events = (st.data as EventStreamData<{
+        operationId: string;
+        operationKey: string;
+        status: string;
+      }>).events;
+      expect(events).toHaveLength(3);
+      expect(events.map((event) => event.operationKey)).toEqual(['inv-a', 'inv-b', 'inv-c']);
+      expect(events[0]?.status).toBe('SUCCEEDED');
+    });
+
+    it('declared primaryKey still appends rows without usable identities independently', () => {
+      const s = strategyFor(eventStreamResource('operationKey'))!;
+      let st = s.reducer(s.initialState, envelope('LIFECYCLE', 1, {
+        kind: 'snapshot',
+        entries: [
+          { label: 'missing-1' },
+          { operationKey: null, label: 'null-1' },
+          { operationKey: '', label: 'blank-1' },
+        ],
+      }));
+      st = s.reducer(st, envelope('UPDATE', 2, { label: 'missing-2' }));
+      st = s.reducer(st, envelope('UPDATE', 3, { operationKey: null, label: 'null-2' }));
+      const events = (st.data as EventStreamData<{ label: string }>).events;
+      expect(events.map((event) => event.label)).toEqual([
+        'missing-1', 'null-1', 'blank-1', 'missing-2', 'null-2',
+      ]);
+    });
+
+    it('keeps scalar identities distinct and does not coerce non-scalars into one key', () => {
+      const s = strategyFor(eventStreamResource('identity'))!;
+      const st = s.reducer(s.initialState, envelope('LIFECYCLE', 1, {
+        kind: 'snapshot',
+        entries: [
+          { identity: 1, label: 'number-one' },
+          { identity: '1', label: 'string-one' },
+          { identity: false, label: 'false' },
+          { identity: { value: 1 }, label: 'object-one' },
+          { identity: { value: 1 }, label: 'object-two' },
+          { identity: [1], label: 'array-one' },
+          { identity: [1], label: 'array-two' },
+        ],
+      }));
+      const events = (st.data as EventStreamData<{ identity: unknown; label: string }>).events;
+      expect(events.map((event) => event.label)).toEqual([
+        'number-one', 'string-one', 'false',
+        'object-one', 'object-two', 'array-one', 'array-two',
+      ]);
+    });
+
+    it('declared primaryKey keeps its bounded 200-entry tail', () => {
+      const s = strategyFor(eventStreamResource('operationKey'))!;
+      let st = s.initialState;
+      for (let i = 0; i < 201; i++) {
+        st = s.reducer(st, envelope('UPDATE', i + 1, { operationKey: `inv-${i}` }));
+      }
+      const events = (st.data as EventStreamData<{ operationKey: string }>).events;
+      expect(events).toHaveLength(200);
+      expect(events[0]?.operationKey).toBe('inv-1');
+      expect(events.at(-1)?.operationKey).toBe('inv-200');
+    });
+
     it('cap-bounded ring evicts oldest', () => {
       const s = strategyFor(eventStreamResource())!;
       let st = s.initialState;
@@ -165,6 +244,28 @@ describe('subscription strategy registry', () => {
       st = s.reducer(st, envelope('UPDATE', 2, { operationId: 'core.y' }));
       const entries = (st.data as HistoryData<{ operationId: string }>).entries;
       expect(entries.map((e) => e.operationId)).toEqual(['core.x', 'core.y']);
+    });
+
+    it('uses the declared primaryKey for snapshot/update convergence', () => {
+      const s = strategyFor(historyResource('operationKey'))!;
+      let st = s.reducer(s.initialState, envelope('LIFECYCLE', 1, {
+        kind: 'snapshot',
+        entries: [
+          { operationRef: 'core.same', operationKey: 'inv-a', outcome: 'RUNNING' },
+          { operationRef: 'core.same', operationKey: 'inv-b', outcome: 'FAILED' },
+        ],
+      }));
+      st = s.reducer(st, envelope('UPDATE', 2, {
+        operationRef: 'core.same', operationKey: 'inv-a', outcome: 'SUCCEEDED',
+      }));
+      const entries = (st.data as HistoryData<{
+        operationRef: string;
+        operationKey: string;
+        outcome: string;
+      }>).entries;
+      expect(entries).toHaveLength(2);
+      expect(entries.map((entry) => entry.operationKey)).toEqual(['inv-a', 'inv-b']);
+      expect(entries[0]?.outcome).toBe('SUCCEEDED');
     });
   });
 

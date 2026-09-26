@@ -3,8 +3,6 @@ package io.justsearch.indexerworker.server;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import io.grpc.Server;
-import io.grpc.ServerInterceptor;
 import io.justsearch.adapters.lucene.runtime.IndexRecoveryMarker;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.DeferredRuntime;
@@ -14,15 +12,15 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeBuilder;
 import io.justsearch.adapters.lucene.runtime.ReadOnlyRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
+import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
-import io.justsearch.indexerworker.coordination.MmfWorkerSignalBus;
+import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.indexerworker.embed.EmbeddingFingerprint;
 import io.justsearch.indexerworker.splade.SpladeFingerprint;
-import io.justsearch.indexerworker.embed.EmbeddingConfig;
 import io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard;
 import io.justsearch.adapters.lucene.runtime.ParityDiagnostics;
 import io.justsearch.indexerworker.embed.EmbeddingMetadataOverlay;
@@ -34,21 +32,18 @@ import io.justsearch.indexerworker.recovery.IndexRecoveryPolicy;
 import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
 import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.app.api.status.MigrationSource;
+import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.indexerworker.liveness.LivenessWindows;
 import io.justsearch.indexerworker.util.IndexRootLock;
-import io.justsearch.indexerworker.grpc.DelegatingHealthService;
-import io.justsearch.indexerworker.grpc.DelegatingIngestService;
-import io.justsearch.indexerworker.grpc.DelegatingSearchService;
-import io.justsearch.indexerworker.grpc.RequestMetadataInterceptor;
-import io.justsearch.indexerworker.grpc.TracingServerInterceptor;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
-import io.justsearch.indexerworker.server.ops.KnowledgeServerGrpcWiring;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
+import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerSafeMetrics;
 import io.justsearch.indexing.SchemaFields;
-import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.InstallContract;
@@ -60,6 +55,7 @@ import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.RepoRootLocator;
+import io.justsearch.configuration.SystemAccess;
 import io.justsearch.ort.GpuSessionConfig;
 import io.justsearch.ort.NativeSessionHandle;
 import io.justsearch.telemetry.JvmRuntimeGauges;
@@ -83,32 +79,38 @@ import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The Knowledge Server hosts gRPC services for search and indexing.
- *
- * <p>This is the main entry point for the isolated worker process that handles:
+ * The Knowledge Server owns the index half's infrastructure — Lucene runtimes, the job queue, the
+ * signal bus — and the application services built on top of it:
  * <ul>
- *   <li>Search queries via gRPC</li>
+ *   <li>Search queries</li>
  *   <li>Batch ingestion of file paths</li>
  *   <li>Background indexing loop</li>
- *   <li>Process coordination via MMF (memory-mapped file)</li>
+ *   <li>The signal bus: the GPU-scheduling gauge it shares with the application half, and the
+ *       dev-only hot-reload request file</li>
  * </ul>
  *
- * <p>The server binds to an ephemeral port (port 0) and writes the actual bound
- * port to the signal bus for discovery by the main process.
+ * <p><b>It is not a server in the socket sense any more.</b> Until lane F stage A it hosted gRPC
+ * services for a second JVM: item A9 deleted the gRPC server, its interceptors and the ephemeral
+ * port it published to the signal bus, and item A11 deleted the worker process itself. Since item
+ * A6 this class is constructed and started in the Head JVM by
+ * {@code io.justsearch.app.engine.EngineRoot}, and callers reach its services as direct calls
+ * through {@link #appServices()}. The name is kept because every log line, metric and doc uses it.
  */
 public final class KnowledgeServer implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServer.class);
   private static final ObjectMapper JSON = new ObjectMapper();
 
-  private static final int SHUTDOWN_TIMEOUT_SECONDS = 5;
   private static final long MIGRATION_SWITCHING_QUEUE_DEPTH_THRESHOLD = 1_000L;
   private static final long MIGRATION_SWITCHING_MAX_DURATION_MS = 30L * 60_000L;
 
@@ -132,11 +134,143 @@ public final class KnowledgeServer implements Closeable {
   private Path activeIndexPath;
   private Path buildingIndexPath;
   private IndexGenerationManager indexGenerationManager;
+  private IndexGenerationManager.BootOwnership generationBootOwnership;
+  private IndexGenerationManager.BootDisposition generationBootDisposition;
+  private volatile boolean promotedReplaySettled;
   private IndexRootLock indexRootLock;
+  private boolean closePrepared;
+  private WorkerAppServices pendingAppServices;
+  private DeferredRuntime.PreparedUpgrade pendingDeferredUpgrade;
+  private final Object closeLock = new Object();
+  private final ReentrantLock runtimeSwapLock = new ReentrantLock();
+
+  /** Serializes dev service replacement with admin runtime replacement and shutdown. */
+  final class DevReplacementLease implements AutoCloseable {
+    private boolean released;
+
+    void assertOwned() {
+      if (released || !runtimeSwapLock.isHeldByCurrentThread()) {
+        throw new IllegalStateException("Dev replacement owner lock is not held");
+      }
+    }
+
+    @Override public void close() {
+      if (released) return;
+      released = true;
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  DevReplacementLease beginDevReplacement() {
+    if (closeStarted) throw new IllegalStateException("Dev reload refused during server close");
+    runtimeSwapLock.lock();
+    if (closeStarted) {
+      runtimeSwapLock.unlock();
+      throw new IllegalStateException("Dev reload refused during server close");
+    }
+    return new DevReplacementLease();
+  }
+  private final ReentrantReadWriteLock publicationLock;
+  private final Object servingViewMonitor = new Object();
+  private ServingView servingView;
+  private final List<ServingView> retiredServingViews = new ArrayList<>();
+
+  private static final class ServingView {
+    private final WorkerAppServices services;
+    private final LuceneRuntime searchRuntime;
+    private final LuceneRuntime ingestRuntime;
+    private final Path activeGenerationPath;
+    private volatile EncoderSet encoderSet;
+    private EncoderSet.Lease encoderLease;
+    private int holders;
+    private final List<Runnable> retirementListeners = new ArrayList<>();
+    private boolean retiring;
+    private boolean cleanupRunning;
+    private boolean abortRetirement;
+    private Runnable retireCleanup;
+
+    private ServingView(WorkerAppServices services, LuceneRuntime searchRuntime,
+        LuceneRuntime ingestRuntime, Path activeGenerationPath) {
+      this.services = Objects.requireNonNull(services, "services");
+      this.searchRuntime = searchRuntime;
+      this.ingestRuntime = ingestRuntime;
+      this.activeGenerationPath = activeGenerationPath;
+    }
+
+    private void attachEncoderSet(EncoderSet owner) {
+      if (encoderSet != null) throw new IllegalStateException("Serving encoder set already installed");
+      encoderLease = Objects.requireNonNull(owner, "owner").acquire();
+      encoderSet = owner;
+    }
+
+    private void releaseEncoderSet() {
+      if (encoderLease != null) encoderLease.close();
+    }
+  }
+
+  /** Retains the exact application services and runtimes selected at capture. */
+  public final class ServingLease implements AutoCloseable {
+    private final ServingView captured;
+    private final AtomicBoolean released = new AtomicBoolean();
+
+    private ServingLease(ServingView captured) { this.captured = captured; }
+
+    public WorkerAppServices services() { return captured.services; }
+
+    public LuceneRuntime searchRuntime() { return captured.searchRuntime; }
+
+    public LuceneRuntime ingestRuntime() { return captured.ingestRuntime; }
+
+    public Path activeGenerationPath() { return captured.activeGenerationPath; }
+
+    /** The exact model owner retained by this serving view, once deferred wiring has completed. */
+    public EncoderSet encoderSet() { return captured.encoderSet; }
+
+    /** Child work may retain its already-issued view after ordinary acquisitions stop. */
+    public ServingLease fork() {
+      synchronized (servingViewMonitor) {
+        if (released.get()) throw new IllegalStateException("Serving lease already released");
+        captured.holders++;
+        return new ServingLease(captured);
+      }
+    }
+
+    /** Long-lived calls can end and reconnect when this physical view stops serving. */
+    public Runnable onRetirement(Runnable listener) {
+      Objects.requireNonNull(listener, "listener");
+      boolean alreadyRetiring;
+      synchronized (servingViewMonitor) {
+        alreadyRetiring = captured.retiring;
+        if (!alreadyRetiring) captured.retirementListeners.add(listener);
+      }
+      if (alreadyRetiring) listener.run();
+      return () -> {
+        synchronized (servingViewMonitor) { captured.retirementListeners.remove(listener); }
+      };
+    }
+
+    @Override public void close() {
+      if (!released.compareAndSet(false, true)) return;
+      synchronized (servingViewMonitor) {
+        captured.holders--;
+        servingViewMonitor.notifyAll();
+      }
+      cleanRetiredServingView(captured);
+    }
+  }
+  private volatile boolean closeStarted;
   private volatile boolean migrationEnumeratorDone;
+  private volatile Throwable migrationEnumeratorFailure;
+  private volatile List<io.justsearch.app.api.indexing.ProjectionSeedSource> projectionSeedSources =
+      List.of();
+  record ProjectionSeedCompletion(String generation, String sourceId) {}
+  private final Set<ProjectionSeedCompletion> completedProjectionSeeds =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
 
   // Package-private: accessed by DevReloadManager for hot-reload (tempdoc 305 Phase 2)
   WorkerSignalBus signalBus;
+  private final WorkerSignalBus injectedSignalBus;
+  private final io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry;
   private JobQueue jobQueue;
 
   // Tempdoc 550 Thesis II / 575 §4.3b (liveness): periodic reaper re-queues PROCESSING rows orphaned by a
@@ -146,21 +280,25 @@ public final class KnowledgeServer implements Closeable {
   private static final long STALE_PROCESSING_MS = LivenessWindows.REAPER_STALE_MS; // 5 min liveness window
   private static final long REAP_INTERVAL_MS = 2 * 60_000L; // check every 2 min (poll cadence, not a window)
   private java.util.concurrent.ScheduledExecutorService stuckJobReaper;
+  private java.util.concurrent.ScheduledFuture<?> stuckJobReapTask;
+  private java.util.concurrent.ExecutorService deferredModelExecutor;
   // Tempdoc 419 / T5.1 (ADR-0028): scoped reverse-lookup store. Constructed in init() against
   // the same jobs.db as JobQueue; closed in shutdown alongside JobQueue.
   private io.justsearch.indexerworker.queue.SqlitePathResolutionStore pathResolutionStore;
   private io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore documentIdentityStore;
-  private LuceneRuntime searchLifecycle;
-  private LuceneRuntime ingestLifecycle;
+  private volatile LuceneRuntime searchLifecycle;
+  private volatile LuceneRuntime ingestLifecycle;
   EmbeddingService embeddingService;
   EmbeddingCompatibilityController embeddingCompatController;
   volatile WorkerAppServices appServices;
+  private WorkerServiceConfiguration serviceConfiguration;
 
   /**
    * Tempdoc 885 item 3: the foreground-load gauge and the duty-cycle policy that reads it. Both are
    * process-scoped and owned here rather than by {@code appServices}, because the app services are
-   * reconstructed (deferred-runtime upgrade, dev hot-reload) while the gRPC server — and therefore
-   * the single interceptor that feeds the gauge — is not. A per-appServices gauge would be orphaned
+   * reconstructed (deferred-runtime upgrade, dev hot-reload) while this server — and therefore the
+   * single producer that feeds the gauge ({@code ForegroundLoadGate} since item A9, the gRPC
+   * {@code ForegroundLoadInterceptor} before it) — is not. A per-appServices gauge would be orphaned
    * from its only producer on the first reconstruction and silently stop throttling.
    */
   private final ForegroundLoad foregroundLoad =
@@ -168,9 +306,6 @@ public final class KnowledgeServer implements Closeable {
 
   private volatile IndexingPacing indexingPacing =
       IndexingPacing.unthrottled();
-  DelegatingSearchService searchWrapper;
-  DelegatingIngestService ingestWrapper;
-  DelegatingHealthService healthWrapper;
   io.justsearch.indexerworker.disambiguation.DisambiguationService disambiguationService;
   io.justsearch.indexerworker.ner.NerService nerServiceInstance;
   io.justsearch.indexerworker.splade.SpladeEncoder spladeEncoderInstance;
@@ -181,11 +316,17 @@ public final class KnowledgeServer implements Closeable {
   // Tempdoc 397 §14.26 T2-C1/C2: surface returned by InferenceCompositionRoot.compose;
   // owns SessionHandle lifetimes closed on shutdown.
   volatile InferenceSurface inferenceSurface;
+  private volatile EncoderSet initialEncoderSet;
+  private volatile GenerationModelSelection initialModelSelection;
   // Phase 3c: WorkerOpsMetricCatalog replaces all worker.* gauge / observable-counter fields.
   // Catalog instance is retained for lifetime; OTel async callbacks fire at flush time.
   @SuppressWarnings("unused")
   private io.justsearch.indexerworker.services.WorkerOpsMetricCatalog workerOpsCatalog;
-  private Server grpcServer;
+  /**
+   * Released only after {@link #close()} reaches its final resource-release step. EngineRoot
+   * checks {@link #awaitClosed(long)} to distinguish completed teardown from an interrupted close.
+   */
+  private final CountDownLatch shutdownLatch = new CountDownLatch(1);
   InfraContext infraCtx; // package-private: DevReloadManager
   volatile CompletableFuture<ModelContext> deferredModelInit; // package-private: DevReloadManager
   private DevReloadManager devReloadManager;
@@ -193,7 +334,12 @@ public final class KnowledgeServer implements Closeable {
   private Thread sentinelThread;
   private Thread migrationEnumeratorThread;
   private Thread migrationCutoverThread;
+  private MigrationTransitionBarrier.Hook migrationTransitionHook;
   private volatile boolean running;
+  private volatile Consumer<Throwable> terminalWriterFaultHandler =
+      failure -> log.error("Terminal writer failure has no Engine fault handler", failure);
+  private volatile Runnable migrationRestartAction =
+      () -> log.warn("Promoted generation requires an Engine restart; no process owner is installed");
   private int migrationCutoverMaxFailedJobs = -1;
   /**
    * Tempdoc 819: set when this boot started a corruption-recovery rebuild (the active generation
@@ -206,10 +352,11 @@ public final class KnowledgeServer implements Closeable {
   /**
    * Set when this boot found a schema mismatch it has already tried to rebuild away
    * {@link IndexGenerationManager#MAX_AUTO_REBUILD_ATTEMPTS} times. The Worker then serves the
-   * existing index READ-ONLY and does not ingest: it must still finish starting, because a Worker
-   * that returns early from {@code start()} never binds gRPC, never writes its port, and exits with
-   * no explanation — the same silent dead-end the old FAIL_CLOSED default produced, which is the
-   * whole thing this brake exists to avoid (tempdoc 915 §C.8).
+   * existing index READ-ONLY and does not ingest: it must still finish starting, because a
+   * {@code start()} that returns early never publishes its services and leaves the caller with no
+   * explanation — the same silent dead-end the old FAIL_CLOSED default produced, which is the
+   * whole thing this brake exists to avoid (tempdoc 915 §C.8). Before item A9 the same dead-end
+   * read as "never binds gRPC, never writes its port".
    *
    * <p>The durable form of this state is {@code auto_rebuild_*} in {@code state.json}; this field is
    * only the in-process consequence for the remainder of {@code start()}.
@@ -268,7 +415,7 @@ public final class KnowledgeServer implements Closeable {
    *   <li><b>Query handlers</b> (tempdoc 397 §14.28 U3) — wired via
    *       {@link io.justsearch.indexerworker.server.WorkerAppServices#wireModelReadyLatch}
    *       in {@link #initDeferredModels()}, consumed by
-   *       {@code GrpcSearchService.awaitModelsReady(...)} on entry of
+   *       {@code WorkerSearchService.awaitModelsReady(...)} on entry of
    *       {@code search}/{@code retrieveContext}/{@code rerank}/{@code matchCitations}.
    *       Closes a boot-race regression where queries arriving before init completed
    *       silently missed reranker + citation wiring.</li>
@@ -286,13 +433,225 @@ public final class KnowledgeServer implements Closeable {
       new AtomicReference<>(java.util.Optional::empty);
 
   /**
-   * Creates a new KnowledgeServer with the specified configuration.
+   * Creates a new KnowledgeServer with the specified configuration and its own signal bus.
+   *
+   * <p>The bus it builds reads a gauge no other component writes, so nothing claims the GPU and
+   * nothing reports an energy signal. That is the right answer for an index half composed on its
+   * own; the Engine's composition root uses the two-argument constructor instead, because the
+   * point of the gauge is that the Head-side writers and this reader share ONE instance.
    *
    * @param config Worker configuration
    */
-  public KnowledgeServer(WorkerConfig config) {
+  public KnowledgeServer(io.justsearch.core.execution.EngineExecutorRegistry executors, WorkerConfig config) {
+    this(executors, config, null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  /**
+   * Creates a new KnowledgeServer with an externally-supplied signal bus (lane F stage A item A6).
+   *
+   * <p>When the index half runs inside the Engine JVM there is no second process, so a
+   * memory-mapped bus would have nothing to carry: the composition root passes an
+   * {@code InProcessWorkerSignalBus} over the shared {@code GpuSchedulingGauge} instead. Item A10
+   * deleted the memory-mapped implementation and the suicide pact with it, so this parameter is now
+   * about gauge identity rather than transport: a bus built here would read a gauge the Head-side
+   * writers never touch, and the index half would never yield the GPU.
+   *
+   * @param config Worker configuration
+   * @param signalBus the bus to use, or {@code null} to build one over a private gauge
+   */
+  public KnowledgeServer(io.justsearch.core.execution.EngineExecutorRegistry executors, WorkerConfig config, WorkerSignalBus signalBus) {
+    this(executors, config, signalBus, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  private final io.justsearch.core.execution.EngineExecutorRegistry executors;
+  private final WorkerExecutorRegistrations workerExecutors;
+  private final RecordedIngestionLifecycle recordedIngestionLifecycle;
+  private final io.justsearch.core.component.ComponentHandle indexComponent;
+  private final io.justsearch.core.component.ComponentHandle encoderComponent;
+  private final java.util.function.Supplier<io.justsearch.core.component.DeviceMemoryLine>
+      deviceMemoryLine;
+  private RecordedIngestionLifecycle.Attachment recordedIngestionAttachment;
+  private volatile ResolvedConfig startupConfiguration;
+  /** Accepted B configuration, independent of the A snapshot while Green is built. */
+  private volatile RecordedIngestionLifecycle.RecordedCandidate recordedCandidate;
+  private volatile io.justsearch.indexerworker.services.CandidateIndexTargetCapture.CaptureResult
+      recordedCandidateFingerprint;
+  private WorkerServiceConfiguration candidateServiceConfiguration;
+  private volatile CandidateModels candidateModels;
+  private volatile boolean recordedCandidateInPlace;
+  private volatile boolean gapWaitProducerPaused;
+  private volatile WorkerAppServices inPlaceLexicalServices;
+  private volatile EncoderSet.ModelIdentity inPlaceSourceIdentity;
+  private volatile boolean inPlaceSourceHadModels;
+  private volatile EmbeddingCompatibilityController candidateEmbeddingCompatController;
+
+  /** B's native/model view, independent of the model wrappers serving A during its build. */
+  private record CandidateModels(
+      EncoderSet owner,
+      EmbeddingService embedding,
+      EncoderBindings.Snapshot bindings,
+      io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder spladeIdf,
+      io.justsearch.reranker.CrossEncoderReranker reranker,
+      io.justsearch.reranker.CitationScorer citation,
+      GpuDiagnosticSuppliers diagnostics) {
+    void close() {
+      owner.close();
+      RuntimeException failure = null;
+      for (AutoCloseable wrapper : new AutoCloseable[] {embedding,
+          bindings.spladeEncoder(), bindings.bgeM3Encoder(), bindings.nerService(),
+          reranker, citation}) {
+        if (wrapper == null) continue;
+        try { wrapper.close(); }
+        catch (Exception cleanup) {
+          if (failure == null) failure = new IllegalStateException(
+              "Candidate model wrapper retirement failed", cleanup);
+          else failure.addSuppressed(cleanup);
+        }
+      }
+      if (failure != null) throw failure;
+    }
+  }
+
+  private static void closeWrapper(AutoCloseable wrapper) {
+    if (wrapper == null) return;
+    try { wrapper.close(); }
+    catch (Exception failure) { throw new IllegalStateException("Model wrapper retirement failed", failure); }
+  }
+  private final java.util.function.Supplier<ResolvedConfig> liveConfiguration;
+  private final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors;
+
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this(executors, config, signalBus, childRegistry, RecordedIngestionLifecycle.denied());
+  }
+
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle, null, null);
+  }
+
+  /** Process composition supplies stable handles retained across physical index replacement. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle,
+        indexComponent, encoderComponent, null);
+  }
+
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle,
+        indexComponent, encoderComponent, startupConfiguration, null);
+  }
+
+  /** Hot auxiliary settings read the same authority captured by the process composition. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration,
+      java.util.function.Supplier<ResolvedConfig> liveConfiguration) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle,
+        indexComponent, encoderComponent, startupConfiguration, liveConfiguration,
+        new ReentrantReadWriteLock());
+  }
+
+  /** Process composition shares the exact configuration/component publication lock. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration,
+      java.util.function.Supplier<ResolvedConfig> liveConfiguration,
+      ReentrantReadWriteLock publicationLock) {
+    this(executors, config, signalBus, childRegistry, recordedIngestionLifecycle,
+        indexComponent, encoderComponent, startupConfiguration, liveConfiguration, publicationLock,
+        () -> new io.justsearch.core.component.DeviceMemoryLine(null, null));
+  }
+
+  /** The Engine binds physical device memory at its composition root. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration,
+      java.util.function.Supplier<ResolvedConfig> liveConfiguration,
+      ReentrantReadWriteLock publicationLock,
+      java.util.function.Supplier<io.justsearch.core.component.DeviceMemoryLine> deviceMemoryLine) {
+    this.publicationLock = Objects.requireNonNull(publicationLock, "publicationLock");
+    this.deviceMemoryLine = Objects.requireNonNull(deviceMemoryLine, "deviceMemoryLine");
+    this.startupConfiguration = startupConfiguration;
+    this.liveConfiguration = liveConfiguration;
+    this.indexComponent = indexComponent;
+    this.encoderComponent = encoderComponent;
+    this.recordedIngestionLifecycle = Objects.requireNonNull(recordedIngestionLifecycle,
+        "recordedIngestionLifecycle");
+    this.executors = Objects.requireNonNull(executors, "executors");
     this.config = config;
     this.dataDir = config.dataDir();
+    this.migrationTransitionHook = MigrationTransitionBarrier.fromEnvironment(
+        this.dataDir, SystemAccess::rawEnvVar);
+    this.injectedSignalBus = signalBus;
+    this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
+    this.luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+    try { this.workerExecutors = new WorkerExecutorRegistrations(executors); }
+    catch (RuntimeException | Error failure) {
+      try { luceneExecutors.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
+  }
+
+  /** Installs the whole-Engine owner for an irrecoverably closed active Lucene writer. */
+  public void onTerminalWriterFailure(Consumer<Throwable> handler) {
+    terminalWriterFaultHandler = Objects.requireNonNull(handler, "handler");
+  }
+
+  /** Bind before start: a resumed migration may promote during startup. */
+  public void onMigrationRestart(Runnable action) {
+    migrationRestartAction = Objects.requireNonNull(action, "action");
+  }
+
+  private void bindTerminalWriterFaultSource(RunningRuntime source) {
+    source.onTerminalWriterFailure(failure -> terminalWriterFaultHandler.accept(failure));
+  }
+
+  /** Publishes an ingest runtime only after its terminal-writer owner is installed. */
+  void publishIngestLifecycle(LuceneRuntime runtime) {
+    if (runtime instanceof RunningRuntime runningRuntime) {
+      bindTerminalWriterFaultSource(runningRuntime);
+    }
+    this.ingestLifecycle = runtime;
   }
 
   /**
@@ -323,12 +682,11 @@ public final class KnowledgeServer implements Closeable {
    *
    * <p>Initialization order:
    * <ol>
-   *   <li>Open signal bus (MMF)</li>
+   *   <li>Open the signal bus (the in-process one under the Engine; the memory-mapped one on the
+   *       standalone path, until item A10 deletes it)</li>
    *   <li>Open job queue (SQLite)</li>
    *   <li>Initialize Lucene runtime</li>
    *   <li>Resolve the embedding compatibility controller — must precede any commit (tempdoc 819)</li>
-   *   <li>Start gRPC server on port 0</li>
-   *   <li>Write bound port to signal bus</li>
    *   <li>Start indexing loop</li>
    *   <li>Start sentinel thread (liveness monitor)</li>
    * </ol>
@@ -337,6 +695,10 @@ public final class KnowledgeServer implements Closeable {
    */
   public void start() throws IOException {
     log.info("Starting KnowledgeServer...");
+    if (indexComponent != null) {
+      indexComponent.transition(io.justsearch.core.component.ComponentState.STARTING,
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_STARTING.code(), null);
+    }
     running = true;
     long t0 = System.nanoTime();
     long tPrev = t0;
@@ -344,6 +706,7 @@ public final class KnowledgeServer implements Closeable {
 
     try {
       // 0. Initialize Worker-owned telemetry (must not write to the Head metrics file).
+      if (startupConfiguration == null) startupConfiguration = ConfigStore.global().get();
       // Tempdoc 417 Phase 1: register IndexRuntimeMetricCatalog.DEFINITIONS so the SDK builds
       // per-metric Views (tag schemas + bucket bounds + exemplar policies) before the
       // SdkMeterProvider is built. F2 fix: catalog has only a registry-arg constructor (final
@@ -351,7 +714,7 @@ public final class KnowledgeServer implements Closeable {
       // construct the typed catalog after LocalTelemetry exists.
       LocalTelemetry workerTelemetry =
           new LocalTelemetry(
-              dataDir,
+              executors, dataDir,
               config.telemetryFlushMs(),
               "justsearch-worker",
               config.serviceVersion(),
@@ -439,16 +802,31 @@ public final class KnowledgeServer implements Closeable {
       telemetry = workerTelemetry;
 
       // 0b. Initialize tracing (must happen before service class loading at step 3b).
-      // Read config directly from EnvRegistry — ConfigStore is not ready until step 3.
-      String tracingLevel = EnvRegistry.INDEX_TRACING_LEVEL
-          .getString("none").toLowerCase(Locale.ROOT);
+      // Use the same resolved snapshot captured for this physical index start.
+      //
+      // Lane F review S13: there is ONE GlobalOpenTelemetry per JVM, and since item A6 the Head and
+      // the index half share one. Whichever bootstrap runs first wins, and the Head's runs first
+      // (its API phase precedes this start()). So in the Engine, JUSTSEARCH_INDEX_TRACING_LEVEL
+      // does not decide anything on its own — it decides only when the Head declined to register,
+      // which happens when JUSTSEARCH_HEAD_TRACING_LEVEL is 'none'. That coupling is real and
+      // stage A does not resolve it (the two levels become one key when the manifest's worker
+      // projection is re-cut in stage B); what it must not do is happen silently. The catch below
+      // used to log at DEBUG under the Worker's INFO threshold, so an operator who set the index
+      // level and saw no indexing spans had nothing to read.
+      String tracingLevel = startupConfiguration.index().tracingLevel();
       if (!"none".equals(tracingLevel)) {
         try {
           tracingBootstrap = io.justsearch.telemetry.TracingBootstrap.forIndexing(
               dataDir, ((LocalTelemetry) telemetry).getHealthState(), tracingLevel);
           log.info("Worker tracing initialized: level={}", tracingLevel);
         } catch (IllegalStateException e) {
-          log.debug("GlobalOpenTelemetry already set, skipping TracingBootstrap: {}", e.getMessage());
+          log.info(
+              "Index tracing level '{}' is not in effect: OpenTelemetry is already registered in"
+                  + " this JVM by the Head (JUSTSEARCH_HEAD_TRACING_LEVEL governs both halves of"
+                  + " the Engine). Indexing spans are emitted at the Head's level, or not at all if"
+                  + " that level is 'none'. ({})",
+              tracingLevel,
+              e.getMessage());
         }
       }
 
@@ -457,13 +835,16 @@ public final class KnowledgeServer implements Closeable {
       tPrev = tPhase;
 
       // 1. Initialize signal bus.
-      // Tempdoc 630: pass Head's PID (forwarded via EnvRegistry.HEAD_PID) so the suicide-pact can
-      // distinguish a real Head death from a benign OS-resume stale heartbeat. Read directly from
-      // EnvRegistry (ConfigStore is not ready until step 3, like INDEX_TRACING_LEVEL above);
-      // 0 ⇒ unknown ⇒ heartbeat-only (pre-630) behavior (standalone runs).
-      Path signalPath = dataDir.resolve("worker_signal.lock");
-      long headPid = EnvRegistry.HEAD_PID.getLong(0L);
-      signalBus = new MmfWorkerSignalBus(signalPath, headPid);
+      // Lane F item A6: the Engine composition root supplies the in-process bus over the gauge it
+      // shares with the Head-side writers. Item A10 deleted the memory-mapped alternative, so the
+      // fallback below is the same implementation over a gauge nobody else writes — the honest
+      // reading for an index half composed on its own (tests, a standalone boot): no GPU claim, no
+      // energy signal, and therefore no yielding.
+      if (injectedSignalBus != null) {
+        signalBus = injectedSignalBus;
+      } else {
+        signalBus = new InProcessWorkerSignalBus(new GpuSchedulingGauge());
+      }
       signalBus.open();
 
       tPhase = System.nanoTime();
@@ -483,7 +864,8 @@ public final class KnowledgeServer implements Closeable {
       // Tempdoc 885 item 21d: the cap lives in ONE place. This was a bare literal `3` that agreed
       // with SqliteJobQueue.DEFAULT_MAX_ATTEMPTS only by coincidence.
       SqliteJobQueue sqliteQueue =
-          new SqliteJobQueue(dbPath, SqliteJobQueue.DEFAULT_MAX_ATTEMPTS, onSwitchBufferWriteFailure);
+          new SqliteJobQueue(dbPath, recordedIngestionLifecycle::recordedClaimDecision,
+              SqliteJobQueue.DEFAULT_MAX_ATTEMPTS, onSwitchBufferWriteFailure);
       // Tempdoc 885 item 21e: per-outcome counters. Late-bound like the write-failure callback
       // above — the catalog does not exist until registerTelemetryGauges runs.
       sqliteQueue.setOutcomeObserver(
@@ -511,40 +893,13 @@ public final class KnowledgeServer implements Closeable {
           throw e;
         }
       }
-      jobQueue.recoverStuckJobs();
-
-      // Tempdoc 550 Thesis II: periodic liveness reaper. recoverStuckJobs() above heals on
-      // startup; this re-queues PROCESSING rows orphaned WITHOUT a restart (worker claimed a job
-      // then died mid-process while the Head/UI keep running), so the rail never shows a dead job
-      // as perpetually "running". Age-bounded → never touches actively-draining jobs.
-      JobQueue reaperQueue = jobQueue;
-      stuckJobReaper =
-          java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
-              r -> {
-                Thread t = new Thread(r, "stuck-job-reaper");
-                t.setDaemon(true);
-                return t;
-              });
-      stuckJobReaper.scheduleWithFixedDelay(
-          () -> {
-            try {
-              reaperQueue.recoverStuckJobs(STALE_PROCESSING_MS);
-            } catch (RuntimeException reapErr) {
-              log.warn("stuck-job reaper tick failed (will retry): {}", reapErr.toString());
-            }
-          },
-          REAP_INTERVAL_MS,
-          REAP_INTERVAL_MS,
-          TimeUnit.MILLISECONDS);
-
       tPhase = System.nanoTime();
       long jobQueueMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
 
       // 3. Resolve generation-scoped index path BEFORE opening Lucene.
-      // Prefer ConfigStore (populated from worker snapshot); fall back to RuntimeConfig.
-      ConfigStore cs = ConfigStore.globalOrNull();
-      ResolvedConfig rc = cs != null ? cs.get() : null;
+      // Production root captured this once; legacy fixture constructors capture at first start.
+      ResolvedConfig rc = startupConfiguration;
       if (rc == null) {
         throw new IllegalStateException("ConfigStore not initialized — cannot start KnowledgeServer");
       }
@@ -558,18 +913,24 @@ public final class KnowledgeServer implements Closeable {
       this.indexRootLock = new IndexRootLock(effectiveIndexBasePath);
       this.indexRootLock.acquire();
 
-      IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
-      IndexGenerationManager.IndexLayout layout = genManager.initializeOrLoad();
-      this.indexGenerationManager = genManager;
-      this.indexBasePath = layout.basePath();
-      this.activeIndexPath = layout.activeGenerationPath();
-      this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
-      this.persistedMigrationProgressSnapshot = this.migrationProgressStore.readBestEffort();
-      IndexGenerationManager.State state = layout.state();
-      this.buildingIndexPath = null;
-      this.migrationEnumeratorDone = false;
-
-      logConfiguration();
+      var bootOwnership = recordedIngestionLifecycle.bootOwnership(jobQueue);
+      var candidate = bootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+          ? recordedIngestionLifecycle.recordedCandidate(recorded.operationKey())
+          : java.util.Optional.<RecordedIngestionLifecycle.RecordedCandidate>empty();
+      this.recordedCandidateFingerprint = null;
+      if (candidate.isPresent()) {
+        var exact = candidate.orElseThrow();
+        var recorded = (IndexGenerationManager.BootOwnership.Recorded) bootOwnership;
+        var captured = io.justsearch.indexerworker.services.CandidateIndexTargetCapture
+            .captureWithRuntimeInputs(exact.configuration());
+        if (!exact.target().equals(captured.target())
+            || !exact.target().fingerprint().equals(recorded.targetFingerprint())
+            || !exact.configuration().paths().indexBasePath().equals(effectiveIndexBasePath)) {
+          throw new IOException("Recorded candidate differs from its generation owner");
+        }
+        this.recordedCandidateFingerprint = captured;
+      }
+      this.recordedCandidate = candidate.orElse(null);
 
       // The embedding and SPLADE model digests are index_fingerprint inputs, but they are only
       // knowable in the Worker's model modules. Install them process-wide BEFORE the first commit
@@ -594,6 +955,40 @@ public final class KnowledgeServer implements Closeable {
       // the boot-time comparison disagree with every later one under BGE-M3.
       IndexFingerprint.installEffectiveVectorDimension(effectiveVectorDimensionSupplier());
 
+      IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
+      var boot = genManager.initializeForBoot(bootOwnership,
+          candidate.map(value -> value.target().fingerprint()).orElseGet(this::expectedIndexFingerprintOrNull));
+      if (candidate.isPresent()
+          && (boot.disposition() == IndexGenerationManager.BootDisposition.BUILDING
+              || boot.disposition() == IndexGenerationManager.BootDisposition.PROMOTED)) {
+        var recorded = (IndexGenerationManager.BootOwnership.Recorded) bootOwnership;
+        var exact = candidate.orElseThrow();
+        String sparseMode = exact.configuration().ai().sparseModel();
+        int vectorDimension = "bge-m3".equalsIgnoreCase(sparseMode)
+            ? 1024 : new io.justsearch.configuration.JustSearchConfigurationLoader()
+                .loadFieldCatalog().vectorDimension();
+        genManager.bindRecordedModels(recorded.operationKey(), recorded.source(),
+            recorded.targetFingerprint(), exact.models(), sparseMode, vectorDimension);
+      }
+      IndexGenerationManager.IndexLayout layout = boot.layout();
+      this.generationBootOwnership = bootOwnership;
+      this.generationBootDisposition = boot.disposition();
+      this.indexGenerationManager = genManager;
+      this.indexBasePath = layout.basePath();
+      this.activeIndexPath = layout.activeGenerationPath();
+      this.initialModelSelection = GenerationModelSelection.from(
+          genManager.manifestForOwnedPath(activeIndexPath)).orElse(null);
+      this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
+      this.persistedMigrationProgressSnapshot = this.migrationProgressStore.readBestEffort();
+      IndexGenerationManager.State state = layout.state();
+      this.buildingIndexPath = null;
+      this.migrationEnumeratorDone = false;
+      this.migrationEnumeratorFailure = null;
+      this.completedProjectionSeeds.clear();
+
+      logConfiguration();
+
+
       // 4. Initialize Lucene runtimes.
       // - searchLifecycle serves queries (Blue during migration)
       // - ingestLifecycle performs all writes (Green during migration; Active when not migrating)
@@ -601,10 +996,13 @@ public final class KnowledgeServer implements Closeable {
       // If a migration is already in progress, honor state.json and wire Blue/Green accordingly.
       IndexGenerationManager.MigrationState ms =
           parseMigrationState(state == null ? null : state.migration_state());
+      gapWaitProducerPaused = ms == IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE
+          && recordedCandidate != null;
       String buildingGenId = state == null ? null : state.building_generation();
       boolean inProgress =
           (ms == IndexGenerationManager.MigrationState.MIGRATING
               || ms == IndexGenerationManager.MigrationState.SWITCHING
+              || ms == IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE
               || ms == IndexGenerationManager.MigrationState.FAILED)
               && buildingGenId != null
               && !buildingGenId.isBlank();
@@ -630,7 +1028,7 @@ public final class KnowledgeServer implements Closeable {
       // legacy-blank rule, the empty-index exclusion and the model tri-state therefore apply
       // identically at both sites, by construction rather than by agreement.
       boolean preOpenMismatch = false;
-      if (!inProgress) {
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE && !inProgress) {
         var preOpenDiffs =
             IndexMetadataParityGuard.inspectCommittedParity(
                 activeIndexPath, () -> expectedCommitMetadata(fpSupplier));
@@ -649,25 +1047,67 @@ public final class KnowledgeServer implements Closeable {
       // lifetime — in the exhausted-brake state, which is precisely the state that keeps running
       // (tempdoc 915 B5 ride-along).
       LuceneRuntime blueReadOnly = null;
+      if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE) {
+        if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED) {
+          publishIngestLifecycle(buildIndexRuntime(activeIndexPath, fpSupplier).withoutRecovery()
+              .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open());
+          this.searchLifecycle = this.ingestLifecycle;
+        } else {
+          if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
+            // A remains the lexical serving generation while Green owns the queue producer.
+            // The directories are distinct; the producer projects accepted text to A.
+            this.searchLifecycle = buildIndexRuntime(activeIndexPath, fpSupplier)
+                .withoutRecovery().withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open();
+            this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
+            publishIngestLifecycle(buildIndexRuntime(buildingIndexPath, fpSupplier).withoutRecovery()
+                .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open());
+            // File work was already enumerated for this candidate. Registered no-file sources
+            // must be enumerated again from their authority before a resumed promotion.
+            this.migrationEnumeratorDone = expectedProjectionSourceIds().isEmpty();
+          } else {
+            boolean fencedSourceRecovery = generationBootDisposition
+                == IndexGenerationManager.BootDisposition.FENCED
+                && bootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+                && recorded.targetFingerprint().equals(recordedCandidate == null
+                    ? expectedIndexFingerprintOrNull() : recordedCandidate.target().fingerprint())
+                && recorded.sourceGeneration().equals(state.active_generation())
+                && (buildingGenId == null
+                    || IndexGenerationManager.recordedGenerationId(recorded.operationKey())
+                        .equals(buildingGenId));
+            if (fencedSourceRecovery) {
+              // Recovery may seal a refusal only after this runtime opens. A therefore needs its
+              // writer for exact B-journal cleanup even when the precommit refusal is not yet
+              // checkpointed. FENCED still prevents the indexing loop and new candidate claims.
+              publishIngestLifecycle(buildIndexRuntime(activeIndexPath, fpSupplier)
+                  .withoutRecovery().withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open());
+              this.searchLifecycle = this.ingestLifecycle;
+            } else {
+              this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).withoutRecovery()
+                  .openReadOnly();
+              publishIngestLifecycle(this.searchLifecycle);
+            }
+          }
+        }
+      } else {
       try {
       if (inProgress) {
         // Serve search from active generation (Blue) while writing to building generation (Green).
         blueReadOnly = buildReadOnlyRuntime(activeIndexPath).openReadOnly();
         this.searchLifecycle = blueReadOnly;
         this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
-        this.ingestLifecycle =
+        publishIngestLifecycle(
             buildIndexRuntime(buildingIndexPath, fpSupplier)
                 .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                .open();
+                .open());
       } else {
         // Normal operation: single runtime against active generation.
         //
         // Tempdoc 406 Phase 4a: deferred-writer mode is re-enabled. When the index
         // has existing segments, openDeferred() opens read-only first (fast); the
-        // background initDeferredModels later calls DeferredRuntime.upgradeWriter()
-        // which returns a fresh RunningRuntime. KS reconstructs appServices and
-        // swaps the gRPC wrappers via reconstructAppServicesAfterDeferredUpgrade()
-        // so write methods become available without restarting the gRPC server.
+        // background initDeferredModels later calls DeferredRuntime.prepareWriterUpgrade()
+        // which returns a fresh RunningRuntime. KS reconstructs and republishes
+        // appServices via reconstructAppServicesAfterDeferredUpgrade() so write
+        // methods become available without restarting this server.
         // A detected mismatch is raised here for the two policies whose handling lives in the
         // catch below. REBUILD_BACKUP_FIRST is deliberately NOT raised: its backup-then-rebuild
         // recovery lives inside RuntimeSession.openComponentsWithRecovery and is the one
@@ -684,7 +1124,7 @@ public final class KnowledgeServer implements Closeable {
           LuceneRuntimeBuilder builder =
               buildIndexRuntime(activeIndexPath, fpSupplier)
                   .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE);
-          this.ingestLifecycle = useDeferredWriter ? builder.openDeferred() : builder.open();
+          publishIngestLifecycle(useDeferredWriter ? builder.openDeferred() : builder.open());
           this.searchLifecycle = this.ingestLifecycle;
 
           // tempdoc 628 Stage B (G3): if the adapter recovered this index to empty on open it dropped
@@ -697,7 +1137,8 @@ public final class KnowledgeServer implements Closeable {
                 activeIndexPath,
                 IndexRecoveryMarker.readReason(activeIndexPath));
             this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).openReadOnly();
-            IndexGenerationManager.State migrated = genManager.startMigration(MigrationSource.CORRUPT_INDEX_REBUILD.wire());
+            IndexGenerationManager.State migrated = genManager.startMigration(
+                MigrationSource.CORRUPT_INDEX_REBUILD.wire(), registeredProjectionSourceIds());
             String greenGenId = migrated == null ? null : migrated.building_generation();
             if (greenGenId == null || greenGenId.isBlank()) {
               throw new IOException(
@@ -705,10 +1146,10 @@ public final class KnowledgeServer implements Closeable {
             }
             this.ingestLifecycle.close();
             this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
-            this.ingestLifecycle =
+            publishIngestLifecycle(
                 buildIndexRuntime(buildingIndexPath, fpSupplier)
                     .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                    .open();
+                    .open());
             startMigrationEnumeratorBestEffort(rc);
             IndexRecoveryMarker.clear(activeIndexPath);
             // Tempdoc 819: remember that BLUE is an index recovered to EMPTY. The green being built
@@ -737,7 +1178,9 @@ public final class KnowledgeServer implements Closeable {
           if (buildingIndexPath == null
               && "blue_green_migrate".equalsIgnoreCase(schemaMismatchPolicy)) {
             if (storedFp != null && !storedFp.isBlank()) {
-              java.util.Optional<String> currentFp = EmbeddingFingerprint.get();
+              java.util.Optional<String> currentFp = initialModelSelection == null
+                  ? EmbeddingFingerprint.get()
+                  : initialModelSelection.availableFingerprint("embedding");
               if (currentFp.isPresent() && !storedFp.equals(currentFp.get())) {
                 log.warn(
                     "Embedding model fingerprint mismatch on active generation {}. "
@@ -751,7 +1194,8 @@ public final class KnowledgeServer implements Closeable {
 
                 // Green: create a new generation and start a writable runtime.
                 IndexGenerationManager.State migrated =
-                    genManager.startMigration(MigrationSource.EMBEDDING_MODEL_CHANGE.wire());
+                    genManager.startMigration(MigrationSource.EMBEDDING_MODEL_CHANGE.wire(),
+                        registeredProjectionSourceIds());
                 String greenGenId =
                     migrated == null ? null : migrated.building_generation();
                 if (greenGenId == null || greenGenId.isBlank()) {
@@ -761,10 +1205,10 @@ public final class KnowledgeServer implements Closeable {
                 // Close the writable runtime on the old generation before opening Green.
                 this.ingestLifecycle.close();
                 this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
-                this.ingestLifecycle =
+                publishIngestLifecycle(
                     buildIndexRuntime(buildingIndexPath, fpSupplier)
                         .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                        .open();
+                        .open());
 
                 startMigrationEnumeratorBestEffort(rc);
               }
@@ -821,7 +1265,7 @@ public final class KnowledgeServer implements Closeable {
                   IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS,
                   e);
               this.searchLifecycle = blue;
-              this.ingestLifecycle = this.searchLifecycle;
+              publishIngestLifecycle(this.searchLifecycle);
               this.buildingIndexPath = null;
               this.rebuildBrakeExhausted = true;
             } else {
@@ -839,7 +1283,8 @@ public final class KnowledgeServer implements Closeable {
               this.searchLifecycle = blue;
 
               // Green: create a new generation and start a writable runtime.
-              IndexGenerationManager.State migrated = genManager.startMigration(MigrationSource.SCHEMA_MISMATCH.wire());
+              IndexGenerationManager.State migrated = genManager.startMigration(
+                  MigrationSource.SCHEMA_MISMATCH.wire(), registeredProjectionSourceIds());
               String greenGenId =
                   migrated == null ? null : migrated.building_generation();
               if (greenGenId == null || greenGenId.isBlank()) {
@@ -847,10 +1292,10 @@ public final class KnowledgeServer implements Closeable {
                     "Failed to start migration: building_generation missing in state.json");
               }
               this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
-              this.ingestLifecycle =
+              publishIngestLifecycle(
                   buildIndexRuntime(buildingIndexPath, fpSupplier)
                       .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                      .open();
+                      .open());
 
               // Kick off background enumeration to populate Green.
               startMigrationEnumeratorBestEffort(rc);
@@ -860,10 +1305,16 @@ public final class KnowledgeServer implements Closeable {
         }
       }
 
+      }
+
       // If a migration is in progress (Blue/Green), ensure the enumerator + cutover monitor are running.
       if (buildingIndexPath != null && searchLifecycle != null && ingestLifecycle != null && searchLifecycle != ingestLifecycle) {
-        startMigrationEnumeratorBestEffort(rc);
-        startMigrationCutoverMonitorBestEffort();
+        if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
+          startMigrationEnumeratorBestEffort(rc);
+        }
+        if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
+          startMigrationCutoverMonitorBestEffort();
+        }
       }
 
       // Schema validation: ensure all indexable fields exist in catalog (via ingest schema).
@@ -883,9 +1334,15 @@ public final class KnowledgeServer implements Closeable {
       // to the background task (after IndexWriter opens). In migration mode, run synchronously.
       // Skipped when the rebuild brake is exhausted: ingest is the READ-ONLY Blue runtime then, so
       // there is no writer to drain into.
-      if (!rebuildBrakeExhausted
-          && ingestLifecycle != null
-          && !(ingestLifecycle instanceof DeferredRuntime)) {
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED) {
+        if (!(ingestLifecycle instanceof RunningRuntime)
+            || !KnowledgeServerMigrationOps.finishCommittedBootSwitchReplay(
+                jobQueue, layout.activeGenerationId())) {
+          throw new IOException("Promoted generation switch replay remains unresolved");
+        }
+        promotedReplaySettled = true;
+      } else if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
+          && !rebuildBrakeExhausted && ingestLifecycle instanceof RunningRuntime) {
         drainSwitchBufferBestEffort();
       }
 
@@ -895,8 +1352,8 @@ public final class KnowledgeServer implements Closeable {
 
       // 3.5 Construct application services via registry (models wired later via deferred init)
       // Tempdoc 419 / T5.1 (ADR-0028): construct PathResolutionStore against the same jobs.db
-      // already migrated by SqliteJobQueue. Threaded through InfraContext so the gRPC handler
-      // and IndexingLoop can both consume it without violating module dependency direction.
+      // already migrated by SqliteJobQueue. Threaded through InfraContext so the ingest/search
+      // services and IndexingLoop can both consume it without violating module dependency direction.
       this.pathResolutionStore =
           new io.justsearch.indexerworker.queue.SqlitePathResolutionStore(dbPath);
       this.infraCtx =
@@ -912,13 +1369,12 @@ public final class KnowledgeServer implements Closeable {
               activeIndexPath,
               this::migrationProgressSnapshot,
               MIGRATION_SWITCHING_MAX_DURATION_MS,
-              this::initiateShutdown,
               pathResolutionStore,
               documentIdentityStore);
       // Tempdoc 885 item 3: build the duty-cycle policy from resolved config before the app
-      // services that consume it. The duty/cooldown arrive through the ordinal-450 worker config
-      // snapshot, not through a raw Worker sysprop — a key the Worker cannot see is the [R1]
-      // defect this item removes.
+      // services that consume it. The duty/cooldown come from the one resolved config in this JVM.
+      // They arrived through the ordinal-450 worker snapshot until item A19 deleted that tier; the
+      // [R1] defect it removed (a key the Worker could not see) needed two processes to exist.
       this.indexingPacing = buildIndexingPacing();
       log.info(
           "Indexing pacing: foreground duty {}%, cooldown {} ms",
@@ -940,8 +1396,18 @@ public final class KnowledgeServer implements Closeable {
       // late: it needs a RunningRuntime for the re-mark and the runtime may still be deferred here.
       initEmbeddingCompatibilityController();
 
+      // Recorded recovery cannot run until the actual serving generation and owner are attached.
+      attachRecordedIngestion();
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
+        if (!expectedProjectionSourceIds().isEmpty()) startMigrationEnumeratorBestEffort(rc, false);
+        startMigrationCutoverMonitorBestEffort();
+      }
+      recoverStuckJobsAdmitted(jobQueue, null);
+      startStuckJobReaper(jobQueue);
+
+
       // Dev hot-reload manager (Phase 2, tempdoc 305)
-      if (ConfigStore.global().get().ai().devHotReload()) {
+      if (startupConfiguration.ai().devHotReload()) {
         devReloadManager = new DevReloadManager(this);
         log.info("Dev hot-reload enabled (justsearch.dev.hotreload=true)");
       }
@@ -952,27 +1418,12 @@ public final class KnowledgeServer implements Closeable {
       long initMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
 
-      // 4. Create and start gRPC server on ephemeral port (before model loading)
-      List<ServerInterceptor> interceptors = List.of(
-          new TracingServerInterceptor(),
-          new RequestMetadataInterceptor(),
-          // Tempdoc 885 item 3: the only producer of the foreground-load gauge the indexing duty
-          // cycle reads. Ingest RPCs (IndexStatus above all) deliberately do not count.
-          new io.justsearch.indexerworker.server.ops.ForegroundLoadInterceptor(foregroundLoad)
-      );
-
-      grpcServer = createGrpcServer(interceptors);
-      grpcServer.start();
-
-      int boundPort = grpcServer.getPort();
-      log.info("gRPC server started on port {}", boundPort);
-
-      // 5. Write port to signal bus — Head is unblocked from here
-      signalBus.writePort(boundPort);
-
-      tPhase = System.nanoTime();
-      long grpcMs = (tPhase - tPrev) / 1_000_000;
-      tPrev = tPhase;
+      // 4-5. The gRPC server, its three interceptors and the port publication used to be here.
+      // Item A9 deleted all of it: the ports are direct calls (item A6), so there is nothing to
+      // bind, no trace/request-id header to extract (the caller's OTel context and MDC are already
+      // current on this thread) and no port for a second process to discover. The foreground-load
+      // gauge kept its producer — ForegroundLoadGate in the composition root, wired at A6 —
+      // which is why the interceptor could go without the gauge going with it.
 
       // 6. Start indexing loop (runs immediately; null-gates embedding/SPLADE until wired)
       // ...unless the rebuild brake is exhausted. The loop's whole job is to write into
@@ -981,7 +1432,13 @@ public final class KnowledgeServer implements Closeable {
       // status surface says why ingestion stopped (BLOCKED_REBUILD_BRAKE ->
       // index.rebuild_brake_exhausted). Recovery is an operator-initiated rebuild, which clears the
       // brake at promotion (IndexGenerationManager.promoteBuildingGenerationToActive).
-      if (rebuildBrakeExhausted) {
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.CAPTURING
+          || generationBootDisposition == IndexGenerationManager.BootDisposition.FENCED) {
+        log.info("Ingestion awaits recorded generation authority; current active index remains read-only");
+      } else if (recordedCandidate != null
+          && generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
+        log.info("Recorded Green ingestion awaits its exact candidate model set");
+      } else if (rebuildBrakeExhausted) {
         log.error(
             "Ingestion is STOPPED: the automatic-rebuild budget for this index shape is spent."
                 + " Search continues to serve the existing index read-only. To recover, run"
@@ -991,33 +1448,44 @@ public final class KnowledgeServer implements Closeable {
         appServices.startIndexingLoop();
       }
 
+      publishServingView(appServices);
+
+      notifyRecordedServicesPublished();
+      retryCommittedGenerationRetirement();
+
       // 7. Start sentinel thread for liveness monitoring
       startSentinelThread();
 
       long loopMs = (System.nanoTime() - tPrev) / 1_000_000;
       long totalMs = (System.nanoTime() - t0) / 1_000_000;
       log.info(
-          "Startup phases (ms): telemetry={}, signalBus={}, jobQueue={}, lucene={}, init={}, grpc={}, loop={}, total={} [models loading in background]",
-          telemetryMs, signalBusMs, jobQueueMs, luceneMs, initMs, grpcMs, loopMs, totalMs);
+          "Startup phases (ms): telemetry={}, signalBus={}, jobQueue={}, lucene={}, init={}, loop={}, total={} [models loading in background]",
+          telemetryMs, signalBusMs, jobQueueMs, luceneMs, initMs, loopMs, totalMs);
 
-      log.info("KnowledgeServer started successfully on port {}", boundPort);
+      log.info("KnowledgeServer started successfully (in-process; no port)");
+      publishIndexConfiguration();
 
       // --- Deferred model initialization (background) ---
-      // Models load in a background thread while gRPC is already serving. Callers
+      // Models load in a background thread while the ports are already answering. Callers
       // are null-safe: search degrades to BM25, IndexingLoop skips embedding/SPLADE,
       // ingest queues jobs normally. Models become available via volatile setters.
-      deferredModelInit = CompletableFuture.supplyAsync(this::initDeferredModels);
+      startDeferredModelInitialization(this::initDeferredModels);
 
-    } catch (Exception e) {
+    } catch (Exception | Error e) {
+      if (indexComponent != null) {
+        indexComponent.transition(io.justsearch.core.component.ComponentState.FAILED,
+            io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(), null);
+      }
       log.error("Failed to start KnowledgeServer", e);
       // tempdoc 628 Stage D-part2: if startup failed because the index is corrupt and could not be
       // auto-recovered (FAIL_CLOSED / recovery-failed), stamp a fatal-reason marker so the Head can
       // offer a "Rebuild index" affordance instead of blind-restarting. This is a controlled exit (the
-      // throw below → IndexerWorker's handler → System.exit), so the write is reliable.
+      // throw below → the Engine's boot failure path in HeadlessApp), so the write is reliable.
       //
       // A FAIL_CLOSED schema mismatch is the same kind of fact and was missing (tempdoc 915, live
       // validation): the refusal reached the Head only as "Worker process crashed (exit code 1)",
-      // with the actual cause visible nowhere but worker.log. It is a deliberate refusal, not a
+      // with the actual cause visible nowhere but the (then separate) worker.log. It is a
+      // deliberate refusal, not a
       // crash, and it has its own remedy. Other fatal causes stay generic.
       if (isCorruptIndexCause(e)) {
         io.justsearch.ipc.WorkerFatalReasonMarker.write(
@@ -1026,14 +1494,166 @@ public final class KnowledgeServer implements Closeable {
         io.justsearch.ipc.WorkerFatalReasonMarker.write(
             dataDir, io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
       }
-      closeQuietly();
+      try {
+        close();
+      } catch (Exception | Error cleanupFailure) {
+        if (cleanupFailure != e) e.addSuppressed(cleanupFailure);
+        log.warn("Failed startup cleanup remains incomplete", cleanupFailure);
+      }
+      if (e instanceof Error fatal) throw fatal;
       throw new IOException("Failed to start KnowledgeServer", e);
     }
   }
 
+  /** Publish ownership before any operation that can fail after attachment returns. */
+  void attachRecordedIngestion() throws IOException {
+    // Validate state even when an intentionally denying attachment does not read its source.
+    currentRecordedServingGeneration();
+    recordedIngestionAttachment = Objects.requireNonNull(recordedIngestionLifecycle.attach(
+        jobQueue, this::currentRecordedServingGeneration, this::recordedWorkerOnline,
+        new RecordedIngestionLifecycle.CheckedBulkRuntime() {
+          @Override public java.util.Optional<RecordedIngestionLifecycle.BulkRuntime> current()
+              throws IOException {
+            return currentRecordedBulkRuntime();
+          }
+
+          @Override public boolean refusalCleanupComplete(String operationKey,
+              String sourceGeneration) throws IOException {
+            return refusedRecordedCleanupComplete(operationKey, sourceGeneration);
+          }
+        }, this::withCandidateGapAcceptanceFence),
+        "recorded ingestion attachment");
+  }
+
+  private boolean refusedRecordedCleanupComplete(String operationKey, String sourceGeneration)
+      throws IOException {
+    if (closeStarted
+        || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+        || !recorded.operationKey().equals(operationKey)
+        || !recorded.sourceGeneration().equals(sourceGeneration)
+        || !recordedCandidatePrecommitRefused()
+        || !(jobQueue instanceof SwitchBufferCapableQueue journal)
+        || !journal.listSwitchBufferOpsStrictForGeneration(
+            IndexGenerationManager.recordedGenerationId(operationKey)).isEmpty()) {
+      return false;
+    }
+    return indexGenerationManager.refusedRecordedGenerationRetired(operationKey, sourceGeneration);
+  }
+
+  java.util.Optional<String> currentRecordedServingGeneration() throws IOException {
+    if (indexGenerationManager == null || activeIndexPath == null) {
+      throw new IOException("Recorded serving generation has not been initialized");
+    }
+    WorkerAppServices initializedServices = appServices;
+    LuceneRuntime ingest = ingestLifecycle;
+    LuceneRuntime search = searchLifecycle;
+    java.util.Optional<String> generation;
+    try {
+      boolean projectedRecordedBuild = generationBootOwnership
+              instanceof IndexGenerationManager.BootOwnership.Recorded
+          && ingestLifecycle != searchLifecycle
+          && searchLifecycle instanceof RunningRuntime activeWriter
+          && activeWriter.isAcceptingWrites();
+      generation = projectedRecordedBuild
+          ? indexGenerationManager.activeGeneration(activeIndexPath)
+          : indexGenerationManager.idleActiveGeneration(activeIndexPath);
+    } catch (tools.jackson.core.JacksonException malformed) {
+      throw new IOException("Malformed authoritative index state", malformed);
+    }
+    if (runtimeSwapLock.isLocked() || initializedServices == null
+        || !initializedServices.recordedWriterReady() || !(ingest instanceof RunningRuntime running)
+        || !running.isAcceptingWrites()
+        || (ingest != search && !(generationBootOwnership
+            instanceof IndexGenerationManager.BootOwnership.Recorded
+            && search instanceof RunningRuntime activeWriter
+            && activeWriter.isAcceptingWrites()))
+        || rebuildBrakeExhausted) {
+      return java.util.Optional.empty();
+    }
+    return generation;
+  }
+
+  private java.util.Optional<RecordedIngestionLifecycle.BulkRuntime> currentRecordedBulkRuntime() throws IOException {
+    if (generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native
+        || appServices == null) {
+      return java.util.Optional.empty();
+    }
+    var current = indexGenerationManager.initializeForBoot(generationBootOwnership,
+        recordedCandidate == null ? expectedIndexFingerprintOrNull()
+            : recordedCandidate.target().fingerprint());
+    String writable = null;
+    if (ingestLifecycle instanceof RunningRuntime) {
+      if (current.disposition() == IndexGenerationManager.BootDisposition.BUILDING
+          && current.layout().activeGenerationPath().equals(activeIndexPath)
+          && current.layout().indicesDir().resolve(current.layout().state().building_generation())
+              .equals(buildingIndexPath) && ingestLifecycle != searchLifecycle) {
+        writable = current.layout().state().building_generation();
+      } else if (current.disposition() == IndexGenerationManager.BootDisposition.PROMOTED
+          && current.layout().activeGenerationPath().equals(activeIndexPath)
+          && ingestLifecycle == searchLifecycle) {
+        writable = current.layout().activeGenerationId();
+      }
+    }
+    return java.util.Optional.of(new RecordedIngestionLifecycle.BulkRuntime(current.disposition(),
+        current.layout().activeGenerationId(), current.layout().state().building_generation(),
+        current.layout().state().migration_state(), writable,
+        generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED,
+        promotedReplaySettled));
+  }
+
+  /** Index runtime presence only; no queue query, model call or Head-side readiness dependency. */
+  boolean recordedWorkerOnline() {
+    return appServices != null && searchLifecycle != null && ingestLifecycle != null;
+  }
+
+  /** Opens the server-owned periodic queue producer on its registered background scheduler. */
+  void startStuckJobReaper(JobQueue reaperQueue) {
+    Objects.requireNonNull(reaperQueue, "reaperQueue");
+    stuckJobReaper = workerExecutors.stuckJobReaper().openScheduled(r -> {
+      Thread thread = new Thread(r, "stuck-job-reaper");
+      thread.setDaemon(true);
+      return thread;
+    });
+    stuckJobReapTask = stuckJobReaper.scheduleWithFixedDelay(() -> {
+      try {
+        recoverStuckJobsAdmitted(reaperQueue, STALE_PROCESSING_MS);
+      } catch (RuntimeException failure) {
+        log.warn("stuck-job reaper tick failed (will retry): {}", failure.toString());
+      }
+      retryRetiredServingViews();
+      retryCommittedGenerationRetirement();
+      try { reconcileRefusedRecordedCandidate(); }
+      catch (RuntimeException failure) {
+        log.error("Refused candidate maintenance will retry", failure);
+      }
+    }, REAP_INTERVAL_MS, REAP_INTERVAL_MS, TimeUnit.MILLISECONDS);
+  }
+
+  /** The periodic queue producer shares the same final fence as request and watcher intake. */
+  private void recoverStuckJobsAdmitted(JobQueue queue, Long olderThanMs) {
+    if (!(appServices instanceof DefaultWorkerAppServices selected)) {
+      throw new IllegalStateException("Stuck-job recovery has no mutation owner");
+    }
+    try (var ignoredMutation = selected.mutationAdmission().enter(selected.mutationOwnerToken())) {
+      if (olderThanMs == null) queue.recoverStuckJobs();
+      else queue.recoverStuckJobs(olderThanMs);
+    }
+  }
+
+  /** The executor remains an actual-exit owner even if its exposed completion is canceled. */
+  void startDeferredModelInitialization(java.util.function.Supplier<ModelContext> initializer) {
+    Objects.requireNonNull(initializer, "initializer");
+    deferredModelExecutor = workerExecutors.deferredModelInit().open(r -> {
+      Thread thread = new Thread(r, "deferred-model-init");
+      thread.setDaemon(true);
+      return thread;
+    });
+    deferredModelInit = io.justsearch.core.execution.EngineFutures.supplyAsync(initializer, deferredModelExecutor);
+  }
+
   /**
    * How a background-model-init failure is reported. Extracted so the one decision it makes is
-   * testable: a {@code SCHEMA_MISMATCH} arriving from {@code DeferredRuntime.upgradeWriter()} means
+   * testable: a {@code SCHEMA_MISMATCH} arriving from {@code DeferredRuntime.prepareWriterUpgrade()} means
    * ingestion has STOPPED — the index cannot accept writes under this runtime's shape — and filing
    * that under the generic "non-fatal" background-init line is how it stayed invisible while the
    * automatic migration silently never ran (tempdoc 915 §C.12, open item O7).
@@ -1061,7 +1681,7 @@ public final class KnowledgeServer implements Closeable {
   /**
    * True if {@code t} or any cause in its chain is a {@code SCHEMA_MISMATCH}. Walks the chain
    * because the deferred upgrade wraps: the guard's exception arrives inside whatever
-   * {@code upgradeWriter()} threw.
+   * {@code prepareWriterUpgrade()} threw.
    */
   static boolean isSchemaMismatch(Throwable t) {
     for (Throwable c = t; c != null; c = c.getCause()) {
@@ -1089,6 +1709,24 @@ public final class KnowledgeServer implements Closeable {
     return false;
   }
 
+  /** Declared configuration inputs consumed by this physical index composition. */
+  public static Set<String> componentDependencies() {
+    return IndexConfigurationProjection.dependencies();
+  }
+
+  private void publishIndexConfiguration() {
+    if (indexComponent == null) return;
+    if (!(appServices instanceof DefaultWorkerAppServices services)) {
+      throw new IllegalStateException("Index configuration requires the composed service owners");
+    }
+    String version = IndexConfigurationProjection.digest(
+        startupConfiguration, config, indexBasePath, searchLifecycle, services,
+        indexingPacing, documentIdentityStore.deletionGraceMs(),
+        tracingBootstrap == null ? null : tracingBootstrap.samplerDescription());
+    indexComponent.setDesiredVersion(version);
+    indexComponent.setAppliedVersion(version);
+  }
+
   /**
    * Constructs a {@link DefaultWorkerAppServices} with the 2 KS-owned pre-wired values
    * (migration-active supplier + embedding telemetry) already supplied at ctor time.
@@ -1102,20 +1740,98 @@ public final class KnowledgeServer implements Closeable {
    * {@link DevReloadManager}'s hot-reload path so all three observe the same wiring.
    */
   DefaultWorkerAppServices newAppServices() {
+    return newAppServices(infraCtx, ingestLifecycle);
+  }
+
+  private DefaultWorkerAppServices newAppServicesForRuntime(RunningRuntime runtime) {
+    return newAppServices(fixedRuntimeContext(runtime, activeIndexPath), runtime);
+  }
+
+  private InfraContext fixedRuntimeContext(RunningRuntime runtime, Path servingPath) {
+    InfraContext base = Objects.requireNonNull(infraCtx, "infraCtx");
+    return new InfraContext(base.config(), base.jobQueue(), () -> runtime,
+        () -> runtime, base.signalBus(), base.telemetry(), base.metricRegistry(),
+        base.indexBasePath(), servingPath, base.migrationProgressSupplier(),
+        base.migrationSwitchingMaxDurationMs(), base.pathResolutionStore(),
+        base.documentIdentityStore());
+  }
+
+  /** Prepares the already-running Green producer's serving services before pointer commitment. */
+  DefaultWorkerAppServices prepareServingSuccessor(RunningRuntime greenRuntime) {
+    if (!(appServices instanceof DefaultWorkerAppServices incumbent)) {
+      throw new IllegalStateException("Green producer services are unavailable");
+    }
+    if (greenRuntime != ingestLifecycle || greenRuntime == searchLifecycle
+        || buildingIndexPath == null) {
+      throw new IllegalStateException("Green runtime is not the open migration writer");
+    }
+    DefaultWorkerAppServices successor =
+        incumbent.prepareServingSuccessor(fixedRuntimeContext(greenRuntime, buildingIndexPath));
+    try {
+      wireAppServicesPostConstruction(successor);
+      if (disambiguationService != null) {
+        successor.wireDisambiguationService(disambiguationService);
+      }
+      if (recordedCandidate != null) {
+        CandidateModels selected = Objects.requireNonNull(candidateModels,
+            "Recorded Green candidate models are not READY");
+        successor.wireEmbeddingCompatController(
+            Objects.requireNonNull(candidateEmbeddingCompatController,
+                "Recorded Green embedding compatibility is not READY"));
+        successor.wireModelReadyLatch(selected.owner()::modelReadyLatch);
+        successor.wireSpladeIdfQueryEncoder(selected.spladeIdf());
+        successor.wireSearchReranker(selected.reranker());
+        successor.wireCitationScorer(selected.citation());
+        successor.wireGpuDiagnostics(selected.diagnostics());
+        successor.wireStageEnabled(selected.embedding() != null,
+            selected.bindings().spladeEncoder() != null,
+            selected.bindings().nerService() != null);
+        successor.wirePolicySnapshotSupplier(() -> {
+          try (var lease = selected.owner().acquire()) {
+            return lease.surface().policies();
+          }
+        });
+      }
+      return successor;
+    } catch (RuntimeException | Error failure) {
+      try { successor.close(); }
+      catch (IOException | RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
+  }
+
+  private DefaultWorkerAppServices newAppServices(InfraContext selected,
+      LuceneRuntime selectedIngest) {
+    if (serviceConfiguration == null) {
+      serviceConfiguration = WorkerServiceConfiguration.capture(
+          startupConfiguration, workerExecutors.pdfOcr().spec().threadCount());
+    }
+    if (recordedCandidate != null
+        && generationBootDisposition != IndexGenerationManager.BootDisposition.PROMOTED
+        && candidateServiceConfiguration == null) {
+      candidateServiceConfiguration = WorkerServiceConfiguration.capture(
+          recordedCandidate.configuration(), workerExecutors.pdfOcr().spec().threadCount());
+    }
+    if (selectedIngest instanceof RunningRuntime runningRuntime) {
+      bindTerminalWriterFaultSource(runningRuntime);
+    }
     return new DefaultWorkerAppServices(
-        infraCtx,
+        workerExecutors,
+        selected,
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
         embeddingTelemetry,
-        indexingPacing);
+        indexingPacing,
+        childRegistry,
+        serviceConfiguration,
+        candidateServiceConfiguration);
   }
 
   /** Tempdoc 885 item 3: the process-scoped duty-cycle policy, built from resolved config. */
   private IndexingPacing buildIndexingPacing() {
-    ConfigStore store = ConfigStore.globalOrNull();
     ResolvedConfig.Ai.BackfillPacing pacing =
-        store == null || store.get() == null
+        startupConfiguration == null
             ? ResolvedConfig.Ai.BackfillPacing.DEFAULTS
-            : store.get().ai().backfillPacing();
+            : startupConfiguration.ai().backfillPacing();
     return new IndexingPacing(
         foregroundLoad, pacing.foregroundDutyPct(), pacing.foregroundCooldownMs());
   }
@@ -1123,29 +1839,30 @@ public final class KnowledgeServer implements Closeable {
   /**
    * Apply post-construction wiring to {@code appServices}. Called after the initial
    * boot-time construction and again after any reconstruction (e.g., when
-   * {@link DeferredRuntime#upgradeWriter()} swaps the runtime and we need a fresh
+   * {@link DeferredRuntime#prepareWriterUpgrade()} swaps the runtime and we need a fresh
    * {@link DefaultWorkerAppServices} with non-null indexingLoop / ingestService).
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
     // 343: Wire resolved config supplier for search config status reporting.
-    svc.grpcIngestService()
+    svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());
+    svc.ingestService().setExpectedCommitMetadataSupplier(this::servingExpectedCommitMetadata);
 
     // 516 P3 FINAL CUT: wireMigrationActiveSupplier removed — pre-wired via DWAS 2-arg ctor.
 
-    // Tempdoc 397 §14.28 U3: wire the modelReadyLatch so GrpcSearchService's query handlers
+    // Tempdoc 397 §14.28 U3: wire the modelReadyLatch so WorkerSearchService's query handlers
     // can await encoder wiring before first use.
     svc.wireModelReadyLatch(() -> modelReadyLatch);
 
-    // Tempdoc 397 §14.28 U4: wire the PolicySnapshot supplier so the GetSessionPolicies
-    // gRPC rpc can return Worker's authoritative snapshot.
+    // Tempdoc 397 §14.28 U4: wire the PolicySnapshot supplier so the getSessionPolicies
+    // port can return the index half's authoritative snapshot.
     svc.wirePolicySnapshotSupplier(
         () -> inferenceSurface != null ? inferenceSurface.policies() : null);
 
     // Tempdoc 406 — wire the runtime reload trigger so POST /api/admin/runtime/reload
     // can drive a holder swap on the active ingest runtime. Captures the active
     // index path lazily at trigger time so post-cutover paths swap correctly.
-    svc.grpcIngestService()
+    svc.ingestService()
         .setRuntimeReloadTrigger(
             reason ->
                 swapRuntime(
@@ -1160,11 +1877,11 @@ public final class KnowledgeServer implements Closeable {
     // recent-job-queue-depth trend. Late-bound supplier handles the LocalTelemetry-pre-init
     // path safely (returns null → empty array on the receiver side).
     if (telemetry instanceof LocalTelemetry lt) {
-      svc.grpcIngestService().setRrdStoreSupplier(lt::getRrdStore);
+      svc.ingestService().setRrdStoreSupplier(lt::getRrdStore);
     }
 
     // Tempdoc 819: the ECC is now resolved BEFORE the first appServices reconstruction
-    // (DeferredRuntime.upgradeWriter -> reconstructAppServicesAfterDeferredUpgrade), which
+    // (DeferredRuntime.prepareWriterUpgrade -> reconstructAppServicesAfterDeferredUpgrade), which
     // previously ran ahead of the ECC's only wire site. Re-wire it on every reconstruction so a
     // fresh DefaultWorkerAppServices does not start its indexing loop with a null controller.
     // Null on the boot-time call (the ECC is constructed just after) — the boot path wires it
@@ -1176,55 +1893,137 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
-   * Tempdoc 406 Phase 4a: after {@link DeferredRuntime#upgradeWriter()} swaps the
+   * Tempdoc 406 Phase 4a: after {@link DeferredRuntime#prepareWriterUpgrade()} swaps the
    * runtime, the existing {@code appServices} captured ops from the now-closed
    * deferred runtime. Reconstruct from the current {@code infraCtx} (which sees
    * the post-upgrade {@code RunningRuntime} via supplier re-read), re-apply
-   * post-construction wiring, swap the {@link DelegatingSearchService} /
-   * {@link DelegatingIngestService} delegates, and start the new indexing loop.
-   * Mirrors {@code DevReloadManager.performReload}'s swap dance.
+   * post-construction wiring, publish the new instance and start its indexing loop.
+   *
+   * <p>Item A9: the three {@code Delegating*Service} wrappers this used to re-point are gone with
+   * the gRPC registration they existed for. Publishing {@code appServices} IS the swap now, because
+   * every caller reaches the services through {@link #appServices()} per call rather than through a
+   * registered wrapper — see {@code EngineKnowledgeClient}, which holds a supplier for exactly this
+   * reason. Mirrors {@code DevReloadManager.performReload}'s swap.
    */
   private void reconstructAppServicesAfterDeferredUpgrade() {
-    log.info("Reconstructing appServices after DeferredRuntime.upgradeWriter()");
+    log.info("Reconstructing appServices after DeferredRuntime.prepareWriterUpgrade()");
+    closePendingAppServices();
     WorkerAppServices oldServices = appServices;
     WorkerAppServices newServices = newAppServices();
-    wireAppServicesPostConstruction(newServices);
-    if (searchWrapper != null) {
-      searchWrapper.setDelegate(newServices.grpcSearchService());
-    }
-    if (ingestWrapper != null) {
-      ingestWrapper.setDelegate(newServices.grpcIngestService());
-    }
-    if (healthWrapper != null) {
-      healthWrapper.setDelegate(newServices.grpcHealthService());
-    }
-    this.appServices = newServices;
-    newServices.startIndexingLoop();
-    if (oldServices != null) {
-      try {
-        oldServices.close();
-      } catch (Exception e) {
-        log.warn("Old appServices close after upgrade failed (best-effort): {}", e.getMessage());
+    pendingAppServices = newServices;
+    try {
+      wireAppServicesPostConstruction(newServices);
+      if (newServices instanceof DefaultWorkerAppServices producer
+          && initialEncoderSet != null) {
+        retainProducerModels(producer, initialEncoderSet);
       }
+      if (oldServices != null) oldServices.close();
+      this.appServices = null; // The incumbent has actually closed; callers see unavailability.
+      newServices.startIndexingLoop();
+      publishServingView(newServices);
+      pendingAppServices = null;
+    } catch (Exception | Error failure) {
+      try { closePendingAppServices(); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      if (failure instanceof Error fatal) throw fatal;
+      throw new IllegalStateException("Application-service replacement failed; owners retained", failure);
     }
   }
 
-  private Server createGrpcServer(List<ServerInterceptor> interceptors) throws IOException {
-    KnowledgeServerGrpcWiring.GrpcWiringResult wiring =
-        KnowledgeServerGrpcWiring.createGrpcServer(config, interceptors, appServices);
-    this.searchWrapper = wiring.searchService();
-    this.ingestWrapper = wiring.ingestService();
-    this.healthWrapper = wiring.healthService();
-    return wiring.server();
+  /** Called only after the replacement service has started and is published to Engine callers. */
+  void notifyRecordedServicesPublished() {
+    // Every caller has released its own transition lock. Wait for a competing transition
+    // instead of silently losing the only notification that can resume a recorded owner.
+    RecordedIngestionLifecycle.Attachment attachment;
+    runtimeSwapLock.lock();
+    try {
+      if (running && appServices instanceof DefaultWorkerAppServices) publishIndexConfiguration();
+      attachment = recordedIngestionAttachment;
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    // The callback can drive an operation that re-enters Worker control. It runs outside the
+    // physical runtime lock and rechecks its own attachment identity before doing any work.
+    if (attachment != null) attachment.servicesPublished();
+  }
+
+  private void closePendingAppServices() {
+    if (pendingAppServices != null) {
+      try {
+        pendingAppServices.close();
+        pendingAppServices = null;
+      } catch (IOException failure) {
+        throw new IllegalStateException("Unpublished application services still own resources", failure);
+      }
+    }
+    if (pendingDeferredUpgrade != null) {
+      pendingDeferredUpgrade.close();
+      pendingDeferredUpgrade = null;
+    }
+  }
+
+  /** Opens and composes the deferred writer successor before changing reader admission. */
+  private void upgradeDeferredServing(DeferredRuntime deferred) {
+    ServingView retired = null;
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted || ingestLifecycle != deferred || searchLifecycle != deferred) {
+        throw new IllegalStateException("Deferred upgrade lost its runtime owner");
+      }
+      closePendingAppServices();
+      var preparation = deferred.prepareWriterUpgrade();
+      pendingDeferredUpgrade = preparation;
+      try {
+        RunningRuntime upgraded = preparation.runtime();
+        WorkerAppServices oldServices = Objects.requireNonNull(appServices, "appServices");
+        DefaultWorkerAppServices candidate = newAppServicesForRuntime(upgraded);
+        pendingAppServices = candidate;
+        wireAppServicesPostConstruction(candidate);
+        if (initialEncoderSet != null) retainProducerModels(candidate, initialEncoderSet);
+        candidate.prepareIndexingLoop();
+        retired = publishDeferredSuccessor(candidate, oldServices, upgraded, preparation);
+        pendingAppServices = null;
+        pendingDeferredUpgrade = null;
+        // Only a no-throw gate opens after B is publicly selected; no jobs were claimed before it.
+        candidate.activatePreparedIndexingLoop();
+      } catch (RuntimeException | Error failure) {
+        try { closePendingAppServices(); }
+        catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+        throw failure;
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+      if (retired != null) cleanRetiredServingView(retired);
+    }
+    notifyRecordedServicesPublished();
+  }
+
+  void retainPendingAppServices(WorkerAppServices candidate) {
+    if (pendingAppServices != null) {
+      throw new IllegalStateException("Prior pending application services still own resources");
+    }
+    pendingAppServices = Objects.requireNonNull(candidate, "candidate");
+  }
+
+  void releasePendingAppServices(WorkerAppServices published) {
+    if (pendingAppServices != published) {
+      throw new IllegalStateException("Published application services do not match pending owner");
+    }
+    pendingAppServices = null;
+  }
+
+  void closeFailedPendingAppServices() {
+    closePendingAppServices();
   }
 
   /**
    * Tempdoc 406 swap helper. Drains the current ingest runtime, opens a fresh one
    * via {@code opener}, atomically replaces the holder fields, and reconstructs
-   * the gRPC service wrappers so downstream consumers see the new runtime via
-   * supplier re-read. Returns the swap duration in milliseconds.
+   * the application services so downstream consumers see the new runtime via
+   * supplier re-read. Returns the swap duration in milliseconds. Before item A9 the
+   * reconstruction step also re-registered the gRPC service wrappers.
    *
-   * <p>Synchronized so concurrent reload triggers serialize. Errors during open
+   * <p>Serialized with other reloads and shutdown. Errors during open
    * leave the old runtime in place and re-throw — callers see a hard failure
    * rather than a half-swapped state.
    *
@@ -1233,71 +2032,542 @@ public final class KnowledgeServer implements Closeable {
    * @param reason low-cardinality tag for telemetry ("admin_triggered" / etc.)
    * @return total swap duration (ms) including drain + open
    */
-  public synchronized long swapRuntime(
+  public long swapRuntime(
       java.util.function.Supplier<RunningRuntime> opener,
       java.time.Duration drainTimeout,
       io.justsearch.adapters.lucene.runtime.SwapReason reason) {
     Objects.requireNonNull(opener, "opener");
     Objects.requireNonNull(drainTimeout, "drainTimeout");
     Objects.requireNonNull(reason, "reason");
-    long startNanos = System.nanoTime();
-    LuceneRuntime old = this.ingestLifecycle;
-    if (old instanceof RunningRuntime running) {
-      running.drainAndClose(drainTimeout, reason);
-    } else if (old != null) {
+    if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
+    final long elapsed;
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
       try {
-        old.close();
-      } catch (Exception e) {
-        log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
+        retireServingView();
+      } catch (IOException refusal) {
+        throw new IllegalStateException("Runtime reload retains active serving holders", refusal);
+      }
+      long startNanos = System.nanoTime();
+      LuceneRuntime old = this.ingestLifecycle;
+      if (old instanceof RunningRuntime running) {
+        running.drainAndClose(drainTimeout, reason);
+      } else if (old != null) {
+        try {
+          old.close();
+        } catch (Exception e) {
+          log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
+        }
+      }
+      RunningRuntime fresh = opener.get();
+      publishIngestLifecycle(fresh);
+      this.searchLifecycle = fresh;
+      reconstructAppServicesAfterDeferredUpgrade();
+      elapsed = (System.nanoTime() - startNanos) / 1_000_000L;
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    notifyRecordedServicesPublished();
+    return elapsed;
+  }
+
+  /** Assign the deferred A surface to every still-issued A view before model wiring is released. */
+  private void attachInitialEncoderSet(InferenceSurface surface, ResolvedConfig configuration) {
+    var selection = initialModelSelection;
+    String sparseMode = selection == null ? configuration.ai().sparseModel()
+        : selection.sparseModel().orElseThrow();
+    int dimension = selection != null ? selection.vectorDimension().orElseThrow()
+        : "bge-m3".equalsIgnoreCase(sparseMode)
+        ? 1024 : new io.justsearch.configuration.JustSearchConfigurationLoader()
+            .loadFieldCatalog().vectorDimension();
+    var owner = new EncoderSet(surface, new EncoderSet.ModelIdentity(
+        selection != null ? selection.fingerprint("embedding") : IndexFingerprint.ModelFingerprint.of(
+            EmbeddingFingerprint.modelPath().isPresent(), EmbeddingFingerprint.get()),
+        selection != null ? selection.fingerprint("splade") : IndexFingerprint.ModelFingerprint.of(
+            SpladeFingerprint.modelPath().isPresent(), SpladeFingerprint.get()),
+        selection != null ? selection.fingerprint("ner") : IndexFingerprint.ModelFingerprint.of(
+            io.justsearch.indexerworker.ner.NerFingerprint.modelPath().isPresent(),
+            io.justsearch.indexerworker.ner.NerFingerprint.get()),
+        "bge-m3".equalsIgnoreCase(sparseMode), dimension));
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        if (initialEncoderSet != null || servingView == null || servingView.retiring) {
+          throw new IllegalStateException("Initial encoder owner lost its serving view");
+        }
+        initialEncoderSet = owner;
+        servingView.attachEncoderSet(owner);
+        if (appServices instanceof DefaultWorkerAppServices producer) {
+          retainProducerModels(producer, owner);
+        }
+        for (ServingView old : retiredServingViews) {
+          if (old.holders > 0 && !old.cleanupRunning && old.encoderSet == null) {
+            old.attachEncoderSet(owner);
+          }
+        }
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+  }
+
+  private static void retainProducerModels(DefaultWorkerAppServices producer, EncoderSet owner) {
+    EncoderSet.Lease lease = owner.acquire();
+    try {
+      producer.replaceProducerModelLease(lease::close);
+    } catch (RuntimeException | Error failure) {
+      lease.close();
+      throw failure;
+    }
+  }
+
+  /** Compose B without publishing any of its model wrappers into A's serving service view. */
+  private CandidateModels composeRecordedCandidateModels() throws IOException {
+    var accepted = Objects.requireNonNull(recordedCandidate, "Recorded candidate");
+    var captured = Objects.requireNonNull(recordedCandidateFingerprint,
+        "Recorded candidate fingerprints");
+    ResolvedConfig configuration = accepted.configuration();
+    var inputs = captured.runtimeFingerprintInputs();
+    Integer declaredDimension = inputs.effectiveVectorDimension();
+    int dimension = declaredDimension == null
+        ? Objects.requireNonNull(new io.justsearch.configuration.JustSearchConfigurationLoader()
+            .loadFieldCatalog().vectorDimension(), "Index vector dimension")
+        : declaredDimension;
+    var selection = GenerationModelSelection.accepted(accepted.models(),
+        configuration.ai().sparseModel(), dimension);
+    Path aiHome = configuration.paths().dataDir();
+    InstallContract contract = aiHome == null ? null : InstallContractIO.read(aiHome);
+    Path modelsDir = resolveModelsDir(contract, aiHome, configuration);
+    HardwareProfile hardware = contract != null && contract.hardwareProfile() != null
+        ? contract.hardwareProfile()
+        : configuration.ai().masterGpuEnabled() ? HardwareProfile.gpuFull(0)
+            : HardwareProfile.cpuOnly();
+    var encoderConfiguration = EncoderConfigurationProjection.from(configuration, selection);
+    long footprint = InferenceCompositionRoot.estimateCandidateFootprintBytes(
+        encoderConfiguration, hardware, contract, modelsDir, selection);
+    var memory = Objects.requireNonNull(deviceMemoryLine.get(), "Device memory line")
+        .withCeilingMb(startupConfiguration == null ? null
+            : startupConfiguration.ai().deviceMemoryCeilingMb());
+    var composition = memory.decision(footprint);
+    if (encoderComponent != null) encoderComponent.setLastCompose(composition);
+    if (composition.mode() == io.justsearch.core.component.ComposeEvidence.Mode.IN_PLACE) {
+      beginInPlaceCandidateBuild();
+    }
+    var identity = new EncoderSet.ModelIdentity(inputs.embeddingModel(), inputs.spladeModel(),
+        inputs.nerModel(), "bge-m3".equalsIgnoreCase(configuration.ai().sparseModel()), dimension);
+    return composeSelectedModels(selection, identity, hardware, contract, modelsDir,
+        encoderConfiguration);
+  }
+
+  /** Publishes lexical A before retiring its exact native owner, then leaves Green's writer alive. */
+  private void beginInPlaceCandidateBuild() throws IOException {
+    ServingView nativeView;
+    DefaultWorkerAppServices producer;
+    EncoderSet incumbent;
+    runtimeSwapLock.lock();
+    try {
+      publicationLock.writeLock().lock();
+      try {
+        synchronized (servingViewMonitor) {
+          nativeView = servingView;
+          incumbent = initialEncoderSet;
+          if (closeStarted || recordedCandidateInPlace || incumbent == null
+              || nativeView == null || nativeView.retiring
+              || nativeView.encoderSet != incumbent
+              || !(nativeView.services instanceof DefaultWorkerAppServices current)
+              || current != appServices || ingestLifecycle == searchLifecycle) {
+            throw new IOException("In-place candidate lost its active A or Green producer");
+          }
+          producer = current;
+          inPlaceSourceIdentity = incumbent.modelIdentity();
+          var sourceObservation = incumbent.surfaceForOwner().componentObservation();
+          inPlaceSourceHadModels = sourceObservation.requestedRoles().stream()
+              .anyMatch(role -> !sourceObservation.missingRoles().contains(role));
+          // The old service remains immutable for its issued calls. New captures see a separate
+          // lexical search service over A while this producer continues writing Green.
+          WorkerAppServices lexicalServices = current.prepareTextOnlyCandidateView(
+              nativeView.searchRuntime);
+          ServingView lexicalView = new ServingView(lexicalServices, nativeView.searchRuntime,
+              nativeView.ingestRuntime, nativeView.activeGenerationPath);
+          nativeView.retiring = true;
+          nativeView.retireCleanup = nativeView::releaseEncoderSet;
+          retiredServingViews.add(nativeView);
+          servingView = lexicalView;
+          inPlaceLexicalServices = lexicalServices;
+          servingViewMonitor.notifyAll();
+          recordedCandidateInPlace = true;
+        }
+      } finally {
+        publicationLock.writeLock().unlock();
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    if (encoderComponent != null) encoderComponent.transition(
+        io.justsearch.core.component.ComponentState.RELOADING, null,
+        "A serves text while candidate native models compose in place");
+    notifyServingViewRetirement(nativeView);
+    try {
+      awaitRetiredNativeView(nativeView);
+    } catch (IOException refusal) {
+      restoreUnretiredNativeView(nativeView);
+      throw refusal;
+    }
+    producer.clearProducerModelLease();
+    producer.clearCandidateSourceStatusDiagnostics();
+    try {
+      incumbent.close();
+    } catch (RuntimeException refusal) {
+      if (encoderComponent != null) encoderComponent.transition(
+          io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
+          "A native retirement refused: " + refusal.getMessage());
+      throw new IOException("A native retirement refused; B composition is excluded", refusal);
+    }
+    initialEncoderSet = null;
+    closeWrapper(embeddingService);
+    closeWrapper(spladeEncoderInstance);
+    closeWrapper(bgeM3EncoderInstance);
+    closeWrapper(nerServiceInstance);
+    closeWrapper(searchRerankerInstance);
+    closeWrapper(citationScorerInstance);
+    inferenceSurface = null;
+    embeddingService = null;
+    nerServiceInstance = null;
+    spladeEncoderInstance = null;
+    spladeIdfQueryEncoder = null;
+    bgeM3EncoderInstance = null;
+    searchRerankerInstance = null;
+    citationScorerInstance = null;
+  }
+
+  /** A slow issued call never forces native retirement; restore the untouched A view. */
+  private void restoreUnretiredNativeView(ServingView nativeView) {
+    ServingView retiredLexical;
+    runtimeSwapLock.lock();
+    try {
+      publicationLock.writeLock().lock();
+      try {
+        synchronized (servingViewMonitor) {
+          if (!retiredServingViews.contains(nativeView) || nativeView.cleanupRunning
+              || servingView == null || servingView.services != inPlaceLexicalServices) return;
+          ServingView lexical = servingView;
+          retiredLexical = lexical;
+          lexical.retiring = true;
+          lexical.retireCleanup = () -> {};
+          retiredServingViews.add(lexical);
+          nativeView.retiring = false;
+          nativeView.retireCleanup = null;
+          nativeView.abortRetirement = false;
+          retiredServingViews.remove(nativeView);
+          servingView = nativeView;
+          recordedCandidateInPlace = false;
+          inPlaceLexicalServices = null;
+          servingViewMonitor.notifyAll();
+        }
+      } finally {
+        publicationLock.writeLock().unlock();
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    notifyServingViewRetirement(retiredLexical);
+    publishEncoderComposition();
+  }
+
+  /** A lexical successor remains capturable while older native calls finish. */
+  private void awaitRetiredNativeView(ServingView nativeView) throws IOException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (true) {
+      cleanRetiredServingView(nativeView);
+      synchronized (servingViewMonitor) {
+        if (!retiredServingViews.contains(nativeView)) return;
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) {
+          if (nativeView.cleanupRunning || nativeView.holders == 0) continue;
+          nativeView.abortRetirement = true;
+          throw new IOException("A native serving calls did not leave before candidate composition");
+        }
+        try {
+          TimeUnit.NANOSECONDS.timedWait(servingViewMonitor, remaining);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Interrupted waiting for A native serving calls", interrupted);
+        }
       }
     }
-    RunningRuntime fresh = opener.get();
-    this.ingestLifecycle = fresh;
-    this.searchLifecycle = fresh;
-    reconstructAppServicesAfterDeferredUpgrade();
-    return (System.nanoTime() - startNanos) / 1_000_000L;
+  }
+
+  /** A committed pointer is never undone; this repairs only a refused precommit B build. */
+  private void recomposeSourceAfterCandidateRefusal(Exception candidateFailure) {
+    if (!recordedCandidateInPlace) return;
+    if (initialEncoderSet != null && !initialEncoderSet.isClosed()) {
+      recordFailedSourceRecompose(candidateFailure,
+          new IOException("A native retirement remains incomplete"));
+      return;
+    }
+    try {
+      if (!(appServices instanceof DefaultWorkerAppServices producer)) {
+        throw new IOException("A query and Green producer services are unavailable");
+      }
+      CandidateModels candidate = candidateModels;
+      if (candidate != null) {
+        if (!producer.producerClosed()) producer.clearProducerModelLease();
+        candidate.close();
+        candidateModels = null;
+      }
+      EncoderSet.ModelIdentity identity = Objects.requireNonNull(inPlaceSourceIdentity,
+          "Active generation model identity");
+      GenerationModelSelection selection = initialModelSelection;
+      if (!inPlaceSourceHadModels) {
+        publishEmptySource(producer);
+        if (encoderComponent != null) encoderComponent.transition(
+            io.justsearch.core.component.ComponentState.ABSENT, null,
+            "Candidate refused; active A remains text-only");
+        return;
+      }
+      ResolvedConfig configuration = Objects.requireNonNull(startupConfiguration,
+          "Active generation configuration");
+      Path aiHome = configuration.paths().dataDir();
+      InstallContract contract = aiHome == null ? null : InstallContractIO.read(aiHome);
+      Path modelsDir = resolveModelsDir(contract, aiHome, configuration);
+      HardwareProfile hardware = contract != null && contract.hardwareProfile() != null
+          ? contract.hardwareProfile() : configuration.ai().masterGpuEnabled()
+              ? HardwareProfile.gpuFull(0) : HardwareProfile.cpuOnly();
+      CandidateModels restored = composeSelectedModels(selection, identity, hardware, contract,
+          modelsDir, selection == null ? EncoderConfigurationProjection.from(configuration)
+              : EncoderConfigurationProjection.from(configuration, selection));
+      try {
+        publishRecomposedSource(producer, restored);
+      } catch (RuntimeException | Error wiringFailure) {
+        try { restored.close(); }
+        catch (RuntimeException | Error cleanup) { wiringFailure.addSuppressed(cleanup); }
+        throw wiringFailure;
+      }
+      publishEncoderComposition();
+      log.info("Recomposed active A after refused in-place candidate");
+    } catch (IOException | RuntimeException | Error restoreFailure) {
+      recordFailedSourceRecompose(candidateFailure, restoreFailure);
+    }
+  }
+
+  private void publishEmptySource(DefaultWorkerAppServices producer) {
+    ServingView retiredLexical;
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        ServingView lexical = servingView;
+        if (closeStarted || lexical == null || lexical.services != inPlaceLexicalServices
+            || lexical.retiring) throw new IllegalStateException("Text-only A changed");
+        ServingView restored = new ServingView(producer, lexical.searchRuntime,
+            lexical.ingestRuntime, lexical.activeGenerationPath);
+        lexical.retiring = true;
+        retiredLexical = lexical;
+        lexical.retireCleanup = () -> {};
+        retiredServingViews.add(lexical);
+        servingView = restored;
+        inPlaceLexicalServices = null;
+        recordedCandidateInPlace = false;
+        servingViewMonitor.notifyAll();
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+    notifyServingViewRetirement(retiredLexical);
+  }
+
+  private void publishRecomposedSource(DefaultWorkerAppServices producer, CandidateModels restored) {
+    ServingView retiredLexical;
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        ServingView lexical = servingView;
+        if (closeStarted || lexical == null || lexical.retiring
+            || lexical.services != inPlaceLexicalServices
+            || lexical.encoderSet != null) {
+          throw new IllegalStateException("Text-only A changed before recomposition");
+        }
+        var bindings = restored.bindings();
+        producer.restoreCandidateSourceQueryConfiguration();
+        producer.wireRestoredSourceEncoders(new EncoderBindings.Snapshot(
+            bindings.spladeEncoder(), bindings.bgeM3Encoder(), bindings.nerService(),
+            disambiguationService));
+        producer.wireEmbeddingProvider(restored.embedding());
+        producer.wireSpladeIdfQueryEncoder(restored.spladeIdf());
+        producer.wireSearchReranker(restored.reranker());
+        producer.wireCitationScorer(restored.citation());
+        producer.wireGpuDiagnostics(restored.diagnostics());
+        producer.wireStageEnabled(restored.embedding() != null,
+            bindings.spladeEncoder() != null, bindings.nerService() != null);
+        producer.wirePolicySnapshotSupplier(() -> inferenceSurface == null
+            ? null : inferenceSurface.policies());
+        ServingView restoredView = new ServingView(producer, lexical.searchRuntime,
+            lexical.ingestRuntime, lexical.activeGenerationPath);
+        restoredView.attachEncoderSet(restored.owner());
+        lexical.retiring = true;
+        retiredLexical = lexical;
+        lexical.retireCleanup = () -> {};
+        retiredServingViews.add(lexical);
+        servingView = restoredView;
+        inPlaceLexicalServices = null;
+        inferenceSurface = restored.owner().surfaceForOwner();
+        initialEncoderSet = restored.owner();
+        embeddingService = restored.embedding();
+        nerServiceInstance = bindings.nerService();
+        spladeEncoderInstance = bindings.spladeEncoder();
+        spladeIdfQueryEncoder = restored.spladeIdf();
+        bgeM3EncoderInstance = bindings.bgeM3Encoder();
+        searchRerankerInstance = restored.reranker();
+        citationScorerInstance = restored.citation();
+        recordedCandidateInPlace = false;
+        servingViewMonitor.notifyAll();
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+    notifyServingViewRetirement(retiredLexical);
+  }
+
+  private void recordFailedSourceRecompose(Exception candidateFailure, Throwable restoreFailure) {
+    candidateFailure.addSuppressed(restoreFailure);
+    if (encoderComponent != null) {
+      encoderComponent.transition(io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
+          "B refused: " + candidateFailure.getMessage() + "; A recompose refused: "
+              + restoreFailure.getMessage());
+      encoderComponent.recordRecoveryAttempt(restoreFailure.getMessage());
+    }
+    log.error("Active A could not be recomposed after candidate refusal", restoreFailure);
+  }
+
+  /** Composes one exact generation-selected model set behind the device-line decision. */
+  private CandidateModels composeSelectedModels(GenerationModelSelection selection,
+      EncoderSet.ModelIdentity identity,
+      HardwareProfile hardware, InstallContract contract, Path modelsDir,
+      EncoderConfigurationProjection encoderConfiguration) throws IOException {
+    InferenceSurface surface = InferenceCompositionRoot.compose(encoderConfiguration, hardware,
+        contract, modelsDir, () -> !signalBus.isMainGpuActive(), ortSessionEvents, selection);
+    var owner = new EncoderSet(surface, identity);
+    EmbeddingService embedding = null;
+    io.justsearch.indexerworker.ner.NerService ner = null;
+    io.justsearch.indexerworker.bgem3.BgeM3Encoder bge = null;
+    io.justsearch.indexerworker.splade.SpladeEncoder splade = null;
+    io.justsearch.reranker.CrossEncoderReranker reranker = null;
+    io.justsearch.reranker.CitationScorer citation = null;
+    try {
+      if (surface.embedding().isPresent()) {
+        var assembly = surface.embedding().orElseThrow();
+        var config = encoderConfiguration.embedding();
+        var encoder = new io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder(
+            assembly.sessions(), assembly.shape(), assembly.tokenizer());
+        var backend = new io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend(
+            encoder, config.gpuEnabled() ? 1 : 0, config.contextLength());
+        embedding = EmbeddingService.createWithBackend(backend, config, embeddingTelemetry,
+            assembly.capabilities().documentPrefix(), assembly.capabilities().queryPrefix());
+        if (!embedding.isAvailable() || embedding.dimension() != identity.vectorDimension()) {
+          throw new IOException("Recorded candidate embedding does not match its index dimension");
+        }
+      }
+      ner = surface.ner().isPresent()
+          ? new io.justsearch.indexerworker.ner.NerService(
+              surface.ner().orElseThrow(), encoderConfiguration.ner()) : null;
+      if (surface.bgeM3().isPresent()) {
+        var assembly = surface.bgeM3().orElseThrow();
+        bge = new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
+            assembly.sessions(), assembly.shape(), assembly.tokenizer(),
+            encoderConfiguration.bgeM3());
+      }
+      io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder idf = null;
+      if (surface.splade().isPresent()) {
+        var assembly = surface.splade().orElseThrow();
+        var config = encoderConfiguration.splade();
+        splade = new io.justsearch.indexerworker.splade.SpladeEncoder(
+            assembly.sessions(), assembly.shape(), assembly.tokenizer(), assembly.vocabulary(),
+            assembly.truncationEvidencePath(), config);
+        if (config.isIdfQueryMode()) {
+          Path table = config.modelPath().resolve("idf.json");
+          if (Files.isRegularFile(table)) {
+            idf = new io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder(
+                table, splade.tokenizer(), splade.vocabulary());
+          }
+        }
+      }
+      if ((!identity.bgeM3Selected()
+              && identity.embeddingModel().state()
+                   == IndexFingerprint.ModelState.PRESENT && embedding == null)
+          || (identity.spladeModel().state()
+               == IndexFingerprint.ModelState.PRESENT && splade == null)
+          || (identity.nerModel().state()
+               == IndexFingerprint.ModelState.PRESENT && ner == null)
+          || (identity.bgeM3Selected() && bge == null)) {
+        throw new IOException("Recorded candidate model could not become READY");
+      }
+      reranker = surface.reranker().isPresent()
+          ? new io.justsearch.reranker.CrossEncoderReranker(
+              surface.reranker().orElseThrow().sessions(),
+              surface.reranker().orElseThrow().shape(),
+              surface.reranker().orElseThrow().tokenizer()) : null;
+      citation = surface.citation().isPresent()
+          ? new io.justsearch.reranker.CitationScorer(
+              surface.citation().orElseThrow().sessions(),
+              surface.citation().orElseThrow().shape(),
+              surface.citation().orElseThrow().tokenizer()) : null;
+      var diagnostics = new GpuDiagnosticSuppliers(
+          splade == null ? null : splade::getOrtCudaStatus,
+          splade == null ? null : splade::resolvedModelPath,
+          embedding == null ? null : embedding::getOrtCudaStatus,
+          embedding == null ? null : embedding::resolvedBackendId,
+          embedding == null ? () -> 0 : embedding::gpuLayers,
+          reranker == null ? null : reranker::getOrtCudaStatus,
+          ner == null ? null : ner::getOrtCudaStatus,
+          citation == null ? null : citation::getOrtCudaStatus,
+          bge == null ? null : bge::getOrtCudaStatus);
+      var bindings = new EncoderBindings.Snapshot(splade, bge, ner, null);
+      owner.releaseModelReady();
+      return new CandidateModels(owner, embedding, bindings, idf, reranker, citation, diagnostics);
+    } catch (IOException | RuntimeException | Error failure) {
+      try { new CandidateModels(owner, embedding,
+          new EncoderBindings.Snapshot(splade, bge, ner, null), null,
+          reranker, citation, null).close(); }
+      catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   /**
-   * Background model initialization — runs in a separate thread after gRPC is serving. Loads
-   * embedding, NER, SPLADE/BGE-M3, and disambiguation models. Opens deferred IndexWriter if
-   * applicable. Non-fatal: failures degrade capabilities but don't crash the server.
+   * Background model initialization — runs in a separate thread once the services are published
+   * and answering. Loads embedding, NER, SPLADE/BGE-M3, and disambiguation models. Opens deferred
+   * IndexWriter if applicable. Non-fatal: failures degrade capabilities but don't crash the server.
    */
   @SuppressWarnings("PMD.CognitiveComplexity")
   private ModelContext initDeferredModels() {
     long bgStart = System.nanoTime();
+    List<ServingLease> modelWiringLeases = new ArrayList<>();
+    if (encoderComponent != null) {
+      encoderComponent.transition(io.justsearch.core.component.ComponentState.STARTING, null, null);
+    }
     try {
-      // Open IndexWriter (deferred from sync path for faster gRPC readiness).
-      // Phase types: DeferredRuntime.upgradeWriter() returns a fresh RunningRuntime;
-      // swap the holder fields, reconstruct appServices (which captured ops from the
-      // now-closed deferred session), and swap the gRPC wrappers. After this:
+      // Open IndexWriter (deferred from sync path so reads are answerable sooner).
+      // Phase types: DeferredRuntime.prepareWriterUpgrade() returns a fresh RunningRuntime;
+      // swap the holder fields and reconstruct appServices (which captured ops from
+      // the now-closed deferred session), then republish it. After this:
       //   - search continues seamlessly via the upgraded runtime
       //   - write methods stop returning UNAVAILABLE; the indexing loop starts
       if (ingestLifecycle instanceof DeferredRuntime deferred) {
-        RunningRuntime upgraded = deferred.upgradeWriter();
-        this.ingestLifecycle = upgraded;
-        if (this.searchLifecycle == deferred) {
-          this.searchLifecycle = upgraded;
-        }
-        reconstructAppServicesAfterDeferredUpgrade();
+        upgradeDeferredServing(deferred);
         drainSwitchBufferBestEffort();
       }
+      modelWiringLeases.addAll(captureModelWiringLeases());
 
       // --- Composition root: resolve install contract + hardware profile ---
-      Path aiHome = null;
-      try {
-        aiHome = PlatformPaths.resolveDataDir();
-      } catch (Exception e) {
-        log.debug("Failed to resolve AI Home for contract reading (dev mode)", e);
-      }
+      var compositionConfig = startupConfiguration;
+      Path aiHome = compositionConfig.paths().dataDir();
       InstallContract contract = aiHome != null ? InstallContractIO.read(aiHome) : null;
       // Tempdoc 374 alpha.18 Bug H + alpha.20 Bug M: honor JUSTSEARCH_MODELS_DIR.
       // alpha.20 prefers contract.modelsDir() (recorded at install time, survives
       // cold restart) over runtime env-var resolution (which doesn't inherit across
       // GUI launches). See resolveModelsDir Javadoc for the three-tier fallback.
-      Path modelsDir = resolveModelsDir(contract, aiHome);
-      boolean gpuEnabled =
-          EnvRegistry.GPU_ENABLED.get().map(Boolean::parseBoolean).orElse(false);
+      Path modelsDir = resolveModelsDir(contract, aiHome, compositionConfig);
+      boolean gpuEnabled = compositionConfig.ai().masterGpuEnabled();
       HardwareProfile hardware =
           (contract != null && contract.hardwareProfile() != null)
               ? contract.hardwareProfile()
@@ -1314,18 +2584,29 @@ public final class KnowledgeServer implements Closeable {
       // Tempdoc 397 §14.26 T2-C1/C2: single-entry compose returns a typed surface. Per-encoder
       // wiring below destructures the surface; graceful degradation is preserved via
       // Optional<> on each role.
+      var selection = initialModelSelection;
+      if (selection != null
+          && (selection.sparseModel().isEmpty() || selection.vectorDimension().isEmpty())) {
+        throw new IOException("Active generation model mode is unavailable");
+      }
+      this.initialModelSelection = selection;
+      var encoderConfiguration = selection == null
+          ? EncoderConfigurationProjection.from(compositionConfig)
+          : EncoderConfigurationProjection.from(compositionConfig, selection);
       InferenceSurface surface =
           InferenceCompositionRoot.compose(
-              ConfigStore.global().get(),
+              encoderConfiguration,
               hardware,
               contract,
               modelsDir,
               () -> !signalBus.isMainGpuActive(),
-              ortSessionEvents);
+              ortSessionEvents,
+              selection);
       this.inferenceSurface = surface;
+      attachInitialEncoderSet(surface, compositionConfig);
 
       // Embedding — skip when BGE-M3 is active (surface.embedding() is already empty in that case).
-      var embeddingConfig = EmbeddingConfig.fromEnv();
+      var embeddingConfig = encoderConfiguration.embedding();
       if (surface.embedding().isPresent()) {
         var embedAssembly = surface.embedding().get();
         var encoder =
@@ -1348,20 +2629,20 @@ public final class KnowledgeServer implements Closeable {
         if (es.isAvailable()) {
           embeddingService = es;
           validateEmbeddingDimension();
-          appServices.wireEmbeddingProvider(es);
+          wireModelServices(modelWiringLeases, svc -> svc.wireEmbeddingProvider(es));
           // observations.md fix: null `embeddingService` on GPU-handoff unload
           // so `GpuDiagnosticSuppliers` lambdas (rebound to re-read the field)
           // stop returning data from the closed instance. The provider becomes
           // NoOpEmbeddingProvider.INSTANCE on unload (IndexingLoop:1581);
           // `instanceof` is rename-safe in a way the prior class-name string
           // match wasn't.
-          appServices.addEmbeddingProviderChangeListener(
+          wireModelServices(modelWiringLeases, svc -> svc.addEmbeddingProviderChangeListener(
               provider -> {
                 if (provider == null
                     || provider instanceof io.justsearch.indexerworker.embed.NoOpEmbeddingProvider) {
                   this.embeddingService = null;
                 }
-              });
+              }));
           log.info("Embedding service ready (dimension={})", es.dimension());
         }
       } else if (surface.bgeM3().isEmpty()) {
@@ -1377,16 +2658,18 @@ public final class KnowledgeServer implements Closeable {
       maybeAutoStartEmbeddingRebuildForBlockedLegacyBestEffort();
 
       // NER — surface-provided assembly wraps in NerService.
-      var nerConfig = io.justsearch.indexerworker.ner.NerConfig.fromEnv();
+      var nerConfig = encoderConfiguration.ner();
       if (surface.ner().isPresent()) {
         var nerService = new io.justsearch.indexerworker.ner.NerService(
             surface.ner().get(), nerConfig);
         nerServiceInstance = nerService;
-        appServices.wireNerService(nerService);
+        wireModelServices(modelWiringLeases, svc -> svc.wireNerService(nerService));
         var nerModelPath = nerConfig.modelPath().toString();
         var nerGpuEnabled = nerConfig.gpuEnabled();
-        appServices.grpcIngestService().setNerModelPathSupplier(() -> nerModelPath);
-        appServices.grpcIngestService().setNerGpuEnabledSupplier(() -> nerGpuEnabled);
+        wireModelServices(modelWiringLeases,
+            svc -> svc.ingestService().setNerModelPathSupplier(() -> nerModelPath));
+        wireModelServices(modelWiringLeases,
+            svc -> svc.ingestService().setNerGpuEnabledSupplier(() -> nerGpuEnabled));
       } else if (nerConfig.isReady()) {
         log.info("NER: surface returned no assembly; NER will be unavailable.");
       }
@@ -1394,7 +2677,7 @@ public final class KnowledgeServer implements Closeable {
       // BGE-M3 unified dense+sparse encoder (when selected + surface has it).
       if (surface.bgeM3().isPresent()) {
         var bgeAssembly = surface.bgeM3().get();
-        var bgeConfig = io.justsearch.indexerworker.bgem3.BgeM3Config.fromEnv();
+        var bgeConfig = encoderConfiguration.bgeM3();
         var bgeEncoder =
             new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
                 bgeAssembly.sessions(),
@@ -1402,14 +2685,14 @@ public final class KnowledgeServer implements Closeable {
                 bgeAssembly.tokenizer(),
                 bgeConfig);
         bgeM3EncoderInstance = bgeEncoder;
-        appServices.wireBgeM3Encoder(bgeEncoder);
+        wireModelServices(modelWiringLeases, svc -> svc.wireBgeM3Encoder(bgeEncoder));
         log.info(
             "BGE-M3 encoder ready (replaces SPLADE + EmbeddingService): model={}",
             bgeConfig.modelPath());
       }
 
       // SPLADE (default, or fallback if BGE-M3 was selected but unavailable).
-      var spladeConfig = io.justsearch.indexerworker.splade.SpladeConfig.fromEnv();
+      var spladeConfig = encoderConfiguration.splade();
       if (surface.splade().isPresent()) {
         var spladeAssembly = surface.splade().get();
         var spladeEncoder =
@@ -1421,7 +2704,7 @@ public final class KnowledgeServer implements Closeable {
                 spladeAssembly.truncationEvidencePath(),
                 spladeConfig);
         spladeEncoderInstance = spladeEncoder;
-        appServices.wireSpladeEncoder(spladeEncoder);
+        wireModelServices(modelWiringLeases, svc -> svc.wireSpladeEncoder(spladeEncoder));
         log.info("SPLADE encoder ready: model={}", spladeConfig.modelPath());
 
         if (spladeConfig.isIdfQueryMode()) {
@@ -1432,7 +2715,8 @@ public final class KnowledgeServer implements Closeable {
                   new io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder(
                       idfPath, spladeEncoder.tokenizer(), spladeEncoder.vocabulary());
               spladeIdfQueryEncoder = idfEncoder;
-              appServices.wireSpladeIdfQueryEncoder(idfEncoder);
+              wireModelServices(modelWiringLeases,
+                  svc -> svc.wireSpladeIdfQueryEncoder(idfEncoder));
               log.info("SPLADE IDF query encoder ready: {}", idfPath);
             } catch (Exception e) {
               log.warn("Failed to load IDF table (falling back to ONNX): {}", e.getMessage());
@@ -1449,20 +2733,21 @@ public final class KnowledgeServer implements Closeable {
         var ds = new io.justsearch.indexerworker.disambiguation.DisambiguationService(dataDir);
         ds.open();
         disambiguationService = ds;
-        appServices.wireDisambiguationService(ds);
+        wireModelServices(modelWiringLeases, svc -> svc.wireDisambiguationService(ds));
       } catch (Exception e) {
         log.warn("Failed to initialize disambiguation service (non-fatal): {}", e.getMessage());
         log.debug("Failed to initialize disambiguation service (stack trace)", e);
       }
 
       // 360: Search reranker (GPU-capable, in Worker process).
-      var searchRerankConfig = io.justsearch.reranker.RerankerConfig.fromEnv();
+      var searchRerankConfig = encoderConfiguration.reranker();
       if (surface.reranker().isPresent()) {
         var rerankAssembly = surface.reranker().get();
         searchRerankerInstance =
             new io.justsearch.reranker.CrossEncoderReranker(
                 rerankAssembly.sessions(), rerankAssembly.shape(), rerankAssembly.tokenizer());
-        appServices.wireSearchReranker(searchRerankerInstance);
+        wireModelServices(modelWiringLeases,
+            svc -> svc.wireSearchReranker(searchRerankerInstance));
         // F5: Warm up ORT session at startup instead of paying 5-10s on the first user query.
         try {
           long warmStart = System.nanoTime();
@@ -1480,13 +2765,14 @@ public final class KnowledgeServer implements Closeable {
       // term-stats, IndexSearcher) so the first real user query after boot doesn't pay the
       // Lucene/ICU JIT + class-load cold-start penalty (measured ~870ms cold vs ~12ms warm).
       // Runs after all encoders above are wired, so the synthetic pass exercises the same
-      // production search stack a real query would. Calls GrpcSearchService.warmUpSearchPath()
-      // directly (in-process, below the gRPC boundary) — see its Javadoc + SearchOrchestrator
+      // production search stack a real query would. Calls WorkerSearchService.warmUpSearchPath()
+      // directly, below the port boundary — see its Javadoc + SearchOrchestrator
       // .warmUp()'s Javadoc for why this can't leak into /api/status search telemetry or the
       // Head's app-services feedback layer (feature snapshots / dispositions / GPL triples).
       try {
         long searchWarmStart = System.nanoTime();
-        boolean searchWarmed = appServices.grpcSearchService().warmUpSearchPath();
+        boolean searchWarmed = modelWiringLeases.getFirst().services().searchService()
+            .warmUpSearchPath();
         long searchWarmMs = (System.nanoTime() - searchWarmStart) / 1_000_000;
         if (searchWarmed) {
           log.info("Search path ready (warm-up={}ms)", searchWarmMs);
@@ -1507,7 +2793,8 @@ public final class KnowledgeServer implements Closeable {
                 citationAssembly.sessions(),
                 citationAssembly.shape(),
                 citationAssembly.tokenizer());
-        appServices.wireCitationScorer(citationScorerInstance);
+        wireModelServices(modelWiringLeases,
+            svc -> svc.wireCitationScorer(citationScorerInstance));
       }
 
       // GPU diagnostics suppliers (post-model wiring)
@@ -1526,8 +2813,7 @@ public final class KnowledgeServer implements Closeable {
       // above) propagate to /api/status. Method-references like
       // `embeddingService::getOrtCudaStatus` would have bound the instance at
       // lambda-creation time and continued returning stale data after close.
-      appServices.wireGpuDiagnostics(
-          new GpuDiagnosticSuppliers(
+      GpuDiagnosticSuppliers diagnostics = new GpuDiagnosticSuppliers(
               sparseStatusSupplier,
               sparseModelPathSupplier,
               () -> {
@@ -1552,21 +2838,23 @@ public final class KnowledgeServer implements Closeable {
               searchRerankerInstance != null ? searchRerankerInstance::getOrtCudaStatus : null,
               nerServiceInstance != null ? nerServiceInstance::getOrtCudaStatus : null,
               citationScorerInstance != null ? citationScorerInstance::getOrtCudaStatus : null,
-              bgeM3EncoderInstance != null ? bgeM3EncoderInstance::getOrtCudaStatus : null));
+              bgeM3EncoderInstance != null ? bgeM3EncoderInstance::getOrtCudaStatus : null);
+      wireModelServices(modelWiringLeases, svc -> svc.wireGpuDiagnostics(diagnostics));
 
       // Tempdoc 394 follow-up: publish per-stage enabled state on /api/status.
       // "Enabled" here means the service is usable — config-enabled AND
       // initialization succeeded. A non-null instance satisfies both.
-      appServices.wireStageEnabled(
-          embeddingService != null,
-          spladeEncoderInstance != null,
-          nerServiceInstance != null);
+      wireModelServices(modelWiringLeases,
+          svc -> svc.wireStageEnabled(embeddingService != null,
+              spladeEncoderInstance != null, nerServiceInstance != null));
+
+      publishEncoderComposition();
 
       // 332 + 397 §14.28 U3: release the shared modelReadyLatch after ALL models are
       // wired (embedding + ECC + SPLADE + BGE-M3 + disambiguation + NER + reranker +
       // citation). This closes both (a) the SPLADE timing gap from 312 — migration
       // enumerator now waits until sparse vectors are available — and (b) the query-
-      // handler boot-race — GrpcSearchService.awaitModelsReady unblocks here. See the
+      // handler boot-race — WorkerSearchService.awaitModelsReady unblocks here. See the
       // modelReadyLatch field Javadoc for the full consumer list before changing the
       // release point.
       modelReadyLatch.countDown();
@@ -1583,6 +2871,10 @@ public final class KnowledgeServer implements Closeable {
           disambiguationService);
 
     } catch (Exception e) {
+      if (encoderComponent != null) {
+        encoderComponent.transition(io.justsearch.core.component.ComponentState.FAILED, null,
+            "encoder_service_wiring_failed");
+      }
       logBackgroundInitFailure(e);
       long bgMs = (System.nanoTime() - bgStart) / 1_000_000;
       log.info("Background model init failed after ({}ms)", bgMs);
@@ -1597,7 +2889,92 @@ public final class KnowledgeServer implements Closeable {
     } finally {
       // Ensure enumerator is unblocked even if init failed partway through.
       modelReadyLatch.countDown();
+      EncoderSet initial = initialEncoderSet;
+      if (initial != null) initial.releaseModelReady();
+      for (ServingLease lease : modelWiringLeases) lease.close();
+      if (recordedCandidate != null && gapWaitProducerPaused) {
+        if (appServices instanceof DefaultWorkerAppServices producer) {
+          producer.parkCandidateProducerModels();
+          producer.startIndexingLoop();
+        }
+        log.info("Recorded Green waits for gap acceptance with A's models serving");
+      } else if (recordedCandidate != null
+          && generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING
+          && !closeStarted) {
+        try {
+          CandidateModels selected = composeRecordedCandidateModels();
+          candidateModels = selected;
+          wireRecordedCandidateProducer(selected);
+          log.info("Recorded Green candidate model set ready for indexing");
+        } catch (Exception failure) {
+          recomposeSourceAfterCandidateRefusal(failure);
+          migrationEnumeratorFailure = failure;
+          log.error("Recorded Green candidate models refused; A state={}",
+              encoderComponent == null ? "unobserved" : encoderComponent.snapshot().state(), failure);
+        }
+      }
     }
+  }
+
+  private void wireRecordedCandidateProducer(CandidateModels selected) throws IOException {
+    if (!(appServices instanceof DefaultWorkerAppServices current)) {
+      throw new IOException("Recorded Green has no candidate producer services");
+    }
+    if (candidateEmbeddingCompatController == null) {
+      var candidateFingerprint = recordedCandidateFingerprint.runtimeFingerprintInputs()
+          .embeddingModel();
+      var candidateEcc = new EmbeddingCompatibilityController(
+          () -> ingestLifecycle.latestCommitUserDataBestEffort(),
+          this::trustworthyDocCountOrThrow,
+          this::trustworthyCompletedEmbeddingCountOrThrow,
+          () -> java.util.Optional.ofNullable(candidateFingerprint.sha()));
+      candidateEcc.refresh();
+      candidateEmbeddingCompatController = candidateEcc;
+    }
+    retainProducerModels(current, selected.owner());
+    current.wireCandidateProducer(selected.embedding(), selected.bindings());
+    current.wireCandidateEmbeddingCompatController(candidateEmbeddingCompatController);
+    current.startIndexingLoop();
+  }
+
+  /** Latch release also happens on failure; only the actual composed-and-wired surface certifies readiness. */
+  void publishEncoderComposition() {
+    if (encoderComponent == null || inferenceSurface == null) return;
+    var observation = inferenceSurface.componentObservation();
+    var missing = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
+    missing.addAll(observation.missingRoles());
+    for (var role : observation.requestedRoles()) {
+      boolean wired = switch (role) {
+        case EMBEDDING -> embeddingService != null && embeddingService.isAvailable();
+        case BGE_M3 -> bgeM3EncoderInstance != null;
+        case SPLADE -> spladeEncoderInstance != null;
+        case NER -> nerServiceInstance != null;
+        case RERANKER -> searchRerankerInstance != null;
+        case CITATION -> citationScorerInstance != null;
+      };
+      if (!wired) missing.add(role);
+    }
+    String desiredVersion = startupConfiguration == null
+        ? observation.configurationDigest().orElse(null)
+        : EncoderConfigurationProjection.from(startupConfiguration).digest();
+    if (desiredVersion != null) encoderComponent.setDesiredVersion(desiredVersion);
+    if (observation.configurationDigest().isPresent() && missing.isEmpty()) {
+      encoderComponent.setAppliedVersion(observation.configurationDigest().orElseThrow());
+    }
+    boolean ready = observation.configurationDigest().isPresent()
+        && observation.hasRequestedRoles() && missing.isEmpty();
+    boolean intentionallyAbsent = observation.configurationDigest().isPresent()
+        && !observation.hasRequestedRoles();
+    String evidence = initialModelSelection != null
+        && initialModelSelection.hasUnavailableModel() ? "INDEX_MODEL_NOT_INSTALLED"
+        : observation.configurationDigest().isEmpty() ? "encoder_observation_unknown"
+        : missing.isEmpty()
+        ? (observation.hasRequestedRoles() ? null : "no_encoder_roles_requested")
+        : "missing_roles=" + missing.stream()
+            .map(Enum::name).sorted().collect(java.util.stream.Collectors.joining(","));
+    encoderComponent.transition(ready ? io.justsearch.core.component.ComponentState.READY
+        : intentionallyAbsent ? io.justsearch.core.component.ComponentState.ABSENT
+        : io.justsearch.core.component.ComponentState.UNAVAILABLE, null, evidence);
   }
 
 
@@ -1655,6 +3032,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   private void maybeAutoStartEmbeddingRebuildForBlockedLegacyBestEffort() {
+    if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE) return;
     io.justsearch.indexerworker.loop.ops.EmbeddingRecoveryOps.rescueBlockedLegacyIndex(
         embeddingCompatController, ingestLifecycle, 1000, log);
   }
@@ -1669,7 +3047,7 @@ public final class KnowledgeServer implements Closeable {
    * exactly such a commit, which made the empty-index fast path unreachable on every first launch.
    *
    * <p>Both index-reading suppliers RE-READ {@code ingestLifecycle} on every call rather than
-   * binding the runtime's ops at construction time: {@code DeferredRuntime.upgradeWriter()}
+   * binding the runtime's ops at construction time: {@code DeferredRuntime.prepareWriterUpgrade()}
    * (DeferredRuntime.java:70-93) builds a NEW {@code RuntimeSession} and closes the old one, so a
    * bound method reference captured here would later read a closed session.
    *
@@ -1685,10 +3063,12 @@ public final class KnowledgeServer implements Closeable {
               return rt == null ? Map.of() : rt.latestCommitUserDataBestEffort();
             },
             this::trustworthyDocCountOrThrow,
-            this::trustworthyCompletedEmbeddingCountOrThrow);
+            this::trustworthyCompletedEmbeddingCountOrThrow,
+            () -> initialModelSelection == null ? EmbeddingFingerprint.get()
+                : initialModelSelection.availableFingerprint("embedding"));
     ecc.refresh();
     embeddingCompatController = ecc;
-    if (corruptionRecoveryRebuildStarted) {
+    if (corruptionRecoveryRebuildStarted || isResumedEmptyCorruptionRecovery()) {
       ecc.permitStampWithoutEmbeddingEvidence("corrupt_index_rebuild");
     }
     // Tempdoc 730 A1 REVERTED (post-review): the unconditional EmbeddingFingerprint::get
@@ -1714,8 +3094,32 @@ public final class KnowledgeServer implements Closeable {
     // would reopen the same hole from the other side — every commit between the loop starting and
     // the models finishing (the help batch again) would omit the fingerprint, so the index the
     // early refresh just certified COMPATIBLE would still persist unstamped.
-    embeddingFingerprintSupplier.set(ecc::fingerprintToStamp);
+    // Preserve a known OLD fingerprint while mismatch blocks embedding writes. This cannot
+    // certify the current model; mixed REBUILDING still withholds both fingerprints.
+    embeddingFingerprintSupplier.set(ecc::fingerprintForCommit);
     appServices.wireEmbeddingCompatController(ecc);
+  }
+
+  /** Re-derive only the empty-Green corruption waiver; source alone cannot attest old vectors. */
+  private boolean isResumedEmptyCorruptionRecovery() {
+    if (indexGenerationManager == null || buildingIndexPath == null) return false;
+    try {
+      var state = indexGenerationManager.readStateBestEffort();
+      if (state == null || state.building_generation() == null
+          || !("MIGRATING".equals(state.migration_state()) || "SWITCHING".equals(state.migration_state()))) {
+        return false;
+      }
+      String generation = state.building_generation();
+      if (!indexGenerationManager.resolveGenerationPathStrict(generation).equals(buildingIndexPath)
+          || !MigrationSource.CORRUPT_INDEX_REBUILD.wire().equals(
+              indexGenerationManager.readGenerationSourceBestEffort(generation))) {
+        return false;
+      }
+      return trustworthyDocCountOrThrow() == 0;
+    } catch (IOException | RuntimeException unavailable) {
+      log.warn("Cannot establish empty corruption-recovery Green: {}", unavailable.getMessage());
+      return false;
+    }
   }
 
   /**
@@ -1786,24 +3190,55 @@ public final class KnowledgeServer implements Closeable {
   private LuceneRuntimeBuilder buildIndexRuntime(
       Path indexPath,
       java.util.function.Supplier<java.util.Optional<String>> fingerprintSupplier) {
+    boolean candidateRuntime = recordedCandidate != null
+        && (indexPath.equals(buildingIndexPath)
+            || (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED
+                && indexPath.equals(activeIndexPath)));
+    ResolvedConfig runtimeConfig = candidateRuntime
+        ? recordedCandidate.configuration() : startupConfiguration;
+    var runtimeFingerprints = candidateRuntime
+        ? Objects.requireNonNull(recordedCandidateFingerprint,
+            "Recorded candidate fingerprint inputs")
+        : null;
+    var boundSelection = modelSelectionFor(indexPath);
+    var boundInputs = boundSelection == null ? null
+        : boundSelection.runtimeFingerprintInputs();
     // Load field catalog via centralized configuration loader
     io.justsearch.configuration.JustSearchConfigurationLoader loader =
         new io.justsearch.configuration.JustSearchConfigurationLoader();
     io.justsearch.configuration.FieldCatalogDef catalog = loader.loadFieldCatalog();
 
     // Apply vector dimension override for BGE-M3 (1024-dim vs nomic-embed's 768-dim)
-    String sparseModel = EnvRegistry.SPARSE_MODEL.getString("splade");
-    if ("bge-m3".equalsIgnoreCase(sparseModel)) {
+    String sparseModel = boundSelection == null ? runtimeConfig.ai().sparseModel()
+        : boundSelection.sparseModel().orElseThrow();
+    if (boundSelection != null) {
+      catalog = catalog.withVectorDimension(boundSelection.vectorDimension().orElseThrow());
+    } else if ("bge-m3".equalsIgnoreCase(sparseModel)) {
       catalog = catalog.withVectorDimension(1024);
       log.info("Field catalog: vector dimension overridden to 1024 (BGE-M3 active)");
     }
 
     // Create runtime with embedding + SPLADE fingerprint overlays
     java.util.function.Supplier<io.justsearch.indexing.runtime.CommitMetadataSource>
-        metadataSupplier =
-            () ->
-                new EmbeddingMetadataOverlay(
-                    new SsotCommitMetadataSource(), fingerprintSupplier, SpladeFingerprint::get);
+        metadataSupplier = runtimeFingerprints != null
+            ? () -> {
+              var inputs = runtimeFingerprints.runtimeFingerprintInputs();
+              return new EmbeddingMetadataOverlay(
+                  new SsotCommitMetadataSource(runtimeConfig, inputs),
+                  () -> {
+                    var candidateEcc = candidateEmbeddingCompatController;
+                    return candidateEcc == null ? java.util.Optional.empty()
+                        : candidateEcc.fingerprintForCommit();
+                  },
+                  () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()));
+            } : boundInputs != null
+            ? () -> new EmbeddingMetadataOverlay(
+                new SsotCommitMetadataSource(runtimeConfig, boundInputs),
+                () -> java.util.Optional.ofNullable(boundInputs.embeddingModel().sha()),
+                () -> java.util.Optional.ofNullable(boundInputs.spladeModel().sha()))
+            : () -> new EmbeddingMetadataOverlay(
+                new SsotCommitMetadataSource(runtimeConfig), fingerprintSupplier,
+                SpladeFingerprint::get);
 
     IndexSchema schema =
         new IndexSchema(
@@ -1812,7 +3247,8 @@ public final class KnowledgeServer implements Closeable {
             metadataSupplier,
             new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
             null);
-    LuceneRuntimeBuilder builder = schema.atPath(indexPath);
+    LuceneRuntimeBuilder builder = schema.atPath(indexPath)
+        .withConfig(runtimeConfig).withExecutorRegistrations(luceneExecutors);
     // Tempdoc 406 observability: wire WorkerLuceneTelemetryAdapter so commit /
     // backpressure / drain / swap / lock-contention events flow into
     // metrics-worker.ndjson under the index.runtime.* namespace.
@@ -1822,11 +3258,25 @@ public final class KnowledgeServer implements Closeable {
               indexRuntimeCatalog));
     }
     // Tempdoc 885 item 19: the reopen-on-demand seam must fire for user-facing reads only.
-    // ForegroundLoad is the one component that knows a search-family RPC is in flight (item 3's
-    // gauge, fed by ForegroundLoadInterceptor); adapters-lucene cannot see it, so it arrives as
+    // ForegroundLoad is the one component that knows a search-family call is in flight (item 3's
+    // gauge, fed by ForegroundLoadGate since item A9); adapters-lucene cannot see it, so it arrives as
     // a predicate. Without this, enrichment-backfill document fetches reopened the searcher.
     builder.withForegroundActive(() -> foregroundLoad.inFlight() > 0);
     return builder;
+  }
+
+  private GenerationModelSelection modelSelectionFor(Path indexPath) {
+    try {
+      return GenerationModelSelection.from(
+          indexGenerationManager.manifestForOwnedPath(indexPath)).orElse(null);
+    } catch (IOException invalid) {
+      if (initialModelSelection == null
+          && generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native
+          && Files.notExists(indexPath.resolve(".justsearch-index-generation.json"))) {
+        return null;
+      }
+      throw new java.io.UncheckedIOException("Generation model identity is unavailable", invalid);
+    }
   }
 
   /**
@@ -1836,8 +3286,8 @@ public final class KnowledgeServer implements Closeable {
    * {@code SsotCommitMetadataSource}, so the status surface's own fresh instance computed a
    * different fingerprint than the commit path did.
    */
-  private static java.util.function.Supplier<Integer> effectiveVectorDimensionSupplier() {
-    boolean bgeM3 = "bge-m3".equalsIgnoreCase(EnvRegistry.SPARSE_MODEL.getString("splade"));
+  private java.util.function.Supplier<Integer> effectiveVectorDimensionSupplier() {
+    boolean bgeM3 = "bge-m3".equalsIgnoreCase(startupConfiguration.ai().sparseModel());
     return () -> bgeM3 ? 1024 : null;
   }
 
@@ -1847,11 +3297,36 @@ public final class KnowledgeServer implements Closeable {
    */
   private Map<String, Object> expectedCommitMetadata(
       java.util.function.Supplier<java.util.Optional<String>> fingerprintSupplier) {
+    var selection = initialModelSelection;
+    if (selection != null) {
+      var inputs = selection.runtimeFingerprintInputs();
+      return new EmbeddingMetadataOverlay(
+          new SsotCommitMetadataSource(startupConfiguration, inputs),
+          () -> java.util.Optional.ofNullable(inputs.embeddingModel().sha()),
+          () -> java.util.Optional.ofNullable(inputs.spladeModel().sha())).build();
+    }
     return new EmbeddingMetadataOverlay(
-            new SsotCommitMetadataSource(),
+            new SsotCommitMetadataSource(startupConfiguration),
             fingerprintSupplier,
             SpladeFingerprint::get)
         .build();
+  }
+
+  private Map<String, Object> servingExpectedCommitMetadata() {
+    LuceneRuntime serving = searchLifecycle;
+    Path path = serving == null ? activeIndexPath : serving.openedIndexPath();
+    var selection = modelSelectionFor(path);
+    ResolvedConfig config = recordedCandidate != null && (path.equals(buildingIndexPath)
+        || (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED
+            && path.equals(activeIndexPath)))
+        ? recordedCandidate.configuration() : startupConfiguration;
+    if (selection == null) {
+      return new SsotCommitMetadataSource(config).build();
+    }
+    var inputs = selection.runtimeFingerprintInputs();
+    return new EmbeddingMetadataOverlay(new SsotCommitMetadataSource(config, inputs),
+        () -> java.util.Optional.ofNullable(inputs.embeddingModel().sha()),
+        () -> java.util.Optional.ofNullable(inputs.spladeModel().sha())).build();
   }
 
   private LuceneRuntimeBuilder buildReadOnlyRuntime(Path indexPath) {
@@ -1859,11 +3334,14 @@ public final class KnowledgeServer implements Closeable {
     io.justsearch.configuration.JustSearchConfigurationLoader loader =
         new io.justsearch.configuration.JustSearchConfigurationLoader();
     io.justsearch.configuration.FieldCatalogDef catalog = loader.loadFieldCatalog();
-    String sparseModel = EnvRegistry.SPARSE_MODEL.getString("splade");
-    if ("bge-m3".equalsIgnoreCase(sparseModel)) {
+    var selection = modelSelectionFor(indexPath);
+    if (selection != null) {
+      catalog = catalog.withVectorDimension(selection.vectorDimension().orElseThrow());
+    } else if ("bge-m3".equalsIgnoreCase(startupConfiguration.ai().sparseModel())) {
       catalog = catalog.withVectorDimension(1024);
     }
-    LuceneRuntimeBuilder builder = IndexSchema.fromCatalog(catalog).atPath(indexPath);
+    LuceneRuntimeBuilder builder = IndexSchema.fromCatalog(catalog).atPath(indexPath)
+        .withConfig(startupConfiguration).withExecutorRegistrations(luceneExecutors);
     if (telemetry != null) {
       builder.withTelemetry(
           new io.justsearch.indexerworker.services.WorkerLuceneTelemetryAdapter(
@@ -1929,13 +3407,11 @@ public final class KnowledgeServer implements Closeable {
     log.info("║ Active index dir: {}", padRight(String.valueOf(activeIndexPath), 44) + "║");
     log.info("║ Build index dir:  {}", padRight(String.valueOf(buildingIndexPath), 44) + "║");
     log.info("║ Jobs DB path:     {}", padRight(dataDir.resolve("jobs.db").toString(), 44) + "║");
-    log.info("║ Signal bus path:  {}", padRight(dataDir.resolve("worker_signal.lock").toString(), 44) + "║");
-    log.info("║ Host:             {}", padRight(config.host(), 44) + "║");
 
     // SSOT paths
-    ConfigStore cs = ConfigStore.globalOrNull();
-    String ssotPath = cs != null && cs.get().paths().ssotPath() != null
-        ? cs.get().paths().ssotPath().toString() : null;
+    ResolvedConfig captured = startupConfiguration;
+    String ssotPath = captured != null && captured.paths().ssotPath() != null
+        ? captured.paths().ssotPath().toString() : null;
     Path effectiveRepoRoot = RepoRootLocator.findRepoRootOrNull();
     String repoRoot = effectiveRepoRoot != null ? effectiveRepoRoot.toString() : "auto-detect";
     if (ssotPath == null || ssotPath.isBlank()) {
@@ -1945,8 +3421,8 @@ public final class KnowledgeServer implements Closeable {
     log.info("║ Repo root:        {}", padRight(repoRoot, 44) + "║");
 
     // Search pipeline configuration
-    if (cs != null && cs.get().hybridSearch() != null) {
-      ResolvedConfig.HybridSearch hs = cs.get().hybridSearch();
+    if (captured != null && captured.hybridSearch() != null) {
+      ResolvedConfig.HybridSearch hs = captured.hybridSearch();
       log.info("╠══════════════════════════════════════════════════════════════╣");
       log.info("║ Fusion strategy:  {}", padRight(hs.fusionStrategy(), 44) + "║");
       if ("cc".equals(hs.fusionStrategy())) {
@@ -1955,7 +3431,7 @@ public final class KnowledgeServer implements Closeable {
                 hs.ccWeightSparse(), hs.ccWeightDense(), hs.ccWeightSplade()), 44) + "║");
       }
       log.info("║ Branch fusion:    {}", padRight(hs.branchFusionStrategy(), 44) + "║");
-      ConfigResolution chunkAwareRes = cs.get().resolutions().get("search.chunk_aware.enabled");
+      ConfigResolution chunkAwareRes = captured.resolutions().get("search.chunk_aware.enabled");
       String chunkAware = chunkAwareRes != null && chunkAwareRes.value() != null
           ? chunkAwareRes.value() : "true";
       log.info("║ Chunk-aware merge:{}", padRight(chunkAware, 44) + "║");
@@ -1978,6 +3454,39 @@ public final class KnowledgeServer implements Closeable {
   // missing from search?" questions remain answerable past the queue retention window.
   private static final int LEDGER_RETENTION_DAYS = 180;
 
+  /** Same daily cleanup operation as the sentinel, exposed in-package for deterministic proof. */
+  void runPeriodicCleanup(long now) {
+    try {
+      int deleted = jobQueue.cleanupOldJobs(CLEANUP_RETENTION_DAYS);
+      if (deleted > 0) {
+        log.info("Periodic cleanup: removed {} old jobs (>{} days)", deleted, CLEANUP_RETENTION_DAYS);
+      }
+    } catch (Exception e) {
+      log.warn("Periodic job cleanup failed (non-fatal)", e);
+    }
+    try {
+      int deletedLedger = jobQueue.cleanupOldLedgerEvents(LEDGER_RETENTION_DAYS);
+      if (deletedLedger > 0) {
+        log.info("Periodic cleanup: removed {} old ledger events (>{} days)",
+            deletedLedger, LEDGER_RETENTION_DAYS);
+      }
+    } catch (Exception e) {
+      log.warn("Periodic ledger cleanup failed (non-fatal)", e);
+    }
+    try {
+      if (pathResolutionStore != null) {
+        ResolvedConfig current = liveConfiguration == null ? startupConfiguration : liveConfiguration.get();
+        int retentionDays = current.paths().pathResolutionRetentionDays();
+        int deletedPaths = pathResolutionStore.pruneOldRemoved(now - TimeUnit.DAYS.toMillis(retentionDays));
+        if (deletedPaths > 0) {
+          log.info("Periodic cleanup: removed {} old path resolutions (>{} days)", deletedPaths, retentionDays);
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Periodic path-resolution cleanup failed (non-fatal)", e);
+    }
+  }
+
   private void startSentinelThread() {
     sentinelThread = new Thread(() -> {
       log.info("Sentinel thread started");
@@ -1987,14 +3496,13 @@ public final class KnowledgeServer implements Closeable {
         try {
           Thread.sleep(1000); // Check every second
 
-          if (signalBus.shouldDie()) {
-            log.info("Sentinel detected termination condition, initiating shutdown");
-            initiateShutdown();
-            break;
-          }
+          // Lane F item A10: the suicide-pact arm is gone with the memory-mapped bus that fed it.
+          // In one JVM there is no heartbeat to miss, so self-termination on a stale beat could
+          // only ever be a false positive. Shutdown is now exclusively the ordered in-process
+          // sequence the composition root drives.
 
           // Dev hot-reload: check for reload signal from Gradle continuous build
-          if (devReloadManager != null && signalBus.isReloadRequested()) {
+          if (devReloadManager != null && devReloadManager.isReloadRequested()) {
             log.info("Sentinel detected reload signal");
             devReloadManager.performReload();
           }
@@ -2012,21 +3520,7 @@ public final class KnowledgeServer implements Closeable {
           // Periodic job queue cleanup: remove old DONE/FAILED rows
           long now = System.currentTimeMillis();
           if (jobQueue != null && now - lastCleanupMs > CLEANUP_INTERVAL_MS) {
-            try {
-              int deleted = jobQueue.cleanupOldJobs(CLEANUP_RETENTION_DAYS);
-              if (deleted > 0) {
-                log.info("Periodic cleanup: removed {} old jobs (>{} days)", deleted, CLEANUP_RETENTION_DAYS);
-              }
-              int deletedLedger = jobQueue.cleanupOldLedgerEvents(LEDGER_RETENTION_DAYS);
-              if (deletedLedger > 0) {
-                log.info(
-                    "Periodic cleanup: removed {} old ledger events (>{} days)",
-                    deletedLedger,
-                    LEDGER_RETENTION_DAYS);
-              }
-            } catch (Exception e) {
-              log.warn("Periodic job cleanup failed (non-fatal)", e);
-            }
+            runPeriodicCleanup(now);
             lastCleanupMs = now;
           }
         } catch (InterruptedException e) {
@@ -2066,9 +3560,9 @@ public final class KnowledgeServer implements Closeable {
     return genManager.recordAutoRebuildAttempt(targetFingerprint);
   }
 
-  private static String expectedIndexFingerprintOrNull() {
+  private String expectedIndexFingerprintOrNull() {
     try {
-      Object fp = new SsotCommitMetadataSource().build().get(IndexFingerprint.COMMIT_META_KEY);
+      Object fp = new SsotCommitMetadataSource(startupConfiguration).build().get(IndexFingerprint.COMMIT_META_KEY);
       String s = fp == null ? null : String.valueOf(fp);
       return s == null || s.isBlank() ? null : s;
     } catch (RuntimeException ex) {
@@ -2090,40 +3584,357 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  private void initiateShutdown() {
-    running = false;
-    if (grpcServer != null) {
-      grpcServer.shutdown();
+  /**
+   * The composed application services (lane F stage A item A6).
+   *
+   * <p>Public so the Engine composition root can bind the ports over the same instance the
+   * indexing loop uses. Null before {@link #start()}, and REPLACED on
+   * a deferred-runtime upgrade or a dev hot-reload — callers must re-read it rather than cache it.
+   */
+  public WorkerAppServices appServices() {
+    return appServices;
+  }
+
+  /** Captures one published physical view under the process configuration publication guard. */
+  public ServingLease captureServingView() {
+    publicationLock.readLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        ServingView current = servingView;
+        if (closeStarted || current == null || current.retiring) {
+          throw new IllegalStateException("Index serving view is unavailable");
+        }
+        current.holders++;
+        return new ServingLease(current);
+      }
+    } finally {
+      publicationLock.readLock().unlock();
+    }
+  }
+
+  /** Installs a fully composed owner view; called only after fallible preparation succeeds. */
+  void publishServingView(WorkerAppServices preparedServices) {
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        if (servingView != null && (!servingView.retiring || servingView.holders != 0)) {
+          throw new IllegalStateException("Prior index serving view is still active");
+        }
+        ServingView previous = servingView;
+        ServingView successor = new ServingView(
+            Objects.requireNonNull(preparedServices, "preparedServices"),
+            searchLifecycle, ingestLifecycle, activeIndexPath);
+        if (previous != null && previous.encoderSet != null) {
+          successor.attachEncoderSet(previous.encoderSet);
+        }
+        appServices = preparedServices;
+        servingView = successor;
+        if (previous != null) previous.releaseEncoderSet();
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+  }
+
+  /** Installs a prepared writer successor while already-issued read-only A leases continue. */
+  private ServingView publishDeferredSuccessor(WorkerAppServices preparedServices,
+      WorkerAppServices oldServices, RunningRuntime upgraded,
+      DeferredRuntime.PreparedUpgrade preparation) {
+    ServingView successor = new ServingView(preparedServices, upgraded, upgraded, activeIndexPath);
+    ServingView old;
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        old = servingView;
+        if (closeStarted || old == null || old.retiring || old.services != oldServices) {
+          throw new IllegalStateException("Deferred successor lost its serving predecessor");
+        }
+        Runnable retireCleanup = () -> {
+          try {
+            oldServices.close();
+          } catch (IOException failure) {
+            throw new IllegalStateException("Old application services still own resources", failure);
+          }
+          preparation.retireReader();
+          old.releaseEncoderSet();
+        };
+        try {
+          if (old.encoderSet != null) successor.attachEncoderSet(old.encoderSet);
+          // Reserve the fallible retirement slot before the upgrade becomes published.
+          retiredServingViews.add(old);
+          preparation.markPublished();
+        } catch (RuntimeException | Error failure) {
+          retiredServingViews.remove(old);
+          successor.releaseEncoderSet();
+          throw failure;
+        }
+        old.retiring = true;
+        old.retireCleanup = retireCleanup;
+        searchLifecycle = upgraded;
+        ingestLifecycle = upgraded; // writer fault source was bound during candidate construction
+        appServices = preparedServices;
+        servingView = successor;
+        servingViewMonitor.notifyAll();
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+    return old;
+  }
+
+  /** Cleanup starts only after A's actual issued work exits, outside owner/publication monitors. */
+  private void cleanRetiredServingView(ServingView retired) {
+    Runnable cleanup;
+    synchronized (servingViewMonitor) {
+      if (retired.holders != 0 || retired.retireCleanup == null || retired.cleanupRunning
+          || retired.abortRetirement) return;
+      retired.cleanupRunning = true;
+      cleanup = retired.retireCleanup;
+    }
+    try {
+      cleanup.run();
+      synchronized (servingViewMonitor) {
+        retired.retireCleanup = null;
+        retiredServingViews.remove(retired);
+        servingViewMonitor.notifyAll();
+      }
+      retryCommittedGenerationRetirement();
+    } catch (RuntimeException | Error failure) {
+      synchronized (servingViewMonitor) {
+        retired.cleanupRunning = false;
+        servingViewMonitor.notifyAll();
+      }
+      log.error("Retired index serving view still owns resources", failure);
+    }
+  }
+
+  /** Reattempt transient close refusals on the existing server-owned maintenance tick. */
+  private void retryRetiredServingViews() {
+    List<ServingView> snapshot;
+    synchronized (servingViewMonitor) { snapshot = List.copyOf(retiredServingViews); }
+    for (ServingView retired : snapshot) cleanRetiredServingView(retired);
+  }
+
+  /** Notify outside publication/runtime locks: listeners may close their issued work and reconnect. */
+  private void notifyServingViewRetirement(ServingView retired) {
+    if (retired == null) return;
+    List<Runnable> listeners;
+    synchronized (servingViewMonitor) {
+      listeners = List.copyOf(retired.retirementListeners);
+      retired.retirementListeners.clear();
+    }
+    for (Runnable listener : listeners) {
+      try { listener.run(); }
+      catch (RuntimeException failure) {
+        log.warn("Retiring index serving view could not notify an issued stream", failure);
+      }
+    }
+  }
+
+  /** Reclaim a committed predecessor only after replay and every old view have settled. */
+  private void retryCommittedGenerationRetirement() {
+    if (indexGenerationManager == null || closeStarted) return;
+    IndexGenerationManager.State state;
+    try { state = indexGenerationManager.readStateBestEffort(); }
+    catch (RuntimeException unavailable) {
+      log.warn("Committed generation retirement awaits readable state", unavailable);
+      return;
+    }
+    if (state == null || state.previous_generation() == null || state.previous_generation().isBlank()
+        || state.active_generation() == null || !state.active_generation().startsWith("g-")) return;
+    String active = state.active_generation();
+    String previous = state.previous_generation();
+    // A failed precommit can retain the original pointer in both fields. There is no
+    // committed operation to retire in that state, and older boot generations need not
+    // have an operation-derived UUIDv7 name.
+    if (previous.equals(active)) return;
+    synchronized (servingViewMonitor) {
+      if (servingView == null || servingView.retiring || !retiredServingViews.isEmpty()
+          || activeIndexPath == null || !active.equals(activeIndexPath.getFileName().toString())) {
+        log.debug("Predecessor retirement waits for serving view: present={}, retiring={}, "
+                + "retiredViews={}, activePath={}, expectedActive={}",
+            servingView != null, servingView != null && servingView.retiring,
+            retiredServingViews.stream().map(view -> view.activeGenerationPath + ":holders="
+                + view.holders + ":cleanupRunning=" + view.cleanupRunning).toList(),
+            activeIndexPath, active);
+        return;
+      }
+    }
+    try {
+      if (IndexGenerationManager.isRecordedGenerationIdentity(active)) {
+        if (recordedIngestionLifecycle == null
+            || !recordedIngestionLifecycle.committedBulkTerminal(active.substring(2))) {
+          log.debug("Predecessor retirement waits for recorded terminal receipt: {}", active);
+          return;
+        }
+      } else if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native)
+          || !nativePredecessorReplaySettled()) {
+        return;
+      }
+      indexGenerationManager.retirePreviousGeneration(active, previous);
+    } catch (IOException | RuntimeException unavailable) {
+      log.warn("Committed generation predecessor {} still owns capacity", previous, unavailable);
+    }
+  }
+
+  /** Native boot can finish replay after a pointer-before-publication crash without a new journal. */
+  private boolean nativePredecessorReplaySettled() {
+    if (promotedReplaySettled) return true;
+    if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE
+        || jobQueue == null || indexGenerationManager == null) {
+      return false;
+    }
+    try {
+      var state = indexGenerationManager.readStateBestEffort();
+      if (state == null || state.active_generation() == null) return false;
+      var counts = jobQueue.jobStateCountsStrict();
+      if (counts.pendingCount() != 0 || counts.processingCount() != 0) return false;
+      if (!(ingestLifecycle instanceof RunningRuntime active) || active != searchLifecycle
+          || activeIndexPath == null
+          || !indexGenerationManager.resolveGenerationPathStrict(state.active_generation())
+              .equals(activeIndexPath)) return false;
+      boolean settled = KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
+          jobQueue, active, state.active_generation(), log);
+      if (settled) promotedReplaySettled = true;
+      return settled;
+    } catch (IOException | RuntimeException unavailable) {
+      return false;
+    }
+  }
+
+  /** Keep every still-issued view alive until its model dependencies are wired and released. */
+  private List<ServingLease> captureModelWiringLeases() {
+    List<ServingLease> leases = new ArrayList<>();
+    runtimeSwapLock.lock();
+    try {
+      publicationLock.readLock().lock();
+      try {
+        synchronized (servingViewMonitor) {
+          if (servingView == null || servingView.retiring) {
+            throw new IllegalStateException("No active serving view for model wiring");
+          }
+          servingView.holders++;
+          leases.add(new ServingLease(servingView));
+          for (ServingView retired : retiredServingViews) {
+            if (retired.holders > 0 && !retired.cleanupRunning) {
+              retired.holders++;
+              leases.add(new ServingLease(retired));
+            }
+          }
+        }
+      } finally {
+        publicationLock.readLock().unlock();
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    return leases;
+  }
+
+  private static void wireModelServices(List<ServingLease> leases,
+      Consumer<WorkerAppServices> wiring) {
+    for (ServingLease lease : leases) wiring.accept(lease.services());
+  }
+
+  /** Shutdown cannot release shared index owners while an older published view still survives. */
+  private void closeRetiredServingViews() throws IOException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (true) {
+      ServingView retired;
+      synchronized (servingViewMonitor) {
+        if (retiredServingViews.isEmpty()) return;
+        retired = retiredServingViews.getFirst();
+        if (retired.holders != 0 || retired.cleanupRunning) {
+          long remaining = deadline - System.nanoTime();
+          if (remaining <= 0) throw new IOException("Retired index serving view still owns resources");
+          try {
+            TimeUnit.NANOSECONDS.timedWait(servingViewMonitor, remaining);
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted waiting for retired index serving view", interrupted);
+          }
+          continue;
+        }
+      }
+      cleanRetiredServingView(retired);
+      synchronized (servingViewMonitor) {
+        if (retiredServingViews.contains(retired)) {
+          throw new IOException("Retired index serving view cleanup refused; owners retained");
+        }
+      }
+    }
+  }
+
+  /** Stops new captures, then waits outside publication for actual users to leave. */
+  void retireServingView() throws IOException {
+    runtimeSwapLock.lock();
+    try {
+      retireServingViewOwned();
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  private void retireServingViewOwned() throws IOException {
+    ServingView retiring;
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        retiring = servingView;
+        if (retiring == null) return;
+        retiring.retiring = true;
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
+    }
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    IOException refusal = null;
+    synchronized (servingViewMonitor) {
+      while (retiring.holders != 0) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) {
+          refusal = new IOException("Index serving view still has active holders; owner retained");
+          break;
+        }
+        try {
+          TimeUnit.NANOSECONDS.timedWait(servingViewMonitor, remaining);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          refusal = new IOException("Interrupted waiting for index serving holders", interrupted);
+          break;
+        }
+      }
+    }
+    if (refusal != null) {
+      restoreServingViewAfterRefusedRetirement(retiring);
+      throw refusal;
+    }
+  }
+
+  /** No destructive step has started when the holder drain refuses; A remains usable. */
+  private void restoreServingViewAfterRefusedRetirement(ServingView retiring) {
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        if (!closeStarted && servingView == retiring) retiring.retiring = false;
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
     }
   }
 
   /**
-   * Blocks until the server terminates.
+   * The process-scoped foreground-load gauge (tempdoc 885 item 3).
    *
-   * @throws InterruptedException if interrupted while waiting
+   * <p>Public since lane F stage A item A6: {@code ForegroundLoadGate} in the composition root was
+   * the second producer alongside the wire interceptor, and since item A9 deleted that interceptor
+   * it is the only one. Either way it must feed THIS instance.
+   * Reading the gauge off {@code indexingPacing().foregroundLoad()} instead would be wrong before
+   * {@link #start()} has run — the field starts as {@code IndexingPacing.unthrottled()}, which
+   * constructs a gauge of its own that nothing paces off.
    */
-  public void blockUntilShutdown() throws InterruptedException {
-    if (grpcServer != null) {
-      grpcServer.awaitTermination();
-    }
-  }
-
-  /**
-   * Returns the bound port, or -1 if not started.
-   *
-   * @return The bound gRPC port
-   */
-  public int getPort() {
-    return grpcServer != null ? grpcServer.getPort() : -1;
-  }
-
-  /**
-   * Checks if the server is running.
-   *
-   * @return true if the server is running
-   */
-  public boolean isRunning() {
-    return running && grpcServer != null && !grpcServer.isShutdown();
+  public ForegroundLoad foregroundLoad() {
+    return foregroundLoad;
   }
 
   /**
@@ -2137,250 +3948,383 @@ public final class KnowledgeServer implements Closeable {
 
   @Override
   public void close() throws IOException {
-    log.info("Shutting down KnowledgeServer...");
-    running = false;
-
-    // Tempdoc 550 Thesis II: stop the periodic stuck-job reaper.
-    if (stuckJobReaper != null) {
-      stuckJobReaper.shutdownNow();
-    }
-
-    // Wait for deferred model init to complete before closing models
-    if (deferredModelInit != null) {
-      try {
-        deferredModelInit.get(5, TimeUnit.SECONDS);
-      } catch (Exception e) {
-        log.warn("Deferred model init did not complete before shutdown: {}", e.getMessage());
-      }
-    }
-
-    // Tempdoc 413: emit unload_total{reason=SHUTDOWN} and explicitly flush *before* any close-
-    // time shutdown begins. The close-time meterProvider.forceFlush().join(2s) at the tail of
-    // LocalTelemetry.close() races the file write — same shutdown gap that affects every other
-    // counter in the system (e.g., worker.documents.indexed.total's last value never reaches
-    // NDJSON either). Calling LocalTelemetry.flush() here (5s join, SDK fully alive) guarantees
-    // the metric lands in metrics-worker.ndjson before any close-time race conditions begin.
-    // Counterpart to GPU_HANDOFF emitted from IndexingLoop.unloadEmbeddingService on hybrid-
-    // inference VRAM handoff. The actual embeddingService.close() runs later in the close
-    // sequence — this emit reflects intent regardless of whether close() succeeds.
-    if (embeddingService != null && embeddingTelemetry != null) {
-      embeddingTelemetry.onUnload(
-          io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents.UnloadReason.SHUTDOWN);
-      if (telemetry instanceof LocalTelemetry lt) {
-        lt.flush();
-      }
-    }
-
-    // Stop sentinel thread
-    if (sentinelThread != null) {
-      sentinelThread.interrupt();
-      try {
-        sentinelThread.join(5_000);  // Allow 5s for sentinel cleanup
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-
-    // Stop indexing loop (via application services registry)
-    if (appServices != null) {
-      try {
-        appServices.close();
-      } catch (Exception e) {
-        log.warn("Error closing application services", e);
-      }
-    }
-
-    // Close disambiguation service (after indexing loop which uses it)
-    if (disambiguationService != null) {
-      try {
-        disambiguationService.close();
-      } catch (Exception e) {
-        log.warn("Error closing disambiguation service", e);
-      }
-    }
-
-    // Close SPLADE encoder (after indexing loop which uses it)
-    if (spladeEncoderInstance != null) {
-      try {
-        spladeEncoderInstance.close();
-      } catch (Exception e) {
-        log.warn("Error closing SPLADE encoder", e);
-      }
-    }
-
-    // Close BGE-M3 encoder (after indexing loop which uses it)
-    if (bgeM3EncoderInstance != null) {
-      try {
-        bgeM3EncoderInstance.close();
-      } catch (Exception e) {
-        log.warn("Error closing BGE-M3 encoder", e);
-      }
-    }
-
-    // 360: Close search reranker (ORT session + tokenizer)
-    if (searchRerankerInstance != null) {
-      try {
-        searchRerankerInstance.close();
-      } catch (Exception e) {
-        log.warn("Error closing search reranker", e);
-      }
-    }
-
-    // Tempdoc 397 §14.26 T2-C1/C2: close any surface-owned SessionHandle that wasn't covered
-    // by the encoder closes above (e.g., citation scorer's handle, which is wired to
-    // appServices rather than owned by a local encoder instance). Handle closes are
-    // idempotent, so double-closing the encoder-owned handles is safe.
-    if (inferenceSurface != null) {
-      try {
-        inferenceSurface.close();
-      } catch (Exception e) {
-        log.warn("Error closing inference surface handles", e);
-      }
-    }
-
-    // Phase 3c: OTel callback handles are managed by LocalTelemetry's gaugeHandles list
-    // (each catalog gauge/observable-counter goes through registry.buildGauge/buildObservableCounter
-    // which adds the handle there). LocalTelemetry.close() drains them on shutdown.
-
-    // Close tracing (flush spans) before telemetry shuts down.
-    if (tracingBootstrap != null) {
-      try {
-        tracingBootstrap.close();
-      } catch (Exception e) {
-        log.warn("Error closing tracing", e);
-      }
-    }
-
-    // Close telemetry (flush best-effort) after loop shutdown so the last stage/commit timings are captured.
-    if (telemetry != null) {
-      try {
-        telemetry.close();
-      } catch (Exception e) {
-        log.warn("Error closing telemetry", e);
-      } finally {
-        telemetry = null;
-      }
-    }
-
-    // Stop gRPC server
-    if (grpcServer != null) {
-      grpcServer.shutdown();
-      try {
-        if (!grpcServer.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-          grpcServer.shutdownNow();
+    synchronized (closeLock) {
+      if (shutdownLatch.getCount() == 0) return;
+      closeStarted = true;
+      // The initializer may be waiting to enter a runtime replacement. Join it before taking
+      // runtimeSwapLock; otherwise close owns the lock while waiting for its prospective owner.
+      if (!closePrepared) {
+        if (deferredModelExecutor != null) deferredModelExecutor.close();
+        if (deferredModelInit != null) {
+          try {
+            deferredModelInit.join();
+          } catch (java.util.concurrent.CompletionException
+              | java.util.concurrent.CancellationException e) {
+            log.warn("Deferred model init completed exceptionally before shutdown: {}", e.toString());
+          }
         }
-      } catch (InterruptedException e) {
-        grpcServer.shutdownNow();
+      }
+      boolean acquired;
+      try {
+        acquired = runtimeSwapLock.tryLock(5, TimeUnit.SECONDS);
+      } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
+        throw new IOException("Interrupted waiting for active runtime replacement; server retained", interrupted);
       }
-    }
+      if (!acquired) {
+        log.warn("Server close deadline exceeded; active runtime replacement still owns the server");
+        throw new IOException("Active runtime replacement prevented close; server retained for retry");
+      }
+      try {
+        if (!closePrepared) {
+          LuceneRuntime currentIngest = ingestLifecycle;
+          if (currentIngest instanceof RunningRuntime runningRuntime) {
+            runningRuntime.retireTerminalWriterFailureNotifications();
+          }
+          log.info("Shutting down KnowledgeServer...");
+          running = false;
 
-    // Stop migration enumerator thread (best-effort)
-    if (migrationEnumeratorThread != null) {
-      migrationEnumeratorThread.interrupt();
-      try {
-        migrationEnumeratorThread.join(10_000);  // Allow 10s for large directory walks
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
+          // Tempdoc 550 Thesis II: stop the periodic stuck-job reaper.
+          if (stuckJobReapTask != null) stuckJobReapTask.cancel(true);
+          if (stuckJobReaper != null) {
+            stuckJobReaper.shutdownNow();
+            stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.
+          }
 
-    // Stop migration cutover monitor thread (best-effort)
-    if (migrationCutoverThread != null) {
-      migrationCutoverThread.interrupt();
-      try {
-        migrationCutoverThread.join(10_000);  // Allow 10s for cutover cleanup
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
+          retireServingView();
+          closeRetiredServingViews();
 
-    // Close Lucene runtimes
-    if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) {
-      try {
-        ingestLifecycle.close();
-      } catch (Exception e) {
-        log.warn("Error closing ingest runtime", e);
-      }
-    }
-    if (searchLifecycle != null) {
-      try {
-        searchLifecycle.close();
-      } catch (Exception e) {
-        log.warn("Error closing search runtime", e);
-      }
-    }
+          // Producer exit precedes native model retirement. The indexing loop may hold an
+          // already-selected A or B wrapper after request admission has stopped.
+          Throwable serviceCloseFailure = null;
+          try { closePendingAppServices(); }
+          catch (RuntimeException | Error failure) { serviceCloseFailure = failure; }
+          if (appServices != null) {
+            try {
+              appServices.close();
+              appServices = null;
+            } catch (Exception | Error failure) {
+              if (serviceCloseFailure == null) serviceCloseFailure = failure;
+              else if (serviceCloseFailure != failure) serviceCloseFailure.addSuppressed(failure);
+            }
+          }
+          if (serviceCloseFailure instanceof Error fatal) throw fatal;
+          if (serviceCloseFailure != null) {
+            throw new IOException("Application services still own resources", serviceCloseFailure);
+          }
 
-    // Close embedding service. unload_total{reason=SHUTDOWN} was emitted earlier (before
-    // telemetry shutdown) so the metric lands in metrics-worker.ndjson regardless of close()'s
-    // outcome.
-    if (embeddingService != null) {
-      try {
-        embeddingService.close();
-      } catch (Exception e) {
-        log.warn("Error closing embedding service", e);
-      }
-    }
+          // The active view is no longer issuing work. Its model hold must leave before the
+          // exact owner can enforce the bounded native retirement deadline below.
+          synchronized (servingViewMonitor) {
+            if (servingView != null) servingView.releaseEncoderSet();
+          }
 
-    // Close auxiliary jobs.db stores before the queue connection.
-    if (documentIdentityStore != null) {
-      try {
-        documentIdentityStore.close();
-      } catch (Exception e) {
-        log.warn("Error closing document-identity store", e);
-      }
-    }
+          // Native retirement follows producer exit and precedes tokenizer/resource teardown. A
+          // timeout retains the exact sessions, their owners and the index root lock for retry.
+          // SessionHandle.close() may report REFUSED without throwing; InferenceSurface checks
+          // every handle's typed disposition after attempting the whole set.
+          CandidateModels selectedCandidate = candidateModels;
+          if (selectedCandidate != null) {
+            try {
+              selectedCandidate.close();
+              candidateModels = null;
+            } catch (RuntimeException refusal) {
+              throw new IOException("Candidate native inference retirement incomplete; server retained for retry",
+                  refusal);
+            }
+          }
+          EncoderSet initialOwner = initialEncoderSet;
+          if (initialOwner != null) {
+            try {
+              initialOwner.close();
+            } catch (RuntimeException refusal) {
+              throw new IOException("Native inference retirement incomplete; server retained for retry",
+                  refusal);
+            }
+          } else if (inferenceSurface != null) {
+            try { inferenceSurface.close(); }
+            catch (RuntimeException refusal) {
+              throw new IOException("Native inference retirement incomplete; server retained for retry",
+                  refusal);
+            }
+          }
 
-    if (pathResolutionStore != null) {
-      try {
-        pathResolutionStore.close();
-      } catch (Exception e) {
-        log.warn("Error closing path-resolution store", e);
-      }
-    }
+          // Tempdoc 413: emit unload_total{reason=SHUTDOWN} and explicitly flush *before* any close-
+          // time shutdown begins. The close-time meterProvider.forceFlush().join(2s) at the tail of
+          // LocalTelemetry.close() races the file write — same shutdown gap that affects every other
+          // counter in the system (e.g., worker.documents.indexed.total's last value never reaches
+          // NDJSON either). Calling LocalTelemetry.flush() here (5s join, SDK fully alive) guarantees
+          // the metric lands in metrics-worker.ndjson before any close-time race conditions begin.
+          // Counterpart to GPU_HANDOFF emitted from IndexingLoop.unloadEmbeddingService on hybrid-
+          // inference VRAM handoff. The actual embeddingService.close() runs later in the close
+          // sequence — this emit reflects intent regardless of whether close() succeeds.
+          if (embeddingService != null && embeddingTelemetry != null) {
+            embeddingTelemetry.onUnload(
+                io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents.UnloadReason.SHUTDOWN);
+            if (telemetry instanceof LocalTelemetry lt) {
+              lt.flush();
+            }
+          }
 
-    // Close job queue
-    if (jobQueue != null) {
-      try {
-        jobQueue.close();
-      } catch (Exception e) {
-        log.warn("Error closing job queue", e);
-      }
-    }
+          // Stop sentinel thread
+          if (sentinelThread != null) {
+            sentinelThread.interrupt();
+            try {
+              sentinelThread.join(5_000);  // Allow 5s for sentinel cleanup
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
 
-    // Close signal bus
-    if (signalBus != null) {
-      try {
-        signalBus.close();
-      } catch (Exception e) {
-        log.warn("Error closing signal bus", e);
-      }
-    }
+          // Close disambiguation service (after indexing loop which uses it)
+          if (disambiguationService != null) {
+            try {
+              disambiguationService.close();
+            } catch (Exception e) {
+              log.warn("Error closing disambiguation service", e);
+            }
+          }
 
-    if (indexRootLock != null) {
-      try {
-        indexRootLock.close();
-      } catch (Exception e) {
-        log.warn("Error closing index root lock", e);
+          // Close SPLADE encoder (after indexing loop which uses it)
+          if (spladeEncoderInstance != null) {
+            try {
+              spladeEncoderInstance.close();
+            } catch (Exception e) {
+              log.warn("Error closing SPLADE encoder", e);
+            }
+          }
+
+          // Close BGE-M3 encoder (after indexing loop which uses it)
+          if (bgeM3EncoderInstance != null) {
+            try {
+              bgeM3EncoderInstance.close();
+            } catch (Exception e) {
+              log.warn("Error closing BGE-M3 encoder", e);
+            }
+          }
+
+          // 360: Close search reranker (ORT session + tokenizer)
+          if (searchRerankerInstance != null) {
+            try {
+              searchRerankerInstance.close();
+            } catch (Exception e) {
+              log.warn("Error closing search reranker", e);
+            }
+          }
+
+          if (nerServiceInstance != null) {
+            try { nerServiceInstance.close(); }
+            catch (Exception e) { log.warn("Error closing NER service", e); }
+          }
+          if (citationScorerInstance != null) {
+            try { citationScorerInstance.close(); }
+            catch (Exception e) { log.warn("Error closing citation scorer", e); }
+          }
+
+          // Phase 3c: OTel callback handles are managed by LocalTelemetry's gaugeHandles list
+          // (each catalog gauge/observable-counter goes through registry.buildGauge/buildObservableCounter
+          // which adds the handle there). LocalTelemetry.close() drains them on shutdown.
+
+          // Close tracing (flush spans) before telemetry shuts down.
+          if (tracingBootstrap != null) {
+            try {
+              tracingBootstrap.close();
+            } catch (Exception e) {
+              log.warn("Error closing tracing", e);
+            }
+          }
+
+          // Close telemetry (flush best-effort) after loop shutdown so the last stage/commit timings are captured.
+          if (telemetry != null) {
+            try {
+              telemetry.close();
+            } catch (Exception e) {
+              log.warn("Error closing telemetry", e);
+            } finally {
+              telemetry = null;
+            }
+          }
+
+          // Stop migration enumerator thread (best-effort)
+          if (migrationEnumeratorThread != null) {
+            migrationEnumeratorThread.interrupt();
+            try {
+              migrationEnumeratorThread.join(10_000);  // Allow 10s for large directory walks
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+
+          // Stop migration cutover monitor thread (best-effort)
+          if (migrationCutoverThread != null) {
+            migrationCutoverThread.interrupt();
+            try {
+              migrationCutoverThread.join(10_000);  // Allow 10s for cutover cleanup
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+
+          closePrepared = true;
+        }
+
+        // A timed-out runtime still owns live Lucene children. Attempt both runtimes, but preserve
+        // the enclosing stores, executor registrations and root lock if either needs a close retry.
+        IOException runtimeCloseFailure = null;
+        if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) {
+          try {
+            ingestLifecycle.close();
+          } catch (Exception e) {
+            log.warn("Error closing ingest runtime", e);
+            runtimeCloseFailure = new IOException("Ingest runtime close incomplete", e);
+          }
+        }
+        if (searchLifecycle != null) {
+          try {
+            searchLifecycle.close();
+          } catch (Exception e) {
+            log.warn("Error closing search runtime", e);
+            if (runtimeCloseFailure == null) {
+              runtimeCloseFailure = new IOException("Search runtime close incomplete", e);
+            } else {
+              runtimeCloseFailure.addSuppressed(e);
+            }
+          }
+        }
+        if (runtimeCloseFailure != null) throw runtimeCloseFailure;
+
+        // Close embedding service. unload_total{reason=SHUTDOWN} was emitted earlier (before
+        // telemetry shutdown) so the metric lands in metrics-worker.ndjson regardless of close()'s
+        // outcome.
+        if (embeddingService != null) {
+          try {
+            embeddingService.close();
+          } catch (Exception e) {
+            log.warn("Error closing embedding service", e);
+          }
+        }
+
+        // Close auxiliary jobs.db stores before the queue connection.
+        if (documentIdentityStore != null) {
+          try {
+            documentIdentityStore.close();
+          } catch (Exception e) {
+            log.warn("Error closing document-identity store", e);
+          }
+        }
+
+        if (pathResolutionStore != null) {
+          try {
+            pathResolutionStore.close();
+          } catch (Exception e) {
+            log.warn("Error closing path-resolution store", e);
+          }
+        }
+
+        // Final recorded receipts observe drained indexing. Keep both owners on failure.
+        if (recordedIngestionAttachment != null) {
+          recordedIngestionAttachment.close();
+          recordedIngestionAttachment = null;
+        }
+
+        // Retain the queue and index exclusion if native connection cleanup needs retry.
+        // EngineRoot must not observe completed shutdown while this mutable owner remains live.
+        if (jobQueue != null) {
+          jobQueue.close();
+        }
+
+        // Close signal bus
+        if (signalBus != null) {
+          try {
+            signalBus.close();
+          } catch (Exception e) {
+            log.warn("Error closing signal bus", e);
+          }
+        }
+
+        try { workerExecutors.close(); }
+        finally { luceneExecutors.close(); }
+
+        if (indexRootLock != null) {
+          // Keep the failed owner available for retry and never signal completed shutdown
+          // while native lock cleanup remains unconfirmed.
+          indexRootLock.close();
+          indexRootLock = null;
+        }
+
+        // Stage-A checkpoint (re-review). This countdown used to sit ~90 lines earlier, where the gRPC
+        // server's termination used to be, and the comment there called it "releasing the shutdown
+        // latch". It marked a point in the MIDDLE of close(): the Lucene runtimes, the embedding
+        // service, the migration threads and the index root lock were all still to come. So the latch
+        // answered "close() got past step N", which is not a fact anyone wants.
+        //
+        // It is the last statement of close() now, so it means exactly one thing: this server ran its
+        // shutdown to completion. That is what EngineRoot.close() consults.
+        if (indexComponent != null) {
+          indexComponent.transition(io.justsearch.core.component.ComponentState.ABSENT,
+              io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SHUT_DOWN.code(), null);
+          indexComponent.setAppliedVersion(null);
+        }
+        if (encoderComponent != null) {
+          encoderComponent.transition(io.justsearch.core.component.ComponentState.ABSENT, null, null);
+          encoderComponent.setAppliedVersion(null);
+        }
+        shutdownLatch.countDown();
+        log.info("KnowledgeServer shutdown complete");
       } finally {
-        indexRootLock = null;
+        runtimeSwapLock.unlock();
       }
     }
+  }
 
-    log.info("KnowledgeServer shutdown complete");
+  /** Native owner disposition used by the process exit authority after ordered close. */
+  public io.justsearch.app.api.NativeQuiescence nativeQuiescence() {
+    CompletableFuture<ModelContext> initialization = deferredModelInit;
+    if (initialization != null && !initialization.isDone()) {
+      return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+    }
+    CandidateModels selectedCandidate = candidateModels;
+    if (selectedCandidate != null && !selectedCandidate.owner().isClosed()) {
+      return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+    }
+    EncoderSet initialOwner = initialEncoderSet;
+    if (initialOwner != null && !initialOwner.isClosed()) {
+      return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+    }
+    InferenceSurface surface = inferenceSurface;
+    // A started initializer with no published surface may have failed after opening a native
+    // candidate. No owner can prove its retirement from a null field, so exit conservatively.
+    if (surface == null) {
+      return initialization == null ? io.justsearch.app.api.NativeQuiescence.QUIESCED
+          : io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+    }
+    if (surface.retirementStatus()
+        == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED) {
+      return io.justsearch.app.api.NativeQuiescence.QUIESCED;
+    }
+    return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+  }
+
+  /**
+   * Blocks until {@link #close()} has run to completion, or the timeout elapses.
+   *
+   * <p>{@code true} means close() reached its final statement — every runtime closed, every thread
+   * joined or abandoned on its own timeout, the index root lock released. {@code false} means it
+   * did not: either close() was never called, or it threw partway and left resources open. A caller
+   * that then re-opens the same data directory is the one who finds out, via a held index lock.
+   *
+   * <p>This exists because the obvious predicate does not work. {@code isRunning()} is
+   * {@code running && latch > 0} and {@code close()} sets {@code running = false} in its FIRST
+   * statement, so reading {@code isRunning()} after {@code close()} returns is constant-false and
+   * can never report a problem.
+   */
+  public boolean awaitClosed(long timeoutMs) throws InterruptedException {
+    return shutdownLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
   }
 
   // Tempdoc 417 Phase 3c: registerOtelObservableCallbacks() removed — its 25 metrics now flow
   // through WorkerOpsMetricCatalog (constructed in registerTelemetryGauges). Telemetry.meter()
   // retired with this change.
-
-  private void closeQuietly() {
-    try {
-      close();
-    } catch (Exception e) {
-      log.warn("Error during cleanup", e);
-    }
-  }
 
   // Package-private accessors for testing
   JobQueue jobQueueForTests() {
@@ -2403,6 +4347,116 @@ public final class KnowledgeServer implements Closeable {
     modelReadyLatch.countDown();
   }
 
+  void installMigrationBarrierForTests(MigrationTransitionBarrier.Hook hook) {
+    if (running || migrationCutoverThread != null) {
+      throw new IllegalStateException("Migration barrier must be injected before start");
+    }
+    migrationTransitionHook = Objects.requireNonNull(hook, "hook");
+  }
+
+  boolean awaitMigrationCutoverExitForTests(long timeout, TimeUnit unit)
+      throws InterruptedException {
+    Thread cutover = migrationCutoverThread;
+    if (cutover == null) return true;
+    cutover.join(unit.toMillis(timeout));
+    return !cutover.isAlive();
+  }
+
+  /** Composition binds source owners before boot can resume or create a candidate. */
+  public synchronized void installProjectionSeedSources(
+      List<io.justsearch.app.api.indexing.ProjectionSeedSource> sources) {
+    if (running || migrationEnumeratorThread != null) {
+      throw new IllegalStateException("Projection seed sources must be installed before start");
+    }
+    var copy = List.copyOf(sources);
+    var names = new java.util.HashSet<String>();
+    if (copy.size() > 64) throw new IllegalArgumentException("Too many projection seed sources");
+    for (var source : copy) {
+      String id = Objects.requireNonNull(source.sourceId(), "sourceId");
+      if (id.isBlank() || id.length() > 256
+          || id.chars().anyMatch(Character::isISOControl) || !names.add(id)) {
+        throw new IllegalArgumentException("Projection source identities must be unique and bounded");
+      }
+    }
+    projectionSeedSources = copy;
+  }
+
+  private List<String> registeredProjectionSourceIds() {
+    return IndexGenerationManager.checkedProjectionSourceIds(
+        projectionSeedSources.stream().map(
+            io.justsearch.app.api.indexing.ProjectionSeedSource::sourceId).toList());
+  }
+
+  /** Read the durable pre-pointer source set; a legacy manifest is safe only with no sources. */
+  private List<String> expectedProjectionSourceIds() throws IOException {
+    if (indexGenerationManager == null || buildingIndexPath == null) {
+      throw new IOException("Projection candidate manifest is unavailable");
+    }
+    var manifest = indexGenerationManager.manifestForOwnedPath(buildingIndexPath);
+    if (generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+        && !Objects.equals(recorded.projectionSourceIds(), manifest.projection_source_ids())) {
+      throw new IOException("Recorded candidate source set differs from accepted preparation");
+    }
+    if (manifest.projection_source_ids() == null) {
+      if (!projectionSeedSources.isEmpty()) {
+        throw new IOException("Legacy candidate has no frozen projection source set");
+      }
+      return List.of();
+    }
+    if (!manifest.projection_source_ids().containsAll(registeredProjectionSourceIds())) {
+      throw new IOException("Candidate predates a registered projection source");
+    }
+    return manifest.projection_source_ids();
+  }
+
+  private boolean projectionSourceReady(String sourceId) {
+    return buildingIndexPath != null && completedProjectionSeeds.contains(
+            new ProjectionSeedCompletion(buildingIndexPath.getFileName().toString(), sourceId))
+        && projectionSeedSources.stream().anyMatch(source -> source.sourceId().equals(sourceId));
+  }
+
+  private boolean nativeProjectionSourcesReadyForPromotion() throws IOException {
+    List<String> expected = expectedProjectionSourceIds();
+    if (expected.isEmpty()) return true;
+    if (!(jobQueue instanceof SwitchBufferCapableQueue journal)) return false;
+    var marked = new java.util.HashSet<String>();
+    for (var op : journal.listSwitchBufferOpsStrictForGeneration(
+        buildingIndexPath.getFileName().toString())) {
+      if ("PROJECTION_SOURCE".equals(op.op()) && expected.contains(op.payload())
+          && ("projection-source:" + op.payload().length() + ":" + op.payload()).equals(op.key())) {
+        marked.add(op.payload());
+      }
+    }
+    return marked.containsAll(expected) && expected.stream().allMatch(this::projectionSourceReady);
+  }
+
+  private void migrationTransition(String point) throws IOException, InterruptedException {
+    if (migrationTransitionHook == MigrationTransitionBarrier.NO_HOOK) return;
+    var state = indexGenerationManager.readStateBestEffort();
+    migrationTransitionHook.await(new MigrationTransitionBarrier.Transition(point,
+        state == null ? null : state.active_generation(),
+        state == null ? null : state.building_generation()));
+  }
+
+  private void migrationTransitionForPublication(String point) throws IOException {
+    try {
+      migrationTransition(point);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Migration publication barrier interrupted", interrupted);
+    }
+  }
+
+  private void migrationReplayCut() {
+    try {
+      migrationTransitionForPublication("migration-after-first-projection-replay");
+    } catch (IOException barrierFailure) {
+      // This cut is only selected for a harness self-exit. If its reached marker cannot be
+      // written, abort the whole promotion attempt rather than treating it as a replay gap.
+      throw new IllegalStateException("Migration replay barrier failed", barrierFailure);
+    }
+  }
+
   private static IndexGenerationManager.MigrationState parseMigrationState(String raw) {
     return KnowledgeServerMigrationOps.parseMigrationState(raw);
   }
@@ -2413,13 +4467,17 @@ public final class KnowledgeServer implements Closeable {
     }
     migrationCutoverThread =
         new Thread(
-            () ->
+            () -> {
+              try {
                 KnowledgeServerMigrationOps.runMigrationCutoverLoop(
                     new KnowledgeServerMigrationOps.CutoverContext(
                         indexGenerationManager,
                         jobQueue,
-                        () -> running,
-                        () -> migrationEnumeratorDone,
+                        () -> running && !recordedCandidatePrecommitRefused(),
+                        () -> migrationEnumeratorDone
+                            && (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+                                || recordedIngestionLifecycle.recordedCutoverReady(recorded.operationKey())),
+                        () -> migrationEnumeratorFailure,
                         MIGRATION_SWITCHING_QUEUE_DEPTH_THRESHOLD,
                         MIGRATION_SWITCHING_MAX_DURATION_MS,
                         migrationCutoverMaxFailedJobs,
@@ -2427,13 +4485,780 @@ public final class KnowledgeServer implements Closeable {
                         this::finalizeEmbeddingRebuildBeforeCutover,
                         this::verifyGreenCommitMetadataBestEffort,
                         this::drainSwitchBufferBestEffort,
-                        this::initiateShutdown,
                         this::flushTelemetryBestEffort,
+                        () -> migrationRestartAction.run(),
                         dataDir,
-                        log)),
+                        log,
+                         () -> {
+                           throw new IOException("Live cutover requires its prepared serving successor");
+                         },
+                         this::enterSwitchingWithMutationAdmission,
+                         new KnowledgeServerMigrationOps.CheckedLiveCutover() {
+                           @Override public boolean recorded() {
+                             return generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded;
+                           }
+
+                           @Override public IndexGenerationManager.State promote()
+                               throws IOException, InterruptedException {
+                             return promoteServingSuccessor(
+                                 generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+                                     ? recorded : null);
+                           }
+
+                           @Override public RecordedIngestionLifecycle.GapDecision gapDecision() {
+                             if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)) {
+                               return RecordedIngestionLifecycle.GapDecision.NONE;
+                             }
+                             return recordedIngestionLifecycle.recordedGapDecision(
+                                 recorded.operationKey(), candidateJournalWitness());
+                           }
+
+                           @Override public boolean enterGapWait() throws IOException, InterruptedException {
+                             return holdInPlaceCandidateForGapDecision();
+                           }
+
+                           @Override public boolean resumeAcceptedGapBuild() throws IOException, InterruptedException {
+                             return resumeInPlaceCandidateAfterGapDecision();
+                           }
+
+                           @Override public void transition(String point) throws IOException, InterruptedException {
+                             migrationTransition(point);
+                           }
+                         }));
+              } finally {
+                try { reconcileRefusedRecordedCandidate(); }
+                catch (RuntimeException failure) {
+                  log.error("Refused candidate cutover cleanup will retry", failure);
+                }
+              }
+            },
             "migration-cutover");
     migrationCutoverThread.setDaemon(true);
     migrationCutoverThread.start();
+  }
+
+  private boolean recordedCandidatePrecommitRefused() {
+    return generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+        && recordedIngestionLifecycle.recordedPrecommitRefused(recorded.operationKey());
+  }
+
+  /** An approval is stamped only against the Green witness held stable by this physical fence. */
+  io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance
+      withCandidateGapAcceptanceFence(java.util.function.Function<
+          RecordedIngestionLifecycle.JournalWitness,
+          io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance> decision)
+          throws IOException, InterruptedException {
+    runtimeSwapLock.lock();
+    try {
+      var state = indexGenerationManager.readStateBestEffort();
+      if (closeStarted || state == null
+          || !"AWAITING_ACCEPTANCE".equals(state.migration_state())
+          || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)
+          || !(appServices instanceof DefaultWorkerAppServices producer)) {
+        throw new IOException("Candidate gap decision has no active physical owner");
+      }
+      // A recovered row can already show the prior wait while this boot is re-enumerating its
+      // source. The enumerator writes the candidate journal outside mutation admission; do not
+      // stamp an approval until that writer has finished and its full witness is visible.
+      if (migrationEnumeratorRunning.get() || !migrationEnumeratorDone) {
+        throw new IOException("Candidate enumeration has not settled for gap decision");
+      }
+      try (var fence = producer.mutationAdmission().beginFinalFence(
+          producer.mutationOwnerToken(), 10_000)) {
+        if (fence == null || !producer.mutationAdmission().replayCertain()) {
+          throw new IOException("Candidate gap witness cannot be fenced");
+        }
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (true) {
+          var counts = jobQueue.jobStateCountsStrict();
+          if (counts.processingCount() == 0 && counts.pendingReadyCount() == 0
+              && counts.pendingBackoffCount() == 0) break;
+          if (closeStarted || System.nanoTime() >= deadline) {
+            throw new IOException("Accepted candidate writes have not settled for gap decision");
+          }
+          Thread.sleep(100);
+        }
+        if (!producer.pauseProducerForCutover(10_000)) {
+          throw new IOException("Candidate writer cannot pause for gap decision");
+        }
+        try {
+          return decision.apply(candidateJournalWitness());
+        } finally {
+          producer.resumeProducerAfterCutover();
+        }
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /** Final Green file witnesses are read by the Worker, never inferred from Head queue counts. */
+  RecordedIngestionLifecycle.JournalWitness candidateJournalWitness() {
+    return candidateJournalSnapshot().witness();
+  }
+
+  private record CandidateJournalSnapshot(
+      RecordedIngestionLifecycle.JournalWitness witness,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, OperationOutcomeView.Gap> rowGaps) {
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> acceptedVersions() {
+      Map<String, OperationOutcomeView.Gap> effective = new HashMap<>();
+      for (var gap : witness.gaps()) effective.put(gap.unitId(), gap);
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> selected = new java.util.HashSet<>();
+      for (var entry : rowGaps.entrySet()) {
+        if (entry.getValue().equals(effective.get(entry.getValue().unitId()))) {
+          selected.add(entry.getKey());
+        }
+      }
+      return Set.copyOf(selected);
+    }
+  }
+
+  private static void addCandidateGap(List<OperationOutcomeView.Gap> gaps,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, OperationOutcomeView.Gap> rowGaps,
+      SwitchBufferCapableQueue.SwitchBufferOp row, String unit, String reason) {
+    var gap = new OperationOutcomeView.Gap(unit, reason,
+        row == null ? null : candidateRowEvidence(row));
+    gaps.add(gap);
+    if (row != null) rowGaps.put(row, gap);
+  }
+
+  /** Approval covers the exact durable row effect, even when its safe reason code is unchanged. */
+  private static String candidateRowEvidence(SwitchBufferCapableQueue.SwitchBufferOp row) {
+    try {
+      var digest = java.security.MessageDigest.getInstance("SHA-256");
+      digest.update("justsearch:candidate-gap-row:v1\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      for (String part : List.of(row.generation(), row.key(), row.op(), row.payload(),
+          row.revision())) {
+        digest.update(part.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+      }
+      return java.util.HexFormat.of().formatHex(digest.digest());
+    } catch (java.security.NoSuchAlgorithmException unavailable) {
+      throw new IllegalStateException("SHA-256 is unavailable", unavailable);
+    }
+  }
+
+  private CandidateJournalSnapshot candidateJournalSnapshot() {
+    if (!(jobQueue instanceof SwitchBufferCapableQueue journal)
+        || indexGenerationManager == null || ingestLifecycle == null) {
+      throw new IllegalStateException("Candidate journal or Green runtime is unavailable");
+    }
+    IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+    if (state == null || state.building_generation() == null) {
+      throw new IllegalStateException("Candidate generation is unavailable");
+    }
+    List<OperationOutcomeView.Gap> gaps = new ArrayList<>();
+    Map<SwitchBufferCapableQueue.SwitchBufferOp, OperationOutcomeView.Gap> rowGaps =
+        new java.util.LinkedHashMap<>();
+    Set<String> covered = new LinkedHashSet<>();
+    final List<String> expectedSources;
+    try {
+      expectedSources = expectedProjectionSourceIds();
+    } catch (IOException unavailable) {
+      throw new IllegalStateException("Candidate source-set witness is unavailable", unavailable);
+    }
+    Set<String> markedSources = new LinkedHashSet<>();
+    for (var op : journal.listSwitchBufferOpsStrictForGeneration(state.building_generation())) {
+      if ("UPSERT".equals(op.op())) {
+        SwitchBufferUpsert upsert = SwitchBufferUpsert.decode(op.payload());
+        String unit = DocumentIdentityStore.pathHash(upsert.path());
+        if (upsert.sourceSha256() == null) {
+          addCandidateGap(gaps, rowGaps, op, unit, "PROJECTION_WITNESS_MISSING");
+        } else if (!journal.matchesAcceptedFileProjection(
+            upsert.path(), upsert.unitRevision(), upsert.sourceSha256())
+            || !upsert.sourceSha256().equals(ingestLifecycle.documentFieldOps()
+                .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256))) {
+          addCandidateGap(gaps, rowGaps, op, unit, "CANDIDATE_PROJECTION_MISSING");
+        } else {
+          covered.add(unit);
+        }
+      } else if ("DELETE".equals(op.op())) {
+        String unit = DocumentIdentityStore.pathHash(op.payload());
+        if (ingestLifecycle.documentFieldOps()
+            .getDocumentField(op.payload(), SchemaFields.DOC_ID) != null) {
+          addCandidateGap(gaps, rowGaps, op, unit, "DELETE_NOT_APPLIED");
+        } else {
+          covered.add(unit);
+        }
+      } else if ("PROJECTION_SOURCE".equals(op.op())) {
+        String sourceId = op.payload();
+        if (!expectedSources.contains(sourceId)
+            || !("projection-source:" + sourceId.length() + ":" + sourceId).equals(op.key())) {
+          throw new IllegalStateException("Candidate journal has an unexpected projection source");
+        }
+        markedSources.add(sourceId);
+        String unit = DocumentIdentityStore.pathHash("projection-source:" + sourceId);
+        if (projectionSourceReady(sourceId)) covered.add(unit);
+        else addCandidateGap(gaps, rowGaps, op, unit, "PROJECTION_SOURCE_INCOMPLETE");
+      } else if ("PROJECTION".equals(op.op())) {
+        var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(op.payload());
+        if (!expectedSources.contains(projection.sourceId())
+            || !projection.journalKey().equals(op.key())) {
+          throw new IllegalStateException("Candidate journal has an unexpected projection revision");
+        }
+        String unit = DocumentIdentityStore.pathHash(projection.indexId());
+        var fields = ingestLifecycle.documentFieldOps();
+        String docId = fields.getDocumentField(projection.indexId(), SchemaFields.DOC_ID);
+        if (projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
+          if (docId == null) covered.add(unit);
+          else addCandidateGap(gaps, rowGaps, op, unit, "PROJECTION_DELETE_NOT_APPLIED");
+        } else if (!projection.indexId().equals(docId)
+            || !projection.sourceId().equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID))
+            || !Long.toString(projection.sourceRevision()).equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION))
+            || !projection.fieldsDigest().equals(fields.getDocumentField(
+                projection.indexId(), SchemaFields.PROJECTION_DIGEST))) {
+          addCandidateGap(gaps, rowGaps, op, unit, "CANDIDATE_PROJECTION_MISSING");
+        } else {
+          covered.add(unit);
+        }
+      }
+    }
+    for (String sourceId : expectedSources) {
+      if (!markedSources.contains(sourceId)) {
+        addCandidateGap(gaps, rowGaps, null,
+            DocumentIdentityStore.pathHash("projection-source:" + sourceId),
+            "PROJECTION_SOURCE_MARKER_MISSING");
+      }
+    }
+    return new CandidateJournalSnapshot(
+        new RecordedIngestionLifecycle.JournalWitness(gaps, covered), Map.copyOf(rowGaps));
+  }
+
+  /** The operator wait has no deadline; release B's native set and restore A before resting. */
+  boolean holdInPlaceCandidateForGapDecision() throws IOException, InterruptedException {
+    runtimeSwapLock.lock();
+    try {
+      IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+      if (state != null && "AWAITING_ACCEPTANCE".equals(state.migration_state())
+          && !recordedCandidateInPlace) return true;
+      if (!(appServices instanceof DefaultWorkerAppServices producer)) {
+        throw new IOException("Gap wait lost its Green producer");
+      }
+      try (var fence = producer.mutationAdmission().beginFinalFence(
+          producer.mutationOwnerToken(), 10_000)) {
+        if (fence == null) return false;
+        if (recordedCandidateInPlace) {
+          if (!producer.pauseProducerForCutover(10_000)) return false;
+          try {
+            producer.parkCandidateProducerModels();
+            gapWaitProducerPaused = true;
+            recomposeSourceAfterCandidateRefusal(new IOException("Candidate awaits gap acceptance"));
+            if (recordedCandidateInPlace) {
+              // B is parked and the component reports UNAVAILABLE. Retain an unbounded wait so
+              // the monitor can retry A composition instead of timing out in SWITCHING.
+              indexGenerationManager.updateMigrationState(
+                  IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE);
+              return false;
+            }
+          } finally {
+            producer.resumeProducerAfterCutover();
+          }
+        }
+        indexGenerationManager.updateMigrationState(
+            IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE);
+        return true;
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /** Rebuild B under the original device-line decision before leaving the unbounded wait. */
+  private boolean resumeInPlaceCandidateAfterGapDecision() throws IOException, InterruptedException {
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted || recordedCandidateInPlace) return false;
+      if (!(appServices instanceof DefaultWorkerAppServices producer)) return false;
+      try (var fence = producer.mutationAdmission().beginFinalFence(
+          producer.mutationOwnerToken(), 10_000)) {
+        if (fence == null) return false;
+        if (gapWaitProducerPaused) {
+          if (!producer.pauseProducerForCutover(10_000)) return false;
+          try {
+            CandidateModels selected = composeRecordedCandidateModels();
+            candidateModels = selected;
+            wireRecordedCandidateProducer(selected);
+            gapWaitProducerPaused = false;
+          } catch (IOException | RuntimeException failure) {
+            producer.parkCandidateProducerModels();
+            recomposeSourceAfterCandidateRefusal(failure);
+            log.warn("Accepted gap candidate cannot resume yet; A remains serving", failure);
+            return false;
+          } finally {
+            producer.resumeProducerAfterCutover();
+          }
+        }
+        indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+        return true;
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /** The application has durably refused B while A is still the pointer. Retire Green first. */
+  private void reconcileRefusedRecordedCandidate() {
+    if (!recordedCandidatePrecommitRefused() || closeStarted) return;
+    CompletableFuture<ModelContext> composition = deferredModelInit;
+    if (composition != null && !composition.isDone()) return;
+    boolean restart = false;
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted
+          || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded)
+          || !(appServices instanceof DefaultWorkerAppServices producer)) return;
+      IndexGenerationManager.State state = indexGenerationManager.readStateBestEffort();
+      if (state == null || !recorded.sourceGeneration().equals(state.active_generation())) return;
+      if (state.building_generation() == null) {
+        // A process restart loses the volatile cleanup flag. The refused operation key still
+        // identifies its exact retired B, including the pointer-before-mark crash cut.
+        try {
+          indexGenerationManager.retireRefusedRecordedGeneration(
+              recorded.operationKey(), recorded.sourceGeneration());
+          restart = true;
+        } catch (IOException cleanupFailure) {
+          log.warn("Refused recorded target remains capacity-owning; cleanup will retry",
+              cleanupFailure);
+        }
+      } else {
+        if (!("g-" + recorded.operationKey()).equals(state.building_generation())) return;
+        try {
+          if (!(searchLifecycle instanceof RunningRuntime source)
+              || !indexGenerationManager.resolveGenerationPathStrict(state.active_generation())
+                  .equals(activeIndexPath)) {
+            throw new IOException("Refused candidate has no exact writable source generation");
+          }
+          // Keep the scoped journal and Green alive until every accepted candidate mutation is
+          // certified on surviving A. The same producer fence excludes a later file admission.
+          try (var fence = producer.mutationAdmission().beginFinalFence(
+              producer.mutationOwnerToken(), 10_000)) {
+            if (fence == null || !producer.mutationAdmission().replayCertain()) {
+              throw new IOException("Refused candidate mutation admission is not settled");
+            }
+            var counts = jobQueue.jobStateCountsStrict();
+            if (counts.processingCount() != 0 || counts.pendingCount() != 0
+                || !producer.pauseProducerForCutover(10_000)) {
+              throw new IOException("Refused candidate writer has not settled");
+            }
+            try {
+              producer.commitActiveLexicalProjectionForCutover();
+              if (!KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
+                  new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
+                      jobQueue, source, signalBus, indexingPacing, indexBasePath, activeIndexPath,
+                      JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log,
+                      System.nanoTime() + TimeUnit.SECONDS.toNanos(10),
+                      state.building_generation(), ignored -> true))) {
+                throw new IOException("Refused candidate still has unproved source mutations");
+              }
+              // Producer close joins the actual Green writer before its B model lease can leave.
+              producer.close();
+              if (recordedCandidateInPlace) {
+                recomposeSourceAfterCandidateRefusal(
+                    new IOException("Recorded candidate refused before pointer"));
+              } else if (candidateModels != null) {
+                candidateModels.close();
+                candidateModels = null;
+              }
+              if (recordedCandidateInPlace) return; // A recompose failed; retain exact owners.
+              if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) ingestLifecycle.close();
+              indexGenerationManager.abandonBuildingGeneration("recorded candidate refused");
+              indexGenerationManager.retireRefusedRecordedGeneration(
+                  recorded.operationKey(), recorded.sourceGeneration());
+              restart = true;
+            } finally {
+              if (!producer.producerClosed()) producer.resumeProducerAfterCutover();
+            }
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          log.warn("Refused candidate source reconciliation was interrupted; retaining Green",
+              interrupted);
+        } catch (IOException | RuntimeException failure) {
+          if (encoderComponent != null) encoderComponent.transition(
+              io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
+              "Refused candidate cleanup requires recovery: " + failure.getMessage());
+          log.error("Refused candidate still owns its Green resources", failure);
+        }
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+    if (restart) {
+      notifyRecordedServicesPublished();
+      migrationRestartAction.run();
+    }
+  }
+
+  /** State transition and producer admission use one lock order: runtime, mutation, generation. */
+  private void enterSwitchingWithMutationAdmission(IndexGenerationManager.State observed)
+      throws IOException, InterruptedException {
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted || !(appServices instanceof DefaultWorkerAppServices services)) {
+        throw new IllegalStateException("Migration has no live producer owner");
+      }
+      try (var ignoredFence = services.mutationAdmission().beginFinalFence(
+          services.mutationOwnerToken(), 10_000)) {
+        if (ignoredFence == null) {
+          throw new IllegalStateException("Migration mutation admission did not drain");
+        }
+        if (!services.mutationAdmission().replayCertain()) {
+          indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+          throw new IOException("Migration has an unrecorded watcher mutation; rescan before retry");
+        }
+        var state = indexGenerationManager.readStateBestEffort();
+        if (state == null || !"MIGRATING".equals(state.migration_state())
+            || !Objects.equals(observed.active_generation(), state.active_generation())
+            || !Objects.equals(observed.building_generation(), state.building_generation())) return;
+        indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+        migrationTransition("migration-switching-entered");
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+    }
+  }
+
+  /** Final Flow A fence: replay, certify Green, commit the pointer and install its view. */
+  private IndexGenerationManager.State promoteServingSuccessor(
+      IndexGenerationManager.BootOwnership.Recorded recorded) throws IOException, InterruptedException {
+    runtimeSwapLock.lockInterruptibly();
+    DefaultWorkerAppServices successor = null;
+    DefaultWorkerAppServices incumbent = null;
+    ServingLease sourceLease = null;
+    RecordedIngestionLifecycle.PreparedCompositeProjection preparedProjection = null;
+    AtomicBoolean published = new AtomicBoolean();
+    AtomicBoolean pointerUncertain = new AtomicBoolean();
+    AtomicReference<ServingView> preparedView = new AtomicReference<>();
+    AtomicReference<ServingView> retiredForNotification = new AtomicReference<>();
+    AtomicReference<RecordedIngestionLifecycle.CommittedProjection>
+        committedProjection = new AtomicReference<>();
+    boolean requestRecovery = false;
+    boolean paused = false;
+    try {
+      if (closeStarted || !(appServices instanceof DefaultWorkerAppServices current)
+          || !(ingestLifecycle instanceof RunningRuntime green) || green == searchLifecycle
+          || buildingIndexPath == null) {
+        throw new IOException("Green no longer has a live source and writer");
+      }
+      incumbent = current;
+      successor = prepareServingSuccessor(green);
+      // A post-pointer failure must leave the transferred Green producer reachable by close().
+      retainPendingAppServices(successor);
+      var switching = indexGenerationManager.readStateBestEffort();
+      if (switching == null || !"SWITCHING".equals(switching.migration_state())) return null;
+      String sourceGeneration = switching.active_generation();
+      String buildingGeneration = switching.building_generation();
+      if (sourceGeneration == null || buildingGeneration == null) return null;
+      if (activeIndexPath == null
+          || !indexGenerationManager.resolveGenerationPathStrict(sourceGeneration).equals(activeIndexPath)
+          || !indexGenerationManager.resolveGenerationPathStrict(buildingGeneration).equals(buildingIndexPath)) {
+        throw new IOException("Serving runtimes do not match the migration generation pointer");
+      }
+      long remainingMs = MIGRATION_SWITCHING_MAX_DURATION_MS
+          - Math.max(0L, System.currentTimeMillis() - switching.updated_at_ms());
+      if (remainingMs <= 0L) return null;
+      long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(remainingMs);
+      try (var fence = current.mutationAdmission().beginFinalFence(
+          current.mutationOwnerToken(), 10_000)) {
+        if (fence == null) return null;
+        if (!current.mutationAdmission().replayCertain()) {
+          throw new IOException("Unrecorded watcher mutation prevents certified promotion");
+        }
+        if (recorded == null && !nativeProjectionSourcesReadyForPromotion()) return null;
+        Set<SwitchBufferCapableQueue.SwitchBufferOp> approvedGapVersions = Set.of();
+        if (recorded != null && recordedIngestionLifecycle.recordedGapDecision(
+            recorded.operationKey()) == RecordedIngestionLifecycle.GapDecision.ACCEPTED) {
+          // Only an already accepted decision may authorize loss before replay. Rebind it to
+          // the full current witness and each exact journal revision under this final fence.
+          var snapshot = candidateJournalSnapshot();
+          if (recordedIngestionLifecycle.recordedGapDecision(
+              recorded.operationKey(), snapshot.witness())
+                  == RecordedIngestionLifecycle.GapDecision.ACCEPTED) {
+            approvedGapVersions = snapshot.acceptedVersions();
+          }
+        }
+        var replay = KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(
+            new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
+                jobQueue, green, signalBus, indexingPacing, indexBasePath, buildingIndexPath,
+                JSON, KnowledgeServer::chunkSpladeEnabled, () -> true, log, deadline,
+                buildingGeneration, this::projectionSourceReady, approvedGapVersions),
+            this::migrationReplayCut);
+        if (replay.isEmpty()) {
+          if (recorded != null) {
+            // A partial pass may have committed projection revisions after an incomplete source
+            // marker. Refresh before sealing the exact gap witness for user acceptance.
+            green.commitOps().maybeRefreshBlocking();
+            recordedIngestionLifecycle.recordedGapDecision(
+                recorded.operationKey(), candidateJournalWitness());
+          }
+          return null;
+        }
+
+        // Replay can enqueue file work. The already-running Green writer drains it while new
+        // producer effects wait at the fence; the pause acknowledges its final batch boundary.
+        while (true) {
+          var counts = jobQueue.jobStateCountsStrict();
+          if (counts.processingCount() == 0 && counts.pendingReadyCount() == 0
+              && counts.pendingBackoffCount() == 0) break;
+          if (System.nanoTime() >= deadline || closeStarted) return null;
+          Thread.sleep(100);
+        }
+        if (!current.pauseProducerForCutover(10_000)) return null;
+        paused = true;
+        var settled = jobQueue.jobStateCountsStrict();
+        if (settled.processingCount() != 0 || settled.pendingReadyCount() != 0
+            || settled.pendingBackoffCount() != 0 || !current.mutationAdmission().replayCertain()
+            || (recorded == null && migrationCutoverMaxFailedJobs >= 0
+                && settled.failedCount() > migrationCutoverMaxFailedJobs)
+            || !finalizeEmbeddingRebuildBeforeCutover()) return null;
+        migrationTransition("migration-green-drained");
+        current.commitActiveLexicalProjectionForCutover();
+        green.commitOps().commitWithBuildState(
+            LuceneRuntimeTypes.BuildState.COMPLETE,
+            io.justsearch.adapters.lucene.runtime.CommitReason.MIGRATION_CUTOVER);
+        if (!verifyGreenCommitMetadataBestEffort()) return null;
+        if (recorded != null && recordedIngestionLifecycle.recordedGapDecision(
+            recorded.operationKey(), candidateJournalWitness())
+                == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) return null;
+
+        Path successorPath = buildingIndexPath;
+        ServingLease heldSource = captureServingView();
+        sourceLease = heldSource;
+        // Component/settings preparation can compose native resources. Leave the physical runtime
+        // lock while the mutation fence and exact A lease hold the cutover source stable.
+        runtimeSwapLock.unlock();
+        IndexGenerationManager.State result;
+        try {
+          var prepared = recorded == null ? null
+              : recordedIngestionLifecycle.prepareRecordedGenerationProjection(
+                  recorded.operationKey(), jobQueue);
+          preparedProjection = prepared;
+          var callbacks = prepared == null ? null : prepared.callbacks();
+          DefaultWorkerAppServices nextServices = successor;
+          RecordedIngestionLifecycle.CheckedPromotion publish = () -> {
+            runtimeSwapLock.lock();
+            try {
+          if (closeStarted || heldSource.services() !=
+                  (recordedCandidateInPlace ? inPlaceLexicalServices : current)
+                  || heldSource.searchRuntime() != searchLifecycle
+                  || heldSource.ingestRuntime() != green || appServices != current
+                  || ingestLifecycle != green || buildingIndexPath == null
+                  || !buildingIndexPath.equals(successorPath)
+                  || !current.mutationAdmission().replayCertain()
+                  || System.nanoTime() >= deadline) {
+                throw new IOException("Serving source changed during cutover preparation");
+              }
+              var counts = jobQueue.jobStateCountsStrict();
+              if (counts.processingCount() != 0 || counts.pendingReadyCount() != 0
+                  || counts.pendingBackoffCount() != 0
+                  || (recorded == null && migrationCutoverMaxFailedJobs >= 0
+                      && counts.failedCount() > migrationCutoverMaxFailedJobs)) {
+                throw new IOException("Green changed during cutover preparation");
+              }
+              try (var transfer = current.prepareProducerTransferTo(nextServices)) {
+          DefaultWorkerAppServices preparedServices = nextServices;
+          RecordedIngestionLifecycle.CheckedPromotion commit = () -> {
+                var projection = callbacks;
+                try (var recordedPromotion = recorded == null ? null
+                         : indexGenerationManager.beginRecordedPromotion(
+                             recorded.operationKey(), recorded.source(), recorded.targetFingerprint(),
+                             recorded.sourceGeneration(), recorded.projectionSourceIds());
+                     var nativePromotion = recorded == null
+                         ? indexGenerationManager.beginNativePromotion(sourceGeneration, buildingGeneration)
+                         : null) {
+                  publicationLock.writeLock().lock();
+                  try {
+                    ServingView old;
+                    synchronized (servingViewMonitor) {
+                      old = servingView;
+                      if (closeStarted || old == null || old.retiring || old.services !=
+                              (recordedCandidateInPlace ? inPlaceLexicalServices : current)
+                          || old.searchRuntime != searchLifecycle || old.ingestRuntime != green) {
+                        throw new IOException("Serving source changed before pointer commitment");
+                      }
+                    }
+                    ServingView next = new ServingView(preparedServices, green, green, successorPath);
+                    EncoderSet successorEncoder = recordedCandidate == null ? old.encoderSet
+                        : Objects.requireNonNull(candidateModels, "Recorded B encoder owner").owner();
+                    if (successorEncoder != null) next.attachEncoderSet(successorEncoder);
+                    preparedView.set(next);
+                    Runnable cleanup = () -> closeRetiredSource(old, successorEncoder);
+                    IndexGenerationManager.State promoted;
+                    try {
+                      if (projection != null) projection.admitBeforePointer();
+                      migrationTransitionForPublication("migration-before-pointer-commit");
+                      promoted = recordedPromotion == null
+                          ? nativePromotion.promote() : recordedPromotion.promote();
+                      migrationTransitionForPublication("migration-after-pointer-commit");
+                      // Settings are the roll-forward projection of this committed pointer.
+                      // Keep capture excluded until the accepted candidate is durably installed.
+                      if (projection != null) projection.afterPointerCommitted();
+                    } catch (IOException | RuntimeException | Error ambiguous) {
+                      // The held state guard lets us distinguish a precommit refusal from a
+                      // post-move failure. Only a committed or unreadable pointer closes A.
+                      var witness = recordedPromotion == null
+                          ? nativePromotion.inspectCommitWitness()
+                          : recordedPromotion.inspectCommitWitness();
+                      if (witness
+                          != IndexGenerationManager.RecordedPromotion.CommitWitness.UNCHANGED) {
+                        pointerUncertain.set(true);
+                        fence.install(preparedServices.mutationOwnerToken());
+                        // The pointer may already name B. Keep its borrowed producer under the
+                        // successor owner until ordered restart, even when settings publication
+                        // or an atomic move reported an error before the view swap.
+                        try { transfer.install(); }
+                        catch (RuntimeException | Error ownershipFailure) {
+                          ambiguous.addSuppressed(ownershipFailure);
+                        }
+                      }
+                      throw ambiguous;
+                    }
+                    pointerUncertain.set(true);
+                    if (promoted == null) {
+                      fence.install(preparedServices.mutationOwnerToken());
+                      throw new IOException("Live promotion returned no generation");
+                    }
+                    migrationTransitionForPublication("migration-before-live-activation");
+                    fence.install(preparedServices.mutationOwnerToken());
+                    transfer.install();
+                    current.clearActiveLexicalProjectionAfterCutover();
+                    synchronized (servingViewMonitor) {
+                      old.retiring = true;
+                      old.retireCleanup = cleanup;
+                      retiredServingViews.add(old);
+                      retiredForNotification.set(old);
+                      activeIndexPath = successorPath;
+                      buildingIndexPath = null;
+                      searchLifecycle = green;
+                      generationBootDisposition = IndexGenerationManager.BootDisposition.PROMOTED;
+                      releasePendingAppServices(preparedServices);
+                      appServices = preparedServices;
+                      if (recordedCandidate != null) {
+                        CandidateModels promotedModels = Objects.requireNonNull(candidateModels,
+                            "Promoted candidate model bundle");
+                        inferenceSurface = successorEncoder.surfaceForOwner();
+                        initialEncoderSet = promotedModels.owner();
+                        embeddingCompatController = candidateEmbeddingCompatController;
+                        candidateEmbeddingCompatController = null;
+                        embeddingService = promotedModels.embedding();
+                        nerServiceInstance = promotedModels.bindings().nerService();
+                        spladeEncoderInstance = promotedModels.bindings().spladeEncoder();
+                        spladeIdfQueryEncoder = promotedModels.spladeIdf();
+                        bgeM3EncoderInstance = promotedModels.bindings().bgeM3Encoder();
+                        searchRerankerInstance = promotedModels.reranker();
+                        citationScorerInstance = promotedModels.citation();
+                        startupConfiguration = recordedCandidate.configuration();
+                        initialModelSelection = GenerationModelSelection.accepted(
+                            recordedCandidate.models(), startupConfiguration.ai().sparseModel(),
+                            promotedModels.owner().modelIdentity().vectorDimension());
+                        candidateModels = null;
+                        recordedCandidateInPlace = false;
+                        inPlaceLexicalServices = null;
+                      }
+                      servingView = next;
+                      servingViewMonitor.notifyAll();
+                    }
+                    committedProjection.set(projection);
+                    published.set(true);
+                    if (recordedCandidate != null) publishEncoderComposition();
+                    migrationTransitionForPublication("migration-after-live-activation");
+                    return promoted;
+                  } finally {
+                    publicationLock.writeLock().unlock();
+                  }
+                }
+               };
+          return recorded == null ? commit.promote()
+              : recordedIngestionLifecycle.promoteRecordedGeneration(
+                  recorded.operationKey(), jobQueue, commit);
+              }
+            } finally {
+              runtimeSwapLock.unlock();
+            }
+          };
+          result = prepared == null ? publish.promote() : prepared.withOwnerLocks(publish);
+        } finally {
+          runtimeSwapLock.lock();
+        }
+        if (result == null) return null;
+          if (!KnowledgeServerMigrationOps.finishPromotedSwitchReplay(jobQueue, replay.orElseThrow())
+              || !KnowledgeServerMigrationOps.switchBufferEmptyStrict(jobQueue,
+                  buildingGeneration)) {
+            log.warn("Promoted Green retains switch-buffer versions; ordered recovery will retry exact replay");
+            requestRecovery = true;
+          } else {
+            fence.certifySuccessor();
+            promotedReplaySettled = true;
+          }
+        return result;
+      }
+    } catch (IOException | RuntimeException | Error failure) {
+      if (pointerUncertain.get()) requestRecovery = true;
+      if (pointerUncertain.get() && !published.get()) {
+        publicationLock.writeLock().lock();
+        try {
+          synchronized (servingViewMonitor) {
+            if (servingView != null) servingView.retiring = true;
+          }
+        } finally {
+          publicationLock.writeLock().unlock();
+        }
+      }
+      throw failure;
+    } finally {
+      try {
+        if (paused && incumbent != null && (!pointerUncertain.get() || published.get())) {
+          incumbent.resumeProducerAfterCutover();
+        }
+        if (!published.get() && !pointerUncertain.get() && successor != null) {
+          try {
+            successor.close();
+            if (pendingAppServices == successor) pendingAppServices = null;
+          } catch (IOException | RuntimeException cleanupFailure) {
+            log.error("Unpublished Green successor still owns resources", cleanupFailure);
+            requestRecovery = true;
+          }
+        }
+        if (!published.get() && preparedView.get() != null) preparedView.get().releaseEncoderSet();
+      } finally {
+        runtimeSwapLock.unlock();
+      }
+      if (published.get()) notifyServingViewRetirement(retiredForNotification.get());
+      if (!published.get() && !pointerUncertain.get() && preparedProjection != null) {
+        try { preparedProjection.abortBeforePointer(); }
+        catch (RuntimeException | Error cleanupFailure) {
+          log.error("Recorded projection could not retire its precommit candidate", cleanupFailure);
+          requestRecovery = true;
+        }
+      }
+      if (sourceLease != null) sourceLease.close();
+      if (published.get() && !requestRecovery) {
+        try {
+          var projection = committedProjection.get();
+          if (projection != null) projection.afterRuntimePublished();
+          // The notification can reconcile and terminate the recorded row. Its projection
+          // callback must still hold the runner's live capability until this step completes.
+          notifyRecordedServicesPublished();
+        } catch (RuntimeException notificationFailure) {
+          log.error("Recorded Green publication requires ordered recovery", notificationFailure);
+          requestRecovery = true;
+        }
+      }
+      if (requestRecovery) migrationRestartAction.run();
+    }
+  }
+
+  private void closeRetiredSource(ServingView old, EncoderSet successorEncoder) {
+    try {
+      old.services.close();
+      old.releaseEncoderSet();
+      if (old.encoderSet != null && old.encoderSet != successorEncoder) old.encoderSet.close();
+      if (old.searchRuntime != null && old.searchRuntime != ingestLifecycle) old.searchRuntime.close();
+    } catch (IOException failure) {
+      throw new IllegalStateException("Retired generation still owns resources", failure);
+    }
   }
 
   /**
@@ -2451,26 +5276,32 @@ public final class KnowledgeServer implements Closeable {
    * immediately before the cutover COMPLETE commit. Flips the ECC to COMPATIBLE iff the green is fully
    * embedded (job queue + pending-embeddings both 0), so the COMPLETE commit's overlay stamps the
    * embedding fingerprint — instead of racing the indexing-loop thread that would otherwise call
-   * {@code checkRebuildCompletion}. Idempotent (no-op unless the ECC is REBUILDING) and best-effort: a
-   * green that is genuinely not fully embedded is not flipped, so {@link #verifyGreenCommitMetadataBestEffort}
-   * correctly blocks its promotion.
+   * {@code checkRebuildCompletion}. Pending work or an unreadable pending count defers the cutover
+   * under its existing switching deadline. Metadata verification still guards promotion after
+   * certification and the final commit. A fresh green may already be COMPATIBLE before backfill
+   * earns its first stamp; reconcile that evidence here too, without waiting for an idle-loop tick.
    */
-  private void finalizeEmbeddingRebuildBeforeCutover() {
-    var ecc = embeddingCompatController;
-    if (ecc == null || ingestLifecycle == null) {
-      return;
+  private boolean finalizeEmbeddingRebuildBeforeCutover() {
+    var ecc = recordedCandidate == null ? embeddingCompatController
+        : candidateEmbeddingCompatController;
+    String expectedFingerprint = ecc == null ? null : ecc.currentFingerprint();
+    if (expectedFingerprint == null || expectedFingerprint.isBlank()) {
+      return true; // No resolvable embedding model: a legitimate keyword-only rebuild.
     }
+    if (ingestLifecycle == null) return false;
     try {
       long queueDepth = jobQueue.queueDepth();
       int pendingEmbeddings =
           ingestLifecycle
               .indexCountOps()
-              .countByField(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+              .countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+      if (pendingEmbeddings > 0) return false;
       ecc.checkRebuildCompletion(queueDepth, pendingEmbeddings);
-    } catch (RuntimeException e) {
-      log.warn(
-          "Fix E: finalize embedding rebuild before cutover failed (best-effort): {}",
-          e.getMessage());
+      return ecc.reconcileStampEvidence()
+          && ecc.fingerprintToStamp().filter(expectedFingerprint::equals).isPresent();
+    } catch (IOException | RuntimeException e) {
+      log.warn("Cannot establish embedding completion before cutover: {}", e.getMessage());
+      return false;
     }
   }
 
@@ -2478,10 +5309,12 @@ public final class KnowledgeServer implements Closeable {
     // Tempdoc 598 R3: also verify the green carries a current-model embedding fingerprint before
     // promotion, so a blue/green rebuild cannot promote a generation that would still serve
     // BLOCKED_LEGACY. Null when no embedding model is resolvable (keyword-only rebuild → skipped).
-    String expectedEmbeddingFp =
-        embeddingCompatController != null ? embeddingCompatController.currentFingerprint() : null;
+    var ecc = recordedCandidate == null ? embeddingCompatController
+        : candidateEmbeddingCompatController;
+    String expectedEmbeddingFp = ecc == null ? null : ecc.currentFingerprint();
+    String expectedIndexFp = recordedCandidate == null ? null : recordedCandidate.target().fingerprint();
     return KnowledgeServerMigrationOps.verifyGreenCommitMetadataBestEffort(
-        ingestLifecycle, expectedEmbeddingFp, log);
+        ingestLifecycle, expectedIndexFp, expectedEmbeddingFp, log);
   }
 
   private void drainSwitchBufferBestEffort() {
@@ -2492,6 +5325,8 @@ public final class KnowledgeServer implements Closeable {
           ingestLifecycle == null ? "null" : ingestLifecycle.getClass().getSimpleName());
       return;
     }
+    LuceneRuntime capturedServing = searchLifecycle;
+    Path capturedPath = activeIndexPath;
     KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
         new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
             jobQueue,
@@ -2499,10 +5334,25 @@ public final class KnowledgeServer implements Closeable {
             signalBus,
             indexingPacing,
             indexBasePath,
-            activeIndexPath,
+            capturedPath,
             JSON,
             KnowledgeServer::chunkSpladeEnabled,
-            log));
+            () -> vduReplayAllowed(running, capturedServing, capturedPath),
+            log,
+            Long.MAX_VALUE,
+            buildingIndexPath == null ? null : buildingIndexPath.getFileName().toString(),
+            this::projectionSourceReady));
+  }
+
+
+  private boolean vduReplayAllowed(RunningRuntime target, LuceneRuntime serving, Path targetPath) {
+    if (target != serving || indexGenerationManager == null) return false;
+    try {
+      return indexGenerationManager.isIdleActiveGeneration(targetPath);
+    } catch (IOException | RuntimeException unavailable) {
+      log.warn("VDU replay awaits readable active generation state: {}", unavailable.getMessage());
+      return false;
+    }
   }
 
   /**
@@ -2516,6 +5366,10 @@ public final class KnowledgeServer implements Closeable {
   }
 
   private void startMigrationEnumeratorBestEffort(ResolvedConfig rc) {
+    startMigrationEnumeratorBestEffort(rc, true);
+  }
+
+  private void startMigrationEnumeratorBestEffort(ResolvedConfig rc, boolean enumerateFiles) {
     if (migrationEnumeratorThread != null) {
       return;
     }
@@ -2548,20 +5402,58 @@ public final class KnowledgeServer implements Closeable {
                       "Migration enumerator: models not ready after 120s, "
                           + "proceeding without inline embedding/SPLADE");
                 }
-                List<Path> roots = loadWatchedRootsBestEffort(rc);
-                if (roots.isEmpty()) {
-                  log.warn("Migration enumerator: no watched roots found; Green index will remain empty");
-                  return;
-                }
+                List<Path> roots = enumerateFiles ? loadMigrationRoots(rc) : List.of();
                 migrationEnumeratorRootsTotal.set(roots.size());
-                int totalEnqueued = enqueueAllFilesUnderRoots(roots);
+                int totalEnqueued = enumerateFiles ? enqueueAllFilesUnderRoots(roots) : 0;
+                List<String> expectedSources = expectedProjectionSourceIds();
+                // Completion is candidate-local. Drop retired candidates even when the next
+                // one has no registered sources, so repeated live activations stay bounded.
+                String buildingGeneration = buildingIndexPath == null ? null
+                    : buildingIndexPath.getFileName().toString();
+                completedProjectionSeeds.removeIf(completion ->
+                    !Objects.equals(completion.generation(), buildingGeneration));
+                if (!expectedSources.isEmpty()) {
+                  if (!(jobQueue instanceof SwitchBufferCapableQueue scoped)
+                      || buildingIndexPath == null) {
+                    throw new IOException("Projection seed requires a writable candidate journal");
+                  }
+                  var state = indexGenerationManager.readStateBestEffort();
+                  String generation = buildingIndexPath.getFileName().toString();
+                  if (state == null || !generation.equals(state.building_generation())) {
+                    throw new IOException("Projection seed candidate identity changed");
+                  }
+                  for (String sourceId : expectedSources) {
+                    var source = projectionSeedSources.stream()
+                        .filter(candidate -> sourceId.equals(candidate.sourceId()))
+                        .findFirst().orElse(null);
+                    if (source == null) {
+                      if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) {
+                        throw new IOException("Native candidate lost projection source: " + sourceId);
+                      }
+                      log.warn("Recorded projection source is unavailable: {}", sourceId);
+                      continue;
+                    }
+                    try {
+                      KnowledgeServerMigrationOps.seedProjectionSource(scoped, generation, source);
+                      completedProjectionSeeds.add(new ProjectionSeedCompletion(generation, sourceId));
+                    } catch (KnowledgeServerMigrationOps.ProjectionSeedIncompleteException incomplete) {
+                      if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded)) {
+                        throw incomplete;
+                      }
+                      log.warn("Recorded projection source awaits gap decision: {}", sourceId,
+                          incomplete);
+                    }
+                  }
+                }
                 log.info(
                     "Migration enumerator finished. roots={} enqueuedFiles={}",
                     roots.size(),
                     totalEnqueued);
                 migrationEnumeratorDone = true;
               } catch (Exception e) {
-                log.warn("Migration enumerator failed (continuing)", e);
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                migrationEnumeratorFailure = e;
+                log.warn("Migration enumeration incomplete; cutover will preserve Blue", e);
               } finally {
                 migrationEnumeratorRunning.set(false);
                 migrationEnumeratorFinishedAtMs.set(System.currentTimeMillis());
@@ -2578,9 +5470,9 @@ public final class KnowledgeServer implements Closeable {
     migrationEnumeratorThread.start();
   }
 
-  private List<Path> loadWatchedRootsBestEffort(ResolvedConfig rc) {
-    return KnowledgeServerMigrationOps.loadWatchedRootsBestEffort(
-        dataDir, rc.collections().items(), JSON, log);
+  private List<Path> loadMigrationRoots(ResolvedConfig rc) throws IOException {
+    return KnowledgeServerMigrationOps.loadMigrationRoots(
+        dataDir, rc.collections().items(), JSON);
   }
 
   private int enqueueAllFilesUnderRoots(List<Path> roots) throws IOException {
@@ -2683,10 +5575,10 @@ public final class KnowledgeServer implements Closeable {
    *       path at install time. Survives cold restart because the contract is persisted to
    *       disk; doesn't depend on env-var inheritance across GUI launches. This is the
    *       primary source for users who pre-stage models via {@code JUSTSEARCH_MODELS_DIR}.
-   *   <li>{@code ConfigStore.global().get().paths().modelsDir()} — alpha.18: bridges
-   *       {@code JUSTSEARCH_MODELS_DIR} env var via {@code EnvRegistry.MODELS_DIR ↔
-   *       justsearch.models.dir}. Works at first launch when the env var is set in the
-   *       launching shell, and pre-alpha.20 contracts that don't have the field.
+   *   <li>{@code config.paths().modelsDir()} — alpha.18: the supplied boot snapshot bridges
+   *       {@code JUSTSEARCH_MODELS_DIR} via {@code EnvRegistry.MODELS_DIR ↔
+   *       justsearch.models.dir}. Works at first launch when the env var is set in the launching
+   *       shell, and pre-alpha.20 contracts that don't have the field.
    *   <li>{@code aiHome.resolve("models")} — the default-flow fallback when neither
    *       contract nor env var is set (Install AI downloaded to {@code %APPDATA%\models\}).
    * </ol>
@@ -2696,14 +5588,14 @@ public final class KnowledgeServer implements Closeable {
    * {@code "Model file missing from disk: ..."} for every installed package after a cold
    * restart (round-10 sandbox finding).
    *
-   * <p>Package-private so {@code KnowledgeServerModelsDirTest} can exercise it without
-   * spinning up a real {@code KnowledgeServer}.
+   * <p>Package-private so {@code KnowledgeServerModelsDirTest} can exercise the captured-config
+   * resolution without spinning up a real {@code KnowledgeServer}.
    */
-  static Path resolveModelsDir(InstallContract contract, Path aiHome) {
+  static Path resolveModelsDir(InstallContract contract, Path aiHome, ResolvedConfig config) {
     if (contract != null && contract.modelsDir() != null) {
       return contract.modelsDir();
     }
-    Path configured = ConfigStore.global().get().paths().modelsDir();
+    Path configured = config.paths().modelsDir();
     if (configured != null) return configured;
     return aiHome != null ? aiHome.resolve("models") : null;
   }

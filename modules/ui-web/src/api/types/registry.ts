@@ -65,7 +65,7 @@ export { resourceWireSchema };
  * Information-shape axis on a Resource. Mirrors `Category.java`.
  *
  * Slice 448 phase 6 (2026-05-07) retired LOG_TAIL per CONFLICT-LEDGER C-012 path-b.
- * Operator-trace surfaces (head-log, worker-log, etc.) are modeled as the sibling
+ * Operator-trace surfaces (engine-log, etc.) are modeled as the sibling
  * DiagnosticChannel primitive — see `api/types/diagnostic.ts`.
  */
 export type Category =
@@ -252,7 +252,7 @@ export const KIND_ADVISORY = 'advisory-event-stream';
  * `modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/Resource.java`.
  *
  * Slice 3a.1.9 additions: `primaryKey` field (required non-blank for TABULAR;
- * empty string for non-TABULAR Resources where the concept doesn't apply).
+ * optional for EVENT_STREAM/HISTORY snapshot-update key merging; blank keeps append semantics).
  */
 /**
  * Wire shape of a Resource catalog entry — a GENERATED single-authority projection (tempdoc 560

@@ -13,7 +13,37 @@ import java.nio.file.Path;
  * <p>Keeps timestamp normalization and persist operations centralized so caller flows
  * can focus on orchestration instead of map/store bookkeeping.
  */
-final class WatchedRootsState {
+public final class WatchedRootsState {
+
+  /** Preload the sole roots state before index startup or authorization wiring. */
+  public static WatchedRootsState load(Path dataDirectory) {
+    Path rootsFile = Objects.requireNonNull(dataDirectory, "dataDirectory")
+        .toAbsolutePath().normalize().resolve("watched_roots.json");
+    var store = new WatchedRootsStore(rootsFile, org.slf4j.LoggerFactory.getLogger(WatchedRootsState.class));
+    store.migrateLegacyRootsFileIfNeeded();
+    var state = new WatchedRootsState(new java.util.concurrent.ConcurrentHashMap<>(), store);
+    state.loadPersistedRoots();
+    return state;
+  }
+
+  /** Isolated empty state for compositions that intentionally have no durable roots. */
+  public static WatchedRootsState inMemory() {
+    return new WatchedRootsState(new java.util.concurrent.ConcurrentHashMap<>(), new WatchedRootsStore(null, null));
+  }
+
+  /** A current copied membership view; no filesystem or Worker call is performed. */
+  public java.util.List<Path> watchedPaths() {
+    return java.util.List.copyOf(watchedRoots.keySet());
+  }
+
+  /** Atomic membership/label projection for pure recorded preparation; no availability probe. */
+  public synchronized java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> snapshotBindings() {
+    return watchedRoots.keySet().stream().sorted()
+        .map(path -> new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(path, collections.get(path)))
+        .toList();
+  }
+
+  Map<Path, Instant> rootsMap() { return watchedRoots; }
 
   private final Map<Path, Instant> watchedRoots;
   private final Map<Path, String> walkErrors;
@@ -76,7 +106,7 @@ final class WatchedRootsState {
     this.clock = Objects.requireNonNull(clock, "clock");
   }
 
-  void loadPersistedRoots() {
+  synchronized void loadPersistedRoots() {
     var result = rootsStore.loadPersistedRootsWithErrors();
     for (var entry : result.roots().entrySet()) {
       watchedRoots.put(entry.getKey(), normalizeTimestamp(entry.getValue()));
@@ -90,7 +120,7 @@ final class WatchedRootsState {
    * Records the collection label a root is watched under. Blank/null clears it, so the callers'
    * "no label" case never persists an empty string that would later read as a real label.
    */
-  void setCollection(Path root, String collection) {
+  synchronized void setCollection(Path root, String collection) {
     if (collection == null || collection.isBlank()) {
       collections.remove(root);
     } else {
@@ -103,26 +133,34 @@ final class WatchedRootsState {
     return collections.get(root);
   }
 
-  void markIndexed(Path root) {
+  /** Register membership and its label together, preserving the caller's duplicate policy. */
+  synchronized boolean register(Path root, String collection, boolean onlyIfAbsent) {
+    if (onlyIfAbsent && watchedRoots.containsKey(root)) return false;
+    markNeverIndexed(root);
+    setCollection(root, collection);
+    return true;
+  }
+
+  synchronized void markIndexed(Path root) {
     watchedRoots.put(root, Instant.now(clock));
     walkErrors.remove(root);
     walkCompleted.add(root);
   }
 
   /** Registration / pre-walk: tracked but the walk has NOT completed yet. */
-  void markNeverIndexed(Path root) {
+  synchronized void markNeverIndexed(Path root) {
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
     walkCompleted.remove(root);
   }
 
   /** Terminal walk outcome with zero admitted files: no timestamp, but the walk DID complete. */
-  void markWalkedEmpty(Path root) {
+  synchronized void markWalkedEmpty(Path root) {
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
     walkErrors.remove(root);
     walkCompleted.add(root);
   }
 
-  void markWalkFailed(Path root, String error) {
+  synchronized void markWalkFailed(Path root, String error) {
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
     walkErrors.put(root, error != null ? error : "unknown");
     walkCompleted.add(root);
@@ -180,7 +218,7 @@ final class WatchedRootsState {
     return driftCorrected.get(root);
   }
 
-  void removeRootAndNested(Path normalizedRoot) {
+  synchronized void removeRootAndNested(Path normalizedRoot) {
     watchedRoots.remove(normalizedRoot);
     walkCompleted.remove(normalizedRoot);
     deleteDetectionUnverified.remove(normalizedRoot);
@@ -195,12 +233,12 @@ final class WatchedRootsState {
     lastVerifiedAt.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
   }
 
-  void persist() {
+  synchronized void persist() {
     rootsStore.persistRoots(watchedRoots, walkErrors, walkCompleted, collections);
   }
 
   /** Clears all watched roots and walk errors, then persists the empty state. */
-  void clearAll() {
+  synchronized void clearAll() {
     watchedRoots.clear();
     walkErrors.clear();
     walkCompleted.clear();

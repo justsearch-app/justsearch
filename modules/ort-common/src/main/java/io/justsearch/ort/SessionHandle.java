@@ -23,7 +23,8 @@ import java.util.Map;
  * <p><strong>Admin API vs encoder API.</strong> Of the surface below:
  *
  * <ul>
- *   <li>{@link #acquire()}, {@link #environment()}, {@link #isGpuAvailable()}, {@link #status()}
+ *   <li>{@link #acquire(SessionAcquisitionRequest)}, {@link #environment()}, {@link
+ *       #isGpuAvailable()}, {@link #status()}
  *       are called by <em>encoder</em> code during inference.
  *   <li>{@link #releaseGpu()} and {@link #close()} are called by the <em>signal-bus
  *       coordinator</em> (today's {@code IndexingLoop}-like GPU-arbitration code) when the Main
@@ -35,7 +36,7 @@ import java.util.Map;
  * require it.
  *
  * <p><strong>Reacquisition.</strong> There is no explicit {@code reacquire()} method:
- * {@link #acquire()} lazily recreates the GPU session on the next call after a prior
+ * {@link #acquire(SessionAcquisitionRequest)} lazily recreates the GPU session on the next call after a prior
  * {@link #releaseGpu()}. This mirrors {@link NativeSessionHandle}'s existing semantics (see
  * {@code tryCreateGpuSession} guarded by {@code gpuSessionAttempted}).
  */
@@ -48,7 +49,7 @@ public interface SessionHandle extends AutoCloseable {
    * runnable. Callers must close the lease via try-with-resources or explicit
    * {@code release.run()} to avoid holding the GPU serialisation semaphore.
    */
-  Lease acquire();
+  Lease acquire(SessionAcquisitionRequest request);
 
   /**
    * Acquires a CPU-only lease for explicit fallback-path inference (e.g., SPLADE's
@@ -59,11 +60,11 @@ public interface SessionHandle extends AutoCloseable {
    *
    * <p>Tempdoc 397 §14.5 W4. Intended for the pattern
    * <pre>{@code
-   * try (var lease = sessions.acquire()) {
+   * try (var lease = sessions.acquire(request)) {
    *     try { session.run(...); }
    *     catch (OrtException e) {
    *         if (!lease.isCpu() && isBfcArenaFailure(e)) {
-   *             try (var cpuLease = sessions.acquireCpu()) {
+   *             try (var cpuLease = sessions.acquireCpu(request)) {
    *                 return runHeapFallback(cpuLease.session(), ...);
    *             }
    *         }
@@ -75,7 +76,7 @@ public interface SessionHandle extends AutoCloseable {
    * lazy double-checked-locking construction before returning (materialisation on demand). This
    * may throw {@link ai.onnxruntime.OrtException} if the CPU model is unavailable.
    */
-  Lease acquireCpu();
+  Lease acquireCpu(SessionAcquisitionRequest request);
 
   /** The shared JVM-singleton {@link OrtEnvironment} used for tensor construction. */
   OrtEnvironment environment();
@@ -88,7 +89,7 @@ public interface SessionHandle extends AutoCloseable {
 
   /**
    * Releases the GPU session to free VRAM. Called by the signal-bus coordinator when the Main
-   * process claims the GPU. Subsequent {@link #acquire()} calls return CPU sessions until
+   * process claims the GPU. Subsequent {@link #acquire(SessionAcquisitionRequest)} calls return CPU sessions until
    * arbitration returns the GPU to the Worker; at that point the next {@code acquire()}
    * lazily recreates the GPU session.
    */
@@ -96,8 +97,9 @@ public interface SessionHandle extends AutoCloseable {
 
   /**
    * Signals that the CPU session has returned bad output (NaN, BFCArena failure, etc.) — see
-   * F-009. The handle tears down the current CPU session; the next {@link #acquire()} call that
-   * needs a CPU session will lazily recreate it. Encoders call this from their
+   * F-009. The handle tears down the current CPU session; the next {@link
+   * #acquire(SessionAcquisitionRequest)} call that needs a CPU session will lazily recreate it.
+   * Encoders call this from their
    * {@link ai.onnxruntime.OrtException} catch blocks, gated on {@link Lease#isCpu()} so only
    * CPU failures trigger recreation (GPU failures don't corrupt the CPU session). Tempdoc 397
    * §14.5 W6.
@@ -131,7 +133,8 @@ public interface SessionHandle extends AutoCloseable {
 
   /**
    * Binds the recording hook invoked by every {@link Lease#run} / {@link Lease#runPinned} call
-   * produced by subsequent {@link #acquire()} / {@link #acquireCpu()} leases (tempdoc 710 Move 2).
+   * produced by subsequent {@link #acquire(SessionAcquisitionRequest)} / {@link
+   * #acquireCpu(SessionAcquisitionRequest)} leases (tempdoc 710 Move 2).
    * A {@link Lease} captures the currently-bound recorder at acquisition time, so callers must
    * bind before the first {@code acquire()} that should be recorded — in practice, encoder
    * constructors bind immediately after constructing their {@code EncoderProfileAccumulator},
@@ -144,19 +147,36 @@ public interface SessionHandle extends AutoCloseable {
    */
   void setOrtRunRecorder(OrtRunRecorder recorder);
 
+  /** Typed disposition of this handle's monotonic native-session retirement. */
+  enum RetirementStatus {
+    ACTIVE,
+    RETIRING,
+    REFUSED,
+    RETIRED
+  }
+
+  /**
+   * Reports whether native retirement is active, still running, refused with resources retained,
+   * or complete. A {@link #close()} timeout or native close failure is {@link
+   * RetirementStatus#REFUSED}; callers may invoke {@code close()} again to retry.
+   */
+  RetirementStatus retirementStatus();
+
   /** Closes all sessions and releases resources. Idempotent. */
   @Override
   void close();
 
   /**
-   * A lease on an ORT session that releases the GPU serialisation semaphore (if held) on close.
-   * Use with try-with-resources.
+   * A lease on one exact ORT session instance. Closing it releases that instance's holder count
+   * and the GPU serialisation semaphore (if held). Release is idempotent; a lease never releases
+   * or authorizes closure of a replacement session. Use with try-with-resources.
    *
    * <p>The {@code release} runnable captures any internal cleanup logic (semaphore release,
    * state-re-check) from the underlying session manager.
    *
-   * <p>Tempdoc 397 §14.5 W3: the {@code isCpu} flag is set by {@link SessionHandle#acquire()}
-   * based on whether the underlying manager handed back its CPU session or its GPU session.
+   * <p>Tempdoc 397 §14.5 W3: the {@code isCpu} flag is set by {@link
+   * SessionHandle#acquire(SessionAcquisitionRequest)} based on whether the underlying manager
+   * handed back its CPU session or its GPU session.
    * Encoders that branch on "which path am I on?" — for CPU-fallback gating or
    * {@code reportCpuSessionFailure} guards — read this flag rather than compare raw session
    * identities against {@code peekCpuSession()}.

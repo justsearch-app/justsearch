@@ -38,6 +38,7 @@ public final class AgentRoutes {
     // forked /api/chat/agent/{approve,reject} + /api/chat/workflow/{approve,reject} routes were retired.
     app.post("/api/chat/approve", controller::handleApprove);
     app.post("/api/chat/reject", controller::handleReject);
+    app.get("/api/chat/approval", controller::handleApproval);
     // Tempdoc 561 P-D — update the live autonomy dial for a running session.
     app.post("/api/chat/agent/autonomy", controller::handleAutonomy);
     // Tempdoc 565 §30 — the DIRECTION authority's interject: queue a mid-run human steering directive.

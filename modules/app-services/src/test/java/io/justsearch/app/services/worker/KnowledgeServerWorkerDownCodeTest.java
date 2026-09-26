@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.ipc.WorkerFatalReasonMarker;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,36 +30,38 @@ final class KnowledgeServerWorkerDownCodeTest {
 
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
-        false, dir, dir, dir, dir, dir.resolve("worker_signal.lock"),
-        5_000L, 15_000L, 3, "256m", 5_000L, 5_000L, 300_000L, 100, 0L, 0);
+        false, dir, dir, dir,
+        5_000L, 15_000L, 3, 5_000L, 5_000L, 300_000L, 100, 0L, 0);
   }
 
   @Test
   @DisplayName("never-started sites pass worker.spawn.failed; the prose becomes the detail")
   void neverStartedYieldsSpawnFailed(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
 
-    bootstrap.transitionWorkerDown(
-        LifecycleReasonCode.WORKER_SPAWN_FAILED, "Health check failed after 4200ms");
+      bootstrap.transitionWorkerDown(
+          LifecycleReasonCode.WORKER_SPAWN_FAILED, "Health check failed after 4200ms");
 
-    var cap = bootstrap.workerCapability();
-    assertEquals(CapabilityHealth.DEGRADED, cap.health());
-    assertEquals(LifecycleReasonCode.WORKER_SPAWN_FAILED.code(), cap.pendingReason());
-    assertEquals(
-        "Health check failed after 4200ms",
-        cap.pendingDetail(),
-        "the sentence still exists — it moved out of the code slot, it was not deleted");
+      var cap = bootstrap.workerCapability();
+      assertEquals(CapabilityHealth.DEGRADED, cap.health());
+      assertEquals(LifecycleReasonCode.WORKER_SPAWN_FAILED.code(), cap.pendingReason());
+      assertEquals(
+          "Health check failed after 4200ms",
+          cap.pendingDetail(),
+          "the sentence still exists — it moved out of the code slot, it was not deleted");
+    }
   }
 
   @Test
   @DisplayName("the was-READY sites pass worker.lost — the distinction the user could not see")
   void lostYieldsWorkerLost(@TempDir Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
-
-    bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
-
-    var cap = bootstrap.workerCapability();
-    assertEquals(LifecycleReasonCode.WORKER_LOST.code(), cap.pendingReason());
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      fixture.bootstrap().transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
+      assertEquals(
+          LifecycleReasonCode.WORKER_LOST.code(),
+          fixture.bootstrap().workerCapability().pendingReason());
+    }
   }
 
   @Test
@@ -69,70 +72,79 @@ final class KnowledgeServerWorkerDownCodeTest {
     // the only fatal reason a dying worker could name. A deliberate refusal is not a crash, and its
     // remedy is a policy that permits a rebuild, not a corruption repair.
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
 
-    bootstrap.transitionWorkerDown(
-        LifecycleReasonCode.WORKER_SPAWN_FAILED,
-        "Worker process crashed (exit code 1) before writing port to signal file");
+      bootstrap.transitionWorkerDown(
+          LifecycleReasonCode.WORKER_SPAWN_FAILED,
+          "Worker process crashed (exit code 1) before writing port to signal file");
 
-    var cap = bootstrap.workerCapability();
-    assertEquals(LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH.code(), cap.pendingReason());
-    assertTrue(
-        cap.pendingDetail().contains("index.schema_mismatch.policy"),
-        "and names the setting that produced the refusal, which the crash message never could");
-    assertFalse(
-        Files.exists(WorkerFatalReasonMarker.pathFor(tempDir)),
-        "readAndClear consumed it, same as its corruption sibling");
+      var cap = bootstrap.workerCapability();
+      assertEquals(LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH.code(), cap.pendingReason());
+      assertTrue(
+          cap.pendingDetail().contains("index.schema_mismatch.policy"),
+          "and names the setting that produced the refusal, which the crash message never could");
+      assertFalse(
+          Files.exists(WorkerFatalReasonMarker.pathFor(tempDir)),
+          "readAndClear consumed it, same as its corruption sibling");
+    }
   }
 
   @Test
   @DisplayName("the corruption axis overrides either generic code, and carries the remedy as detail")
   void corruptMarkerOverridesTheGenericCode(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_CORRUPT);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
 
-    bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
-
-    var cap = bootstrap.workerCapability();
-    assertEquals(LifecycleReasonCode.WORKER_INDEX_CORRUPT.code(), cap.pendingReason());
-    assertTrue(
-        cap.pendingDetail().contains("index.recovery.policy=BACKUP_REBUILD"),
-        "the concrete remedy the Head already knew now reaches the user instead of being discarded");
-    assertFalse(
-        Files.exists(WorkerFatalReasonMarker.pathFor(tempDir)),
-        "readAndClear consumed the marker — which is exactly why the capability must latch the code");
+      var cap = bootstrap.workerCapability();
+      assertEquals(LifecycleReasonCode.WORKER_INDEX_CORRUPT.code(), cap.pendingReason());
+      assertTrue(
+          cap.pendingDetail().contains("index.recovery.policy=BACKUP_REBUILD"),
+          "the concrete remedy the Head already knew now reaches the user instead of being discarded");
+      assertFalse(
+          Files.exists(WorkerFatalReasonMarker.pathFor(tempDir)),
+          "readAndClear consumed the marker — which is exactly why the capability must latch the code");
+    }
   }
 
   @Test
   @DisplayName("an unrelated fatal reason is NOT read as corruption")
   void unrelatedMarkerKeepsTheGenericCode(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, "out_of_memory");
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
 
-    bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
-
-    assertEquals(
-        LifecycleReasonCode.WORKER_LOST.code(),
-        bootstrap.workerCapability().pendingReason(),
-        "628's fail-loud-with-the-RIGHT-reason thesis: never offer a rebuild for a non-corruption death");
+      assertEquals(
+          LifecycleReasonCode.WORKER_LOST.code(),
+          bootstrap.workerCapability().pendingReason(),
+          "628's fail-loud-with-the-RIGHT-reason thesis: never offer a rebuild for a non-corruption death");
+    }
   }
 
   @Test
   @DisplayName("end-to-end latch: the corrupt cause survives the restart-then-give-up sequence")
   void corruptCauseSurvivesTheSupervisionSequence(@TempDir Path tempDir) {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_CORRUPT);
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
-    var cap = bootstrap.workerCapability();
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
+      var cap = bootstrap.workerCapability();
 
-    bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
-    // The supervisor restarts; the index is still corrupt so the restart fails, and the marker is
-    // already gone — a second read cannot recover the cause.
-    cap.transition(CapabilityHealth.RECOVERING, LifecycleReasonCode.WORKER_RECOVERING.code(), "a1");
-    bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_SPAWN_FAILED, "Start failed");
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
+      // The supervisor restarts; the index is still corrupt so the restart fails, and the marker is
+      // already gone — a second read cannot recover the cause.
+      fixture
+          .indexComponent()
+          .transition(
+              ComponentState.STARTING, LifecycleReasonCode.WORKER_RECOVERING.code(), "a1");
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_SPAWN_FAILED, "Start failed");
 
-    assertEquals(
-        LifecycleReasonCode.WORKER_INDEX_CORRUPT.code(),
-        cap.pendingReason(),
-        "without the latch this reports worker.spawn.failed and the real cause is unrecoverable");
+      assertEquals(
+          LifecycleReasonCode.WORKER_INDEX_CORRUPT.code(),
+          cap.pendingReason(),
+          "without the latch this reports worker.spawn.failed and the real cause is unrecoverable");
+    }
   }
 }

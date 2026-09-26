@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Utility methods for converting gRPC proto messages to runtime types.
  *
- * <p>Extracted from GrpcSearchService for reusability and testability.
+ * <p>Extracted from WorkerSearchService for reusability and testability.
  */
 public final class ProtoConverters {
 

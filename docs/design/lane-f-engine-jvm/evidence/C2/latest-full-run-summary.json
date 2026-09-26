@@ -1,0 +1,400 @@
+{
+  "revision": "13b6bd6802c860dcb5a891bcab730891f19464c7",
+  "command": "gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 10301,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 35,
+    "suites": 1662
+  },
+  "tasks": [
+    {
+      "module": "api-contract-projection-java",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    },
+    {
+      "module": "adapters-lucene",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 724,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 102
+    },
+    {
+      "module": "ai-backend",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 62,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    },
+    {
+      "module": "app-agent",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 685,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 51
+    },
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 243,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 204,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-config",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "app-inference",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 320,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 30
+    },
+    {
+      "module": "app-engine",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 231,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 47
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 87,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 23
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 464,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 71
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 2703,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "suites": 415
+    },
+    {
+      "module": "app-services",
+      "task": "integrationTest",
+      "status": "EXECUTED",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    },
+    {
+      "module": "app-util",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    },
+    {
+      "module": "benchmarks",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 104,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    },
+    {
+      "module": "configuration",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 267,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 32
+    },
+    {
+      "module": "core",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 102,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 17
+    },
+    {
+      "module": "core-contracts",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 38,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "dead-code-audit",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "extension-substrate",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "gpu-bridge",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 77,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    },
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 482,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 12,
+      "suites": 82
+    },
+    {
+      "module": "indexing",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 84,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 19
+    },
+    {
+      "module": "indexing",
+      "task": "integrationTest",
+      "status": "UP-TO-DATE",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "infra-core",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "ipc-common",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "ort-common",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 170,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 35
+    },
+    {
+      "module": "prompt-support",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "reranker",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 68,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 7
+    },
+    {
+      "module": "reranker",
+      "task": "integrationTest",
+      "status": "UP-TO-DATE",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 9,
+      "suites": 2
+    },
+    {
+      "module": "ssot-tools",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    },
+    {
+      "module": "system-tests",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 96,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 29
+    },
+    {
+      "module": "telemetry",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 94,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suites": 26
+    },
+    {
+      "module": "test-support",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 1183,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suites": 180
+    },
+    {
+      "module": "ui",
+      "task": "integrationTest",
+      "status": "EXECUTED",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suites": 4
+    },
+    {
+      "module": "worker-core",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 342,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 6,
+      "suites": 84
+    },
+    {
+      "module": "worker-services",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 1347,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "suites": 256
+    }
+  ],
+  "log": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-3-full1059.txt",
+  "xmlRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-3-full1059-xml",
+  "result": "BUILD SUCCESSFUL in 10m 36s; 367 tasks, 30 executed and 337 up-to-date",
+  "executedTests": 4314,
+  "reuse": "30 test tasks UP-TO-DATE with unchanged successful inputs; eight test tasks executed. Per-task represented counts distinguish reuse.",
+  "limits": "Local integrated Java proof at13b6bd680. CI34748767868 remains pending with no jobs assigned; CLA34748767771 is queued on ubuntu-latest without a runner. C2-3 producer delivery and C2-4 onward remain open. Full1038 remains failed historical evidence.",
+  "warnings": "Existing JDK/dependency Unsafe, LightGBM small-fixture and configuration-cache incompatibility warnings remain visible in the successful log."
+}

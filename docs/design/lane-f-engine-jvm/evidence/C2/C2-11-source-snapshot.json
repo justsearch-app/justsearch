@@ -1,0 +1,40 @@
+{
+  "base": "b713307eada7f56f772aaf7a9b715846802ba736",
+  "status": "R10 corrected source inventory from committed Git blobs; this identifies current sources and does not relabel historical test runs.",
+  "supersedes": {
+    "snapshotAt": "6b109c27c",
+    "declaredBase": "396d16e22",
+    "reason": "Historical inventory hashes did not identify the declared committed tree. Original document remains available via git show 6b109c27c:docs/design/lane-f-engine-jvm/evidence/C2/C2-11-source-snapshot.json"
+  },
+  "hashSource": "git show <base>:<path> (raw blob bytes; no working-tree line-ending conversion)",
+  "sourceFiles": [
+    {
+      "path": "scripts/supervisor-conformance/operation-resume-scenario.mjs",
+      "sha256": "721824b8c4d508d2c3b4a90bc3d95e2e645c4c61e1b0a9c00bc83117d6faf00a"
+    },
+    {
+      "path": "scripts/supervisor-conformance/processing-replay-scenario.mjs",
+      "sha256": "2bbc3f65c0f982559acdd2523f1b12daaf23283378f59bb27db2201eaac5c734"
+    },
+    {
+      "path": "scripts/supervisor-conformance/real-writer-recovery.mjs",
+      "sha256": "50d412a8a6ed2dc8df84bafcc259d6df7162339aa8cfe8e483aa8ca1eff798cb"
+    },
+    {
+      "path": "modules/system-tests/build.gradle.kts",
+      "sha256": "a1d586be3fb290a5d631b5f8c7e940b06fdd3b1b624847e5847c0375bdaf1084"
+    },
+    {
+      "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java",
+      "sha256": "3bbf4e8d6513fe852eab2c93530b4477b1fc82ccd189d548052f05e029a7e6d9"
+    },
+    {
+      "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/OperationResumeE2ETest.java",
+      "sha256": "861e886236b63c2691968869647d4167276cd957d0393b73a93479e87006a1cd"
+    }
+  ],
+  "previousSnapshot": {
+    "base": "c56e1a83879810e3a7a8ce3e5d08a1d8c8bcfc52",
+    "retrieval": "git show b713307eada7f56f772aaf7a9b715846802ba736:docs/design/lane-f-engine-jvm/evidence/C2/C2-11-source-snapshot.json"
+  }
+}

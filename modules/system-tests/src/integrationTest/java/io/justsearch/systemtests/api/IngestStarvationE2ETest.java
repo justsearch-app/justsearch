@@ -102,8 +102,8 @@ class IngestStarvationE2ETest {
 
     // 2. Batch A.
     Path corpusA = createBatch("a");
-    int acceptedA = ingest(corpusA);
-    assertTrue(acceptedA > 0, "batch A was admitted by the worker scan; accepted=" + acceptedA);
+    String operationA = ingest(corpusA);
+    assertTrue(!operationA.isBlank(), "batch A has a durable operation identity");
 
     // 3. Batch A must drain AND the background enrichment tail must go idle — the precondition
     //    under which the tight loop used to capture the indexing loop forever.
@@ -125,16 +125,16 @@ class IngestStarvationE2ETest {
 
     // 4. Batch B — same worker lifetime, no restart. This is the whole point of the test.
     Path corpusB = createBatch("b");
-    int acceptedB = ingest(corpusB);
-    assertTrue(acceptedB > 0, "batch B was admitted by the worker scan; accepted=" + acceptedB);
+    String operationB = ingest(corpusB);
+    assertTrue(!operationB.isBlank(), "batch B has a durable operation identity");
 
     // 5. Batch B must be claimed and indexed within a bounded window.
     boolean drained = awaitBatchIndexed(docsAfterA, BATCH_B_TIMEOUT);
     assertTrue(
         drained,
-        "batch B was admitted ("
-            + acceptedB
-            + " files) but never got claimed and indexed within "
+        "batch B operation "
+            + operationB
+            + " was accepted but never got claimed and indexed within "
             + BATCH_B_TIMEOUT.toSeconds()
             + "s while the worker stayed up. This is the tempdoc-798 ingest livelock: the "
             + "background-enrichment loop never returns to poll the job queue, so every ingest "
@@ -269,15 +269,14 @@ class IngestStarvationE2ETest {
     return corpus;
   }
 
-  private static int ingest(Path corpus) throws Exception {
+  private static String ingest(Path corpus) throws Exception {
     String body =
         MAPPER.writeValueAsString(Map.of("paths", List.of(corpus.toAbsolutePath().toString())));
     JsonNode parsed = MAPPER.readTree(httpPost("/api/knowledge/ingest", body));
-    String error = parsed.path("error").asText("");
-    if (!error.isBlank()) {
-      throw new IllegalStateException("Ingest reported error: " + error);
+    if (!parsed.path("success").asBoolean()) {
+      throw new IllegalStateException("Ingest operation failed: " + parsed);
     }
-    return parsed.path("accepted").asInt(0);
+    return parsed.path("structuredData").path("operationKey").asText("");
   }
 
   private static JsonNode status() throws Exception {

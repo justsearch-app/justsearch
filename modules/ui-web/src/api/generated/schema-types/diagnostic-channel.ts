@@ -32,7 +32,7 @@ export interface DiagnosticChannelWire {
     iconHint: string | null;
     labelKey: I18nKey;
   };
-  producer: "IN_PROCESS_LOGBACK" | "WORKER_GRPC_STREAM" | "EXTERNAL_OBSERVER";
+  producer: "IN_PROCESS_LOGBACK" | "EXTERNAL_OBSERVER";
   provenance: {
     contributorId: string;
     identity: {
@@ -65,7 +65,7 @@ export const diagnosticChannelWireSchema = z.strictObject({
     "iconHint": z.string().nullable(),
     "labelKey": i18nKeySchema,
   }),
-  "producer": z.enum(["IN_PROCESS_LOGBACK", "WORKER_GRPC_STREAM", "EXTERNAL_OBSERVER"]),
+  "producer": z.enum(["IN_PROCESS_LOGBACK", "EXTERNAL_OBSERVER"]),
   "provenance": z.strictObject({
     "contributorId": z.string(),
     "identity": z.strictObject({

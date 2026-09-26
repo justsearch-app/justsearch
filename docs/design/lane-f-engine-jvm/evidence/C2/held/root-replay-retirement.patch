@@ -1,0 +1,1691 @@
+diff --git a/modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java b/modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java
+index bbbe98143..739397e53 100644
+--- a/modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java
++++ b/modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java
+@@ -12,0 +13,2 @@ import java.util.Objects;
++ * The current dispatcher refuses non-null replay schemas until C2-3 provides separate persisted
++ * preparation and public-input key comparison; this value alone does not activate replay.
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java b/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java
+index 3f670e542..2cb7ebd99 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java
+@@ -214,6 +213,0 @@ public interface IndexingService {
+-  /** Freeze watched-root scope and serving generation without scheduling or admitting index work. */
+-  default io.justsearch.app.api.operations.RecordedRootPlan prepareReindexPlan(
+-      boolean force, EngineContext engineContext) {
+-    throw new UnsupportedOperationException("Recorded reindex preparation unavailable");
+-  }
+-
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java
+index 8cdaf095a..d6d38ff4f 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java
+@@ -37,7 +36,0 @@ public interface OperationAttemptRunner {
+-  /**
+-   * Find or accept a child inside this runner's parent capability and recorded root scope.
+-   * The Engine mints its key; callers cannot repartition scope or supply another generation.
+-   * Existing children never execute through start; interrupted children use INGEST reconciliation.
+-   */
+-  PreparedAttempt acceptIngestChild(OperationRecordHandle parent, RecordedRootPlan.Root root);
+-
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java
+index edd395767..f0de637fc 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java
+@@ -7,2 +6,0 @@ import java.util.Objects;
+-import java.util.Map;
+-import tools.jackson.databind.json.JsonMapper;
+@@ -11,2 +9,2 @@ import tools.jackson.databind.json.JsonMapper;
+- * The replay dependency identity. Generic arguments are represented by a canonical digest;
+- * replayable owners may retain roots, generation and policy, never document or prompt content.
++ * The public invocation identity. Arguments are represented by a canonical digest;
++ * server-prepared replay data must stay separate from this key comparison.
+@@ -17,2 +14,0 @@ public record OperationDescriptor(OperationKind kind, String operationRef, Strin
+-  private static final JsonMapper JSON = JsonMapper.builder().build();
+-
+@@ -27,30 +22,0 @@ public record OperationDescriptor(OperationKind kind, String operationRef, Strin
+-  /** Persist the safe frozen replay projection beside the unchanged public argument identity. */
+-  public static OperationDescriptor preparedInvocation(OperationKind kind, String operationRef,
+-      String argumentsJson, String replaySchema, String replayPayloadJson) {
+-    Objects.requireNonNull(replaySchema, "replaySchema");
+-    Objects.requireNonNull(replayPayloadJson, "replayPayloadJson");
+-    if (replaySchema.isBlank() || replaySchema.length() > 128 || replayPayloadJson.length() > 200000) {
+-      throw new IllegalArgumentException("Invalid replay projection bounds");
+-    }
+-    Map<?, ?> payload = RootPlanReplayProjection.parsePayload(replaySchema, replayPayloadJson);
+-    return new OperationDescriptor(kind, operationRef, JSON.writeValueAsString(Map.of(
+-        "mode", "invoke", "argumentsSha256", CanonicalOperationArguments.digest(argumentsJson),
+-        "preparedInvocation", Map.of("schema", replaySchema, "payload", payload))));
+-  }
+-
+-  /** One recorded scan inherits an exact frozen root, including its partition exclusions. */
+-  public static OperationDescriptor ingestChild(String parentKey, RecordedRootPlan plan) {
+-    OperationKeys.timestampMillis(parentKey);
+-    Objects.requireNonNull(plan, "plan");
+-    if (plan.roots().size() != 1) throw new IllegalArgumentException("An ingest child requires one root");
+-    var payload = RootPlanReplayProjection.parsePayload(RecordedRootPlan.SCHEMA, plan.toReplayPayload());
+-    return new OperationDescriptor(OperationKind.INGEST, null, JSON.writeValueAsString(Map.of(
+-        "mode", "ingest-child", "parentOperationKey", parentKey,
+-        "preparedInvocation", Map.of("schema", RecordedRootPlan.SCHEMA, "payload", payload))));
+-  }
+-
+-  /** Strictly decode recorded scope; an ordinary digest-only or malformed identity is not replayable. */
+-  public RecordedRootPlan recordedRootPlan() {
+-    return RootPlanReplayProjection.parseIdentity(identityJson);
+-  }
+-
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java
+index 0e369720c..51387782b 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java
+@@ -16,7 +15,0 @@ public interface OperationStore extends AutoCloseable {
+-  /**
+-   * Atomically find or accept one frozen ingest child. The runner validates its parent capability;
+-   * this transaction derives scope and attribution from the stored parent. Only a new child needs
+-   * a RUNNING parent; an existing matching child is returned even after parent completion.
+-   */
+-  Acceptance acceptIngestChild(String parentKey, String childKey, RecordedRootPlan.Root root);
+-
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java
+index e78f9ae1c..1a15e8a04 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStoreException.java
+@@ -8 +8 @@ public final class OperationStoreException extends RuntimeException {
+-    CHILD_ACCEPTANCE_REFUSED, OPERATIONS_CAPACITY }
++    OPERATIONS_CAPACITY }
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedRootPlan.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedRootPlan.java
+deleted file mode 100644
+index 4ae439dea..000000000
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedRootPlan.java
++++ /dev/null
+@@ -1,187 +0,0 @@
+-/* SPDX-License-Identifier: Apache-2.0 */
+-package io.justsearch.app.api.operations;
+-
+-import java.nio.file.Path;
+-import java.util.ArrayList;
+-import java.util.Comparator;
+-import java.util.HashMap;
+-import java.util.LinkedHashMap;
+-import java.util.List;
+-import java.util.Map;
+-import java.util.Objects;
+-import tools.jackson.databind.json.JsonMapper;
+-
+-/** Immutable, filesystem-free root scope prepared for a recorded operation. */
+-public record RecordedRootPlan(String generation, List<RecordedRootPlan.Root> roots) {
+-  public static final String SCHEMA = RootPlanReplayProjection.SCHEMA;
+-
+-  private static final int MAX_ROOTS = 1024;
+-  private static final JsonMapper JSON = JsonMapper.builder().build();
+-
+-  public RecordedRootPlan {
+-    generation = validateGeneration(generation);
+-    Objects.requireNonNull(roots, "roots");
+-    if (roots.size() > MAX_ROOTS) {
+-      throw new IllegalArgumentException("A root plan may contain at most 1024 roots");
+-    }
+-    roots = List.copyOf(roots);
+-  }
+-
+-  /** Render the safe root-plan payload, without its enclosing operation identity. */
+-  public String toReplayPayload() {
+-    Map<String, Object> plan = new LinkedHashMap<>();
+-    plan.put("generation", generation);
+-    List<Map<String, Object>> encodedRoots = new ArrayList<>();
+-    for (Root root : roots) encodedRoots.add(root.toReplayMap());
+-    plan.put("roots", encodedRoots);
+-    RootPlanReplayProjection.validate(SCHEMA, plan);
+-    String payload = JSON.writeValueAsString(plan);
+-    if (payload.length() > RootPlanReplayProjection.MAX_PAYLOAD_CHARS) {
+-      throw new IllegalArgumentException("Replay projection is too large");
+-    }
+-    return payload;
+-  }
+-
+-  /** Parse one strict {@value SCHEMA} payload into an immutable plan. */
+-  public static RecordedRootPlan fromReplayPayload(String payloadJson) {
+-    return RootPlanReplayProjection.parsePlan(SCHEMA, payloadJson);
+-  }
+-
+-  /** Normalize and partition requested roots into one deterministic ownership plan. */
+-  public static RecordedRootPlan partition(String generation, List<Root> requested) {
+-    validateGeneration(generation);
+-    Objects.requireNonNull(requested, "requested");
+-    if (requested.size() > MAX_ROOTS) {
+-      throw new IllegalArgumentException("A root plan may contain at most 1024 roots");
+-    }
+-
+-    Map<Path, Root> unique = new LinkedHashMap<>();
+-    for (Root root : requested) {
+-      Objects.requireNonNull(root, "requested root");
+-      if (!root.excludedSubtrees().isEmpty()) {
+-        throw new IllegalArgumentException("Requested roots must not contain excluded subtrees");
+-      }
+-      Root prior = unique.putIfAbsent(root.path(), root);
+-      if (prior != null && !sameIdentityPolicy(prior, root)) {
+-        throw new IllegalArgumentException("Conflicting policies for the same root path");
+-      }
+-    }
+-
+-    List<Root> ordered = new ArrayList<>(unique.values());
+-    ordered.sort(Comparator.comparingInt((Root root) -> root.path().getNameCount())
+-        .thenComparing(root -> root.path().toString()));
+-
+-    List<Root> retained = new ArrayList<>();
+-    for (Root candidate : ordered) {
+-      Root nearest = nearestRetainedAncestor(candidate, retained);
+-      if (nearest != null && !nearest.singleFile() && sameEffectivePolicy(nearest, candidate)) {
+-        continue;
+-      }
+-      retained.add(candidate);
+-    }
+-
+-    Map<Path, Path> parentByPath = new HashMap<>();
+-    for (Root root : retained) {
+-      Root parent = nearestRetainedAncestor(root, retained);
+-      parentByPath.put(root.path(), parent == null ? null : parent.path());
+-    }
+-    Map<Path, List<Path>> childrenByParent = new HashMap<>();
+-    for (Root root : retained) {
+-      Path parent = parentByPath.get(root.path());
+-      if (parent != null) {
+-        childrenByParent.computeIfAbsent(parent, ignored -> new ArrayList<>()).add(root.path());
+-      }
+-    }
+-
+-    List<Root> planned = new ArrayList<>();
+-    for (Root root : retained) {
+-      List<Path> children = childrenByParent.getOrDefault(root.path(), List.of());
+-      planned.add(new Root(root.path(), root.collection(), root.force(), root.singleFile(),
+-          root.excludePatterns(), children));
+-    }
+-    return new RecordedRootPlan(generation, planned);
+-  }
+-
+-  private static Root nearestRetainedAncestor(Root candidate, List<Root> retained) {
+-    Root nearest = null;
+-    for (Root root : retained) {
+-      if (candidate.path().equals(root.path()) || !candidate.path().startsWith(root.path())) {
+-        continue;
+-      }
+-      if (nearest == null
+-          || root.path().getNameCount() > nearest.path().getNameCount()) nearest = root;
+-    }
+-    return nearest;
+-  }
+-
+-  private static boolean sameEffectivePolicy(Root left, Root right) {
+-    return Objects.equals(left.collection(), right.collection())
+-        && left.force() == right.force()
+-        && left.excludePatterns().equals(right.excludePatterns());
+-  }
+-
+-  private static boolean sameIdentityPolicy(Root left, Root right) {
+-    return sameEffectivePolicy(left, right) && left.singleFile() == right.singleFile();
+-  }
+-
+-  private static String validateGeneration(String value) {
+-    Objects.requireNonNull(value, "generation");
+-    if (value.isBlank() || value.length() > 128) {
+-      throw new IllegalArgumentException("Invalid replay generation identity");
+-    }
+-    return RootPlanReplayProjection.validateGeneration(value);
+-  }
+-
+-  public record Root(Path path, String collection, boolean force, boolean singleFile,
+-      List<String> excludePatterns, List<Path> excludedSubtrees) {
+-    public Root {
+-      Objects.requireNonNull(path, "path");
+-      path = path.toAbsolutePath().normalize();
+-      if (path.toString().length() > 32768) {
+-        throw new IllegalArgumentException("Root path is too long");
+-      }
+-      Objects.requireNonNull(excludePatterns, "excludePatterns");
+-      Objects.requireNonNull(excludedSubtrees, "excludedSubtrees");
+-      if (excludePatterns.size() > MAX_ROOTS || excludedSubtrees.size() > MAX_ROOTS) {
+-        throw new IllegalArgumentException("Root policy lists may contain at most 1024 entries");
+-      }
+-      if (collection != null && (collection.isBlank() || collection.length() > 256)) {
+-        throw new IllegalArgumentException("Invalid root collection");
+-      }
+-      List<String> patterns = new ArrayList<>();
+-      for (String pattern : excludePatterns) {
+-        if (pattern == null || pattern.isBlank() || pattern.length() > 4096) {
+-          throw new IllegalArgumentException("Invalid root exclude pattern");
+-        }
+-        patterns.add(pattern);
+-      }
+-      List<Path> subtrees = new ArrayList<>();
+-      for (Path subtree : excludedSubtrees) {
+-        Objects.requireNonNull(subtree, "excluded subtree");
+-        Path normalized = subtree.toAbsolutePath().normalize();
+-        if (normalized.toString().length() > 32768) {
+-          throw new IllegalArgumentException("Excluded subtree path is too long");
+-        }
+-        if (normalized.equals(path) || !normalized.startsWith(path)) {
+-          throw new IllegalArgumentException("Excluded subtree must be inside its root");
+-        }
+-        subtrees.add(normalized);
+-      }
+-      excludePatterns = List.copyOf(patterns);
+-      excludedSubtrees = List.copyOf(subtrees);
+-    }
+-
+-    private Map<String, Object> toReplayMap() {
+-      Map<String, Object> root = new LinkedHashMap<>();
+-      root.put("path", path.toString());
+-      root.put("collection", collection);
+-      root.put("force", force);
+-      root.put("singleFile", singleFile);
+-      root.put("excludePatterns", excludePatterns);
+-      List<String> subtrees = new ArrayList<>();
+-      for (Path subtree : excludedSubtrees) subtrees.add(subtree.toString());
+-      root.put("excludedSubtrees", subtrees);
+-      return root;
+-    }
+-  }
+-}
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/RootPlanReplayProjection.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/RootPlanReplayProjection.java
+deleted file mode 100644
+index 23182dab2..000000000
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/RootPlanReplayProjection.java
++++ /dev/null
+@@ -1,186 +0,0 @@
+-/* SPDX-License-Identifier: Apache-2.0 */
+-package io.justsearch.app.api.operations;
+-
+-import java.nio.file.Path;
+-import java.util.ArrayList;
+-import java.util.List;
+-import java.util.Map;
+-import java.util.Objects;
+-import java.util.Set;
+-import tools.jackson.core.StreamReadFeature;
+-import tools.jackson.databind.json.JsonMapper;
+-
+-/** The safe metadata grammar accepted by the operation row, not another mutable root plan. */
+-final class RootPlanReplayProjection {
+-  static final String SCHEMA = "root-plan.v1";
+-  static final int MAX_PAYLOAD_CHARS = 200000;
+-
+-  private static final JsonMapper JSON = JsonMapper.builder()
+-      .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+-      .build();
+-
+-  private RootPlanReplayProjection() {}
+-
+-  static void validate(String schema, Map<?, ?> plan) {
+-    if (!SCHEMA.equals(schema)) {
+-      throw new IllegalArgumentException("Unsupported safe replay schema");
+-    }
+-    Objects.requireNonNull(plan, "plan");
+-    requireFields(plan, Set.of("generation", "roots"));
+-    validateGeneration(requireText(plan.get("generation"), 128));
+-    for (Object item : requireList(plan.get("roots"))) {
+-      if (!(item instanceof Map<?, ?> root)) {
+-        throw new IllegalArgumentException("Replay root must be an object");
+-      }
+-      requireFields(root, Set.of("path", "collection", "force", "singleFile",
+-          "excludePatterns", "excludedSubtrees"));
+-      Path path = requirePath(root.get("path"));
+-      if (root.get("collection") != null) requireText(root.get("collection"), 256);
+-      if (!(root.get("force") instanceof Boolean) || !(root.get("singleFile") instanceof Boolean)) {
+-        throw new IllegalArgumentException("Replay scan flags must be boolean");
+-      }
+-      for (Object pattern : requireList(root.get("excludePatterns"))) requireText(pattern, 4096);
+-      for (Object subtree : requireList(root.get("excludedSubtrees"))) {
+-        Path excluded = requirePath(subtree);
+-        if (excluded.equals(path) || !excluded.startsWith(path)) {
+-          throw new IllegalArgumentException("Excluded replay subtree must be inside its root");
+-        }
+-      }
+-    }
+-  }
+-
+-  /** Parse and validate one complete safe replay payload at the persistence boundary. */
+-  static Map<?, ?> parsePayload(String schema, String payloadJson) {
+-    Objects.requireNonNull(payloadJson, "payloadJson");
+-    if (payloadJson.length() > MAX_PAYLOAD_CHARS) {
+-      throw new IllegalArgumentException("Replay projection is too large");
+-    }
+-    final Object payload;
+-    try {
+-      payload = JSON.readValue(payloadJson, Object.class);
+-    } catch (RuntimeException e) {
+-      throw new IllegalArgumentException("Malformed replay projection", e);
+-    }
+-    if (!(payload instanceof Map<?, ?> plan)) {
+-      throw new IllegalArgumentException("Replay projection must be a JSON object");
+-    }
+-    validate(schema, plan);
+-    return plan;
+-  }
+-
+-  static RecordedRootPlan parsePlan(String schema, String payloadJson) {
+-    return parsePlan(parsePayload(schema, payloadJson));
+-  }
+-
+-  /** Decode only the two safe identity shapes that carry an admitted root plan. */
+-  static RecordedRootPlan parseIdentity(String identityJson) {
+-    final Object value;
+-    try {
+-      value = JSON.readValue(identityJson, Object.class);
+-    } catch (RuntimeException failure) {
+-      throw new IllegalArgumentException("Malformed recorded root identity", failure);
+-    }
+-    if (!(value instanceof Map<?, ?> identity)) {
+-      throw new IllegalArgumentException("Recorded root identity must be an object");
+-    }
+-    String mode = requireText(identity.get("mode"), 32);
+-    if (mode.equals("invoke")) {
+-      requireFields(identity, Set.of("mode", "argumentsSha256", "preparedInvocation"));
+-      if (!requireText(identity.get("argumentsSha256"), 64).matches("[a-f0-9]{64}")) {
+-        throw new IllegalArgumentException("Invalid recorded argument digest");
+-      }
+-    } else if (mode.equals("ingest-child")) {
+-      requireFields(identity, Set.of("mode", "parentOperationKey", "preparedInvocation"));
+-      OperationKeys.timestampMillis(requireText(identity.get("parentOperationKey"), 36));
+-    } else {
+-      throw new IllegalArgumentException("Operation identity has no replayable root plan");
+-    }
+-    if (!(identity.get("preparedInvocation") instanceof Map<?, ?> prepared)) {
+-      throw new IllegalArgumentException("Missing recorded root preparation");
+-    }
+-    requireFields(prepared, Set.of("schema", "payload"));
+-    if (!(prepared.get("payload") instanceof Map<?, ?> plan)) {
+-      throw new IllegalArgumentException("Recorded root plan must be an object");
+-    }
+-    if (!SCHEMA.equals(requireText(prepared.get("schema"), 128))) {
+-      throw new IllegalArgumentException("Unsupported safe replay schema");
+-    }
+-    if (JSON.writeValueAsString(plan).length() > MAX_PAYLOAD_CHARS) {
+-      throw new IllegalArgumentException("Replay projection is too large");
+-    }
+-    RecordedRootPlan result = parsePlan(plan);
+-    if (mode.equals("ingest-child") && result.roots().size() != 1) {
+-      throw new IllegalArgumentException("An ingest child requires one root");
+-    }
+-    return result;
+-  }
+-
+-  static RecordedRootPlan parsePlan(Map<?, ?> plan) {
+-    validate(SCHEMA, plan);
+-    List<RecordedRootPlan.Root> roots = new ArrayList<>();
+-    for (Object item : requireList(plan.get("roots"))) {
+-      Map<?, ?> root = (Map<?, ?>) item;
+-      roots.add(new RecordedRootPlan.Root(
+-          requirePath(root.get("path")),
+-          root.get("collection") == null ? null : requireText(root.get("collection"), 256),
+-          (Boolean) root.get("force"),
+-          (Boolean) root.get("singleFile"),
+-          textList(root.get("excludePatterns"), 4096),
+-          pathList(root.get("excludedSubtrees"))));
+-    }
+-    return new RecordedRootPlan(
+-        validateGeneration(requireText(plan.get("generation"), 128)), roots);
+-  }
+-
+-  static String validateGeneration(String generation) {
+-    if (!generation.matches("[A-Za-z0-9][A-Za-z0-9._-]*")) {
+-      throw new IllegalArgumentException("Invalid replay generation identity");
+-    }
+-    return generation;
+-  }
+-
+-  private static List<String> textList(Object value, int limit) {
+-    List<String> result = new ArrayList<>();
+-    for (Object item : requireList(value)) result.add(requireText(item, limit));
+-    return List.copyOf(result);
+-  }
+-
+-  private static List<Path> pathList(Object value) {
+-    List<Path> result = new ArrayList<>();
+-    for (Object item : requireList(value)) result.add(requirePath(item));
+-    return List.copyOf(result);
+-  }
+-
+-  private static void requireFields(Map<?, ?> value, Set<String> fields) {
+-    if (!value.keySet().equals(fields)) {
+-      throw new IllegalArgumentException("Replay projection has missing or unsupported fields");
+-    }
+-  }
+-
+-  private static List<?> requireList(Object value) {
+-    if (!(value instanceof List<?> list) || list.size() > 1024) {
+-      throw new IllegalArgumentException("Replay list must contain at most 1024 entries");
+-    }
+-    return list;
+-  }
+-
+-  private static Path requirePath(Object value) {
+-    final Path path;
+-    try {
+-      path = Path.of(requireText(value, 32768));
+-    } catch (RuntimeException e) {
+-      throw new IllegalArgumentException("Replay path is invalid", e);
+-    }
+-    if (!path.isAbsolute() || !path.normalize().equals(path)) {
+-      throw new IllegalArgumentException("Replay path must be absolute and normalized");
+-    }
+-    return path;
+-  }
+-
+-  private static String requireText(Object value, int limit) {
+-    if (!(value instanceof String text) || text.isBlank() || text.length() > limit) {
+-      throw new IllegalArgumentException("Replay value must be bounded nonblank text");
+-    }
+-    return text;
+-  }
+-}
+diff --git a/modules/app-api/src/test/java/io/justsearch/app/api/operations/OperationDescriptorPreparationTest.java b/modules/app-api/src/test/java/io/justsearch/app/api/operations/OperationDescriptorPreparationTest.java
+index 5e4accb35..acd962383 100644
+--- a/modules/app-api/src/test/java/io/justsearch/app/api/operations/OperationDescriptorPreparationTest.java
++++ b/modules/app-api/src/test/java/io/justsearch/app/api/operations/OperationDescriptorPreparationTest.java
+@@ -5,3 +4,0 @@ import io.justsearch.agent.api.registry.OperationKind;
+-
+-import static org.junit.jupiter.api.Assertions.assertEquals;
+-import static org.junit.jupiter.api.Assertions.assertFalse;
+@@ -10,4 +6,0 @@ import org.junit.jupiter.api.Test;
+-import java.nio.file.Path;
+-import java.util.List;
+-import java.util.Map;
+-import tools.jackson.databind.json.JsonMapper;
+@@ -16,124 +8,0 @@ final class OperationDescriptorPreparationTest {
+-  @org.junit.jupiter.api.io.TempDir Path directory;
+-
+-  private Map<String, Object> root() {
+-    return Map.of("path", directory.toString(), "collection", "default", "force", false,
+-        "singleFile", false, "excludePatterns", List.of(), "excludedSubtrees", List.of());
+-  }
+-
+-  private String payload(Map<String, Object> root) {
+-    return JsonMapper.builder().build().writeValueAsString(Map.of("generation", "g1", "roots", List.of(root)));
+-  }
+-  @Test
+-  void preparedProjectionPreservesPublicDigestWithoutPublicContent() {
+-    String arguments = "{\"body\":\"private-text\"}";
+-    var descriptor = OperationDescriptor.preparedInvocation(OperationKind.OPERATION, "core.reindex",
+-        arguments, "root-plan.v1", payload(root()));
+-    var tree = JsonMapper.builder().build().readTree(descriptor.identityJson());
+-    assertEquals("invoke", tree.path("mode").asText());
+-    assertEquals(CanonicalOperationArguments.digest(arguments), tree.path("argumentsSha256").asText());
+-    assertEquals("root-plan.v1", tree.path("preparedInvocation").path("schema").asText());
+-    assertEquals(directory.toString(), tree.path("preparedInvocation").path("payload")
+-        .path("roots").get(0).path("path").asText());
+-    assertFalse(descriptor.identityJson().contains("private-text"));
+-  }
+-
+-  @org.junit.jupiter.params.ParameterizedTest
+-  @org.junit.jupiter.params.provider.ValueSource(strings = {"prompt", "body", "messages", "canonicalArguments"})
+-  void contentFieldsCannotEnterSafeReplayProjection(String field) {
+-    var root = new java.util.HashMap<>(root());
+-    root.put(field, "forbidden-content");
+-    assertThrows(IllegalArgumentException.class, () -> OperationDescriptor.preparedInvocation(
+-        OperationKind.OPERATION, "core.reindex", "{}", "root-plan.v1", payload(root)));
+-    String topLevel = payload(root()).replace("\"roots\":", "\"" + field + "\":\"forbidden-content\",\"roots\":");
+-    assertThrows(IllegalArgumentException.class, () -> OperationDescriptor.preparedInvocation(
+-        OperationKind.OPERATION, "core.reindex", "{}", "root-plan.v1", topLevel));
+-  }
+-
+-  @Test
+-  void rejectsUnsupportedSchemaRelativePathsAndEscapingSubtrees() {
+-    assertThrows(IllegalArgumentException.class, () -> OperationDescriptor.preparedInvocation(
+-        OperationKind.OPERATION, "core.reindex", "{}", "content-plan.v1", payload(root())));
+-    for (Map<String, Object> changes : List.of(Map.<String, Object>of("path", "relative-path"),
+-        Map.<String, Object>of("force", 1),
+-        Map.<String, Object>of("excludePatterns", List.of(Map.of("body", "private"))),
+-        Map.<String, Object>of("excludedSubtrees", List.of(directory.resolveSibling("elsewhere").toString())))) {
+-      var root = new java.util.HashMap<>(root());
+-      root.putAll(changes);
+-      assertThrows(IllegalArgumentException.class, () -> OperationDescriptor.preparedInvocation(
+-          OperationKind.OPERATION, "core.reindex", "{}", "root-plan.v1", payload(root)));
+-    }
+-  }
+-
+-  @Test
+-  void malformedOrNonObjectReplayProjectionIsRefused() {
+-    for (String payload : new String[] {"[", "[]", "null", "\"string\""}) {
+-      assertThrows(RuntimeException.class, () -> OperationDescriptor.preparedInvocation(
+-          OperationKind.OPERATION, "core.reindex", "{}", "root-plan.v1", payload));
+-    }
+-  }
+-
+-  @Test
+-  void ingestChildRetainsExactlyOneRecordedPartitionAndParentKey() {
+-    var root = new java.util.HashMap<>(root());
+-    root.put("excludedSubtrees", List.of(directory.resolve("nested").toString()));
+-    var plan = RecordedRootPlan.fromReplayPayload(payload(root));
+-    var parent = OperationDescriptor.preparedInvocation(OperationKind.REINDEX, "core.parent-fixture",
+-        "{}", RecordedRootPlan.SCHEMA, plan.toReplayPayload());
+-    assertEquals(plan, parent.recordedRootPlan());
+-    String key = OperationKeys.generate(java.time.Clock.systemUTC());
+-    var child = OperationDescriptor.ingestChild(key, parent.recordedRootPlan());
+-    assertEquals(OperationKind.INGEST, child.kind());
+-    org.junit.jupiter.api.Assertions.assertNull(child.operationRef());
+-    assertEquals(plan, child.recordedRootPlan());
+-    assertEquals(List.of(directory.resolve("nested")), child.recordedRootPlan().roots().getFirst().excludedSubtrees());
+-    var json = JsonMapper.builder().build().readTree(child.identityJson());
+-    assertEquals(java.util.Set.of("mode", "parentOperationKey", "preparedInvocation"), json.propertyNames());
+-    assertEquals("ingest-child", json.path("mode").asText());
+-    assertEquals(key, json.path("parentOperationKey").asText());
+-    assertThrows(IllegalArgumentException.class, () -> OperationDescriptor.ingestChild(key,
+-        new RecordedRootPlan(plan.generation(), List.of())));
+-    assertThrows(IllegalArgumentException.class, () -> OperationDescriptor.ingestChild(key,
+-        new RecordedRootPlan(plan.generation(), List.of(plan.roots().getFirst(), plan.roots().getFirst()))));
+-  }
+-
+-  @Test
+-  void recordedRootDecoderRejectsAmbiguousIdentityAndUnsafePayload() {
+-    var parent = OperationDescriptor.preparedInvocation(OperationKind.REINDEX, "core.parent-fixture",
+-        "{}", RecordedRootPlan.SCHEMA, payload(root()));
+-    String valid = parent.identityJson();
+-    for (String invalid : List.of("null", "[]", "[", valid + " {}",
+-        valid.replace("\"mode\":\"invoke\"", "\"mode\":\"invoke\",\"mode\":\"invoke\""),
+-        valid.replace("\"mode\":\"invoke\"", "\"mode\":\"invoke\",\"extra\":true"),
+-        valid.replace(CanonicalOperationArguments.digest("{}"), "bad-digest"),
+-        valid.replace("\"schema\":\"root-plan.v1\"", "\"schema\":\"content-plan.v1\""),
+-        valid.replace("\"generation\":", "\"body\":\"private\",\"generation\":"))) {
+-      assertThrows(IllegalArgumentException.class, () ->
+-          new OperationDescriptor(OperationKind.REINDEX, "core.parent-fixture", invalid).recordedRootPlan());
+-    }
+-    assertThrows(IllegalArgumentException.class, () -> OperationDescriptor.invocation(
+-        OperationKind.REINDEX, "core.parent-fixture", "{}", false).recordedRootPlan());
+-    String key = OperationKeys.generate(java.time.Clock.systemUTC());
+-    var child = OperationDescriptor.ingestChild(key, parent.recordedRootPlan());
+-    assertThrows(IllegalArgumentException.class, () -> new OperationDescriptor(OperationKind.INGEST, null,
+-        child.identityJson().replace(key, "not-a-key")).recordedRootPlan());
+-    var childJson = JsonMapper.builder().build().readTree(child.identityJson());
+-    var roots = (tools.jackson.databind.node.ArrayNode) childJson.path("preparedInvocation").path("payload").path("roots");
+-    var duplicateRoot = roots.get(0).deepCopy();
+-    roots.add(duplicateRoot);
+-    assertThrows(IllegalArgumentException.class, () ->
+-        new OperationDescriptor(OperationKind.INGEST, null, childJson.toString()).recordedRootPlan());
+-  }
+-
+-  @Test
+-  void recordedIdentityCannotBypassThePayloadSizeBound() {
+-    var root = new java.util.HashMap<>(root());
+-    root.put("excludePatterns", java.util.Collections.nCopies(1000, "a".repeat(204)));
+-    var mapper = JsonMapper.builder().build();
+-    String identity = mapper.writeValueAsString(Map.of("mode", "invoke",
+-        "argumentsSha256", CanonicalOperationArguments.digest("{}"), "preparedInvocation",
+-        Map.of("schema", RecordedRootPlan.SCHEMA, "payload", mapper.readTree(payload(root)))));
+-    org.junit.jupiter.api.Assertions.assertTrue(identity.length() > 200000 && identity.length() < 262144);
+-    assertThrows(IllegalArgumentException.class, () ->
+-        new OperationDescriptor(OperationKind.REINDEX, "core.parent-fixture", identity).recordedRootPlan());
+-  }
+-
+diff --git a/modules/app-api/src/test/java/io/justsearch/app/api/operations/RecordedRootPlanTest.java b/modules/app-api/src/test/java/io/justsearch/app/api/operations/RecordedRootPlanTest.java
+deleted file mode 100644
+index c90c74004..000000000
+--- a/modules/app-api/src/test/java/io/justsearch/app/api/operations/RecordedRootPlanTest.java
++++ /dev/null
+@@ -1,175 +0,0 @@
+-/* SPDX-License-Identifier: Apache-2.0 */
+-package io.justsearch.app.api.operations;
+-
+-import static org.junit.jupiter.api.Assertions.assertEquals;
+-import static org.junit.jupiter.api.Assertions.assertFalse;
+-import static org.junit.jupiter.api.Assertions.assertThrows;
+-import static org.junit.jupiter.api.Assertions.assertTrue;
+-
+-import java.nio.file.Path;
+-import java.util.ArrayList;
+-import java.util.List;
+-import org.junit.jupiter.api.Test;
+-import tools.jackson.databind.json.JsonMapper;
+-
+-final class RecordedRootPlanTest {
+-  private static final Path BASE = Path.of("recorded-root-plan").toAbsolutePath().normalize();
+-  private static final JsonMapper JSON = JsonMapper.builder().build();
+-
+-  private static RecordedRootPlan.Root root(Path path, String collection, boolean singleFile) {
+-    return new RecordedRootPlan.Root(path, collection, false, singleFile, List.of(), List.of());
+-  }
+-
+-  @Test
+-  void copiesMutableInputsAndExposesImmutableValues() {
+-    List<String> patterns = new ArrayList<>(List.of("*.tmp"));
+-    List<Path> subtrees = new ArrayList<>();
+-    List<RecordedRootPlan.Root> roots = new ArrayList<>(List.of(
+-        new RecordedRootPlan.Root(BASE, null, false, false, patterns, subtrees)));
+-    RecordedRootPlan plan = new RecordedRootPlan("g1", roots);
+-    patterns.add("*.bak");
+-    subtrees.add(BASE.resolve("ignored"));
+-    roots.clear();
+-
+-    assertEquals(List.of("*.tmp"), plan.roots().get(0).excludePatterns());
+-    assertThrows(UnsupportedOperationException.class, () -> plan.roots().clear());
+-    assertThrows(UnsupportedOperationException.class,
+-        () -> plan.roots().get(0).excludePatterns().add("*.bak"));
+-  }
+-
+-  @Test
+-  void rejectsDuplicatePathWithDifferentPolicy() {
+-    assertThrows(IllegalArgumentException.class, () -> RecordedRootPlan.partition("g1", List.of(
+-        root(BASE, "a", false), root(BASE, "b", false))));
+-    assertThrows(IllegalArgumentException.class, () -> RecordedRootPlan.partition("g1", List.of(
+-        new RecordedRootPlan.Root(BASE, "a", false, false, List.of(), List.of()),
+-        new RecordedRootPlan.Root(BASE, "a", false, true, List.of(), List.of()))));
+-    assertThrows(IllegalArgumentException.class, () -> RecordedRootPlan.partition("g1", List.of(
+-        new RecordedRootPlan.Root(BASE, "a", true, false, List.of(), List.of()),
+-        new RecordedRootPlan.Root(BASE, "a", false, false, List.of(), List.of()))));
+-    assertThrows(IllegalArgumentException.class, () -> RecordedRootPlan.partition("g1", List.of(
+-        new RecordedRootPlan.Root(BASE, "a", false, false, List.of("*.tmp"), List.of()),
+-        new RecordedRootPlan.Root(BASE, "a", false, false, List.of("*.bak"), List.of()))));
+-  }
+-
+-  @Test
+-  void collapsesExactDuplicatesAndSamePolicyNestedRoots() {
+-    Path child = BASE.resolve("child");
+-    RecordedRootPlan plan = RecordedRootPlan.partition("g1", List.of(
+-        root(child, "a", false), root(BASE, "a", false), root(BASE, "a", false)));
+-
+-    assertEquals(List.of(BASE), plan.roots().stream().map(RecordedRootPlan.Root::path).toList());
+-    assertEquals(List.of(), plan.roots().get(0).excludedSubtrees());
+-  }
+-
+-  @Test
+-  void collapsesRedundantSingleFileChildUnderMatchingDirectory() {
+-    Path child = BASE.resolve("child");
+-    RecordedRootPlan plan = RecordedRootPlan.partition("g1", List.of(
+-        root(BASE, "a", false), root(child, "a", true)));
+-
+-    assertEquals(List.of(BASE), plan.roots().stream().map(RecordedRootPlan.Root::path).toList());
+-  }
+-
+-  @Test
+-  void rejectsMoreThan1024RequestedRootsBeforePartitioning() {
+-    List<RecordedRootPlan.Root> roots = new ArrayList<>();
+-    for (int i = 0; i < 1025; i++) {
+-      roots.add(root(BASE.resolve("root-" + i), "a", false));
+-    }
+-    assertThrows(IllegalArgumentException.class, () -> RecordedRootPlan.partition("g1", roots));
+-  }
+-
+-  @Test
+-  void retainsNestedRootsWithDistinctPoliciesAndExcludesImmediateChild() {
+-    Path child = BASE.resolve("child");
+-    RecordedRootPlan plan = RecordedRootPlan.partition("g1", List.of(
+-        root(BASE, "a", false), root(child, "b", false)));
+-
+-    assertEquals(List.of(BASE, child), plan.roots().stream()
+-        .map(RecordedRootPlan.Root::path).toList());
+-    assertEquals(List.of(child), plan.roots().get(0).excludedSubtrees());
+-  }
+-
+-  @Test
+-  void nearestRetainedAncestorPreventsAlternatingPolicyCollapse() {
+-    Path b = BASE.resolve("b");
+-    Path c = b.resolve("c");
+-    RecordedRootPlan plan = RecordedRootPlan.partition("g1", List.of(
+-        root(BASE, "x", false), root(b, "y", false), root(c, "x", false)));
+-
+-    assertEquals(List.of(BASE, b, c), plan.roots().stream()
+-        .map(RecordedRootPlan.Root::path).toList());
+-    assertEquals(List.of(b), plan.roots().get(0).excludedSubtrees());
+-    assertEquals(List.of(c), plan.roots().get(1).excludedSubtrees());
+-  }
+-
+-  @Test
+-  void pathPrefixSiblingsRemainIndependentAndSingleFileIsPreserved() {
+-    Path sibling = BASE.resolveSibling(BASE.getFileName() + "2");
+-    RecordedRootPlan plan = RecordedRootPlan.partition("g1", List.of(
+-        root(BASE, "a", true), root(sibling, "a", false)));
+-
+-    List<Path> paths = plan.roots().stream().map(RecordedRootPlan.Root::path).toList();
+-    assertEquals(2, paths.size());
+-    assertTrue(paths.contains(BASE));
+-    assertTrue(paths.contains(sibling));
+-    RecordedRootPlan.Root file = plan.roots().stream()
+-        .filter(RecordedRootPlan.Root::singleFile).findFirst().orElseThrow();
+-    assertEquals(BASE, file.path());
+-    assertFalse(BASE.startsWith(sibling));
+-  }
+-
+-  @Test
+-  void serializationIsDeterministicAndRoundTrips() {
+-    Path child = BASE.resolve("child");
+-    RecordedRootPlan plan = RecordedRootPlan.partition("g1", List.of(
+-        root(child, "b", false), root(BASE, "a", false)));
+-    String first = plan.toReplayPayload();
+-    String second = RecordedRootPlan.partition("g1", List.of(
+-        root(BASE, "a", false), root(child, "b", false))).toReplayPayload();
+-
+-    assertEquals(first, second);
+-    assertEquals(plan, RecordedRootPlan.fromReplayPayload(first));
+-  }
+-
+-  @Test
+-  void strictReplayBoundaryRejectsUnknownFieldsUnsafePathsAndNonBooleanFlags() {
+-    String base = new RecordedRootPlan("g1", List.of(root(BASE, null, false))).toReplayPayload();
+-    assertEquals(new RecordedRootPlan("g1", List.of(root(BASE, null, false))),
+-        RecordedRootPlan.fromReplayPayload(base));
+-    assertThrows(IllegalArgumentException.class,
+-        () -> RecordedRootPlan.fromReplayPayload(base.replace(
+-            "\"excludedSubtrees\":[]}", "\"excludedSubtrees\":[],\"unknown\":1}")));
+-    assertThrows(IllegalArgumentException.class,
+-        () -> RecordedRootPlan.fromReplayPayload(base.replace(
+-            JSON.writeValueAsString(BASE.toString()), "\"relative\"")));
+-    assertThrows(IllegalArgumentException.class,
+-        () -> RecordedRootPlan.fromReplayPayload(base.replace("\"force\":false", "\"force\":1")));
+-  }
+-
+-  @Test
+-  void rejectsDuplicateKeysAndUnnormalizedPathsAtCommonBoundary() {
+-    String valid = new RecordedRootPlan("g1", List.of(root(BASE, null, false))).toReplayPayload();
+-    assertThrows(IllegalArgumentException.class,
+-        () -> RecordedRootPlan.fromReplayPayload(valid.replace(
+-            "\"generation\":\"g1\"", "\"generation\":\"g1\",\"generation\":\"g1\"")));
+-
+-    Path unnormalized = BASE.resolve("child").resolve("..");
+-    String pathJson = JSON.writeValueAsString(BASE.toString());
+-    String unnormalizedJson = JSON.writeValueAsString(unnormalized.toString());
+-    assertThrows(IllegalArgumentException.class,
+-        () -> RecordedRootPlan.fromReplayPayload(valid.replace(pathJson, unnormalizedJson)));
+-  }
+-
+-  @Test
+-  void rejectsTrailingTokensAfterAValidPlan() {
+-    var plan = new RecordedRootPlan("g1", List.of(root(BASE, null, false)));
+-    String valid = plan.toReplayPayload();
+-    assertEquals(plan, RecordedRootPlan.fromReplayPayload(valid));
+-    for (String tail : List.of("{}", "[]", "null", "true", "1", "garbage")) {
+-      assertThrows(IllegalArgumentException.class,
+-          () -> RecordedRootPlan.fromReplayPayload(valid + " " + tail), tail);
+-    }
+-  }
+-}
+diff --git a/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGenerationCaptureTest.java b/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGenerationCaptureTest.java
+index 367a3756c..0b597bc5e 100644
+--- a/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGenerationCaptureTest.java
++++ b/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGenerationCaptureTest.java
+@@ -72 +71,0 @@ final class EngineGenerationCaptureTest {
+-        assertUnavailable(() -> client.prepareReindexPlan(false, TestEngineContexts.FOREGROUND));
+@@ -104,4 +102,0 @@ final class EngineGenerationCaptureTest {
+-          var plan = client.prepareReindexPlan(true, owner.context());
+-          assertEquals(layout.activeGenerationId(), plan.generation());
+-          assertTrue(plan.roots().isEmpty());
+-          verify(worker, times(2)).captureServingGeneration(any());
+diff --git a/modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java b/modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java
+index 5cc165edd..334e6f97f 100644
+--- a/modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java
++++ b/modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java
+@@ -33 +33 @@ class OperationStoreArchitectureTest {
+-            && java.util.Set.of("accept", "acceptIngestChild", "start", "resume", "rejectBeforeStart", "finish")
++            && java.util.Set.of("accept", "start", "resume", "rejectBeforeStart", "finish")
+@@ -74,15 +73,0 @@ class OperationStoreArchitectureTest {
+-  @Test
+-  void attemptWriterRuleRejectsAProducerAcceptingAChildWithoutParentCapability() {
+-    var imported = new ClassFileImporter().importClasses(UnauthorizedChildWriter.class, OperationStore.class);
+-    var result = ATTEMPT_WRITER.evaluate(imported);
+-    assertTrue(result.hasViolation());
+-    assertTrue(result.getFailureReport().toString().contains("OperationStore.acceptIngestChild"));
+-  }
+-
+-  static final class UnauthorizedChildWriter {
+-    void acceptChild(OperationStore store, String parentKey, String childKey,
+-        io.justsearch.app.api.operations.RecordedRootPlan.Root root) {
+-      store.acceptIngestChild(parentKey, childKey, root);
+-    }
+-  }
+-
+@@ -90,4 +74,0 @@ class OperationStoreArchitectureTest {
+-    @Override public Acceptance acceptIngestChild(String parentKey, String childKey,
+-        io.justsearch.app.api.operations.RecordedRootPlan.Root root) {
+-      throw new UnsupportedOperationException();
+-    }
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java
+index 27a037290..ee8d08c5d 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java
+@@ -15 +14,0 @@ import io.justsearch.app.api.operations.OperationStoreException;
+-import io.justsearch.app.api.operations.RecordedRootPlan;
+@@ -67,10 +65,0 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner
+-  @Override
+-  public PreparedAttempt acceptIngestChild(OperationRecordHandle parent, RecordedRootPlan.Root root) {
+-    if (!(parent instanceof OperationAttemptRunnerImpl.Control control) || control.owner != this
+-        || control.done.isCompletedExceptionally()) {
+-      throw new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
+-    }
+-    var accepted = store.acceptIngestChild(control.key, OperationKeys.generate(clock), root);
+-    return new Prepared(controlFor(accepted.record()), accepted.record(), !accepted.created());
+-  }
+-
+@@ -287 +275,0 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner
+-    private final OperationAttemptRunnerImpl owner = OperationAttemptRunnerImpl.this;
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java
+index 38c0d8bbd..c79f44083 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java
+@@ -12 +11,0 @@ import io.justsearch.app.api.operations.OperationStoreException;
+-import io.justsearch.app.api.operations.RecordedRootPlan;
+@@ -329,84 +327,0 @@ public final class SqliteOperationStore implements OperationStore {
+-  @Override
+-  public Acceptance acceptIngestChild(String parentKey, String childKey, RecordedRootPlan.Root root) {
+-    return locked(() -> transaction(() -> {
+-      OperationRecord parent = findRow(parentKey).orElseThrow(() -> childRefused(null));
+-      final OperationDescriptor descriptor;
+-      try {
+-        RecordedRootPlan plan = parent.descriptor().recordedRootPlan();
+-        var storedRoot = plan.roots().stream().filter(candidate -> candidate.equals(root))
+-            .findFirst().orElseThrow(() -> new IllegalArgumentException("Root is outside recorded parent scope"));
+-        descriptor = OperationDescriptor.ingestChild(parent.key(),
+-            new RecordedRootPlan(plan.generation(), List.of(storedRoot)));
+-      } catch (IllegalArgumentException failure) {
+-        throw childRefused(failure);
+-      }
+-      String identity = canonicalIdentity(descriptor.identityJson());
+-      var existing = findIngestChild(identity);
+-      if (existing.isPresent()) {
+-        OperationRecord child = existing.get();
+-        if (!child.context().equals(parent.context())
+-            || !Objects.equals(child.executor(), parent.executor())
+-            || !Objects.equals(child.initiator(), parent.initiator())
+-            || !Objects.equals(child.correlationId(), parent.correlationId())) {
+-          throw childRefused(null);
+-        }
+-        return new Acceptance(child, false);
+-      }
+-      if (parent.state() != OperationState.RUNNING) throw childRefused(null);
+-      long keyTime;
+-      try { keyTime = OperationKeys.timestampMillis(childKey); }
+-      catch (IllegalArgumentException failure) {
+-        throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, failure);
+-      }
+-      long now = clock.millis();
+-      if (keyTime > now + FUTURE_SKEW_MS) {
+-        throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
+-      }
+-      if (keyTime < readHistorySince()) {
+-        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null,
+-            readHistorySince() - now);
+-      }
+-      pruneToLimit(ROW_CAP - 1);
+-      if (rowCount() >= ROW_CAP) {
+-        throw new OperationStoreException(OperationStoreException.Code.OPERATIONS_CAPACITY, null);
+-      }
+-      if (keyTime < readHistorySince()) {
+-        throw new OperationStoreException(OperationStoreException.Code.OPERATION_EXPIRED, null,
+-            readHistorySince() - now);
+-      }
+-      // Copy the stored columns directly: InvocationProvenance has fields the row never retained.
+-      String sql = INSERT_OPERATION + """
+-          SELECT ?, ?, survival, urgency, 'ACCEPTED', NULL, ?, grant_ref,
+-            client_kind, client_id, session_id, source_tier, transport,
+-            executor, initiator, correlation_id, ?, ?
+-          FROM operations WHERE id = ? AND state = 'RUNNING'
+-          ON CONFLICT(operation_key) DO NOTHING
+-          """;
+-      try (var insert = connection.prepareStatement(sql)) {
+-        insert.setString(1, childKey); insert.setString(2, descriptor.kind().wireValue());
+-        insert.setString(3, identity); insert.setLong(4, now); insert.setLong(5, now);
+-        insert.setLong(6, parent.id());
+-        if (insert.executeUpdate() != 1) throw new SQLException("Child acceptance did not insert exactly one row");
+-      }
+-      return new Acceptance(findRow(childKey).orElseThrow(() -> new SQLException("Accepted child is missing")), true);
+-    }));
+-  }
+-
+-  private java.util.Optional<OperationRecord> findIngestChild(String identity) throws SQLException {
+-    try (var query = connection.prepareStatement("""
+-        SELECT * FROM operations WHERE kind = ? AND operation_ref IS NULL AND identity_json = ?
+-        """)) {
+-      query.setString(1, OperationKind.INGEST.wireValue()); query.setString(2, identity);
+-      try (var rows = query.executeQuery()) {
+-        if (!rows.next()) return java.util.Optional.empty();
+-        OperationRecord child = readRecord(rows);
+-        if (rows.next()) throw childRefused(null);
+-        return java.util.Optional.of(child);
+-      }
+-    }
+-  }
+-
+-  private static OperationStoreException childRefused(Throwable cause) {
+-    return new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, cause);
+-  }
+-
+diff --git a/modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationChildAcceptanceTest.java b/modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationChildAcceptanceTest.java
+deleted file mode 100644
+index 66e33cc21..000000000
+--- a/modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationChildAcceptanceTest.java
++++ /dev/null
+@@ -1,508 +0,0 @@
+-/* SPDX-License-Identifier: Apache-2.0 */
+-package io.justsearch.app.observability.operations;
+-
+-import static org.junit.jupiter.api.Assertions.assertEquals;
+-import static org.junit.jupiter.api.Assertions.assertFalse;
+-import static org.junit.jupiter.api.Assertions.assertNotNull;
+-import static org.junit.jupiter.api.Assertions.assertNull;
+-import static org.junit.jupiter.api.Assertions.assertThrows;
+-import static org.junit.jupiter.api.Assertions.assertTrue;
+-
+-import io.justsearch.agent.api.registry.InvocationProvenance;
+-import io.justsearch.agent.api.registry.ExecutorTag;
+-import io.justsearch.agent.api.registry.OperationExecution;
+-import io.justsearch.agent.api.registry.OperationKind;
+-import io.justsearch.agent.api.registry.OperationRecordHandle;
+-import io.justsearch.agent.api.registry.OperationResult;
+-import io.justsearch.agent.api.registry.TransportTag;
+-import io.justsearch.app.api.operations.OperationAttemptRunner;
+-import io.justsearch.app.api.operations.OperationDescriptor;
+-import io.justsearch.app.api.operations.OperationKeys;
+-import io.justsearch.app.api.operations.OperationRecord;
+-import io.justsearch.app.api.operations.OperationReceipt;
+-import io.justsearch.app.api.operations.OperationState;
+-import io.justsearch.app.api.operations.OperationStoreException;
+-import io.justsearch.app.api.operations.RecordedRootPlan;
+-import io.justsearch.core.context.EngineContext;
+-import java.nio.file.Path;
+-import java.sql.DriverManager;
+-import java.time.Clock;
+-import java.time.Instant;
+-import java.time.ZoneOffset;
+-import java.util.List;
+-import java.util.Optional;
+-import java.util.Set;
+-import java.util.concurrent.CompletableFuture;
+-import java.util.concurrent.CountDownLatch;
+-import java.util.concurrent.Executors;
+-import java.util.concurrent.Future;
+-import java.util.concurrent.TimeUnit;
+-import java.util.concurrent.atomic.AtomicInteger;
+-import java.util.concurrent.atomic.AtomicReference;
+-import org.junit.jupiter.api.Test;
+-import org.junit.jupiter.api.Timeout;
+-import org.junit.jupiter.api.io.TempDir;
+-
+-@Timeout(30)
+-final class OperationChildAcceptanceTest {
+-  private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-12T09:00:00Z"), ZoneOffset.UTC);
+-  private static final EngineContext CONTEXT = new EngineContext(EngineContext.ClientKind.INTERNAL,
+-      "child-test-client", Optional.of("session-17"), Optional.of("grant-9"), "test-tier",
+-      "AGENT_LOOP", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
+-  private static final InvocationProvenance PROVENANCE = new InvocationProvenance(
+-      TransportTag.AGENT_LOOP, ExecutorTag.AGENT, Optional.of("initiator-17"), CLOCK.instant(),
+-      Optional.of("intent-17"), Optional.of("correlation-17"));
+-
+-  @TempDir Path temp;
+-
+-  @Test
+-  void childInheritsFrozenRootAndAttributionAndParentWaitsForDurableChild() throws Exception {
+-    try (var store = store()) {
+-      var runner = newRunner(store);
+-      RecordedRootPlan plan = plan();
+-      OperationAttemptRunner.PreparedAttempt parent = runner.accept(parentRequest(plan));
+-      AtomicReference<OperationRecordHandle> parentHandle = new AtomicReference<>();
+-      AtomicReference<OperationAttemptRunner.PreparedAttempt> childAttempt = new AtomicReference<>();
+-      CompletableFuture<OperationResult> parentOwnOutcome = new CompletableFuture<>();
+-      CompletableFuture<OperationResult> childOutcome = new CompletableFuture<>();
+-      AtomicInteger childRuns = new AtomicInteger();
+-      runner.start(parent, handle -> {
+-        parentHandle.set(handle);
+-        var child = runner.acceptIngestChild(handle, plan.roots().get(0));
+-        childAttempt.set(child);
+-        runner.start(child, childHandle -> {
+-          childRuns.incrementAndGet();
+-          return new OperationExecution(OperationResult.success("child-started"), childOutcome);
+-        });
+-        var completion = parentOwnOutcome.thenCombine(child.completion(),
+-            (own, ignored) -> own);
+-        return new OperationExecution(OperationResult.success("parent-started"), completion);
+-      });
+-
+-      OperationAttemptRunner.PreparedAttempt child = childAttempt.get();
+-      assertNotNull(child);
+-      assertFalse(child.existing());
+-      OperationRecord parentRow = store.find(parent.accepted().key()).orElseThrow();
+-      OperationRecord childRow = store.find(child.accepted().key()).orElseThrow();
+-      assertEquals(OperationState.RUNNING, childRow.state());
+-      assertEquals(parentRow.context(), childRow.context());
+-      assertEquals(parentRow.executor(), childRow.executor());
+-      assertEquals(parentRow.initiator(), childRow.initiator());
+-      assertEquals(parentRow.correlationId(), childRow.correlationId());
+-      assertEquals(OperationKind.INGEST, childRow.descriptor().kind());
+-      assertNull(childRow.descriptor().operationRef());
+-      assertEquals(plan.generation(), childRow.descriptor().recordedRootPlan().generation());
+-      assertEquals(plan.roots().get(0), childRow.descriptor().recordedRootPlan().roots().get(0));
+-
+-      var identity = tools.jackson.databind.json.JsonMapper.builder().build()
+-          .readTree(childRow.descriptor().identityJson());
+-      assertEquals("ingest-child", identity.path("mode").asText());
+-      assertEquals(parentRow.key(), identity.path("parentOperationKey").asText());
+-      assertEquals("root-plan.v1", identity.path("preparedInvocation").path("schema").asText());
+-
+-      parentOwnOutcome.complete(OperationResult.success("parent-effect-committed"));
+-      assertEquals(OperationState.RUNNING, store.find(parentRow.key()).orElseThrow().state());
+-      assertFalse(parent.completion().toCompletableFuture().isDone());
+-
+-      childOutcome.complete(OperationResult.success("child-committed", "child-execution-1"));
+-      assertEquals(OperationState.COMPLETE, child.completion().toCompletableFuture().join().state());
+-      var duplicateTerminal = runner.acceptIngestChild(parentHandle.get(), plan.roots().get(0));
+-      assertTrue(duplicateTerminal.existing());
+-      assertEquals(child.accepted().key(), duplicateTerminal.accepted().key());
+-      assertEquals(OperationState.COMPLETE, duplicateTerminal.accepted().state());
+-      assertEquals(OperationState.COMPLETE, parent.completion().toCompletableFuture().join().state());
+-      assertEquals(1, childRuns.get());
+-    }
+-  }
+-
+-  @Test
+-  void forgedForeignAndOutOfScopeCapabilitiesRefuseBeforeAnyChildEffect() throws Exception {
+-    try (var store = store()) {
+-      var runner = newRunner(store);
+-      RecordedRootPlan plan = plan();
+-      OperationAttemptRunner.PreparedAttempt parent = runner.accept(parentRequest(plan));
+-      AtomicReference<OperationRecordHandle> parentHandle = new AtomicReference<>();
+-      CompletableFuture<OperationResult> parentOutcome = new CompletableFuture<>();
+-      runner.start(parent, handle -> {
+-        parentHandle.set(handle);
+-        return new OperationExecution(OperationResult.success("parent-running"), parentOutcome);
+-      });
+-
+-      OperationRecord parentRow = store.find(parent.accepted().key()).orElseThrow();
+-      OperationRecordHandle forged = new OperationRecordHandle() {
+-        @Override public long id() { return parentRow.id(); }
+-        @Override public String key() { return parentRow.key(); }
+-        @Override public void checkpoint(String cursor, long completed, long failed) {}
+-      };
+-      assertChildRefused(() -> runner.acceptIngestChild(forged, plan.roots().get(0)));
+-
+-      var foreignRunner = newRunner(store);
+-      assertChildRefused(() -> foreignRunner.acceptIngestChild(parentHandle.get(), plan.roots().get(0)));
+-
+-      Path outsidePath = temp.resolve("outside");
+-      RecordedRootPlan.Root outside = root(outsidePath, "docs", false, List.of(), List.of());
+-      assertChildRefused(() -> runner.acceptIngestChild(parentHandle.get(), outside));
+-      RecordedRootPlan.Root changedPolicy = root(plan.roots().get(0).path(), "other-collection", false,
+-          plan.roots().get(0).excludePatterns(), plan.roots().get(0).excludedSubtrees());
+-      assertChildRefused(() -> runner.acceptIngestChild(parentHandle.get(), changedPolicy));
+-
+-      assertEquals(1, store.openRecords().size());
+-      parentOutcome.complete(OperationResult.success("parent-done"));
+-      assertEquals(OperationState.COMPLETE, parentRowState(store, parentRow.key()));
+-    }
+-  }
+-
+-  @Test
+-  void childAdmissionRefusalFromParentBodyStoresTypedFailureCode() throws Exception {
+-    try (var store = store()) {
+-      var runner = newRunner(store);
+-      RecordedRootPlan plan = plan();
+-      OperationAttemptRunner.PreparedAttempt parent = runner.accept(parentRequest(plan));
+-      assertThrows(OperationStoreException.class, () -> runner.start(parent, handle -> {
+-        OperationRecordHandle forged = new OperationRecordHandle() {
+-          @Override public long id() { return handle.id(); }
+-          @Override public String key() { return handle.key(); }
+-          @Override public void checkpoint(String cursor, long completed, long failed) {}
+-        };
+-        runner.acceptIngestChild(forged, plan.roots().get(0));
+-        return OperationExecution.finished(OperationResult.success("unreachable"));
+-      }));
+-      OperationRecord failed = store.find(parent.accepted().key()).orElseThrow();
+-      assertEquals(OperationState.FAILED, failed.state());
+-      assertEquals(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED.name(), failed.failureReason());
+-      assertEquals(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED.name(), failed.receipt().code());
+-
+-      OperationAttemptRunner.PreparedAttempt asyncParent = runner.accept(parentRequest(plan));
+-      CompletableFuture<OperationResult> asyncFailure = new CompletableFuture<>();
+-      runner.start(asyncParent, handle -> {
+-        OperationRecordHandle forged = new OperationRecordHandle() {
+-          @Override public long id() { return handle.id(); }
+-          @Override public String key() { return handle.key(); }
+-          @Override public void checkpoint(String cursor, long completed, long failed) {}
+-        };
+-        try {
+-          runner.acceptIngestChild(forged, plan.roots().get(0));
+-        } catch (OperationStoreException refusal) {
+-          asyncFailure.completeExceptionally(refusal);
+-        }
+-        return new OperationExecution(OperationResult.success("parent-async"), asyncFailure);
+-      });
+-      OperationRecord asyncFailed = store.find(asyncParent.accepted().key()).orElseThrow();
+-      assertEquals(OperationState.FAILED, asyncFailed.state());
+-      assertEquals(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED.name(), asyncFailed.failureReason());
+-      assertEquals(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED.name(), asyncFailed.receipt().code());
+-    }
+-  }
+-
+-  @Test
+-  void directStoreRequiresRunningParentAndRejectsAbsentTerminalOrAuditMismatchedChild() throws Exception {
+-    try (var store = store()) {
+-      RecordedRootPlan.Root root = plan().roots().get(0);
+-      String absent = OperationKeys.generate(CLOCK);
+-      assertChildRefused(() -> store.acceptIngestChild(absent, OperationKeys.generate(CLOCK), root));
+-
+-      String unstartedKey = OperationKeys.generate(CLOCK);
+-      OperationRecord unstarted = store.accept(unstartedKey, parentDescriptor(plan()), CONTEXT, PROVENANCE).record();
+-      assertChildRefused(() -> store.acceptIngestChild(unstarted.key(), OperationKeys.generate(CLOCK), root));
+-
+-      String terminalKey = OperationKeys.generate(CLOCK);
+-      OperationRecord terminal = store.accept(terminalKey, parentDescriptor(plan()), CONTEXT, PROVENANCE).record();
+-      assertTrue(store.finish(terminal.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null)).isPresent());
+-      assertChildRefused(() -> store.acceptIngestChild(terminal.key(), OperationKeys.generate(CLOCK), root));
+-
+-      String runningKey = OperationKeys.generate(CLOCK);
+-      OperationRecord running = store.accept(runningKey, parentDescriptor(plan()), CONTEXT, PROVENANCE).record();
+-      assertTrue(store.start(running.id()));
+-      String childKey = OperationKeys.generate(CLOCK);
+-      store.acceptIngestChild(running.key(), childKey, root);
+-      assertEquals(childKey, store.find(childKey).orElseThrow().key());
+-      execute("UPDATE operations SET client_id = 'tampered-client' WHERE operation_key = '" + childKey + "'");
+-      assertChildRefused(() -> store.acceptIngestChild(running.key(), childKey, root));
+-    }
+-  }
+-
+-  @Test
+-  void parallelDuplicateAcceptanceCreatesOneChildAndExecutesOneBody() throws Exception {
+-    try (var store = store(); var pool = Executors.newFixedThreadPool(8)) {
+-      var runner = newRunner(store);
+-      RecordedRootPlan plan = plan();
+-      OperationAttemptRunner.PreparedAttempt parent = runner.accept(parentRequest(plan));
+-      AtomicReference<OperationRecordHandle> parentHandle = new AtomicReference<>();
+-      CompletableFuture<OperationResult> parentOutcome = new CompletableFuture<>();
+-      runner.start(parent, handle -> {
+-        parentHandle.set(handle);
+-        return new OperationExecution(OperationResult.success("parent-running"), parentOutcome);
+-      });
+-      CountDownLatch gate = new CountDownLatch(1);
+-      var futures = new java.util.ArrayList<Future<OperationAttemptRunner.PreparedAttempt>>();
+-      for (int i = 0; i < 16; i++) {
+-        futures.add(pool.submit(() -> {
+-          assertTrue(gate.await(5, TimeUnit.SECONDS));
+-          return runner.acceptIngestChild(parentHandle.get(), plan.roots().get(0));
+-        }));
+-      }
+-      gate.countDown();
+-      var attempts = new java.util.ArrayList<OperationAttemptRunner.PreparedAttempt>();
+-      for (var future : futures) attempts.add(future.get(5, TimeUnit.SECONDS));
+-      Set<String> keys = attempts.stream().map(attempt -> attempt.accepted().key()).collect(java.util.stream.Collectors.toSet());
+-      assertEquals(1, keys.size());
+-      assertEquals(1, attempts.stream().filter(attempt -> !attempt.existing()).count());
+-
+-      AtomicInteger bodies = new AtomicInteger();
+-      for (var attempt : attempts) {
+-        runner.start(attempt, handle -> {
+-          bodies.incrementAndGet();
+-          return OperationExecution.finished(OperationResult.success("one-child-body"));
+-        });
+-      }
+-      assertEquals(1, bodies.get());
+-      assertEquals(1, store.find(keys.iterator().next()).orElseThrow().attempts());
+-      parentOutcome.complete(OperationResult.success("parent-done"));
+-    }
+-  }
+-
+-  @Test
+-  void storageRefusalLeavesParentRunningAndDoesNotReachChildBody() throws Exception {
+-    try (var store = store()) {
+-      var runner = newRunner(store);
+-      RecordedRootPlan plan = plan();
+-      OperationAttemptRunner.PreparedAttempt parent = runner.accept(parentRequest(plan));
+-      AtomicReference<OperationRecordHandle> parentHandle = new AtomicReference<>();
+-      CompletableFuture<OperationResult> parentOutcome = new CompletableFuture<>();
+-      runner.start(parent, handle -> {
+-        parentHandle.set(handle);
+-        return new OperationExecution(OperationResult.success("parent-running"), parentOutcome);
+-      });
+-      execute("CREATE TRIGGER refuse_ingest_child BEFORE INSERT ON operations "
+-          + "WHEN NEW.kind = 'ingest' BEGIN SELECT RAISE(ABORT, 'fixture'); END");
+-
+-      assertEquals(OperationStoreException.Code.STORAGE_FAILED,
+-          assertThrows(OperationStoreException.class,
+-              () -> runner.acceptIngestChild(parentHandle.get(), plan.roots().get(0))).code());
+-      assertEquals(OperationState.RUNNING, store.find(parent.accepted().key()).orElseThrow().state());
+-      assertEquals(1, store.openRecords().size());
+-      parentOutcome.complete(OperationResult.success("parent-done"));
+-    }
+-  }
+-
+-  @Test
+-  void reopenReconcilesParentFirstWithoutRerunningExistingChild() throws Exception {
+-    reopenAndReconcile(true);
+-  }
+-
+-  @Test
+-  void childStorageRefusalInParentBodyRetainsTypedDurableFailure() throws Exception {
+-    childStorageFailureReceipt(false);
+-  }
+-
+-  @Test
+-  void childStorageRefusalInParentCompletionRetainsTypedDurableFailure() throws Exception {
+-    childStorageFailureReceipt(true);
+-  }
+-
+-  private void childStorageFailureReceipt(boolean asynchronous) throws Exception {
+-    try (var store = store()) {
+-      var runner = newRunner(store);
+-      RecordedRootPlan plan = plan();
+-      var parent = runner.accept(parentRequest(plan));
+-      execute("CREATE TRIGGER refuse_ingest_child BEFORE INSERT ON operations "
+-          + "WHEN NEW.kind = 'ingest' BEGIN SELECT RAISE(ABORT, 'fixture'); END");
+-      if (asynchronous) {
+-        CompletableFuture<OperationResult> completion = new CompletableFuture<>();
+-        AtomicReference<OperationRecordHandle> parentHandle = new AtomicReference<>();
+-        runner.start(parent, handle -> {
+-          parentHandle.set(handle);
+-          return new OperationExecution(OperationResult.success("parent-running"), completion);
+-        });
+-        var refusal = assertThrows(OperationStoreException.class,
+-            () -> runner.acceptIngestChild(parentHandle.get(), plan.roots().get(0)));
+-        completion.completeExceptionally(refusal);
+-      } else {
+-        assertThrows(OperationStoreException.class, () -> runner.start(parent, handle -> {
+-          runner.acceptIngestChild(handle, plan.roots().get(0));
+-          throw new AssertionError("a refused acceptance must not reach child execution");
+-        }));
+-      }
+-      OperationRecord failed = parent.completion().toCompletableFuture().join();
+-      assertEquals(OperationState.FAILED, failed.state());
+-      assertEquals(OperationStoreException.Code.STORAGE_FAILED.name(), failed.failureReason());
+-      assertEquals(OperationStoreException.Code.STORAGE_FAILED.name(), failed.receipt().code());
+-      assertTrue(store.openRecords().isEmpty());
+-    }
+-  }
+-
+-  @Test
+-  void reopenReconcilesIngestFirstWithoutRerunningExistingChild() throws Exception {
+-    reopenAndReconcile(false);
+-  }
+-
+-  @Test
+-  void childMissingAtRunnerBootGetsNormalStartAndIsAbsentFromLaterReconciliation() throws Exception {
+-    Path db = temp.resolve("missing-child.db");
+-    RecordedRootPlan plan = plan();
+-    String parentKey = OperationKeys.generate(CLOCK);
+-    try (var store = new SqliteOperationStore(db, CLOCK, step -> {})) {
+-      OperationRecord parent = store.accept(parentKey, parentDescriptor(plan), CONTEXT, PROVENANCE).record();
+-      assertTrue(store.start(parent.id()));
+-    }
+-
+-    try (var store = new SqliteOperationStore(db, CLOCK, step -> {})) {
+-      var runner = newRunner(store);
+-      AtomicReference<OperationAttemptRunner.PreparedAttempt> createdChild = new AtomicReference<>();
+-      AtomicInteger childRuns = new AtomicInteger();
+-      runner.reconcile(OperationKind.REINDEX, row -> new OperationAttemptRunner.Reconciliation.Resume(handle -> {
+-        var child = runner.acceptIngestChild(handle, plan.roots().get(0));
+-        assertFalse(child.existing());
+-        createdChild.set(child);
+-        runner.start(child, childHandle -> {
+-          childRuns.incrementAndGet();
+-          return OperationExecution.finished(OperationResult.success("new-child"));
+-        });
+-        return OperationExecution.finished(OperationResult.success("resumed-parent"));
+-      }));
+-
+-      assertTrue(createdChild.get() != null);
+-      assertEquals(OperationState.COMPLETE, createdChild.get().completion().toCompletableFuture().join().state());
+-      assertEquals(1, childRuns.get());
+-      assertEquals(OperationState.COMPLETE, store.find(parentKey).orElseThrow().state());
+-      runner.reconcile(OperationKind.INGEST, row -> {
+-        throw new AssertionError("a child created after runner boot must not be reconciled again");
+-      });
+-      assertEquals(1, childRuns.get());
+-    }
+-  }
+-
+-  @Test
+-  void lostParentCapabilityRefusesChildAfterParentCompletionPersistenceFailure() throws Exception {
+-    try (var store = store()) {
+-      var runner = newRunner(store);
+-      RecordedRootPlan plan = plan();
+-      OperationAttemptRunner.PreparedAttempt parent = runner.accept(parentRequest(plan));
+-      AtomicReference<OperationRecordHandle> parentHandle = new AtomicReference<>();
+-      CompletableFuture<OperationResult> parentOutcome = new CompletableFuture<>();
+-      runner.start(parent, handle -> {
+-        parentHandle.set(handle);
+-        return new OperationExecution(OperationResult.success("parent-running"), parentOutcome);
+-      });
+-      long parentId = parent.accepted().id();
+-      execute("CREATE TRIGGER refuse_parent_complete BEFORE UPDATE ON operations "
+-          + "WHEN OLD.id = " + parentId + " AND NEW.state = 'COMPLETE' "
+-          + "BEGIN SELECT RAISE(ABORT, 'fixture'); END");
+-
+-      parentOutcome.complete(OperationResult.success("parent-complete"));
+-      assertThrows(java.util.concurrent.CompletionException.class,
+-          () -> parent.completion().toCompletableFuture().join());
+-      assertEquals(OperationState.RUNNING, store.find(parent.accepted().key()).orElseThrow().state());
+-      assertChildRefused(() -> runner.acceptIngestChild(parentHandle.get(), plan.roots().get(0)));
+-      assertEquals(1, store.openRecords().size());
+-    }
+-  }
+-
+-  private void reopenAndReconcile(boolean parentFirst) throws Exception {
+-    Path db = temp.resolve(parentFirst ? "parent-first.db" : "child-first.db");
+-    RecordedRootPlan plan = plan();
+-    String parentKey;
+-    String childKey;
+-    try (var store = new SqliteOperationStore(db, CLOCK, step -> {})) {
+-      parentKey = OperationKeys.generate(CLOCK);
+-      OperationRecord parent = store.accept(parentKey, parentDescriptor(plan()), CONTEXT, PROVENANCE).record();
+-      assertTrue(store.start(parent.id()));
+-      childKey = OperationKeys.generate(CLOCK);
+-      store.acceptIngestChild(parentKey, childKey, plan.roots().get(0));
+-    }
+-
+-    try (var store = new SqliteOperationStore(db, CLOCK, step -> {})) {
+-      var runner = newRunner(store);
+-      OperationRecord persistedChild = store.find(childKey).orElseThrow();
+-      AtomicInteger parentRuns = new AtomicInteger();
+-      AtomicInteger childRuns = new AtomicInteger();
+-      AtomicReference<OperationAttemptRunner.PreparedAttempt> resumedChild = new AtomicReference<>();
+-      CompletableFuture<OperationResult> parentOutcome = new CompletableFuture<>();
+-      OperationAttemptRunner.PreparedAttempt duplicateChild = runner.accept(
+-          new OperationAttemptRunner.Request(childKey, persistedChild.descriptor(), persistedChild.context(), null));
+-      runner.start(duplicateChild, handle -> {
+-        throw new AssertionError("a preexisting child must not run through normal start");
+-      });
+-
+-      Runnable reconcileParent = () -> runner.reconcile(OperationKind.REINDEX,
+-          row -> new OperationAttemptRunner.Reconciliation.Resume(handle -> {
+-            parentRuns.incrementAndGet();
+-            var child = runner.acceptIngestChild(handle,
+-                persistedChild.descriptor().recordedRootPlan().roots().get(0));
+-            assertTrue(child.existing());
+-            assertEquals(childKey, child.accepted().key());
+-            resumedChild.set(child);
+-            var completion = parentOutcome.thenCombine(child.completion(), (own, ignored) -> own);
+-            return new OperationExecution(OperationResult.success("resumed-parent"), completion);
+-          }));
+-      Runnable reconcileChild = () -> runner.reconcile(OperationKind.INGEST,
+-          row -> new OperationAttemptRunner.Reconciliation.Resume(handle -> {
+-            childRuns.incrementAndGet();
+-            return OperationExecution.finished(OperationResult.success("resumed-child"));
+-          }));
+-
+-      if (parentFirst) {
+-        reconcileParent.run();
+-        assertEquals(OperationState.RUNNING, store.find(parentKey).orElseThrow().state());
+-        reconcileChild.run();
+-      } else {
+-        reconcileChild.run();
+-        reconcileParent.run();
+-      }
+-      assertNotNull(resumedChild.get());
+-      assertEquals(1, childRuns.get());
+-      assertEquals(OperationState.COMPLETE, store.find(childKey).orElseThrow().state());
+-      parentOutcome.complete(OperationResult.success("parent-after-child"));
+-      assertEquals(OperationState.COMPLETE, store.find(parentKey).orElseThrow().state());
+-      assertEquals(1, parentRuns.get());
+-      reconcileChild.run();
+-      reconcileParent.run();
+-      assertEquals(1, childRuns.get());
+-      assertEquals(1, parentRuns.get());
+-    }
+-  }
+-
+-  private SqliteOperationStore store() throws Exception {
+-    return new SqliteOperationStore(temp.resolve("operations.db"), CLOCK, step -> {});
+-  }
+-
+-  private static OperationAttemptRunnerImpl newRunner(SqliteOperationStore store) {
+-    return new OperationAttemptRunnerImpl(store, CLOCK, Set.of(OperationKind.REINDEX, OperationKind.INGEST));
+-  }
+-
+-  private static OperationAttemptRunner.Request parentRequest(RecordedRootPlan plan) {
+-    return new OperationAttemptRunner.Request(OperationKeys.generate(CLOCK), parentDescriptor(plan), CONTEXT, PROVENANCE);
+-  }
+-
+-  private static OperationDescriptor parentDescriptor(RecordedRootPlan plan) {
+-    return OperationDescriptor.preparedInvocation(OperationKind.REINDEX, "core.child-fixture", "{}",
+-        RecordedRootPlan.SCHEMA, plan.toReplayPayload());
+-  }
+-
+-  private static RecordedRootPlan plan() {
+-    Path base = Path.of("child-acceptance-root").toAbsolutePath().normalize();
+-    return new RecordedRootPlan("generation-child-17", List.of(root(base, "docs", false,
+-        List.of("*.tmp", "*.partial"), List.of(base.resolve("ignored")))));
+-  }
+-
+-  private static RecordedRootPlan.Root root(Path path, String collection, boolean singleFile,
+-      List<String> patterns, List<Path> exclusions) {
+-    return new RecordedRootPlan.Root(path, collection, true, singleFile, patterns, exclusions);
+-  }
+-
+-  private static OperationState parentRowState(SqliteOperationStore store, String key) {
+-    return store.find(key).orElseThrow().state();
+-  }
+-
+-  private static void assertChildRefused(org.junit.jupiter.api.function.Executable operation) {
+-    var failure = assertThrows(OperationStoreException.class, operation);
+-    assertEquals(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, failure.code());
+-  }
+-
+-  private void execute(String sql) throws Exception {
+-    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("operations.db"));
+-        var statement = connection.createStatement()) {
+-      statement.execute(sql);
+-    }
+-  }
+-}
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java b/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java
+index a151e8e2d..14f1c2e2e 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java
+@@ -433,4 +433,4 @@ public final class OperationExecutorImpl implements OperationDispatcher {
+-      OperationDescriptor descriptor = value.replaySchema() == null ? generic
+-          : OperationDescriptor.preparedInvocation(op.policy().recordKind(), op.id().value(),
+-              argumentsJson, value.replaySchema(), value.replayPayloadJson());
+-      return new PreparedInvocation(handler, value, descriptor, null, null);
++      if (value.replaySchema() != null) {
++        throw new IllegalArgumentException("Prepared replay is unavailable");
++      }
++      return new PreparedInvocation(handler, value, generic, null, null);
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
+index 50fd0b3ad..5c7f53832 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
+@@ -996,7 +995,0 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
+-    @Override
+-    public io.justsearch.app.api.operations.RecordedRootPlan prepareReindexPlan(
+-            boolean force, EngineContext engineContext) {
+-        String generation = captureServingGeneration(engineContext);
+-        return rootLifecycleOps.prepareReindexPlan(generation, force);
+-    }
+-
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java b/modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java
+index 7c7abe401..07e375658 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/RootLifecycleOps.java
+@@ -128,10 +127,0 @@ final class RootLifecycleOps {
+-    io.justsearch.app.api.operations.RecordedRootPlan prepareReindexPlan(String generation, boolean force) {
+-        var bindings = watchedRootsState.snapshotBindings();
+-        List<String> patterns = List.copyOf(excludeMatcherSupplier.get().patterns());
+-        var roots = bindings.stream().map(binding -> new io.justsearch.app.api.operations.RecordedRootPlan.Root(
+-                binding.path(), binding.collection() == null || binding.collection().isBlank()
+-                    ? IngestCollectionPolicy.DEFAULT_COLLECTION : binding.collection(),
+-                force, false, patterns, List.of())).toList();
+-        return io.justsearch.app.api.operations.RecordedRootPlan.partition(generation, roots);
+-    }
+-
+diff --git a/modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java b/modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java
+index 8177c9e43..218c1e197 100644
+--- a/modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java
++++ b/modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java
+@@ -93 +93 @@ final class OperationExecutorImplTest {
+-  void preparedScopeIsAcceptedAndExecutedWithoutRereadingMutableInput() {
++  void unactivatedReplayPlanCannotEnterTheCurrentRowIdentity() throws Exception {
+@@ -95,7 +95,2 @@ final class OperationExecutorImplTest {
+-    var id = new OperationRef("core.prepared-test");
+-    var currentRoot = new java.util.concurrent.atomic.AtomicReference<>("original-root");
+-    var frozen = new java.util.concurrent.atomic.AtomicReference<OperationPreparation>();
+-    var preparationCalls = new java.util.concurrent.atomic.AtomicInteger();
+-    var key = new java.util.concurrent.atomic.AtomicReference<String>();
+-    var context = io.justsearch.app.services.TestEngineContexts.internal();
+-    String publicInput = "{\"privateBody\":\"not-for-the-row\"}";
++    var id = new OperationRef("core.held-replay-test");
++    var calls = new java.util.concurrent.atomic.AtomicInteger();
+@@ -103,13 +98,3 @@ final class OperationExecutorImplTest {
+-      @Override public OperationResult execute(String args, EngineContext ctx) {
+-        throw new AssertionError("Must execute the frozen invocation");
+-      }
+-      @Override public OperationPreparation prepare(String args,
+-          InvocationProvenance provenance, EngineContext ctx) {
+-        org.junit.jupiter.api.Assertions.assertSame(context, ctx);
+-        assertTrue(operationStore.openRecords().isEmpty(), "scope must be captured before acceptance");
+-        preparationCalls.incrementAndGet();
+-        var value = new OperationPreparation(args, "root-plan.v1",
+-            rootPlanPayload(currentRoot.get()));
+-        frozen.set(value);
+-        currentRoot.set("changed-after-preparation");
+-        return value;
++      @Override public OperationResult execute(String args, EngineContext context) {
++        calls.incrementAndGet();
++        return OperationResult.success("effect");
+@@ -117,16 +102,3 @@ final class OperationExecutorImplTest {
+-      @Override public OperationExecution executePrepared(
+-          OperationPreparation value, InvocationProvenance provenance,
+-          EngineContext ctx, OperationRecordHandle handle) {
+-        org.junit.jupiter.api.Assertions.assertSame(frozen.get(), value);
+-        org.junit.jupiter.api.Assertions.assertSame(context, ctx);
+-        key.set(handle.key());
+-        var row = operationStore.find(handle.key()).orElseThrow();
+-        assertEquals(io.justsearch.app.api.operations.OperationState.RUNNING, row.state());
+-        String identity = row.descriptor().identityJson();
+-        assertTrue(identity.contains("original-root"));
+-        assertTrue(identity.contains("root-plan.v1"));
+-        assertFalse(identity.contains("changed-after-preparation"));
+-        assertFalse(identity.contains("privateBody"));
+-        assertFalse(identity.contains("not-for-the-row"));
+-        assertTrue(identity.contains(io.justsearch.app.api.operations.CanonicalOperationArguments.digest(publicInput)));
+-        return OperationExecution.finished(OperationResult.success("Committed"));
++      @Override public OperationPreparation prepare(String args, InvocationProvenance provenance,
++          EngineContext context) {
++        return new OperationPreparation(args, "root-plan.v1", rootPlanPayload("held"));
+@@ -135,5 +107,14 @@ final class OperationExecutorImplTest {
+-    assertTrue(new OperationExecutorImpl(attempts, admission, handlers)
+-        .dispatch(makeOp(id, TrustTier.CORE, false), publicInput, context).success());
+-    assertEquals(1, preparationCalls.get());
+-    assertEquals(io.justsearch.app.api.operations.OperationState.COMPLETE,
+-        operationStore.find(key.get()).orElseThrow().state());
++    assertThrows(IllegalArgumentException.class,
++        () -> new OperationExecutorImpl(attempts, admission, handlers)
++        .dispatch(makeOp(id, TrustTier.CORE, false), "{}",
++            io.justsearch.app.services.TestEngineContexts.internal()));
++    assertEquals(0, calls.get());
++    try (var connection = java.sql.DriverManager.getConnection(
++        "jdbc:sqlite:" + operationDirectory.resolve("operations.db"));
++        var statement = connection.createStatement();
++        var row = statement.executeQuery("SELECT identity_json, state FROM operations")) {
++      assertTrue(row.next());
++      assertEquals("FAILED", row.getString("state"));
++      assertFalse(row.getString("identity_json").contains("preparedInvocation"));
++      assertFalse(row.next());
++    }
+@@ -143,3 +124,2 @@ final class OperationExecutorImplTest {
+-  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+-  void declaredKindSelectsRecoveryAfterDispatcherAcceptance(boolean prepared) throws Exception {
+-    var kind = prepared ? OperationKind.REINDEX : OperationKind.INGEST;
++  @org.junit.jupiter.params.provider.EnumSource(value = OperationKind.class, names = {"REINDEX", "INGEST"})
++  void declaredKindSelectsRecoveryAfterDispatcherAcceptance(OperationKind kind) throws Exception {
+@@ -156,2 +136 @@ final class OperationExecutorImplTest {
+-        return prepared ? new OperationPreparation(args, "root-plan.v1", rootPlanPayload("frozen"))
+-            : OperationPreparation.passthrough(args);
++        return OperationPreparation.passthrough(args);
+@@ -183 +162 @@ final class OperationExecutorImplTest {
+-      assertEquals(prepared, row.descriptor().identityJson().contains("preparedInvocation"));
++      assertFalse(row.descriptor().identityJson().contains("preparedInvocation"));
+diff --git a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
+index ef0bbf586..4ec293fc4 100644
+--- a/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
++++ b/modules/app-services/src/test/java/io/justsearch/app/services/worker/RecordedRootPreparationTest.java
+@@ -9 +8,0 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
+-import static org.mockito.ArgumentMatchers.any;
+@@ -11,2 +9,0 @@ import static org.mockito.Mockito.mock;
+-import static org.mockito.Mockito.never;
+-import static org.mockito.Mockito.verify;
+@@ -15 +11,0 @@ import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
+-import io.justsearch.app.api.operations.RecordedRootPlan;
+@@ -120,73 +115,0 @@ final class RecordedRootPreparationTest {
+-  @Test
+-  @DisplayName("preparation is pure and freezes nested labels, excludes, and directory metadata")
+-  void prepareSnapshotsPurelyAndPreservesDistinctNestedPolicy() throws Exception {
+-    Path parent = Files.createDirectories(tempDir.resolve("library")).toAbsolutePath().normalize();
+-    Path child = Files.createDirectories(parent.resolve("private")).toAbsolutePath().normalize();
+-    Path sibling = Files.createDirectories(tempDir.resolve("library-other")).toAbsolutePath().normalize();
+-    Path rootsFile = tempDir.resolve("prepared-roots.json");
+-    AtomicInteger excludeCalls = new AtomicInteger();
+-    Fixture fixture =
+-        new Fixture(
+-            () -> {
+-              excludeCalls.incrementAndGet();
+-              return ExcludeMatcher.fromPatterns(List.of("*.tmp"), false);
+-            },
+-            null,
+-            rootsFile);
+-
+-    fixture.state.register(parent, "notes", false);
+-    fixture.state.register(child, "secret", false);
+-    fixture.state.register(sibling, "  ", false);
+-
+-    RecordedRootPlan plan = fixture.ops.prepareReindexPlan("generation-1", true);
+-
+-    assertEquals(1, excludeCalls.get(), "the exclusion source is captured once");
+-    assertEquals(3, plan.roots().size(), "distinct nested policies remain separate roots");
+-    RecordedRootPlan.Root plannedParent = rootFor(plan, parent);
+-    RecordedRootPlan.Root plannedChild = rootFor(plan, child);
+-    RecordedRootPlan.Root plannedSibling = rootFor(plan, sibling);
+-    assertEquals("notes", plannedParent.collection());
+-    assertEquals("secret", plannedChild.collection());
+-    assertEquals(IngestCollectionPolicy.DEFAULT_COLLECTION, plannedSibling.collection());
+-    assertEquals(List.of(child), plannedParent.excludedSubtrees());
+-    assertEquals(List.of("**/*.tmp"), plannedParent.excludePatterns());
+-    assertEquals(List.of("**/*.tmp"), plannedChild.excludePatterns());
+-    assertTrue(plannedParent.force());
+-    assertFalse(plannedParent.singleFile(), "watched roots are directory units");
+-    assertFalse(plannedChild.singleFile(), "watched roots are directory units");
+-
+-    // Scope is frozen in the immutable plan even when live state changes after capture.
+-    fixture.state.register(child, "changed-after-capture", false);
+-    Path late = Files.createDirectories(tempDir.resolve("late")).toAbsolutePath().normalize();
+-    fixture.state.register(late, "late", false);
+-    assertEquals("secret", rootFor(plan, child).collection());
+-    assertEquals(3, plan.roots().size());
+-    assertThrows(
+-        UnsupportedOperationException.class,
+-        () -> plan.roots().get(0).excludePatterns().add("late/**"));
+-
+-    assertFalse(Files.exists(rootsFile), "pure preparation must not persist root state");
+-    assertEquals(0, fixture.submittedWalks.get());
+-    assertEquals(0, fixture.watchCalls.get());
+-    assertEquals(0, fixture.scanCalls.get());
+-    assertEquals(0, fixture.deleteCalls.get());
+-    verify(fixture.walkExecutor, never()).execute(any(Runnable.class));
+-  }
+-
+-  @Test
+-  @DisplayName("null and explicit default labels collapse before partitioning")
+-  void nullAndDefaultCollectionsHaveOneEffectivePolicy() throws Exception {
+-    Path parent = Files.createDirectories(tempDir.resolve("shared")).toAbsolutePath().normalize();
+-    Path child = Files.createDirectories(parent.resolve("child")).toAbsolutePath().normalize();
+-    Fixture fixture = new Fixture(ExcludeMatcher::empty, null);
+-    fixture.state.register(parent, null, false);
+-    fixture.state.register(child, IngestCollectionPolicy.DEFAULT_COLLECTION, false);
+-
+-    RecordedRootPlan plan = fixture.ops.prepareReindexPlan("generation-2", false);
+-
+-    assertEquals(1, plan.roots().size(), "null and default must be normalized before partitioning");
+-    assertEquals(parent, plan.roots().get(0).path());
+-    assertEquals(IngestCollectionPolicy.DEFAULT_COLLECTION, plan.roots().get(0).collection());
+-    assertEquals(List.of(), plan.roots().get(0).excludedSubtrees());
+-  }
+-
+@@ -273,7 +195,0 @@ final class RecordedRootPreparationTest {
+-  private static RecordedRootPlan.Root rootFor(RecordedRootPlan plan, Path path) {
+-    return plan.roots().stream()
+-        .filter(root -> root.path().equals(path))
+-        .findFirst()
+-        .orElseThrow(() -> new AssertionError("missing planned root " + path));
+-  }
+-
+@@ -287,2 +202,0 @@ final class RecordedRootPreparationTest {
+-    private final AtomicInteger scanCalls = new AtomicInteger();
+-    private final AtomicInteger deleteCalls = new AtomicInteger();
+@@ -310 +223,0 @@ final class RecordedRootPreparationTest {
+-                scanCalls.incrementAndGet();
+@@ -314 +226,0 @@ final class RecordedRootPreparationTest {
+-                scanCalls.incrementAndGet();
+@@ -333 +244,0 @@ final class RecordedRootPreparationTest {
+-                deleteCalls.incrementAndGet();

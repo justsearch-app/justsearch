@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,10 +21,14 @@ import io.justsearch.app.observability.health.HealthEventChangeRegistry;
 import io.justsearch.app.observability.health.OccurrenceLog;
 import io.justsearch.app.observability.health.Severity;
 import io.justsearch.app.observability.health.Source;
+import io.justsearch.app.observability.stream.SseStreamChannel;
 import io.justsearch.telemetry.Telemetry;
+import io.justsearch.core.execution.TestEngineExecutors;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,11 +38,18 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests for {@link HealthEventStreamController} per tempdoc 430 §"In scope — substrate"
  * (item 9) + slice 436 retrofit. Verifies the synchronous connected/snapshot lifecycle
- * + onClose registration + keepAlive + UPDATE forwarding path under the universal
+ * + onClose registration + request-future lifecycle + UPDATE forwarding path under the universal
  * envelope wire shape (constant SSE event name {@code "frame"}).
  */
 @DisplayName("HealthEventStreamController")
 final class HealthEventStreamControllerTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   private static final Source EVENT_SOURCE = Source.forProcess("head", "instance-1", "1.0");
 
@@ -52,7 +64,9 @@ final class HealthEventStreamControllerTest {
     occurrences = new OccurrenceLog();
     registry = new HealthEventChangeRegistry();
     Telemetry telemetry = mock(Telemetry.class);
-    controller = new HealthEventStreamController(conditions, occurrences, registry, telemetry);
+    controller = new HealthEventStreamController(
+            processExecutors,
+              conditions, occurrences, registry, telemetry);
   }
 
   @AfterEach
@@ -112,11 +126,12 @@ final class HealthEventStreamControllerTest {
   }
 
   @Test
-  @DisplayName("subscribe calls keepAlive to hold the connection")
-  void subscribeCallsKeepAlive() {
+  @DisplayName("subscribe registers a pre-created request future and never calls keepAlive")
+  void subscribeRegistersRequestFuture() {
     SseClient client = mockSseClient();
     controller.handle(client);
-    verify(client).keepAlive();
+    verify(client.ctx()).future(any());
+    verify(client, never()).keepAlive();
   }
 
   @Test
@@ -164,6 +179,7 @@ final class HealthEventStreamControllerTest {
   @Test
   @DisplayName("Fix C: subscribe with valid in-window token replays from the buffer")
   void subscribeWithValidResumeTokenReplays() {
+    String token = registry.channel().captureSnapshotBoundary().resumeToken();
     // Populate the channel's ring buffer with one UPDATE frame BEFORE the client connects.
     HealthEvent change =
         new HealthEvent(
@@ -182,10 +198,7 @@ final class HealthEventStreamControllerTest {
                 List.of()));
     registry.broadcast(HealthEventChangeRegistry.Kind.CONDITION_ADDED, change);
 
-    // Build a token at seq=0 — replay should send the one UPDATE frame.
-    String token =
-        io.justsearch.app.observability.stream.ResumeTokenCodec.encode(
-            HealthEventChangeRegistry.STREAM_ID, 0L);
+    // The source-issued seq=0 boundary captured before the UPDATE must replay that UPDATE.
     SseClient client = mockSseClientWithToken(token);
     List<String> sent = new ArrayList<>();
     doAnswer(
@@ -217,12 +230,11 @@ final class HealthEventStreamControllerTest {
   @Test
   @DisplayName("Fix C: subscribe with expired token emits reset + fresh snapshot")
   void subscribeWithExpiredResumeTokenResetsAndSnapshots() {
-    // Use a token with a seq HIGHER than the channel's current — simulates a token from a
-    // previous server lifetime. Per Fix B, this returns false from attemptResume so the
-    // controller emits reset + snapshot.
-    String expiredToken =
-        io.justsearch.app.observability.stream.ResumeTokenCodec.encode(
-            HealthEventChangeRegistry.STREAM_ID, 999L);
+    // A token issued by a distinct source incarnation must be rejected as a restart cursor.
+    SseStreamChannel previousSource =
+        new SseStreamChannel(HealthEventChangeRegistry.STREAM_ID);
+    previousSource.publish(io.justsearch.app.api.stream.SseFrameKind.UPDATE, Map.of("previous", true));
+    String expiredToken = previousSource.framesSince(0).getFirst().resumeToken();
     SseClient client = mockSseClientWithToken(expiredToken);
     List<String> sent = new ArrayList<>();
     doAnswer(

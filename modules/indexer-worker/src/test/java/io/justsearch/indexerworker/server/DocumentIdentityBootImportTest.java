@@ -4,23 +4,22 @@ package io.justsearch.indexerworker.server;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
+import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.services.WorkerServiceException;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
-import io.justsearch.ipc.IngestServiceGrpc;
 import io.justsearch.ipc.PathMapping;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
 import io.justsearch.ipc.SearchResult;
-import io.justsearch.ipc.SearchServiceGrpc;
 import io.justsearch.ipc.UpdatePathsRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,14 +40,9 @@ import org.junit.jupiter.api.io.TempDir;
 final class DocumentIdentityBootImportTest {
 
   private KnowledgeServer server;
-  private ManagedChannel channel;
 
   @AfterEach
   void tearDown() {
-    if (channel != null) {
-      channel.shutdownNow();
-      channel = null;
-    }
     if (server != null) {
       try {
         server.close();
@@ -66,7 +60,7 @@ final class DocumentIdentityBootImportTest {
     WorkerBootFixture.seed(layout.activePath(), null, 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "FAIL_CLOSED");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     try (SqliteDocumentIdentityStore probe =
@@ -92,7 +86,7 @@ final class DocumentIdentityBootImportTest {
     String generationId =
         layout.genManager().readStateBestEffort().active_generation();
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     server.close();
     server = null;
@@ -104,7 +98,7 @@ final class DocumentIdentityBootImportTest {
     WorkerBootFixture.seedDocument(
         layout.activePath(), null, "after-import.txt", "after-import-uid", "added post-import");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     assertEquals(List.of(3L, 3L, 0L), importRow(dbPath, generationId));
@@ -153,7 +147,7 @@ final class DocumentIdentityBootImportTest {
     }
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "FAIL_CLOSED");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     try (SqliteDocumentIdentityStore probe = new SqliteDocumentIdentityStore(dbPath)) {
@@ -168,7 +162,7 @@ final class DocumentIdentityBootImportTest {
 
   @Test
   @DisplayName("Blue identity is imported before a paused migration reindexes into Green")
-  // channel/server = null between the mid-test close() and the later reassignment guard
+  // server = null between the mid-test close() and the later reassignment guards
   // tearDown() against acting on an already-torn-down handle if a later step throws.
   @SuppressWarnings("PMD.UnusedAssignment")
   void blueUidIsImportedBeforePausedMigrationReindexesIntoGreen(@TempDir Path tempDir)
@@ -183,18 +177,13 @@ final class DocumentIdentityBootImportTest {
 
     WorkerBootFixture.seedDocument(
         layout.activePath(), null, docId, blueUid, "old Blue content");
-    var migration = layout.genManager().startMigration("identity_continuity_test");
-    Path greenPath =
-        layout.genManager().resolveGenerationPathStrict(migration.building_generation());
-    WorkerBootFixture.seedDocument(greenPath, null, docId, wrongGreenUid, "stale Green content");
-    layout.genManager().setMigrationPaused(true, "identity continuity assertion");
     Files.writeString(
         layout.dataDir().resolve("watched_roots.json"),
         new tools.jackson.databind.ObjectMapper().writeValueAsString(List.of(root.toString())));
     WorkerBootFixture.publishConfig(
-        layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
+        layout.dataDir(), layout.indexBase(), "FAIL_CLOSED");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     server.releaseModelReadyLatchForTests();
 
@@ -205,30 +194,19 @@ final class DocumentIdentityBootImportTest {
           probe.lookup(DocumentIdentityStore.pathHash(docId)).orElseThrow().docUid(),
           "the serving Blue index must seed identity authority before enumeration starts");
     }
-    assertEquals(
-        wrongGreenUid,
-        server
-            .lifecycleManagerForTests()
-            .documentFieldOps()
-            .getDocumentField(docId, SchemaFields.DOC_UID),
-        "the pause must hold Green at its adverse pre-reindex identity");
-
     Path renamed = root.resolve("continuity-renamed.txt");
     Files.move(source, renamed);
     String renamedDocId = PathNormalizer.normalizeKey(renamed);
-    channel =
-        ManagedChannelBuilder.forAddress("127.0.0.1", server.getPort()).usePlaintext().build();
-    var renamedResponse =
-        IngestServiceGrpc.newBlockingStub(channel)
-            .withDeadlineAfter(30, TimeUnit.SECONDS)
-            .updateDocumentPaths(
-                UpdatePathsRequest.newBuilder()
-                    .addMappings(
-                        PathMapping.newBuilder()
-                            .setOldPath(docId)
-                            .setNewPath(renamedDocId)
-                            .build())
-                    .build());
+    var renameRequest = UpdatePathsRequest.newBuilder().addMappings(
+        PathMapping.newBuilder().setOldPath(docId).setNewPath(renamedDocId).build()).build();
+    io.justsearch.ipc.UpdatePathsResponse renamedResponse = null;
+    long renameDeadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
+    while (System.nanoTime() < renameDeadline) {
+      renamedResponse = server.appServices().ingestService()
+          .updateDocumentPaths(renameRequest, CallContext.none());
+      if (renamedResponse.getUpdatedCount() == 1) break;
+      Thread.sleep(100L);
+    }
     assertEquals(1, renamedResponse.getUpdatedCount());
     assertTrue(renamedResponse.getFailedPathsList().isEmpty());
     try (SqliteDocumentIdentityStore probe =
@@ -240,17 +218,49 @@ final class DocumentIdentityBootImportTest {
               .lookup(DocumentIdentityStore.pathHash(renamedDocId))
               .orElseThrow()
               .docUid(),
-          "the production gRPC service must be wired to the durable identity store");
+          "the production ingest service must be wired to the durable identity store");
     }
-    assertEquals(
-        wrongGreenUid,
-        server
-            .lifecycleManagerForTests()
-            .documentFieldOps()
+    assertEquals(blueUid,
+        server.lifecycleManagerForTests().documentFieldOps()
             .getDocumentField(renamedDocId, SchemaFields.DOC_UID),
-        "the supported rename moves Green's adverse row without rewriting its uid");
+        "the production rename retains the serving document identity");
+    server.close();
+    server = null;
 
-    server.indexGenerationManagerForTests().setMigrationPaused(false, null);
+    var migration = layout.genManager().startMigration("identity_continuity_test");
+    Path greenPath =
+        layout.genManager().resolveGenerationPathStrict(migration.building_generation());
+    WorkerBootFixture.seedDocument(
+        greenPath, null, renamedDocId, wrongGreenUid, "stale Green content");
+    assertEquals(wrongGreenUid,
+        WorkerBootFixture.readDocumentField(greenPath, renamedDocId, SchemaFields.DOC_UID),
+        "the seeded Green identity must disagree before production reindexing");
+    WorkerBootFixture.publishConfig(
+        layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
+
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
+    var barrier = new MigrationTransitionBarrier.Controlled("migration-before-pointer-commit");
+    server.installMigrationBarrierForTests(barrier);
+    server.start();
+    server.releaseModelReadyLatchForTests();
+    try {
+    Path refusedRename = root.resolve("refused-during-migration.txt");
+    assertThrows(WorkerServiceException.class, () -> server.appServices().ingestService()
+        .updateDocumentPaths(UpdatePathsRequest.newBuilder().addMappings(
+            PathMapping.newBuilder().setOldPath(renamedDocId)
+                .setNewPath(PathNormalizer.normalizeKey(refusedRename)).build()).build(),
+            CallContext.none()));
+    try (SqliteDocumentIdentityStore probe =
+        new SqliteDocumentIdentityStore(layout.dataDir().resolve("jobs.db"))) {
+      assertEquals(blueUid,
+          probe.lookup(DocumentIdentityStore.pathHash(renamedDocId)).orElseThrow().docUid(),
+          "refused migration rename must not rekey durable identity");
+      assertTrue(probe.lookup(DocumentIdentityStore.pathHash(
+          PathNormalizer.normalizeKey(refusedRename))).isEmpty());
+    }
+
+    assertTrue(barrier.awaitReached(60, TimeUnit.SECONDS),
+        "production cutover must reach the exact pre-pointer transition");
     awaitGreenUid(renamedDocId, blueUid, Duration.ofSeconds(15));
 
     // The chunks are written in a pass AFTER the parent (ChunkDocumentWriter
@@ -274,31 +284,38 @@ final class DocumentIdentityBootImportTest {
     // (SearchResponseBuilder.java:653-656 for a chunk hit's parent metadata, the stored-field
     // projection for a whole-document hit), which KnowledgeSearchController.withFeedbackUid adds to
     // the projection on every Head search. A uid that survives the migration in the index but not
-    // on the wire orphans every label just the same.
+    // in the served response orphans every label just the same.
     //
-    // Green is not the SERVING generation while the migration is in flight — searchLifecycle is
-    // Blue by construction — so the search has to happen after the cutover. The production cutover
-    // ends in a Worker restart (KnowledgeServerMigrationOps promotes, then calls
-    // initiateShutdownAction), so this reproduces exactly that sequence: commit Green, close, promote,
-    // boot again. Searching the in-flight server instead would have queried BLUE and passed on
-    // Blue's own uid, proving nothing about the rebuild.
-    server.lifecycleManagerForTests().commitOps().commitAndTrack();
-    channel.shutdownNow();
-    // channel/server = null: if promoteBuildingGenerationToActive() below throws before the
-    // reassignments further down, tearDown() reads these fields and must not act on the
-    // already-shut-down channel / already-closed server.
-    channel = null;
+    // Green is not serving while the migration is in flight. Close after committing Green,
+    // promote its pointer while no Worker can publish a successor runtime, then boot again.
+    // This is the native pointer-before-publication crash cut: boot must serve Green and finish
+    // predecessor retirement. Searching the in-flight server would have queried Blue instead.
+    for (int observation = 0; observation < 3; observation++) {
+      assertEquals(migration.active_generation(),
+          new tools.jackson.databind.ObjectMapper()
+              .readTree(Files.readString(layout.indexBase().resolve("state.json")))
+              .path("active_generation").asText(),
+          "the active pointer must remain Blue while the monitor is held before commit");
+      Thread.sleep(1_000L);
+    }
+    } finally {
+      barrier.cancel();
+    }
+    assertTrue(server.awaitMigrationCutoverExitForTests(30, TimeUnit.SECONDS),
+        "cancelled cutover must release its serving view before this crash cut closes the Worker");
     server.close();
+    // server = null: if promoteBuildingGenerationToActive() below throws before the reassignment
+    // further down, tearDown() reads this field and must not act on the already-closed server.
     server = null;
 
     IndexGenerationManager postMigration = new IndexGenerationManager(layout.indexBase());
-    postMigration.promoteBuildingGenerationToActive();
+    var pointerCommitted = postMigration.promoteBuildingGenerationToActive();
+    assertEquals(migration.active_generation(), pointerCommitted.previous_generation(),
+        "the crash cut must retain Blue until the successor boot settles replay");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     server.releaseModelReadyLatchForTests();
-    channel =
-        ManagedChannelBuilder.forAddress("127.0.0.1", server.getPort()).usePlaintext().build();
 
     SearchRequest asHeadSendsIt =
         SearchRequest.newBuilder()
@@ -313,7 +330,7 @@ final class DocumentIdentityBootImportTest {
             .build();
     // A fresh boot over an index that already has segments opens DEFERRED: read-only first, with
     // the writer and the analyzers arriving on the background upgrade. So both "not ready yet"
-    // shapes are polled through — the RPC failing outright, and the RPC answering empty — rather
+    // shapes are polled through — the call failing outright, and the call answering empty — rather
     // than being read as the answer.
     List<SearchResult> uidBearingHits = List.of();
     long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
@@ -321,16 +338,14 @@ final class DocumentIdentityBootImportTest {
     while (System.nanoTime() < deadline && uidBearingHits.isEmpty()) {
       try {
         SearchResponse searchResponse =
-            SearchServiceGrpc.newBlockingStub(channel)
-                .withDeadlineAfter(30, TimeUnit.SECONDS)
-                .search(asHeadSendsIt);
+            server.appServices().searchService().search(asHeadSendsIt, CallContext.none());
         lastOutcome = searchResponse;
         uidBearingHits =
             searchResponse.getResultsList().stream()
                 .filter(hit -> hit.getFieldsMap().containsKey(SchemaFields.DOC_UID))
                 .toList();
-      } catch (io.grpc.StatusRuntimeException notReadyYet) {
-        lastOutcome = notReadyYet.getStatus();
+      } catch (WorkerServiceException notReadyYet) {
+        lastOutcome = notReadyYet.status() + ": " + notReadyYet.getMessage();
       }
       if (uidBearingHits.isEmpty()) {
         Thread.sleep(200L);
@@ -338,8 +353,8 @@ final class DocumentIdentityBootImportTest {
     }
     assertFalse(
         uidBearingHits.isEmpty(),
-        "the promoted Green must serve the document over the wire AND carry the feedback key;"
-            + " last outcome="
+        "the promoted Green must serve the document through the search service AND carry the"
+            + " feedback key; last outcome="
             + lastOutcome);
     for (SearchResult hit : uidBearingHits) {
       assertEquals(
@@ -354,9 +369,22 @@ final class DocumentIdentityBootImportTest {
       assertNotNull(revision, "the promoted generation must serve the content revision too");
       assertTrue(
           revision.matches("[0-9a-f]{64}"),
-          "the wire revision must be lowercase SHA-256 hex, not a truncated or upper-cased form:"
+          "the served revision must be lowercase SHA-256 hex, not a truncated or upper-cased form:"
               + " " + revision);
     }
+    long retirementDeadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+    boolean retired = false;
+    while (System.nanoTime() < retirementDeadline) {
+      var state = new IndexGenerationManager(layout.indexBase()).readStateBestEffort();
+      if ((state.previous_generation() == null || state.previous_generation().isBlank())
+          && !Files.exists(layout.activePath())) {
+        retired = true;
+        break;
+      }
+      Thread.sleep(200L);
+    }
+    assertTrue(retired,
+        "native boot must delete Blue and clear its pointer after the committed successor serves");
   }
 
   /** Chunk hits of {@code parentDocId} once at least {@code minimum} are visible, else fails. */
@@ -422,7 +450,7 @@ final class DocumentIdentityBootImportTest {
 
     WorkerBootFixture.seedDocument(layout.activePath(), null, docId, blueUid, "Blue authority");
     layout.genManager().startMigration("pending_boot_identity_test");
-    layout.genManager().setMigrationPaused(true, "exclude migration enumeration from assertion");
+    Files.writeString(layout.dataDir().resolve("watched_roots.json"), "[]");
     try (SqliteJobQueue queue =
         new SqliteJobQueue(layout.dataDir().resolve("jobs.db"))) {
       queue.open();
@@ -430,15 +458,21 @@ final class DocumentIdentityBootImportTest {
     }
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
+    var barrier = new MigrationTransitionBarrier.Controlled("migration-before-pointer-commit");
+    server.installMigrationBarrierForTests(barrier);
     server.start();
 
-    awaitGreenUid(docId, blueUid, Duration.ofSeconds(15));
-    try (SqliteDocumentIdentityStore probe =
-        new SqliteDocumentIdentityStore(layout.dataDir().resolve("jobs.db"))) {
-      assertEquals(
-          blueUid,
-          probe.lookup(DocumentIdentityStore.pathHash(docId)).orElseThrow().docUid());
+    try {
+      awaitGreenUid(docId, blueUid, Duration.ofSeconds(15));
+      try (SqliteDocumentIdentityStore probe =
+          new SqliteDocumentIdentityStore(layout.dataDir().resolve("jobs.db"))) {
+        assertEquals(
+            blueUid,
+            probe.lookup(DocumentIdentityStore.pathHash(docId)).orElseThrow().docUid());
+      }
+    } finally {
+      barrier.cancel();
     }
   }
 

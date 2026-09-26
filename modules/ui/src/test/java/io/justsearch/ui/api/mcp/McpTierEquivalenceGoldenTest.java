@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -88,7 +90,7 @@ final class McpTierEquivalenceGoldenTest {
   private static Map<String, Object> invokeSearch(
       KnowledgeSearchResponse canned, Map<String, Object> args) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(canned);
+    McpSearchSessionFixture.stub(adapter, canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -98,15 +100,16 @@ final class McpTierEquivalenceGoldenTest {
             () -> ctrl,
             () -> null,
             FIXED_CLOCK);
-    return surface.callTool("justsearch_search", args, "s1");
+    return surface.callTool("justsearch_search", args, "s1", TestRequestContexts.mcp("s1"));
   }
 
   private static Map<String, Object> invokeAnswer(ContextResult canned, Map<String, Object> args) {
     DocumentService documents = mock(DocumentService.class);
-    when(documents.retrieveContext(any())).thenReturn(CompletableFuture.completedFuture(canned));
+    when(documents.retrieveContext(any(), any(EngineContext.class))).thenReturn(CompletableFuture.completedFuture(canned));
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
+    McpAnswerCaptureFixture.bind(facade, documents);
     McpToolSurface surface =
         new McpToolSurface(
             List.of(OperationCatalog.of("core", List.of())),
@@ -114,7 +117,7 @@ final class McpTierEquivalenceGoldenTest {
             () -> null,
             () -> facade,
             FIXED_CLOCK);
-    return surface.callTool("justsearch_answer", args, "s1");
+    return surface.callTool("justsearch_answer", args, "s1", TestRequestContexts.mcp("s1"));
   }
 
   @Test

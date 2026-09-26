@@ -1,0 +1,587 @@
+{
+  "base": "73b100dec8060b792366f337d9a29cd5cc3b0605",
+  "runs": {
+    "full1180": {
+      "revision": "Source identical to 73b100dec; launched on fa2c2e560 plus committed watchdog test",
+      "command": "./gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 10342,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 35,
+        "suites": 1670
+      },
+      "tasks": [
+        {
+          "module": "adapters-lucene",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 724,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 102
+        },
+        {
+          "module": "ai-backend",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 62,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        },
+        {
+          "module": "api-contract-projection-java",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 685,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 51
+        },
+        {
+          "module": "app-agent-api",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 243,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 42
+        },
+        {
+          "module": "app-api",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 204,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 42
+        },
+        {
+          "module": "app-config",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-engine",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 234,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 48
+        },
+        {
+          "module": "app-inference",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 320,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 30
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 87,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 23
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 492,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 77
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2709,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3,
+          "suites": 415
+        },
+        {
+          "module": "app-services",
+          "task": "integrationTest",
+          "status": "EXECUTED",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "app-util",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "benchmarks",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 104,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        },
+        {
+          "module": "configuration",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 267,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 32
+        },
+        {
+          "module": "core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 102,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 17
+        },
+        {
+          "module": "core-contracts",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "dead-code-audit",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "extension-substrate",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "gpu-bridge",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 77,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 482,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 82
+        },
+        {
+          "module": "indexing",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 84,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 19
+        },
+        {
+          "module": "indexing",
+          "task": "integrationTest",
+          "status": "UP-TO-DATE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "infra-core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "ipc-common",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "ort-common",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 170,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 35
+        },
+        {
+          "module": "prompt-support",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "reranker",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 68,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 7
+        },
+        {
+          "module": "reranker",
+          "task": "integrationTest",
+          "status": "UP-TO-DATE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 9,
+          "suites": 2
+        },
+        {
+          "module": "ssot-tools",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "system-tests",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 96,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 29
+        },
+        {
+          "module": "telemetry",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 94,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 26
+        },
+        {
+          "module": "test-support",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1187,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 181
+        },
+        {
+          "module": "ui",
+          "task": "integrationTest",
+          "status": "EXECUTED",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 4
+        },
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1347,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        }
+      ]
+    },
+    "factory1182": {
+      "revision": "73b100dec plus consolidated journal factory",
+      "command": "./gradlew.bat :modules:app-observability:spotlessApply :modules:app-observability:test --tests '*ActionEventJournalDurabilityTest' --tests '*ActionEventJournalTest' --tests '*ActionEventJournalRetryTest' --tests '*ActionLedgerChangeRegistryTest' :modules:app-launcher:test --tests '*UnreferencedCodeTest' --tests '*OperationStoreArchitectureTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 64,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 21
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 16
+        }
+      ]
+    }
+  },
+  "sourceFiles": [
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionEventJournal.java",
+      "bytes": 15354,
+      "sha256": "8573ee13c65112fa809f0e020f2baf5d582279be85a9641b9d1a7d232f9b6c37"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-4-full1180.txt",
+      "bytes": 100396,
+      "sha256": "37b4b5c0fdedfa116b55f2ec90cc195205427b7f36957dab667084abe9da5b3c"
+    },
+    {
+      "path": "tmp/c2-4-full1180-counts.json",
+      "bytes": 7761,
+      "sha256": "26836ca4d1c8eaf1e9ab7852087f4b90032fbceac03061e02ddf470945ba84c3"
+    },
+    {
+      "path": "tmp/c2-4-full1180-xml.zip",
+      "bytes": 9687268,
+      "sha256": "aefdd5c406b475ef71a5cb4ed4843d4baac5c8589909b2929ae48024f8e17d05"
+    },
+    {
+      "path": "tmp/c2-4-hosted1180.json",
+      "bytes": 713,
+      "sha256": "ad992dbb8ba584b706034181086da88e354090524e8077f73a86dc2736c607a2"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182.txt",
+      "bytes": 45378,
+      "sha256": "45c5803da73439c1b59415a6fd211400210515709fadbccf7a8b17164cbe05d9"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-counts.json",
+      "bytes": 1114,
+      "sha256": "5efd93fd122fd49d0b9e156c0094e0fc629ff4405f8285c7b2b2453c83223cad"
+    },
+    {
+      "path": "tmp/c2-4-watchdog-typecheck1181.txt",
+      "bytes": 63,
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "ac367bfa801d2abde137400b1939e0931a3f87b50aae57961c5bc8b593adca3d"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalDurabilityTest.xml",
+      "bytes": 43054,
+      "sha256": "07d8d930ce0ac56d40f394a297f10c2bbbdfb81cf55af807f4a44ecdc17d74ed"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalRetryTest.xml",
+      "bytes": 47677,
+      "sha256": "3af079a6124260003c3b2c6febdacff7280437e6ba8c36d8a8af58f50e88eef7"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalTest.xml",
+      "bytes": 14898,
+      "sha256": "327dd55496e22efcbe0985e06548e5960e4001ccf6ac27a904e4c6702e937956"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionLedgerChangeRegistryTest.xml",
+      "bytes": 1504,
+      "sha256": "befe665a2cf61c83984b11376d8cfde115f34c4f6ca4f98ad54248b8f88725b1"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.AttributesUseRuleTest.xml",
+      "bytes": 479,
+      "sha256": "a9c20ae48d2b513e7e11bc2c74573910d9841637999d9d26e43b68ab7b8d437b"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.BoundaryRulesTest.xml",
+      "bytes": 481,
+      "sha256": "05ef56766ee57bfbb755152478d1851502919d1b74a565f3c02af2cbdb69fcb3"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ClosurePropertyTest.xml",
+      "bytes": 467,
+      "sha256": "1f68816a9c4ecf362a31ec1536f76c52d2ecda1baee1a53f81cca6450d1b1437"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.EnvRegistryDirectReadTest.xml",
+      "bytes": 492,
+      "sha256": "b6f00363a2a5a2e6b0116c62b7524fc56dfb259b140cdfb3bfee978fb8caa6b1"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExecutorArchitectureTest.xml",
+      "bytes": 483,
+      "sha256": "588ba2f2bc70c35e012d90860cc82cc9872047b2d79be79ea96d6fd18fd22825"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExtractionParserConfinementTest.xml",
+      "bytes": 506,
+      "sha256": "6bfff992501760a87f3f9ec8c5d3a7a001098e29af193640c675df60de584074"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.GpuProbeAccessTest.xml",
+      "bytes": 576,
+      "sha256": "1c0651dab9bac6354a4863fcbde6705f6de06173212f8c05444429e42e414bb3"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.IndexWriterOwnershipTest.xml",
+      "bytes": 620,
+      "sha256": "f3d5bb6fe6ae855b4f02116321ef5574b11374834d09fad8a9d3d106b7f1feb3"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LayeringEnforcementTest.xml",
+      "bytes": 2260,
+      "sha256": "0f0273cb61f482c5c7f3fed1a1f510ae47691ca368d24657c3ab125588a31c87"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LibraryResolveHashOnlyCallerPin.xml",
+      "bytes": 656,
+      "sha256": "199ca994aed10b270e8eb301369ba33de37a3a9c85fe2aa586d7978c72790127"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OperationStoreArchitectureTest.xml",
+      "bytes": 1041,
+      "sha256": "171a21bf40ab0afa5b2d30dd05c1031dddd2c4ed8db066fd16b055ee747c92bf"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OrtRunChokePointTest.xml",
+      "bytes": 489,
+      "sha256": "308cb529834f55f0041f0f1755dd90b2f907b0bfc375eca92ff39da3ebfb197c"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.Slf4jOnlyRuleTest.xml",
+      "bytes": 473,
+      "sha256": "3ec7393bcbe3005a46853a49e8488324003c9ab92b60325890be93473774df01"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.UnreferencedCodeTest.xml",
+      "bytes": 742,
+      "sha256": "506dbee7e29dc08486758f4c3a844a988747b1b45deb10d141d51018974c8755"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.VramDetectorAccessTest.xml",
+      "bytes": 480,
+      "sha256": "1ef3dbf5d597e7ae36cad6bb0189674d652be8dfe5401f0d203c7f768f32c2f2"
+    },
+    {
+      "path": "tmp/c2-4-journal-factory1182-xml/app-launcher/test/TEST-io.justsearch.app.launcher.WireShapeMandateTest.xml",
+      "bytes": 488,
+      "sha256": "3d57e6a111c5c5809ce514b96690c813448ccaad2e58d22f86f7fff039d81166"
+    }
+  ],
+  "rawRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A",
+  "retention": "Lane acceptance plus 30 days; export before worktree release",
+  "limits": [
+    "Full1180 FAILED one unused factory rule; focused1182 is not a new full success.",
+    "Full1180 source matched73b100dec;1182 uses that base plus the sourceFiles overlay committed with this evidence.",
+    "Installed-v5 and hosted verification remain required."
+  ]
+}

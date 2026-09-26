@@ -215,8 +215,8 @@ Sections in render order:
 1. **Recommended next step** — A breadcrumb: "1) Install models → 2) Start inference → 3) Apply settings"
 
 2. **Compatibility warnings** (3 cards):
-   - `EmbeddingCompatibilityCard` — warns when the embedding model fingerprint has changed since indexing. Shows "BLOCKED_LEGACY" or "BLOCKED_MISMATCH" states with a force-reindex button.
-   - `SchemaCompatibilityCard` — warns when the index schema format is incompatible. Similar blocking states with force-reindex.
+   - `EmbeddingCompatibilityCard` — warns when the embedding model fingerprint has changed since indexing. Shows "BLOCKED_LEGACY" or "BLOCKED_MISMATCH" states with the catalog full-index rebuild action (`core.rebuild-index`).
+   - `SchemaCompatibilityCard` — warns when the index schema format is incompatible. The Brain compatibility panel uses the same full-index rebuild action for blocking schema states.
    - `ChunkVectorStatusCard` — shows semantic search readiness: chunk doc count, vector coverage %, pending/failed embedding counts.
 
    **Search Quality Features** (`SearchQualityFeaturesSection`): An extracted component that shows the active/inactive status of search quality subsystems (e.g., reranking, citation scoring). The component corrects ONNX feature status using system store data before rendering — it reads `rerankerOrtCuda` and `rerankerModelPath` from `/api/status` (ground truth reflecting the Worker's actual ORT session state) rather than relying solely on ONNX model discovery (which reflects static file presence and can report "Inactive" when the model is actually executing via env-var configuration). Displays status like "1/2 active" with per-feature detail (e.g., "Search reranking: Active" + correct model path).
@@ -247,7 +247,7 @@ Sections in render order:
 
 7. **AI Home** _(Tauri only)_ — File system paths:
    - Home directory path with "Open folder" button
-   - Reveal buttons: logs dir, llama-server.log, headless-backend.log
+   - Reveal buttons: logs dir, llama-server.log, engine.log
    - Export diagnostics button
 
 8. **Runtime** — Inference mode control:
@@ -345,13 +345,27 @@ shared `jf-health-event` activity-row renderer. Each row preserves its producer'
 severity and uses the existing status-tone mapping. An empty list says "No events
 yet."; it does not imply that every subsystem is healthy.
 
-### Quick actions
+### Recovery recommendations and quick actions
 
-- **Open Library** — switches to library view via `setActiveView('library')`
-- **Reindex now** (force) — triggers full reindex, teal styling
-- **Restart worker** — requires `ConfirmDialog` (warning variant): "This will stop the knowledge server process and restart it. Any in-progress indexing will be interrupted."
-- All actions disabled in demo mode, with italic note: "Actions unavailable in demo mode."
-- Action errors display in a red banner below the buttons.
+Recovery recommendations preserve the operation and default arguments declared on each condition.
+REST and SSE snapshots use the same inverse-index projection; conditions sharing an operation can
+still carry different arguments. The first stream snapshot/update takes precedence over a late
+initial REST response; reconnect starts fresh and old connection responses are ignored. Malformed or missing argument objects produce no actionable
+recommendation. The catalog operation control supplies its audience, availability and confirmation
+behavior, with the condition label beside it. A trusted plugin override replaces the invocation;
+the target-only overlay contract supplies empty arguments, never the overridden core arguments.
+
+For `schema.reindex-required`, embedding mismatch, legacy embedding provenance and an exhausted
+rebuild brake select `core.rebuild-index` with empty arguments. Other schema reasons retain the
+existing `core.reindex` action with `force=true`. A selected forced reindex bypasses unchanged-file
+extraction checks; it cannot certify whole-index embedding provenance. Full rebuild uses its
+catalog inline confirmation before invocation.
+
+The separate quick-action section also uses catalog operation controls for incremental reindex,
+Engine restart, full rebuild, failed-job cleanup and diagnostics export. Incremental reindex uses
+its ordinary defaults; the full rebuild is a separate action. Success refreshes Health-specific
+state; operation controls show pending state, and failed recommendations display the Health error alert. A successful retry clears that alert. These are live controls;
+there is no demo-mode action branch.
 
 ### Polling
 

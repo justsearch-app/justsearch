@@ -15,7 +15,7 @@ import java.util.Objects;
  *       process-backed phase is active; empty otherwise.
  *   <li>{@code port}: llama-server port when a process-backed phase is active; 0 otherwise.
  *   <li>{@code loadedAtEpochMs}: wall-clock at construction. Useful for cross-process drift
- *       detection when an external operator hits {@code /api/admin/inference/reload}.
+ *       detection when an external operator refreshes the runtime through reconfigure.
  * </ul>
  *
  * <p>Use {@link #nonProcess(long)} for {@code OFFLINE} / {@code INDEXING} phases (no

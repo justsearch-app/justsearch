@@ -173,14 +173,8 @@ public enum EnvRegistry {
 
 
 
-    /** Summary pipeline identifier. */
-    SUMMARY_PIPELINE("justsearch.summary.pipeline", "JUSTSEARCH_SUMMARY_PIPELINE", LifecycleStage.PERMANENT),
-
     /** Summary max estimated tokens before rejection. */
     SUMMARY_MAX_TOKENS("justsearch.summary.max_tokens", "JUSTSEARCH_SUMMARY_MAX_TOKENS", LifecycleStage.PERMANENT),
-
-    /** Embedding dimension override for worker/runtime compatibility. */
-    EMBED_DIMENSION_OVERRIDE("justsearch.embed.dimension", "JUSTSEARCH_EMBED_DIM", LifecycleStage.PERMANENT),
 
     /** Embedding backend to use: "auto" (default) or "onnx". "llama" was removed in March 2026. */
     EMBED_BACKEND("justsearch.embed.backend", "JUSTSEARCH_EMBED_BACKEND", LifecycleStage.PERMANENT),
@@ -261,12 +255,6 @@ public enum EnvRegistry {
     RERANK_CHUNKS_GPU_DEVICE_ID(
         "justsearch.rerank.chunks.gpu.device_id", "JUSTSEARCH_RERANK_CHUNKS_GPU_DEVICE_ID", "0", LifecycleStage.PERMANENT),
 
-    /** Search pipeline profile. */
-    SEARCH_PROFILE("justsearch.search.pipeline.profile", "JUSTSEARCH_SEARCH_PROFILE", LifecycleStage.PERMANENT),
-
-    /** Primary index collection override (legacy escape hatch; prefer YAML). */
-    INDEX_COLLECTION("justsearch.index.collection", "JUSTSEARCH_INDEX_COLLECTION", LifecycleStage.DEPRECATED),
-
     /** Index parity guard escape hatch (allow opening read-only on mismatch). */
     INDEX_PARITY_ALLOW_MISMATCH(
         "justsearch.index.parity.allow_mismatch", "JUSTSEARCH_INDEX_PARITY_ALLOW_MISMATCH", LifecycleStage.PERMANENT),
@@ -334,6 +322,12 @@ public enum EnvRegistry {
     /** Master GPU switch for ONNX models (auto-set when CUDA detected). Per-model overrides win. */
     GPU_ENABLED("justsearch.gpu.enabled", "JUSTSEARCH_GPU_ENABLED", LifecycleStage.PERMANENT),
 
+    /** Optional startup cap for reported GPU device memory, in MB; absent means no cap. */
+    GPU_DEVICE_MEMORY_CEILING_MB(
+        "justsearch.gpu.device_memory_ceiling_mb",
+        "JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB",
+        LifecycleStage.PERMANENT),
+
     /** GPU acceleration policy gate (true = allow GPU, false = CPU-only). */
     POLICY_GPU_ACCELERATION_ENABLED(
         "policy.gpu_acceleration_enabled",
@@ -374,9 +368,6 @@ public enum EnvRegistry {
 
     /** ORT VERBOSE-level session logging toggle (diagnostic, tempdoc 397 §14.24 FB). */
     ORT_VERBOSE_LOGGING("justsearch.ort.verbose", "JUSTSEARCH_ORT_VERBOSE", LifecycleStage.PERMANENT),
-
-    /** Search pipeline definition file path (full path override). */
-    SEARCH_PIPELINE("justsearch.search.pipeline", "JUSTSEARCH_SEARCH_PIPELINE", LifecycleStage.PERMANENT),
 
     /** 306: enable/disable query classification for A/B eval (default: true via builder). */
     SEARCH_QUERY_CLASSIFICATION_ENABLED(
@@ -474,9 +465,6 @@ public enum EnvRegistry {
 
     /** UI settings persistence mode (read-only, in-memory, etc.). */
     UI_SETTINGS_MODE("justsearch.ui.settings.mode", "JUSTSEARCH_UI_SETTINGS_MODE", LifecycleStage.PERMANENT),
-
-    /** Source of server executable selection (environment_variable / operator / etc.). */
-    SERVER_EXE_SOURCE("justsearch.server.exe.source", "JUSTSEARCH_SERVER_EXE_SOURCE", LifecycleStage.PERMANENT),
 
     /** LambdaMART reranker enabled flag (default: true when model file exists). */
     LAMBDAMART_ENABLED("justsearch.lambdamart.enabled", "JUSTSEARCH_LAMBDAMART_ENABLED", LifecycleStage.PERMANENT),
@@ -911,34 +899,6 @@ public enum EnvRegistry {
     GPL_REEVAL_SIZE_FACTOR(
         "justsearch.gpl.reeval_size_factor", "JUSTSEARCH_GPL_REEVAL_SIZE_FACTOR", LifecycleStage.PERMANENT),
 
-    // ==================== Worker Indexer Connection (tempdoc 314 C1) ====================
-
-    /** Whether the indexer worker gRPC client is enabled. */
-    INDEXER_ENABLED("workers.indexer.enabled", "JUSTSEARCH_INDEXER_ENABLED", LifecycleStage.PERMANENT),
-
-    /** Indexer worker client host (gRPC connection from Head). */
-    INDEXER_HOST("justsearch.indexer.host", "JUSTSEARCH_INDEXER_HOST", LifecycleStage.PERMANENT),
-
-    /** Indexer worker client port (gRPC connection from Head). */
-    INDEXER_PORT("justsearch.indexer.port", "JUSTSEARCH_INDEXER_PORT", LifecycleStage.PERMANENT),
-
-    /** Indexer worker client deadline (ms). */
-    INDEXER_DEADLINE_MS("justsearch.indexer.deadlineMs", "JUSTSEARCH_INDEXER_DEADLINE_MS", LifecycleStage.PERMANENT),
-
-    /** Indexer worker ingest queue size. */
-    INDEXER_QUEUE_SIZE("justsearch.indexer.queueSize", "JUSTSEARCH_INDEXER_QUEUE_SIZE", LifecycleStage.PERMANENT),
-
-    /** Indexer worker max in-flight bytes. */
-    INDEXER_MAX_INFLIGHT_BYTES(
-        "justsearch.indexer.maxInFlightBytes", "JUSTSEARCH_INDEXER_MAX_INFLIGHT_BYTES", LifecycleStage.PERMANENT),
-
-    // ==================== Infra Health (tempdoc 314 Phase F) ====================
-
-    /** Infra health gRPC server host. */
-    INFRA_HEALTH_HOST("justsearch.infra.health.host", "JUSTSEARCH_INFRA_HEALTH_HOST", LifecycleStage.PERMANENT),
-    /** Infra health gRPC server port. */
-    INFRA_HEALTH_PORT("justsearch.infra.health.port", "JUSTSEARCH_INFRA_HEALTH_PORT", LifecycleStage.PERMANENT),
-
     // ==================== Indexing Tracing (tempdoc 312 Phase 0) ====================
 
     /** Indexing pipeline tracing level: none (default), sample (1%), detailed (100%). */
@@ -956,15 +916,30 @@ public enum EnvRegistry {
 
     // ==================== Dev Hot-Reload (tempdoc 305 Phase 2) ====================
 
-    /** Enables dev hot-reload service restart on recompile (default false). */
+    /**
+     * Enables dev hot-reload service restart on recompile (default false).
+     *
+     * <p><b>Kept, where its two siblings below were deleted.</b> The review pass asked whether this
+     * row survived stage A for a reason or by omission — it is the former, and the difference is
+     * where the key is read. This one is resolved into {@code ResolvedConfig} by
+     * {@code ResolvedConfigBuilder:1036} and gated in the Engine's own JVM at
+     * {@code KnowledgeServer.java:990}, which constructs {@code DevReloadManager} (referenced by
+     * name, not {@code @link}: it is package-private in {@code indexer-worker}, a module this one
+     * does not and must not depend on). That reader is
+     * in-process and was never part of the Worker child, so deleting the Worker child did not touch
+     * it. {@code DEV_HOTRELOAD_CLASSES_DIR} and {@code DEV_DEBUG_PORT} had no such reader.
+     */
     DEV_HOTRELOAD("justsearch.dev.hotreload", "JUSTSEARCH_DEV_HOTRELOAD", LifecycleStage.PERMANENT),
 
-    /** Path to worker-services classes directory (dev only). */
-    DEV_HOTRELOAD_CLASSES_DIR(
-        "justsearch.dev.hotreload.classesDir", "JUSTSEARCH_DEV_HOTRELOAD_CLASSES_DIR", LifecycleStage.PERMANENT),
-
-    /** JDWP debug port for HotSwapPush bytecode updates (default 5005). */
-    DEV_DEBUG_PORT("justsearch.dev.debug.port", "JUSTSEARCH_DEV_DEBUG_PORT", LifecycleStage.PERMANENT),
+    // Lane F stage A item A11 deleted DEV_HOTRELOAD_CLASSES_DIR and DEV_DEBUG_PORT from here.
+    // Both were read by exactly one place, WorkerSpawner.addDevHotReloadFlags, which built the
+    // Worker CHILD's command line — the classes dir onto its classpath, the port into its
+    // -agentlib:jdwp. There is no child, so there is no Java reader, and the config-surface gate
+    // caught them as dead keys. They are not deleted as *settings*: JUSTSEARCH_DEV_DEBUG_PORT is
+    // still an operator override, read by the dev-runner from its own environment and applied to
+    // the Engine's launch flags (scripts/dev/dev-runner.cjs buildHeadJavaOpts). A launch flag is
+    // the launcher's input, and declaring it here said the running JVM could read it back, which
+    // was never true and is now not even nearly true.
 
     /** 371: Content hash of the Worker distribution (stale-JVM detection). */
     BUILD_STAMP("justsearch.build.stamp", "JUSTSEARCH_BUILD_STAMP", LifecycleStage.PERMANENT),
@@ -980,15 +955,6 @@ public enum EnvRegistry {
     // ==================== Worker Bootstrap (tempdoc 329) ====================
 
     /** Path to worker config snapshot JSON (set by HeadlessApp at runtime). */
-    WORKER_CONFIG_SNAPSHOT(
-        "justsearch.worker.config_snapshot", "JUSTSEARCH_WORKER_CONFIG_SNAPSHOT", LifecycleStage.PERMANENT),
-
-    /**
-     * Main (Head) process PID, forwarded Head→Worker so the Worker can probe Head liveness and
-     * distinguish a real Head death from a benign OS-resume stale heartbeat (tempdoc 630). Absent
-     * on standalone worker runs, where the Worker falls back to heartbeat-only suicide.
-     */
-    HEAD_PID("justsearch.head.pid", "JUSTSEARCH_HEAD_PID", LifecycleStage.PERMANENT),
 
     /**
      * Dev/test override for the OS energy-intent poll (tempdoc 630): {@code reduced} or {@code full}
@@ -1263,8 +1229,9 @@ public enum EnvRegistry {
      * Minimum share of wall time (1..100, default 20) that indexing and enrichment backfill keep
      * while foreground search-family RPCs are in flight. Replaces the breath-hold pause, which was
      * a full stop and starved indexing to zero under a continuous search loop (885 baseline arm
-     * (c)). 100 disables throttling. Resolved onto {@code ResolvedConfig.Ai.BackfillPacing}, so the
-     * Worker reads it from the ordinal-450 config snapshot rather than from its own sysprops.
+     * (c)). 100 disables throttling. Resolved onto {@code ResolvedConfig.Ai.BackfillPacing} and read
+     * from there by the index half. It used to travel to the Worker through the ordinal-450 config
+     * snapshot; item A19 deleted that tier, because one JVM has one ResolvedConfig.
      */
     INDEXING_FOREGROUND_DUTY_PCT(
         "justsearch.indexing.foreground_duty_pct", "JUSTSEARCH_INDEXING_FOREGROUND_DUTY_PCT", "20", LifecycleStage.PERMANENT),
@@ -1322,8 +1289,10 @@ public enum EnvRegistry {
      * longer and hands the timer MORE work. A commit-cadence arm cannot be measured until this is a
      * knob, which is what the tracked item asked for.
      *
-     * <p>Resolved onto {@code ResolvedConfig.Index} and read by the Worker from the ordinal-450
-     * config snapshot, not from a raw sysprop read inside the Worker JVM (the [R1] defect shape).
+     * <p>Resolved onto {@code ResolvedConfig.Index} and read from there, not from a raw sysprop read at
+     * the point of use (the [R1] defect shape). It reached the Worker through the ordinal-450 config
+     * snapshot until item A19 deleted that tier; [R1]'s hazard — a key resolved on one side and read
+     * raw on the other — no longer has two sides.
      */
     INDEX_COMMIT_TIMER_INTERVAL_MS(
         "index.commit.timer_interval_ms", "JUSTSEARCH_INDEX_COMMIT_TIMER_INTERVAL_MS", "10000", LifecycleStage.PERMANENT),
@@ -1341,8 +1310,9 @@ public enum EnvRegistry {
      * across an ordinary restore. The grace window is the compromise: within it a reappearance is
      * the SAME document; past it, a new uid is minted.
      *
-     * <p>Resolved onto {@code ResolvedConfig.Index} and read by the Worker from the ordinal-450
-     * config snapshot, not from a raw sysprop read inside the Worker JVM.
+     * <p>Resolved onto {@code ResolvedConfig.Index} and read from there, not from a raw sysprop read at
+     * the point of use. The ordinal-450 config snapshot it used to travel through was deleted at
+     * item A19.
      */
     INDEX_IDENTITY_DELETION_GRACE_MS(
         "index.identity.deletion_grace_ms",
@@ -1399,7 +1369,13 @@ public enum EnvRegistry {
      * only load-bearing for CPU, where the reduction happens on those threads.
      */
     ORT_INTRA_OP_THREADS("justsearch.onnxruntime.intra_op_threads",
-        "JUSTSEARCH_ORT_INTRA_OP_THREADS", LifecycleStage.PERMANENT);
+        "JUSTSEARCH_ORT_INTRA_OP_THREADS", LifecycleStage.PERMANENT),
+
+    /** Optional startup cap for the Engine admission aggregate; absent uses the packaged policy. */
+    ENGINE_ADMISSION_AGGREGATE_LIMIT(
+        "justsearch.engine.admission.aggregate_limit",
+        "JUSTSEARCH_ENGINE_ADMISSION_AGGREGATE_LIMIT",
+        LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 

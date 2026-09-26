@@ -41,6 +41,20 @@ public final class ReadOnlyRuntime implements LuceneRuntime {
     return origin;
   }
 
+  @Override public java.nio.file.Path openedIndexPath() {
+    return session.indexPath;
+  }
+
+  @Override
+  public LuceneExecutorRegistrations executorRegistrations() {
+    return session.executorRegistrations;
+  }
+
+  @Override
+  public io.justsearch.core.execution.EngineTaskLifetime taskLifetime() {
+    return session::retainTaskLifetime;
+  }
+
   @Override
   public ReadPathOps readPathOps() {
     return session.readPathOps;
@@ -104,6 +118,11 @@ public final class ReadOnlyRuntime implements LuceneRuntime {
   @Override
   public ResolvedConfig resolvedConfig() {
     return session.resolvedConfig();
+  }
+
+  @Override
+  public Map<String, Object> appliedConfigurationValues() {
+    return session.appliedConfigurationValues();
   }
 
   @Override

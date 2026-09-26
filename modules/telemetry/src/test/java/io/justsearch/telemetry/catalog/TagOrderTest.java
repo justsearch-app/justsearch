@@ -101,7 +101,7 @@ class TagOrderTest {
   void perMetricTagKeyOrderReachesNdjson() throws Exception {
     TwoOrderingsCatalog catalog = new TwoOrderingsCatalog();
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(tmp, 500, "test", "0", "metrics.ndjson", List.of(catalog))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "test", "0", "metrics.ndjson", List.of(catalog))) {
 
       HistogramMetric<AlphaThenZetaTags> az =
           telemetry.registry().buildHistogram("test.order.alpha_then_zeta_ms");

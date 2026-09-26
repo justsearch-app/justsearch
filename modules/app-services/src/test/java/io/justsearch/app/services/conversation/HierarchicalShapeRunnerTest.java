@@ -29,7 +29,7 @@ final class HierarchicalShapeRunnerTest {
   void noDocId() {
     var runner = new HierarchicalShapeRunner(() -> new StubAi(List.of()), () -> new StubDocs(Map.of()));
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of(), Audience.USER, events::add);
+    runner.run(Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err = events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
     assertEquals("NO_DOC_ID", err.payload().get("errorCode"));
@@ -43,7 +43,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // progress: loading, standard, then chunk + done.
     assertTrue(
@@ -62,18 +62,18 @@ final class HierarchicalShapeRunnerTest {
   }
 
   @Test
-  @DisplayName("Large document triggers hierarchical: split + per-section + synthesis")
+  @DisplayName("A source above the 20K single-pass limit remains eligible for hierarchical synthesis")
   void largeDocHierarchical() {
-    // Comfortably over the derived hierarchical threshold (tempdoc 883: the input budget, which is
-    // 2304 tokens at this stub's 4096-token window). This filler has NO whitespace, so
-    // estimateTokens takes its dense arm (chars/3, not chars/4): 30k chars is ~10000 tokens.
-    String huge = "x".repeat(30_000);
+    // The shared dense-source estimator is chars/3, so this is ~30,000 tokens: above the
+    // canonical 20K guard for single-pass summary inputs. This path must split rather than inherit
+    // that refusal, because its section calls each fit the live context window.
+    String huge = "x".repeat(90_000);
     var ai = new StubAi(List.of("s1", "s2", "final synthesis"));
     var docs = new StubDocs(Map.of("doc", new DocumentRecord("doc", huge, Map.of())));
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // Must emit splitting + sections + at least one summarizing + synthesis phases.
     assertTrue(events.stream().anyMatch(
@@ -99,7 +99,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
@@ -114,7 +114,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
@@ -129,7 +129,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
@@ -146,7 +146,7 @@ final class HierarchicalShapeRunnerTest {
     var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
 
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("docId", "doc"), Audience.USER, events::add);
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent done =
         events.stream().filter(e -> "done".equals(e.name())).findFirst().orElseThrow();
@@ -166,7 +166,7 @@ final class HierarchicalShapeRunnerTest {
     runner.run(
         Map.of("docId", "missing-doc", "content", "inline fallback content"),
         Audience.USER,
-        events::add);
+        events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // docId is set so missing-doc routes through fetch first → returns null → falls back to
     // inline content → goes through small-doc single-pass.
@@ -186,7 +186,7 @@ final class HierarchicalShapeRunnerTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(docs.get(docId));
     }
   }
@@ -235,6 +235,12 @@ final class HierarchicalShapeRunnerTest {
       String text = nextResponse();
       onChunk.accept(text);
       onComplete.accept(text);
+    }
+
+    @Override
+    public void stream(StreamRequest request, StreamSink sink) {
+      streamChat(request.messages(), request.maxTokens(), sink.onContent(), sink.onComplete(),
+          sink.onError(), request.sampling(), request.requireSentinel());
     }
 
     @Override
@@ -332,6 +338,12 @@ final class HierarchicalShapeRunnerTest {
         // Section call — fail.
         onError.accept(new RuntimeException("section LLM failure"));
       }
+    }
+
+    @Override
+    public void stream(StreamRequest request, StreamSink sink) {
+      streamChat(request.messages(), request.maxTokens(), sink.onContent(), sink.onComplete(),
+          sink.onError(), request.sampling(), request.requireSentinel());
     }
 
     @Override

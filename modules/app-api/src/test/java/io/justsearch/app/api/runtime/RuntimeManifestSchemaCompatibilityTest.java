@@ -77,6 +77,8 @@ class RuntimeManifestSchemaCompatibilityTest {
     assertEquals(null, parsed.ai(), "older bodies have no ai sub-record");
     assertEquals(null, parsed.mode(), "older bodies have no mode sub-record (tempdoc 657)");
     assertEquals(null, parsed.chat(), "older bodies have no chat sub-record (tempdoc 842)");
+    assertEquals(null, parsed.children(), "v1 bodies have no managed-child registry");
+    assertEquals(null, parsed.shutdownHandoff(), "v1 bodies have no shutdown handoff");
   }
 
   @Test

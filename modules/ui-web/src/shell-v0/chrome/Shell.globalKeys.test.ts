@@ -28,6 +28,7 @@ import { __resetSurfaceSchemasForTest } from '../router/surfaceSchemas.js';
 import { __resetStoreRegistryForTest } from '../router/storeRegistry.js';
 import { __resetBootstrapForTest } from '../router/bootstrap.js';
 import { __resetUserConfigForTest } from '../state/userConfigState.js';
+import { __resetAiStateForTest } from '../state/aiStateStore.js';
 import { deactivateProjection } from '../router/URLProjector.js';
 import { ModalityController, __resetModalityForTest } from '../primitives/modality.js';
 import type { Surface, SurfaceCatalog } from '../../api/types/surface.js';
@@ -117,6 +118,7 @@ describe('Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a
   afterEach(() => {
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
     document.querySelectorAll('.probe-host').forEach((el) => el.remove());
+    __resetAiStateForTest();
     resetSurfaceCatalog();
     __resetUserConfigForTest();
     __resetStoreRegistryForTest();

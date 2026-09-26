@@ -1,4 +1,9 @@
 {
+  "shell-v0/components/EngineRecovery.ts": ["engine-recovery"],
+  "boot/desktopRecovery.ts": ["engine-recovery"],
+  "shell-v0/state/admissionWaitNotice.ts": ["engine-admission-wait"],
+  "api/admissionFetch.ts": ["engine-admission-wait"],
+  "shell-v0/api/authorizedFetch.ts": ["engine-admission-wait"],
   "shell-v0/components/searchResults/ResultsCard.ts": [
     "search-results", "command-mode", "zero-results", "input-focus",
     "filters-chips", "search-simple-mode", "search-advanced-mode",
@@ -59,9 +64,9 @@
   ],
   "shell-v0/views/SecuritySurface.ts": ["security", "security-light"],
   "shell-v0/views/security/atRestCard.ts": ["security", "security-light", "health", "health-light"],
-  "shell-v0/views/HealthSurface.ts": ["health", "health-light", "health-completion"],
+  "shell-v0/views/HealthSurface.ts": ["health", "health-light", "health-completion", "health-recovery"],
   "shell-v0/aggregate-substrate/strategies/healthEventActivityRow.ts": ["health-completion"],
-  "shell-v0/views/LibrarySurface.ts": ["library", "library-light", "skeleton-library", "library-enriching", "library-ingestion"],
+  "shell-v0/views/LibrarySurface.ts": ["library", "library-light", "skeleton-library", "library-enriching", "library-ingestion", "library-gap-decision"],
   "shell-v0/components/IngestionSummary.ts": ["library-ingestion"],
   "shell-v0/components/ingestionSummaryPresentation.ts": ["library-ingestion"],
   "shell-v0/state/searchState.ts": ["search-failure"],

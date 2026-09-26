@@ -21,7 +21,15 @@ package io.justsearch.indexerworker.queue;
  *   <li>V10: Added nullable first_failed_at column to jobs (tempdoc 885 item 21)</li>
  *   <li>V11: Added durable, path-free document_identity table (tempdoc 915 Phase 2)</li>
  *   <li>V12: Added document_identity_import bookkeeping table (tempdoc 931 §C.2)</li>
- *   <li>V13: Added nullable deleted_at column to document_identity (tempdoc 931 §C.6)</li>
+   *   <li>V13: Added nullable deleted_at column to document_identity (tempdoc 931 §C.6)</li>
+ *   <li>V14: Added nullable admission originator/transport to jobs and ingestion_ledger (lane F C1)</li>
+ *   <li>V15: Added nullable content_hash to jobs for idempotent unit recovery (lane F C2)</li>
+ *   <li>V16: Added switch-buffer replacement identity for conditional replay removal (lane F C2)</li>
+ *   <li>V17: Added stable queue admission revisions for operation recovery (lane F C2)</li>
+ *   <li>V18: Added finite-walk receipts and ledger terminal coverage (lane F C2)</li>
+ *   <li>V19: Added captured source plans and immutable sealed member selection (lane F C2)</li>
+ *   <li>V20: Added explicit switch-buffer admission order for exact replay (lane F D1)</li>
+ *   <li>V21: Scoped switch-buffer rows to a candidate generation (lane F D1-9)</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -34,7 +42,109 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 13;
+  public static final int TARGET_VERSION = 21;
+
+  public static final String MIGRATE_V19_TO_V20_SWITCH_ORDER =
+      "ALTER TABLE switch_buffer ADD COLUMN accepted_order INTEGER NOT NULL DEFAULT 0 "
+          + "CHECK(accepted_order >= 0)";
+  public static final String CREATE_SWITCH_BUFFER_ORDER_INDEX =
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_switch_buffer_order "
+          + "ON switch_buffer(accepted_order)";
+
+  public static final String CREATE_SWITCH_BUFFER_GENERATION_ORDER_INDEX =
+      "CREATE INDEX IF NOT EXISTS idx_switch_buffer_generation_order "
+          + "ON switch_buffer(generation, accepted_order)";
+
+  public static final String MIGRATE_V18_TO_V19_JOB_PLAN =
+      "ALTER TABLE jobs ADD COLUMN planned_source_sha256 TEXT";
+  public static final String MIGRATE_V18_TO_V19_LEDGER_PLAN =
+      "ALTER TABLE ingestion_ledger ADD COLUMN planned_source_sha256 TEXT";
+  public static final String MIGRATE_V18_TO_V19_CAPTURE_MODE =
+      "ALTER TABLE ingestion_walk_progress ADD COLUMN captured_plan INTEGER NOT NULL DEFAULT 0 CHECK(captured_plan IN (0,1))";
+  public static final String MIGRATE_V18_TO_V19_MANIFEST =
+      "ALTER TABLE ingestion_walk_progress ADD COLUMN manifest_sha256 TEXT";
+  public static final String MIGRATE_V18_TO_V19_PLAN_COUNT =
+      "ALTER TABLE ingestion_walk_progress ADD COLUMN planned_units INTEGER CHECK(planned_units >= 0)";
+  public static final String CREATE_INGESTION_WALK_SEALED_UNITS = """
+      CREATE TABLE IF NOT EXISTS ingestion_walk_sealed_units (
+        operation_key TEXT NOT NULL,
+        sealed_revision INTEGER NOT NULL CHECK(sealed_revision > 0),
+        path_hash TEXT NOT NULL,
+        unit_revision TEXT NOT NULL,
+        ledger_id INTEGER NOT NULL UNIQUE,
+        PRIMARY KEY(operation_key, path_hash)
+      )
+      """;
+
+  public static final String MIGRATE_V17_TO_V18_WALK_EPOCH =
+      "ALTER TABLE jobs ADD COLUMN walk_seen_epoch INTEGER";
+  public static final String MIGRATE_V17_TO_V18_LEDGER_OPERATION =
+      "ALTER TABLE ingestion_ledger ADD COLUMN operation_key TEXT";
+  public static final String MIGRATE_V17_TO_V18_LEDGER_REVISION =
+      "ALTER TABLE ingestion_ledger ADD COLUMN unit_revision TEXT";
+  public static final String MIGRATE_V17_TO_V18_LEDGER_HASH =
+      "ALTER TABLE ingestion_ledger ADD COLUMN content_hash TEXT";
+  public static final String MIGRATE_V17_TO_V18_LEDGER_COVERAGE =
+      "ALTER TABLE ingestion_ledger ADD COLUMN terminal_coverage TEXT "
+          + "CHECK(terminal_coverage IN ('INDEXED', 'FAILED', 'SKIPPED'))";
+
+  /** Derived walk coverage, never operation acceptance, authorization or attempt state. */
+  public static final String CREATE_INGESTION_WALK_PROGRESS = """
+      CREATE TABLE IF NOT EXISTS ingestion_walk_progress (
+        operation_key TEXT PRIMARY KEY,
+        plan_hash TEXT NOT NULL,
+        enumeration_epoch INTEGER NOT NULL CHECK(enumeration_epoch > 0),
+        enumeration_closed_at INTEGER,
+        enumeration_outcome TEXT CHECK(enumeration_outcome IN ('COMPLETE', 'FAILED', 'CANCELLED')),
+        completed_units INTEGER NOT NULL DEFAULT 0 CHECK(completed_units >= 0),
+        failed_units INTEGER NOT NULL DEFAULT 0 CHECK(failed_units >= 0),
+        revision INTEGER NOT NULL DEFAULT 1 CHECK(revision > 0),
+        sealed_at INTEGER,
+        receipt_json TEXT,
+        acknowledged_revision INTEGER NOT NULL DEFAULT 0 CHECK(acknowledged_revision >= 0 AND acknowledged_revision <= revision),
+        CHECK((enumeration_closed_at IS NULL) = (enumeration_outcome IS NULL)),
+        CHECK((sealed_at IS NULL) = (receipt_json IS NULL)),
+        CHECK(sealed_at IS NULL OR enumeration_closed_at IS NOT NULL)
+      )
+      """;
+  public static final String CREATE_JOBS_WALK_EPOCH_INDEX = """
+      CREATE INDEX IF NOT EXISTS idx_jobs_walk_epoch ON jobs(scan_id, walk_seen_epoch)
+      """;
+  public static final String CREATE_LEDGER_WALK_UNIT_INDEX = """
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_walk_unit
+      ON ingestion_ledger(operation_key, path_hash, unit_revision, terminal_coverage)
+      WHERE terminal_coverage IS NOT NULL
+      """;
+  public static final String CREATE_LEDGER_WALK_HASH_INDEX = """
+      CREATE INDEX IF NOT EXISTS idx_ledger_walk_hash
+      ON ingestion_ledger(operation_key, path_hash, content_hash)
+      WHERE terminal_coverage = 'INDEXED'
+      """;
+
+  /** An admission identity survives retries; a real replacement receives a new identity. */
+  public static final String MIGRATE_V16_TO_V17_UNIT_REVISION =
+      "ALTER TABLE jobs ADD COLUMN unit_revision TEXT NOT NULL DEFAULT ''";
+  public static final String BACKFILL_UNIT_REVISIONS =
+      "UPDATE jobs SET unit_revision = lower(hex(randomblob(16))) WHERE unit_revision = ''";
+
+  /** An opaque identity for each accepted buffer replacement, independent of wall-clock time. */
+  public static final String MIGRATE_V15_TO_V16_SWITCH_REVISION =
+      "ALTER TABLE switch_buffer ADD COLUMN revision TEXT NOT NULL DEFAULT ''";
+  public static final String BACKFILL_SWITCH_REVISIONS =
+      "UPDATE switch_buffer SET revision = lower(hex(randomblob(16))) WHERE revision = ''";
+
+  public static final String MIGRATE_V14_TO_V15_CONTENT_HASH =
+      "ALTER TABLE jobs ADD COLUMN content_hash TEXT";
+
+  /** V14 persists admission attribution across queue recovery and terminal outcome writes. */
+  public static final String MIGRATE_V13_TO_V14_JOBS_ORIGINATOR =
+      "ALTER TABLE jobs ADD COLUMN originator TEXT";
+  public static final String MIGRATE_V13_TO_V14_JOBS_TRANSPORT =
+      "ALTER TABLE jobs ADD COLUMN transport TEXT";
+  public static final String MIGRATE_V13_TO_V14_LEDGER_ORIGINATOR =
+      "ALTER TABLE ingestion_ledger ADD COLUMN originator TEXT";
+  public static final String MIGRATE_V13_TO_V14_LEDGER_TRANSPORT =
+      "ALTER TABLE ingestion_ledger ADD COLUMN transport TEXT";
 
   // ==================== Table: jobs ====================
 
@@ -60,7 +170,11 @@ public final class SqliteSchema {
         last_updated INTEGER NOT NULL,
         error_message TEXT,
         retry_after INTEGER,
-        first_failed_at INTEGER
+        first_failed_at INTEGER,
+        originator TEXT,
+        transport TEXT,
+        content_hash TEXT,
+        unit_revision TEXT NOT NULL DEFAULT ''
       )
       """;
 
@@ -85,20 +199,29 @@ public final class SqliteSchema {
    *
    * <p>Columns:
    * <ul>
-   *   <li>key - Primary key for deduplication (e.g., "path:/normalized/path")</li>
+   *   <li>generation - Candidate generation scope; empty is the legacy unscoped buffer</li>
+   *   <li>key - Primary key within a generation (e.g., "path:/normalized/path")</li>
    *   <li>op - Operation type (UPSERT, DELETE, SYNC_ROOT, etc.)</li>
    *   <li>payload - JSON payload with operation details</li>
-   *   <li>last_updated - Timestamp for ordering replay</li>
+   *   <li>last_updated - Observation timestamp, not replay order</li>
+   *   <li>accepted_order - Durable order of each retained accepted mutation</li>
    * </ul>
    */
   public static final String CREATE_SWITCH_BUFFER_TABLE = """
       CREATE TABLE IF NOT EXISTS switch_buffer (
-        key TEXT PRIMARY KEY,
+        generation TEXT NOT NULL DEFAULT '',
+        key TEXT NOT NULL,
         op TEXT NOT NULL,
         payload TEXT NOT NULL,
-        last_updated INTEGER NOT NULL
+        last_updated INTEGER NOT NULL,
+        revision TEXT NOT NULL DEFAULT '',
+        accepted_order INTEGER NOT NULL DEFAULT 0 CHECK(accepted_order >= 0),
+        PRIMARY KEY(generation, key)
       )
       """;
+
+  /** V20→V21 copies legacy rows into a generation-scoped switch buffer. */
+  public static final String SWITCH_BUFFER_LEGACY_TABLE = "switch_buffer_v20";
 
   /** Index on switch_buffer.last_updated for ordered replay. */
   public static final String CREATE_SWITCH_BUFFER_INDEX = """
@@ -122,7 +245,14 @@ public final class SqliteSchema {
         source_kind TEXT,
         artifact_status TEXT,
         policy_id TEXT,
-        parser_id TEXT
+        parser_id TEXT,
+        originator TEXT,
+        transport TEXT,
+        operation_key TEXT,
+        unit_revision TEXT,
+        content_hash TEXT,
+        terminal_coverage TEXT CHECK(terminal_coverage IN ('INDEXED', 'FAILED', 'SKIPPED')),
+        planned_source_sha256 TEXT
       )
       """;
 

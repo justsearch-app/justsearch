@@ -58,6 +58,7 @@ describe('Table — column derivation', () => {
       data: [{ name: 'Ada', age: 36 }],
     });
     const headers = el.shadowRoot?.querySelectorAll('.header-cell');
+    expect(el.shadowRoot?.querySelector('.table-root')?.getAttribute('role')).toBe('table');
     expect(headers?.length).toBe(2);
     expect(headers?.[0]?.textContent).toContain('Full Name');
     expect(headers?.[1]?.textContent).toContain('Age');

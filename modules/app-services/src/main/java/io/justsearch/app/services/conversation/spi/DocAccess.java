@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation.spi;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.ContextInjector;
 import io.justsearch.agent.api.conversation.ConversationContext;
 import io.justsearch.agent.api.conversation.InjectorResult;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,14 +62,40 @@ public final class DocAccess implements ContextInjector {
 
   private final DocumentService documents;
   private final Duration fetchTimeout;
+  private final SummaryInputLimit inputLimit;
 
   public DocAccess(DocumentService documents) {
-    this(documents, DEFAULT_FETCH_TIMEOUT);
+    this(documents, DEFAULT_FETCH_TIMEOUT, () -> SummaryInputLimit.DEFAULT_MAX_TOKENS);
   }
 
   public DocAccess(DocumentService documents, Duration fetchTimeout) {
+    this(documents, fetchTimeout, () -> SummaryInputLimit.DEFAULT_MAX_TOKENS);
+  }
+
+  public DocAccess(DocumentService documents, IntSupplier maxInputTokens) {
+    this(documents, DEFAULT_FETCH_TIMEOUT, maxInputTokens);
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public DocAccess(DocumentService documents, ConversationConfigProvider configProvider) {
+    this(documents, DEFAULT_FETCH_TIMEOUT, configProvider);
+  }
+
+  /** Uses the immutable configuration captured for each admitted conversation turn. */
+  public DocAccess(
+      DocumentService documents,
+      Duration fetchTimeout,
+      ConversationConfigProvider configProvider) {
     this.documents = Objects.requireNonNull(documents, "documents");
     this.fetchTimeout = Objects.requireNonNull(fetchTimeout, "fetchTimeout");
+    this.inputLimit = new SummaryInputLimit(configProvider);
+  }
+
+  public DocAccess(
+      DocumentService documents, Duration fetchTimeout, IntSupplier maxInputTokens) {
+    this.documents = Objects.requireNonNull(documents, "documents");
+    this.fetchTimeout = Objects.requireNonNull(fetchTimeout, "fetchTimeout");
+    this.inputLimit = new SummaryInputLimit(maxInputTokens);
   }
 
   @Override
@@ -76,6 +105,7 @@ public final class DocAccess implements ContextInjector {
 
   @Override
   public InjectorResult inject(ConversationContext ctx) {
+    var engineContext = ctx.engineContext();
     Map<String, Object> body = ctx.requestBody();
     // Per tempdoc 526 §13 §13.4 R8 — positional body.startChar/endChar
     // fallback is retired. Selection-range summarize is the typed body.selection
@@ -89,11 +119,14 @@ public final class DocAccess implements ContextInjector {
     String docId = asString(body.get("docId"));
     String providedContent = asString(body.get("content"));
 
-    Resolved resolved = resolveContent(docId, providedContent);
+    Resolved resolved = resolveContent(docId, providedContent, engineContext);
     String fullContent = resolved.content();
     if (fullContent == null || fullContent.isBlank()) {
       return InjectorResult.empty();
     }
+
+    SseEvent rejection = inputLimit.rejection(fullContent, engineContext);
+    if (rejection != null) return InjectorResult.terminalError(rejection);
 
     String truncated = fullContent.length() > MAX_CONTENT_CHARS
         ? fullContent.substring(0, MAX_CONTENT_CHARS)
@@ -171,14 +204,14 @@ public final class DocAccess implements ContextInjector {
    * supplied; falls back to {@code providedContent} when the fetch returns nothing or the
    * service is unavailable.
    */
-  private Resolved resolveContent(String docId, String providedContent) {
+  private Resolved resolveContent(String docId, String providedContent, EngineContext engineContext) {
     String fallback = providedContent == null ? "" : providedContent;
     if (docId == null || docId.isBlank()) {
       return new Resolved(fallback, "", false);
     }
     try {
       DocumentRecord record =
-          documents.fetch(docId).toCompletableFuture().get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
+          documents.fetch(docId, engineContext).toCompletableFuture().get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
       if (record != null && record.content() != null && !record.content().isBlank()) {
         return new Resolved(record.content(), docId, true);
       }

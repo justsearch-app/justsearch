@@ -14,11 +14,8 @@ dependencies {
   api(project(":modules:app-api"))
   api(libs.guava)
   api(libs.protobuf.java)
-  implementation(libs.grpc.protobuf)
-  api(libs.grpc.stub)
   implementation(libs.slf4j.api)
   implementation(libs.opentelemetry.api)
-  runtimeOnly(libs.grpc.core)
   testImplementation(platform(libs.junit.bom))
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -26,8 +23,12 @@ dependencies {
   testRuntimeOnly(libs.logback.classic)
 }
 
+// Lane F stage A item A14: protoc only. The three `service` blocks left indexing.proto with the
+// wire they described (items A9-A11), and the last gRPC service in this module,
+// InfraDiagnosticsService, went with them — so protoc-gen-grpc-java has nothing to generate and is
+// no longer resolved. What survives is the message half: these protos are the DTOs at the Engine's
+// in-process ports (design section 6, transitional).
 val protocVersion = libs.versions.protoc.get()
-val grpcVersion = libs.versions.grpc.get()
 val isWindows = System.getProperty("os.name").lowercase().contains("win")
 val isMac = System.getProperty("os.name").lowercase().contains("mac")
 val arch = System.getProperty("os.arch").lowercase()
@@ -54,24 +55,9 @@ fun resolveTool(notation: String): java.io.File {
 val protocBinary =
     resolveTool("com.google.protobuf:protoc:${protocVersion}:${osClassifier}@exe")
 
-val grpcPluginBinary =
-    resolveTool("io.grpc:protoc-gen-grpc-java:${grpcVersion}:${osClassifier}@exe")
-
 protobuf {
   protoc {
     path = protocBinary.absolutePath
-  }
-  plugins {
-    create("grpc") {
-      path = grpcPluginBinary.absolutePath
-    }
-  }
-  generateProtoTasks {
-    all().configureEach {
-      plugins {
-        create("grpc")
-      }
-    }
   }
 }
 

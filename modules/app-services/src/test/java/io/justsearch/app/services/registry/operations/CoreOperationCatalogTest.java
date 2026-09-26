@@ -10,8 +10,10 @@ import io.justsearch.agent.api.registry.AuditPolicy;
 import io.justsearch.agent.api.registry.ConfirmStrategy;
 import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.agent.api.registry.RiskTier;
 import io.justsearch.agent.api.registry.TrustTier;
+import io.justsearch.core.context.EngineContext;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +34,7 @@ final class CoreOperationCatalogTest {
   }
 
   @Test
-  void definitionsContainExactlyTwentySevenSeedEntries() {
+  void definitionsContainTheExpectedSeedEntries() {
     // Slice 445: TABULAR Resource cluster — added cancel-indexing-job,
     // retry-indexing-job, resolve-path-hash (item Operations + privacy resolver).
     // Slice 447-followup §X.11.5 Phase 7: added core.rebuild-index parameterless
@@ -60,7 +62,6 @@ final class CoreOperationCatalogTest {
             "core.remove-watched-root",
             "core.preview-excludes",
             "core.apply-excludes",
-            "core.reload-inference",
             "core.switch-inference-mode",
             "core.set-chat-enabled",
             "core.trigger-offline-processing",
@@ -69,11 +70,14 @@ final class CoreOperationCatalogTest {
             "core.preflight-ai-pack",
             "core.import-ai-pack",
             "core.start-ai-install",
+            "core.activate-installed-models",
+            "core.accept-gaps",
             "core.cancel-ai-install",
             "core.repair-ai-install",
             "core.create-user-policy",
             "core.allowlist-add-digest",
             "core.reset-settings",
+            "core.reconfigure",
             "core.cancel-indexing-job",
             "core.retry-indexing-job",
             "core.resolve-path-hash",
@@ -110,6 +114,19 @@ final class CoreOperationCatalogTest {
     assertEquals(AuditPolicy.METADATA_ONLY, op.policy().audit());
     assertEquals(Set.of(ExecutorTag.UI, ExecutorTag.AGENT), op.executors());
     assertFalse(op.policy().undoSupported());
+    assertFalse(
+        op.intf().inputs().contains("installer_model_activation"),
+        "installer activation source belongs only to its distinct operation");
+  }
+
+  @Test
+  void bulkReindexAndRecoveryRebuildDeclareDurableReindexOwnership() {
+    for (var reference : Set.of(CoreOperationCatalog.BULK_REINDEX, CoreOperationCatalog.REBUILD_INDEX)) {
+      Operation op = catalog.findById(reference).orElseThrow();
+      assertEquals(OperationKind.REINDEX, op.policy().recordKind(), reference.value());
+      assertEquals(EngineContext.Survival.DURABLE,
+          op.policy().declaredSurvival().orElseThrow(), reference.value());
+    }
   }
 
   @Test
@@ -178,6 +195,8 @@ final class CoreOperationCatalogTest {
     Operation op = catalog.findById(CoreOperationCatalog.REINDEX).orElseThrow();
     assertEquals(RiskTier.LOW, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.None.class, op.policy().confirm());
+    assertEquals(EngineContext.Survival.DURABLE,
+        op.policy().declaredSurvival().orElseThrow());
     assertEquals(Set.of(ExecutorTag.UI, ExecutorTag.AGENT), op.executors());
   }
 
@@ -266,10 +285,11 @@ final class CoreOperationCatalogTest {
   }
 
   @Test
-  void reloadInferenceHasMediumRiskInlineConfirm() {
-    Operation op = catalog.findById(CoreOperationCatalog.RELOAD_INFERENCE).orElseThrow();
+  void reconfigureHasMediumRiskAndAcceptsAnExplicitRefreshIntent() {
+    Operation op = catalog.findById(CoreOperationCatalog.RECONFIGURE).orElseThrow();
     assertEquals(RiskTier.MEDIUM, op.policy().risk());
-    assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
+    assertInstanceOf(ConfirmStrategy.None.class, op.policy().confirm());
+    assertTrue(op.intf().inputs().contains("refreshInference"));
   }
 
   /**
@@ -353,6 +373,22 @@ final class CoreOperationCatalogTest {
     Operation op = catalog.findById(CoreOperationCatalog.START_AI_INSTALL).orElseThrow();
     assertEquals(RiskTier.MEDIUM, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
+    assertEquals(OperationKind.OPERATION, op.policy().recordKind());
+    assertTrue(op.policy().declaredSurvival().isEmpty());
+  }
+
+  @Test
+  void activateInstalledModelsHasHighRiskInlineConfirmDurableReindexPolicy() {
+    Operation op = catalog.findById(CoreOperationCatalog.ACTIVATE_INSTALLED_MODELS).orElseThrow();
+    assertEquals(RiskTier.HIGH, op.policy().risk());
+    assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
+    assertEquals(OperationKind.REINDEX, op.policy().recordKind());
+    assertEquals(
+        EngineContext.Survival.DURABLE, op.policy().declaredSurvival().orElseThrow());
+    assertEquals(Set.of(ExecutorTag.UI), op.executors());
+    assertTrue(
+        op.intf().inputs().contains("\"enum\":[\"installer_model_activation\"]"));
+    assertTrue(op.intf().inputs().contains("\"required\":[\"source\"]"));
   }
 
   @Test
@@ -391,6 +427,20 @@ final class CoreOperationCatalogTest {
     assertEquals(RiskTier.MEDIUM, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
     assertEquals(Set.of(ExecutorTag.UI), op.executors());
+  }
+
+  @Test
+  void reconfigureIsAUiOnlyNoConfirmReconfigureRecordWithWitnessEnvelope() {
+    Operation op = catalog.findById(CoreOperationCatalog.RECONFIGURE).orElseThrow();
+    assertEquals(RiskTier.MEDIUM, op.policy().risk());
+    assertInstanceOf(ConfirmStrategy.None.class, op.policy().confirm());
+    assertEquals(OperationKind.RECONFIGURE, op.policy().recordKind());
+    assertEquals(AuditPolicy.METADATA_ONLY, op.policy().audit());
+    assertEquals(Set.of(ExecutorTag.UI), op.executors());
+    assertTrue(op.intf().inputs().contains("\"settings\""));
+    assertTrue(op.intf().inputs().contains("\"witness\""));
+    assertTrue(op.intf().inputs().contains("\"operationKey\""));
+    assertTrue(op.intf().inputs().contains("\"modeIntent\""));
   }
 
   /**

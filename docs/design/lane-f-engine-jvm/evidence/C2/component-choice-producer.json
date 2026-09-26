@@ -1,0 +1,47 @@
+{
+  "base": "8c4f34a02",
+  "testedSources": {
+    "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java": "49ab9a0c135360e8e2a6500daafdaab8fa17e01ee141e6256fd1bb1ae1332ec7",
+    "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceComponentIntentTest.java": "fdf536d97064f817f2d9cb75429ab690863bf97b97601bf638bb53c55dd3dcdc"
+  },
+  "verification": {
+    "revision": "8c4f34a02-plus-component-choice",
+    "command": "./gradlew.bat :modules:app-services:test --tests *AiInstallServiceComponentIntentTest --tests *AiInstallServiceCudaServerExeGuardTest --tests *SettingsInternalProducerTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-services:spotlessCheck --console=plain",
+    "summary": {
+      "tests": 28,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 7
+    },
+    "tasks": [
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 28,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 7
+      }
+    ]
+  },
+  "rawRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp",
+  "artifacts": [
+    "component-choice1421.txt",
+    "component-choice1421-counts.json",
+    "component-choice1421-xml",
+    "component-choice1422.txt",
+    "component-choice1422-counts.json",
+    "component-choice1422-xml",
+    "component-choice1423.txt",
+    "component-choice1423-counts.json",
+    "component-choice1423-xml"
+  ],
+  "retention": "Through lane acceptance plus 30 days; export before worktree release",
+  "limits": [
+    "Focused local proof only; full integrated, live, installed and final-head hosted proof remain required"
+  ],
+  "review": "Independent refute-first reviewer CLEAR after successful-but-unresolved regression"
+}

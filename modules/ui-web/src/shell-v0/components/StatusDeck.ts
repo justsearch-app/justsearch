@@ -24,7 +24,6 @@ import { JfElement } from '../primitives/JfElement.js';
 import { icon } from './Icon.js';
 import './StatusBadge.js';
 import { type NoticeTone } from '../utils/statusTone.js';
-import { LIFECYCLE } from '../../api/lifecycleState.js';
 import {
   subscribeAiState,
   statusWithoutVerdictFlavor,
@@ -59,6 +58,7 @@ import './Control.js';
 import { subscribeTasks, listRunningTasks, type Task } from '../substrates/tasks/index.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
+import type { ComponentState } from '../../api/generated/schema-types/status-response.js';
 
 // Tempdoc 508 §4.3 — core items register via the same contribution
 // mechanism plugins use. The render functions are markers (returning
@@ -416,11 +416,13 @@ export class StatusDeck extends JfElement {
     // fact, and before the shell has looked even once there is no contact either).
     if (!this.status) return { cls: 'muted', name: 'unknown' };
     if (this.aiState && !this.aiState.snapshotLive) return { cls: 'error', name: 'disconnected' };
-    const head = this.status.components?.head?.state;
-    const worker = this.status.components?.worker?.state;
-    if (head === LIFECYCLE.READY && worker === LIFECYCLE.READY)
+    const api: ComponentState | null | undefined =
+      this.status.readiness?.engineComponents?.api?.state;
+    const index: ComponentState | null | undefined =
+      this.status.readiness?.engineComponents?.index?.state;
+    if (api === 'READY' && index === 'READY')
       return { cls: 'healthy', name: 'connected' };
-    if (head === LIFECYCLE.STARTING || worker === LIFECYCLE.STARTING)
+    if (api === 'STARTING' || index === 'STARTING')
       return { cls: 'warn', name: 'starting' };
     return { cls: 'error', name: 'error' };
   }

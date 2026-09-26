@@ -99,18 +99,29 @@ public record RerankerConfig(
    *       decisive. Requires {@code judge_arbitration_enabled} (default: false)
    * </ul>
    */
-  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from} in new code. */
+  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from(ResolvedConfig)}. */
   public static RerankerConfig fromEnv() {
-    return from(ConfigStore.global().get().ai());
+    return from(ConfigStore.global().get());
   }
 
-  /** Creates configuration from a resolved AI sub-record and auto-discovery. */
+  /** Creates configuration and discovers models from one resolved snapshot. */
+  public static RerankerConfig from(ResolvedConfig config) {
+    return from(config.ai(), config);
+  }
+
+  /** Legacy sub-record factory; discovery retains its historical global-snapshot fallback. */
   public static RerankerConfig from(ResolvedConfig.Ai ai) {
+    return from(ai, null);
+  }
+
+  private static RerankerConfig from(ResolvedConfig.Ai ai, ResolvedConfig config) {
     ResolvedConfig.Ai.Reranker reranker = ai.reranker();
 
     String modelPathStr = reranker.modelPath() != null ? reranker.modelPath().toString() : null;
     OnnxModelDiscovery.Result discovery =
-        OnnxModelDiscovery.resolve(modelPathStr, "reranker", null);
+        config != null
+            ? OnnxModelDiscovery.resolve(config, modelPathStr, "reranker", null)
+            : OnnxModelDiscovery.resolve(modelPathStr, "reranker", null);
     Path modelPath = discovery != null ? discovery.modelDir() : null;
 
     Boolean explicitEnabled = reranker.enabled();
@@ -216,8 +227,17 @@ public record RerankerConfig(
       return from(ConfigStore.global().get().ai());
     }
 
+    /** Creates chunk reranker configuration and discovers models from one resolved snapshot. */
+    public static ChunkRerankerConfig from(ResolvedConfig config) {
+      return from(config.ai(), config);
+    }
+
     /** Creates chunk reranker configuration from a resolved AI sub-record. */
     public static ChunkRerankerConfig from(ResolvedConfig.Ai ai) {
+      return from(ai, null);
+    }
+
+    private static ChunkRerankerConfig from(ResolvedConfig.Ai ai, ResolvedConfig config) {
       ResolvedConfig.Ai.Reranker.ChunkReranker chunks = ai.reranker().chunks();
 
       // Fall back to search reranker model path if not specified
@@ -227,8 +247,11 @@ public record RerankerConfig(
         modelPathStr = resolveRerankerModelPath(ai);
       }
       OnnxModelDiscovery.Result discovery =
-          OnnxModelDiscovery.resolve(
-              modelPathStr, "reranker", "reranker/ms-marco-MiniLM-L6-v2");
+          config != null
+              ? OnnxModelDiscovery.resolve(
+                  config, modelPathStr, "reranker", "reranker/ms-marco-MiniLM-L6-v2")
+              : OnnxModelDiscovery.resolve(
+                  modelPathStr, "reranker", "reranker/ms-marco-MiniLM-L6-v2");
       Path modelPath = discovery != null ? discovery.modelDir() : null;
 
       Boolean explicitEnabled = chunks.enabled();

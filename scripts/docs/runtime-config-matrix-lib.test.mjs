@@ -18,6 +18,8 @@ function withFixture(run) {
     const envRegistryPath = path.join(root, "EnvRegistry.java");
     const configKeyPath = path.join(root, "ConfigKey.java");
     const builderPath = path.join(root, "ResolvedConfigBuilder.java");
+    const configApplyPath = path.join(root, "config-apply.v1.json");
+    writeFileSync(configApplyPath, JSON.stringify({ entries: [{ key: "justsearch.normal", applyScope: "hot" }] }));
     writeFileSync(
       envRegistryPath,
       `enum EnvRegistry {
@@ -38,7 +40,7 @@ function withFixture(run) {
       builderPath,
       `putYaml("justsearch.normal", root, "normal");`,
     );
-    run({ root, envRegistryPath, configKeyPath, builderPath });
+    run({ root, envRegistryPath, configKeyPath, builderPath, configApplyPath });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -113,19 +115,39 @@ test("the independent census ignores declaration-shaped comments and literals", 
 });
 
 test("matrix projects canonical declaration and lifecycle without copying values", () => {
-  withFixture(({ root, envRegistryPath, configKeyPath, builderPath }) => {
+  withFixture(({ root, envRegistryPath, configKeyPath, builderPath, configApplyPath }) => {
     const model = buildMatrixModel({
       repoRoot: root,
       envRegistryPath,
       configKeyPath,
       builderPath,
+      configApplyPath,
     });
     const rows = new Map(model.rows.map((row) => [row.declaration, row]));
+    assert.equal(model.applyScopeCount, 1, "count the register, not enum declarations or scope categories");
 
     assert.equal(rows.get("EnvRegistry.NORMAL").lifecycleStage, "permanent");
     assert.equal(rows.get("EnvRegistry.EXPERIMENT").lifecycleStage, "experimental");
     assert.equal(rows.get("ConfigKey.INTERNAL_EXPERIMENT").lifecycleStage, "experimental");
     assert.equal(rows.get("EnvRegistry.NORMAL").yamlKey, "justsearch.normal");
     assert.match(renderMatrixMarkdown(model), /\| EnvRegistry\.EXPERIMENT \| experimental \|/);
+  });
+});
+
+test("API-port row projects the typed settings contributor and separates bound-port evidence", () => {
+  withFixture(({ root, envRegistryPath, configKeyPath, builderPath, configApplyPath }) => {
+    writeFileSync(envRegistryPath,
+      `enum EnvRegistry {
+        API_PORT("justsearch.api.port", "JUSTSEARCH_API_PORT", LifecycleStage.PERMANENT);
+      }`);
+    const uiSettingsContributorPath = path.join(root, "ConfigStoreRebuilder.java");
+    writeFileSync(uiSettingsContributorPath,
+      `builder.putSettings("justsearch.api.port", String.valueOf(settings.configuredApiPort()));`);
+    const model = buildMatrixModel({ repoRoot: root, envRegistryPath, configKeyPath,
+      builderPath, configApplyPath, uiSettingsContributorPath });
+    const row = model.rows.find((item) => item.declaration === "EnvRegistry.API_PORT");
+    assert.match(row.precedenceNotes, /settings\.json > default/);
+    assert.match(row.precedenceNotes, /bound port is runtime evidence/);
+    assert.match(renderMatrixMarkdown(model), /typed nullable `apiPort` contributes/);
   });
 });

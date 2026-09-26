@@ -64,7 +64,7 @@ final class LifecycleSnapshotTapTest {
     for (Map.Entry<ReadinessDimension, ReadinessComponentView> e : dims.entrySet()) {
       components.put(e.getKey().key(), e.getValue());
     }
-    return new ReadinessEnvelopeView(1, T0.toString(), components, Map.of());
+    return new ReadinessEnvelopeView(2, T0.toString(), Map.of(), components, Map.of());
   }
 
   private static ReadinessEnvelopeView singleDim(

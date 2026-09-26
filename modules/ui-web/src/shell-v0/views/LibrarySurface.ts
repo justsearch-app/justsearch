@@ -16,6 +16,7 @@
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/OpButton.js';
 import '../components/Button.js';
@@ -42,6 +43,7 @@ import {
   indexedRootViewSchema,
   type IndexedRootView,
 } from '../../api/generated/schema-types/indexed-root-view.js';
+import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api/generated/schema-types/index.js';
 // Tempdoc 599 §9.1 — the ONE per-folder status derivation; the row glyph + meta line project from it.
 import {
   folderStatus,
@@ -97,6 +99,9 @@ const listResponseSchema = z
   })
   .loose();
 
+type GapDecisionView = { reindexKey: string; gapListHash: string;
+  gaps: readonly { unitId: string; reason: string }[] };
+
 /**
  * Tempdoc 804 §B9 (round-10 F8) — how a watched-folder row NAMES itself.
  *
@@ -145,6 +150,7 @@ export class LibrarySurface extends JfElement {
     error: { state: true },
     excludesText: { state: true },
     excludesLoaded: { state: true },
+    excludesBusy: { state: true },
     pendingPath: { state: true },
     pendingCollection: { state: true },
     pendingPreview: { state: true },
@@ -156,6 +162,9 @@ export class LibrarySurface extends JfElement {
     enrichmentPending: { state: true },
     enrichmentBlocked: { state: true },
     otherSources: { state: true },
+    gapDecision: { state: true },
+    gapDecisionBusy: { state: true },
+    gapDecisionError: { state: true },
   };
 
   declare apiBase: string;
@@ -166,6 +175,10 @@ export class LibrarySurface extends JfElement {
   declare error: string | null;
   declare excludesText: string;
   declare excludesLoaded: boolean;
+  declare excludesBusy: boolean;
+  private excludesWitness: SettingsWitness | null = null;
+  private excludesAttempt: SettingsAttempt | null = null;
+  private excludesLoadStarted = false;
   declare pendingPath: string;
   /**
    * Tempdoc 914 D4 — the optional collection the new watched root's documents are tagged with.
@@ -214,6 +227,14 @@ export class LibrarySurface extends JfElement {
    * entirely, not an empty shell.
    */
   declare otherSources: OtherSourcesSnapshot;
+  declare gapDecision: GapDecisionView | null;
+  declare gapDecisionBusy: boolean;
+  declare gapDecisionError: string | null;
+  private observedGapKey: string | null = null;
+  private gapRequestSerial = 0;
+  private gapDecisionAttemptSerial = 0;
+  private gapLoading = false;
+  private lastGapReadAtMs = 0;
 
   private aiUnsub: (() => void) | null = null;
   /**
@@ -243,6 +264,7 @@ export class LibrarySurface extends JfElement {
     this.error = null;
     this.excludesText = '';
     this.excludesLoaded = false;
+    this.excludesBusy = false;
     this.pendingPath = '';
     this.pendingCollection = '';
     this.pendingPreview = null;
@@ -254,6 +276,9 @@ export class LibrarySurface extends JfElement {
     this.enrichmentPending = false;
     this.enrichmentBlocked = false;
     this.otherSources = EMPTY_OTHER_SOURCES;
+    this.gapDecision = null;
+    this.gapDecisionBusy = false;
+    this.gapDecisionError = null;
   }
 
   // Tempdoc 571 §11 / 578: Library is a host surface — it delegates layout to <jf-surface-tabs>
@@ -307,6 +332,17 @@ export class LibrarySurface extends JfElement {
       color: var(--text-warning);
       font-size: var(--font-size-sm);
     }
+    .gap-decision {
+      margin-bottom: 1rem;
+      padding: 1rem;
+      border: 1px solid var(--accent-warning-30);
+      border-radius: 0.5rem;
+      background: var(--accent-warning-08);
+    }
+    .gap-decision h3 { margin: 0 0 0.5rem; font-size: var(--font-size-md); }
+    .gap-decision p { margin: 0 0 0.75rem; font-size: var(--font-size-sm); }
+    .gap-decision ul { max-height: 12rem; overflow-y: auto; padding-left: 1.25rem; }
+    .gap-decision li { font-size: var(--font-size-sm); overflow-wrap: anywhere; }
     .cards {
       display: grid;
       gap: 0.5rem;
@@ -520,12 +556,13 @@ export class LibrarySurface extends JfElement {
       this.isTauri = this.host_.platform.capabilities.has('folder-picker');
     }
     void this.refresh();
-    void this.loadExcludes();
+    if (!this.excludesLoadStarted) void this.loadExcludes();
     this.presentationUnsub = subscribePresentation(() => this.requestUpdate());
     // 595 §4.3 — observe the one Stability axis so an empty roots list during a
     // transition renders as "Rebuilding…", not "No watched folders".
     this.aiUnsub = subscribeAiState((s) => {
       this.provisional = s.stability.kind === 'provisional';
+      this.observeGapDecision(s.status?.worker?.migration);
       // Tempdoc 813 §4 — the per-root second tier needs to know which stages apply; take it from the
       // ONE index-wide progress derivation rather than re-reading the enrichment wire flags here.
       const progress = selectIndexingProgress(
@@ -565,6 +602,11 @@ export class LibrarySurface extends JfElement {
   protected override settleTransients(): void {
     this.loading = false;
     this.error = null;
+    this.gapDecisionError = null;
+    this.gapRequestSerial++;
+    this.gapDecisionAttemptSerial++;
+    this.gapLoading = false;
+    this.gapDecisionBusy = false;
   }
 
   override disconnectedCallback(): void {
@@ -778,36 +820,132 @@ export class LibrarySurface extends JfElement {
       method: init?.method,
       headers: init?.headers as Record<string, string> | undefined,
       body: init?.body as string | undefined,
+      signal: init?.signal ?? undefined,
     });
   }
 
-  private async loadExcludes(): Promise<void> {
-    try {
-      const res = await this.doFetch('/api/settings/v2');
-      if (!res.ok) return;
-      const body = await res.json();
-      const patterns: string[] = body?.ui?.excludePatterns ?? [];
-      this.excludesText = patterns.join('\n');
-      this.excludesLoaded = true;
-    } catch {
-      // Silent: excludes section still works, just starts empty.
-      this.excludesLoaded = true;
+  private observeGapDecision(migration: { migrationState?: string | null;
+    buildingGenerationId?: string | null } | null | undefined): void {
+    const building = migration?.buildingGenerationId ?? '';
+    const key = migration?.migrationState === 'AWAITING_ACCEPTANCE'
+      && /^g-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(building)
+      ? building.slice(2) : null;
+    if (key !== this.observedGapKey) {
+      this.observedGapKey = key;
+      this.gapDecision = null;
+      this.gapDecisionError = null;
+      this.gapRequestSerial++;
+      this.lastGapReadAtMs = 0;
+    }
+    if (key && !this.gapLoading && Date.now() - this.lastGapReadAtMs >= 4_000) {
+      void this.loadGapDecision(key);
     }
   }
 
-  private async persistExcludes(): Promise<void> {
-    const patterns = this.excludesText
-      .split('\n')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+  private async loadGapDecision(key: string): Promise<void> {
+    this.gapLoading = true;
+    this.lastGapReadAtMs = Date.now();
+    const serial = ++this.gapRequestSerial;
     try {
-      await this.doFetch('/api/settings/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ui: { excludePatterns: patterns } }),
-      });
+      const response = await this.doFetch(`/api/operation-history/${encodeURIComponent(key)}`);
+      if (!response.ok) throw new Error(`Could not read migration gaps (HTTP ${response.status})`);
+      const outcome: OperationOutcomeView = parseWireContract(operationOutcomeViewSchema,
+        await response.json(), '/api/operation-history/{operationKey}');
+      if (serial !== this.gapRequestSerial || key !== this.observedGapKey) return;
+      if (outcome.phase !== 'awaiting_acceptance') {
+        this.gapDecision = null;
+        return;
+      }
+      const result = outcome.result;
+      if (!result?.gapListHash || !/^[0-9a-f]{64}$/.test(result.gapListHash)
+          || !result.gaps?.length || result.gaps.some((gap) => !gap.unitId || !gap.reason)) {
+        throw new Error('Migration gap decision is incomplete');
+      }
+      this.gapDecision = { reindexKey: key, gapListHash: result.gapListHash,
+        gaps: result.gaps.map((gap) => ({ unitId: gap.unitId!, reason: gap.reason! })) };
+      this.gapDecisionError = null;
+    } catch (failure) {
+      if (serial === this.gapRequestSerial && key === this.observedGapKey) {
+        this.gapDecisionError = failure instanceof Error ? failure.message : String(failure);
+      }
+    } finally {
+      if (serial === this.gapRequestSerial) this.gapLoading = false;
+    }
+  }
+
+  private async acceptCurrentGaps(): Promise<void> {
+    const decision = this.gapDecision;
+    if (!decision || this.gapDecisionBusy) return;
+    const attemptSerial = ++this.gapDecisionAttemptSerial;
+    this.gapDecisionBusy = true;
+    this.gapDecisionError = null;
+    try {
+      const result = await this.host_.data.invokeOperation('core.accept-gaps', {
+        reindexKey: decision.reindexKey, gapListHash: decision.gapListHash,
+      }, { consented: true });
+      if (!result.success) throw new Error(result.message ?? 'Migration gap acceptance failed');
+      if (attemptSerial === this.gapDecisionAttemptSerial && this.isConnected
+          && decision.reindexKey === this.observedGapKey) {
+        await this.loadGapDecision(decision.reindexKey);
+      }
+    } catch (failure) {
+      if (attemptSerial !== this.gapDecisionAttemptSerial || !this.isConnected
+          || decision.reindexKey !== this.observedGapKey) return;
+      const refreshSerial = this.gapRequestSerial + 1;
+      await this.loadGapDecision(decision.reindexKey);
+      if (refreshSerial === this.gapRequestSerial && this.isConnected
+          && attemptSerial === this.gapDecisionAttemptSerial) {
+        this.gapDecisionError = failure instanceof Error ? failure.message : String(failure);
+      }
+    } finally {
+      if (attemptSerial === this.gapDecisionAttemptSerial) this.gapDecisionBusy = false;
+    }
+  }
+
+  private async loadExcludes(): Promise<void> {
+    if (this.excludesBusy || this.excludesAttempt) return;
+    this.excludesLoadStarted = true;
+    this.excludesBusy = true;
+    try {
+      const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
+      this.excludesText = (body.ui?.excludePatterns ?? []).join('\n');
+      this.excludesWitness = body.witness;
+      this.excludesLoaded = true;
+      this.error = null;
     } catch (err) {
+      this.excludesLoaded = false;
+      this.excludesWitness = null;
       this.error = err instanceof Error ? err.message : String(err);
+    } finally {
+      this.excludesBusy = false;
+    }
+  }
+
+  private async persistExcludes(): Promise<boolean> {
+    if (!this.excludesLoaded || !this.excludesWitness) return false;
+    try {
+      if (!this.excludesAttempt) {
+        const patterns = this.excludesText.split('\n').map((value) => value.trim()).filter(Boolean);
+        this.excludesAttempt = createSettingsAttempt({ ui: { excludePatterns: patterns } }, this.excludesWitness);
+      }
+      const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), this.excludesAttempt);
+      this.excludesWitness = result.witness;
+      this.excludesAttempt = null;
+      return true;
+    } catch (err) {
+      // An uncertain save remains the same attempt on the next Preview/Apply click.
+      // Do not let an edited draft acquire a newer witness while that row is unresolved.
+      const state = err instanceof SettingsAttemptError ? err.response?.['state'] : undefined;
+      const terminal = state === 'FAILED' || state === 'CANCELLED'
+        || (err instanceof SettingsAttemptError && ['VERSION_CONFLICT', 'SETTINGS_READ_ONLY', 'INVALID_REQUEST', 'INVALID_PATH',
+          'OPERATION_KEY_INVALID', 'OPERATION_KEY_REUSED', 'OPERATION_KEY_EXPIRED'].includes(err.code));
+      if (terminal) {
+        this.excludesAttempt = null;
+        this.excludesLoaded = false;
+        this.excludesWitness = null;
+      }
+      this.error = err instanceof Error ? err.message : String(err);
+      return false;
     }
   }
 
@@ -969,13 +1107,21 @@ export class LibrarySurface extends JfElement {
   }
 
   private async handlePreviewExcludes(): Promise<void> {
-    await this.persistExcludes();
-    await this.invoke(OP_PREVIEW, {});
+    await this.saveAndInvokeExcludes(OP_PREVIEW);
   }
 
   private async handleApplyExcludes(): Promise<void> {
-    await this.persistExcludes();
-    await this.invoke(OP_APPLY, {});
+    await this.saveAndInvokeExcludes(OP_APPLY);
+  }
+
+  private async saveAndInvokeExcludes(operation: string): Promise<void> {
+    if (this.excludesBusy || !this.excludesLoaded) return;
+    this.excludesBusy = true;
+    try {
+      if (await this.persistExcludes()) await this.invoke(operation, {});
+    } finally {
+      this.excludesBusy = false;
+    }
   }
 
   private renderStatusIcon(status: string): TemplateResult {
@@ -1242,6 +1388,7 @@ export class LibrarySurface extends JfElement {
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
+      ${this.renderGapDecision()}
       ${!this.isTauri
         ? html`<div class="browser-banner">
             ${icon({ name: 'alert-circle', size: 14 })}
@@ -1338,15 +1485,23 @@ export class LibrarySurface extends JfElement {
             </p>
           </div>
           <div class="actions">
-            <jf-button label="Preview" .onActivate=${() => void this.handlePreviewExcludes()}
+            <jf-button label="Reload saved patterns" .disabled=${this.excludesBusy || this.excludesAttempt !== null}
+              .onActivate=${() => void this.loadExcludes()}>Reload saved patterns</jf-button>
+            <jf-button label="Preview" .disabled=${!this.excludesLoaded || this.excludesBusy}
+              .onActivate=${() => void this.handlePreviewExcludes()}
               >Preview</jf-button
             >
-            <jf-button label="Apply" .onActivate=${() => void this.handleApplyExcludes()}
+            <jf-button label="Apply" .disabled=${!this.excludesLoaded || this.excludesBusy}
+              .onActivate=${() => void this.handleApplyExcludes()}
               >Apply</jf-button
             >
           </div>
         </div>
+        ${this.excludesAttempt && !this.excludesBusy
+          ? html`<p>Save completion is unknown. Retry Preview or Apply to check the same save.</p>` : nothing}
         <textarea
+          aria-label="Exclude patterns"
+          ?disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
           .value=${this.excludesText}
           @input=${(e: Event) =>
             (this.excludesText = (e.target as HTMLTextAreaElement).value)}
@@ -1354,6 +1509,23 @@ export class LibrarySurface extends JfElement {
         ></textarea>
       </div>
     `;
+  }
+
+  private renderGapDecision(): TemplateResult | typeof nothing {
+    if (!this.observedGapKey) return nothing;
+    const decision = this.gapDecision;
+    return html`<section class="gap-decision" aria-label="Migration gaps">
+      <h3>New index — activation requires your decision</h3>
+      ${decision ? html`
+        <p>${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} could not be
+          included in the new index. Your current index stays available until you accept this list.</p>
+        <ul>${decision.gaps.map((gap) => html`<li>${gap.unitId}: ${gap.reason}</li>`)}</ul>
+        <jf-button label="Accept gaps and activate" variant="primary"
+          .disabled=${this.gapDecisionBusy}
+          .onActivate=${() => void this.acceptCurrentGaps()}>Accept gaps and activate</jf-button>
+      ` : html`<p>Reading the migration gap list…</p>`}
+      ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}</p>` : nothing}
+    </section>`;
   }
 }
 

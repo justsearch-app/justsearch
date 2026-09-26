@@ -1,0 +1,1944 @@
+{
+  "date": "2026-09-13",
+  "range": "c9f5e3e93..a0c7d390a",
+  "totalCommits": 73,
+  "missingBodies": 54,
+  "scope": "Historical recorded claims and immutable Git evidence, not freshly executed verification or stage completion.",
+  "entries": [
+    {
+      "commit": "35d03f7c41d417faf9e7d54de6417bca0f451c2d",
+      "subject": "fix(hooks): keep worktree base imports free of stdin reads",
+      "item": "C1 tooling resumption",
+      "recordedResult": "Negative486 catches stdin import;487/490 pass hook suites; lint/parity/recipe checks pass.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C1/resume-2026-09-12.md",
+          "sha256": "1369411e56eb756b15743906d1edbf5baabb737002ab0bde809de4e6a02dc35d",
+          "gitRead": "git show 35d03f7c41d417faf9e7d54de6417bca0f451c2d:docs/design/lane-f-engine-jvm/evidence/C1/resume-2026-09-12.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/35d03f7c41d417faf9e7d54de6417bca0f451c2d/docs/design/lane-f-engine-jvm/evidence/C1/resume-2026-09-12.md",
+          "addedEvidenceLines": [
+            "Tooling482 was interrupted after importing worktree-base-hint left the Node test",
+            "is introduced. Regression486 fails against the old footer (reads1 versus0).",
+            "Restored487 passes all four hook/ledger files;490 passes all11 files,162 inner",
+            "Standalone removal491 passes5 checks, including expected refusal output. Script",
+            "lint493, agent parity488 and consult recipe validation489 pass.",
+            "Hook-integrity492 initially fails because this worktree's ignored local Claude",
+            "passes with zero findings. Existing local permissions/env remain preserved.",
+            "Raw: `tmp/c1-resume-tooling-482.txt`, `tmp/c1-base-hook-negative-486.txt`,",
+            "`tmp/c1-resume-hook-gate-negative-492.sarif`, `tmp/c1-resume-lint-493.txt`,"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "1501ff0c4cfbbc19ec563e29bf40a7b4764fa4eb",
+      "subject": "docs(lane-f): settle C2 idempotency and committed settings outcomes",
+      "item": "C2-3/C2-6 design",
+      "recordedResult": "Idempotency and committed-settings decisions only; implementation/proof explicitly owed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+          "sha256": "20f021269e381c77619d0647ce9969fa1a9751fcd46693323340662730b03102",
+          "gitRead": "git show 1501ff0c4cfbbc19ec563e29bf40a7b4764fa4eb:docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/1501ff0c4cfbbc19ec563e29bf40a7b4764fa4eb/docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+          "addedEvidenceLines": [
+            "A failed write throws and the caller must not proceed",
+            "verdict is marked `FAILED` with reason `interrupted_by_restart` only when no owner",
+            "witness in section1.8. A reconfigure interrupted before that commit becomes `FAILED`",
+            "preparation failure. Retire the direct public save bypass once all writers use the owner.",
+            "into a reported failed apply. Fatal Error is not swallowed: restart reads the committed",
+            "RuntimeException must complete from the committed receipt rather than report FAILED.",
+            "Precommit failure has no committed receipt: the runner fails the attempt and clears its",
+            "fence outside the mutex. Fatal process failure is reconciled from the file at boot.",
+            "No handler-visible complete/fail method, arbitrary callback under the apply mutex, or",
+            "that completion write fails after file replacement, retain RUNNING, refuse further",
+            "settings mutation and request the existing ordered restart; never report FAILED or",
+            "the row; unchanged revision means interrupted before commitment and fails it; an advanced",
+            "revision with another witness is an invariant violation and fails closed. A later",
+            "## 6. September12 resumption amendments and required proof",
+            "- Settings faults: failed prepare leaves file/revision/config unchanged; same expected",
+            "  failure prevents a second mutation until recovery. Test direct install/import writers",
+            "  Also prove postcommit RuntimeException cannot yield FAILED, nested applies are refused,",
+            "  and no direct production writer can bypass runner-owned AttemptControl."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "a480ac6f611a1de1e155a8e883c0db387a6d328b",
+      "subject": "docs(lane-f): bind D1 query generations and correct activation batches",
+      "item": "D1/C2 activation design",
+      "recordedResult": "Query-generation binding and activation batch decisions only; no runtime pass claimed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/stages/D1.md",
+          "sha256": "1f70f7526f664d8a41669d582e1423697f6da6e4fc3a54eb52e07ceea849d847",
+          "gitRead": "git show a480ac6f611a1de1e155a8e883c0db387a6d328b:docs/design/lane-f-engine-jvm/stages/D1.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/a480ac6f611a1de1e155a8e883c0db387a6d328b/docs/design/lane-f-engine-jvm/stages/D1.md",
+          "addedEvidenceLines": [
+            "composition precedes the settings-file commitment point. Before commitment, failure or",
+            "and fails the row naming the component. After commitment, publish only prepared references",
+            "failure is recovered as committed, never mislabeled FAILED. The bounded settings witness",
+            "becomes FAILED/ENGINE_RESTARTED_DURING_APPLY. Prove component installation needs no"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "e247533bd8d98cb8d5f6262ec3a6af0f10b22d18",
+      "subject": "docs(936): close C1 with complete live and hosted proof",
+      "item": "C1 proof reconciliation",
+      "recordedResult": "C1 full/live/hosted evidence reconciled; later MCP correction is separate.",
+      "currentDisposition": "C1 later MCP correction is covered by full863/869 and named hosted d9c80 artifacts; do not attribute it to the earlier C1 closure.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C1/acceptance-reconciliation.md",
+          "sha256": "20b3c3cc363ed7555111365803608f4480014669baf7faa27162454a678c12dc",
+          "gitRead": "git show e247533bd8d98cb8d5f6262ec3a6af0f10b22d18:docs/design/lane-f-engine-jvm/evidence/C1/acceptance-reconciliation.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e247533bd8d98cb8d5f6262ec3a6af0f10b22d18/docs/design/lane-f-engine-jvm/evidence/C1/acceptance-reconciliation.md",
+          "addedEvidenceLines": [
+            "hosted verification and live acceptance are separate. Every C1 item is reconciled below; later-stage obligations retain their named placement.",
+            "| C1-10 | Foreground actual dispatch increments exactly once; background and observer polling do not. Root walk and handoff corrections retain actual work. [Corrections](independent-review-fixes.md), [final candidate](final-candidate.md). | Standard-active primary460 passes all469 files and308/308 searches; fresh chat-offline483 completes full enrichment for469/469 and9720/9720 continuous searches, zero errors; [live proof](final-live.md). Historical470 remains interrupted. |",
+            "| C1-16 | Whole-program dead-code test passes, retired producer references are historical,17-seam gate and regeneration checks pass. [Governance sweep](governance-sweep.md). | Full478, Python456, hosted34683617524 and fresh offline483 pass; this record closes the stage-wide obligations. |",
+            "Full478 at merge9762cf593 passes with3 executed/366 up-to-date tasks and the same",
+            "represented counts as455. No modules changed since8f8; Java proof is reused only on",
+            "Python456 remains3640 passed,16 skips,83 warnings; prior failures remain recorded.",
+            "reset/backfill churn is explicit in [live proof](final-live.md), not hidden by the",
+            "final pass. Optional index settling and E quality/latency claims are not inferred."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C1/final-live.md",
+          "sha256": "79db6cb536a7bb8ef56fa1235d0f8b160ac8dbcf9dd481eb67321eda9f89ec7c",
+          "gitRead": "git show e247533bd8d98cb8d5f6262ec3a6af0f10b22d18:docs/design/lane-f-engine-jvm/evidence/C1/final-live.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e247533bd8d98cb8d5f6262ec3a6af0f10b22d18/docs/design/lane-f-engine-jvm/evidence/C1/final-live.md",
+          "addedEvidenceLines": [
+            "## Fresh chat-offline full enrichment483 \u2014 PASS, 2026-09-12",
+            "All469 materialized files index from zero and full readiness passes with no failure",
+            "with zero silent drops. This is C1 plumbing/pacing proof, not E latency or retrieval",
+            "to PENDING so backfill re-derives them. It preserves FAILED status. Timeline.py:230-240",
+            "recovery. This run claims convergence, not absence of enrichment churn or an E budget pass.",
+            "No failed request was removed or retried away. Historical470 remains interrupted.",
+            "is not an excluded search failure. Raw: `tmp/c1-resume-log-review-513.json`."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C1/hosted-ci.md",
+          "sha256": "a62c0052efa8167f1cd2bc7b47f80acd868194685ff86829d1a98fc7c3fdc7c8",
+          "gitRead": "git show e247533bd8d98cb8d5f6262ec3a6af0f10b22d18:docs/design/lane-f-engine-jvm/evidence/C1/hosted-ci.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e247533bd8d98cb8d5f6262ec3a6af0f10b22d18/docs/design/lane-f-engine-jvm/evidence/C1/hosted-ci.md",
+          "addedEvidenceLines": [
+            "passes all13 jobs at35d03f7c41d417faf9e7d54de6417bca0f451c2d, including Windows-native,",
+            "runs34683172273 and34683424602 were cancelled by later pushes, not successful proof.",
+            "Downloaded system XML contains88 cases in20 files, zero failures/errors,42 skips and",
+            "no failure/error/flaky/rerun elements. The indexing-ledger case and all five supervised"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C1/resume-2026-09-12.md",
+          "sha256": "28db65e561892bd14e3502e220f2c1c246c95577c2d5ee435a1626d3e8a370b9",
+          "gitRead": "git show e247533bd8d98cb8d5f6262ec3a6af0f10b22d18:docs/design/lane-f-engine-jvm/evidence/C1/resume-2026-09-12.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e247533bd8d98cb8d5f6262ec3a6af0f10b22d18/docs/design/lane-f-engine-jvm/evidence/C1/resume-2026-09-12.md",
+          "addedEvidenceLines": [
+            "the60s periodic rescan. Full enrichment subsequently passes483; the final result and clean stop are in"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "b77b68e2fb1770f86bd7a272459efff631d829ad",
+      "subject": "feat(936): C2-2 guard queued completion by processing claim",
+      "item": "C2-2 queue claim prerequisite",
+      "recordedResult": "Negative572/573; focused571 and corrected integrated575 pass after fixture signature migrations.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "bf32b1bdff077d2c9d9e7fb39cba661776b19957b52d3f8f2d29cd538270d92e",
+          "gitRead": "git show b77b68e2fb1770f86bd7a272459efff631d829ad:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/b77b68e2fb1770f86bd7a272459efff631d829ad/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "# C2-2: implementation seams and verification plan",
+            "Status: source-grounded at6a4059352 on2026-09-12; batch1 closed at e60e2cb0d; C2-2 implementation and negative proofs in progress.",
+            "   its current synchronous syncDirectory shortcut cannot bypass that authority.",
+            "5. The runner accepts before scheduling/enqueue/effect, then owns start, failure,",
+            "   before exposing any existing outcome. Capability/input/admission failures after",
+            "   failure propagates and no unit runs. Handler acceptance of its own dispatch row",
+            "8. Negative568 reproduces an older committed unit incorrectly completing a newer",
+            "   and failure paths. The capability need not persist: a restarted Engine cannot",
+            "   validate successful admission before counting units; a short/failed enqueue",
+            "   becomes a typed runner failure, never a clean enumeration completion.",
+            "  before the first enqueue and failed-acceptance/no-enqueue are required tests.",
+            "that only a later producer can prove; keep each proof boundary explicit.",
+            "Store tests must refute same-key duplicate execution, identity mismatch, failed",
+            "id in jobs, including failure before the first enqueue. Scheduled tests must show",
+            "acceptance at scheduling time and failure when fire-time admission refuses.",
+            "## Independent review and negative evidence",
+            "handle-location bullet and ignored enqueue failure. The root's decisions above",
+            "must demonstrate those decisions, including delayed/failed index startup, repeated",
+            "-PtestParallelism=1 --max-workers=4 --console=plain fails the intended assertion in",
+            "tmp/c2-2-queue-ownership-negative-568.txt and .xml. Production had not changed:",
+            "collection and provenance project from that claim), stale/failure/defer writes and",
+            "remove a current claim's failed retry along with a value-equal stale transition.",
+            "Negative573 reproduced that exact loss (expected one pending transition, actual",
+            "also retries the surviving current transition successfully. Negative572 proved a",
+            "QUEUE_ADMISSION_FAILED error instead of producing a clean terminal frame.",
+            "Evidence: tmp/c2-2-scan-admission-negative-572.txt/.xml and",
+            " tmp/c2-2-journal-identity-negative-573.txt/.xml. Focused571 passed after updating the",
+            "failed nine old-signature calls; 569 XML retained under",
+            " tmp/c2-2-worker-services-569-xml). Integrated574 completed with eleven failures, all the other old reflective helper",
+            "in AdversarialCorpusIngestionTest; the rest passed. Its output/XML are preserved",
+            "migrated with unchanged behavioral assertions. Run575 passes (4m29s): full",
+            "committed scan rows. The bounded UI/audit stream cannot substitute for this proof."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+          "sha256": "717cd27d698d5f064a33b84d9cfd9978781184c271650be0266a7381e773db7f",
+          "gitRead": "git show b77b68e2fb1770f86bd7a272459efff631d829ad:docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/b77b68e2fb1770f86bd7a272459efff631d829ad/docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+          "addedEvidenceLines": []
+        }
+      ]
+    },
+    {
+      "commit": "530da091464cd1cfa171ae46f9c7233289563e49",
+      "subject": "feat(936): C2-2 add shared durable operation runner core",
+      "item": "C2-2 durable runner",
+      "recordedResult": "578:49 tests;579:35; writer-gate negative580 and architecture583. No producer activation closure.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "8dcebff7624406f219dd15ca3bb70a03db956e5de081e8e1d17fd147e82d4ad1",
+          "gitRead": "git show 530da091464cd1cfa171ae46f9c7233289563e49:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/530da091464cd1cfa171ae46f9c7233289563e49/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "attempt can fail only while ACCEPTED. Failed completion persistence leaves RUNNING",
+            "and fails the completion observation. Synchronous exceptions are recorded and",
+            "return wait/complete/fail/resume verdicts; only the runner writes terminal state.",
+            "The C2-8/D1 owners still supply their four-condition eligibility/identity proofs.",
+            "578 passes acceptance/key/consent and all six original Runtime.halt recovery",
+            "points. 576's six child failures were missing Jackson in the explicit child",
+            "579 passes the runner/store/key tests and owner PMD checks (24s), with XML retained",
+            "Gate negative580 detects both new unregistered record writers. After adding their",
+            "pass. Negative SARIF/log are retained as tmp/c2-2-operation-surface-negative-580.*;",
+            "snapshot on b77b68e2f and the retained evidence: 578 has49 tests and579 has35,",
+            "all without failures/errors/skips. Run583 passes OperationStoreArchitectureTest,",
+            "including a negative fixture proving a producer cannot write terminal state."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "8482492c0ee98c8f9e15bf4aee953f5c1ec8e849",
+      "subject": "feat(936): C2-2 wire shared runner into dispatch and undo",
+      "item": "C2-2 dispatch/undo",
+      "recordedResult": "586:93 tests/12 suites; writer-gate negative587; guard589 and PMD591 pass.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "d0bd1997b3f9af7e49b1cb080e3714cea0ffc99bdfc069800d7be87bcd586a23",
+          "gitRead": "git show 8482492c0ee98c8f9e15bf4aee953f5c1ec8e849:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/8482492c0ee98c8f9e15bf4aee953f5c1ec8e849/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "retain the default interrupted failure. Dispatch and supported undo accept after",
+            "Its regression test is unchanged. 586 passes93 tests in12 suites without failures,",
+            "errors or skips, including real-store async completion, acceptance failure/no body,",
+            "Surface negative587 detects the new dispatch writer; registered projection588 passes.",
+            "Retained negative SARIF: tmp/c2-2-dispatch-surfaces-587.sarif.",
+            "Register guard589 passes. Owner checks590 caught12 unnecessary fully-qualified",
+            "591 passes the architecture test and app-services/app-engine PMD main/test checks.",
+            "overrides, ingestion, scheduled producers and installed proofs remain required.",
+            "map or polling projection. Their current already-running failures remain failures."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "5f0c2c9319e8ff0694411174d0f43a35f0f6cb78",
+      "subject": "fix(936): C2-2 surface synchronous completion storage failures",
+      "item": "C2-2 synchronous storage refusal",
+      "recordedResult": "Negative592 rejects false success;593 runner/executor and system-test compilation pass.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "95eba9496df0c4e49297d7cd9d332466b01aad37736585b85a1ba56c9eb5735e",
+          "gitRead": "git show 5f0c2c9319e8ff0694411174d0f43a35f0f6cb78:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/5f0c2c9319e8ff0694411174d0f43a35f0f6cb78/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "Independent review of8482492c0 found two defects. Negative592 proves synchronous",
+            "terminal-write failure returned success (expected OperationStoreException, nothing",
+            "already-observed completion persistence failure before returning the immediate",
+            "response; later async failures remain exposed by the completion stage. The row",
+            "their existing store. 593 passes the executor/runner regression suites and",
+            ":modules:system-tests:compileSystemTestJava. Negative log/XML:",
+            "tmp/c2-2-dispatch-storage-negative-592.*; positive log/XML/counts:"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "8d5c424f7f5f0b87b493d33e9d294976b42bb401",
+      "subject": "docs(936): adopt project-memory requirements in lane F stages",
+      "item": "955 consumer amendments",
+      "recordedResult": "Six requirements adopted in owning stages; consumer implementation and proofs remain owed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+          "sha256": "fe08635874a8277cf87d21715c287b540440d626a7d8805c9a44fc4dab6720fe",
+          "gitRead": "git show 8d5c424f7f5f0b87b493d33e9d294976b42bb401:docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/8d5c424f7f5f0b87b493d33e9d294976b42bb401/docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md",
+          "addedEvidenceLines": [
+            "and non-dispatched-consumer proof. D1 journals non-file upserts/deletes and treats a"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/project-memory-consumer.md",
+          "sha256": "b29e02f43581fb678822a5b727849dfe362c46a7063034710a7225358998333c",
+          "gitRead": "git show 8d5c424f7f5f0b87b493d33e9d294976b42bb401:docs/design/lane-f-engine-jvm/evidence/C2/project-memory-consumer.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/8d5c424f7f5f0b87b493d33e9d294976b42bb401/docs/design/lane-f-engine-jvm/evidence/C2/project-memory-consumer.md",
+          "addedEvidenceLines": [
+            "client bucket until established, so arbitrary session strings cannot bypass the fix.",
+            "Required correction proof: hold one admitted MCP call, rotate the client-id header",
+            "C2, recorded separately from the already-completed C1 hosted/live proof.",
+            "OperationExecutorImpl. The port exposes accept and complete/fail semantics through",
+            "The fixture must fail acceptance before touching the store, persist an effect only",
+            "after acceptance/start, terminalize failures truthfully and complete exactly that",
+            "Required C2-3 cases: terminal retry after the note file exists, accepted retry after",
+            "with an authoritative durable absence proof. The projection and note un-designation",
+            "Required proof: immediate forced restart preserves deletion; concurrent durable",
+            "deletes coalesce commits; failed commit yields no durable success; a concurrent"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "871a021bb56f331878cbda29ed0221b5db0298e8",
+      "subject": "feat(936): C2-2 record scheduled agent work through actual outcome",
+      "item": "C2-2 scheduled agent producer",
+      "recordedResult": "596:35 tests/7 suites and PMD; negative595 and registered597/598 gates.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "97926311d0170ab4def5a138c5015974e38289ccb890c63b33ad98e589d62216",
+          "gitRead": "git show 871a021bb56f331878cbda29ed0221b5db0298e8:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/871a021bb56f331878cbda29ed0221b5db0298e8/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "propagated on direct calls; scheduled calls also log failures instead of swallowing",
+            "fails, CANCELLED cancels, and missing/nonterminal outcome never claims completion.",
+            "596 passes35 tests in7 suites without failures/errors/skips and app-agent/ui/",
+            "app-observability owner PMD checks. Cases include acceptance failure/no timer, timer",
+            "actual work-lifetime tests. Retained evidence: tmp/c2-2-scheduled-verification-596.txt,",
+            "qualification violations were corrected without rule changes. Surface negative595",
+            "detects the new producer; registered597 and guard-resolution598 pass. C2-2 remains",
+            "installed acceptance-before-effect proof."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "fc67f6ed96fa9abf089d9ee8787684465284a617",
+      "subject": "fix(936): bind MCP admission identity to server-issued sessions",
+      "item": "C1 MCP identity correction",
+      "recordedResult": "Negative599;601:66 tests/5 suites and PMD. Focused proof, later integrated/hosted coverage separate.",
+      "currentDisposition": "C1 later MCP correction is covered by full863/869 and named hosted d9c80 artifacts; do not attribute it to the earlier C1 closure.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C1/mcp-session-quota.md",
+          "sha256": "fc4d7debe4371dd1e2829c1e20e4a8d89417d88d75f2bd734b13ed6562318ff9",
+          "gitRead": "git show fc67f6ed96fa9abf089d9ee8787684465284a617:docs/design/lane-f-engine-jvm/evidence/C1/mcp-session-quota.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/fc67f6ed96fa9abf089d9ee8787684465284a617/docs/design/lane-f-engine-jvm/evidence/C1/mcp-session-quota.md",
+          "addedEvidenceLines": [
+            "the correction commit contains this record. The older C1 hosted/live proof is",
+            "existing retry-safe JSON-RPC refusal. Existing aggregate-limit tests also pass.",
+            "Verification on Windows/JDK25:",
+            "./gradlew.bat :modules:ui:test --tests '*RequestEngineContextTest' --tests '*EngineAdmissionTransportTest' --tests '*McpProtocolHandlerTest' --tests '*McpOriginValidationTest' :modules:ui:pmdMain :modules:ui:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+            "Run601 passes66 tests in5 suites, no failures/errors/skips; PMD main/test pass",
+            "(main reused unchanged600 input). Run600's sole failure was the superseded",
+            "- tmp/c1-mcp-quota-negative-599.txt and .xml: executable counterfactual.",
+            "- tmp/c1-mcp-quota-verification-600.txt and tmp/c1-mcp-quota-600-xml: prior failure.",
+            "- tmp/c1-mcp-quota-verification-601.txt, tmp/c1-mcp-quota-601-xml and",
+            "The correction has focused local proof; the next coherent C2 integrated and hosted"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "aad9d1845ea417630b1741e620b49d86dbc3926c",
+      "subject": "test(936): prove non-dispatched sealed mutation admission",
+      "item": "C2-2 non-dispatched consumer port",
+      "recordedResult": "602:10 tests/2 suites including4 sealed-mutation cases; actual955 MemoryAdmission remains downstream.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "f7a0d477b37234da40d08b1f1a0c6d37843344e2661458f627653e2e81ef6f3b",
+          "gitRead": "git show aad9d1845ea417630b1741e620b49d86dbc3926c:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/aad9d1845ea417630b1741e620b49d86dbc3926c/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "accept/complete/fail without catalog dispatch. Its Javadoc now explicitly describes",
+            "effect. Injected acceptance INSERT failure proves zero entries into the sealed store.",
+            "Injected effect INSERT failure produces FAILED and a failed retry receipt without",
+            "602 passes10 tests in2 suites (new consumer4 plus existing runner6), no failures,",
+            "./gradlew.bat :modules:app-observability:test --tests '*NonDispatchedMutationTest' --tests '*OperationAttemptRunnerTest' :modules:app-api:pmdMain :modules:app-observability:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+            "failure injections. This is local port proof;955's actual MemoryAdmission/store and",
+            "async handler owners and installed acceptance-before-effect crash proof."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/project-memory-consumer.md",
+          "sha256": "09ce831725a65065d4714f33832d14ea16ea5a53a73061941479403365d094fd",
+          "gitRead": "git show aad9d1845ea417630b1741e620b49d86dbc3926c:docs/design/lane-f-engine-jvm/evidence/C2/project-memory-consumer.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/aad9d1845ea417630b1741e620b49d86dbc3926c/docs/design/lane-f-engine-jvm/evidence/C2/project-memory-consumer.md",
+          "addedEvidenceLines": [
+            "Implemented local port proof602: four sealed-mutation consumer cases plus six runner",
+            "cases pass; see [C2-2 evidence](C2-2-plan.md#non-dispatched-sealed-mutation-consumer-september12)."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "5f2285f63211dd1ca945f1cd8d1bb0a3e017816c",
+      "subject": "feat(936): complete runtime operation rows after owner cleanup",
+      "item": "C2-2 runtime owner completion",
+      "recordedResult": "Negative606 rejects early receipt;608/609 owner and transport gates pass;609:11 tests/5 suites.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "c268ee051d964157f4a0e4e5e39fba96ebd7a645fea26a29a241e0018055deed",
+          "gitRead": "git show 5f2285f63211dd1ca945f1cd8d1bb0a3e017816c:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/5f2285f63211dd1ca945f1cd8d1bb0a3e017816c/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "602 passes11 tests in3 suites (new consumer4, existing runner6 and the automatically",
+            "included diagnostic architecture guard1), no failures,",
+            "A completed self-test with failed/inconclusive result did not activate the variant",
+            "and must fail the operation rather than claim its requested effect completed.",
+            "owner stage if the adapter's broader status read failed after starting. Root fixes",
+            "both here: start refusal writes failed status and frees the guard; read the broader",
+            "record. Exceptional owner exit also sets failed status before releasing its lease.",
+            "Verification:607 passes79 tests in13 suites, no failures/errors/skips, plus affected",
+            "refusal no longer leaves phantom running status; a broad status-read failure starts",
+            "no effect. Failed/inconclusive self-test yields a failed receipt.609 additionally",
+            "proves an unexpected owner exception releases its lease, sets failed status, allows",
+            "and test PMD pass; exact counts in retained JSON).",
+            "Negative606 temporarily restored the old finished-started adapter and fails the",
+            "constructor;604's78-test pass predates the independent review corrections.",
+            "tmp/c2-2-runtime-negative-606.txt/.xml; tmp/c2-2-runtime-failures-609.txt.",
+            "These are local owner/transport proofs; integrated stress, installed crash and live",
+            "pass; llmstxt/skills-sync checks pass.609 totals11 tests in5 suites including the"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "3be553d891de2f41460772572ec2169b72cb6b86",
+      "subject": "fix(936): preserve live install ownership across stale status reads",
+      "item": "C2-2 live install ownership",
+      "recordedResult": "Negative612 catches stale-status reaping;613:10 tests/6 suites and PMD pass.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "08024609aa38bd977123b5ad3c9507478196c3e4bb28f95fdba40706d792b095",
+          "gitRead": "git show 3be553d891de2f41460772572ec2169b72cb6b86:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/3be553d891de2f41460772572ec2169b72cb6b86/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "Reaper prerequisite: negative612 observes failed instead of running while the owner",
+            "refusal; the original stale-unowned and fresh-status tests pass unchanged.613 passes",
+            "10 tests in6 suites, no failures/errors/skips, plus app-services PMD main/test.",
+            "Evidence: tmp/c2-2-install-reaper-negative-612.txt/.xml,"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "d86d5d40c656c705889c8ad80ded97cff3929dec",
+      "subject": "feat(936): record install and repair through actual owner completion",
+      "item": "C2-2 install/repair producer",
+      "recordedResult": "618 producer gate;621 cancellation/cleanup and existing stress cases pass.620 was an empty-selector failure.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "348aa6be755bc37cf589bc68a4d4267a634457b8b4c3d06a192a34f64a5542ff",
+          "gitRead": "git show d86d5d40c656c705889c8ad80ded97cff3929dec:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/d86d5d40c656c705889c8ad80ded97cff3929dec/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "615 passes123 tests in26 suites, no failures/errors/skips, plus app-services/API PMD",
+            "and one unnecessary qualification; both corrected. Negative616 restores the old",
+            "finished-started adapter and fails the pending-completion assertion at held cleanup;",
+            "tmp/c2-2-install-negative-616.txt/.xml. Live download/model success is not claimed by",
+            "activation, bypassing catalog dispatch. The current checkpoint fixes catalog handler",
+            "new owner snapshots cannot alias. Its proof audit requested explicit cleanup-error",
+            "lease cleanup is held, then cancels. Lease-release failure remains exceptional and",
+            "Combined local618 passes163 tests in17 suites (dispatch/undo, shared runner,",
+            "tmp/c2-2-producers-618-xml and -counts.json.617/619 surface and guard gates pass.",
+            "The initial broad stress620 command fails because app-agent has no *Stress* tests;",
+            "this is an invocation mismatch, not a failed stress case. Its log and available XML",
+            "621 passes the added real-owner cancellation and cleanup-error cases, existing",
+            "unit/controlled concurrency proofs, not a live model download or installed crash.",
+            "Root independently read the XML after the review; no required proof is waived.",
+            "621 exact counts: app-services15 tests/7 suites, adapters-lucene1/1, ort-common1/1;",
+            "all zero failures/errors/skips. Code revision is the install completion commit carrying",
+            "before the negative injection, which is restored. No install item is marked closed."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "4e800f61d88cf99d53b57290cfc4d65907cd472f",
+      "subject": "fix(936): retain Engine quota through actual operation completion",
+      "item": "C2-2 Engine quota lifetime",
+      "recordedResult": "Negative623;625:116 tests/13 suites with explicit reuse; surface626/guard627 pass.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "37cc25f60509135566a480cf904bc54cc9c2c5783bc49ea7e0741eee3223dac2",
+          "gitRead": "git show 4e800f61d88cf99d53b57290cfc4d65907cd472f:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/4e800f61d88cf99d53b57290cfc4d65907cd472f/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "retain before invoking the handler, pass the admitted context and release that retained",
+            "622 compiles production wiring and passes existing dispatcher/composition tests but the",
+            "stop in finally. Negative623 removes only the retained reference: all four HTTP outcome",
+            "arms fail while checking that work survives the response (expected1, actual0), before",
+            "tmp/c2-2-dispatch-admission-negative-623.txt and -623-xml.",
+            "Restored625 passes116 tests in13 suites: app-services87/8 (unchanged results reused",
+            "from622), UI29/5 executed, zero failures/errors/skips, plus PMD.624's four async HTTP",
+            "arms passed; its separate refusal fixture accidentally used the validator's explicit",
+            "expectation changed. Negative623 remains a valid counterexample to ownership.",
+            "-625-xml and -625-counts.json. Operation-surface626 and guard-resolution627 pass.",
+            "existing-attempt bypass, synchronous attach/retain/body failures, cancellation, fatal",
+            "the negative/positive XML. The quota reference closes on actual effect completion;",
+            "terminal-row persistence follows and has its separate C2 failure semantics. HTTP quota",
+            "proof does not claim live install/download success; hosted inclusion remains at C2."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "3e6569a0df329f793553e09055bb4646839d7546",
+      "subject": "test(936): supply operation runner to schema integration fixture",
+      "item": "C2 integration fixture repair",
+      "recordedResult": "633 UI integration-test compilation and PMD pass; prior hosted constructor failures retained.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "sha256": "6abcd7b819a7fabdede1b2cbc4cb0d76ab5adadd0349630698e09227aba566ec",
+          "gitRead": "git show 3e6569a0df329f793553e09055bb4646839d7546:docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/3e6569a0df329f793553e09055bb4646839d7546/docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "addedEvidenceLines": [
+            "# C2 hosted verification",
+            "September12: CI34695294553 at3be553d89 passes12 jobs but Build (no model blobs)",
+            "fails in the all-source-set static-analysis step: ui compileIntegrationTestJava,",
+            "set. CI34696855256 at4e800f61d repeats that exact failure in completed build job",
+            "Raw logs: tmp/c2-hosted-34695294553-failed.txt and",
+            "log is retained in tmp/c2-hosted-34696855256-failed.txt (not a failure log).",
+            "Local633 passes :modules:ui:compileIntegrationTestJava and :modules:ui:pmdIntegrationTest"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "70e9e577ca50fd0726574dd188245e232b75e062",
+      "subject": "feat(936): complete pack import records after owner cleanup",
+      "item": "C2-2 pack import producer",
+      "recordedResult": "Negative630 rejects early completion;631 owner cases and PMD; surface629/guard632 pass.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "cc9866e5317c77c59fd8e689c17ad02e2022cbcddabdb3b0e96f806877e83cc7",
+          "gitRead": "git show 70e9e577ca50fd0726574dd188245e232b75e062:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/70e9e577ca50fd0726574dd188245e232b75e062/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "or thread-start refusal clears it with PACK_IMPORT_START_FAILED. Unexpected runtime",
+            "owner/cleanup failure completes exceptionally with PACK_IMPORT_OWNER_FAILED status;",
+            "fatal Error remains exceptional, not a successful operation receipt. A domain failure",
+            "that returns normally releases the lease with FAILURE, not the old unconditional",
+            "Pack628 and restored631 each pass84 tests in8 suites, zero failures/errors/skips,",
+            "while the row remains RUNNING and a duplicate is refused, then prove domain failure,",
+            "registration refusal, cleanup failure, and stale-owned versus stale-unowned status.",
+            "Negative630 restores finished(started) and fails the pending-completion assertion;",
+            "-counts.json; tmp/c2-2-pack-negative-630.txt and -630-xml. Surface629 and guard632 pass.",
+            "628 and the negative evidence. Root read631 and all counts. Thread.start refusal is",
+            "cleanup exceptions are executed. The opposing initial running/terminal failed values",
+            "status. No live installed distribution/crash or hosted proof is claimed by these tests.",
+            "commit3e6569a0d corrects it and633 passes integration compilation/PMD. See",
+            "[hosted evidence](hosted-ci.md). The failure is not waived and fresh hosted success"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "1cbe0a3059abad182c2a6c59ab4d67111f8f1b69",
+      "subject": "docs(936): reconcile producer checkpoint and remaining completion work",
+      "item": "C2 producer proof checkpoint",
+      "recordedResult": "CI34697406424 artifacts reconciled; orphan required retry, explicitly not clean first-attempt proof.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "053976017b63eab190cffd1b9de0c804d6e7f06305dc1733f74ed3756c21cada",
+          "gitRead": "git show 1cbe0a3059abad182c2a6c59ab4d67111f8f1b69:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/1cbe0a3059abad182c2a6c59ab4d67111f8f1b69/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "At pushed code revision 70e9e577c, `gradlew.bat build pmdAll -PtestParallelism=1",
+            "--max-workers=4 --console=plain` passes in 19m30s: 366 tasks (78 executed, 3 from",
+            "actual Gradle output total 9,901 cases/1,624 suites, zero failures/errors, 35 skips.",
+            "while searches execute; no test was killed, bypassed or weakened. Hosted evidence at",
+            "1. Resolve the newly observed hosted orphan-test identity failure with a nonvacuous",
+            "   clean. Preserve the raw failed attempt and successful retry.",
+            "   proof of final Lucene commit. Recorded ingestion needs its separate committed-unit",
+            "   (VDU pass and embedding-mode handoff), not immediate virtual-thread dispatch or"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "sha256": "8c40f5c342c56ef83c7a058c5949f4f6ba0970d6275802fcca608243aad31884",
+          "gitRead": "git show 1cbe0a3059abad182c2a6c59ab4d67111f8f1b69:docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/1cbe0a3059abad182c2a6c59ab4d67111f8f1b69/docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "addedEvidenceLines": [
+            "integration. The old missing-runner constructor failure is resolved. New hosted",
+            "EngineAdmissionTransportTest (9), all without failures/errors/skips. This includes",
+            "case entries in 21 suites, 42 skips and one failed attempt. ExtractionSandboxOrphanE2ETest",
+            "first fails at line 126 (the parser PID must not be in the pre-root descendant set),",
+            "policy. Do not describe this as a clean first-attempt orphan proof. The first failure",
+            "The app-ui artifact totals 5,228 cases/807 suites, 4 skips, no failures/errors;",
+            "search-worker totals 3,264/583, 43 skips, no failures/errors. These are artifact totals,",
+            "- tmp/c2-hosted-34697406424-integration.txt (failed attempt, successful retry and job result)."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "03c05f47e253f6fa5ff0c4c65b6d189479cec4e0",
+      "subject": "fix(936): publish queue changes after committed owner bookkeeping",
+      "item": "C2-2 queue projection prerequisite",
+      "recordedResult": "Negative641 observes native-hook callbacks;642:153 tests/13 suites and PMD pass.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "172291c45514c535c597fc366c01223546ce744ddd9b24f7020baecb63bb7c8b",
+          "gitRead": "git show 03c05f47e253f6fa5ff0c4c65b6d189479cec4e0:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/03c05f47e253f6fa5ff0c4c65b6d189479cec4e0/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "also exposed SQLite truncate optimization bypassing update hooks; DELETE with WHERE 1",
+            "Focused636 passed153 tests/13 suites with zero failures/errors/skips plus main/test PMD.",
+            "Initial635 exposed missing clear-all deletes (151/153 passed) and a PMD guard-shape issue;",
+            "both fixed without suppressions or weakened assertions. Negative637 put delivery back",
+            "inside the native hook but the independent-reader assertion still passed: visibility alone",
+            "does not establish the callback boundary. Negative638 had a new-test generic-overload",
+            "compile error. Negative639 detected the callback frame inside JNI, whose swallowed test",
+            "assertion made the later observed-state assertion fail. The final regression records the",
+            "callback frame and asserts outside JNI so the failure states the exact boundary violation.",
+            "plus tmp/c2-2-queue-projection-negative-{637,638,639,641}.txt and available -xml captures.",
+            "fail-closed initial handoff and forced-interleaving tests; never hold the emitter lock while",
+            "acquiring the queue lock. This is required work, not a waiver. Hosted/integrated proof for",
+            "Final negative641 fails explicitly: expected callback-inside-native-hook [false,false],",
+            "observed [true,true]. Restored642 passes153 tests/13 suites, zero failures/errors/skips,",
+            "whitespace pass. No weakening of validation or callback exception suppression was added."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "41eed16e6806accdb5a0e6ac13fce7a02db12437",
+      "subject": "fix(936): deliver indexing snapshot before concurrent deltas",
+      "item": "C2-2 snapshot before deltas",
+      "recordedResult": "Negative645;648:23 tests/5 suites and PMD pass; handoff overflow/sink failure covered.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "5d25098bafbe29f9eedb79ae162e44ac5331878afaeb1cf4c5383c35d46ba645",
+          "gitRead": "git show 41eed16e6806accdb5a0e6ac13fce7a02db12437:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/41eed16e6806accdb5a0e6ac13fce7a02db12437/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "the subscription (including a handle returned after overflow) and fails with UNAVAILABLE",
+            "Cancellation and snapshot failure close the subscription and stop buffered delivery.",
+            "returns. Initial644 passes19 tests/5 suites plus worker-services main/test PMD. Original",
+            "service negative645 fails the first-frame-is-snapshot assertion (1 test/1 failure).",
+            "tmp/c2-2-snapshot-order-negative-645.txt and -645-xml. The intended service is restored",
+            "from the snapshot sink. Hosted/integrated and named stress proof remains required at",
+            "Restored646 passes21 tests/5 suites, zero failures/errors/skips plus PMD. Independent",
+            "review found no material source defect and requested a buffered-delta sink-failure",
+            "regression. Final648 adds that case and overflow during snapshot emission:23 tests/5",
+            "suites pass, zero failures/errors/skips, with main/test PMD (main unchanged-input reuse).",
+            "diff whitespace pass. Root independently inspected the failure and final result XML."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "f5c2c2edc629b962d469b82659bc4197d9270b79",
+      "subject": "test(936): force indexing snapshot handoff across threads",
+      "item": "C2-2 concurrent snapshot witness",
+      "recordedResult": "Forced cross-thread handoff:10 snapshot tests and PMD pass; orphan runtime not claimed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "7ca39de82786329a99f5c229041cee14f12a8b46022df59aa3e4f0b52581769f",
+          "gitRead": "git show f5c2c2edc629b962d469b82659bc4197d9270b79:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/f5c2c2edc629b962d469b82659bc4197d9270b79/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "subscribe would deadlock and fail the bounded assertion. The10 snapshot-order tests pass",
+            "with zero failures/errors/skips and worker-services test PMD. The same command compiles",
+            "and PMD-checks the in-progress orphan fixture separately; it is not an orphan runtime proof."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "758aeb2eb2a371971c078fbdc4838f2a4f7928a7",
+      "subject": "test(936): prove orphan containment with a reused parser identity",
+      "item": "B17/C2 orphan containment proof",
+      "recordedResult": "650/652/653 installed cases pass; negatives651/654 reject old PID freshness assertion.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "ea7c37369c71738ed04c7a9ac03ede4d55632c1c52a5236c69fbcb0e977d4083",
+          "gitRead": "git show 758aeb2eb2a371971c078fbdc4838f2a4f7928a7:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/758aeb2eb2a371971c078fbdc4838f2a4f7928a7/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "### Orphan proof correction",
+            "The inherited A12 Windows proof now prewarms and reuses an exact production parser",
+            "Final local653 passes actual kill/reap, negative654 refutes the old freshness rule and",
+            "exercises bounded failure cleanup, and655 restores identical-source cached proof.",
+            "Independent review passes after identity-publication and cleanup findings were fixed.",
+            "retention and the still-required fresh hosted first-attempt/integrated/stress proof."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "sha256": "b6959c98e4640b7ef1ace4794255cf63bcfe25e3d4398080679de045cbd7dca0",
+          "gitRead": "git show 758aeb2eb2a371971c078fbdc4838f2a4f7928a7:docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/758aeb2eb2a371971c078fbdc4838f2a4f7928a7/docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "addedEvidenceLines": [
+            "snapshot. The original hosted artifact did not log identities, so its exact first-failure",
+            "live identity cannot prove death. Failure cleanup waits boundedly for both owned children,",
+            "retains primary failures, and preserves backend logs. No production parser behavior or",
+            "Local Windows/Java25 proof:",
+            "-650 passes first attempt in25s: Engine23364, reused parser35816, native11184; both",
+            "reaped519ms. -652 passes in13s after the observation-race correction, reaped312ms.",
+            "parser31200, native37676; both reaped522ms. Each has1 test and zero failures/errors/skips.",
+            "-651 and final-654 temporarily restore the old freshness assertion and fail exactly on",
+            "preserves that primary assertion with no suppressed cleanup failure; bounded cleanup",
+            "PMD pass. Independent source review and independent re-reading of -650/-653 pass after",
+            "tmp/c2-2-orphan-reuse-negative-{651,654}.txt, matching -xml/ and -logs/ (backend/engine",
+            "failure logs copied out before later runs). Retain through lane acceptance plus30 days.",
+            "Corrected hosted first-attempt proof and integrated/named stress checks are still owed",
+            "at this checkpoint; the earlier hosted retry is not retroactively converted to clean proof."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "0bdf584bc14c5d21e85255294238effd95f60f2f",
+      "subject": "docs(936): repair orphan amendment UTF-8 encoding",
+      "item": "C2 amendment encoding repair",
+      "recordedResult": "Documentation encoding correction only; no new executable or test-result claim.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/design.md",
+          "sha256": "087cc7830d2c8e97c79e882397938f754d15e60e10cf9fc283b424c91af681ae",
+          "gitRead": "git show 0bdf584bc14c5d21e85255294238effd95f60f2f:docs/design/lane-f-engine-jvm/design.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/0bdf584bc14c5d21e85255294238effd95f60f2f/docs/design/lane-f-engine-jvm/design.md",
+          "addedEvidenceLines": [
+            "| 2026-09-12 | **A12 orphan proof correction during C2.** Persistent production parser reuse makes a pre-request PID freshness assertion invalid. Prewarm deliberately; bind request witnesses to creator-published PID/start/executable, require exact target/parent chain/private manifest/live descendants, then prove both parser and native instance exit after forced Engine death. Cleanup waits and preserves primary evidence. This strengthens the surviving process-boundary proof without changing process placement. | [A section 10](stages/A.md#10-what-is-allowed-to-be-red-after-stage-a-and-nothing-else); [C2 hosted evidence](evidence/C2/hosted-ci.md#orphan-witness-correction-during-c2) |"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "914f010fa09d5fe9cf0a2668a3e8bdccf346b3d0",
+      "subject": "docs(936): reconcile integrated projection and hosted orphan proof",
+      "item": "C2 projection/hosted checkpoint",
+      "recordedResult": "Integrated656 and corrected first-attempt orphan hosted proof reconciled; old retry remains historical.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "2f03c3e68bcddd77d5c18073e036ceb064055c13e56076d45738250a8a1df26f",
+          "gitRead": "git show 914f010fa09d5fe9cf0a2668a3e8bdccf346b3d0:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/914f010fa09d5fe9cf0a2668a3e8bdccf346b3d0/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "Latest coherent projection/orphan proof is [checkpoint656](projection-checkpoint-656.md):",
+            "full build/PMD9,917 cases, stress659 and clean hosted orphan/queue/snapshot results."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "sha256": "5f8f16821ae7cd761708f57e53d80f7340a0ffe1ce18ca6577ee2e105ca00781",
+          "gitRead": "git show 914f010fa09d5fe9cf0a2668a3e8bdccf346b3d0:docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/914f010fa09d5fe9cf0a2668a3e8bdccf346b3d0/docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "addedEvidenceLines": [
+            "Current projection/orphan proof: [checkpoint656](projection-checkpoint-656.md)."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/projection-checkpoint-656.md",
+          "sha256": "29d88de27eaf8901a1ed4693234ab148aae9a70351836f461f996628e1658720",
+          "gitRead": "git show 914f010fa09d5fe9cf0a2668a3e8bdccf346b3d0:docs/design/lane-f-engine-jvm/evidence/C2/projection-checkpoint-656.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/914f010fa09d5fe9cf0a2668a3e8bdccf346b3d0/docs/design/lane-f-engine-jvm/evidence/C2/projection-checkpoint-656.md",
+          "addedEvidenceLines": [
+            "# C2 projection checkpoint: integrated, stress and hosted proof",
+            "and corrected orphan containment have coherent proof. C2-2 remains open for offline",
+            "Windows/Java25 full656, `gradlew.bat build pmdAll -PtestParallelism=1",
+            "--max-workers=4 --console=plain`, passes in13m45s. The38 selected test tasks account",
+            "for9,917 cases/1,626 suites, zero failures/errors and35 skips. Thirty tasks reuse",
+            "This is a selection failure, not a failed test. Source inventory locates the two",
+            "gradlew.bat :modules:adapters-lucene:test --tests '*Stress*'",
+            "Result: three cases/three suites, zero failures/errors/skips,1m29s. The changed",
+            "assertion was weakened to bypass the empty modules.",
+            "is run attempt1. Twelve jobs pass; Public claims fails only because one amendment",
+            "local docs-validate passes and the successor CI's Public claims job passes.",
+            "| Artifact | Suites | Cases | Skips | Failures/errors | Recorded flaky retries |",
+            "The corrected orphan case passes once without retry: Engine3228, deliberately",
+            "Engine death. This closes the corrected hosted first-attempt proof. The old run's",
+            "failed attempt is preserved as historical evidence, not rewritten.",
+            "-artifacts.json, -integration.txt and -search-worker.txt. Failure log:",
+            "tmp/c2-2-hosted-758-failed.txt; workflow routing: tmp/c2-2-workflow-health-657.md."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "3b425cebb826da335863dae6eca4ffa342e494ee",
+      "subject": "fix(936): release offline procedure guard after failed cleanup",
+      "item": "C2-2 offline guard cleanup",
+      "recordedResult": "Coordinator failure regressions prove release after cleanup failure; broader owner proof still owed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "22be7ba8e6ed4c01348e57fc3bff877ca3a490c9e6f07109a811d9c91423e716",
+          "gitRead": "git show 3b425cebb826da335863dae6eca4ffa342e494ee:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/3b425cebb826da335863dae6eca4ffa342e494ee/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "setup and releases even if endProcedure fails. End only a successfully begun procedure;",
+            "preserve a body RuntimeException/Error and suppress a distinct cleanup failure onto it.",
+            "Windows/Java25 focused660 executes29 cases/10 suites, zero failures/errors/skips plus",
+            "app-services main/test PMD. Negative661 restores the original production coordinator:",
+            "allfour new tests fail for the intended stuck-guard/primary-error-masking reasons.",
+            "logic into finishProcedure, without suppression. Final663 executes29 cases/10 suites,",
+            "zero failures/errors/skips plus PMD and no Finally warning. Evidence is retained in",
+            "tmp/c2-2-offline-cleanup-{660,662,663}.txt with -xml/-counts.json, and negative-661.txt",
+            "with -xml. Tests use the real coordinator and mocked procedure failures. Broader module,",
+            "hosted and live owner-completion proof remains part of the upcoming producer boundary.",
+            "   indexing.proto. Prove real empty/nonempty results, reader failure, unavailable",
+            "   either as a fabricated pass barrier. Chunk deletion/regeneration failures must",
+            "   the existing switch buffer and resolve its missing-document/chunk-failure gaps;",
+            "4. Return the bounded pass's processed, failed, remaining and blocked outcome and",
+            "   embedding handoff after cleanup. The captured default pass is at most100 IDs;",
+            "   later global pending work is not a failed captured unit or a global-drain promise.",
+            "   partial durable progress before terminal failure. Correct the UI drain wording"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "6b1d6db4feb3f251ec2748e14b3023b6d7a0393d",
+      "subject": "fix(936): preserve offline backlog read failures",
+      "item": "C2-2 strict backlog reads",
+      "recordedResult": "Negative667; restored668 reuses prior46 cases;669 adds executed Engine translation proof.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "6a4f76e4c3ba361af55b1039d33c773ece4c17eb4f7398f4de32145aac1a52ce",
+          "gitRead": "git show 6b1d6db4feb3f251ec2748e14b3023b6d7a0393d:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/6b1d6db4feb3f251ec2748e14b3023b6d7a0393d/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "1. Implemented with [strict backlog proof](backlog-reads.md): reads distinguish"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/backlog-reads.md",
+          "sha256": "64fc83f52d3421566baec3a51ecf8b3b9b5f5fd3cecce44c23555470730761ea",
+          "gitRead": "git show 6b1d6db4feb3f251ec2748e14b3023b6d7a0393d:docs/design/lane-f-engine-jvm/evidence/C2/backlog-reads.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/6b1d6db4feb3f251ec2748e14b3023b6d7a0393d/docs/design/lane-f-engine-jvm/evidence/C2/backlog-reads.md",
+          "addedEvidenceLines": [
+            "I/O and cancellation failures. Pending embeddings use a Java-only ingest method;",
+            "gradlew.bat :modules:adapters-lucene:test --tests '*DocumentFieldOpsStrictQueryTest'",
+            "Result: 46 cases in14 suites, zero failures/errors/skips, all four modules' main/test",
+            "PMD pass. The adapter test reuses its successful665 execution; the other three test",
+            "Negative667 restores the false-empty behavior in the strict adapter selection and",
+            "exactly three intended regressions fail (adapter I/O plus facade I/O/cancellation).",
+            "This is a restored-source confirmation, not another execution of46 tests.",
+            "Additional669 executes `:modules:app-engine:test --tests '*EngineEnrichmentBacklogFailureTest'",
+            "failures/errors/skips and test PMD pass. These use the real Engine budget/executor",
+            "and Java adapter with controlled Worker failures; all three reads preserve CANCELLED,",
+            "Earlier664 failed compilation because the adapter fixture assumed an absent Mockito",
+            "Earlier665 passed the adapter regression but rejected a Worker fixture with COMPLETED",
+            "two refute-first passes, including the added Engine translation proof. git diff --check",
+            "and docs-validate pass. No full suite, live stack, hosted run or restart-durability",
+            "-counts.json where produced; tmp/c2-2-backlog-negative-667.txt and -667-xml;"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "e784a97f39a5d0b88a31da048e13c671f2b4155e",
+      "subject": "fix(936): commit direct VDU effects before acknowledgement",
+      "item": "C2-2 VDU commit prerequisite",
+      "recordedResult": "674:162 cases/37 suites with stated reuse; negative675 fails four service boundaries.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "6da9036ba90ffc65255587677f5ff3dd679515c8a292d0503138ddbe367ae0c5",
+          "gitRead": "git show e784a97f39a5d0b88a31da048e13c671f2b4155e:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e784a97f39a5d0b88a31da048e13c671f2b4155e/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "   [VDU commit proof](vdu-commits.md). Acknowledgements need a covering commit after parent/chunk",
+            "   and swallowed chunk-failure paths so failed effects retain their durable buffer."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "sha256": "16a0c17262cc25fc4990b95b340201feb93d31cbc6919ba8c6d64fe54f2c089c",
+          "gitRead": "git show e784a97f39a5d0b88a31da048e13c671f2b4155e:docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e784a97f39a5d0b88a31da048e13c671f2b4155e/docs/design/lane-f-engine-jvm/evidence/C2/hosted-ci.md",
+          "addedEvidenceLines": []
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-commits.md",
+          "sha256": "980838180ec652c0d498ea3ede0fce542137080016cb0647090b3ca0f8906807",
+          "gitRead": "git show e784a97f39a5d0b88a31da048e13c671f2b4155e:docs/design/lane-f-engine-jvm/evidence/C2/vdu-commits.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e784a97f39a5d0b88a31da048e13c671f2b4155e/docs/design/lane-f-engine-jvm/evidence/C2/vdu-commits.md",
+          "addedEvidenceLines": [
+            "Reader refresh follows commit. Chunk deletion propagates failure; recovery's strict",
+            "reader or commit failure propagates through the actual Engine client instead of zero.",
+            "The existing per-document recovery loop still attempts later documents after failure;",
+            "its returned count covers only successful resets committed together. An all-failed",
+            "I/O failure cannot default the poison-document budget back to zero. Chunk replacement",
+            "precedes the terminal parent update: a failure plus a later unrelated commit retains",
+            "and swallowed chunk-regeneration failures. No global drain or atomic multi-document",
+            "## Proof",
+            "Focused670 executes13 cases/two suites (VduMutationCommitTest and",
+            "ChunkThresholdCharacterizationTest), zero failures/errors/skips, plus worker main/test",
+            "revisions share the committed index. Controlled commit failures prevent acknowledgements.",
+            "Broader671 executes157 cases/36 suites, zero failures/errors/skips. All four test tasks",
+            "execute, including actual Engine recovery and Worker-to-Engine failure translation.",
+            "gradlew.bat :modules:worker-services:test --tests '*VduMutationCommitTest'",
+            "  :modules:app-engine:test --tests '*EngineEnrichmentBacklogFailureTest' --tests '*EngineVduRecoveryTest'",
+            "Negative672 removes only the four VDU commit calls and restores suppressed chunk",
+            "deletion failures. Running the two670 test selections yields exactly10 failures in13",
+            "cases pass. Restoring exact source bytes and repeating671 as673 passes157 cases with",
+            "preceded chunk replacement, an all-failed reset selection returned zero, and retry",
+            "adds service-level deletion/second-chunk failure followed by an unrelated commit,",
+            "all-reset failure, and retry-reader failure regressions. The pre-correction671/673",
+            "`:modules:adapters-lucene:pmdTest`:162 cases/37 suites, zero failures/errors/skips.",
+            "unchanged results UP-TO-DATE. All selected PMD tasks pass.",
+            "Negative675 restores the three review defects. Exactly four of14 service cases fail:",
+            "both failed replacements publish COMPLETED rather than PROCESSING, all resets failing",
+            "checks corrected source,674 counts and the exact four negative675 failures.",
+            "the selected results before subsequent filters. Negative evidence is",
+            "tmp/c2-2-vdu-commit-negative-{672,675}.txt and their -xml trees. Keep through lane acceptance plus"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "e225cbf4b6381ca2ab87aeb49ee896d0d1c111ad",
+      "subject": "fix(936): retain failed VDU replay work durably",
+      "item": "C2-2 VDU replay retention",
+      "recordedResult": "Negative678:five intended failures;679:29 cases/5 suites; generation/producer proof still owed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "59a0ae911adb50a5060c0b541c34e27d230ea9b8651a77b0216449df58a08cf6",
+          "gitRead": "git show e225cbf4b6381ca2ab87aeb49ee896d0d1c111ad:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e225cbf4b6381ca2ab87aeb49ee896d0d1c111ad/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": []
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-replay-retention.md",
+          "sha256": "9d77cee450c050d74faec9b399baec17cc9c5d37c66472905efd2666e1dfafe2",
+          "gitRead": "git show e225cbf4b6381ca2ab87aeb49ee896d0d1c111ad:docs/design/lane-f-engine-jvm/evidence/C2/vdu-replay-retention.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e225cbf4b6381ca2ab87aeb49ee896d0d1c111ad/docs/design/lane-f-engine-jvm/evidence/C2/vdu-replay-retention.md",
+          "addedEvidenceLines": [
+            "switch buffer when its parent is missing, chunk replacement fails, the runtime is",
+            "unavailable, the payload is blank or its covering commit fails. Chunks precede the",
+            "Focused677 passes29 cases/five suites, zero failures/errors/skips, plus indexer-worker",
+            "index failures. The existing real-Lucene chunk-regeneration case remains selected.",
+            "gradlew.bat :modules:indexer-worker:test --tests '*VduReplayFailureRetentionTest'",
+            "Before negative678, explicitly stub the parent update as successful in both chunk",
+            "failure fixtures so the old parent-first implementation reaches the injected chunk",
+            "failure. Restore the original e784a97f3 migration source and select only",
+            "VduReplayFailureRetentionTest:13 cases/two suites, exactly five intended failures",
+            "29 cases/five suites, zero failures/errors/skips; test and test PMD execute, main PMD",
+            "parses final679/negative678 XML and verifies restored source bytes. The new replay",
+            "checks, canonical links, dependency graph and runtime-config matrix checks pass.",
+            "this source. git diff --check and docs-validate pass.",
+            "tmp/c2-2-vdu-replay-negative-678.txt and -678-xml; intended-source restore copy",
+            "and integrated/hosted/installed proof are still required. Retention alone does not"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "9ca622e4eb3136db341b7cd89abd383a471bdf66",
+      "subject": "fix(936): share committed VDU mutation rules with replay",
+      "item": "C2-2 VDU writer parity",
+      "recordedResult": "Negative683:13 intended failures;684:78 cases/15 suites with explicit reuse.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "ad3165d59bb2c922a1b400f379902d2132279b957c52f23d118d9efec2661b89",
+          "gitRead": "git show 9ca622e4eb3136db341b7cd89abd383a471bdf66:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/9ca622e4eb3136db341b7cd89abd383a471bdf66/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "   using the existing UpdateVduResultRequest, with [focused and negative proof](vdu-writer.md).",
+            "   Unknown typed outcomes refuse and strict dropout-reason read failure prevents mutation."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-writer.md",
+          "sha256": "7b3abcb21a1affdcf9f09c86eac53391200a72edf23419656e7702f3952894d5",
+          "gitRead": "git show 9ca622e4eb3136db341b7cd89abd383a471bdf66:docs/design/lane-f-engine-jvm/evidence/C2/vdu-writer.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/9ca622e4eb3136db341b7cd89abd383a471bdf66/docs/design/lane-f-engine-jvm/evidence/C2/vdu-writer.md",
+          "addedEvidenceLines": [
+            "Strict dropout-reason read failure cannot publish an incorrect terminal reason.",
+            "## Focused and negative proof",
+            "Compile/main PMD680 passes. Corrected682 passes78 cases/15 suites with zero failures,",
+            "its successful681 execution. All four selected main/test PMD tasks pass or reuse",
+            "gradlew.bat :modules:indexer-worker:test --tests '*VduResultReplayParityTest'",
+            "  --tests '*VduReplayFailureRetentionTest' --tests '*WorkerIngestServiceVduHardeningTest'",
+            "  :modules:app-engine:test --tests '*EngineEnrichmentBacklogFailureTest'",
+            "values prevent a matching wrong projection from passing. Two invalid cases prove",
+            "invalid; no681 XML proof is claimed.",
+            "Negative683 restores both e225cbf4b caller implementations, keeping the new tests:",
+            "gradlew.bat :modules:indexer-worker:test --tests '*VduResultReplayParityTest'",
+            "  --tests '*VduMutationCommitTest.dropoutReadFailureCannotPublishAnIncorrectTerminalReason'",
+            "It executes19 cases/four suites: all13 new cases fail for the missing parity,",
+            "validation or strict-read behavior; six mandatory guardrail cases pass. Exact",
+            "and passes78 cases/15 suites using identical cached/unchanged results, not another",
+            "tmp/c2-2-vdu-writer-negative-683.txt with -xml/-counts.json; intended caller copies",
+            "bounded proof does not close C2-2: typed deferred completion, current generation",
+            "boundary, actual offline operation ownership/outcome and integrated/installed proof"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "a4691fc6d9e86aeb2f719fe5e286863a54bc99e7",
+      "subject": "docs(936): record VDU checkpoint and offline ownership cut",
+      "item": "C2 VDU checkpoint/offline design",
+      "recordedResult": "Full685:9974 cases/1635 suites,35 skips; offline ownership cut records remaining design/proof.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "d3cb9dd838cf723129f30f6c3b36ac749c630628e5e88d24df46ea902d903735",
+          "gitRead": "git show a4691fc6d9e86aeb2f719fe5e286863a54bc99e7:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/a4691fc6d9e86aeb2f719fe5e286863a54bc99e7/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "failure must close any acquired registration. This relocation is simpler than a",
+            "cleanup and work-reference release. Preserve a body failure and attach cleanup failure;",
+            "Avoid another hand-written FutureTask lifecycle unless this existing composition fails",
+            "captured VDU IDs, processed/failed/remaining/blocked counts and the embedding-mode",
+            "failed mode entry/exit, index failure and cancellation each need an explicit outcome.",
+            "Mode cleanup failures currently swallowed by VduProcessor and pending-write refusals",
+            "Required proof: one shared manual/automatic single-flight owner; exact work identity",
+            "cleanup failures release ownership once; HeadAssembly waits before dependency close;",
+            "each blocked/failure/partial outcome matches durable index/checkpoint evidence. Use",
+            "plus a real runner/store/admission fixture. Negative regressions restore early completion",
+            "and raw detached work. Full suite, actual model/API and installed-path proof remain owed."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-checkpoint-685.md",
+          "sha256": "1ccadac3b257e0993f1b080e16840166799fb0b657922aafd040cfd97e2b1548",
+          "gitRead": "git show a4691fc6d9e86aeb2f719fe5e286863a54bc99e7:docs/design/lane-f-engine-jvm/evidence/C2/vdu-checkpoint-685.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/a4691fc6d9e86aeb2f719fe5e286863a54bc99e7/docs/design/lane-f-engine-jvm/evidence/C2/vdu-checkpoint-685.md",
+          "addedEvidenceLines": [
+            "gradlew.bat build pmdAll -PtestParallelism=1 --max-workers=4 --console=plain",
+            "PASS in19m14s:9,974 cases/1,635 suites, zero failures/errors,35 skips. Of38 test",
+            "the build's other required checks pass. The prior focused/negative proofs remain",
+            "e784a97f3 workflows also passed, as recorded in vdu-writer.md."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "c950e8c721a289db889b1b4c3ea57e0a6b923c57",
+      "subject": "fix(936): preserve newer switch-buffer admissions during replay",
+      "item": "C2 queue schema16 replay identity",
+      "recordedResult": "Negative690:three intended failures;691:75 cases/9 suites with reuse.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "98351ad7b5bd33eccbabaa5aa8b7add4ef6c2bb76363c7a6b15aa3b433869e5c",
+          "gitRead": "git show c950e8c721a289db889b1b4c3ea57e0a6b923c57:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/c950e8c721a289db889b1b4c3ea57e0a6b923c57/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "with the key at removal after the covering commit. Content/time comparisons fail for"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/switch-buffer-version.md",
+          "sha256": "c5a71ed34fd48b2fbd21be2f8c69dc215e9f9f51fa64d0b69a92ac2d1d154b98",
+          "gitRead": "git show c950e8c721a289db889b1b4c3ea57e0a6b923c57:docs/design/lane-f-engine-jvm/evidence/C2/switch-buffer-version.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/c950e8c721a289db889b1b4c3ea57e0a6b923c57/docs/design/lane-f-engine-jvm/evidence/C2/switch-buffer-version.md",
+          "addedEvidenceLines": [
+            "ladder. Existing payloads and timestamps stay unchanged. Migration failure rolls back",
+            "DDL and version together; removal failure rolls back all snapshot deletions. The store",
+            "## Verification",
+            "- `c2-2-buffer-version-negative-686`: old a469 production plus the new concurrent replay",
+            "  fixture:9 cases/2 suites,3 intended failures,0 errors/skips. All three scenarios lose",
+            "  the late admission (expected depth1, actual0); six mandatory test guardrails pass.",
+            "- `c2-2-buffer-version-687`: revision implementation,75 cases/9 suites,3 failures from",
+            "  existing hard-coded migration target/future-version fixtures. New races and V16 cases",
+            "  pass. Run688 repeats that result because a local UTF-8 editing failure left those",
+            "  literals unchanged; it is not a separate defect or proof. The fixtures now derive the",
+            "  unsupported version from TARGET_VERSION+1 and inject failure at TARGET_VERSION's",
+            "- `c2-2-buffer-version-689`:75 cases/9 suites,0 failures/errors/skips; test task executed.",
+            "  Indexer main/test and worker-core main PMD pass (unchanged main tasks reused).",
+            "gradlew.bat :modules:indexer-worker:test --tests '*SwitchBufferConcurrentReplayTest' --tests '*SwitchBufferVersionTest' --tests '*SwitchBufferDurabilityTest' --tests '*JobQueueMigrationTest' --tests '*IngestionProvenancePersistenceTest' --tests '*VduReplayFailureRetentionTest' --tests '*VduResultReplayParityTest' --tests '*SyncRootReplayProvenanceTest' :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:worker-core:pmdMain -PtestParallelism=1 --max-workers=4 --console=plain",
+            "Negative686 command:",
+            "gradlew.bat :modules:indexer-worker:test --tests '*SwitchBufferConcurrentReplayTest' -PtestParallelism=1 --max-workers=4 --console=plain",
+            "Negative690 removes the revision predicate/binding from DELETE while keeping key",
+            "matching. It fails3 of13 cases/3 suites exactly at both same-key replacement witnesses",
+            "guardrails pass. The script restores original source bytes in finally. Command:",
+            "gradlew.bat :modules:indexer-worker:test --tests '*SwitchBufferConcurrentReplayTest' --tests '*SwitchBufferVersionTest' -PtestParallelism=1 --max-workers=4 --console=plain",
+            "Restored691 uses the focused command and passes75/9,0 failures/errors/skips; the test",
+            "proof, not fresh execution. Raw prefixes are `c2-2-buffer-version-negative-690` and",
+            "`c2-2-buffer-version-691`; the mutation script is beside the negative log.",
+            "and diff whitespace pass. No generated content change is needed. Independent review",
+            "Integrated/stress and hosted proof must cover the final implementation boundary."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "41a74500ba72762a18ae2221bf74a581b5221505",
+      "subject": "fix(936): preserve VDU mutation control failures",
+      "item": "C2-2 VDU control failures",
+      "recordedResult": "Negative692 and corrected693; typed control failures preserved; main/test PMD pass.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "6aeef4b2cae2798a50aeb0801beece2d32ea2c627c6178efa824c05ac6613485",
+          "gitRead": "git show 41a74500ba72762a18ae2221bf74a581b5221505:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/41a74500ba72762a18ae2221bf74a581b5221505/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "and executor refusal without converting them to false/-1. Explicit application failure",
+            "EngineContext and deadline categories are unchanged. [Focused and negative proof](vdu-control-errors.md)."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-control-errors.md",
+          "sha256": "ce59b512b14eac5ccbc017ec84cae7af5566bd2ed32a7ac1919ef635773ef6d3",
+          "gitRead": "git show 41a74500ba72762a18ae2221bf74a581b5221505:docs/design/lane-f-engine-jvm/evidence/C2/vdu-control-errors.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/41a74500ba72762a18ae2221bf74a581b5221505/docs/design/lane-f-engine-jvm/evidence/C2/vdu-control-errors.md",
+          "addedEvidenceLines": [
+            "The existing RecordingRpc test boundary throws each of transport failure, open circuit,",
+            "failure witnesses inspect the emitted request fields and preserve the normal result.",
+            "Negative692 runs old c950 production with the new tests:25 cases/5 suites,8 intended",
+            "failures (all four control failures through both methods),0 errors/skips. Existing backlog",
+            "and explicit application outcome cases pass. Positive693 executes70 cases/20 suites,",
+            "0 failures/errors/skips, plus app-services main/test PMD.",
+            "# Negative692",
+            "gradlew.bat :modules:app-services:test --tests '*VduBacklogReadTest' -PtestParallelism=1 --max-workers=4 --console=plain",
+            "gradlew.bat :modules:app-services:test --tests '*VduBacklogReadTest' --tests '*VduBatchProcessor*' --tests '*OfflineCoordinator*' :modules:app-services:pmdMain :modules:app-services:pmdTest -PtestParallelism=1 --max-workers=4 --console=plain",
+            "Raw logs, XML and counts are `tmp/c2-2-vdu-control-negative-692{.txt,-xml,-counts.json}`",
+            "lane acceptance plus30 days and exported before worktree release. Negative metadata",
+            "Independent read-only review found no blockers and parsed the retained failure/pass XML.",
+            "matrix, surface-altitude and diff whitespace pass.",
+            "proof. Integrated/stress coverage remains required at the coherent owner boundary."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "9d7183dd4b8a76a440b153717c9c4bbcc419e8f4",
+      "subject": "docs(936): sync VDU control error guidance",
+      "item": "C2 canonical VDU guidance",
+      "recordedResult": "Canonical control/error contract mirrored; no additional runtime claim.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": ".claude/skills/inference-runtime/SKILL.md",
+          "sha256": "4ca1fdf709ec9f9d7fbb81ea4e5419db9cbf796d6e26ab0eb9e5631be24b2068",
+          "gitRead": "git show 9d7183dd4b8a76a440b153717c9c4bbcc419e8f4:.claude/skills/inference-runtime/SKILL.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/9d7183dd4b8a76a440b153717c9c4bbcc419e8f4/.claude/skills/inference-runtime/SKILL.md",
+          "addedEvidenceLines": [
+            "VDU index calls distinguish application outcomes from control failures. `VduOps`",
+            "returns false for an explicit rejected result response and -1 for an explicit failed",
+            "control failures, so unavailable work cannot appear as an empty backlog. The batch",
+            "coordinator owns how these failures affect the running procedure."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "e872a36d42b49a844950c495cf5ece0e4c9cff7a",
+      "subject": "docs(936): mirror VDU control contract in Codex guidance",
+      "item": "C2 Codex VDU guidance",
+      "recordedResult": "Codex skill mirrors canonical contract; no additional runtime claim.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": ".agents/skills/inference-runtime/SKILL.md",
+          "sha256": "a4e7b1398ccbe6af7abde1802400f3bb560f8eb578363b6b7506e3c8b36dbca4",
+          "gitRead": "git show e872a36d42b49a844950c495cf5ece0e4c9cff7a:.agents/skills/inference-runtime/SKILL.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/e872a36d42b49a844950c495cf5ece0e4c9cff7a/.agents/skills/inference-runtime/SKILL.md",
+          "addedEvidenceLines": [
+            "VDU index calls distinguish application outcomes from control failures. `VduOps`",
+            "returns false for an explicit rejected result response and -1 for an explicit failed",
+            "control failures, so unavailable work cannot appear as an empty backlog. The batch",
+            "coordinator owns how these failures affect the running procedure."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "2f97a7825791c3adca8baed948f6c81c8a864cfa",
+      "subject": "docs(936): record buffer and VDU control integrated proof",
+      "item": "C2 VDU/control checkpoint",
+      "recordedResult": "Full694:9993 cases/1637 suites,35 skips; named stress proof passes with reuse; empty-selector failure retained.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-checkpoint-694.md",
+          "sha256": "f50e1712be897659dc86f9745804e804d954bad39b831a1ab497dbfbe00d4320",
+          "gitRead": "git show 2f97a7825791c3adca8baed948f6c81c8a864cfa:docs/design/lane-f-engine-jvm/evidence/C2/vdu-checkpoint-694.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/2f97a7825791c3adca8baed948f6c81c8a864cfa/docs/design/lane-f-engine-jvm/evidence/C2/vdu-checkpoint-694.md",
+          "addedEvidenceLines": [
+            "gradlew.bat build pmdAll -PtestParallelism=1 --max-workers=4 --console=plain",
+            "PASS in22m32s:9,993 cases/1,637 suites, zero failures/errors,35 skips. Eleven of38",
+            "Focused and negative evidence remains in switch-buffer-version.md and vdu-control-errors.md.",
+            "`*Stress*` test. It reports a selection failure, not a failed test. Source inventory",
+            "gradlew.bat :modules:adapters-lucene:test --tests '*Stress*'",
+            "PASS in8s. adapters-lucene is UP-TO-DATE from695; ort-common is FROM-CACHE with",
+            "No tag, selector rule or assertion was weakened to bypass empty modules.",
+            "41a74500b and9d7183dd4 runs were cancelled by newer pushes, not treated as passing.",
+            "the shared offline owner, actual-model/installed proof or C2-2 as a whole."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "927acc400990178c8414100c9ee32b26336ed73a",
+      "subject": "docs(936): settle VDU generation guard and legacy replay boundary",
+      "item": "C2-2/D1 generation design",
+      "recordedResult": "Serving-generation guard/legacy replay decision and required proof; implementation not claimed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "63729fc0b1ab82cff751f86efe3c7c3126d42008bebf42319d4c9e4d709bc987",
+          "gitRead": "git show 927acc400990178c8414100c9ee32b26336ed73a:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/927acc400990178c8414100c9ee32b26336ed73a/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "including strict state reads, retired VDU buffer writers, negative/recovery proof and"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-boundary.md",
+          "sha256": "1b8648f860a248c36bd95cd50cb529b272979d9456373ab178b7cd9681a12c2e",
+          "gitRead": "git show 927acc400990178c8414100c9ee32b26336ed73a:docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-boundary.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/927acc400990178c8414100c9ee32b26336ed73a/docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-boundary.md",
+          "addedEvidenceLines": [
+            "replace D1's accepted-write journal/activation proof. A lock around start would still not",
+            "  and would expand this item into partial effect accounting. Failed/malformed/unknown",
+            "## Required proof",
+            "   distinct Blue/Green, MIGRATING, SWITCHING, FAILED/building and pointer rollback refuse",
+            "   with a covering commit and its exact version is removed. Missing parent/failed commit",
+            "5. Legacy processing/failed marks with missing parents or malformed payloads remain;",
+            "6. Negative mutations omit each identity/state/pointer/post-commit condition and allow",
+            "   premature replay. Require focused, full, stress and hosted proof at coherent boundaries."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "b532a56ee1556e0017a23721104ec5d4630b4030",
+      "subject": "fix(936): guard VDU commits and defer legacy replay to serving generations",
+      "item": "C2-2 VDU generation guard",
+      "recordedResult": "Generation and recovery negative matrix697-712; corrected713 and independent reread; combined Engine proof owed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "f2d4dba5569c59ef6c72570b050b228052aea2e8fa76bdbc4ca36caaa3e2e823",
+          "gitRead": "git show b532a56ee1556e0017a23721104ec5d4630b4030:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/b532a56ee1556e0017a23721104ec5d4630b4030/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "[133-case focused proof and negative checks](vdu-generation-proof.md). The independent",
+            "review corrections and combined production replay/full/stress/hosted proof remain the",
+            "current verification boundary; shared offline ownership follows this item."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-boundary.md",
+          "sha256": "b9d6cd8f80de7d37851fdffcaccfde456c24f9b1768b832425a50061e25e54c3",
+          "gitRead": "git show b532a56ee1556e0017a23721104ec5d4630b4030:docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-boundary.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/b532a56ee1556e0017a23721104ec5d4630b4030/docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-boundary.md",
+          "addedEvidenceLines": [
+            "corrections have [focused/negative proof](vdu-generation-proof.md); combined production",
+            "replay and broader verification remain required.",
+            "  selection carries its recovered count and first failure in one local result: a missing",
+            "  failed. Legacy recovery therefore retains its row. This is a local aggregate from the",
+            "parent-directory creation; and the old recovery count hiding selected failures. Pure",
+            "read path. The old partial-loop test keeps its continue-after-failure assertion and gains"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-proof.md",
+          "sha256": "c70093b13d55440e2b199d246b55dc3bb35d44bd2b9db40c06cf45e9045562cc",
+          "gitRead": "git show b532a56ee1556e0017a23721104ec5d4630b4030:docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-proof.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/b532a56ee1556e0017a23721104ec5d4630b4030/docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-proof.md",
+          "addedEvidenceLines": [
+            "# C2-2 generation refusal and legacy replay proof",
+            "versions. Incomplete selected recovery commits its successful subset and then fails,",
+            "`--continue` to collect independent failures without skipping later selected tasks.",
+            "| 697 | Old927acc400 production plus new VduGenerationBoundaryTest; indexer-worker:test | 18 cases/2 suites,9 intended failures: three mutations each violate identity, pre-restart migration and post-commit transition checks. Three valid commits and6 guardrails pass. |",
+            "| 698 | Initial implementation; focused VDU/replay tests and PMD | Indexer-worker test compilation fails at two missed context-constructor call sites. Worker-services executes15 passing cases. Both call sites and the app-engine counterpart are corrected. |",
+            "| 699 | Strict state fixture and other selected suites | Six cases,1 fixture failure: incomplete future-format JSON fails parsing before format validation. Corrected to mutate a complete valid state. |",
+            "| 700 | New generation/replay/port fixtures and PMD | 13 cases,1 fixture failure: no-interactions assertion includes constructor getters. Corrected to assert no field reads, index effects or commits. |",
+            "| 701 | Same selection after fixture correction | 104 cases,2 failures: nested Mockito stubbing and one remaining retired SWITCHING-buffer expectation. Corrected while preserving retry/state and continue-after-failure intent. |",
+            "| 702 | Three-module focused generation/replay/port suites and PMD | PASS111 cases/20 suites. Indexer-worker98 and app-engine7 execute; worker-core6 reuse700. |",
+            "| 711 | Snapshot702 plus absent-layout and absent-ingest regressions | Nine cases/2 suites,2 intended failures. The strict predicate creates/accepts an absent layout; absent-ingest update loses typed refusal. |",
+            "| 712 | Old recovery aggregate plus VduRecoveryReplayCompletenessTest | 11 cases/2 suites,3 intended failures: all selected misses, partial miss, partial IOException erase the row. Successful/empty selections and6 guardrails pass. |",
+            "| 713 | Corrected implementation; four-module focused selection and affected PMD | PASS133 cases/22 suites, zero failures/errors/skips,1m23s. All four test tasks execute: worker-core7, worker-services15, indexer-worker103, app-engine8. PMD passes. |",
+            "`*VduResultReplayParityTest`, `*VduReplayFailureRetentionTest`,",
+            "Temporary source mutations against snapshot702 each fail the relevant assertion;",
+            "| Run | Omitted condition | Cases / intended failures |",
+            "pass a second read-only check and independent skeptical pass with no remaining",
+            "production blocker. Canonical reference/handoff drift found in that pass is corrected.",
+            "activation. That combined proof remains required, along with full/stress/hosted checks",
+            "`c2-2-vdu-generation-{negative-697,698,699,700,701,702,negative-703,...,negative-710,713}`,",
+            "`c2-2-vdu-generation-review-negative-711` and",
+            "`c2-2-vdu-recovery-review-negative-712`. Each retained test run has `-xml/` and"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "55b8aeb15ba17e63415b05acf0f30540ea6fe5f8",
+      "subject": "test(936): prove legacy VDU replay across real Engine migration boots",
+      "item": "C2-2 real Engine migration proof",
+      "recordedResult": "719 real Engine witness passes; negatives718/720;721 restores identical cached source proof.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "f9a5f082d9ecd977086e0e102366a29045eec05a9fb04e2fb47f3c11544834dd",
+          "gitRead": "git show 55b8aeb15ba17e63415b05acf0f30540ea6fe5f8:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/55b8aeb15ba17e63415b05acf0f30540ea6fe5f8/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "   including missing-document/chunk-failure retention; no new journal. Current cutover",
+            "[generation cut](vdu-generation-boundary.md) and [real Engine proof](engine-vdu-migration-replay.md)."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/engine-vdu-migration-replay.md",
+          "sha256": "6af34fce9b2d5eca0dc3c0a743b717a53ffa564b5b32d348f8ea27079e9eebe1",
+          "gitRead": "git show 55b8aeb15ba17e63415b05acf0f30540ea6fe5f8:docs/design/lane-f-engine-jvm/evidence/C2/engine-vdu-migration-replay.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/55b8aeb15ba17e63415b05acf0f30540ea6fe5f8/docs/design/lane-f-engine-jvm/evidence/C2/engine-vdu-migration-replay.md",
+          "addedEvidenceLines": [
+            "old Green parent and hide failed source re-enumeration. The final SUCCESS_EMPTY",
+            "the replacement. Queue drain alone is not used as proof of successful indexing.",
+            "negative capability rather than relying on a missing parent to retain the row.",
+            "## Verification",
+            "Commands use `gradlew.bat :modules:app-engine:test --tests '*EngineVduMigrationReplayTest'",
+            "| 715 | Test executes and passes1 case. Overall command fails PMD for a redundant cleanup assignment. Reuse the fixture's close helper; no suppression. |",
+            "| 716 | Initial content-replacing fixture executes and passes1 case plus PMD. |",
+            "| 717 | Python's relative Windows batch invocation fails before Gradle starts; no test evidence. Corrected to an absolute gradlew.bat path. |",
+            "| 718 | Force KnowledgeServer.vduReplayAllowed to true: initial fixture fails at exact row retention on the paused boot, because the row was consumed. |",
+            "| 719 | Final content-preserving fixture executes and passes1 case, zero failures/errors/skips,32s. Test PMD executes and passes; main PMD reuses unchanged results. |",
+            "| 720 | Same production-guard mutation with the final fixture:1 executed case,1 intended failure at the paused-boot requireBuffered call (row absent),22s. |",
+            "| 721 | Exact production bytes restored: PASS1 case FROM-CACHE719; both PMD tasks reuse unchanged results. |",
+            "at b532a56ee. Named stress714 passes2 cases with both tasks UP-TO-DATE from the",
+            "Full integrated verification and hosted execution of the new fixture follow this",
+            "`tmp/c2-2-engine-vdu-replay-negative-{718,720}` each contain `.txt`, `-xml/` and",
+            "`-counts.json`. Launcher failure717 is `tmp/c2-2-engine-vdu-replay-launch-717.txt`."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-proof.md",
+          "sha256": "c88b6724fb80c4c091ecd57f500ecbf4353329a84b11592cf87d2d1a73f027fe",
+          "gitRead": "git show 55b8aeb15ba17e63415b05acf0f30540ea6fe5f8:docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-proof.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/55b8aeb15ba17e63415b05acf0f30540ea6fe5f8/docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-proof.md",
+          "addedEvidenceLines": [
+            "[real Engine proof](engine-vdu-migration-replay.md) closes that composition gap with",
+            "source replacement, promotion, eligible reopen and a production-guard negative.",
+            "Hosted CI34711067677 passes b532a56ee; stress714 reuses unchanged passing inputs.",
+            "Full integrated verification including the new Engine fixture and its hosted execution,"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "f989c59d12831653b16c112630c90a90c174821d",
+      "subject": "docs(936): settle offline outcome and repeatable shutdown barriers",
+      "item": "C2-2 offline outcome design",
+      "recordedResult": "Offline completion and retryable shutdown barriers decided; no implementation/test pass claimed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "0cc3c1dde0cc92e19a1e9deaba132cf4db0dcd3b2c22475cebbc633aaffb904b",
+          "gitRead": "git show f989c59d12831653b16c112630c90a90c174821d:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/f989c59d12831653b16c112630c90a90c174821d/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": [
+            "per-pass projection, acknowledgement-only counts, task-cancellation versus body-result",
+            "It is the current implementation contract; its review is not executable proof."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-cut.md",
+          "sha256": "ef5303265d414adfe2b198f63c6382b26df591034f38493157c0d7addbf5f614",
+          "gitRead": "git show f989c59d12831653b16c112630c90a90c174821d:docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-cut.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/f989c59d12831653b16c112630c90a90c174821d/docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-cut.md",
+          "addedEvidenceLines": [
+            "Add one immutable app-api OfflineProcessingOutcome for the captured pass, reused",
+            "selected, processed and failed counts, a bounded block reason and embedding-handoff",
+            "no-text, abstention or failed-document results count as failed. A false/throwing",
+            "index acknowledgement is not a completed unit. Preserve prior checkpoints and fail",
+            "the attempt without recursively trying to turn a control failure into a FAILED",
+            "document. markVduProcessing's negative scalar cannot distinguish retry exhaustion",
+            "from a global count. A completed pass is not a promise to drain future/global work.",
+            "result can precede body cleanup and discard a later cleanup failure. Keep a separate",
+            "attach any captured cleanup failure to that refusal because no stage is returned.",
+            "request cannot rewrite it. Preserve actual body/fatal failures and suppressed cleanup",
+            "failures rather than losing them to an early cancelled FutureTask result. Normalize",
+            "closure; its existing failed-step/unclean receipt is the reporting authority. Its",
+            "must propagate a failed HeadAssembly close before closing the operations store or",
+            "## Required proof",
+            "owner; submission/cleanup failure; partial acknowledged checkpoints; late mode-exit",
+            "failure; retained dependencies and an unclean shutdown receipt on nontermination.",
+            "Use the real store/runner/admission in an integration fixture. Negative checks restore",
+            "early result publication, detached manual work and swallowed write/cleanup failures.",
+            "Focused checks, full/PMD, live actual-model/API and installed-path proof remain owed.",
+            "implementation or test pass."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "1c419e91a56c5311b888ef07ebdfe29634870ffe",
+      "subject": "docs(936): record integrated and hosted VDU generation proof",
+      "item": "C2 VDU generation checkpoint",
+      "recordedResult": "Full724:10034 cases/1643 suites,35 skips; hosted success and prior Engine/stress proof reconciled.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/engine-vdu-migration-replay.md",
+          "sha256": "16afca5f9e72363fbfe0d270c654aa755855b7319097524f7e0965950d3f52c9",
+          "gitRead": "git show 1c419e91a56c5311b888ef07ebdfe29634870ffe:docs/design/lane-f-engine-jvm/evidence/C2/engine-vdu-migration-replay.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/1c419e91a56c5311b888ef07ebdfe29634870ffe/docs/design/lane-f-engine-jvm/evidence/C2/engine-vdu-migration-replay.md",
+          "addedEvidenceLines": [
+            "The later [checkpoint724](vdu-checkpoint-724.md) passes full integrated verification"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-checkpoint-724.md",
+          "sha256": "6f64f29fd7b5765b851450a148b77eef9468fda91c8b54343702f9ca91ef1315",
+          "gitRead": "git show 1c419e91a56c5311b888ef07ebdfe29634870ffe:docs/design/lane-f-engine-jvm/evidence/C2/vdu-checkpoint-724.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/1c419e91a56c5311b888ef07ebdfe29634870ffe/docs/design/lane-f-engine-jvm/evidence/C2/vdu-checkpoint-724.md",
+          "addedEvidenceLines": [
+            "production/test inputs changed during verification.",
+            "`gradlew.bat build pmdAll -PtestParallelism=1 --max-workers=4 --console=plain`",
+            "| 722 | RED at indexer-worker spotlessJavaSourcesCheck: mixed local line endings in SwitchBufferConcurrentReplayTest. Test tasks already reported2,126 cases/293 suites with zero failures/errors/skips, including214 freshly executed Engine cases. Later tasks were not run; this is not a full pass. |",
+            "| 723 | Affected worker-core/worker-services/indexer-worker/app-engine spotlessApply passes. It normalizes local line endings; Git reports no content diff. |",
+            "| 724 | PASS full build and PMD,11m.10,034 cases/1,643 suites, zero failures/errors,35 skips.8 test tasks execute,1 FROM-CACHE,29 UP-TO-DATE.366 build tasks:28 execute,1 FROM-CACHE,337 UP-TO-DATE. |",
+            "passes55b8aeb15, including the new Engine fixture in its test inputs. The original",
+            "passes2 unchanged cases with documented reuse; adding an Engine fixture does not",
+            "Together with [focused/negative proof](vdu-generation-proof.md) and",
+            "[real Engine proof](engine-vdu-migration-replay.md), this closes the current VDU",
+            "generation prerequisite's local integrated and hosted verification. It does not",
+            "acceptance and installed/live producer proofs remain. D1 still owns carry-forward",
+            "particularly for722's formatting failure."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-proof.md",
+          "sha256": "0efe46761ccb5cbf06b8649c9106086dd4182b20479f70859b0cdb24afcd323b",
+          "gitRead": "git show 1c419e91a56c5311b888ef07ebdfe29634870ffe:docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-proof.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/1c419e91a56c5311b888ef07ebdfe29634870ffe/docs/design/lane-f-engine-jvm/evidence/C2/vdu-generation-proof.md",
+          "addedEvidenceLines": [
+            "The later [checkpoint724](vdu-checkpoint-724.md) passes full integrated verification"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "82e0e185d88157067833d59ae2ac7f9d2ba65a53",
+      "subject": "feat(936): own offline enrichment through durable completion",
+      "item": "C2-2 offline durable owner",
+      "recordedResult": "Owner/integration/negative727-743 and corrected742; required live/installed and final full proof remain separate.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-cut.md",
+          "sha256": "56f686c083fc613e69348a6b68e92435f07873dc4f3643173ccffd84deca8805",
+          "gitRead": "git show 82e0e185d88157067833d59ae2ac7f9d2ba65a53:docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-cut.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/82e0e185d88157067833d59ae2ac7f9d2ba65a53/docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-cut.md",
+          "addedEvidenceLines": [
+            "The implementation and review corrections have [focused proof](offline-owner-proof.md);",
+            "A failed mode entry checkpoints AI_OFFLINE with zero selected before selection or",
+            "the captured remainder afterward, then propagates its original operational failure.",
+            "Ordinary checkpoint-delivery failure is suppressed on that failure; a checkpoint",
+            "Error remains fatal with the mode failure suppressed. Mode exit and write failures",
+            "also remain operational failures, not normal blocked returns."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-proof.md",
+          "sha256": "1a84664aac07dc3854d51273896fde194132b0f8d7f0001c223300b04a54ac1c",
+          "gitRead": "git show 82e0e185d88157067833d59ae2ac7f9d2ba65a53:docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-proof.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/82e0e185d88157067833d59ae2ac7f9d2ba65a53/docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-proof.md",
+          "addedEvidenceLines": [
+            "# C2-2 offline procedure ownership proof",
+            "This record separates focused proof from the still-required integrated, hosted,",
+            "Only acknowledged index results advance counts; no-text/rejected/failed results",
+            "are failed units. A false or throwing write leaves that unit unfinished.",
+            "Headless and launcher cleanup retain dependent resources after a failed drain.",
+            "## Focused and negative checks",
+            "| 725\u2013726 | Affected main compilation/PMD passes. New API Javadoc and future-composition warnings were corrected in726. Other existing compiler warnings remain in their original subjects. |",
+            "| 727\u2013729 | Fixture correction runs: worker tests had constructor/checked-exception issues, a mixed Mockito matcher, and a non-waiting test registry. PMD also rejected redundant qualifiers. These are recorded red attempts, not proof. |",
+            "| 730 | PASS150 cases/36 suites, zero failures/errors/skips; affected test PMD. Services85 and UI25 execute; launcher40 reuses729. Architecture suites are included. |",
+            "| 732 | PASS13 cases/7 suites: real contention and recorded lifecycle fixtures plus included architecture cases; affected main/test PMD. |",
+            "| 733 | Intentional early-handler-completion mutation: all3 recorded lifecycle cases fail because completion publishes during held cleanup. |",
+            "| 734 | Intentional replacement of caller admission with internal backlog attribution: all3 lifecycle cases fail with ENGINE_LIMIT while the dispatch holds the only slot. Exact work linkage is necessary. |",
+            "| 735 | Intentional swallowed false index acknowledgement:4 cases fail for lost write refusal, advanced no-text/rejection counts, and displaced primary error. |",
+            "| 736 | Restored intended code: PASS156 cases/38 suites, zero failures/errors/skips. Services87, UI29 and launcher40 all execute; affected test PMD passes. Includes the real registry timeout/retry test. |",
+            "| 737 | RED full build:2,126 cases/293 suites observed,2 failures in EngineWorkCancellationTest. The newly waiting default test registry conflicted with tests that deliberately hold cleanup through close. No full pass is claimed. |",
+            "| 738 | Operation-surface and guard-resolution pass before explicit offline declarations. Their import scan does not discover every per-pass projection; registration is still required. |",
+            "| 739\u2013740 | New mode-metadata regression setup:739 has a test generic-inference compile error (fixed);740 fails both new integration cases, including an absent-cursor NPE. Root adds an explicit non-null checkpoint assertion for a decisive witness. Narrowed registry deadline tests pass. |",
+            "| 741 | Negative before mode-metadata fix:33 cases/9 suites,6 intended failures (missing preselection cursor, postselection reason NONE, absent checkpoint-error preservation). The7 deadline cases reuse the narrowed-fixture pass. |",
+            "| 742 | PASS129 cases/23 suites, all freshly executed: services91, UI31, Engine7. Zero failures/errors/skips; affected main/test and core test-fixture PMD pass. Covers the mode-metadata and opt-in registry corrections. |",
+            "| 743 | Explicit offline producer/projection declarations pass operation-surface and register-guard-resolution. |",
+            "The root read the negative XML failure messages and verified exact source bytes",
+            "  Model/GPU/index ports are controlled doubles; this is not an actual-model proof.",
+            "  failure, negative processing refusal, cancellation, mode-exit error preservation",
+            "  while the body is held, and admits the next pass immediately after completion.",
+            "Independent implementation review found one metadata gap: mode-entry failure",
+            "afterward, then propagates the transition failure. Ordinary checkpoint-delivery",
+            "failure is suppressed on that primary; Error remains fatal with the mode failure",
+            "and four component cases verify failure/cause priority. Negative741 refutes the",
+            "uncorrected code;742 passes the correction.",
+            "The7 EngineWorkCancellationTest cases pass freshly in742. Final independent",
+            "reread found no remaining source defect and independently inspected negative741,",
+            "focused727\u2013730/736/742, integration731/732, negative733\u2013735, full737,",
+            "mode-negative739\u2013741 and surface/guard738/743. Completed",
+            "Read the log with counts: passing test XML cannot excuse a compilation/PMD failure.",
+            "`tmp/c2-2-offline-negative.py` records each mutation and restores source in finally;"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "09e86ab7137fe42614f4559fe65efc6396753225",
+      "subject": "docs(936): record offline owner integrated verification",
+      "item": "C2 offline proof checkpoint",
+      "recordedResult": "Full744:10047 cases/1636 suites,35 skips; stress745 and hosted success; actual-model/API still owed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-proof.md",
+          "sha256": "d9887f3bdb3a69eafa5d97d0b171ee1cc2e7162cfea370a0ae661543742953d1",
+          "gitRead": "git show 09e86ab7137fe42614f4559fe65efc6396753225:docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-proof.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/09e86ab7137fe42614f4559fe65efc6396753225/docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-proof.md",
+          "addedEvidenceLines": [
+            "Focused, full build/PMD and hosted proof now pass at82e0e185d. Actual-model/API",
+            "| 744 | PASS full build and PMD at82e0e185d:10,047 cases/1,636 suites, zero failures/errors,35 skips. Production and test inputs remained unchanged between configuration and commit. Captured XML and task execution/reuse ledger are retained before any focused rerun. |",
+            "| 745 | PASS named Lucene/ORT stress selection:2 cases/2 suites, zero failures/errors/skips. Lucene executes; ORT reuses its unchanged-input cache. This is the existing concurrency gate, not additional offline-owner coverage. |",
+            "positive742 and gate743 evidence. Full744 passes both corrections. Hosted",
+            "also passes at82e0e185d, including Windows-native and system integration jobs.",
+            "Named stress745 also passes. Actual-model/API and installed acceptance remain open.",
+            "mode-negative739\u2013741, surface/guard738/743, full744 and stress745. Completed"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "28f7d4779e5d5f3a9c9e28534e159b13f500bdce",
+      "subject": "docs(936): settle recorded ingestion preparation boundary",
+      "item": "C2-3/C2-8 preparation design",
+      "recordedResult": "Recorded ingestion preparation boundary and child identity decided; implementation/proof explicitly owed.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "sha256": "e087e7b44c85248ea0fef329124129b12373cccffe3658b4de17e1dfed7fbb96",
+          "gitRead": "git show 28f7d4779e5d5f3a9c9e28534e159b13f500bdce:docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/28f7d4779e5d5f3a9c9e28534e159b13f500bdce/docs/design/lane-f-engine-jvm/evidence/C2/C2-2-plan.md",
+          "addedEvidenceLines": []
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "sha256": "c3417367e8a75020d2bcb78f0d259f82cdf405a6e57e1508b2db5dabf0a43995",
+          "gitRead": "git show 28f7d4779e5d5f3a9c9e28534e159b13f500bdce:docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/28f7d4779e5d5f3a9c9e28534e159b13f500bdce/docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "addedEvidenceLines": [
+            "decisions1,3,5 and7. Implementation and all proof below remain owed.",
+            "Schema validation can be computed first; invalid input or preparation failure",
+            "passes the strict check; missing generation-manager/runtime dependencies refuse.",
+            "## Child identity and proof"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "a0cf80c0b9274c2462d280a6660e05e6441db56d",
+      "subject": "test(936): prove recorded offline pass with real vision model",
+      "item": "C2-2 real-model offline proof",
+      "recordedResult": "Live754, corrected readback755 and107 unit cases; processed1/failed0/remaining0/blocked0; source-distribution limit explicit.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-live.md",
+          "sha256": "51ae1990e4a1a704eadf9c36610ccf0fb7b4d5dc67bbacb21a4d6beb9992f315",
+          "gitRead": "git show a0cf80c0b9274c2462d280a6660e05e6441db56d:docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-live.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/a0cf80c0b9274c2462d280a6660e05e6441db56d/docs/design/lane-f-engine-jvm/evidence/C2/offline-owner-live.md",
+          "addedEvidenceLines": [
+            "September12, Windows. Live754 passes against the installed Gradle distribution in",
+            "requires one selected/processed unit, zero failed/remaining/blocked units and the",
+            "Empty passes and SUCCESS_EMPTY are not positive evidence. A missing or failed row",
+            "fails the instrument; its terminal metadata remains in the artifact.",
+            "SQLite readback is a local durable-row proof, not C2-6's future public query API.",
+            "## Verification",
+            "- Unit748:95 cases pass, including17 instrument cases and78 shared production",
+            "  retained failure details and strict numeric checkpoint types before live use.",
+            "  an empty mutation token. This failed preflight is retained, not counted as live proof.",
+            "- Unit752 passes106 cases:28 instrument and78 shared preview cases. Independent",
+            "  output creation is exclusive. Negative753 changes the validated output assignment",
+            "  All six selected output-collision regressions fail for overwritten bytes or a new",
+            "- Final parent read found that the query omitted failure_reason/result_json despite",
+            "  a real SQLite regression preserves non-null failure and receipt values. Unit755",
+            "  passes107 cases. Corrected readback755 joins the same stopped live754 database,",
+            "  row and checkpoint. Original754's null receipt/failure fields are not evidence",
+            "  processed1, failed0, remaining0, blocked0 and embeddingHandoff=not_needed.",
+            "  native resources and npm frontend mean this is not a self-contained package proof.",
+            "  confirms both ports closed without errors. The proof does not require a forceful",
+            "tmp/c2-2-offline-instrument-negative-753.txt, tmp/c2-2-offline-live-754.json,",
+            "and activation metadata and failed749 capture remain under their numbered prefixes."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "c4fbcb53f8fd1f2c0247bb63ad498189e62e6d06",
+      "subject": "feat(936): persist safe operation preparation before dispatch",
+      "item": "C2 prepared invocation foundation",
+      "recordedResult": "Negative757/762; broader763:3491 cases/557 suites,3 skips and PMD; not full repository proof.",
+      "currentDisposition": "Generic pure preparation remains; non-null replay refuses until C2-3; held root/child contracts require redesign before activation.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "sha256": "b227b1a4b3b04d208ee16d0b379d38272a57a7ba5f752e10c3c98bad81ad7cf2",
+          "gitRead": "git show c4fbcb53f8fd1f2c0247bb63ad498189e62e6d06:docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/c4fbcb53f8fd1f2c0247bb63ad498189e62e6d06/docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "addedEvidenceLines": [
+            "failure code before returning it. Receipt and preparation refusal share the existing",
+            "Unexpected runtime exceptions still receive generic failed attempts and propagate.",
+            "## Common seam verification",
+            "passthrough; a replay-capable handler must implement executePrepared, so the default",
+            "cannot silently ignore its frozen scope. The executor passes the same immutable",
+            "Focused756 passes80 cases/8 suites plus affected PMD. Negative757 drops the prepared",
+            "descriptor at acceptance: the frozen-root persisted-identity assertion fails; six",
+            "conformance cases pass. The original source is restored. Independent review then",
+            "758 fails compilation on an ignored Optional return in the new exception guard;",
+            "759 passes compilation but two new invalid-input tests used the intentionally",
+            "schema; existing passthrough semantics are preserved. 760 catches the fixture's",
+            "incorrect Interface accessor, corrected to result(). Final focused761 passes94 cases/",
+            "8 suites, zero failures/errors/skips plus PMD. app-services executes77 cases; app-api's",
+            "gradlew.bat :modules:app-agent-api:test --tests *OperationPreparationTest",
+            "Allowlist-negative762 removes the projection validator call: six intended failures",
+            "in20 cases prove both shape rejection and refusal to persist content through actual",
+            "remaining substantive source defect. Broad affected-module763 passes3491 cases/",
+            "557 suites, zero failures/errors and3 skips; all four test tasks execute (236",
+            "app-agent-api,209 app-api,420 app-observability,2626 app-services). Affected PMD passes.",
+            "`:modules:app-observability:test`. This is not a full repository or live producer proof.",
+            "`tmp/c2-2-preparation-negative-757` prefixes (`.txt`, `-counts.json`, `-xml/`).",
+            "Compile-only failures758/760 have logs. Retain through lane acceptance plus30 days,",
+            "`tmp/c2-2-preparation-negative-762` and `tmp/c2-2-preparation-modules-763`.",
+            "canonical link checks pass. Full repository/hosted/live validation remains part of"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "23974e42455273048d6b11eaa07b461c2321497e",
+      "subject": "fix(engine): capture serving generation and refuse replacement gaps",
+      "item": "C2-12 generation capture prerequisite",
+      "recordedResult": "Negative769:three intended failures; restored generation768 proof; not D1 carry-forward or live ingest proof.",
+      "currentDisposition": "Temporary replacement-null guard; D1 removes the window and owns carry-forward/activation proof.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/generation-capture.md",
+          "sha256": "5f93e9283733d35e8e629238123698e4911ba8b095059f6b0dc77bb24aecb87f",
+          "gitRead": "git show 23974e42455273048d6b11eaa07b461c2321497e:docs/design/lane-f-engine-jvm/evidence/C2/generation-capture.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/23974e42455273048d6b11eaa07b461c2321497e/docs/design/lane-f-engine-jvm/evidence/C2/generation-capture.md",
+          "addedEvidenceLines": [
+            "## Verification",
+            "Windows/Java25 focused768 passes55 cases/9 suites, zero failures/errors/skips and affected",
+            "PMD. app-engine executes27 cases; app-api's21 reuse unchanged passing767 inputs and",
+            "SQLite queue with mocked runtime operations; it is not a live ingestion proof.",
+            "gradlew.bat :modules:app-api:test --tests *RecordedRootPlanTest",
+            "764 fails compilation in concurrent app-api work before generation tests. 765 and767",
+            "each run55 cases with one new fixture failure: context reference equality incorrectly",
+            "flags an unused resource variable, corrected without suppression. Negative769 replaces",
+            "requireService with the old dereference behavior: three intended NPE/status failures",
+            "in12 cases. Exact production source bytes are restored afterward. Its command is",
+            "tmp/c2-2-generation-negative-769, with .txt, -counts.json and -xml/ suffixes.",
+            "live proof of that integration remains required; C2-2 is open."
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "154742d4aa94e5feeac485b05670a9be97b28a70",
+      "subject": "test(ci): retain native parser bootstrap failure evidence",
+      "item": "C2 hosted parser diagnostics",
+      "recordedResult": "Hosted failure766 retained; local diagnostic4 cases/2 suites and PMD pass; no hosted-fix claim at this commit.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/parser-hosted-766.md",
+          "sha256": "d0b6008b33488515da5ebe3d4706eadc7c93f87843918515033ff1514873599b",
+          "gitRead": "git show 154742d4aa94e5feeac485b05670a9be97b28a70:docs/design/lane-f-engine-jvm/evidence/C2/parser-hosted-766.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/154742d4aa94e5feeac485b05670a9be97b28a70/docs/design/lane-f-engine-jvm/evidence/C2/parser-hosted-766.md",
+          "addedEvidenceLines": [
+            "# Hosted parser fixture failure: September12",
+            "Preparation checkpoint c4fbcb53f run34719066293 fails Windows-native tests job103621468209",
+            "all precede that PID file. The log does not expose the future's failure, so a startup",
+            "timeout and native/bootstrap failure cannot be distinguished. No worker-services or",
+            "workflow code changed from passing a0cf80c0b run34717959968. This establishes an",
+            "environment-sensitive failure, not its precise cause or a waived test.",
+            "The diagnostic correction preserves a completed extraction failure when no PID file",
+            "exists, and the Windows job now uploads JUnit XML/HTML even on failure, retained30 days.",
+            "plus diagnostic diff passes4 cases/2 suites, zero failures/errors/skips and worker-services",
+            "that the hosted startup failure is fixed; the next hosted result must be checked.",
+            "gradlew.bat :modules:worker-services:test --tests *WindowsParserContainmentTest",
+            "Evidence: worktree tmp/c2-2-preparation-hosted-failure-766.txt (failed hosted job log),"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "04716d41e35a4f6c4ba09b72aa3597a02a471f8e",
+      "subject": "feat(operations): freeze and partition recorded root plans",
+      "item": "C2 root-plan representation",
+      "recordedResult": "771:22 cases/3 suites; negative772 nearest-root regression; exact source restored.",
+      "currentDisposition": "Unactivated replay/child surface held by R9 (6b109c27c; snapshot supplement d9c80a646) for C2-3/C2-8/C2-10; historical proof is not activation.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/parser-hosted-766.md",
+          "sha256": "f6bc055c2921da62b15f4af55f4fec7838adc41ffa4c3c12ec00ddea5d1573ae",
+          "gitRead": "git show 04716d41e35a4f6c4ba09b72aa3597a02a471f8e:docs/design/lane-f-engine-jvm/evidence/C2/parser-hosted-766.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/04716d41e35a4f6c4ba09b72aa3597a02a471f8e/docs/design/lane-f-engine-jvm/evidence/C2/parser-hosted-766.md",
+          "addedEvidenceLines": [
+            "plus diagnostic diff passes4 cases/1 suite, zero failures/errors/skips and worker-services"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "sha256": "b8fac80e8837ae521e5ca8ecfc8e59b6331cf313721b41ba7047e583aa7940ef",
+          "gitRead": "git show 04716d41e35a4f6c4ba09b72aa3597a02a471f8e:docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/04716d41e35a4f6c4ba09b72aa3597a02a471f8e/docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "addedEvidenceLines": [
+            "## Immutable root plan verification",
+            "Focused771 at154742d4a plus this DTO diff executes22 cases/3 suites, zero failures,",
+            "errors or skips and passing app-api PMD. This includes12 root-plan,7 descriptor and3",
+            "architecture cases. Negative772 chooses the outermost ancestor instead of the nearest:",
+            "the alternating-policy regression fails, with one intended failure in15 cases/2 suites.",
+            "Exact production bytes are restored. The separately documented generation768 proof",
+            "and prior preparation763 proof remain scoped to their tested inputs.",
+            "gradlew.bat :modules:app-api:test --tests *RecordedRootPlanTest",
+            "Negative772 uses only RecordedRootPlanTest and omits PMD. Artifacts are worktree",
+            "tmp/c2-2-root-plan-771 and tmp/c2-2-root-plan-negative-772 with .txt, -counts.json,"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "c6556fa020c6588340cd7b399b979f1a103fc766",
+      "subject": "feat(operations): snapshot watched root scope before acceptance",
+      "item": "C2 frozen root-scope preparation",
+      "recordedResult": "Negative774:three intended failures;775:40 cases/11 suites with Engine reuse and PMD.",
+      "currentDisposition": "Unactivated replay/child surface held by R9 (6b109c27c; snapshot supplement d9c80a646) for C2-3/C2-8/C2-10; historical proof is not activation.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/parser-hosted-766.md",
+          "sha256": "5c364b44bf377f71a525549d48379e28d0b9ab4a5bac7edaae6200f9484235cb",
+          "gitRead": "git show c6556fa020c6588340cd7b399b979f1a103fc766:docs/design/lane-f-engine-jvm/evidence/C2/parser-hosted-766.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/c6556fa020c6588340cd7b399b979f1a103fc766/docs/design/lane-f-engine-jvm/evidence/C2/parser-hosted-766.md",
+          "addedEvidenceLines": [
+            "that the hosted startup failure is fixed. Successor run34720523685 passes04716d41e,",
+            "failure remains unclassified in its insufficient historical log."
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "sha256": "ba77ef5068414429ffbcaf39f736126cc589116d1a542e571dd52d798cc29aec",
+          "gitRead": "git show c6556fa020c6588340cd7b399b979f1a103fc766:docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/c6556fa020c6588340cd7b399b979f1a103fc766/docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "addedEvidenceLines": [
+            "production deliberately owns REINDEX/INGEST and fails unowned interactive operations at",
+            "refusal is distinct from storage failure. The parent owner aggregates every child's durable",
+            "## Atomic root-state preparation verification",
+            "proof is then supplied by the final fixtures; parent takes the test diff after two worker",
+            "773 executes40 cases/11 suites plus affected PMD, zero failures/errors/skips.",
+            "Negative774 restores the old registration synchronization and removes the completion",
+            "monitor. Three failures in13 cases show actual null collection, two duplicate walks,",
+            "and removed-root resurrection. Original production bytes are restored. Final775 passes",
+            "40 cases/11 suites with PMD:28 app-services cases execute,12 app-engine cases reuse the",
+            "gradlew.bat :modules:app-services:test --tests *RecordedRootPreparationTest",
+            "Negative774 selects only the two new app-services fixtures and omits PMD. Base04716d41e",
+            "and tmp/c2-2-root-snapshot-negative-774, each with .txt, -counts.json, -xml/ suffixes.",
+            "Hosted run34720523685 passes04716d41e, including the prior preparation/generation/DTO",
+            "and Windows-native fixture. It precedes this snapshot; broader snapshot/producer proof"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "8ead6de3b17c2ecca89ed7e1de8c3949a47c5491",
+      "subject": "feat(operations): project declared record kinds into durable rows",
+      "item": "C2 operation record-kind policy",
+      "recordedResult": "Negative780:four intended failures;781:120 cases/13 suites with explicit reuse and PMD.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "sha256": "7488d83887f6249db1202865e6729da02df9a5f596b9e595cd9a26da92d708d3",
+          "gitRead": "git show 8ead6de3b17c2ecca89ed7e1de8c3949a47c5491:docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/8ead6de3b17c2ecca89ed7e1de8c3949a47c5491/docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "addedEvidenceLines": [
+            "Broader776 at c6556fa02 passes5189 cases/906 suites, zero failures/errors and11 skips.",
+            "adversarial corpus1 and SPLADE tokenizer crash harness1. Affected PMD passes, with",
+            "unchanged inputs reused where Gradle reports UP-TO-DATE. Hosted CI34721364763 passes",
+            "776 command: `gradlew.bat :modules:app-api:test :modules:app-services:test",
+            "Verification at c6556fa02 plus this prerequisite, Windows/Java25: schema generation777",
+            "passes. Focused778 executes120 cases/13 suites without failures/errors/skips and compiles",
+            "all moved-type consumers, but fails PMD on18 redundant test qualifiers after imports were",
+            "779 passes affected PMD and reuses all120 unchanged tests. Negative780 restores both",
+            "hardcoded OPERATION projections: allfour new dispatch cases fail (two persist operation",
+            "5-suite negative has exactly four failures, no errors/skips. Exact source bytes are restored.",
+            "Final781 passes120 cases/13 suites and affected PMD; app-services tests reuse the identical",
+            "passing compiled input from cache, the other three tasks are UP-TO-DATE from778.",
+            "gradlew.bat :modules:app-agent-api:test --tests *OperationPolicyTest",
+            "parallelism flags. Both operation.v1 copies match; all eight `regen-all --check` sets pass,",
+            "Logs/counts/XML are `tmp/c2-2-kind-{778,779,781}` and `tmp/c2-2-kind-negative-780` with"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "fc679f92a7efd27a07d4767dc39553b303585357",
+      "subject": "test(ci): align policy-axis fixture with declared record kind",
+      "item": "C2 policy-axis fixture repair",
+      "recordedResult": "Policy-axis self-test12 assertions and10-axis gate pass; prior hosted failure retained.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/record-kind-policy-fixture.md",
+          "sha256": "35690477dad1d7cddb0d2cb6ef70ff4ab4b1a7402092fe484d23a8831c671ff6",
+          "gitRead": "git show fc679f92a7efd27a07d4767dc39553b303585357:docs/design/lane-f-engine-jvm/evidence/C2/record-kind-policy-fixture.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/fc679f92a7efd27a07d4767dc39553b303585357/docs/design/lane-f-engine-jvm/evidence/C2/record-kind-policy-fixture.md",
+          "addedEvidenceLines": [
+            "failed Public claims at the policy-axis liveness self-test. Its literal component",
+            "record-order assertion correctly detected the mismatch. Other hosted jobs passed.",
+            "`node scripts/ci/check-policy-axis-liveness.test.mjs` passes all 12 assertions and",
+            "`node scripts/ci/check-policy-axis-liveness.mjs` passes all 10 policy axes, each",
+            "with a production reader. The failure log and workflow classification are retained",
+            "at worktree `tmp/c2-2-kind-hosted-8ead-failure.txt` and"
+          ]
+        }
+      ]
+    },
+    {
+      "commit": "4d1e49befcdf326f1f02d6e4f66cdd8c3c16e6fa",
+      "subject": "feat(operations): accept ingest children from recorded parent scope",
+      "item": "C2 recorded ingest-child primitive",
+      "recordedResult": "Negative785:two intended failures;786 corrected; broader787:741 cases/134 suites and PMD.",
+      "currentDisposition": "Unactivated replay/child surface held by R9 (6b109c27c; snapshot supplement d9c80a646) for C2-3/C2-8/C2-10; historical proof is not activation.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/recorded-ingest-child.md",
+          "sha256": "4c811550ef378d7939a8bad82a7d421af8d5bedc17050f58e29b734a7f519e6f",
+          "gitRead": "git show 4d1e49befcdf326f1f02d6e4f66cdd8c3c16e6fa:docs/design/lane-f-engine-jvm/evidence/C2/recorded-ingest-child.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/4d1e49befcdf326f1f02d6e4f66cdd8c3c16e6fa/docs/design/lane-f-engine-jvm/evidence/C2/recorded-ingest-child.md",
+          "addedEvidenceLines": [
+            "September13, implemented at fc679f92a plus this item; local primitive proof complete.",
+            "Governing scope: [recorded-root preparation, child identity and proof](recorded-root-preparation.md#child-identity-and-proof).",
+            "whose terminal-persistence observation failed. A failed terminal write can leave the",
+            "declaration. Storage failures remain STORAGE_FAILED; capability, parent or scope",
+            "refusals are CHILD_ACCEPTANCE_REFUSED, including synchronous/asynchronous parent failure",
+            "## Verification",
+            "Grammar782 executes25 cases/3 suites with zero failures/errors/skips, passes app-api",
+            "Focused783 passes93 cases/22 suites;784 passes94 after the architecture review fix;",
+            "final786 passes96 cases/22 suites with zero failures/errors/skips and selected PMD.",
+            "violation; all bounded OperationStoreException codes now survive parent failure",
+            "receipts. Negative785 executes3 cases/2 suites and fails both intended synchronous",
+            "and deferred asynchronous assertions with STORAGE_FAILED expected versus",
+            "UNCAUGHT_EXCEPTION actual. Final786 passes those unchanged assertions. Review reread",
+            "finds no surviving primitive source defect. Broader787 executes741 cases/134 suites with zero failures/errors/skips across",
+            "execute; selected PMD passes with unchanged-input reuse. Production scan",
+            "gradlew.bat :modules:app-api:test --tests *OperationDescriptorPreparationTest",
+            "gradlew.bat :modules:app-api:test --tests *OperationDescriptorPreparationTest",
+            "Negative785 uses only `:modules:app-observability:test` and",
+            "`tmp/c2-2-child-negative-785`, and `tmp/c2-2-child-modules-787`, each with `.txt`,"
+          ]
+        },
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "sha256": "71ca25c460cd63da7bce34de7382b9abbb3398935ffa332005de213da398ae00",
+          "gitRead": "git show 4d1e49befcdf326f1f02d6e4f66cdd8c3c16e6fa:docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/4d1e49befcdf326f1f02d6e4f66cdd8c3c16e6fa/docs/design/lane-f-engine-jvm/evidence/C2/recorded-root-preparation.md",
+          "addedEvidenceLines": []
+        }
+      ]
+    },
+    {
+      "commit": "429115fec0dabce9b63db5825d36d42a0c2d0a58",
+      "subject": "fix(governance): catalog implemented operations ports",
+      "item": "C2 operations-port governance",
+      "recordedResult": "Engine-port self-test7 cases and five-declaration gate pass; both omitted-binding negatives fail correctly.",
+      "currentDisposition": "Historical item proof only; the current R1-R10 correction batch and owning stage govern acceptance.",
+      "evidence": [
+        {
+          "path": "docs/design/lane-f-engine-jvm/evidence/C2/operations-port-catalog.md",
+          "sha256": "d8bdd8e0cd6fcce8ea5fd6b984f321f05c9c157ee763969b2b42298ec3ee453e",
+          "gitRead": "git show 429115fec0dabce9b63db5825d36d42a0c2d0a58:docs/design/lane-f-engine-jvm/evidence/C2/operations-port-catalog.md",
+          "url": "https://github.com/justsearch-app/justsearch/blob/429115fec0dabce9b63db5825d36d42a0c2d0a58/docs/design/lane-f-engine-jvm/evidence/C2/operations-port-catalog.md",
+          "addedEvidenceLines": [
+            "(`OperationStore`), both in app-api. The passing gate did not scan either binding.",
+            "Verification at 4d1e49bef plus this register change:",
+            "- `node scripts/governance/gates/engine-port/enforcer.test.mjs`: all seven cases pass.",
+            "- `node scripts/governance/run.mjs --gate engine-port --mode gate`: pass, five scanned",
+            "  declarations, no failures.",
+            "- Two negative register projections independently omit the runner and store binding.",
+            "  Both fail specifically with `engine-port/undeclared-implementation`, while source",
+            "`tmp/c2-2-engine-port-negative.mjs`, and `-negative-results.json`. Retain through",
+            "coverage, not proof of recorded producer activation or committed scan completion."
+          ]
+        }
+      ]
+    }
+  ]
+}

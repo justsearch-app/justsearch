@@ -15,9 +15,17 @@ description: >-
 from the *facts* (accessibility tree, axe violations, geometry, console), and use the PNG only for the overall
 look.
 
-> The harness drives the REAL Lit app — NOT the retired React stack. There is **no mock-data demo mode**
-> anymore: view/chrome steps render without a backend (the tool auto-serves a Vite), but anything with data —
-> search, inspector, AI/citation — needs the **dev stack running** (and AI steps need `ai_activate`).
+> The harness drives the real Lit app. Live data/AI steps need the owned dev stack
+> and an online model. Deterministic state steps use explicit `--fixtures` route
+> responses; these prove UI rendering, not backend or model behavior. A step with
+> a non-default fixture variant (for example `chat-chip-yield`) requires that flag.
+> The retired `?demo=true` mode is unrelated and remains inert.
+>
+> A mount failure naming `504 /node_modules/.vite/deps/...` is a failed Vite
+> optimized dependency, not evidence that backend readiness or a UI selector is
+> wrong. Use the owned stack lifecycle to restart/reoptimize, verify the current
+> served dependency returns200, then repeat the unchanged capture. Preserve the
+> failed evidence; do not hide it with fixtures or a longer mount timeout.
 
 ## Quick reference
 
@@ -27,6 +35,7 @@ jseval ui-shot search-results
 jseval ui-shot citation-highlight
 jseval ui-shot --list            # list all steps
 jseval ui-shot --affected modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.ts
+jseval ui-shot --affected modules/ui-web/src/shell-v0/components/StatusDeck.ts --fixtures
 jseval ui-check                  # batch-capture all steps (~60s+), diff vs baseline
 ```
 

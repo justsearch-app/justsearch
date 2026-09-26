@@ -1,136 +1,94 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import io.justsearch.contract.wire.LifecycleState;
-import io.justsearch.app.api.runtime.RuntimeManifest;
-import io.justsearch.app.api.runtime.RuntimeManifestBuilder;
-import io.justsearch.app.api.runtime.RuntimeManifestHeadInfoBuilder;
+import io.justsearch.app.services.lifecycle.LifecycleProjection;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.ui.runtime.RuntimeManifestPublisher;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Tempdoc 501 Phase 26 + Phase 39 (F9): verifies the three fallback paths
- * of {@link StatusLifecycleHandler#readManifestLifecycle}. The method must
- * return {@code null} (forcing fallback to direct {@code LifecycleProjection.derive})
- * when the publisher is unwired, hasn't published yet, or carries a
- * lifecycle string that cannot be parsed as {@link LifecycleState}.
- *
- * <p>Tests use minimal-construction handlers (most collaborators are
- * irrelevant for this method; we only need the publisher field wired).
- */
+/** The served schema-2 lifecycle and runtime manifest share one post-sampling observation. */
 class StatusLifecycleHandlerManifestFallbackTest {
 
   @Test
-  void publisherUnwiredReturnsNull() {
-    StatusLifecycleHandler handler = newHandler();
-    // No setRuntimeManifestPublisher call — runtimeManifestPublisher stays null.
-    assertNull(handler.readManifestLifecycle());
-  }
+  void servedLifecycleAndManifestAgreeAfterSamplingForEveryInputCombination(@TempDir Path temp)
+      throws Exception {
+    try (var components = new StatusComponentFixture();
+        var publisher = new RuntimeManifestPublisher(temp)) {
+      publisher.publishHead(54321, null);
+      var graph = components.capabilities();
+      StatusLifecycleHandler handler = new StatusLifecycleHandler(
+          mock(io.justsearch.app.api.OnlineAiService.class),
+          mock(io.justsearch.agent.api.AgentService.class),
+          () -> null,
+          null,
+          null,
+          temp.resolve("index"),
+          Instant.now(),
+          () -> "OK",
+          null,
+          null,
+          null,
+          graph.worker(),
+          graph.inference());
+      components.attach(handler);
 
-  @Test
-  void publisherWithoutManifestReturnsNull() {
-    StatusLifecycleHandler handler = newHandler();
-    RuntimeManifestPublisher publisher = mock(RuntimeManifestPublisher.class);
-    when(publisher.current()).thenReturn(null);
-    handler.setRuntimeManifestPublisher(publisher);
+      int combinations = 0;
+      int normalizedReadyIndexes = 0;
+      List<String> names = List.of("api", "index", "encoders", "generative");
+      for (ComponentState api : ComponentState.values()) {
+        for (ComponentState index : ComponentState.values()) {
+          for (ComponentState encoders : ComponentState.values()) {
+            for (ComponentState generative : ComponentState.values()) {
+              ComponentState[] requested = {api, index, encoders, generative};
+              for (String name : names) {
+                components.transition(name, ComponentState.READY, null, name + " reset");
+              }
+              for (int position = 0; position < names.size(); position++) {
+                ComponentState state = requested[position];
+                components.transition(
+                    names.get(position),
+                    state,
+                    state == ComponentState.READY ? null : names.get(position) + "." + state,
+                    names.get(position) + " input " + state);
+              }
 
-    assertNull(handler.readManifestLifecycle());
-  }
+              var response = handler.buildStatusSnapshot();
+              var accepted = components.registry().snapshot();
+              var expected = LifecycleProjection.project(accepted, Instant.now());
+              publisher.publishLifecycle(accepted);
 
-  @Test
-  void manifestWithNullLifecycleReturnsNull() {
-    StatusLifecycleHandler handler = newHandler();
-    RuntimeManifest m =
-        RuntimeManifestBuilder.builder()
-            .schemaVersion(1)
-            .instanceId("i")
-            .pid(1L)
-            .startedAt("2026-05-21T00:00:00Z")
-            .dataDir("/tmp")
-            .head(
-                RuntimeManifestHeadInfoBuilder.builder()
-                    .apiPort(1234)
-                    .apiBaseUrl("http://127.0.0.1:1234")
-                    .readyAt("2026-05-21T00:00:01Z")
-                    .build())
-            .build();
-    // lifecycle stays null (no .lifecycle(...) call)
-    RuntimeManifestPublisher publisher = mock(RuntimeManifestPublisher.class);
-    when(publisher.current()).thenReturn(m);
-    handler.setRuntimeManifestPublisher(publisher);
+              assertEquals(2, response.schemaVersion());
+              assertEquals(expected.lifecycle().lifecycle(), response.lifecycle());
+              assertEquals(expected.lifecycle().components(), response.components());
+              assertEquals(expected.engineComponents(), response.readiness().engineComponents());
+              assertEquals(response.lifecycle().state().name(), publisher.current().lifecycle());
+              if (index == ComponentState.READY) {
+                assertEquals(
+                    ComponentState.UNAVAILABLE,
+                    accepted.components().stream()
+                        .filter(component -> component.spec().name().equals("index"))
+                        .findFirst()
+                        .orElseThrow()
+                        .state(),
+                    "failed Worker contact normalizes a claimed READY index");
+                normalizedReadyIndexes++;
+              }
+              combinations++;
+            }
+          }
+        }
+      }
 
-    assertNull(handler.readManifestLifecycle());
-  }
-
-  @Test
-  void unrecognizedDiscriminatorReturnsNull() {
-    StatusLifecycleHandler handler = newHandler();
-    RuntimeManifest m =
-        RuntimeManifestBuilder.builder()
-            .schemaVersion(1)
-            .instanceId("i")
-            .pid(1L)
-            .startedAt("2026-05-21T00:00:00Z")
-            .dataDir("/tmp")
-            .lifecycle("THIS_IS_NOT_A_LIFECYCLE_STATE")
-            .head(
-                RuntimeManifestHeadInfoBuilder.builder()
-                    .apiPort(1234)
-                    .apiBaseUrl("http://127.0.0.1:1234")
-                    .readyAt("2026-05-21T00:00:01Z")
-                    .build())
-            .build();
-    RuntimeManifestPublisher publisher = mock(RuntimeManifestPublisher.class);
-    when(publisher.current()).thenReturn(m);
-    handler.setRuntimeManifestPublisher(publisher);
-
-    assertNull(handler.readManifestLifecycle());
-  }
-
-  @Test
-  void validLifecycleStringReturnsParsedState() {
-    StatusLifecycleHandler handler = newHandler();
-    RuntimeManifest m =
-        RuntimeManifestBuilder.builder()
-            .schemaVersion(1)
-            .instanceId("i")
-            .pid(1L)
-            .startedAt("2026-05-21T00:00:00Z")
-            .dataDir("/tmp")
-            .lifecycle("LIFECYCLE_STATE_READY")
-            .head(
-                RuntimeManifestHeadInfoBuilder.builder()
-                    .apiPort(1234)
-                    .apiBaseUrl("http://127.0.0.1:1234")
-                    .readyAt("2026-05-21T00:00:01Z")
-                    .build())
-            .build();
-    RuntimeManifestPublisher publisher = mock(RuntimeManifestPublisher.class);
-    when(publisher.current()).thenReturn(m);
-    handler.setRuntimeManifestPublisher(publisher);
-
-    assertEquals(LifecycleState.LIFECYCLE_STATE_READY, handler.readManifestLifecycle());
-  }
-
-  private static StatusLifecycleHandler newHandler() {
-    // Minimal collaborators — readManifestLifecycle uses none of these.
-    return new StatusLifecycleHandler(
-        mock(io.justsearch.app.api.OnlineAiService.class),
-        mock(io.justsearch.agent.api.AgentService.class),
-        () -> null,
-        null,
-        null,
-        null,
-        java.time.Instant.now(),
-        () -> "OK",
-        null,
-        null,
-        null,
-        mock(io.justsearch.app.services.lifecycle.WorkerCapability.class),
-        mock(io.justsearch.app.services.lifecycle.InferenceCapability.class));
+      assertEquals(1_296, combinations);
+      assertEquals(216, normalizedReadyIndexes);
+    }
   }
 }

@@ -14,8 +14,8 @@ import java.util.Map;
  *
  * <p>Outside the shared full-stack dev mode (e.g., production Tauri, isolated backend-only
  * eval), the {@code JUSTSEARCH_DEV_RUNNER_STATE_ROOT} environment variable is unset; in that
- * case the service is a no-op and handles are trivial — call sites do not need to branch on
- * environment.
+ * case only the file projection is disabled. The production implementation still enforces
+ * process-local admission and owner cancellation; call sites do not branch on environment.
  *
  * <p>Stability: stable SPI.
  */

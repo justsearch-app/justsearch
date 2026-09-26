@@ -4,6 +4,7 @@ package io.justsearch.app.api.runtime;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.soabase.recordbuilder.core.RecordBuilder;
 import io.justsearch.app.api.OnlineAiRuntimeIntrospection;
+import java.util.List;
 
 /**
  * Producer-published runtime manifest (tempdoc 501).
@@ -44,8 +45,7 @@ public record RuntimeManifest(
     String startedAt,
     String dataDir,
     /**
-     * Tempdoc 501 §12.1 projection from {@code LifecycleProjection.derive(WorkerCapability,
-     * InferenceCapability)}. Single string discriminator over the canonical
+     * Projection from {@code LifecycleProjection.project} over one component registry snapshot. Single string discriminator over the canonical
      * {@code LifecycleState} enum ({@code STARTING} | {@code READY} | {@code DEGRADED} |
      * {@code ERROR}). Consumers get the overall state without composing sub-records.
      * Null only during the head-only initial publish before the head is fully bound;
@@ -73,7 +73,7 @@ public record RuntimeManifest(
      * Install/runtime mode (tempdoc 657). {@code intent} is the configured product shape
      * ({@code full-desktop} | {@code headless} | {@code mcp-lite}, from {@code -Djustsearch.mode});
      * {@code realized} is the coarse capability actually up ({@code full} | {@code retrieval-only} |
-     * {@code degraded}), projected from {@code WorkerCapability} + {@code InferenceCapability}. So the
+     * {@code degraded}), projected from registry-backed index and generative capability views. So the
      * advertised mode never outruns what is actually loaded. Nullable — a manifest written before the
      * first mode publish omits it; {@code @JsonInclude(NON_NULL)} keeps it optional and the schema
      * version stays 1 (older readers unaffected).
@@ -103,9 +103,13 @@ public record RuntimeManifest(
      * at all) omits it; {@code @JsonInclude(NON_NULL)} keeps it optional and the schema version
      * stays 1 (older readers unaffected), exactly as {@code mode} was added.
      */
-    ChatInfo chat) {
+    ChatInfo chat,
+    /** Private filesystem-only ownership records. Public projections always omit this list. */
+    List<ManagedChild> children,
+    /** Private warm-handoff state. Public projections always omit it. */
+    ShutdownHandoff shutdownHandoff) {
 
-  public static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 2;
 
   public RuntimeManifest {
     if (schemaVersion <= 0) {
@@ -132,16 +136,13 @@ public record RuntimeManifest(
   @RecordBuilder
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record HeadInfo(
-      int apiPort, String apiBaseUrl, String sessionToken, String readyAt, String buildStamp) {
+      Integer apiPort, String apiBaseUrl, String sessionToken, String readyAt, String buildStamp) {
     public HeadInfo {
-      if (apiPort <= 0 || apiPort > 65535) {
+      if (apiPort != null && (apiPort <= 0 || apiPort > 65535)) {
         throw new IllegalArgumentException("apiPort out of range: " + apiPort);
       }
-      if (apiBaseUrl == null || apiBaseUrl.isBlank()) {
-        throw new IllegalArgumentException("apiBaseUrl must be non-blank");
-      }
-      if (readyAt == null || readyAt.isBlank()) {
-        throw new IllegalArgumentException("readyAt must be non-blank");
+      if ((apiPort == null) != (apiBaseUrl == null) || (apiPort == null) != (readyAt == null)) {
+        throw new IllegalArgumentException("apiPort, apiBaseUrl and readyAt must be set together");
       }
     }
 
@@ -154,6 +155,9 @@ public record RuntimeManifest(
       return sessionToken == null ? this : new HeadInfo(apiPort, apiBaseUrl, null, readyAt, buildStamp);
     }
   }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public record ShutdownHandoff(String state, String reason, String changedAt) {}
 
   /**
    * Worker process surface — nullable. Becomes non-null on the second manifest write,
@@ -172,7 +176,6 @@ public record RuntimeManifest(
   public record WorkerInfo(
       /** {@code "pending"} | {@code "ready"} | {@code "failed"}. Always present. */
       String state,
-      Integer grpcPort,
       String indexBasePath,
       String readyAt,
       /** Populated when {@link #state} is {@code "failed"}; null otherwise. */
@@ -190,9 +193,8 @@ public record RuntimeManifest(
   }
 
   /**
-   * Inference (AI) runtime surface — nullable until the producer first observes the
-   * {@code InferenceCapability}. Projects from
-   * {@code io.justsearch.app.services.lifecycle.InferenceCapability} (tempdoc 501 §12.1).
+   * Inference (AI) runtime surface, projected from the generative component's read-only
+   * capability view. Nullable before the component is registered.
    *
    * <p>The {@code phase} discriminator carries the upstream {@code CapabilityHealth} name
    * ({@code PENDING}, {@code READY}, {@code DEGRADED}, {@code OFFLINE}, {@code RECOVERING}).
@@ -259,7 +261,7 @@ public record RuntimeManifest(
    * {@code -Djustsearch.mode} ({@code full-desktop} | {@code headless} | {@code mcp-lite}; defaults to
    * {@code full-desktop}). {@code realized} is a coarse projection of what is actually up —
    * {@code full} (retrieval + LLM ready), {@code retrieval-only} (retrieval up, LLM not required/offline),
-   * or {@code degraded} — derived from {@code WorkerCapability} + {@code InferenceCapability}. Consumers
+   * or {@code degraded} — derived from registry-backed index and generative capability views. Consumers
    * branch on {@code realized}; when it diverges from {@code intent} the manifest tells the honest truth.
    */
   @RecordBuilder
@@ -332,11 +334,14 @@ public record RuntimeManifest(
         && publicReach == reachability
         && publicMode == mode
         && publicContract == runtimeContract
-        && publicChat == chat) {
+        && publicChat == chat
+        && (children == null || children.isEmpty())
+        && shutdownHandoff == null) {
       return this;
     }
     return new RuntimeManifest(
         schemaVersion, instanceId, pid, startedAt, dataDir, lifecycle,
-        publicHead, publicWorker, publicAi, publicReach, publicMode, publicContract, publicChat);
+        publicHead, publicWorker, publicAi, publicReach, publicMode, publicContract, publicChat,
+        null, null);
   }
 }

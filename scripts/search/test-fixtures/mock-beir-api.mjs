@@ -218,7 +218,10 @@ async function handleRequest(req, res) {
   } else if (req.method === 'POST' && url.pathname === '/api/indexing/roots') {
     response = normalizeResponse(takeSequenceEntry('indexRootsSequence'), 200, { ok: true });
   } else if (req.method === 'POST' && url.pathname === '/api/knowledge/ingest') {
-    response = normalizeResponse(takeSequenceEntry('ingestSequence'), 200, { accepted: 0, error: null });
+    response = normalizeResponse(takeSequenceEntry('ingestSequence'), 200, {
+      success: true, message: 'Ingestion accepted',
+      structuredData: { operationKey: '01996c43-8300-7000-8000-000000000001', status: 'ACCEPTED' },
+    });
   } else if (req.method === 'POST' && url.pathname === '/api/knowledge/search') {
     response = getSearchResponse(requestBody.json);
   } else {

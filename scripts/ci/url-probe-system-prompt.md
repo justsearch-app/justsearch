@@ -66,10 +66,6 @@ op:    core.apply-excludes
 title: apply excludes
 note:  audience=USER, confirm=typed
 
-op:    core.reload-inference
-title: reload inference
-note:  audience=USER, confirm=inline
-
 op:    core.switch-inference-mode
 title: switch inference mode
 args:  mode:enum(online|indexing)

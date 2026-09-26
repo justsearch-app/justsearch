@@ -47,6 +47,13 @@ export const OPEN_HEALTH: NoticeRemedy = {
   label: 'Open Health',
 };
 
+/** The Brain surface offers the witnessed reconfigure refresh action. */
+const OPEN_BRAIN: NoticeRemedy = {
+  kind: 'navigate',
+  target: 'core.brain-surface',
+  label: 'Open Brain',
+};
+
 /**
  * The closed cause vocabulary: backend reason code → (wording, remedy?).
  * Codes the backend emits today (`LifecycleReasonCode` + StatusLifecycleHandler's
@@ -73,6 +80,11 @@ const CAUSE_ROWS: ReadonlyArray<{
    */
   severity?: ReasonSeverity;
 }> = [
+  {
+    code: 'engine.restart_exhausted',
+    wording: 'JustSearch could not restart',
+    severity: 'error',
+  },
   {
     // Tempdoc 637 #1 — FE-derived (declared in readiness-reason-codes.v1.json feDerived); the
     // backend never emits it. Minted by computeVerdict when the FE→backend binding is dead.
@@ -103,12 +115,12 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'inference.offline',
     wording: 'The local AI model is offline',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
   },
   { code: 'inference.starting', wording: 'The local AI model is still starting', severity: 'info' },
   // Tempdoc 656 — the AI capability's previously-generic "offline" reason, now specific. No
-  // remedy operation is registered for install/import actions today (unlike
-  // core.reload-inference), so these fall back to the Open-Health reference — same pattern as
+  // remedy operation is registered for install/import actions today, so these fall back to
+  // the Open-Health reference — same pattern as
   // vdu.missing_mmproj / ocr.engine_missing below, rather than pointing at a nonexistent operation.
   {
     code: 'inference.model_not_configured',
@@ -160,7 +172,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'inference.crashed',
     wording: 'The local AI model stopped unexpectedly',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'warn',
   },
   // Tempdoc 837 S5 — the user turned chat off (TransitionReason.USER_SWITCH / ADMIN_TRIGGERED). The
@@ -169,7 +181,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'inference.deactivated',
     wording: 'The local AI model is turned off',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'info',
   },
   {
@@ -179,7 +191,7 @@ const CAUSE_ROWS: ReadonlyArray<{
     // when the user was actually deactivating.
     code: 'inference.activation_failed',
     wording: 'The local AI runtime failed to switch modes',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'warn',
   },
   {
@@ -200,7 +212,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'vdu.ai_offline',
     wording: 'Visual document understanding is waiting for the local AI model',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'info',
   },
   {
@@ -234,7 +246,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   // budget is spent, so nothing is retrying any more. Distinct wording is the whole point of the code:
   // `worker.spawn.failed` now means "failed, recovery pending or in flight", and telling a user that
   // while the Head keeps re-attempting reads as a dead end it isn't. No one-click remedy — a respawn is
-  // exactly what just failed four times ⇒ Open-Health fallback, mirroring worker.restart_exhausted.
+  // exactly what just failed four times ⇒ Open-Health fallback.
   {
     code: 'worker.spawn_recovery_exhausted',
     wording: 'The knowledge server failed to start and could not be recovered',
@@ -247,20 +259,25 @@ const CAUSE_ROWS: ReadonlyArray<{
     wording: 'The knowledge server is restarting',
     severity: 'info',
   },
-  // Tempdoc 627 — terminal give-up: the supervisor exhausted its restart budget and stopped retrying.
-  // Distinct from transient codes; does not self-recover. No one-click remedy (a worker respawn is
-  // what just failed) ⇒ Open-Health fallback, mirroring worker.spawn.failed.
-  {
-    code: 'worker.restart_exhausted',
-    wording: 'The knowledge server stopped responding and could not be recovered',
-    severity: 'error',
-  },
   // Tempdoc 837 S3 — the worker WAS serving and stopped answering. `worker.spawn.failed` told these
   // users their knowledge server "failed to start", which is false: it started fine and then died.
-  // No remedy operation — a supervised restart is already in flight, so there is nothing to click.
+  //
+  // Lane F stage A item A11 made the SECOND sentence of this row load-bearing. This row used to
+  // carry no remedy on the grounds that "a supervised restart is already in flight, so there is
+  // nothing to click" — that supervisor is deleted. A11 removed crash detection, the restart budget
+  // and the cooldown along with the Worker child process (stage A §10.1 lists the loss as
+  // deliberate until stage B restores supervision), so a stopped Engine now STAYS stopped. Leaving
+  // the old wording would have left the user waiting for a recovery that is never coming — the
+  // worst failure mode a readiness notice has, because it reads as reassuring.
+  //
+  // The remedy has to ride in the wording: `NoticeRemedy` can only be an operation id or a surface
+  // navigation, and "restart the application" is neither. `core.restart-worker` still exists but
+  // its handler answers `restart required` (stage A §5), so pointing at it would be a button that
+  // tells you to do the thing it was supposed to do. Open Health stays the fallback remedy.
   {
     code: 'worker.lost',
-    wording: 'The knowledge server stopped responding',
+    wording:
+      'The knowledge server stopped responding and does not restart itself — restart JustSearch to recover it',
     severity: 'error',
   },
   // Tempdoc 837 S3 — the highest-value row in the batch: this cause is DETECTED today (the dying
@@ -511,7 +528,6 @@ const RETRIEVAL_IMPAIRING_CODES: ReadonlySet<string> = new Set([
   'worker.starting',
   'worker.recovering',
   'worker.spawn.failed',
-  'worker.restart_exhausted',
   // Tempdoc 825 — the boot-recovery budget is spent and no worker is serving. Same rule as its
   // siblings: omission would let the banner claim "search is fully working" over nothing at all.
   'worker.spawn_recovery_exhausted',

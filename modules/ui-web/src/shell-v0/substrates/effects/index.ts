@@ -60,6 +60,8 @@ export type EffectOriginator = 'user' | 'agent' | 'system';
 
 export interface JournalEntry {
   readonly id: number;
+  /** Globally unique ledger identity; absent only on entries persisted before this field existed. */
+  readonly ledgerId?: string;
   readonly effect: Effect;
   readonly invokedBy: Provenance;
   readonly invokedAt: string;
@@ -79,6 +81,11 @@ export interface JournalEntry {
 }
 
 const _entries: JournalEntry[] = [];
+
+/** Preserve historical wire identities on restore; new effects persist a UUID identity once. */
+export function journalEventId(entry: JournalEntry): string {
+  return entry.ledgerId ?? `fe-effect:${entry.id}`;
+}
 const _listeners = new Set<(entry: JournalEntry) => void>();
 let _nextId = 1;
 
@@ -420,6 +427,7 @@ export function recordEffect(
   // so it was dropped; `causation` now travels via `opts.causation`.
   const entry: JournalEntry = {
     id: _nextId++,
+    ledgerId: `fe-effect:${crypto.randomUUID()}`,
     effect,
     invokedBy,
     invokedAt: new Date().toISOString(),

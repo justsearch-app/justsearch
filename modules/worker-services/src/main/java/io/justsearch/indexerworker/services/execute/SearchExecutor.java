@@ -11,8 +11,12 @@ import io.justsearch.adapters.lucene.runtime.QueryFilterBuilder;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
 import io.justsearch.adapters.lucene.runtime.TextQueryOps;
 import io.justsearch.configuration.resolved.ResolvedConfig;
-import io.justsearch.indexerworker.grpc.TracingServerInterceptor;
+import io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineFutures;
+import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.SearchOutcome;
+import io.justsearch.indexerworker.services.WorkerServiceException;
 import io.justsearch.indexerworker.services.SearchReasonCode;
 import io.justsearch.indexerworker.services.input.SearchInputs;
 import io.justsearch.indexerworker.services.plan.ChunkMergeDirective;
@@ -32,8 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,18 +75,24 @@ public final class SearchExecutor {
   private final HybridSearchOps hybridSearchOps;
   private final ChunkSearchOps chunkSearchOps;
   private final Supplier<ResolvedConfig> resolvedConfigSupplier;
+  private final LuceneExecutorRegistrations executorRegistrations;
+  private final io.justsearch.core.execution.EngineTaskLifetime runtimeLifetime;
 
   public SearchExecutor(
       TextQueryOps textQueryOps,
       ReadPathOps readPathOps,
       HybridSearchOps hybridSearchOps,
       ChunkSearchOps chunkSearchOps,
-      Supplier<ResolvedConfig> resolvedConfigSupplier) {
+      Supplier<ResolvedConfig> resolvedConfigSupplier,
+      LuceneExecutorRegistrations executorRegistrations,
+      io.justsearch.core.execution.EngineTaskLifetime runtimeLifetime) {
     this.textQueryOps = textQueryOps;
     this.readPathOps = readPathOps;
     this.hybridSearchOps = hybridSearchOps;
     this.chunkSearchOps = chunkSearchOps;
     this.resolvedConfigSupplier = resolvedConfigSupplier;
+    this.executorRegistrations = Objects.requireNonNull(executorRegistrations, "executorRegistrations");
+    this.runtimeLifetime = Objects.requireNonNull(runtimeLifetime, "runtimeLifetime");
   }
 
   /**
@@ -94,15 +102,54 @@ public final class SearchExecutor {
    * are read off the decision by the response builder — this method only records
    * runtime-derived state.
    */
-  public SearchOutcome execute(SearchDecision decision, SearchInputs inputs) {
+  /**
+   * Runs the decided search. The {@code ctx} overload is the live one; see
+   * {@link #execute(SearchDecision, SearchInputs)} for why the other exists.
+   */
+  public SearchOutcome execute(SearchDecision decision, SearchInputs inputs, CallContext ctx) {
     Objects.requireNonNull(decision, "decision");
     Objects.requireNonNull(inputs, "inputs");
+    CallContext call = ctx == null ? CallContext.none() : ctx;
+    abortIfCancelled(call, "dispatch");
     return switch (decision) {
       case SearchDecision.EmptyQueryDecision e -> handleEmpty();
       case SearchDecision.BlockedDecision b -> handleBlocked();
-      case SearchDecision.SparseShortcut s -> runSparseShortcut(s, inputs);
-      case SearchDecision.MultiLegDecision m -> runMultiLeg(m, inputs);
+      case SearchDecision.SparseShortcut s -> runSparseShortcut(s, inputs, call);
+      case SearchDecision.MultiLegDecision m -> runMultiLeg(m, inputs, call);
     };
+  }
+
+  /**
+   * Uncancellable overload, for the two callers that genuinely have no caller to abandon them: the
+   * boot-time warm-up pass and the tests. It is not a convenience — routing a real search through
+   * it would silently reinstate the pre-review behaviour, so the live path does not use it.
+   */
+  public SearchOutcome execute(SearchDecision decision, SearchInputs inputs) {
+    return execute(decision, inputs, CallContext.none());
+  }
+
+  /**
+   * Stops the search if the caller has gone (review B3).
+   *
+   * <p>On the wire a deadline or a client disconnect ended the server's work: gRPC cancelled the
+   * server call and the handler's next write failed. In process nothing has that authority — the
+   * client's budget releases the CALLER at the deadline, but the search itself runs on until it
+   * finishes, holding a call thread, an index searcher and (on a multi-leg query) a virtual-thread
+   * fan-out. Under load that is the difference between a slow search and a search that is still
+   * being paid for long after nobody wants it, which is precisely how a bounded thread pool starts
+   * rejecting calls that would have succeeded.
+   *
+   * <p>So the poll goes where the work is divisible: between the pipeline's four phases, and inside
+   * this class between retrieval and the fusion/merge phase that follows it. Not finer — a poll
+   * inside a Lucene collector would be a different mechanism (an interruptible collector), and not
+   * coarser, because the phases either side of retrieval are where the seconds are.
+   *
+   * @throws WorkerServiceException {@code CANCELLED} if the caller has abandoned the call
+   */
+  private static void abortIfCancelled(CallContext ctx, String stage) {
+    if (ctx.cancelled()) {
+      throw WorkerServiceException.cancelled("search cancelled by caller at stage: " + stage);
+    }
   }
 
   private SearchOutcome handleEmpty() {
@@ -113,8 +160,22 @@ public final class SearchExecutor {
     return SearchOutcome.empty(new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0));
   }
 
-  private SearchOutcome runSparseShortcut(SearchDecision.SparseShortcut decision, SearchInputs inputs) {
-    Context parentCtx = TracingServerInterceptor.currentOtelContext();
+  /**
+   * The parent span every leg of this search hangs off.
+   *
+   * <p>Lane F stage A item A9: this used to read
+   * {@code TracingServerInterceptor.currentOtelContext()}, a gRPC {@code Context} key the server
+   * interceptor stashed the extracted W3C context under. The interceptor existed because the
+   * transport delivered the trace headers on a thread that had no OTel context of its own. In
+   * process the caller IS the caller: {@code WorkerSearchService.search} runs the orchestrator
+   * synchronously on the thread that called the port, so the Head's span is already current here
+   * and the extraction step has nothing left to do. It is read ONCE per search, at the top, because
+   * the legs below run on executor pools and each sets this value as its explicit parent — which is
+   * the same reason the interceptor version read it once.
+   */
+  private SearchOutcome runSparseShortcut(
+      SearchDecision.SparseShortcut decision, SearchInputs inputs, CallContext ctx) {
+    Context parentCtx = Context.current();
     var request = inputs.request();
     String queryString = request.getQuery();
     var runtimeFilters = inputs.runtimeFilters();
@@ -161,8 +222,8 @@ public final class SearchExecutor {
         // is unwrapped inside Worker. Drop to TRACE so the failure-diagnosis affordance survives
         // for ad-hoc debugging while staying out of any reasonable production log level. The
         // diagnostics export DOES bundle this Logback-written log file — DiagnosticsServiceImpl's
-        // addDirectoryRedacted(zos, logsDir, "logs") zips worker.log with path-only redaction, no
-        // query/content redaction — so staying at TRACE (below the Worker's default INFO level) is
+        // addDirectoryRedacted(zos, logsDir, "logs") zips engine.log with path-only redaction, no
+        // query/content redaction — so staying at TRACE (below the Engine's default INFO level) is
         // what keeps this text out of exported diagnostics, not any exemption of logs from the ZIP.
         // Observations.md item #205 follow-up: typed in-process SafeQueryString wrapper deferred.
         log.trace("Failed query text: {}", queryString);
@@ -237,6 +298,11 @@ public final class SearchExecutor {
     // Tempdoc 549 Slice 3c (U2): single BM25 text leg (no fusion); survives into/through chunk merge.
     result = HitProvenanceProjector.attachSingleLeg(result, HitProvenanceProjector.LegKind.BM25);
 
+    // Review B3: retrieval is done, and the chunk merge below is a second retrieval round of its
+    // own (its own bm25/knn/splade legs, its own fusion). If the caller left during the first, it
+    // must not pay for the second.
+    abortIfCancelled(ctx, "retrieval");
+
     var chunkOutcome = maybeApplyChunkMerge(decision.chunkMerge(), result, inputs, chunkQueryText);
     // Facet computation is deferred to SearchResponseBuilder (which owns FacetingEngine).
     // The decision carries the FacetCompute discriminator + arguments; the builder reads
@@ -262,8 +328,9 @@ public final class SearchExecutor {
         chunkOutcome.branchFusionNs());
   }
 
-  private SearchOutcome runMultiLeg(SearchDecision.MultiLegDecision decision, SearchInputs inputs) {
-    Context parentCtx = TracingServerInterceptor.currentOtelContext();
+  private SearchOutcome runMultiLeg(
+      SearchDecision.MultiLegDecision decision, SearchInputs inputs, CallContext ctx) {
+    Context parentCtx = Context.current();
     var request = inputs.request();
     String queryString = request.getQuery();
     var runtimeFilters = inputs.runtimeFilters();
@@ -311,7 +378,8 @@ public final class SearchExecutor {
             case LegSet.ThreeWay tw -> {
               spladeExecuted = true;
               yield runThreeWay(
-                  tw, queryString, runtimeFilters, boostRuntimeFilters, syntax, debug, retrievalSpan);
+                  tw, queryString, runtimeFilters, boostRuntimeFilters, syntax, debug, retrievalSpan,
+                  ctx.engineContext().urgency(), ctx.childLifetime());
             }
             case LegSet.Bm25Dense bd ->
                 debug
@@ -320,13 +388,15 @@ public final class SearchExecutor {
                         toFloatArray(bd.vector().vector()),
                         bd.retrievalLimit(),
                         runtimeFilters,
-                        syntax)
+                        syntax,
+                        ctx.engineContext().urgency(), ctx.childLifetime())
                     : hybridSearchOps.searchHybridFiltered(
                         queryString,
                         toFloatArray(bd.vector().vector()),
                         bd.retrievalLimit(),
                         QueryFilterBuilder.buildFilterQueryOnly(runtimeFilters),
-                        syntax);
+                        syntax,
+                        ctx.engineContext().urgency(), ctx.childLifetime());
             case LegSet.DenseOnly d ->
                 // Tempdoc 549 Slice 3c (U2): single dense leg, no fusion.
                 HitProvenanceProjector.attachSingleLeg(
@@ -380,6 +450,11 @@ public final class SearchExecutor {
       retrievalSpan.end();
     }
 
+    // Review B3: same seam as the sparse shortcut, and the one that matters most — a multi-leg
+    // retrieval has just fanned out across virtual threads, and the chunk branch below fans out
+    // again. This is the point where an abandoned search stops costing anything.
+    abortIfCancelled(ctx, "retrieval");
+
     // Facet computation deferred to SearchResponseBuilder (which owns FacetingEngine).
     var chunkOutcome =
         maybeApplyChunkMerge(decision.chunkMerge(), result, inputs, queryString);
@@ -411,7 +486,8 @@ public final class SearchExecutor {
       LuceneRuntimeTypes.RuntimeSearchFilters boostRuntimeFilters,
       LuceneRuntimeTypes.QuerySyntax syntax,
       boolean debug,
-      Span retrievalSpan) {
+      Span retrievalSpan,
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     ResolvedConfig rc3 = resolvedConfigSupplier.get();
     ResolvedConfig.HybridSearch hs3 = rc3 != null ? rc3.hybridSearch() : null;
     int candidateMax = Math.max(hs3 != null ? hs3.candidateLimitMax() : 100, tw.retrievalLimit());
@@ -422,9 +498,10 @@ public final class SearchExecutor {
 
     Context otelCtx = Context.current().with(retrievalSpan);
     LuceneRuntimeTypes.SearchResult result;
-    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    try (var group = io.justsearch.core.execution.EngineTaskGroup.open(
+        () -> executorRegistrations.openSearchFanout(urgency), runtimeLifetime.and(childLifetime))) {
       var bm25F =
-          CompletableFuture.supplyAsync(
+          group.submit(
               () -> {
                 try (Scope ctxScope = otelCtx.makeCurrent()) { // NOPMD - auto-close
                   return branchSpan(
@@ -437,10 +514,9 @@ public final class SearchExecutor {
                               boostRuntimeFilters,
                               syntax));
                 }
-              },
-              executor);
+              });
       var denseF =
-          CompletableFuture.supplyAsync(
+          group.submit(
               () -> {
                 try (Scope ctxScope = otelCtx.makeCurrent()) { // NOPMD - auto-close
                   return branchSpan(
@@ -451,21 +527,19 @@ public final class SearchExecutor {
                               vectorCandLimit,
                               QueryFilterBuilder.buildFilterQueryOnly(runtimeFilters)));
                 }
-              },
-              executor);
+              });
       var spladeF =
-          CompletableFuture.supplyAsync(
+          group.submit(
               () -> {
                 try (Scope ctxScope = otelCtx.makeCurrent()) { // NOPMD - auto-close
                   return branchSpan(
                       "splade",
                       () -> searchSplade(tw.splade().weights(), textCandLimit, runtimeFilters));
                 }
-              },
-              executor);
-      var bm25Result = bm25F.join();
-      var denseResult = denseF.join();
-      var spladeResult = spladeF.join();
+              });
+      var bm25Result = EngineFutures.await(bm25F);
+      var denseResult = EngineFutures.await(denseF);
+      var spladeResult = EngineFutures.await(spladeF);
       double[] weights = {
         hs3 != null ? hs3.ccWeightSparse() : 0.35,
         hs3 != null ? hs3.ccWeightDense() : 0.35,
@@ -565,7 +639,7 @@ public final class SearchExecutor {
           0L);
     }
 
-    Context parentCtx = TracingServerInterceptor.currentOtelContext();
+    Context parentCtx = Context.current();
     Span chunkSpan = tracer().spanBuilder("search/chunk_merge").setParent(parentCtx).startSpan();
     // Tempdoc 553 Phase A: structural (CHAIN) span — its retriever/reranker children carry documents.
     chunkSpan.setAllAttributes(OpenInferenceSpanProjection.chain());

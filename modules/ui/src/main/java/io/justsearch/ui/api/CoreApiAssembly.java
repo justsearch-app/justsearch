@@ -69,7 +69,9 @@ final class CoreApiAssembly {
       AiModelsController aiModelsController,
       HeadHttpInflightMetricCatalog inflightCatalog,
       HeadGpuMetricCatalog gpuCatalog,
-      KnowledgeSearchController knowledgeSearchController) {}
+      KnowledgeSearchController knowledgeSearchController,
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
+      ConfigStore configStore) {}
 
   static Result assemble(
       LocalApiServer.Builder b,
@@ -150,7 +152,7 @@ final class CoreApiAssembly {
             enterprisePolicyService,
             b.settingsStore,
             telemetry,
-            resolveInferenceCapability(b.HeadAssembly, b.inferenceCapability),
+            b.HeadAssembly != null ? b.HeadAssembly.generativeComponent() : b.generativeComponent,
             // Tempdoc 737 fix pack (fix 4): the ONE runtime-intent authority for /api/inference/mode.
             // Null for legacy test seams (HeadAssembly absent) — those keep the raw fallback path.
             b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null
@@ -183,8 +185,11 @@ final class CoreApiAssembly {
             b.lambdaMartReranker != null ? () -> b.lambdaMartReranker : null,
             b.gplJobCoordinator != null ? () -> b.gplJobCoordinator : null,
             () -> gpuCapabilitiesService,
-            resolveWorkerCapability(headAssemblyRef, b.knowledgeServer, b.knowledgeServerStartError),
-            resolveInferenceCapability(headAssemblyRef, b.inferenceCapability));
+            resolveWorkerCapability(headAssemblyRef, b.knowledgeServer, b.componentRegistry),
+            resolveInferenceCapability(headAssemblyRef, b.inferenceCapability, b.componentRegistry));
+    if (b.indexComponent != null) {
+      statusLifecycleHandler.setIndexComponent(b.componentRegistry, b.indexComponent);
+    }
     // 419 C3 V1: wire head-side time-series + telemetry-health suppliers.
     if (telemetry instanceof io.justsearch.telemetry.LocalTelemetry lt) {
       statusLifecycleHandler.setRrdStoreSupplier(lt::getRrdStore);
@@ -193,9 +198,6 @@ final class CoreApiAssembly {
     // Tempdoc 501 Phase 26 (§13.7 Q5): thread the runtime manifest publisher
     // into the status handler so it reads the overall lifecycle projection
     // from one canonical source instead of re-deriving on every request.
-    if (b.runtimeManifestPublisher != null) {
-      statusLifecycleHandler.setRuntimeManifestPublisher(b.runtimeManifestPublisher);
-    }
     if (b.HeadAssembly != null) {
       var coordinator = b.HeadAssembly.headInfraRegistry().offlineCoordinator();
       if (coordinator != null) {
@@ -215,6 +217,7 @@ final class CoreApiAssembly {
     io.justsearch.ui.observability.GpuSaturationMonitor gpuSaturationMonitor = new io.justsearch.ui.observability.GpuSaturationMonitor();
     io.justsearch.ui.observability.GpuSaturationSampler gpuSaturationSampler =
         new io.justsearch.ui.observability.GpuSaturationSampler(
+            b.executors,
             () -> gpuCapabilitiesService, gpuSaturationMonitor);
     statusLifecycleHandler.setGpuSaturationMonitor(gpuSaturationMonitor);
     // Tempdoc 672 follow-up: idle/energy-aware VDU auto-trigger sampler, same shape as
@@ -223,6 +226,7 @@ final class CoreApiAssembly {
     final HeadAssembly headForVduSampler = b.HeadAssembly;
     io.justsearch.app.services.vdu.VduOfflineTriggerSampler vduOfflineTriggerSampler =
         new io.justsearch.app.services.vdu.VduOfflineTriggerSampler(
+            b.executors,
             () ->
                 headForVduSampler != null
                     ? headForVduSampler.headInfraRegistry().offlineCoordinator()
@@ -254,10 +258,15 @@ final class CoreApiAssembly {
               healthSub.changes(),
               healthSub.headSource(),
               java.time.Clock.systemUTC(),
-              () ->
-                  b.knowledgeServer != null
-                      ? b.knowledgeServer.client().getWatchedRoots()
-                      : java.util.List.of()));
+              () -> {
+                if (b.knowledgeServer == null) return java.util.List.of();
+                try (var lease = b.knowledgeServer.captureClient()) {
+                  return lease.withClient(client -> client.getWatchedRoots(
+                      io.justsearch.app.services.intent.EngineProvenance.internal(
+                          "index-drift-health-tap", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND)));
+                }
+              }));
       // Tempdoc 629 (FLOOR): wire the at-rest-protection condition tap + the shared disk-encryption
       // probe (one PowerShell shell-property read of the data-dir volume, cached 5s, fed to both the
       // /api/status View and the at-rest.unprotected condition).
@@ -342,7 +351,8 @@ final class CoreApiAssembly {
         b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null
             ? b.HeadAssembly.serviceOut().aiInstallHelper()
             : new io.justsearch.app.services.ai.install.AiInstallService(
-                onlineAi, b.settingsStore, b.knowledgeServer, enterprisePolicyService);
+                onlineAi, b.settingsStore, b.knowledgeServer, enterprisePolicyService,
+                null, b.settingsService);
     AiInstallController aiInstallController = new AiInstallController(aiInstallHelper, telemetry);
     // Tempdoc 374 alpha.17 R5: read the resolved llama-server port live from
     // ConfigStore so a runtime change (rare, but supported via UI settings or
@@ -351,7 +361,7 @@ final class CoreApiAssembly {
     // unless the head's own apiPort already holds it (then 8082). Pre-alpha.13
     // both defaulted to 8080 and collided.
     OpenAiCompatController openAiCompatController =
-        new OpenAiCompatController(llamaServerPortSupplier, telemetry);
+        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry);
     PolicyController policyController = new PolicyController(enterprisePolicyService, telemetry);
     // §31 Phase 4: DiagnosticsService read from bootstrap (its SPI providers resolve through
     // BootstrapLateBindings, which LocalApiServer publishes below).
@@ -367,7 +377,7 @@ final class CoreApiAssembly {
     EffectiveConfigController effectiveConfigController =
         new EffectiveConfigController(portSupplier, b.settingsStore, enterprisePolicyService,
             b.HeadAssembly != null && b.HeadAssembly.inference().onlineAi() != null ? b.HeadAssembly.inference().onlineAi() : OnlineAiService.unavailable(), b.indexBasePath,
-            ConfigStore.globalOrNull());
+            ConfigStore.globalOrNull(), b.engineAdmission);
     SessionPoliciesController sessionPoliciesController =
         b.knowledgeServer != null
             ? new SessionPoliciesController(b.knowledgeServer.client())
@@ -391,13 +401,16 @@ final class CoreApiAssembly {
     } else {
       runtimeActivationHelper =
           new RuntimeActivationService(
+              b.executors,
               onlineAi,
               b.settingsStore,
               gpuCapabilitiesService,
               enterprisePolicyService,
               b.workerFeatureCache,
-              resolveInferenceCapability(b.HeadAssembly, b.inferenceCapability),
-              aiInstallHelper);
+              b.HeadAssembly != null ? b.HeadAssembly.generativeComponent() : b.generativeComponent,
+              aiInstallHelper,
+              null,
+              b.settingsService);
       if (b.knowledgeServer != null) {
         // Tempdoc 805 G.3: observed ONNX execution provider beside the intent fields on
         // /api/ai/runtime/status, from the same explainer that backs /api/inference/encoders.
@@ -414,7 +427,8 @@ final class CoreApiAssembly {
       }
     }
     AiRuntimeController aiRuntimeController =
-        new AiRuntimeController(runtimeActivationHelper, telemetry);
+        new AiRuntimeController(runtimeActivationHelper, telemetry,
+            b.HeadAssembly == null || b.HeadAssembly.serviceOut() == null);
     // Tempdoc 656 Task 4: read-only reconciliation of the model registry against on-disk
     // presence — reuses aiInstallHelper + runtimeActivationHelper, no new resolution logic.
     AiModelsController aiModelsController =
@@ -429,15 +443,14 @@ final class CoreApiAssembly {
                 b.settingsStore,
                 b.knowledgeServer,
                 enterprisePolicyService,
-                packAllowlistService);
+                packAllowlistService,
+                b.settingsService);
     AiPackController aiPackController = new AiPackController(aiPackImportHelper, telemetry);
     // §31 Phase 3: services are constructed by ServicePhase from boot. LocalApiServer no
-    // longer constructs services or calls registerLateBoundHandlers. Only 3 controller
-    // back-refs need publishing: settings reset callback (used by SettingsServiceImpl),
-    // DebugStateProvider + StatusSnapshotProvider SPIs (used by DiagnosticsServiceImpl).
+    // longer constructs services or calls registerLateBoundHandlers. Only diagnostic
+    // controller SPIs (DebugStateProvider and StatusSnapshotProvider) need publishing.
     if (headAssemblyRef != null) {
       var lateBindings = headAssemblyRef.lateBindings();
-      lateBindings.setSettingsResetFn(settingsController::resetToDefaults);
       lateBindings.setDebugStateProvider(debugStateController);
       lateBindings.setStatusSnapshotProvider(statusLifecycleHandler);
       // Tempdoc 876 §B.2a: give the readiness-reconciliation trigger its thunk. This is the first
@@ -494,13 +507,18 @@ final class CoreApiAssembly {
 
     // Log server start event
     eventBuffer.info("LocalApiServer", "API Server starting");
+    // The core search cohort keeps the borrowed Head owner for both eager and late wiring.
+    var perSourceSearch = b.perSourceSearch != null ? b.perSourceSearch
+        : b.HeadAssembly == null ? null : b.HeadAssembly.perSourceSearch();
     KnowledgeSearchController knowledgeSearchController = b.knowledgeServer != null
         ? new KnowledgeSearchController(
             b.knowledgeServer,
+            perSourceSearch,
             telemetry,
             b.HeadAssembly != null && b.HeadAssembly.inference().onlineAi() != null ? b.HeadAssembly.inference().onlineAi() : OnlineAiService.unavailable(),
             b.lambdaMartReranker,
-            apiCatalog)
+            apiCatalog,
+            b.configStore)
         : null;
     if (knowledgeSearchController != null && headAssemblyRef != null) {
       knowledgeSearchController.setWorkerCapability(headAssemblyRef.capabilities().worker());
@@ -537,42 +555,30 @@ final class CoreApiAssembly {
         aiModelsController,
         inflightCatalog,
         gpuCatalog,
-        knowledgeSearchController);
+        knowledgeSearchController,
+        perSourceSearch,
+        b.configStore);
   }
 
-  private static io.justsearch.app.services.lifecycle.WorkerCapability resolveWorkerCapability(
+  private static io.justsearch.app.api.lifecycle.Capability resolveWorkerCapability(
       HeadAssembly bootstrap,
       KnowledgeServerBootstrap ks,
-      String startError) {
+      io.justsearch.core.component.EngineComponentRegistry components) {
     if (bootstrap != null) return bootstrap.capabilities().worker();
+    if (components != null) return new io.justsearch.app.services.lifecycle.RegistryBackedCapability(
+        components, "index", "worker");
     if (ks != null) return ks.workerCapability();
-    if (startError != null && !startError.isBlank()) return createFailedWorkerCapability(startError);
-    return createOfflineWorkerCapability();
+    return io.justsearch.app.services.bootstrap.CapabilityGraph.unavailable().worker();
   }
 
-  private static io.justsearch.app.services.lifecycle.WorkerCapability createOfflineWorkerCapability() {
-    var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
-    cap.transition(
-        io.justsearch.app.api.lifecycle.CapabilityHealth.OFFLINE,
-        io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_NOT_CONFIGURED.code(),
-        "Worker not configured");
-    return cap;
-  }
-
-  private static io.justsearch.app.services.lifecycle.WorkerCapability createFailedWorkerCapability(String error) {
-    var cap = new io.justsearch.app.services.lifecycle.WorkerCapability();
-    cap.transition(
-        io.justsearch.app.api.lifecycle.CapabilityHealth.DEGRADED,
-        io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
-        "Worker spawn failed: " + error);
-    return cap;
-  }
-
-  private static io.justsearch.app.services.lifecycle.InferenceCapability resolveInferenceCapability(
+  private static io.justsearch.app.api.lifecycle.Capability resolveInferenceCapability(
       HeadAssembly bootstrap,
-      io.justsearch.app.services.lifecycle.InferenceCapability explicit) {
+      io.justsearch.app.api.lifecycle.Capability explicit,
+      io.justsearch.core.component.EngineComponentRegistry components) {
     if (bootstrap != null) return bootstrap.capabilities().inference();
+    if (components != null) return new io.justsearch.app.services.lifecycle.RegistryBackedCapability(
+        components, "generative", "inference");
     if (explicit != null) return explicit;
-    return new io.justsearch.app.services.lifecycle.InferenceCapability(false);
+    return io.justsearch.app.services.bootstrap.CapabilityGraph.unavailable().inference();
   }
 }

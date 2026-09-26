@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api.registry;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.AgentEvent;
 import java.util.function.Consumer;
 
@@ -39,5 +41,17 @@ public interface WorkflowToolRunner {
    * @return the workflow's final result; a workflow error becomes an {@link OperationResult#failure}
    *     the model can see and recover from (host owns truth, §4.5).
    */
-  OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink);
+  OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink, EngineContext engineContext);
+
+  /** Server-owned run posture; implementations must explicitly support background execution. */
+  default OperationResult run(OperationRef ref, String argumentsJson, Consumer<AgentEvent> sink,
+      EngineContext engineContext, boolean background) {
+    return background ? OperationResult.failure("Workflow runner does not support background execution")
+        : run(ref, argumentsJson, sink, engineContext);
+  }
+
+  /** Public gate details for an enclosing run's snapshot; never frozen approval display. */
+  default java.util.List<AgentEvent.PendingApproval> pendingApprovals(String sessionId) {
+    return java.util.List.of();
+  }
 }

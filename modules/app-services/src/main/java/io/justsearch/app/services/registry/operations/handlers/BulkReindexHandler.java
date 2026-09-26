@@ -1,85 +1,112 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.OperationApprovalPreview;
+import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationHandler;
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationPreparationRefused;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
-import io.justsearch.app.api.OpCriticality;
-import io.justsearch.app.api.OpLeaseOutcome;
-import io.justsearch.app.api.OperationLeaseHandle;
-import io.justsearch.app.api.OperationLeaseService;
-import io.justsearch.app.api.status.MigrationSource;
+import io.justsearch.app.api.operations.RecordedBulkPlan;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
+import io.justsearch.app.api.operations.RecordedIngestionService;
+import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.core.context.EngineContext;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/**
- * Handler for {@code core.bulk-reindex}.
- *
- * <p>Delegates to {@link IndexingService#startMigration(String)} via a lazy supplier —
- * the IndexingService isn't available until after AppFacade construction, which
- * happens later in {@code HeadAssembly} than handler registration. The supplier
- * closure resolves the live service on each {@link #execute(String)} invocation.
- *
- * <p>V1 ignores the {@code corpusIds} arg from the Operation declaration — the
- * underlying {@code startMigration} only takes a reason string. Future expansion can
- * add corpus-scoped migrations when the indexing service supports them.
- *
- * <p>Slice 429 carryover: replaces the prior NOT_IMPLEMENTED stub (slice 1.2's
- * substrate-only ship). Real implementation lands as part of the slice 3a-1-2 +
- * slice 3a-2-c HealthView migration unblock.
- */
+/** Freezes a complete rebuild before approval; the recorded owner controls its restart lifecycle. */
 public final class BulkReindexHandler implements OperationHandler {
+  private final RecordedIngestionService ingestion;
+  private final Function<EngineContext, List<RootBinding>> roots;
+  private final RecordedBulkPlan.Profile profile;
+  private final Supplier<IndexingService> indexing;
+  private final Supplier<List<String>> exclusions;
 
-  private static final Logger log = LoggerFactory.getLogger(BulkReindexHandler.class);
-
-  private final Supplier<IndexingService> indexingSupplier;
-  private final OperationLeaseService leaseService;
-
-  public BulkReindexHandler(
-      Supplier<IndexingService> indexingSupplier,
-      OperationLeaseService leaseService) {
-    this.indexingSupplier = Objects.requireNonNull(indexingSupplier, "indexingSupplier");
-    this.leaseService = Objects.requireNonNull(leaseService, "leaseService");
+  public BulkReindexHandler(RecordedBulkPlan.Profile profile, RecordedIngestionService ingestion,
+      Function<EngineContext, List<RootBinding>> roots,
+      Supplier<IndexingService> indexing, Supplier<List<String>> exclusions) {
+    this.ingestion = Objects.requireNonNull(ingestion, "ingestion");
+    this.roots = Objects.requireNonNull(roots, "roots");
+    this.profile = Objects.requireNonNull(profile, "profile");
+    this.indexing = Objects.requireNonNull(indexing, "indexing");
+    this.exclusions = Objects.requireNonNull(exclusions, "exclusions");
   }
 
-  @Override
-  public OperationResult execute(String argumentsJson) {
-    IndexingService indexing;
-    try {
-      indexing = indexingSupplier.get();
-    } catch (RuntimeException e) {
-      log.warn("BulkReindexHandler: indexing service supplier threw", e);
-      return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
+  @Override public OperationResult execute(String argumentsJson, EngineContext context) {
+    throw new IllegalStateException("Reindex requires an accepted prepared invocation");
+  }
+
+  @Override public OperationPreparation prepare(String argumentsJson, InvocationProvenance provenance,
+      EngineContext context) {
+    final String source;
+    try { source = RecordedBulkPlan.sourceForArguments(profile, argumentsJson); }
+    catch (IllegalArgumentException invalid) { throw badArguments(); }
+    List<RootBinding> bindings = List.copyOf(roots.apply(context));
+    List<String> patterns = List.copyOf(exclusions.get());
+    IndexingService service = Objects.requireNonNull(indexing.get(), "Indexing service unavailable");
+    String generation = captureSourceGeneration(service, context);
+    var target = service.captureIndexTarget(context);
+    List<String> projectionSourceIds = List.copyOf(service.captureProjectionSourceIds(context));
+    if (!generation.equals(captureSourceGeneration(service, context))) {
+      throw new IllegalStateException("Serving generation changed while preparing rebuild");
     }
-    if (indexing == null) {
-      return OperationResult.failure("Indexing service unavailable");
+    var planned = bindings.stream().map(root -> new RecordedRootPlan.Root(
+        root.path(), root.collection(), true, false, patterns, List.of())).toList();
+    var plan = new RecordedBulkPlan(profile, source, RecordedRootPlan.partition(generation, planned), target,
+        projectionSourceIds);
+    return new OperationPreparation(argumentsJson, plan.replaySchema(), plan.toReplayPayload());
+  }
+
+  @Override public void validatePreparation(OperationPreparation prepared) {
+    frozenPlan(prepared);
+  }
+
+  @Override public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+    var plan = frozenPlan(prepared).scope();
+    String targets = plan.roots().stream().limit(6).map(root -> root.path().toString())
+        .map(path -> path.length() > 256 ? path.substring(0, 253) + "..." : path)
+        .collect(java.util.stream.Collectors.joining("\n"));
+    return new OperationApprovalPreview("Rebuild all " + plan.roots().size() + " watched locations, including unchanged files"
+        + ":\n" + targets + (plan.roots().size() > 6 ? "\nAdditional locations: " + (plan.roots().size() - 6) : "")
+        + "\nThis one approved operation may continue through Engine restarts until completion or cancellation.");
+  }
+
+  @Override public OperationExecution executePrepared(OperationPreparation prepared,
+      InvocationProvenance provenance, EngineContext context, OperationRecordHandle record) {
+    validatePreparation(prepared);
+    Objects.requireNonNull(record, "Accepted reindex record");
+    return ingestion.execute(record, context);
+  }
+
+  private String captureSourceGeneration(IndexingService service, EngineContext context) {
+    return profile == RecordedBulkPlan.Profile.RECOVERY_REBUILD
+        ? service.captureRebuildGeneration(context) : service.captureServingGeneration(context);
+  }
+
+  private RecordedBulkPlan frozenPlan(OperationPreparation prepared) {
+    Objects.requireNonNull(prepared, "prepared");
+    if (prepared.content() != OperationPreparation.Content.METADATA
+        || !RecordedBulkPlan.isSupportedSchema(prepared.replaySchema())) {
+      throw new IllegalArgumentException("Bulk reindex requires a metadata bulk plan");
     }
-    // Tempdoc 542 Phase 3: bulk reindex is MUST_COMPLETE — interruption mid-flight leaves
-    // the index in an inconsistent state. Register the lease BEFORE issuing the gRPC call so
-    // any concurrent takeover gate read sees the lease (race-window closure per §B.3).
-    //
-    // Worker persists MIGRATING before acknowledging. The Head lease protects request dispatch;
-    // Worker-owned upgrade quiescence protects the asynchronous migration lifetime.
-    OperationLeaseHandle handle = leaseService.register(
-        "indexing.bulk-reindex",
-        OpCriticality.MUST_COMPLETE,
-        1800L,
-        Map.of("source", "core.bulk-reindex"));
-    try {
-      boolean started = indexing.startMigration(MigrationSource.USER_REQUESTED_BULK_REINDEX.wire());
-      if (!started) {
-        handle.release(OpLeaseOutcome.FAILURE);
-        return OperationResult.failure("Bulk reindex could not be started; see worker logs");
-      }
-      handle.release(OpLeaseOutcome.SUCCESS);
-      return OperationResult.success("Bulk reindex (migration) started");
-    } catch (RuntimeException e) {
-      handle.release(OpLeaseOutcome.FAILURE);
-      log.error("BulkReindexHandler: startMigration threw", e);
-      return OperationResult.failure("Bulk reindex failed: " + e.getMessage());
+    var plan = RecordedBulkPlan.fromReplayPayload(prepared.replaySchema(),
+        prepared.replayPayloadJson());
+    if (plan.profile() != profile
+        || !plan.source().equals(RecordedBulkPlan.sourceForArguments(profile, prepared.argumentsJson()))) {
+      throw new IllegalArgumentException("Bulk plan differs from its prepared invocation");
     }
+    return plan;
+  }
+
+  private static OperationPreparationRefused badArguments() {
+    return new OperationPreparationRefused(OperationResult.failure(
+        "Invalid bulk rebuild arguments", "BAD_REQUEST", Map.of(), false));
   }
 }

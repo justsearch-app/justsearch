@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.knowledge.KnowledgeStatus;
 import io.justsearch.ipc.FacetCounts;
 import io.justsearch.ipc.FacetFieldSpec;
@@ -18,8 +20,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Tempdoc 556 (F-C4.2): owns the Worker status projection ({@link #status()}) and the QU
- * facet-snapshot cache ({@link #refreshFacetSnapshotIfStale()}) extracted verbatim from {@code
+ * Tempdoc 556 (F-C4.2): owns the Worker status projection ({@link #status(EngineContext)}) and the QU
+ * facet-snapshot cache ({@link #refreshFacetSnapshotIfStale(EngineContext, KnowledgeClient)}) extracted verbatim from {@code
  * KnowledgeHttpApiAdapter}/{@code KnowledgeSearchEngine}. These belong together because they share the
  * mutable cache state (avg-content-length for the cross-encoder doc-length gate, the facet snapshot +
  * meta_source vocabulary for query understanding) that the search path reads. {@code KnowledgeSearchEngine}
@@ -27,8 +29,7 @@ import org.slf4j.LoggerFactory;
  * {@code getCachedFacetSnapshot()} / {@code setWorkerCapability()} here. Behaviour-preserving.
  */
 final class WorkerStatusCache {
-
-  private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.class);
+private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.class);
 
   /** 363: TTL for facet snapshot cache (5 minutes). */
   private static final long FACET_SNAPSHOT_TTL_MS = 5L * 60 * 1000;
@@ -47,13 +48,13 @@ final class WorkerStatusCache {
   /** 385: Cached set of known meta_source values (lowercased) from the last facet refresh. */
   private volatile Set<String> cachedSourceVocabulary = Set.of();
 
-  private volatile io.justsearch.app.services.lifecycle.WorkerCapability workerCapability;
+  private volatile io.justsearch.app.api.lifecycle.Capability workerCapability;
 
   WorkerStatusCache(KnowledgeServerBootstrap knowledgeServer) {
     this.knowledgeServer = knowledgeServer;
   }
 
-  void setWorkerCapability(io.justsearch.app.services.lifecycle.WorkerCapability cap) {
+  void setWorkerCapability(io.justsearch.app.api.lifecycle.Capability cap) {
     this.workerCapability = cap;
   }
 
@@ -84,7 +85,7 @@ final class WorkerStatusCache {
     return knowledgeServer.workerCapability().health().name();
   }
 
-  KnowledgeStatus status() {
+  KnowledgeStatus status(EngineContext engineContext) {
     boolean ready = isWorkerReady();
 
     if (!ready) {
@@ -112,8 +113,10 @@ final class WorkerStatusCache {
           Map.of());
     }
 
-    RemoteKnowledgeClient client = knowledgeServer.client();
-    StatusResponse s = client.getStatus();
+    StatusResponse s;
+    try (var lease = knowledgeServer.captureClient()) {
+      s = lease.withClient(client -> client.getStatus(engineContext));
+    }
 
     // Include embedding compatibility status in extras
     Map<String, Object> extras = new HashMap<>();
@@ -195,7 +198,8 @@ final class WorkerStatusCache {
    * background search with facets and updates the cached snapshot when the result arrives. The
    * snapshot is a text block listing top facet values per field.
    */
-  void refreshFacetSnapshotIfStale() {
+  /** Search operations pass their already captured client so refresh cannot rebind mid-request. */
+  void refreshFacetSnapshotIfStale(EngineContext engineContext, KnowledgeClient client) {
     long now = System.currentTimeMillis();
     if (now - facetSnapshotTimestampMs < FACET_SNAPSHOT_TTL_MS) return;
     if (!isWorkerReady()) return;
@@ -204,7 +208,6 @@ final class WorkerStatusCache {
     facetSnapshotTimestampMs = now;
 
     try {
-      RemoteKnowledgeClient client = knowledgeServer.client();
       SearchRequest facetReq =
           SearchRequest.newBuilder()
               .setQuery("*:*")
@@ -229,7 +232,7 @@ final class WorkerStatusCache {
                               .setField("entity_organizations_raw")
                               .setSize(30)))
               .build();
-      SearchResponse resp = client.search(facetReq);
+      SearchResponse resp = client.search(facetReq, engineContext);
 
       // 385: Extract meta_source keys for StructuredQueryAnalyzer vocabulary
       FacetCounts sourceFacet = resp.getFacetsMap().get("meta_source");

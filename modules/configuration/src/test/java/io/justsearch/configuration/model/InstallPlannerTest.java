@@ -28,6 +28,28 @@ class InstallPlannerTest {
   }
 
   @Test
+  void effectiveTargetDir_retainsOnnxCandidatesByContentIdentity() {
+    ModelPackage embedding = registryWithEmbeddingOnly().findPackage("embedding");
+    ModelVariant cpu = embedding.selectVariant(HardwareProfile.cpuOnly().downloadProfile());
+
+    String target = InstallPlanner.effectiveTargetDir(embedding, cpu);
+    assertTrue(target.startsWith("onnx/embed/candidates/"));
+    assertEquals(target, InstallPlanner.effectiveTargetDir(embedding, cpu));
+
+    ModelPackage changedSupport = new ModelPackage(
+        embedding.id(), embedding.label(), embedding.description(), embedding.targetDir(),
+        embedding.variants(),
+        List.of(new SupportingFile("tokenizer.json", "CHANGED", 10_000, "https://example.com/tok")),
+        embedding.minVramBytes(), embedding.termsUrl());
+    assertNotEquals(
+        target, InstallPlanner.effectiveTargetDir(changedSupport, changedSupport.variants().get(0)),
+        "supporting asset identity must retain a separate candidate directory");
+
+    ModelPackage chat = registryWithEmbeddingAndChat().findPackage("chat");
+    assertEquals("gguf", InstallPlanner.effectiveTargetDir(chat, chat.variants().get(0)));
+  }
+
+  @Test
   void cpuProfile_skipsGgufAndDownloadsFp32() {
     ModelRegistry registry = registryWithEmbeddingAndChat();
     HardwareProfile hw = HardwareProfile.cpuOnly();
@@ -69,9 +91,9 @@ class InstallPlannerTest {
     ModelRegistry registry = registryWithEmbeddingOnly();
     HardwareProfile hw = HardwareProfile.cpuOnly();
 
-    // Pre-create the files at their registry-declared sizes (isAlreadyInstalled now checks size).
-    Path modelFile = tempDir.resolve("onnx/embed/model.onnx");
-    Path tokenizerFile = tempDir.resolve("onnx/embed/tokenizer.json");
+    // Pre-create files whose bytes match the registry identity.
+    Path modelFile = embeddingTarget(HardwareProfile.cpuOnly(), "model.onnx");
+    Path tokenizerFile = embeddingTarget(HardwareProfile.cpuOnly(), "tokenizer.json");
     Files.createDirectories(modelFile.getParent());
     Files.write(modelFile, new byte[1_000_000]);
     Files.write(tokenizerFile, new byte[10_000]);
@@ -85,12 +107,35 @@ class InstallPlannerTest {
   }
 
   @Test
+  void sameSizeCorruptOnnxCandidate_isPlannedForRepair() throws Exception {
+    ModelRegistry registry = registryWithEmbeddingOnly();
+    Path modelFile = embeddingTarget(HardwareProfile.cpuOnly(), "model.onnx");
+    Path tokenizerFile = embeddingTarget(HardwareProfile.cpuOnly(), "tokenizer.json");
+    Files.createDirectories(modelFile.getParent());
+    byte[] corrupt = new byte[1_000_000];
+    corrupt[0] = 1;
+    Files.write(modelFile, corrupt);
+    Files.write(tokenizerFile, new byte[10_000]);
+
+    InstallPlan plan = InstallPlanner.plan(registry, HardwareProfile.cpuOnly(), tempDir);
+
+    assertTrue(
+        plan.downloads().stream()
+            .anyMatch(
+                    d ->
+                    d.isModelVariant()
+                        && d.targetPath()
+                            .equals(embeddingTargetPath(HardwareProfile.cpuOnly(), "model.onnx"))),
+        "same-size corruption in a candidate-owned ONNX file must schedule a repair");
+  }
+
+  @Test
   void deltaComputation_onlyDownloadsMissing() throws Exception {
     ModelRegistry registry = registryWithEmbeddingOnly();
     HardwareProfile hw = HardwareProfile.cpuOnly();
 
     // Pre-create only the tokenizer at its declared size (model is missing).
-    Path tokenizerFile = tempDir.resolve("onnx/embed/tokenizer.json");
+    Path tokenizerFile = embeddingTarget(HardwareProfile.cpuOnly(), "tokenizer.json");
     Files.createDirectories(tokenizerFile.getParent());
     Files.write(tokenizerFile, new byte[10_000]);
 
@@ -98,7 +143,8 @@ class InstallPlannerTest {
 
     assertEquals(1, plan.downloads().size());
     assertTrue(plan.downloads().get(0).isModelVariant());
-    assertEquals("onnx/embed/model.onnx", plan.downloads().get(0).targetPath());
+    assertEquals(embeddingTargetPath(HardwareProfile.cpuOnly(), "model.onnx"),
+        plan.downloads().get(0).targetPath());
   }
 
   /**
@@ -116,7 +162,7 @@ class InstallPlannerTest {
     HardwareProfile hw = HardwareProfile.cpuOnly();
 
     // 400_000 of the FP32 model's 1_000_000 bytes downloaded before the user cancelled.
-    Path partial = tempDir.resolve("onnx/embed/model.onnx.partial");
+    Path partial = embeddingTarget(HardwareProfile.cpuOnly(), "model.onnx.partial");
     Files.createDirectories(partial.getParent());
     Files.write(partial, new byte[400_000]);
 
@@ -145,7 +191,7 @@ class InstallPlannerTest {
    */
   @Test
   void partialLargerThanExpected_isNotCountedAsResumable() throws Exception {
-    Path partial = tempDir.resolve("onnx/embed/model.onnx.partial");
+    Path partial = embeddingTarget(HardwareProfile.cpuOnly(), "model.onnx.partial");
     Files.createDirectories(partial.getParent());
     Files.write(partial, new byte[1_500_000]); // declared size is 1_000_000
 
@@ -159,7 +205,7 @@ class InstallPlannerTest {
   /** A partial staged for a SUPPORTING file counts too — the planner probes both download kinds. */
   @Test
   void partialForSupportingFile_countsAsResumable() throws Exception {
-    Path partial = tempDir.resolve("onnx/embed/tokenizer.json.partial");
+    Path partial = embeddingTarget(HardwareProfile.cpuOnly(), "tokenizer.json.partial");
     Files.createDirectories(partial.getParent());
     Files.write(partial, new byte[4_000]);
 
@@ -177,16 +223,17 @@ class InstallPlannerTest {
    */
   @Test
   void completedFileLeavesThePlan_whilePartialStaysWithItsBytesDiscounted() throws Exception {
-    Path tokenizer = tempDir.resolve("onnx/embed/tokenizer.json");
+    Path tokenizer = embeddingTarget(HardwareProfile.cpuOnly(), "tokenizer.json");
     Files.createDirectories(tokenizer.getParent());
     Files.write(tokenizer, new byte[10_000]); // complete, at its declared size
-    Files.write(tempDir.resolve("onnx/embed/model.onnx.partial"), new byte[250_000]);
+    Files.write(embeddingTarget(HardwareProfile.cpuOnly(), "model.onnx.partial"), new byte[250_000]);
 
     InstallPlan plan =
         InstallPlanner.plan(registryWithEmbeddingOnly(), HardwareProfile.cpuOnly(), tempDir);
 
     assertEquals(1, plan.downloads().size());
-    assertEquals("onnx/embed/model.onnx", plan.downloads().get(0).targetPath());
+    assertEquals(embeddingTargetPath(HardwareProfile.cpuOnly(), "model.onnx"),
+        plan.downloads().get(0).targetPath());
     assertEquals(1_000_000, plan.totalBytes());
     assertEquals(250_000, plan.resumableBytes());
     assertEquals(750_000, plan.remainingBytes());
@@ -257,16 +304,17 @@ class InstallPlannerTest {
     HardwareProfile hw = HardwareProfile.cpuOnly();
 
     // A truncated/wrong file at the right path (size != declared) must be re-planned, not trusted.
-    Path modelFile = tempDir.resolve("onnx/embed/model.onnx");
+    Path modelFile = embeddingTarget(HardwareProfile.cpuOnly(), "model.onnx");
     Files.createDirectories(modelFile.getParent());
     Files.write(modelFile, new byte[42]); // declared size is 1_000_000
-    Files.write(tempDir.resolve("onnx/embed/tokenizer.json"), new byte[10_000]);
+    Files.write(embeddingTarget(HardwareProfile.cpuOnly(), "tokenizer.json"), new byte[10_000]);
 
     InstallPlan plan = InstallPlanner.plan(registry, hw, tempDir);
 
     assertTrue(
         plan.downloads().stream()
-            .anyMatch(d -> d.isModelVariant() && d.targetPath().equals("onnx/embed/model.onnx")),
+            .anyMatch(d -> d.isModelVariant()
+                && d.targetPath().equals(embeddingTargetPath(HardwareProfile.cpuOnly(), "model.onnx"))),
         "wrong-size model must be scheduled for re-download");
   }
 
@@ -516,7 +564,8 @@ class InstallPlannerTest {
         "embedding", "Embedding model", "Semantic search", "onnx/embed",
         List.of(
             new ModelVariant("model.onnx", ModelPrecision.FP32, ExecutionProvider.CPU,
-                "AAAA", 1_000_000, "https://example.com/fp32"),
+                "AAAA", 1_000_000,
+                "https://example.com/fp32"),
             new ModelVariant("model_fp16.onnx", ModelPrecision.FP16, ExecutionProvider.CUDA,
                 "BBBB", 500_000, "https://example.com/fp16")),
         List.of(new SupportingFile("tokenizer.json", "CCCC", 10_000, "https://example.com/tok")),
@@ -691,7 +740,9 @@ class InstallPlannerTest {
             new ModelVariant("model_fp16.onnx", ModelPrecision.FP16, ExecutionProvider.CUDA,
                 "BBBB", 500_000, "https://example.com/fp16")),
         List.of(
-            new SupportingFile("tokenizer.json", "CCCC", 10_000, "https://example.com/tok")),
+            new SupportingFile(
+                "tokenizer.json", "CCCC",
+                10_000, "https://example.com/tok")),
         0, null);
 
     ModelPackage chat = new ModelPackage(
@@ -706,16 +757,33 @@ class InstallPlannerTest {
     return new ModelRegistry(2, "test registry", List.of(embedding, chat));
   }
 
+  private Path embeddingTarget(HardwareProfile hardware, String filename) {
+    ModelPackage embedding = registryWithEmbeddingOnly().findPackage("embedding");
+    return tempDir.resolve(InstallPlanner.effectiveTargetDir(
+        embedding, embedding.selectVariant(hardware.downloadProfile()))).resolve(filename);
+  }
+
+  private String embeddingTargetPath(HardwareProfile hardware, String filename) {
+    ModelPackage embedding = registryWithEmbeddingOnly().findPackage("embedding");
+    String dir = InstallPlanner.effectiveTargetDir(
+        embedding, embedding.selectVariant(hardware.downloadProfile()));
+    return dir + "/" + filename;
+  }
+
   private ModelRegistry registryWithEmbeddingOnly() {
     ModelPackage embedding = new ModelPackage(
         "embedding", "Embedding", "Semantic search", "onnx/embed",
         List.of(
             new ModelVariant("model.onnx", ModelPrecision.FP32, ExecutionProvider.CPU,
-                "AAAA", 1_000_000, "https://example.com/fp32"),
+                "D29751F2649B32FF572B5E0A9F541EA660A50F94FF0BEEDFB0B692B924CC8025", 1_000_000,
+                "https://example.com/fp32"),
             new ModelVariant("model_fp16.onnx", ModelPrecision.FP16, ExecutionProvider.CUDA,
                 "BBBB", 500_000, "https://example.com/fp16")),
         List.of(
-            new SupportingFile("tokenizer.json", "CCCC", 10_000, "https://example.com/tok")),
+            new SupportingFile(
+                "tokenizer.json", String.join("", "95B532CC4381AFFD", "FF0D956E12520A04",
+                    "129ED49D37E15422", "8368FE5621F0B9A2"),
+                10_000, "https://example.com/tok")),
         0, null);
 
     return new ModelRegistry(2, "test registry", List.of(embedding));

@@ -2,16 +2,29 @@
 package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.component.ComponentState;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -21,12 +34,9 @@ import org.junit.jupiter.api.io.TempDir;
  * The boot-recovery ARC, driven through a real {@link KnowledgeServerBootstrap} and a real
  * {@link KnowledgeServerHealthMonitor} (tempdoc 825 §D4, middle rung of the ladder).
  *
- * <p>Fixture shape borrowed from {@code KnowledgeServerBootstrapRestartabilityTest}: every path
- * points at an empty temp dir, so the spawned worker JVM cannot find its main class and dies before
- * publishing a port. Every attempt therefore FAILS — which is precisely what makes the budget, the
- * narration and the terminal state observable here. Convergence (the attempt that succeeds) needs a
- * real worker and lives one rung up, in the isolated-backend integration leg with the countdown
- * fault injector.
+ * <p>The default fixture supplies {@link WorkerHost#unavailable()}, so every attempted composition
+ * fails deterministically. Tests of recovery completion replace it with a controlled host and
+ * client at the same physical assembly boundary.
  *
  * <p>{@code tick()} is called directly rather than via {@code start()}: the schedule is the
  * executor's business, the decision is the arm's, and driving it explicitly keeps the test bounded
@@ -35,11 +45,16 @@ import org.junit.jupiter.api.io.TempDir;
 @DisplayName("boot recovery: the arc, over a real bootstrap")
 final class KnowledgeServerBootRecoveryTest {
 
+  private final List<KnowledgeServerBootstrapTestFixture> fixtures = new ArrayList<>();
+  private final List<AutoCloseable> recoveryResources = new ArrayList<>();
+  private final Map<KnowledgeServerBootstrap, KnowledgeServerBootstrapTestFixture> fixtureByBootstrap =
+      new IdentityHashMap<>();
+
   /** Mirrors {@code KnowledgeServerBootstrapRestartabilityTest.configFor}, with a tighter budget. */
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
-        false, dir, dir, dir, dir, dir.resolve("worker_signal.lock"),
-        5_000L, 1_000L, 3, "256m", 1_000L, 1_000L, 300_000L, 100, 0L, 0);
+        false, dir, dir, dir,
+        5_000L, 1_000L, 3, 1_000L, 1_000L, 300_000L, 100, 0L, 0);
   }
 
   /** No backoff: the arc's attempt schedule is pinned by the pure decision test, not by waiting. */
@@ -47,13 +62,23 @@ final class KnowledgeServerBootRecoveryTest {
 
   private static final String SPAWN_FAILED = LifecycleReasonCode.WORKER_SPAWN_FAILED.code();
   private static final String RECOVERING = LifecycleReasonCode.WORKER_RECOVERING.code();
-  private static final String RESTART_EXHAUSTED = LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code();
   private static final String RECOVERY_EXHAUSTED =
       LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code();
 
   /** A bootstrap in the post-boot bricked state: start attempted, failed, capability pinned. */
-  private static KnowledgeServerBootstrap bricked(Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+  private KnowledgeServerBootstrap newBootstrap(Path tempDir) {
+    return newBootstrap(tempDir, WorkerHost.unavailable());
+  }
+
+  private KnowledgeServerBootstrap newBootstrap(Path tempDir, WorkerHost host) {
+    var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir), host);
+    fixtures.add(fixture);
+    fixtureByBootstrap.put(fixture.bootstrap(), fixture);
+    return fixture.bootstrap();
+  }
+
+  private KnowledgeServerBootstrap bricked(Path tempDir) {
+    var bootstrap = newBootstrap(tempDir);
     assertThrows(Exception.class, () -> bootstrap.startWithRetry(1, 0));
     assertFalse(bootstrap.hasClient(), "the fixture must leave no client bound");
     assertEquals(
@@ -63,27 +88,27 @@ final class KnowledgeServerBootRecoveryTest {
     return bootstrap;
   }
 
-  /**
-   * The post-boot state after supervision gave up DURING the boot: the capability holds what
-   * {@code SupervisionEvents.onGaveUp} writes, and the start it was supervising then failed. The
-   * transition is the producer's own call, verbatim — what makes this the "real path" (review F1) is
-   * the ORDER: the verdict is in the slot before {@code startWithRetry}'s final catch runs over it.
-   */
-  private static KnowledgeServerBootstrap brickedAfterSupervisionGaveUp(Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
-    bootstrap
-        .workerCapability()
-        .transition(CapabilityHealth.DEGRADED, RESTART_EXHAUSTED, "restart budget exhausted");
-    assertThrows(Exception.class, () -> bootstrap.startWithRetry(1, 0));
-    assertFalse(bootstrap.hasClient(), "the fixture must leave no client bound");
-    return bootstrap;
+  private List<String> recordTransitions(KnowledgeServerBootstrap bootstrap) {
+    return fixtureByBootstrap.get(bootstrap).recordIndexTransitions();
   }
 
-  private static List<String> recordTransitions(KnowledgeServerBootstrap bootstrap) {
-    WorkerCapability cap = bootstrap.workerCapability();
-    List<String> seen = new ArrayList<>();
-    cap.addListener((prev, next) -> seen.add(next + "/" + cap.pendingReason()));
-    return seen;
+  private KnowledgeServerHealthMonitor newMonitor(KnowledgeServerBootstrap bootstrap) {
+    var executors = new io.justsearch.core.execution.TestEngineExecutors();
+    var monitor =
+        new KnowledgeServerHealthMonitor(
+            executors, bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    recoveryResources.add(executors);
+    recoveryResources.add(monitor);
+    return monitor;
+  }
+
+  @AfterEach
+  void closeFixtures() throws Exception {
+    for (int i = recoveryResources.size() - 1; i >= 0; i--) recoveryResources.get(i).close();
+    recoveryResources.clear();
+    for (int i = fixtures.size() - 1; i >= 0; i--) fixtures.get(i).close();
+    fixtures.clear();
+    fixtureByBootstrap.clear();
   }
 
   @Test
@@ -91,8 +116,7 @@ final class KnowledgeServerBootRecoveryTest {
   @DisplayName("the pinned state is re-attempted, and the recovery narration is NOT swallowed")
   void firstTickReAttemptsAndNarratesRecovering(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    var monitor = newMonitor(bootstrap);
 
     monitor.tick();
 
@@ -104,7 +128,7 @@ final class KnowledgeServerBootRecoveryTest {
         RECOVERING,
         bootstrap.workerCapability().pendingReason(),
         "the in-flight recovery must reach the reason slot, not be latched out by the pin");
-    assertEquals(CapabilityHealth.RECOVERING, bootstrap.workerCapability().health());
+    assertEquals(CapabilityHealth.PENDING, bootstrap.workerCapability().health());
   }
 
   @Test
@@ -112,8 +136,7 @@ final class KnowledgeServerBootRecoveryTest {
   @DisplayName("a failing arc gives up exactly once, on the terminal code, after the budget")
   void arcGivesUpOnceAfterTheBudget(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    var monitor = newMonitor(bootstrap);
     List<String> seen = recordTransitions(bootstrap);
 
     for (int i = 0; i < NO_WAIT.maxAttempts(); i++) {
@@ -145,8 +168,7 @@ final class KnowledgeServerBootRecoveryTest {
   @DisplayName("no flapping: a whole failing arc narrates no OFFLINE and no per-attempt spawn-failed")
   void arcDoesNotFlap(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    var monitor = newMonitor(bootstrap);
     List<String> seen = recordTransitions(bootstrap);
 
     for (int i = 0; i <= NO_WAIT.maxAttempts(); i++) {
@@ -159,53 +181,66 @@ final class KnowledgeServerBootRecoveryTest {
     assertFalse(
         seen.stream().anyMatch(t -> t.contains(SPAWN_FAILED)),
         "the per-attempt spawn-failed pin belongs to the arc's owner, not to each cycle: " + seen);
-    // One RECOVERING (the arc, entered once and held) + one terminal DEGRADED. Anything more is the
-    // flap the acceptance criterion forbids: with N attempts, an unsuppressed arc would emit
+    // One PENDING (physical recovery startup, entered once and held) + one terminal DEGRADED.
+    // Anything more is the flap the acceptance criterion forbids: with N attempts, an
+    // unsuppressed arc would emit
     // RECOVERING/PENDING/DEGRADED/OFFLINE per cycle.
     assertEquals(
         2,
         seen.size(),
         "an arc of " + NO_WAIT.maxAttempts() + " attempts must narrate 2 transitions, got: " + seen);
-    assertTrue(seen.get(0).startsWith("RECOVERING"), "first: " + seen);
+    assertTrue(seen.get(0).startsWith("PENDING"), "first: " + seen);
     assertTrue(seen.get(1).startsWith("DEGRADED"), "last: " + seen);
   }
 
   @Test
   @Timeout(180)
-  @DisplayName("F1: a supervisor's give-up survives the failed start that follows it")
-  void supervisionVerdictSurvivesTheFailedStartThatFollowsIt(@TempDir Path tempDir) {
-    var bootstrap = brickedAfterSupervisionGaveUp(tempDir);
-
-    // Review F1: worker.restart_exhausted and worker.spawn.failed are BOTH FAULT, so ReasonRetention
-    // lets the incoming one win — startWithRetry's unguarded final catch therefore erased the
-    // supervisor's verdict on every real boot where supervision gave up. That is not cosmetic: the
-    // permanent veto below reads this exact slot, so the erasure silently downgraded "supervision
-    // gave up, stop for good" into "nobody knows, keep re-attempting".
-    assertEquals(
-        RESTART_EXHAUSTED,
-        bootstrap.workerCapability().pendingReason(),
-        "the generic start-failure stamp must not overwrite supervision's terminal verdict");
+  @DisplayName("a predecessor supervisor record cannot veto local recovery or change its budget")
+  void predecessorSupervisorRecordDoesNotOwnLocalRecovery(@TempDir Path tempDir) throws Exception {
+    Path record = tempDir.resolve("runtime/supervisor.v1.json");
+    Files.createDirectories(record.getParent());
+    String exhausted = """
+        {"schemaVersion":1,"kind":"engine-supervisor-state.v1","supervisor":"tauri",
+         "state":"exhausted","incarnation":8,"restartCount":3,"maxRestartAttempts":3,
+         "reason":"ENGINE_RESTART_EXHAUSTED:out_of_memory"}
+        """;
+    Files.writeString(record, exhausted);
+    var bootstrap = bricked(tempDir);
+    try (var monitor = newMonitor(bootstrap)) {
+      List<String> seen = recordTransitions(bootstrap);
+      monitor.tick();
+      assertEquals(RECOVERING, bootstrap.workerCapability().pendingReason());
+      for (int i = 1; i <= NO_WAIT.maxAttempts(); i++) monitor.tick();
+      assertEquals(RECOVERY_EXHAUSTED, bootstrap.workerCapability().pendingReason());
+      assertEquals(1, seen.stream().filter(t -> t.contains(RECOVERY_EXHAUSTED)).count());
+      assertEquals(exhausted, Files.readString(record), "Java does not rewrite host-owned state");
+    } finally {
+      bootstrap.close();
+    }
   }
 
   @Test
   @Timeout(180)
-  @DisplayName("VETO: a held worker.restart_exhausted is never superseded — no attempt, no overwrite")
-  void restartExhaustedIsNeverSuperseded(@TempDir Path tempDir) {
-    // Produced by the REAL path (review F1): the supervisor's give-up lands during the boot, and the
-    // boot then fails — which is the only way this state occurs in production.
-    var bootstrap = brickedAfterSupervisionGaveUp(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
-    List<String> seen = recordTransitions(bootstrap);
-
-    monitor.tick();
-    monitor.tick();
-
-    assertEquals(
-        RESTART_EXHAUSTED,
-        bootstrap.workerCapability().pendingReason(),
-        "boot recovery must not overwrite supervision's terminal verdict with its own");
-    assertTrue(seen.isEmpty(), "a vetoed arc narrates nothing at all: " + seen);
+  @DisplayName("a stale legacy reason cannot suppress this Engine's actual boot failure")
+  void staleLegacyReasonCannotSuppressCurrentBootFailure(@TempDir Path tempDir) {
+    var bootstrap = newBootstrap(tempDir);
+    try {
+      // The literal deliberately represents retired input, not a new production reason code.
+      bootstrap
+          .indexComponent()
+          .transition(ComponentState.FAILED, "worker.restart_exhausted", "predecessor verdict");
+      // Exercise the funnel before STARTING can clear this now-unknown legacy code.
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_SPAWN_FAILED, "current boot failed");
+      assertEquals(SPAWN_FAILED, bootstrap.workerCapability().pendingReason());
+      assertThrows(Exception.class, () -> bootstrap.startWithRetry(1, 0));
+      assertEquals(SPAWN_FAILED, bootstrap.workerCapability().pendingReason());
+      try (var monitor = newMonitor(bootstrap)) {
+        monitor.tick();
+        assertEquals(RECOVERING, bootstrap.workerCapability().pendingReason());
+      }
+    } finally {
+      bootstrap.close();
+    }
   }
 
   @Test
@@ -213,8 +248,7 @@ final class KnowledgeServerBootRecoveryTest {
   @DisplayName("the manual path shares the authority: it is accepted, then vetoed once terminal")
   void manualRequestSharesTheSameAuthority(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    var monitor = newMonitor(bootstrap);
 
     assertEquals(
         WorkerRecoveryAuthority.Verdict.ACCEPTED,
@@ -252,8 +286,8 @@ final class KnowledgeServerBootRecoveryTest {
     // lives in transitionWorkerDown, which every site calls, including any added later.
     var bootstrap = bricked(tempDir);
     bootstrap
-        .workerCapability()
-        .transition(CapabilityHealth.RECOVERING, RECOVERING, "attempt 1 of 2");
+        .indexComponent()
+        .transition(ComponentState.STARTING, RECOVERING, "attempt 1 of 2");
     List<String> seen = recordTransitions(bootstrap);
 
     // Outside an arc the funnel narrates, as it always has.
@@ -265,7 +299,9 @@ final class KnowledgeServerBootRecoveryTest {
         "the funnel must still narrate when no arc owns the narration");
 
     // Inside one it does not — and every site inherits that, because they all come through here.
-    bootstrap.workerCapability().transition(CapabilityHealth.RECOVERING, RECOVERING, "attempt 2");
+    bootstrap
+        .indexComponent()
+        .transition(ComponentState.STARTING, RECOVERING, "attempt 2");
     seen.clear();
     assertThrows(Exception.class, bootstrap::startForRecovery);
 
@@ -283,9 +319,10 @@ final class KnowledgeServerBootRecoveryTest {
   @DisplayName("F4: a closed monitor never spawns — the shutdown race cannot orphan a worker JVM")
   void closedMonitorNeverSpawns(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    var monitor = newMonitor(bootstrap);
     List<String> seen = recordTransitions(bootstrap);
+    var occurrences = new CopyOnWriteArrayList<RecoveryOccurrence>();
+    monitor.onRecoveryOccurrence(occurrences::add);
 
     monitor.close();
     // A tick already in the executor's hands when close() lands: without the closed flag this
@@ -295,6 +332,8 @@ final class KnowledgeServerBootRecoveryTest {
     monitor.tick();
 
     assertTrue(seen.isEmpty(), "a closed monitor must not narrate or attempt anything: " + seen);
+    assertTrue(
+        occurrences.isEmpty(), "close before the attempt gate must emit no recovery occurrence");
     assertFalse(bootstrap.hasClient(), "…and certainly must not bind a new worker");
     assertEquals(
         WorkerRecoveryAuthority.Verdict.NOT_APPLICABLE,
@@ -303,12 +342,62 @@ final class KnowledgeServerBootRecoveryTest {
   }
 
   @Test
+  @Timeout(20)
+  void recoveryFinishingAfterCloseCannotCallClosedHeadOwners(@TempDir Path tempDir)
+      throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var interrupted = new AtomicBoolean();
+    var client = mock(KnowledgeClient.class);
+    when(client.isHealthy(any())).thenReturn(true);
+    var host = mock(WorkerHost.class);
+    when(host.start(any(), any())).thenAnswer(ignored -> {
+      entered.countDown();
+      boolean released = false;
+      while (!released) {
+        try {
+          released = release.await(15, TimeUnit.SECONDS);
+          assertTrue(released, "test must release the blocked host");
+        } catch (InterruptedException expected) {
+          // Deliberately model a native start that outlives shutdown's interruption and await.
+          interrupted.set(true);
+        }
+      }
+      return client;
+    });
+    var bootstrap = newBootstrap(tempDir, host);
+    bootstrap.transitionWorkerDown(
+        LifecycleReasonCode.WORKER_SPAWN_FAILED, "initial composition failed");
+    var monitor = newMonitor(bootstrap);
+    var occurrences = new CopyOnWriteArrayList<RecoveryOccurrence>();
+    var handedOver = new AtomicBoolean();
+    monitor.onRecoveryOccurrence(occurrences::add);
+    monitor.onRecoveryConnected(ignored -> handedOver.set(true));
+
+    try {
+      assertEquals(WorkerRecoveryAuthority.Verdict.ACCEPTED, monitor.requestRecoveryNow());
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      monitor.close();
+      assertTrue(interrupted.get(), "the host must survive shutdown interruption");
+      assertTrue(monitor.recoveryAttemptRunningForTest(), "close returned with start still blocked");
+    } finally {
+      release.countDown();
+      // Await the actual admitted task; assertions below cannot race its completion.
+      monitor.close();
+    }
+
+    assertFalse(monitor.recoveryAttemptRunningForTest());
+    assertTrue(bootstrap.hasClient(), "the late successful start must really have completed");
+    assertEquals(List.of(RecoveryOccurrence.Kind.ATTEMPTED), kinds(occurrences));
+    assertFalse(handedOver.get(), "a late client must not be bound into closed Head owners");
+  }
+
+  @Test
   @Timeout(180)
   @DisplayName("F5: a burst of manual requests cannot out-spend the declared budget")
   void manualBurstCannotOutspendTheBudget(@TempDir Path tempDir) throws Exception {
     var bootstrap = bricked(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+    var monitor = newMonitor(bootstrap);
     try {
       // Ten operator requests, each waiting only for the executor to be free — which is how a real
       // burst behaves once the ALREADY_RUNNING short-circuit stops queueing duplicates. An ACCEPTED
@@ -351,41 +440,90 @@ final class KnowledgeServerBootRecoveryTest {
               + accepted
               + " of a budgeted "
               + NO_WAIT.maxAttempts());
-      RecoveryContext last = bootstrap.workerCapability().lastRecoveryContext();
       assertTrue(
-          last != null && last.attempt() <= NO_WAIT.maxAttempts(),
-          "no attempt may be numbered beyond the budget; highest seen: "
-              + (last == null ? "none" : last.attempt()));
+          monitor.recoveryAttemptsMadeForTest() <= NO_WAIT.maxAttempts(),
+          "the admitted-attempt counter may not exceed the declared budget; got "
+              + monitor.recoveryAttemptsMadeForTest());
     } finally {
       monitor.close();
     }
   }
 
   @Test
-  @Timeout(180)
-  @DisplayName("close() resets initGeneration, so a recovered worker still gets its help files")
-  void closeResetsInitGeneration(@TempDir Path tempDir) throws Exception {
-    // #439 review finding E / charter item 4: initGeneration outlived the connection it described,
-    // so the first successful start AFTER any close() took the generation>=1 "recovery" branch of
-    // completeReadyInitialization and skipped tryIngestHelpFiles for the rest of the process. Latent
-    // before 825 (nothing re-started a closed bootstrap); LIVE the moment a recovery loop exists.
-    //
-    // Read reflectively because the counter has no consumer that would justify a public accessor,
-    // and asserting it through completeReadyInitialization would need a live gRPC client — the exact
-    // substrate this rung of the ladder is defined to exclude.
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
-    var field = KnowledgeServerBootstrap.class.getDeclaredField("initGeneration");
-    field.setAccessible(true);
-    var generation = (java.util.concurrent.atomic.AtomicLong) field.get(bootstrap);
-    generation.set(3); // as if three connections had completed initialization
+  void boundButUnhealthyRecoveryCompletesOnlyAfterAHealthyObservation(@TempDir Path tempDir)
+      throws Exception {
+    var healthy = new AtomicBoolean();
+    var client = mock(KnowledgeClient.class);
+    when(client.isHealthy(any())).thenAnswer(ignored -> healthy.get());
+    var host = mock(WorkerHost.class);
+    when(host.start(any(), any())).thenReturn(client);
+    var bootstrap = newBootstrap(tempDir, host);
+    bootstrap.transitionWorkerDown(
+        LifecycleReasonCode.WORKER_SPAWN_FAILED, "initial composition failed");
+    var monitor = newMonitor(bootstrap);
+    var occurrences = new CopyOnWriteArrayList<RecoveryOccurrence>();
+    monitor.onRecoveryOccurrence(occurrences::add);
 
-    bootstrap.closeForUpgrade();
+    monitor.tick();
+
+    assertTrue(bootstrap.hasClient(), "the host bound even though its health check failed");
+    assertEquals(List.of(RecoveryOccurrence.Kind.ATTEMPTED), kinds(occurrences));
+
+    healthy.set(true);
+    monitor.tick();
 
     assertEquals(
-        0L,
-        generation.get(),
-        "close() drops the client, spawner and signal bus; the generation describes that same"
-            + " connection and must go with them, or the next start() skips first-connect init");
-    assertFalse(bootstrap.hasClient());
+        List.of(RecoveryOccurrence.Kind.ATTEMPTED, RecoveryOccurrence.Kind.RECOVERED),
+        kinds(occurrences));
+    assertEquals(occurrences.get(0).context(), occurrences.get(1).context());
   }
+
+  @Test
+  void failedAttemptsEmitOneAttemptedAndRecoveryCarriesLatestAttempt(@TempDir Path tempDir)
+      throws Exception {
+    var client = mock(KnowledgeClient.class);
+    when(client.isHealthy(any())).thenReturn(true);
+    var host = mock(WorkerHost.class);
+    when(host.start(any(), any()))
+        .thenThrow(new IOException("first recovery failed"))
+        .thenReturn(client);
+    var bootstrap = newBootstrap(tempDir, host);
+    bootstrap.transitionWorkerDown(
+        LifecycleReasonCode.WORKER_SPAWN_FAILED, "initial composition failed");
+    var monitor = newMonitor(bootstrap);
+    var occurrences = new CopyOnWriteArrayList<RecoveryOccurrence>();
+    monitor.onRecoveryOccurrence(occurrences::add);
+
+    monitor.tick();
+    monitor.tick();
+
+    assertEquals(
+        List.of(RecoveryOccurrence.Kind.ATTEMPTED, RecoveryOccurrence.Kind.RECOVERED),
+        kinds(occurrences));
+    assertEquals(1, occurrences.get(0).context().attempt());
+    assertEquals(2, occurrences.get(1).context().attempt());
+    assertEquals("boot", occurrences.get(0).context().faultKind());
+    assertEquals("boot", occurrences.get(1).context().faultKind());
+    assertEquals(0, occurrences.get(0).context().backoffMs());
+    assertEquals(0, occurrences.get(1).context().backoffMs());
+  }
+
+  @Test
+  void recoveryOccurrenceCallbackFailureDoesNotKillTheAttempt(@TempDir Path tempDir) {
+    var bootstrap = newBootstrap(tempDir);
+    bootstrap.transitionWorkerDown(
+        LifecycleReasonCode.WORKER_SPAWN_FAILED, "initial composition failed");
+    var monitor = newMonitor(bootstrap);
+    monitor.onRecoveryOccurrence(ignored -> { throw new IllegalStateException("sink failed"); });
+
+    assertDoesNotThrow(monitor::tick);
+    assertEquals(1, monitor.recoveryAttemptsMadeForTest());
+  }
+
+  private static List<RecoveryOccurrence.Kind> kinds(List<RecoveryOccurrence> occurrences) {
+    return occurrences.stream().map(RecoveryOccurrence::kind).toList();
+  }
+
+  // BootstrapPhysicalInitializationTest proves close/restart initialization through real
+  // bootstrap calls and client effects; the retired generation counter is not an authority.
 }

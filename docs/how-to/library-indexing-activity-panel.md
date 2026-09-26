@@ -16,17 +16,15 @@ outcome and reason, and exposes loading, empty, refresh and fetch-error states.
 checks coverage against the Java constants. Counts are retained events, not unique
 files or a current-readiness verdict. No path hashes are resolved by this panel.
 
-The recent-event drawer, filename resolution and live scan-progress flows described
+The recent-event drawer, filename resolution and operation-progress flows described
 below remain planned. Their delivery must be verified separately. The historical
 nine-row wording example is illustrative; the implementation's complete wording
 projection is the maintained consumer.
 
 This document is the frontend implementation guide for the **Library
-Indexing Activity panel** (tempdoc 419 / WP1) and the live **scan
-progress UI** (WP4). Backend substrate is shipped in slices T1-T6
-(tempdoc 419); the
-frontend slice can be built on top with no further backend changes
-once T1-T6 land.
+Indexing Activity panel** (tempdoc 419 / WP1) and the **operation
+progress UI** (WP4). Ingestion now uses the durable operations owner and its keyed
+history read. The former per-scan SSE and disconnect-to-cancel contract are retired.
 
 **Scope of this doc:** what to build, which endpoints to call, which
 patterns to reuse, and what the UI must NOT do (privacy contract).
@@ -40,7 +38,7 @@ Today the Library tab shows watched roots and lets the user trigger a
 reindex. It does NOT show what *happened* — which files succeeded,
 skipped, or failed; how recent activity went; or what's currently
 being scanned. The substrate to answer those questions exists
-(diagnostic ledger endpoints, gRPC scan progress stream, scoped
+(diagnostic ledger endpoints, the scan-progress stream, scoped
 path-resolution); this panel is where the user finally sees it.
 
 ## Endpoints to consume
@@ -74,21 +72,14 @@ POST /api/library/resolve-hash
 may call to convert a `pathHash` into a filename. It must NEVER be
 called inside an export / copy / share flow. See [Privacy contract](#privacy-contract).
 
-### WP4 — Live scan progress
+### WP4 — Durable operation progress
 
-After T2-T4 ship:
-
-```http
-GET /api/scans/{scanId}/progress  (Server-Sent Events stream)
-  → events:
-      progress { filesWalked, filesAdmitted, filesSkipped, bytesWalked, complete? }
-      complete { terminalReasonCode, totalDuration }
-      error { message }
-```
-
-Closing the SSE connection (e.g., `eventSource.close()`) propagates a
-gRPC cancel to the worker via T3 substrate cancel — that's the
-"Cancel scan" affordance.
+`POST /api/knowledge/ingest` returns the canonical operation invocation response.
+Require `success: true` and retain `structuredData.operationKey`. Read
+`GET /api/operation-history/{operationKey}` for `state`, committed
+`unitsCompleted` / `unitsFailed`, optional `phase`, and the terminal result/reason.
+The initial response acknowledges the operation, not a count of indexed files.
+The read does not start, retry or cancel work; closing its client does not cancel ingestion.
 
 ## Reusable patterns
 
@@ -157,22 +148,11 @@ Reuse existing infrastructure (do not invent a new pattern):
   `Accept: text/event-stream`, accumulate from `ReadableStream`, feed
   to `parseSseBufferJson` line-by-line, dispatch by event name.
 
-For the scan-progress UI:
-
-```ts
-const eventSource = new EventSource(
-  `${baseUrl}/api/scans/${scanId}/progress`,
-);
-eventSource.addEventListener('progress', (ev) => {
-  const data = JSON.parse((ev as MessageEvent).data);
-  // update UI with filesWalked, bytesWalked, etc.
-});
-eventSource.addEventListener('complete', (ev) => {
-  eventSource.close();
-});
-// User clicks Cancel:
-eventSource.close();  // triggers backend gRPC cancel via T3
-```
+For operation progress, use the keyed history read and keep the operation key
+with the initiating activity. A normal running ingestion has no phase. Render a
+phase only when the outcome supplies one; `awaiting_acceptance` is the existing
+gap-acceptance projection. Keep failed, unknown and expired outcomes distinct.
+The former scan EventSource example is superseded; no scan SSE subscription is required.
 
 ### Host components
 
@@ -315,31 +295,26 @@ UI must respect them:
   the panel session, but do not persist to localStorage or session
   storage (resolved paths shouldn't leak across browser sessions).
 
-## Live scan progress UI (WP4)
+## Operation progress UI (WP4)
 
-When a user triggers an action that starts a scan (add root, reindex,
-ingest), the response includes a `scanId`. The UI:
+For an ingestion operation:
 
-1. Subscribes to `/api/scans/{scanId}/progress` via EventSource.
-2. Displays a progress card with files-walked, files-admitted, bytes-walked.
-3. Shows a "Cancel" button that calls `eventSource.close()`.
-4. On `complete` event, shows the terminal reason and closes the connection.
+1. Retain its returned operation key and show accepted/running state.
+2. Read the keyed outcome and display committed unit counts.
+3. Render the terminal outcome or the explicit unknown/expired history limit.
 
-Concurrent scans are first-class: the UI can show multiple progress
-cards simultaneously, each with its own scanId.
-
-**Do NOT show `currentDirectory` as a literal label** — it's privacy-hashed
-in the progress events. If the UI wants to show "currently scanning:
-/Users/.../Documents", it must call `resolveHash` on the `currentDirectory`
-hash. Same privacy rules apply.
+Concurrent operations have independent keys. These counts do not describe walked
+files or bytes and do not expose directory names. Do not implement cancellation by
+closing a read or infer a cancel operation from this observation contract.
 
 ## Verification
 
 The frontend slice is complete when:
 
-- A user adding a watched root can see a progress card for the scan.
-- After indexing completes, the Library Activity panel shows rollup
-  counts ("23 indexed, 2 skipped because unchanged, 1 extraction failed").
+- A user requesting ingestion can see its operation state and committed progress by key.
+- After indexing completes, the panel shows the keyed operation's terminal outcome
+  and committed units. Diagnostic summary counts remain a separate view of job
+  outcomes; retained scan-rollup rows are historical compatibility data.
 - Clicking an event in the drawer reveals friendly fields without
   exposing the raw hash.
 - Clicking "Show filename" resolves the hash and displays the path,

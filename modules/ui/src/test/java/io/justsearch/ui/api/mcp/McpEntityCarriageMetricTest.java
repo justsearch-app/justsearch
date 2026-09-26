@@ -352,7 +352,7 @@ final class McpEntityCarriageMetricTest {
             Map.of("query", "value associated with the designer"),
             FRAMING_OFF,
             -1L,
-            carriage);
+            carriage, null);
     return McpToolSurface.renderSearchText(resp, content, false);
   }
 }

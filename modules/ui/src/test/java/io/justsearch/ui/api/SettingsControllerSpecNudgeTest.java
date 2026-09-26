@@ -1,22 +1,17 @@
 package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 import io.javalin.http.Context;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,17 +30,45 @@ final class SettingsControllerSpecNudgeTest {
   private UiSettingsStore store;
   private AtomicInteger nudges;
   private SettingsController controller;
+  private io.justsearch.app.observability.operations.SqliteOperationStore operations;
+  private static final tools.jackson.databind.ObjectMapper JSON = tools.jackson.databind.json.JsonMapper.builder().build();
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
     nudges = new AtomicInteger();
-    controller = new SettingsController(store, tmp, null, null, nudges::incrementAndGet);
+    operations = new io.justsearch.app.observability.operations.SqliteOperationStore(tmp.resolve("operations.db"));
+    var config = new io.justsearch.configuration.resolved.ConfigStore(
+        io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(store.load()));
+    var owner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(store, config,
+        () -> { throw new AssertionError("Unexpected settings restart"); },
+        candidate -> io.justsearch.agent.api.registry.OperationResult.success("Settings committed"),
+        () -> false, inMemoryComponents());
+    var runner = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operations,
+        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+            io.justsearch.agent.api.registry.OperationKind.RECONFIGURE), owner);
+    controller = new SettingsController(store, tmp, null,
+        new io.justsearch.app.services.settings.SettingsServiceImpl(store, runner, nudges::incrementAndGet));
+  }
+
+  @AfterEach void closeOperations() throws Exception { operations.close(); }
+
+  private String envelope(String body) {
+    var tree = (tools.jackson.databind.node.ObjectNode) JSON.readTree(body);
+    tree.set("witness", JSON.valueToTree(store.inspect().witness()));
+    tree.put("operationKey", io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC()));
+    return JSON.writeValueAsString(tree);
   }
 
   private Context contextWithBody(String body) {
+    return contextWithEnvelope(envelope(body));
+  }
+
+  private Context contextWithEnvelope(String body) {
     Context ctx = mock(Context.class);
     when(ctx.body()).thenReturn(body);
+    when(ctx.path()).thenReturn("/api/settings/v2");
+    when(ctx.method()).thenReturn(io.javalin.http.HandlerType.POST);
     when(ctx.json(any())).thenReturn(ctx);
     when(ctx.status(org.mockito.ArgumentMatchers.anyInt())).thenReturn(ctx);
     return ctx;
@@ -55,6 +78,16 @@ final class SettingsControllerSpecNudgeTest {
     Context ctx = contextWithBody(body);
     when(ctx.header(SettingsController.UI_MODE_INTENT_HEADER)).thenReturn(intent);
     return ctx;
+  }
+
+  private static io.justsearch.app.services.settings.SettingsComponentComposer inMemoryComponents() {
+    return (candidate, desired, affected) -> new io.justsearch.app.services.settings.SettingsComponentComposer.Prepared() {
+      @Override public void validate() { }
+      @Override public void install() { }
+      @Override public void notifyObservers() { }
+      @Override public void retire() { }
+      @Override public void abort() { }
+    };
   }
 
   @Test
@@ -89,49 +122,27 @@ final class SettingsControllerSpecNudgeTest {
   }
 
   @Test
-  @DisplayName("concurrent partial patches serialize their whole-document transaction")
-  void concurrentPartialPatchesDoNotClobberOneAnother() throws Exception {
-    CountDownLatch firstBodyEntered = new CountDownLatch(1);
-    CountDownLatch releaseFirstBody = new CountDownLatch(1);
-    CountDownLatch secondCallStarted = new CountDownLatch(1);
-    CountDownLatch secondBodyEntered = new CountDownLatch(1);
+  @DisplayName("stale partial patches conflict; a new observed attempt preserves both changes")
+  void concurrentPartialPatchesDoNotClobberOneAnother() {
     Context first = contextWithBody("{\"ui\":{\"mode\":\"advanced\"}}");
-    when(first.body()).thenAnswer(ignored -> {
-      firstBodyEntered.countDown();
-      if (!releaseFirstBody.await(5, TimeUnit.SECONDS)) {
-        throw new AssertionError("test did not release the first settings request");
-      }
-      return "{\"ui\":{\"mode\":\"advanced\"}}";
-    });
     Context second = contextWithBody("{\"ui\":{\"theme\":\"dark\"}}");
-    when(second.body()).thenAnswer(ignored -> {
-      secondBodyEntered.countDown();
-      return "{\"ui\":{\"theme\":\"dark\"}}";
-    });
+    controller.handleUpdateSettingsV2(first);
+    controller.handleUpdateSettingsV2(second);
+    verify(second).status(409);
+    assertEquals("advanced", store.inspect().settings().getMode());
+    assertEquals("system", store.inspect().settings().getTheme());
+    controller.handleUpdateSettingsV2(contextWithBody("{\"ui\":{\"theme\":\"dark\"}}"));
+    assertEquals("advanced", store.inspect().settings().getMode());
+    assertEquals("dark", store.inspect().settings().getTheme());
+  }
 
-    ExecutorService executor = Executors.newFixedThreadPool(2);
-    try {
-      Future<?> firstCall = executor.submit(() -> controller.handleUpdateSettingsV2(first));
-      assertTrue(firstBodyEntered.await(5, TimeUnit.SECONDS));
-      Future<?> secondCall = executor.submit(() -> {
-        secondCallStarted.countDown();
-        controller.handleUpdateSettingsV2(second);
-      });
-
-      assertTrue(secondCallStarted.await(5, TimeUnit.SECONDS));
-      assertFalse(secondBodyEntered.await(1, TimeUnit.SECONDS),
-          "the second request must not enter while the first owns the settings transaction");
-      releaseFirstBody.countDown();
-      firstCall.get(5, TimeUnit.SECONDS);
-      secondCall.get(5, TimeUnit.SECONDS);
-
-      assertTrue(secondBodyEntered.await(5, TimeUnit.SECONDS));
-      assertEquals("advanced", store.load().getMode());
-      assertEquals("dark", store.load().getTheme());
-    } finally {
-      releaseFirstBody.countDown();
-      executor.shutdownNow();
-    }
+  @Test
+  void uncomposedControllerCannotCreateAnUnrecordedWriter() {
+    var context = contextWithBody("{\"ui\":{\"chatEnabled\":true}}");
+    new SettingsController(store, tmp, null).handleUpdateSettingsV2(context);
+    verify(context).status(503);
+    assertEquals(0, store.inspect().witness().acceptedRevision());
+    assertEquals(0, nudges.get());
   }
 
   @Test

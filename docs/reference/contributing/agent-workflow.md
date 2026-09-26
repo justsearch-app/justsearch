@@ -110,6 +110,14 @@ apply. A new code change, failure, environment difference, or unresolved concern
 can justify rerunning; a documentation checkpoint alone does not invalidate an
 unrelated passing test. Complete every required tier without redundant reruns.
 
+Prove the checklist's named acceptance behavior before adjacent behavior. When a
+required test cannot be written against the selected design, correct that design
+and its acceptance mapping rather than substituting an easier proof. Prefer a
+complete consumer path as the next batch outcome; counts of helpers, commits or
+reviews do not establish progress against that outcome. Keep the required proof
+tier explicit and record a concrete reason before adding a more expensive tier
+to an item, so later items do not inherit accidental verification requirements.
+
 Preserve suite output and result files before targeted reruns can overwrite them.
 Capture exit status on the first run. Keep concise summaries and reproducible
 commands in Git. Store bulky logs in retained CI artifacts or an explicitly
@@ -118,12 +126,25 @@ limits. A hash establishes identity but does not make a missing artifact
 inspectable. Never put private transcripts, credentials, or machine-local state
 in a public review record.
 
+Checkpoint a connected acceptance slice after its required checks pass, before
+starting adjacent work. Preserve a long-running incomplete slice as an explicitly
+incomplete checkpoint when necessary; neither that commit nor its test totals
+close the acceptance item. Update the current revision, evidence and next action
+in place once per coherent batch, linking superseded run details as history.
+
 Independent review checks both code and the acceptance-to-evidence mapping,
 including a counterexample to the completion claim. Prose checks cannot prove
 that the checklist itself is exhaustive; the reviewer must compare it with the
 governing specification and the actual user-visible behavior.
 
 ## Keep current decisions discoverable
+
+Discover unfamiliar owners with `rg --files` before reading candidate paths;
+use `--no-ignore` when locating ignored logs or generated evidence. Retain a
+short map of the relevant owners and evidence locations in the active work
+record. Reuse that map after a context reset and refresh entries when they move,
+rather than guessing sibling paths or repeating broad searches. Put wildcard
+filters in `rg -g` arguments, not literal path arguments.
 
 Edit the owning design section when a decision changes. Maintain a short dated
 index linking to the rationale, alternatives, and superseded decision. Do not

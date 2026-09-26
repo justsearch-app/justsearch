@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { statusResponseSchema } from './status-response';
+import { componentStateSchema, statusResponseSchema } from './status-response';
 import statusFixture from '../../__fixtures__/status-response-live.json';
 
 describe('generated statusResponseSchema (564 faithfulness)', () => {
@@ -21,5 +21,19 @@ describe('generated statusResponseSchema (564 faithfulness)', () => {
       );
     }
     expect(result.success).toBe(true);
+  });
+
+  it('exposes the six engine-component states as a distinct generated vocabulary', () => {
+    const expected = ['ABSENT', 'STARTING', 'READY', 'RELOADING', 'FAILED', 'UNAVAILABLE'];
+
+    expect(componentStateSchema.options).toEqual(expected);
+    for (const state of expected) {
+      expect(componentStateSchema.safeParse(state).success).toBe(true);
+    }
+  });
+
+  it('rejects the retired aggregate spelling and unknown component states', () => {
+    expect(componentStateSchema.safeParse('LIFECYCLE_STATE_READY').success).toBe(false);
+    expect(componentStateSchema.safeParse('FUTURE_COMPONENT_STATE').success).toBe(false);
   });
 });

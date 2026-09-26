@@ -1,0 +1,293 @@
+{
+  "base": "3471870734cbf7d1d82d243f5c651c04883fa40a",
+  "environment": "Windows; repository Gradle/JDK; no dev stack",
+  "testedSources": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationRecord.java",
+      "sha256": "a49d8818f7956fa6a918004b3ca4474fb946bcf69cc346dae2aaef15af50457b"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+      "sha256": "545c0d90b7b2a0ca59a2d85273db396cadd737d117d8f7bdfcd9a3e33a4cfbbd"
+    },
+    {
+      "path": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
+      "sha256": "c59dda7d20d91bf233ba3dc68424b27224de34fbf9d1c6f87d39910e367f58dd"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "sha256": "409e7fb9dcaef1a5e2d0025d9629018b165dbae2ab2241bfcaa468010bffd396"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+      "sha256": "45b2294fdcdbf8d43ab0af9342c16cde80e0e9f5dd4e7a9d5cc8c07e7167cd97"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/OrchestrationHandles.java",
+      "sha256": "870b447fad65458188490006d15748ce545bc696d0377fb2f95a5d2e25713421"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/HeadAssemblyTest.java",
+      "sha256": "d682785b784c04e9c84285770fe7cc8188045d0fcb39fa6faf2a40f3e602f947"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+      "sha256": "3184f01c40ceb37948638874a17534808f8806f62a74aa56e0acb23fecf06239"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppShutdownWiringTest.java",
+      "sha256": "dc95eb56c3ef49831a5c80663d076358adc2b0761c4d9758da44d5e1991f2ad0"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationCheckpointTest.java",
+      "sha256": "6409daae93f362b97bdb40f207ffcd385538c552f45b314e30d9a461812be8f0"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/OperationsMaintenanceTimerTest.java",
+      "sha256": "840f8c0a034578e94abb4efc8214c8882e5465d5d58877bfa65bef71b7c97be7"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppOperationsCheckpointTest.java",
+      "sha256": "30879c2a0751d59f3621406a6f57cdb0786cbecd8787b34e8a77ddc9c7ce547e"
+    }
+  ],
+  "runs": [
+    {
+      "label": "checkpoint-focused1511",
+      "counts": {
+        "revision": "347187073 + C2-7 diff",
+        "command": "./gradlew.bat :modules:app-observability:test --tests *OperationCheckpointTest :modules:app-services:test --tests *OperationsMaintenanceTimerTest :modules:ui:test --tests *HeadlessApp*CheckpointTest --tests *HeadlessAppShutdownWiringTest :modules:app-launcher:compileTestJava",
+        "summary": {
+          "tests": 32,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 11
+        },
+        "tasks": [
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 2
+          },
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 5
+          },
+          {
+            "module": "ui",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 4
+          }
+        ]
+      },
+      "rawLog": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-focused1511.txt",
+      "rawLogSha256": "9d598ebb52b9928d91fa6261e17bde9843d62a1e166e335a2556e225dcca13d5",
+      "countsPath": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-focused1511-counts.json",
+      "xmlDirectory": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-focused1511-xml"
+    },
+    {
+      "label": "checkpoint-negative1512",
+      "counts": {
+        "revision": "347187073 + C2-7 deliberate omitted timer/shutdown callbacks",
+        "command": "./gradlew.bat :modules:app-services:test --tests *OperationsMaintenanceTimerTest :modules:ui:test --tests *HeadlessAppOperationsCheckpointTest --continue",
+        "summary": {
+          "tests": 17,
+          "failures": 6,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 8
+        },
+        "tasks": [
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 12,
+            "failures": 4,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 5
+          },
+          {
+            "module": "ui",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 5,
+            "failures": 2,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 3
+          }
+        ]
+      },
+      "rawLog": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-negative1512.txt",
+      "rawLogSha256": "21ca1a66b2ee760c3bcf3c7dd834e88b8e4fafed514fe05ac5ab5f8f86b981db",
+      "countsPath": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-negative1512-counts.json",
+      "xmlDirectory": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-negative1512-xml"
+    },
+    {
+      "label": "checkpoint-integrated1513",
+      "counts": {
+        "revision": "347187073 + C2-7 diff",
+        "command": "./gradlew.bat :modules:app-api:test :modules:app-observability:test :modules:app-services:test :modules:ui:test :modules:app-launcher:test :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava spotlessCheck",
+        "summary": {
+          "tests": 4963,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 4,
+          "suites": 769
+        },
+        "tasks": [
+          {
+            "module": "app-api",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 207,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 43
+          },
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 564,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 84
+          },
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 2863,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 3,
+            "suites": 429
+          },
+          {
+            "module": "ui",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 1237,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 1,
+            "suites": 190
+          },
+          {
+            "module": "app-launcher",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 92,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 23
+          }
+        ]
+      },
+      "rawLog": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-integrated1513.txt",
+      "rawLogSha256": "e70da59e7bd355f86211255469b78b63f9b532f6d3cd41aef123295a572fb071",
+      "countsPath": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-integrated1513-counts.json",
+      "xmlDirectory": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-integrated1513-xml"
+    },
+    {
+      "label": "checkpoint-final1514",
+      "counts": {
+        "revision": "347187073 + final C2-7 diff",
+        "command": "./gradlew.bat :modules:app-api:test :modules:app-observability:test :modules:app-services:test :modules:ui:test :modules:app-launcher:test :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava spotlessCheck",
+        "summary": {
+          "tests": 4964,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 4,
+          "suites": 769
+        },
+        "tasks": [
+          {
+            "module": "app-api",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 207,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 43
+          },
+          {
+            "module": "app-services",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 2863,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 3,
+            "suites": 429
+          },
+          {
+            "module": "app-launcher",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 92,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 23
+          },
+          {
+            "module": "ui",
+            "task": "test",
+            "status": "UP-TO-DATE",
+            "tests": 1237,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 1,
+            "suites": 190
+          },
+          {
+            "module": "app-observability",
+            "task": "test",
+            "status": "EXECUTED",
+            "tests": 565,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "suites": 84
+          }
+        ]
+      },
+      "rawLog": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-final1514.txt",
+      "rawLogSha256": "bb7b91589f8bd0dd3c681f352f3401c377120767dc703c5c5708fec5970cacb9",
+      "countsPath": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-final1514-counts.json",
+      "xmlDirectory": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\checkpoint-final1514-xml"
+    }
+  ],
+  "review": "Independent refute-first review is clear after replacing the rejected physical-WAL proposal with logical row checkpoints and adding explicit COMPLETE_WITH_GAPS coverage. Final reviewer independently verified source/log hashes, XML inventories, task reuse and six intended negative failures.",
+  "retention": "Active worktree tmp retained through lane acceptance plus30 days; export before releasing worktree.",
+  "limits": [
+    "No new hosted proof for this dirty C2-7 revision.",
+    "No live ingest/reindex, model, installed-process, power-loss or producer-unit-coverage claim. C2-8/9/10/11 retain those obligations.",
+    "Cadence is periodic attestation of the current committed position, not a bound on unit duration or replay work."
+  ]
+}

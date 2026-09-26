@@ -1,28 +1,23 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.OperationApprovalPreview;
+import io.justsearch.agent.api.registry.OperationExecution;
 import io.justsearch.agent.api.registry.OperationHandler;
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationPreparationRefused;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.SettingsService;
+import io.justsearch.app.services.settings.SettingsResetPreparation;
+import io.justsearch.core.context.EngineContext;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/**
- * Handler for {@code core.reset-settings}.
- *
- * <p>Slice 3a-2-c continuation: SettingsView Reset to Defaults button.
- * Delegates to {@link SettingsService#resetToDefaults()} via lazy supplier.
- *
- * <p>Returns the post-reset SettingsV2 shape in {@code structuredData} so
- * the FE can refresh its store from the response without an extra GET.
- */
+/** Fixed reset intent is accepted before the settings owner performs any write. */
 public final class ResetSettingsHandler implements OperationHandler {
-
-  private static final Logger log = LoggerFactory.getLogger(ResetSettingsHandler.class);
-
   private final Supplier<SettingsService> supplier;
 
   public ResetSettingsHandler(Supplier<SettingsService> supplier) {
@@ -30,34 +25,41 @@ public final class ResetSettingsHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
-    SettingsService svc;
-    try {
-      svc = supplier.get();
-    } catch (RuntimeException e) {
-      log.warn("ResetSettingsHandler: supplier threw", e);
-      return OperationResult.failure("Settings service unavailable: " + e.getMessage());
-    }
-    if (svc == null) {
-      return OperationResult.failure("Settings service unavailable");
-    }
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
+    throw new IllegalStateException("Settings reset requires an accepted prepared invocation");
+  }
 
-    try {
-      Map<String, Object> result = svc.resetToDefaults();
-      return OperationResult.success("Settings reset to defaults", result);
-    } catch (IllegalStateException e) {
-      // Read-only mode (e.g. in_memory eval). Phase B: typed errorCode lets
-      // the FE distinguish "settings persistence disabled" from other failures.
-      return OperationResult.failure(
-          e.getMessage(), "SETTINGS_READ_ONLY", Map.of(), false);
-    } catch (Exception e) {
-      log.error("ResetSettingsHandler: resetToDefaults threw", e);
-      return OperationResult.failure(
-          "Settings reset failed: "
-              + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()),
-          "SETTINGS_RESET_FAILED",
-          Map.of(),
-          true);
+  @Override
+  public OperationPreparation prepare(String argumentsJson, InvocationProvenance provenance, EngineContext context) {
+    return service().prepareReset(argumentsJson);
+  }
+
+  @Override
+  public void validatePreparation(OperationPreparation prepared) {
+    SettingsResetPreparation.validate(prepared);
+  }
+
+  @Override
+  public OperationApprovalPreview approvalPreview(OperationPreparation prepared) {
+    var intent = SettingsResetPreparation.validate(prepared);
+    return new OperationApprovalPreview(intent.recovery()
+        ? "Reset unavailable settings history to defaults and restart the Engine. Preserved corruption evidence remains."
+        : "Reset user-facing settings to defaults while preserving administrator paths and window settings.");
+  }
+
+  @Override
+  public OperationExecution executePrepared(OperationPreparation prepared, InvocationProvenance provenance,
+      EngineContext context, OperationRecordHandle record) {
+    SettingsResetPreparation.validate(prepared);
+    return OperationExecution.finished(service().resetToDefaults(Objects.requireNonNull(record, "accepted record")));
+  }
+
+  private SettingsService service() {
+    var service = supplier.get();
+    if (service == null) {
+      throw new OperationPreparationRefused(OperationResult.failure(
+          "Settings service unavailable", "SETTINGS_RESET_FAILED", Map.of(), false));
     }
+    return service;
   }
 }

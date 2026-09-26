@@ -57,7 +57,7 @@ final class AgentEventTracing {
               e.errorClass(),
               e.retryAction(),
               e.retryAttempt(),
-              trace);
+              trace, e.reasonCode());
       case AgentEvent.AgentProgress e ->
           new AgentEvent.AgentProgress(
               e.phase(), e.message(), e.iteration(), e.maxIterations(), e.severity(), trace);

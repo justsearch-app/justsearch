@@ -1,0 +1,113 @@
+{
+  "revision": "b1ff98611 plus final frozen preview backend diff",
+  "command": "gradlew.bat :modules:app-services:test --tests '*PreparedOperationDispatchTest' --tests '*OperationExecutorImplTest' --tests '*PendingAuthorizationStoreTest' :modules:ui:test --tests '*OperationsControllerTest' --tests '*AuthorizationControllerTest' --tests '*McpOperationKeyTest' --tests '*McpProtocolHandlerTest' --tests '*PreparedDispatchAdmissionTest' :modules:app-agent-api:test :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:app-agent-api:pmdMain :modules:app-agent-api:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 463,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 55
+  },
+  "tasks": [
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 110,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 7
+    },
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 240,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 113,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    }
+  ],
+  "reuse": "services110 and app-agent-api240 unchanged successful995; UI113 executed997",
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-preparation-preview-negative994",
+    "c2-3-preparation-preview995",
+    "c2-3-preparation-preview996",
+    "c2-3-preparation-preview997"
+  ],
+  "sources": [
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/ConfirmationRequiredException.java",
+      "sha256": "6961e3a27dc12e77f153977a1aa8a813e20db3cbad77025fe4738127870a1f18"
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationHandler.java",
+      "sha256": "08afe9eefae0d9a3862018add1400e0ff7789831f1f6bee68c9d56c4a53cd2d0"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/intent/PendingAuthorization.java",
+      "sha256": "73f6e74932af4c14ce9c1239b4b1aa6bb4edb62b90e4c069f10adf45a4a576a5"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/intent/PendingAuthorizationStore.java",
+      "sha256": "fa7df5205afc4987a15e0bdc02ce4f556483168df23523e1f0e7d59c7f04158b"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+      "sha256": "993e1089f42de6027dd0060f4d118ef870946fc549034d9834884f6efec5c477"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/PreparedOperationDispatchTest.java",
+      "sha256": "8cdee5e747dc67c7a6708b0f9504224f10f70b328bc7c75b68313bec1f7f5eec"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ArgsSummary.java",
+      "sha256": "5cd681705f06352c45c25fd202522571f78a4f0b8cd26ad5a58ad3368c06592e"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/AuthorizationController.java",
+      "sha256": "7bd566fe2c08a3edd1c87055d606f06d9d8416e38f80f398f8263c226b1cd1d6"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperationsController.java",
+      "sha256": "b245611ced5cf03f1c8b46dbd161d28259ffcf13b436572e17b36997acda696e"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java",
+      "sha256": "dc372b58cc01e2a95e5e9cc6c385c75b817113dc406c1f5c1e08294ee2ec981e"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/OperationsControllerTest.java",
+      "sha256": "d3fa27ce8af2720ad3ba2a9dea4d976bd40f667a55294541dfb5f8a2c8f487d0"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/PreparedDispatchAdmissionTest.java",
+      "sha256": "0eb6bb78045f72fdd28e36cd00f1b8a4916b764fc61b7b998af19c6068281cbe"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java",
+      "sha256": "3fbe13fd083d03962b9688f8502b242f4a330c03048632b905e2e22d7cd94ec4"
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationApprovalPreview.java",
+      "sha256": "0aa07e2655c651a6e0f380f743176bdfba856e85097f2a428a05686851d0b1ee"
+    },
+    {
+      "path": "modules/app-agent-api/src/test/java/io/justsearch/agent/api/registry/OperationApprovalPreviewTest.java",
+      "sha256": "25bfa03bab986a4ab9861296e37a1fdc2a34c799f669fc6d93b9f0608189dbd2"
+    }
+  ]
+}

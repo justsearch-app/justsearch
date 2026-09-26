@@ -1,10 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.agent.api.registry.OperationCatalog;
@@ -14,12 +19,14 @@ import io.justsearch.app.api.knowledge.KnowledgeSearchResponse.ExcerptRegion;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponse.Hit;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponse.MatchSpan;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.ui.api.KnowledgeSearchController;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +46,7 @@ final class McpSearchResponseFormatTest {
   private static Map<String, Object> invokeSearch(
       KnowledgeSearchResponse canned, Map<String, Object> args) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(canned);
+    McpSearchSessionFixture.stub(adapter, canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -49,7 +56,7 @@ final class McpSearchResponseFormatTest {
             () -> ctrl,
             () -> null,
             FIXED_CLOCK);
-    return surface.callTool("justsearch_search", args, "s1");
+    return surface.callTool("justsearch_search", args, "s1", TestRequestContexts.mcp("s1"));
   }
 
   private static String textOf(Map<String, Object> result) {
@@ -76,6 +83,79 @@ final class McpSearchResponseFormatTest {
             null);
     return new KnowledgeSearchResponse(
         1L, 1L, 12L, List.of(hit), null, null, null, null, null, null, null, null, null);
+  }
+
+  @Test
+  void searchRenderingUsesRetainedSessionSettingsAndDocCountUntilExit() {
+    KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
+    ResolvedConfig config = mock(ResolvedConfig.class);
+    ResolvedConfig.Search search = mock(ResolvedConfig.Search.class);
+    when(config.search()).thenReturn(search);
+    when(search.mcpFraming()).thenReturn(new ResolvedConfig.Search.McpFraming(
+        false, true, true, 400, 0));
+    when(search.mcpDeliveryBudgetBytes()).thenReturn(45_000);
+    var closed = new AtomicBoolean();
+    var selectedGeneration = new java.util.concurrent.atomic.AtomicReference<>("A");
+    var countReads = new java.util.concurrent.atomic.AtomicInteger();
+    var empty = new KnowledgeSearchResponse(
+        0L, 0L, 0L, List.of(), null, null, null, null, null, null, null, null, null);
+    when(adapter.openSearch(any(), any(EngineContext.class))).thenAnswer(ignored -> {
+      selectedGeneration.set("B");
+      return new KnowledgeHttpApiAdapter.SearchSession() {
+          @Override public KnowledgeSearchResponse response() { return empty; }
+          @Override public ResolvedConfig config() { return config; }
+          @Override public StatusFacts statusFacts(EngineContext context) {
+            assertFalse(closed.get(), "same-view status must run before the session closes");
+            assertEquals("B", selectedGeneration.get(), "B was selected after A was captured");
+            countReads.incrementAndGet();
+            return new StatusFacts(17, 50, 100);
+          }
+          @Override public void close() { closed.set(true); }
+        };
+    });
+    KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
+    when(ctrl.getAdapter()).thenReturn(adapter);
+    var surface = new McpToolSurface(
+        List.of(OperationCatalog.of("core", List.of())), mock(OperationDispatcher.class),
+        () -> ctrl, () -> null, FIXED_CLOCK);
+
+    String text = textOf(surface.callTool("justsearch_search", Map.of("query", "missing"),
+        "s1", TestRequestContexts.mcp("s1")));
+    assertTrue(text.contains("Retrieval evidence"), text);
+    assertTrue(text.contains("17 documents are indexed"), text);
+    assertTrue(text.contains("Enrichment in progress"), text);
+    assertEquals(1, countReads.get());
+    verify(adapter, never()).status(any());
+    assertTrue(closed.get(), "render completion must release the retained search");
+  }
+
+  @Test
+  void searchRenderingFailureReleasesRetainedSession() {
+    KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
+    ResolvedConfig config = mock(ResolvedConfig.class);
+    when(config.search()).thenThrow(new IllegalStateException("render failure"));
+    var closed = new AtomicBoolean();
+    var empty = new KnowledgeSearchResponse(
+        0L, 0L, 0L, List.of(), null, null, null, null, null, null, null, null, null);
+    when(adapter.openSearch(any(), any(EngineContext.class))).thenReturn(
+        new KnowledgeHttpApiAdapter.SearchSession() {
+          @Override public KnowledgeSearchResponse response() { return empty; }
+          @Override public ResolvedConfig config() { return config; }
+          @Override public StatusFacts statusFacts(EngineContext context) {
+            return new StatusFacts(0, 100, 100);
+          }
+          @Override public void close() { closed.set(true); }
+        });
+    KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
+    when(ctrl.getAdapter()).thenReturn(adapter);
+    var surface = new McpToolSurface(
+        List.of(OperationCatalog.of("core", List.of())), mock(OperationDispatcher.class),
+        () -> ctrl, () -> null, FIXED_CLOCK);
+
+    String text = textOf(surface.callTool("justsearch_search", Map.of("query", "missing"),
+        "s1", TestRequestContexts.mcp("s1")));
+    assertTrue(text.contains("render failure"), text);
+    assertTrue(closed.get(), "render failure must release the retained search");
   }
 
   @Test

@@ -15,14 +15,13 @@ import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.services.conversation.CoreWorkflowCatalog;
 import io.justsearch.app.services.conversation.WorkflowOperationProjection;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.app.services.mcphost.McpHostService;
 import io.justsearch.app.services.registry.emitter.AgentOperationEmitter;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.operations.handlers.NavigateToSurfaceHandler;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.nio.file.Path;
@@ -40,7 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <p><b>What this closes.</b> {@code core.remember} is declared with no availability expression
  * (offered to the model on every run) but was only registered by ONE of the two agent-tool
- * handler-registration paths ({@link AgentToolFactoryScanWiringTest} pins the registration
+ * handler-registration paths ({@link AgentToolFactoryCompositionTest} pins the registration
  * mechanism directly). This test closes the mirror-image gap: it asserts the invariant over the
  * ACTUAL composed offering an
  * {@link AgentOperationEmitter} hands the model — every {@code Operation} that survives
@@ -75,34 +74,36 @@ final class AgentOfferingIsExecutableTest {
   @Test
   @DisplayName("every operation the agent offering surfaces is executable")
   void offeredOperationsAreAllExecutable(@TempDir Path dataDir) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    WorkerCapability capability = mock(WorkerCapability.class);
-    when(capability.available()).thenReturn(true);
+    KnowledgeClient client = mock(KnowledgeClient.class);
 
     // ---- 1. Handler registry: both AgentToolHandlers paths, all prerequisites satisfied,
     // exactly as production runs them (SubstratePhase.run's eager call at construction time,
     // then HeadAssembly's Memoized field triggering the late-bound call once the worker
     // connects) — the SAME shape as
-    // AgentToolFactoryScanWiringTest#eagerThenLateBoundRegistersAllSixOnTheSameRegistry.
+    // AgentToolFactoryCompositionTest#eagerThenLateBoundRegistersAllSixOnTheSameRegistry.
     HandlerRegistry operationHandlers = new HandlerRegistry();
 
     AgentToolFactory.Output eagerTools =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
             client,
             OnlineAiService.unavailable(),
             null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     AgentToolHandlers.registerEager(operationHandlers, eagerTools);
 
     boolean lateBoundRan =
         AgentToolHandlers.registerLateBound(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             operationHandlers,
             mock(KnowledgeServerBootstrap.class),
             client,
-            capability,
             dataDir,
             client,
             OnlineAiService.unavailable(),
@@ -110,9 +111,10 @@ final class AgentOfferingIsExecutableTest {
             null,
             null,
             MemoryStore.noop(),
-            null,
-            null,
-            mock(DocumentService.class));
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> mock(KnowledgeClient.class));
     assertTrue(lateBoundRan, "late-bound registration must run with all prerequisites satisfied");
 
     // core.navigate-to-surface: registered by OperationSubstrateInit (a side effect of building

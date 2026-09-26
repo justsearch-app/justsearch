@@ -1,17 +1,24 @@
 ---
-title: Health Readiness Contract v1
+title: Health Readiness Contract
 type: contract
 status: stable
-updated: 2026-08-12
-description: Additive typed readiness envelope for /api/status with legacy boolean aliases.
+updated: 2026-09-21
+description: Schema-2 Engine component observations plus diagnostic readiness dimensions and composites.
 ---
 
-# Health Readiness Contract v1
+# Health Readiness Contract
+
+The filename is retained as the stable link created with the original readiness
+envelope. The current wire contract is schema 2. Keeping the path avoids breaking
+canonical, historical, and embedded-skill links merely to restate the schema number.
 
 ## Scope
 
-This contract defines `/api/status.readiness` semantics and migration rules.
-`/api/health` lifecycle semantics remain unchanged.
+This contract defines the schema-2 lifecycle projection shared by `/api/health`
+and `/api/status`, plus `/api/status.readiness` diagnostics and migration rules.
+The Engine component registry is the lifecycle authority. Health, status, the
+runtime manifest, and compatibility `Capability` readers are projections of one
+immutable registry observation; none owns a mutable lifecycle copy.
 
 ## Canonical Surface
 
@@ -20,8 +27,14 @@ This contract defines `/api/status.readiness` semantics and migration rules.
 ```json
 {
   "readiness": {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "observedAt": "2026-02-19T08:00:00Z",
+    "engineComponents": {
+      "api": { "state": "READY", "stateSince": "2026-02-19T07:59:30Z", "appliedVersion": "...", "desiredVersion": "...", "mode": "IN_PLACE", "deadlineMs": 0, "recoveryAttempts": 0, "evidence": "boundPort=8080" },
+      "index": { "state": "READY", "stateSince": "2026-02-19T07:59:45Z", "appliedVersion": "...", "desiredVersion": "...", "mode": "BESIDE", "deadlineMs": 30000, "recoveryAttempts": 0, "evidence": "Worker serving" },
+      "encoders": { "state": "READY", "stateSince": "2026-02-19T07:59:40Z", "appliedVersion": "...", "desiredVersion": "...", "mode": "BESIDE", "deadlineMs": 30000, "recoveryAttempts": 0, "evidence": "encoders ready" },
+      "generative": { "state": "ABSENT", "stateSince": "2026-02-19T07:59:30Z", "deadlineMs": 30000, "recoveryAttempts": 0 }
+    },
     "components": {
       "workerControlPlane": { "state": "READY", "reasonCode": null, "source": "lifecycle_snapshot", "observedAt": "...", "stale": false, "stalenessMs": 0 },
       "indexServing": { "state": "READY", "reasonCode": null, "source": "worker_status", "observedAt": "...", "stale": false, "stalenessMs": 0 },
@@ -38,9 +51,47 @@ This contract defines `/api/status.readiness` semantics and migration rules.
 }
 ```
 
-This sample shows a **reachable Worker**, which is why every component carries `stale: false` and
+This sample shows a **reachable index**, which is why every diagnostic component carries `stale: false` and
 `stalenessMs: 0`; it also abbreviates `components` to a representative subset. See
 [Staleness Semantics](#staleness-semantics) for what these fields carry when Worker contact is lost.
+
+`readiness.engineComponents` always contains `api`, `index`, `encoders`, and
+`generative`. Each value is the registry observation: six-state `state`, optional
+`reasonCode`, wall-clock state epoch `stateSince`, applied and desired
+configuration digests, last compose `mode`, start `deadlineMs`,
+`recoveryAttempts`, and optional diagnostic `evidence`. Nullable fields are
+omitted by the JSON serializer.
+
+The top-level lifecycle subset on both `/api/health` and `/api/status` is a
+smaller projection of that same snapshot. It uses snake-case wire fields
+`schema_version`, `observed_at`, and four fixed `components` slots. Each slot has
+only `state`, `reason_code`, and `state_since`. The camel-case
+`readiness.engineComponents.*.stateSince` and snake-case
+`components.*.state_since` values identify the same state epoch; consumers must
+not treat them as two clocks or two authorities.
+
+## Engine Component States
+
+Registry components use exactly six states:
+
+1. `ABSENT`: intentionally not requested. Optional absence does not degrade the aggregate.
+2. `STARTING`: requested and starting.
+3. `READY`: serving its owned responsibility.
+4. `RELOADING`: replacing or reconfiguring the owned runtime.
+5. `UNAVAILABLE`: requested but presently unable to serve.
+6. `FAILED`: activation, composition, or runtime failure.
+
+The overall lifecycle prioritizes essential `FAILED`/`RELOADING`, then essential
+`STARTING`, then unavailable essential components, then requested optional
+components. An optional component in `ABSENT` preserves retrieval readiness.
+Reason retention belongs to decorated component handles; compatibility
+`Capability` objects are read-only adapters over the registry.
+
+Recovery occurrences come from the health monitor's recovery decision, separately
+from coalesced state observations. Shutdown revokes recovery before stopping the
+local API or Head owners. A physical start can outlive the monitor's bounded close
+wait; its client remains bootstrap-owned, and its late completion cannot publish
+recovery or rebind the stopped API.
 
 ## Typed States
 
@@ -65,12 +116,16 @@ Interpretation:
 3. `aiReady` is derived from canonical AI readiness (`state == READY`).
 4. `embeddingReady` is derived from canonical embedding readiness (`state == READY`).
 5. Legacy aliases can be removed only after a versioned contract migration with dual-read window.
+6. Schema-2 consumers read lifecycle ownership from `engineComponents`; they do
+   not reconstruct it from legacy booleans or diagnostic dimensions.
+7. Unknown component fields remain forward-compatible. Missing component
+   entries or unknown states fail closed for host supervision.
 
-## State Mapping Rules (v1)
+## State Mapping Rules
 
-1. Worker lifecycle (`/api/health` component state) maps to `readiness.components.workerControlPlane.state`.
-2. Worker index status maps to `readiness.components.indexServing.state`.
-3. Inference lifecycle state maps to `readiness.components.ai.state` with source `lifecycle_inference`.
+1. Registry `index` state maps to `readiness.components.workerControlPlane.state`.
+2. Registry `index` state supplies the essential part of `readiness.components.indexServing`; compatibility, embedding and throughput observations can still degrade that diagnostic while the registry component remains `READY`.
+3. Registry `generative` state maps to `readiness.components.ai.state` with source `lifecycle_inference`: `READY` → `READY`, `ABSENT` → `NOT_CONFIGURED`, `STARTING` → `NOT_READY`, and `RELOADING`/`FAILED`/`UNAVAILABLE` → `DEGRADED`.
 4. Worker embedding probe maps to `readiness.components.embedding.state` with source `worker_health_check`.
 5. Worker visual extraction status maps missing baseline readable visual text to `readiness.components.visualTextExtraction` with source `worker_status`.
 6. Head VDU capability status maps enrichment-only visual understanding blockers to `readiness.components.visualDocumentUnderstanding` with source `head_vdu_status`.
@@ -89,7 +144,7 @@ Interpretation:
    on a component or on a composite's `reasonCodes` list is not, on its own, evidence of
    degradation.
 
-## Reason Code Taxonomy (v1)
+## Reason Code Taxonomy
 
 Common reason codes:
 1. `worker.not_configured`
@@ -112,6 +167,20 @@ Common reason codes:
 
 Worker `health_check.ai_ready` remains worker-local telemetry and is non-authoritative for governance readiness.
 
+## Host Essential-Readiness Gate
+
+The development runner and native shell gate restart-budget stability on exactly
+`readiness.engineComponents.index.state == "READY"` with a valid
+`readiness.engineComponents.index.stateSince` UTC epoch. They do not substitute
+the `indexServing` diagnostic: that dimension may correctly be `DEGRADED` while
+keyword search remains available.
+
+`stateSince` is an epoch token, not an elapsed-time clock shared with the JVM.
+Each host measures the stability interval with its own monotonic clock. A
+non-READY state, missing or malformed epoch, failed liveness probe, or a changed
+READY epoch restarts that local interval. The JVM's internal monotonic state
+timestamp never crosses the process boundary.
+
 ## Staleness Semantics
 
 For each readiness component:
@@ -125,9 +194,9 @@ Head-local dimensions read head-side supervisor, capability, or monitor state th
 response-build time. They always report `stale=false`, `stalenessMs=0`, and the response-build
 `observedAt` — a Worker outage does not make them stale.
 
-Worker-observed dimensions are those whose verdict reads the Worker's gRPC status view. That view
+Worker-observed dimensions are those whose verdict reads the index half's status view. That view
 is **not** fetched on the request thread: an internal sampler on the Head's health-monitor schedule
-performs the `IndexStatus` unary (10 s while idle, 2 s while indexing/backfill/AI activation is in
+performs the `indexStatus` port call (10 s while idle, 2 s while indexing/backfill/AI activation is in
 flight, plus one sample on every capability transition), and a request reports what the last sample
 found. Consequently `meta.workerRpcAtMs` is the **sample's** observation time, not a per-request
 timestamp, and successive responses within one sampling period carry the same value by design.
@@ -187,6 +256,6 @@ Example of the same envelope after Worker contact is lost (components abbreviate
 
 ## Non-Goals
 
-1. Do not change `/api/health` HTTP status mapping.
-2. Do not remove legacy readiness booleans in v1.
+1. Do not change `/api/health` HTTP status mapping: READY and DEGRADED are 200; other lifecycle states are 503.
+2. Do not remove legacy readiness booleans without a versioned migration.
 3. Do not introduce breaking schema changes on existing status fields.

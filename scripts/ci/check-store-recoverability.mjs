@@ -9,7 +9,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { scanPersistenceWriteSites } from '../governance/lib/persistence-write-scan.mjs';
+import { scanPersistenceWriteSites, stripJavaComments } from '../governance/lib/persistence-write-scan.mjs';
 
 const REGISTER = 'governance/store-recoverability.v1.json';
 /**
@@ -286,6 +286,40 @@ export function checkDurableStoreRegister({
 
     failures.push(...checkPathAgreement({ root, row, label, readableSources, readSource }));
     failures.push(...checkEncryptionDisposition({ row, label, authoredCatalogDirs }));
+    if (row.id === 'jobs-db' || row.id === 'operations-db') {
+      if (!row.versionSource) failures.push(`${label}: versionSource is required for SQLite stores.`);
+    }
+    if (row.versionSource !== undefined) {
+      const { file, symbol } = row.versionSource ?? {};
+      if (typeof file !== 'string' || !file.trim() || !pathExists(resolve(root, file))) {
+        failures.push(`${label}: versionSource.file must resolve to the schema source.`);
+      } else if (typeof symbol !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(symbol)) {
+        failures.push(`${label}: versionSource.symbol must name a Java version constant.`);
+      } else if (row.versionAuthority && file !== row.versionAuthority) {
+        failures.push(`${label}: versionSource.file must equal versionAuthority.`);
+      } else {
+        try {
+          const code = stripJavaComments(readSource(resolve(root, file)), { stripLiterals: true });
+          // Only a single positive decimal literal is an auditable schema version. In
+          // particular, do not reinterpret octal, hex, an expression, or prose as one.
+          const declaration = new RegExp(
+            `^\\s*(?:(?:public|private|protected)\\s+)?static\\s+final\\s+int\\s+${symbol}`
+              + '\\s*=\\s*([1-9](?:[\\d_]*\\d)?)\\s*;\\s*$', 'gm');
+          const declarations = [...code.matchAll(declaration)];
+          if (declarations.length !== 1) {
+            failures.push(`${label}: versionSource must declare exactly one literal ${symbol}.`);
+          } else {
+            const target = Number(declarations[0][1].replaceAll('_', ''));
+            if (!Number.isSafeInteger(target) || row.currentVersion !== target) {
+              failures.push(`${label}: currentVersion ${row.currentVersion} disagrees with `
+                + `${file} ${symbol} ${target}.`);
+            }
+          }
+        } catch (error) {
+          failures.push(`${label}: cannot read versionSource ${file}: ${error.message}.`);
+        }
+      }
+    }
     for (const evidence of [...(row.tests ?? []), ...(row.fixtures ?? [])]) {
       if (!pathExists(resolve(root, evidence))) {
         failures.push(`${label}: evidence does not exist: ${evidence}.`);

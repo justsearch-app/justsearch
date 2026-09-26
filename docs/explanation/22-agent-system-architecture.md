@@ -140,6 +140,24 @@ Key classes:
 
 Wire-name projection is deliberate. Dotted operation IDs such as `core.search-index` are projected to model-visible tool names such as `core_search_index`.
 
+`core.ingest-files` and `core.reindex` use prepared, recorded execution. Preparation
+copies watched-root membership and collection labels from `WatchedRootsState`, captures
+resolved exclusions and the currently serving generation, and freezes a `root-plan.v1`
+metadata payload. Ingest resolves and classifies every requested path before acceptance;
+unresolved, missing, unreadable or symbolic-link inputs refuse the requested set. An explicit
+collection applies to the whole request; otherwise nested watched roots keep their labels
+and out-of-root inputs use `mcp-ingest`. Reindex freezes all watched directory roots and
+the requested force flag. Neither preparation starts a scan or enqueues writes.
+
+Approval preview and replay read this frozen preparation. They do not reread roots,
+configuration or input files. The accepted record and context reach
+`RecordedIngestionService`, whose completion waits for the recorded ingestion owner;
+calling these handlers directly does not authorize an effect. Eager and late registration
+resolve the current client when preparing, so Engine replacement cannot retain a stale
+generation supplier. The REST ingestion and reindex aliases enter this same dispatcher path.
+The dev/prod stdio MCP bridges preserve MCP attribution, operation controls and the complete
+invocation response, including confirmation refusal and its prepared identity.
+
 ### The offering
 
 The set of tools a run puts in front of the model — the *offering* — is produced in exactly one place, `AgentToolEmitter.offer(...)`, by filtering the composed catalog through executor tag, an audience allow-list (`USER`/`AGENT`), the caller's optional tool selection, and each operation's evaluated availability. `GET /api/chat/agent/tools` and the build-time registry snapshot are projections of that same call, not independent re-derivations, so the trust panel and the governance witness cannot disagree with what the model was sent.
@@ -203,13 +221,16 @@ Explicit caller-provided filters and boost filters take precedence over inferred
 
 ## MCP Tool Surface
 
-The production MCP server exposes four task-oriented tools:
+The legacy stdio compatibility bridge exposes these task-oriented tools. New
+clients should use the Java Streamable HTTP handler documented in
+[MCP production server](../reference/mcp-production-server.md).
 
 | Tool | Purpose |
 |------|---------|
 | `justsearch_answer` | Primary QA tool over local indexed content. |
 | `justsearch_search` | Search with filters, boost filters, facets, pagination, and excerpts. |
 | `justsearch_ingest` | Index files or directories. |
+| `justsearch_operation_outcome` | Read durable progress/outcome by the returned operation key, including after interruption or restart. This never starts work. |
 | `justsearch_status` | Inspect index and ingestion health. |
 
 ADR-0015 records the design rationale for a compact task-oriented MCP surface. Local JustSearch evaluation evidence and external prompting/tool-use research should be treated separately:
@@ -272,6 +293,41 @@ Every action an actor takes — whether the user clicked it, the agent proposed 
 **One action-event log.** `ActionEvent` (in `app-observability`) is a sealed union — `Operation` / `Navigation` / `Gate` / `Grant` / `Effect` — with an explicit, deterministic id. `ActionEventStore` is the one authoritative store: id-keyed, idempotent (re-ingest on reload does not duplicate), and bounded. `ActionLedgerProjection.toWireRow` is the single projection layer; `/api/action-ledger` (snapshot) and `/api/action-ledger/stream` (SSE) are two reads of that one projection. The FE folds its local effects into the same log via `POST /api/action-ledger/events`, so the log spans the process boundary. Per-kind Outcome read-views fan into the one log on append, so they cannot diverge from it: `operation-history` keeps its own standalone REST snapshot (`GET /api/operation-history`), while the Navigation kind's standalone `GET /api/navigation-history` snapshot was torn down (tempdoc 689 — zero consumers once the FE moved to reading Navigation entries off the unified `GET /api/action-ledger` kind:'navigation'); `NavigationHistoryStore` itself is unchanged and still feeds `ActionLedgerProjection` in-process.
 
 **One intent verdict.** `IntentGateEvaluator` (in `app-services`) computes `(sourceTier × riskTier) → gateBehavior`, the lattice, and the Global Hard-Stop state into one `IntentVerdict`. The enforcement chokepoint (`OperationExecutorImpl.enforceTrustLattice`) and the Preview face (`/api/operations/{id}/preview`) read the *same* evaluator instance — the preview is the structural-prediction read of the one verdict (no args/token; args-bound capsule verification stays enforcement-only). A consumer cannot disagree with enforcement because there is one computation. **Undoing is dispatching.** A reversal is an operation and inherits the risk class of its forward form, so `OperationExecutorImpl.undo` runs the same chokepoint over the reversal's own canonical arguments (`OperationDispatcher.undoArguments`, `{"executionId":…}`) — same lattice cell, same risk ceiling on durable grants, same args-bound capsule. Consequences that follow from that and are not softened: the forward invocation's capsule does not authorize the reversal (capsules are args-bound), a standing grant does not cover it (a reversal names no path, so `DurableGrantScope` cannot prove containment and fails closed), and an engaged hard stop denies it. Before tempdoc 875 §C.7 this path checked `undoSupported` and the capability set only, so the reverse of a HIGH-risk write dispatched with no gate at all — an agent that could not perform an action could still undo one.
+
+The process loads one `OperationAuthority` before launching asynchronous index
+startup. It owns the durable grant store, capsule service, hard stop, evaluator and
+indexed-root scope. The existing `WatchedRootsState` loads from the configured data
+directory and supplies both that scope and the later `KnowledgeClient`/root lifecycle
+operations. API composition consumes these same objects and attaches audit sinks.
+A failed roots migration or corrupt roots/grants file stops this preload; client
+construction does not read a second roots snapshot.
+
+Prepared filesystem grant scope reads the strict frozen root plan. Every frozen path
+must resolve to a real path inside a current watched root; missing paths and link
+escapes refuse coverage. The scope takes one current roots snapshot per decision.
+The existing preparation codec and resolver validate invocation identity, while
+the trusted producer owns the original input-to-plan mapping.
+
+**Recorded authorization evidence.** After the shared lattice authorizes a dispatch,
+acceptance replaces the caller's grant reference with a versioned server-selected
+basis in the operations row: structural AUTO, one-time capsule, exact operation
+grant, or exact family grant. This reference is evidence for later revalidation;
+it is never authority supplied by a request header. Ungated test wiring clears the
+reference. Prepared retries retain their frozen context and provenance for the gate;
+acceptance changes only the grant reference in that context. The exact-grant query
+refuses substitution when the selected entry was revoked, even if another grant
+could cover a fresh invocation. The shared authority also supplies a pure recorded
+ingestion decision using its canonical operation catalogs: invalid binding, current
+scope or exact-basis authority refuses before generation/capability readiness can
+wait. A capsule never authorizes restart. This decision writes nothing and grants
+no queue permission; recorded ingestion still requires its pre-poll authority
+integration before activation.
+
+Durable grant writes serialize a candidate snapshot and force its atomic file
+replacement before publishing the new immutable set to authorization readers.
+Failed issuance or revocation throws and leaves the last committed file and view
+unchanged. Audit callbacks run after publication and outside the mutation lock;
+they describe successful changes and are not a source of current grant authority.
 
 **One grant model.** A `Grant` is a caveat-bearing, attenuable, revocable token. Two members exist: the single-use, args-bound, short-TTL **consent capsule** (`ConsentCapsuleService`, an HMAC token minted on user approval) and the **durable allow-always grant** (`DurableGrantStore`, keyed `(operationId, sourceTier)` or `(capabilityFamily, sourceTier)`). A durable grant carries two caveats, because it is a standing consent and may only cover invocations the user could foresee when granting it (tempdoc 875): a **risk ceiling** — it never satisfies a gate on a HIGH-risk operation, so destructive work always costs a fresh args-bound gesture, which is the same floor `IntentGateEvaluator.agentGate` already applies on the issuance side; and an **argument scope** (`DurableGrantScope`) — it never covers an invocation whose path arguments reach outside the indexed roots, so an out-of-root ingest still happens, but behind a confirm that names the path rather than behind a blanket grant. Both caveats are enforced at the one durable short-circuit in `OperationExecutorImpl.enforceTrustLattice`, the only place that knows a confirmation was skipped; the `file-operations` capability family (tempdoc 560 §28) is unchanged and still auto-approves its MEDIUM member. The autonomy dial is the *issuance policy* (which grants auto-issue per source×risk), and the **Global Hard Stop** is a *global revocation* over all non-user (UNTRUSTED) grants — a user-mediated approval survives an emergency stop. Grant lifecycle is recorded as `Grant` ActionEvents → one audit, one revocation path, one ceremony (`<jf-authorization-host>` on the FE). That one ceremony posts its verdict to **one** backend endpoint — `POST /api/chat/{approve,reject}` (tempdoc 565 §15.C) — which dispatches the agent tool-call gate (`AgentSession.approvalGates`, keyed by `sessionId`+`callId`) → the workflow GateStep/ToolStep gate (`WorkflowGateRegistry`, keyed by `callId`) → 404. "A run is a run" all the way down: the FE no longer branches the approval URL by run shape, and the forked `/api/chat/agent/{approve,reject}` + `/api/chat/workflow/{approve,reject}` routes were retired. The run-substrate differences that remain (session cancel/resume, the autonomy dial) are legitimately agent-only — workflows are stateless/deterministic — so the unification stops at the genuinely-shared *approval* concept.
 

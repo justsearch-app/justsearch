@@ -5,6 +5,7 @@ import io.justsearch.app.api.AiInstallService;
 import io.justsearch.app.api.BrainInstallService;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,9 +27,14 @@ public final class BrainInstallServiceImpl implements BrainInstallService {
   }
 
   @Override
-  public Map<String, Object> startInstall(boolean acceptTerms) throws Exception {
-    helper.startInstall(acceptTerms);
-    return statusAsMap();
+  public Optional<AiInstallService.InstalledGenerationCandidate>
+      prepareInstalledGenerationCandidate() {
+    return helper.prepareInstalledGenerationCandidate();
+  }
+
+  @Override
+  public AiInstallService.Attempt startInstall(boolean acceptTerms) throws Exception {
+    return helper.startInstall(acceptTerms);
   }
 
   @Override
@@ -38,9 +44,8 @@ public final class BrainInstallServiceImpl implements BrainInstallService {
   }
 
   @Override
-  public Map<String, Object> repairInstall(boolean acceptTerms) throws Exception {
-    helper.repair(acceptTerms);
-    return statusAsMap();
+  public AiInstallService.Attempt repairInstall(boolean acceptTerms) throws Exception {
+    return helper.repair(acceptTerms);
   }
 
   @SuppressWarnings("unchecked")

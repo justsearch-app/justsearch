@@ -24,6 +24,11 @@ import java.util.Objects;
  */
 final class EngineConversationContext implements ConversationContext {
 
+  private final io.justsearch.core.context.EngineContext engineContext;
+
+  @Override
+  public io.justsearch.core.context.EngineContext engineContext() { return engineContext; }
+
   private final List<Map<String, Object>> messages;
   private final Audience audience;
   private final String sessionId;
@@ -37,7 +42,8 @@ final class EngineConversationContext implements ConversationContext {
       Audience audience,
       String sessionId,
       String shapeId,
-      Map<String, Object> requestBody) {
+      Map<String, Object> requestBody, io.justsearch.core.context.EngineContext engineContext) {
+    this.engineContext = Objects.requireNonNull(engineContext, "engineContext");
     Objects.requireNonNull(initialMessages, "initialMessages");
     this.messages = new ArrayList<>(initialMessages);
     this.audience = Objects.requireNonNull(audience, "audience");

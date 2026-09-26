@@ -9,6 +9,7 @@ import io.justsearch.app.api.RetrieveContextParams;
 import io.justsearch.app.services.worker.ContextSufficiencyService;
 import io.justsearch.app.services.worker.FilterNormalizationService;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.configuration.resolved.ConfigStore;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,7 +44,21 @@ public class RetrieveContextController {
       DocumentService documentService,
       OnlineAiService onlineAiService,
       Supplier<String> facetSnapshotSupplier) {
-    this(knowledgeServer, () -> documentService, onlineAiService, facetSnapshotSupplier);
+    this(knowledgeServer, () -> documentService, onlineAiService, facetSnapshotSupplier, null);
+  }
+
+  public RetrieveContextController(
+      KnowledgeServerBootstrap knowledgeServer,
+      DocumentService documentService,
+      OnlineAiService onlineAiService,
+      Supplier<String> facetSnapshotSupplier,
+      ConfigStore configStore) {
+    this(
+        knowledgeServer,
+        () -> documentService,
+        onlineAiService,
+        facetSnapshotSupplier,
+        configStore);
   }
 
   // knowledgeServer is retained for the constructor-overload/wiring API; its backing field was
@@ -54,10 +69,25 @@ public class RetrieveContextController {
       Supplier<DocumentService> documentServiceSupplier,
       OnlineAiService onlineAiService,
       Supplier<String> facetSnapshotSupplier) {
+    this(knowledgeServer, documentServiceSupplier, onlineAiService, facetSnapshotSupplier, null);
+  }
+
+  @SuppressWarnings("PMD.UnusedFormalParameter")
+  public RetrieveContextController(
+      KnowledgeServerBootstrap knowledgeServer,
+      Supplier<DocumentService> documentServiceSupplier,
+      OnlineAiService onlineAiService,
+      Supplier<String> facetSnapshotSupplier,
+      ConfigStore configStore) {
     this.documentServiceSupplier = documentServiceSupplier;
     this.facetSnapshotSupplier = facetSnapshotSupplier != null ? facetSnapshotSupplier : () -> "";
     this.sufficiencyService = new ContextSufficiencyService(onlineAiService);
-    this.normService = new FilterNormalizationService(onlineAiService);
+    this.normService =
+        configStore == null
+            ? new FilterNormalizationService(onlineAiService)
+            : new FilterNormalizationService(
+                onlineAiService,
+                () -> configStore.get().search().filterNormalizationEnabled());
   }
 
   private DocumentService documentService() {
@@ -154,7 +184,7 @@ public class RetrieveContextController {
           .metaAuthor(metaAuthor)
           .metaCategory(metaCategory)
           .build();
-      normFuture = normService.normalize(tempFilters, facetSnapshotSupplier.get());
+      normFuture = normService.normalize(tempFilters, facetSnapshotSupplier.get(), RequestEngineContext.get(ctx));
     }
 
     // Collect normalization result
@@ -186,7 +216,7 @@ public class RetrieveContextController {
 
     try {
       ContextResult result = documentService()
-          .retrieveContext(params)
+          .retrieveContext(params, RequestEngineContext.get(ctx))
           .toCompletableFuture()
           .get(RETRIEVE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
@@ -235,11 +265,12 @@ public class RetrieveContextController {
         try {
           ContextSufficiencyService.SufficiencyResult sr =
               sufficiencyService
-                  .classify(question, result.context())
+                  .classify(question, result.context(), RequestEngineContext.get(ctx))
                   .toCompletableFuture()
                   .get(5, TimeUnit.SECONDS);
           quality.put("context_sufficient", sr != null ? sr.sufficient() : null);
         } catch (Exception e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
           log.debug("Sufficiency check timed out or failed: {}", e.getMessage());
           quality.put("context_sufficient", null);
         }
@@ -251,6 +282,7 @@ public class RetrieveContextController {
 
       ctx.json(response);
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
       log.error("Failed to retrieve context", e);
       ctx.status(500).json(Map.of("ok", false, "error", e.getMessage()));
     }
@@ -294,7 +326,7 @@ public class RetrieveContextController {
 
     try {
       var result = documentService()
-          .matchCitationsAgainst(answerText, sources, threshold)
+          .matchCitationsAgainst(answerText, sources, threshold, RequestEngineContext.get(ctx))
           .toCompletableFuture()
           .get(CITATIONS_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 

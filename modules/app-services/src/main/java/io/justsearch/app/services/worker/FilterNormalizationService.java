@@ -21,6 +21,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -81,9 +82,17 @@ public final class FilterNormalizationService {
   }
 
   private final OnlineAiService aiService;
+  private final BooleanSupplier enabled;
 
   public FilterNormalizationService(OnlineAiService aiService) {
+    this(
+        aiService,
+        () -> io.justsearch.configuration.EnvRegistry.FILTER_NORM_ENABLED.getBoolean(false));
+  }
+
+  public FilterNormalizationService(OnlineAiService aiService, BooleanSupplier enabled) {
     this.aiService = Objects.requireNonNull(aiService, "aiService");
+    this.enabled = Objects.requireNonNull(enabled, "enabled");
     if (PROMPT_TEMPLATE != null) {
       log.info("FilterNormalizationService initialized (prompt loaded)");
     } else {
@@ -96,9 +105,7 @@ public final class FilterNormalizationService {
    * Used by callers that want the best possible normalization.
    */
   public boolean isAvailable() {
-    return io.justsearch.configuration.EnvRegistry.FILTER_NORM_ENABLED.getBoolean(false)
-        && PROMPT_TEMPLATE != null
-        && aiService.isAvailable();
+    return isAvailable(enabled.getAsBoolean());
   }
 
   /**
@@ -120,10 +127,42 @@ public final class FilterNormalizationService {
    * @return a future containing the normalization result, never null
    */
   public CompletableFuture<NormResult> normalize(
-      KnowledgeSearchRequest.Filters filters, String facetSnapshot) {
+      KnowledgeSearchRequest.Filters filters, String facetSnapshot,
+      io.justsearch.core.context.EngineContext engineContext) {
     if (filters == null) {
       return CompletableFuture.completedFuture(null);
     }
+    boolean llmAvailable = isAvailable(enabled.getAsBoolean());
+    return normalize(filters, facetSnapshot, engineContext, llmAvailable);
+  }
+
+  /**
+   * Runs the full normalization feature only when it is available for this operation.
+   *
+   * @return the normalization future, or {@code null} when the captured feature gate or its AI
+   *     dependency is unavailable
+   */
+  CompletableFuture<NormResult> normalizeIfAvailable(
+      KnowledgeSearchRequest.Filters filters,
+      String facetSnapshot,
+      io.justsearch.core.context.EngineContext engineContext,
+      boolean enabledForOperation) {
+    if (filters == null) {
+      return null;
+    }
+    boolean llmAvailable = isAvailable(enabledForOperation);
+    return llmAvailable ? normalize(filters, facetSnapshot, engineContext, true) : null;
+  }
+
+  private boolean isAvailable(boolean enabledForOperation) {
+    return enabledForOperation && PROMPT_TEMPLATE != null && aiService.isAvailable();
+  }
+
+  private CompletableFuture<NormResult> normalize(
+      KnowledgeSearchRequest.Filters filters,
+      String facetSnapshot,
+      io.justsearch.core.context.EngineContext engineContext,
+      boolean llmAvailable) {
 
     // Lowercase all metadata values (always)
     List<String> sources = lowercase(filters.metaSource());
@@ -163,7 +202,7 @@ public final class FilterNormalizationService {
     }
 
     // LLM fallback: only for values that deterministic matching couldn't resolve
-    if (!isAvailable()) {
+    if (!llmAvailable) {
       // No LLM available — use deterministic results + lowercased originals for unresolved
       finalSources = mergeResolved(resolvedSources);
       finalAuthors = mergeResolved(resolvedAuthors);
@@ -198,7 +237,7 @@ public final class FilterNormalizationService {
 
     long startNs = System.nanoTime();
     return aiService
-        .chatCompletion(messages, NORM_MAX_TOKENS, NORM_SAMPLING)
+        .chatCompletion(messages, NORM_MAX_TOKENS, NORM_SAMPLING, engineContext)
         .orTimeout(NORM_DEADLINE_MS, TimeUnit.MILLISECONDS)
         .thenApply(
             response -> {
@@ -209,6 +248,7 @@ public final class FilterNormalizationService {
             })
         .exceptionally(
             ex -> {
+              io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(ex);
               long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
               log.debug("Filter normalization LLM failed/timeout after {}ms: {}", elapsedMs, ex.getMessage());
               // Fallback: use deterministic results + lowercased originals for unresolved

@@ -139,11 +139,11 @@ public record SubstrateGraph(
               readinessReconciliationTrigger) {}
 
   /**
-   * Diagnostic channel catalogs (core head-log + the composed plugin-contributed channels, tempdoc
+   * Diagnostic channel catalogs (core engine-log + the composed plugin-contributed channels, tempdoc
    * 560 §10.4) + SSE stream registry.
    */
   public record ChannelSubstrate(
-      DiagnosticChannelCatalog headLogCatalog,
+      DiagnosticChannelCatalog engineLogCatalog,
       DiagnosticChannelCatalog pluginChannelCatalog,
       DiagnosticChannelStreamRegistry streams) {}
 
@@ -178,10 +178,6 @@ public record SubstrateGraph(
       // Tempdoc 550 G3/G4/G5: the unified live action-ledger change-stream.
       io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry
           actionLedgerChangeRegistry,
-      // Tempdoc 812 D2: the scan-rollup aggregator over that log — the ingest adapter hands it each
-      // scan's identity/root/admitted count; it counts the REAL terminal job outcomes and emits one
-      // durable scan-completion row.
-      io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger,
       // Tempdoc 550 E2: the process-wide emergency stop (lattice deny-all-non-user).
       io.justsearch.app.services.registry.executor.GlobalHardStop globalHardStop,
       // Tempdoc 550 thesis III: the ONE intent-gate evaluator shared by enforcement + Preview.

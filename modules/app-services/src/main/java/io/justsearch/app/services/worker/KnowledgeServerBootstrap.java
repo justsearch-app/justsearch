@@ -1,9 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.app.api.lifecycle.Capability;
+import io.justsearch.app.services.lifecycle.RegistryBackedCapability;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.app.util.AppInstanceLock;
 import io.justsearch.app.util.EnergyState;
 import io.justsearch.configuration.EnvRegistry;
@@ -28,18 +33,20 @@ import org.slf4j.LoggerFactory;
  * <ol>
  *   <li>Loads configuration</li>
  *   <li>Opens signal bus</li>
- *   <li>Spawns worker process</li>
- *   <li>Connects gRPC client</li>
+ *   <li>Starts the index half through the {@link WorkerHost} — since lane F stage A item A6 that is
+ *       {@code EngineRoot}, composing it in this JVM. Item A11 deleted the other implementation,
+ *       which spawned a worker process</li>
+ *   <li>Obtains a {@link KnowledgeClient} from the host (direct calls, not a gRPC channel)</li>
  *   <li>Provides health monitoring</li>
  * </ol>
  *
  * <p>Usage:
  * <pre>{@code
- * KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap();
+ * KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(executors);
  * bootstrap.start();
  *
  * // Use the client
- * RemoteKnowledgeClient client = bootstrap.client();
+ * KnowledgeClient client = bootstrap.client();
  * client.search("query", 10);
  *
  * // On shutdown
@@ -47,31 +54,40 @@ import org.slf4j.LoggerFactory;
  * }</pre>
  */
 public final class KnowledgeServerBootstrap implements Closeable {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "engine-bootstrap", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+
     private static final Logger log = LoggerFactory.getLogger(KnowledgeServerBootstrap.class);
 
     private final KnowledgeServerConfig config;
     private final Telemetry telemetry;
-    private final WorkerCapability workerCapability;
+    private final Capability workerCapability;
+    private final ComponentHandle indexComponent;
     private final AtomicBoolean started = new AtomicBoolean(false);
-    /**
-     * Tempdoc 502 §4.4: generation counter replaces the never-reset boolean CAS.
-     * Generation 0 = never initialized. Generation 1 = first connect (full init).
-     * Generation 2+ = recovery (partial re-init: reindex + periodic sync only).
-     */
-    private final java.util.concurrent.atomic.AtomicLong initGeneration =
-        new java.util.concurrent.atomic.AtomicLong(0);
+    // Private initialization bookkeeping, never a readiness authority. Only direct health
+    // observations change these flags; API state and sampler staleness cannot re-run setup.
+    // All accesses are serialized with start/close by initLock.
+    private boolean physicalHealthy;
+    private boolean healthyInitializationComplete;
     private final java.util.concurrent.locks.ReentrantLock initLock =
         new java.util.concurrent.locks.ReentrantLock();
 
-    // Tempdoc 825 review F10: volatile. These three are written by whichever thread runs start() /
+    // Tempdoc 825 review F10: volatile. Written by whichever thread runs start() /
     // closeForUpgrade() — the boot thread, and (since 825) the health monitor's executor — and read
-    // by the other: hasClient() is the monitor's arm discriminator, and the shutdown coordinator
-    // calls closeForUpgrade() from the shutdown hook thread. Without volatile a reader can observe a
-    // stale non-null spawner (double shutdown) or a stale null client (a needless recovery attempt
-    // against a worker that is already up).
-    private volatile MainSignalBus signalBus;
-    private volatile WorkerSpawner spawner;
-    private volatile RemoteKnowledgeClient client;
+    // by the other: hasClient() is the monitor's arm discriminator, so without volatile a reader can
+    // observe a stale null client and make a needless recovery attempt against a worker that is up.
+    private volatile KnowledgeClient client;
+    private final java.util.concurrent.locks.ReentrantReadWriteLock publicationLock;
+    private final Object clientLeaseMonitor = new Object();
+    private int clientHolders;
+    private boolean clientRetiring;
+    private boolean clientVerified;
+
+    /**
+     * Where the index half lives (lane F item A6). Required since item A11 deleted the alternative:
+     * the Engine composition root supplies itself, and there is no spawn-a-process path left.
+     */
+    private final WorkerHost workerHost;
 
     /**
      * Tempdoc 672 follow-up: epoch-ms of the most recent {@link #recordUserActivity()} call. Since
@@ -83,18 +99,32 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private final java.util.concurrent.atomic.AtomicLong lastUserActivityEpochMs =
         new java.util.concurrent.atomic.AtomicLong(0);
 
+    /**
+     * Lane F item A5: the one in-process GPU-scheduling gauge. {@code main_gpu_active} is written
+     * from the inference mode-change listener ({@code InferenceWiring.wireGpuStatusBroadcast}) and
+     * {@code energy_reduced} from {@link #energyPoller}; while the Worker is still a separate
+     * process both writers ALSO publish the matching MMF byte, which is the half deleted at A10.
+     * The composition rule ("yield GPU-heavy backfill when either holds") lives in the gauge.
+     */
+    private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling =
+        new io.justsearch.core.scheduling.GpuSchedulingGauge();
+
+    /**
+     * Tempdoc 630's OS energy-intent poll, moved off the spawner at item A5 because it had to
+     * outlive it (the spawner went at A11). Constructed eagerly and started with the integration,
+     * so {@link #energyState()} answers UNKNOWN — not null — before the first poll.
+     */
+    private final io.justsearch.app.services.power.EnergyStatePoller energyPoller;
+        // Item A11: the second sink is gone. It wrote the OS energy-intent into the memory-mapped
+        // signal file for a Worker process to read; there is no second process, and the gauge the
+        // first argument writes is the one the indexing loop reads.
+
+
     /** Tempdoc 630: epoch-ms of the most recent OS-resume handled, for the "Catching up" notice. */
     private final java.util.concurrent.atomic.AtomicLong lastResumeEpochMs =
         new java.util.concurrent.atomic.AtomicLong(0);
     /** How long after a resume the transient "Catching up after sleep" notice stays up. */
     private static final long RESUME_NOTICE_WINDOW_MS = 30_000;
-
-    /** gRPC deadline for the FIRST PID-validation attempt; each further attempt doubles it. */
-    private static final long PID_VALIDATION_FIRST_ATTEMPT_MS = 1_000;
-    /** Budget below which a further PID-validation attempt is not worth issuing. */
-    private static final long PID_VALIDATION_MIN_ATTEMPT_MS = 250;
-    /** Budget below which stale-port recovery would overrun the window rather than rescue it. */
-    private static final long PID_VALIDATION_MISMATCH_RECOVERY_FLOOR_MS = 1_500;
 
     /** Total boot-time {@link #start()} attempts, including the first. */
     public static final int DEFAULT_START_ATTEMPTS = 3;
@@ -108,9 +138,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * which is the honest reading of "still starting". The final outcome always transitions.
      */
     private volatile boolean retryPending;
-
-    /** Whether the last failed {@link #start()} left supervision holding the restart budget. */
-    private volatile boolean supervisionEngagedOnLastAttempt;
+    /** Existing test-only countdown, retained across retries and local recovery attempts. */
+    private final java.util.concurrent.atomic.AtomicInteger bootFaultsRemaining;
 
     /**
      * Tempdoc 825: true while {@link KnowledgeServerHealthMonitor}'s boot-recovery arm owns the
@@ -138,63 +167,45 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * The corruption axis has the identical hole; it escapes only when its first worker-down call
      * happens to land outside a suppressed arc.
      *
-     * <p>Cleared on READY (the worker opened the index, so no index verdict stands) — the same
+     * <p>Cleared on a direct healthy observation (the index opened, so no verdict stands) — the same
      * anti-staleness bound {@link io.justsearch.app.services.lifecycle.ReasonRetention} uses.
      */
     private volatile WorkerDown latchedIndexFatalVerdict;
 
-    /**
-     * Tempdoc 825 §D4: countdown for the prod-guarded boot fault injector. Each remaining count fails
-     * one PID validation with the exact 821 §O.4 signature, then the injector stops — which is what
-     * makes CONVERGENCE (not just the pin) reproducible. Zero unless
-     * {@code justsearch.worker.boot.faultInjectAttempts} is set on a non-production config.
-     */
-    private final java.util.concurrent.atomic.AtomicInteger bootFaultCountdown;
-
     private AppInstanceLock appLock;
     private IpcTelemetry ipcTelemetry;
+    private final boolean automaticRootProducers;
 
-    public KnowledgeServerBootstrap() {
-        this(KnowledgeServerConfig.load(), new NoopTelemetry());
-    }
-
-    /** Tempdoc 627 Deliverable 10: production async-start ctor — loaded config + the injected shared capability. */
-    public KnowledgeServerBootstrap(WorkerCapability workerCapability) {
-        this(KnowledgeServerConfig.load(), new NoopTelemetry(), workerCapability);
-    }
-
-    public KnowledgeServerBootstrap(KnowledgeServerConfig config) {
-        this(config, new NoopTelemetry());
-    }
-
-    public KnowledgeServerBootstrap(KnowledgeServerConfig config, Telemetry telemetry) {
-        this(config, telemetry, new WorkerCapability());
-    }
-
-    /**
-     * Tempdoc 627 Deliverable 10: inject a shared {@link WorkerCapability} so the Head's
-     * {@code CapabilityGraph} and this supervisor drive ONE instance — eliminating the
-     * {@code HeadAssembly.connectKnowledgeServer} mirror and its silent-drift bug class. The
-     * no-arg / 2-arg ctors keep their own instance for tests and isolated launchers.
-     */
+    /** Uses the Engine's existing index owner and registry for every publication and gate. */
     public KnowledgeServerBootstrap(
-        KnowledgeServerConfig config, Telemetry telemetry, WorkerCapability workerCapability) {
+        io.justsearch.core.execution.EngineExecutorRegistry executors,
+        KnowledgeServerConfig config, Telemetry telemetry, EngineComponentRegistry components,
+        ComponentHandle indexComponent, WorkerHost workerHost,
+        java.util.concurrent.locks.ReentrantReadWriteLock publicationLock) {
+        this(executors, config, telemetry, components, indexComponent, workerHost, true,
+            publicationLock);
+    }
+
+    /** Installed fault fixtures isolate explicit operations from automatic root scans and watchers. */
+    public KnowledgeServerBootstrap(
+        io.justsearch.core.execution.EngineExecutorRegistry executors,
+        KnowledgeServerConfig config, Telemetry telemetry, EngineComponentRegistry components,
+        ComponentHandle indexComponent, WorkerHost workerHost, boolean automaticRootProducers,
+        java.util.concurrent.locks.ReentrantReadWriteLock publicationLock) {
+        this.automaticRootProducers = automaticRootProducers;
+        this.publicationLock = java.util.Objects.requireNonNull(publicationLock, "publicationLock");
+        this.workerHost =
+            java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
+        this.energyPoller = new io.justsearch.app.services.power.EnergyStatePoller(executors, gpuScheduling);
         this.config = config;
+        this.bootFaultsRemaining = new java.util.concurrent.atomic.AtomicInteger(config.bootFaultInjectAttempts());
         this.telemetry = telemetry != null ? telemetry : new NoopTelemetry();
-        this.workerCapability = workerCapability != null ? workerCapability : new WorkerCapability();
-        // Tempdoc 915 R1: drop the fatal-index latch wherever READY comes from, rather than at the
-        // two sites that happen to write it today. READY means the worker opened the index and is
-        // serving, so no index verdict stands — the same anti-staleness bound ReasonRetention uses,
-        // and the reason it needs no timer. Placed here so a future READY path inherits it.
-        this.workerCapability.addListener(
-            (prev, next) -> {
-                if (next == CapabilityHealth.READY) {
-                    latchedIndexFatalVerdict = null;
-                }
-            });
-        this.bootFaultCountdown =
-            new java.util.concurrent.atomic.AtomicInteger(
-                config != null ? config.bootFaultInjectAttempts() : 0);
+        this.indexComponent = java.util.Objects.requireNonNull(indexComponent, "indexComponent");
+        if (!"index".equals(indexComponent.spec().name())) {
+            throw new IllegalArgumentException("Bootstrap requires the index component owner");
+        }
+        this.workerCapability = new RegistryBackedCapability(components, "index", "worker");
+
     }
 
     /**
@@ -202,15 +213,24 @@ public final class KnowledgeServerBootstrap implements Closeable {
      *
      * <p>Steps:
      * <ol>
-     *   <li>Creates signal bus</li>
-     *   <li>Starts worker spawner (which spawns the process)</li>
-     *   <li>Connects gRPC client to discovered port</li>
+     *   <li>Acquires the single-instance lock for the data directory</li>
+     *   <li>Asks the {@link WorkerHost} to compose the index half (in this JVM)</li>
+     *   <li>Polls health until the worker component reaches READY</li>
      * </ol>
      *
-     * @throws IOException if spawn or connection fails
+     * @throws IOException if composition fails
      * @throws InterruptedException if startup is interrupted
      */
     public void start() throws IOException, InterruptedException {
+        initLock.lockInterruptibly();
+        try {
+            startLocked();
+        } finally {
+            initLock.unlock();
+        }
+    }
+
+    private void startLocked() throws IOException, InterruptedException {
         if (!started.compareAndSet(false, true)) {
             throw new IllegalStateException("KnowledgeServerBootstrap already started");
         }
@@ -219,12 +239,17 @@ public final class KnowledgeServerBootstrap implements Closeable {
         // owns the narration; dropping back to PENDING here would re-enter RECOVERING on the next
         // attempt and emit a worker.restart-attempted occurrence per cycle.
         if (!bootRecoveryInFlight) {
-            workerCapability.transition(
-                CapabilityHealth.PENDING, LifecycleReasonCode.WORKER_STARTING.code(), "Worker starting");
+            indexComponent.transition(
+                ComponentState.STARTING, LifecycleReasonCode.WORKER_STARTING.code(), "Worker starting");
         }
         log.info("Starting Knowledge Server integration...");
 
         try {
+            // The old injector lived in deleted Worker PID validation. Fail before composition
+            // instead; KnowledgeServerConfig forces this countdown to zero in production.
+            if (bootFaultsRemaining.getAndUpdate(remaining -> Math.max(0, remaining - 1)) > 0) {
+                throw new IOException("Injected test-only Engine index boot failure");
+            }
             // 0. Enforce single-instance semantics for this data directory.
             // This must happen before we spawn the Worker (and before any code tries to mutate jobs.db/index).
             //
@@ -249,99 +274,99 @@ public final class KnowledgeServerBootstrap implements Closeable {
                     ? new IpcTelemetry(new IpcMetricCatalog(lt.registry()))
                     : IpcTelemetry.noop();
 
-            // 2. Create signal bus
-            signalBus = new MainSignalBus(config.signalFilePath());
-
-            // 3. Create and start worker spawner (with IPC telemetry)
-            spawner = new WorkerSpawner(config, signalBus, ipcTelemetry);
-            // Tempdoc 627: bridge the spawner's supervision lifecycle to the worker capability so a
-            // recovery (RECOVERING) or terminal give-up (DEGRADED + worker.restart_exhausted) is
-            // legible on /api/health. Mirrors the Brain's InferenceCapabilityWiring mode→capability
-            // bridge. onRecovered is intentionally a no-op: the next health poll confirms READY, so we
-            // never claim healthy before it is verified.
-            spawner.setSupervisionEvents(new SupervisionEvents() {
-                @Override
-                public void onRecovering(String reason, RecoveryContext ctx) {
-                    // Tempdoc 627 (N2): park the forensic context before the transition so the
-                    // capability-health bridge (a synchronous transition listener) attaches it to the
-                    // worker.restart-attempted occurrence.
-                    workerCapability.setRecoveryContext(ctx);
-                    // Tempdoc 837 S3: the supervisor's sentence is the DETAIL; the reason slot carries
-                    // the code the /api/status RECOVERING arm already publishes.
-                    workerCapability.transition(
-                        CapabilityHealth.RECOVERING,
-                        LifecycleReasonCode.WORKER_RECOVERING.code(),
-                        reason);
+            // 2. The Engine composes the index half in this JVM. Item A11 deleted the alternative:
+            // there is no spawner, no memory-mapped signal file, no port to discover, no channel to
+            // open and no PID to validate against a spawn. `workerHost` is required rather than
+            // optional now, which is why the field is final and the constructor rejects null.
+            energyPoller.start();
+            try {
+                KnowledgeClient startedClient = workerHost.start(gpuScheduling, ipcTelemetry);
+                publicationLock.writeLock().lock();
+                try {
+                    synchronized (clientLeaseMonitor) {
+                        if (client != null || clientHolders != 0) {
+                            throw new IllegalStateException("Prior client has not been retired");
+                        }
+                        client = startedClient;
+                        clientRetiring = false;
+                        clientVerified = false;
+                    }
+                } finally {
+                    publicationLock.writeLock().unlock();
                 }
-
-                @Override
-                public void onGaveUp(String reason) {
-                    workerCapability.transition(
-                        CapabilityHealth.DEGRADED,
-                        LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code(),
-                        reason);
-                }
-            });
-            int port = spawner.start();
-
-            // 4. Create circuit breaker for gRPC failure handling
-            GrpcCircuitBreaker circuitBreaker = new GrpcCircuitBreaker(ipcTelemetry);
-
-            // 5. Create and connect client (with circuit breaker and telemetry)
-            client = new RemoteKnowledgeClient(signalBus, config.deadlineMs(), config.maxRetries(), config.batchSize(), circuitBreaker, ipcTelemetry);
-            client.connect(port);
-
-            // 5.5. Validate that the connected port belongs to our spawned worker PID
-            long expectedPid = spawner.getWorkerPid();
-            validateWorkerPid(expectedPid, config.pidValidationTimeoutMs());
-
-            // 5.6. Check for Head→Worker config divergence (tempdoc 329)
-            checkConfigDivergence();
-
-            // 6. Verify health with bounded retry (Tempdoc 374 alpha.23 R13-A defect #1).
-            // Round-13 cycle 2 caught the worker still warming up Lucene SearcherManager.
-            // Pre-fix: a single isHealthy() call straddled the warmup, transitioned to ERROR,
-            // and steps 7-9 never ran. Post-fix: poll for up to healthCheckRetryBudgetMs.
-            // If the budget elapses without success, KnowledgeServerHealthMonitor takes over.
-            long retryBudgetMs = config.healthCheckRetryBudgetMs();
-            long healthCheckStartMs = System.currentTimeMillis();
-            boolean healthy = client.isHealthy();
-            while (!healthy && (System.currentTimeMillis() - healthCheckStartMs) < retryBudgetMs) {
-                Thread.sleep(1000);
-                healthy = client.isHealthy();
-            }
-            long healthCheckElapsedMs = System.currentTimeMillis() - healthCheckStartMs;
-
-            if (healthy) {
-                workerCapability.transition(CapabilityHealth.READY, null);
-                if (healthCheckElapsedMs >= 1000) {
-                    log.info("Knowledge Server became healthy after {}ms of warmup polling on port {}",
-                            healthCheckElapsedMs, port);
-                } else {
-                    log.info("Knowledge Server is READY on port {}", port);
-                }
-                completeReadyInitialization();
-            } else {
-                // Tempdoc 837 §3.1: the start-time health budget elapsed — the worker NEVER started.
-                // Review F7: this site is reachable DURING a recovery arc — the attempt's worker
-                // spawns and answers gRPC but never reaches healthy — and it was the one worker-down
-                // site without a suppression guard. The rule now lives in transitionWorkerDown, so
-                // this call is unconditional and the funnel decides.
-                transitionWorkerDown(
-                    LifecycleReasonCode.WORKER_SPAWN_FAILED,
-                    "Health check failed after " + healthCheckElapsedMs + "ms");
-                log.warn("Knowledge Server health check failed after {}ms budget; auxiliary services not initialized — background monitor will retry",
-                        healthCheckElapsedMs);
+            } catch (IOException | InterruptedException | RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                // WorkerHost.start is declared broadly so a future host can fail its own way; the
+                // bootstrap contract is IOException, so wrap anything else honestly rather than
+                // widening start()'s throws clause.
+                throw new IOException("Engine composition failed: " + e.getMessage(), e);
             }
 
+            // 3. Verify health, transition to READY and run the ready-initialization sequence.
+            // Unchanged from the spawned path on purpose: /api/health's worker component keeps its
+            // exact WORKER_* vocabulary, which design §6 re-cuts at D1, not here.
+            awaitHealthyAndComplete();
         } catch (Exception e) {
-            // Read supervision's verdict BEFORE close() drops the spawner that holds it.
-            supervisionEngagedOnLastAttempt = spawner != null && spawner.supervisionEngaged();
             transitionWorkerDown(
                 LifecycleReasonCode.WORKER_SPAWN_FAILED, "Start failed: " + e.getMessage());
             log.error("Failed to start Knowledge Server integration", e);
-            close();
+            try {
+                if (closeForUpgrade() != ShutdownOutcome.GRACEFUL) {
+                    e.addSuppressed(new IOException(
+                        "Startup cleanup refused; the prior index owner remains retained"));
+                }
+            } catch (RuntimeException cleanup) {
+                if (cleanup != e) e.addSuppressed(cleanup);
+            }
             throw e;
+        }
+    }
+
+    /**
+     * Verifies health with a bounded retry (Tempdoc 374 alpha.23 R13-A defect #1), then transitions
+     * the worker capability and runs the ready-initialization sequence.
+     *
+     * <p>Round-13 cycle 2 caught the worker still warming up Lucene SearcherManager. Pre-fix: a
+     * single {@code isHealthy()} call straddled the warmup, transitioned to ERROR, and the
+     * auxiliary services never initialized. Post-fix: poll for up to
+     * {@code healthCheckRetryBudgetMs}; if the budget elapses without success,
+     * {@link KnowledgeServerHealthMonitor} takes over.
+     *
+     * <p>Lane F item A6 extracted this from {@code start()} so the in-process host and the legacy
+     * spawned process shared one readiness path; item A11 deleted the spawned one, and this stayed
+     * where it was — the WORKER_* reason codes and the auxiliary-service sequence are the worker
+     * component's contract on {@code /api/health}, not a property of how it was started.
+     *
+     */
+    private void awaitHealthyAndComplete() throws InterruptedException {
+        long retryBudgetMs = config.healthCheckRetryBudgetMs();
+        long healthCheckStartMs = System.currentTimeMillis();
+        boolean healthy = checkHealth();
+        while (!healthy && (System.currentTimeMillis() - healthCheckStartMs) < retryBudgetMs) {
+            Thread.sleep(1000);
+            healthy = checkHealth();
+        }
+        long healthCheckElapsedMs = System.currentTimeMillis() - healthCheckStartMs;
+
+        if (healthy) {
+            if (healthCheckElapsedMs >= 1000) {
+                log.info("Knowledge Server became healthy after {}ms of warmup polling",
+                        healthCheckElapsedMs);
+            } else {
+                log.info("Knowledge Server is READY");
+            }
+        } else {
+            // Tempdoc 837 §3.1: the start-time health budget elapsed — the worker NEVER started.
+            // Review F7: this site is reachable DURING a recovery arc — the attempt's worker
+            // spawns and answers but never reaches healthy — and it was the one worker-down
+            // site without a suppression guard. The rule now lives in transitionWorkerDown, so
+            // this call is unconditional and the funnel decides.
+            transitionWorkerDown(
+                LifecycleReasonCode.WORKER_SPAWN_FAILED,
+                "Health check failed after " + healthCheckElapsedMs + "ms");
+            log.warn("Knowledge Server health check failed after {}ms budget; auxiliary services not initialized — background monitor will retry",
+                    healthCheckElapsedMs);
         }
     }
 
@@ -349,43 +374,66 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * Starts with a bounded retry, so a transient boot-time timing failure is not terminal.
      *
      * <p>{@link #start()} tears itself down via {@link #close()} on failure — which resets
-     * {@code started} and drops the spawner, client and signal bus — so a subsequent attempt
-     * respawns from a clean slate rather than leaking the previous worker. Only failures
-     * {@link WorkerStartFailures#isTransient(Throwable) classified as transient} are retried, and
-     * only while {@link WorkerSpawner#supervisionEngaged() supervision has not engaged}; everything
-     * else propagates from the first attempt with its original error.
+     * {@code started} and drops the client — so a subsequent attempt composes from a clean slate.
+     *
+     * <p>Item A11 removed the transient/permanent classifier ({@code WorkerStartFailures}) with the
+     * spawner it classified: its whole vocabulary was spawn-shaped (worker jar missing, port
+     * discovery timeout, PID mismatch), and an in-process composition fails for different reasons —
+     * a Lucene open, a jobs.db migration. Every attempt is now retried within the budget, which is
+     * what the spawn-shaped classifier did for the transient class anyway; a permanent failure
+     * simply costs the remaining attempts before the same verdict lands.
      */
     public void startWithRetry() throws IOException, InterruptedException {
         startWithRetry(DEFAULT_START_ATTEMPTS, DEFAULT_START_RETRY_BACKOFF_MS);
     }
 
     /** {@link #startWithRetry()} with an explicit attempt budget; visible for tests. */
+    /** {@link #startWithRetry()} with an explicit attempt budget; visible for tests. */
     public void startWithRetry(int maxAttempts, long backoffMs)
             throws IOException, InterruptedException {
-        int[] attemptNo = {0};
-        supervisionEngagedOnLastAttempt = false;
-        try {
-            WorkerStartFailures.startWithRetry(
-                () -> {
-                    retryPending = ++attemptNo[0] < maxAttempts;
-                    start();
-                },
-                maxAttempts,
-                backoffMs,
-                () -> supervisionEngagedOnLastAttempt);
-        } catch (Exception e) {
-            // The per-attempt narration was suppressed; the final verdict lands exactly once, here —
-            // unless the boot-recovery arm owns this arc's narration (tempdoc 825), in which case the
-            // verdict is ITS terminal give-up, not a per-cycle spawn-failed pin.
-            retryPending = false;
-            // transitionWorkerDown is the one funnel: it owns both the arc-suppression rule (F7) and
-            // the "never overwrite supervision's terminal verdict" rule (F1).
-            transitionWorkerDown(
-                LifecycleReasonCode.WORKER_SPAWN_FAILED, "Start failed: " + e.getMessage());
-            throw e;
-        } finally {
-            retryPending = false;
+        Exception last = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            retryPending = attempt < maxAttempts;
+            try {
+                start();
+                retryPending = false;
+                return;
+            } catch (IOException | InterruptedException | RuntimeException e) {
+                last = e;
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                if (started.get()) {
+                    log.error("Knowledge Server startup retained an incomplete owner; refusing retry", e);
+                    break;
+                }
+                if (attempt < maxAttempts) {
+                    log.warn("Knowledge Server start attempt {}/{} failed ({}); retrying in {}ms",
+                            attempt, maxAttempts, e.getMessage(), backoffMs);
+                    try {
+                        Thread.sleep(backoffMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
         }
+        retryPending = false;
+        // The per-attempt narration was suppressed; the final verdict lands exactly once, here —
+        // unless the boot-recovery arm owns this arc's narration (tempdoc 825), in which case the
+        // verdict is ITS terminal give-up. transitionWorkerDown is the one funnel and owns that rule.
+        transitionWorkerDown(
+            LifecycleReasonCode.WORKER_SPAWN_FAILED,
+            "Start failed: " + (last == null ? "unknown" : last.getMessage()));
+        if (last instanceof IOException io) {
+            throw io;
+        }
+        if (last instanceof InterruptedException ie) {
+            throw ie;
+        }
+        throw new IOException("Knowledge Server start failed after " + maxAttempts + " attempts", last);
     }
 
     /**
@@ -398,12 +446,15 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * <p>The flag is set and cleared around the single call, so a throwing attempt cannot leave the
      * bootstrap permanently unable to narrate.
      */
-    public void startForRecovery() throws IOException, InterruptedException {
-        bootRecoveryInFlight = true;
+    public boolean startForRecovery() throws IOException, InterruptedException {
+        initLock.lockInterruptibly();
         try {
+            bootRecoveryInFlight = true;
             startWithRetry(1, 0);
+            return physicalHealthy && healthyInitializationComplete;
         } finally {
             bootRecoveryInFlight = false;
+            initLock.unlock();
         }
     }
 
@@ -413,45 +464,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     /**
-     * Tempdoc 825 review F1: whether SUPERVISION has already stamped its terminal verdict on this
-     * capability. {@code worker.restart_exhausted} and {@code worker.spawn.failed} are both
-     * {@code FAULT}, so {@link io.justsearch.app.services.lifecycle.ReasonRetention} lets the
-     * incoming one win — which means this class's own final "start failed" stamp would erase the
-     * supervisor's verdict on every boot where supervision engaged and gave up. That is not merely a
-     * cosmetic loss: {@link BootRecoveryDecision}'s permanent veto reads this exact slot, so the
-     * erasure would silently convert "supervision gave up, stop for good" into "nobody knows, keep
-     * re-attempting" — the second restart authority the tempdoc-627 review forbade.
-     */
-    private boolean supervisionVerdictHeld() {
-        return LifecycleReasonCode.WORKER_RESTART_EXHAUSTED
-            .code()
-            .equals(workerCapability.pendingReason());
-    }
-
-    /**
-     * Tempdoc 825 (§D2 mechanism 1, corrected by review F2): whether a supervisor is alive RIGHT NOW
-     * and holding the restart budget — the honest cross-cycle form of the veto.
-     *
-     * <p>The obvious signal, {@code supervisionEngagedOnLastAttempt}, is the wrong one here.
-     * {@link WorkerSpawner#supervisionEngaged()} latches on {@code restartCount > 0}, so it means "a
-     * supervised restart happened at some point during that attempt", not "supervision is working on
-     * it". That field is also never cleared until the next {@link #startWithRetry}, so a boot-recovery
-     * arm gated on it would stand down forever and never run the very attempt that clears it — the
-     * bricked-boot class would get zero attempts and no terminal code at all. It stays private, doing
-     * the job it was written for: bounding ONE {@code startWithRetry} call.
-     *
-     * <p>This asks the live question instead. After a failed start, {@link #close()} has dropped the
-     * spawner, so no supervisor exists and the restart budget is nobody's — recovery may proceed.
-     * While a spawner IS alive and has restarted the worker, supervision owns the arc and this
-     * authority yields the cycle (never permanently: the next tick re-asks).
-     */
-    public boolean supervisionActive() {
-        WorkerSpawner s = spawner;
-        return s != null && s.supervisionEngaged();
-    }
-
-    /**
-     * Tempdoc 825: whether a gRPC client is bound. This is the discriminator between the health
+     * Tempdoc 825: whether a knowledge-port client is bound (it was a gRPC client until lane F
+     * stage A item A6 made the port an in-process call). This is the discriminator between the health
      * monitor's two arms — a bound client means the bootstrap is up and {@link #checkHealth()} owns
      * it; no client means {@code start()} never completed and the boot-recovery arm owns it.
      */
@@ -459,249 +473,140 @@ public final class KnowledgeServerBootstrap implements Closeable {
         return client != null;
     }
 
-    /**
-     * Tempdoc 502 §4.4: generation-based initialization. First call (generation 0→1)
-     * runs full initialization. Subsequent calls (recovery) re-run only catch-up steps
-     * (reindex + periodic sync). Called from both the bootstrap success path and the
-     * health-monitor recovery path.
-     */
-    private void completeReadyInitialization() {
-        if (!initLock.tryLock()) {
-            log.debug("completeReadyInitialization already running — skipping");
-            return;
+    /** Called only under initLock after a direct healthy observation. */
+    private void completeHealthyInitialization() {
+        if (healthyInitializationComplete) return;
+        if (automaticRootProducers) {
+            // Queue catch-up work once per physically healthy period. Help ingestion keeps its
+            // existing marker-idempotent, best-effort semantics on first start and recovery.
+            client.reindexPersistedRoots(ENGINE_CONTEXT);
+            tryIngestHelpFiles(client, config);
+            client.startPeriodicSync();
         }
-        try {
-            long prevGen = initGeneration.getAndIncrement();
-            if (prevGen == 0) {
-                // Tempdoc 626 §Axis-A — the redundant Head-side file watcher was removed; the
-                // Worker-side watcher (registered via WatchRoot during the root walk) is the sole
-                // event source, and the periodic sync + reindexPersistedRoots are the reconcile
-                // backstop. File-event integration now lives entirely in the Worker process.
-                client.reindexPersistedRoots();
-                tryIngestHelpFiles(client, config);
-                client.startPeriodicSync();
-            } else {
-                log.info("Worker recovery detected (generation {}); re-running catch-up initialization", prevGen + 1);
-                client.reindexPersistedRoots();
-                client.startPeriodicSync();
-            }
-        } finally {
-            initLock.unlock();
-        }
+        // A thrown required setup call leaves this false so a later healthy poll retries it.
+        healthyInitializationComplete = true;
     }
 
-    /**
-     * Tempdoc 374 alpha.23 R13-A defect #2: package-private hook called by
-     * {@link KnowledgeServerHealthMonitor} when the worker recovers from
-     * non-READY to READY. Delegates to the same idempotent helper used by
-     * the bootstrap success path.
-     */
-    void completeReadyInitializationFromMonitor() {
-        completeReadyInitialization();
-        tryIngestHelpFiles(client, config);
-    }
+    boolean automaticRootProducersSuppressed() { return !automaticRootProducers; }
 
     /**
      * Returns true if the Knowledge Server is ready.
-     * Delegates to {@link WorkerCapability#available()}.
+     * Delegates to {@link io.justsearch.app.api.lifecycle.Capability#available()}.
      */
     public boolean isReady() {
-        return workerCapability.available();
+        if (!workerCapability.available()) return false;
+        try (ClientLease ignored = captureClient()) {
+            return true;
+        } catch (IllegalStateException unavailable) {
+            return false;
+        }
     }
 
-    public WorkerCapability workerCapability() {
+    public Capability workerCapability() {
         return workerCapability;
     }
 
-    /**
-     * Validates that the connected gRPC port belongs to the expected worker PID.
-     *
-     * <p>This prevents connecting to a stale/zombie process that wrote its port
-     * between zeroPort() and the new worker starting.
-     *
-     * <p>Each attempt gets its own gRPC deadline, escalating from
-     * {@link #PID_VALIDATION_FIRST_ATTEMPT_MS} and always clamped to the budget left. Before that,
-     * every attempt inherited the STANDARD RPC deadline, which equals the whole validation window by
-     * default — so one slow cold health check (the worker-side check runs live SQLite and Lucene
-     * queries, expensive on first contact) consumed the entire budget and this loop never got a
-     * second iteration. That turned a warm-up race into a permanently worker-less Head.
-     *
-     * @param expectedPid the PID of the spawned worker process
-     * @param timeoutMs maximum time to retry PID validation
-     * @throws PidValidationTimeoutException if PID validation fails after timeout
-     */
-    private void validateWorkerPid(long expectedPid, long timeoutMs) throws InterruptedException {
-        int remainingFaults = bootFaultCountdown.getAndUpdate(n -> n > 0 ? n - 1 : 0);
-        if (remainingFaults > 0) {
-            // Tempdoc 825 §D4: the countdown fault injector. Fails PID validation with the exact
-            // 821 §O.4 signature (PidValidationTimeoutException — transient, so the boot retry and
-            // the recovery arm both engage) for the first N attempts and then stops, so a test can
-            // prove CONVERGENCE and not merely the pin. The guard is exactly this: the config's
-            // compact constructor zeroes the count whenever isProduction() is true — which is a
-            // DETECTED property (explicit justsearch.prod / JUSTSEARCH_PROD flag, or a bundled-JRE
-            // layout), not a build-time constant, so a shipped build launched with the flag forced
-            // to false can still arm it. That is the same reach every other dev-only sysprop in
-            // KnowledgeServerConfig has; it is not a security boundary.
-            log.warn(
-                "Injecting boot fault (justsearch.worker.boot.faultInjectAttempts): {} injected"
-                    + " failure(s) remaining after this one",
-                remainingFaults - 1);
-            throw new PidValidationTimeoutException(
-                "Injected boot fault (justsearch.worker.boot.faultInjectAttempts): expected PID "
-                    + expectedPid);
-        }
-        awaitWorkerPid(
-                expectedPid,
-                timeoutMs,
-                attemptDeadlineMs -> client.getHealthCheck(attemptDeadlineMs).getPid(),
-                remainingMs -> {
-                    ipcTelemetry.recordPidMismatch();
-                    // The reconnect is NOT covered by the per-attempt gRPC deadline: connect() closes
-                    // the old channel with its own 5s awaitTermination, so entering this arm on a
-                    // nearly-spent budget overruns the window for a recovery that cannot land anyway.
-                    if (remainingMs < PID_VALIDATION_MISMATCH_RECOVERY_FLOOR_MS) {
-                        log.warn("Skipping stale-port recovery: only {}ms of the validation window left",
-                                remainingMs);
-                        return;
-                    }
-                    // Zero the stale port and wait for the new worker to write its port.
-                    signalBus.zeroPort();
-                    Thread.sleep(100);
-                    long awaitTimeout = Math.min(1000, Math.max(100, remainingMs / 2));
-                    client.connect(signalBus.awaitPort(awaitTimeout, 100));
-                });
+    /** The existing physical owner, shared with recovery supervision and the readiness sampler. */
+    public ComponentHandle indexComponent() {
+        return indexComponent;
     }
 
-    /** One PID-validation attempt, honouring a per-attempt gRPC deadline. */
-    @FunctionalInterface
-    interface PidProbe {
-        long reportedPid(long attemptDeadlineMs) throws Exception;
-    }
-
-    /** Re-points the client at a freshly spawned worker after a stale-port PID mismatch. */
-    @FunctionalInterface
-    interface StalePortRecovery {
-        void reconnect(long remainingMs) throws Exception;
-    }
 
     /**
-     * The PID-validation retry loop, decoupled from its collaborators so the attempt schedule is
-     * directly testable. Package-private for {@code WorkerPidValidationTest}.
-     */
-    static void awaitWorkerPid(
-            long expectedPid, long timeoutMs, PidProbe probe, StalePortRecovery onMismatch)
-            throws InterruptedException {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        long attemptBudgetMs = PID_VALIDATION_FIRST_ATTEMPT_MS;
-        int retryCount = 0;
-
-        while (true) {
-            long remainingMs = deadline - System.currentTimeMillis();
-            if (remainingMs < PID_VALIDATION_MIN_ATTEMPT_MS) {
-                break;
-            }
-            long attemptDeadlineMs = Math.min(remainingMs, attemptBudgetMs);
-            attemptBudgetMs = Math.min(attemptBudgetMs * 2, Math.max(timeoutMs, 1));
-            try {
-                long actualPid = probe.reportedPid(attemptDeadlineMs);
-
-                if (actualPid == expectedPid) {
-                    log.info("Worker PID validated: {}", actualPid);
-                    return;
-                }
-
-                // PID mismatch - likely stale port from zombie process
-                log.warn("PID mismatch: expected {}, got {} (retry {})", expectedPid, actualPid, ++retryCount);
-                onMismatch.reconnect(deadline - System.currentTimeMillis());
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw e;
-            } catch (Exception e) {
-                log.debug("PID validation attempt failed: {}", e.getMessage());
-                Thread.sleep(100);
-            }
-        }
-
-        throw new PidValidationTimeoutException(
-                "PID validation timeout after " + timeoutMs + "ms: expected PID " + expectedPid);
-    }
-
-    /**
-     * Compares critical config values between Head and Worker, logging WARN on divergence.
-     *
-     * <p>This turns silent misconfiguration (tempdoc 312 item 20) into a visible signal.
-     * Best-effort: failures are logged but do not block startup.
-     */
-    private void checkConfigDivergence() {
-        try {
-            HealthCheckResponse response = client.getHealthCheck();
-            Map<String, String> workerConfig = response.getEffectiveConfigMap();
-            if (workerConfig.isEmpty()) {
-                log.debug("Worker did not report effective config (older version?)");
-                return;
-            }
-
-            int mismatches = 0;
-            for (EnvRegistry key : EnvRegistry.CONFIG_DIVERGENCE_CHECK_KEYS) {
-                String headValue = key.get().orElse("");
-                String workerValue = workerConfig.getOrDefault(key.sysProp(), "");
-                if (!headValue.equals(workerValue)) {
-                    log.warn("Config divergence [{}]: head='{}', worker='{}'",
-                            key.sysProp(), headValue, workerValue);
-                    mismatches++;
-                }
-            }
-            if (mismatches == 0) {
-                log.info("Head→Worker config check passed ({} keys verified)",
-                        EnvRegistry.CONFIG_DIVERGENCE_CHECK_KEYS.size());
-            } else {
-                log.warn("Head→Worker config divergence detected: {} key(s) differ. "
-                        + "Check env var / system property forwarding.", mismatches);
-            }
-        } catch (Exception e) {
-            log.debug("Config divergence check failed (non-fatal): {}", e.getMessage());
-        }
-    }
-
-    /**
-     * Returns the gRPC client for Knowledge Server operations.
+     * Returns the client for Knowledge Server operations.
      *
      * @throws IllegalStateException if not started or not ready
      */
-    public RemoteKnowledgeClient client() {
+    public KnowledgeClient client() {
         if (client == null) {
             throw new IllegalStateException("Knowledge Server not started");
         }
         return client;
     }
 
-    /**
-     * Returns the worker spawner for process management.
-     */
-    public WorkerSpawner spawner() {
-        return spawner;
+    /** A short capture retains the exact client until the calling operation exits. */
+    public ClientLease acquireClientLease() {
+        if (publicationLock.getReadHoldCount() == 0
+                && !publicationLock.isWriteLockedByCurrentThread()) {
+            throw new IllegalStateException("Client capture requires the publication lock");
+        }
+        synchronized (clientLeaseMonitor) {
+            KnowledgeClient captured = client;
+            if (clientRetiring || !clientVerified || captured == null) {
+                throw new IllegalStateException("Knowledge Server client is unavailable");
+            }
+            WorkerHost.ServingLease serving =
+                java.util.Objects.requireNonNull(workerHost.captureServingView(), "serving lease");
+            clientHolders++;
+            return new ClientLease(captured, serving);
+        }
     }
 
-    /**
-     * Returns the signal bus for inter-process coordination.
-     *
-     * <p>Used by InferenceLifecycleManager to broadcast GPU status changes
-     * to the Worker process.
-     *
-     * @return the MainSignalBus, or null if not started
-     */
-    public MainSignalBus signalBus() {
-        return signalBus;
+    /** Retains one client across an operation that does not also require a config capture. */
+    public ClientLease captureClient() {
+        publicationLock.readLock().lock();
+        try {
+            return acquireClientLease();
+        } finally {
+            publicationLock.readLock().unlock();
+        }
+    }
+
+    /** Process lock used to capture configuration and this client as one serving view. */
+    public java.util.concurrent.locks.ReentrantReadWriteLock publicationLock() {
+        return publicationLock;
+    }
+
+    public final class ClientLease implements AutoCloseable {
+        private final KnowledgeClient captured;
+        private final WorkerHost.ServingLease serving;
+        private final AtomicBoolean released = new AtomicBoolean();
+
+        private ClientLease(KnowledgeClient captured, WorkerHost.ServingLease serving) {
+            this.captured = captured;
+            this.serving = serving;
+        }
+
+        public KnowledgeClient client() { return captured; }
+
+        /** Runs a synchronous operation bound to this exact physical view. */
+        public <T> T withClient(java.util.function.Function<KnowledgeClient, T> action) {
+            if (released.get()) throw new IllegalStateException("Client lease already released");
+            return serving.withClient(captured, action);
+        }
+
+        @Override public void close() {
+            if (!released.compareAndSet(false, true)) return;
+            try {
+                serving.close();
+            } finally {
+                synchronized (clientLeaseMonitor) {
+                    clientHolders--;
+                    clientLeaseMonitor.notifyAll();
+                }
+            }
+        }
     }
 
     /**
      * The latest polled OS energy-intent (tempdoc 630), for the /api/status "Paused — saving energy"
-     * Queue-card state. Null-safe: returns {@link EnergyState#unknown()} before the spawner exists.
+     * Queue-card state. Never null: {@link EnergyState#unknown()} until the first poll, which is
+     * also what it answers before {@link #start()} has run (item A5 moved the poll off the spawner,
+     * so this no longer depends on a spawned process existing).
      */
     public EnergyState energyState() {
-        WorkerSpawner s = spawner;
-        return s != null ? s.energyState() : EnergyState.unknown();
+        return energyPoller.energyState();
+    }
+
+    /**
+     * The in-process GPU-scheduling gauge (item A5): {@code main_gpu_active} and
+     * {@code energy_reduced} as one holder with one composition rule.
+     * {@code InferenceWiring.wireGpuStatusBroadcast} writes the GPU half; {@link #energyPoller}
+     * writes the energy half. At item A6 the Engine root hands this same instance to the worker half
+     * and the memory-mapped bytes stop being a transport.
+     */
+    public io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling() {
+        return gpuScheduling;
     }
 
     /**
@@ -756,7 +661,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
     /**
      * The remedy sentence for a refused schema mismatch. Tempdoc 915, live validation: the Head used
      * to report this as "Worker process crashed (exit code 1)" with the real cause visible only in
-     * worker.log, because nothing wrote the fatal-reason marker on the refusal path.
+     * the (then separate) worker.log, because nothing wrote the fatal-reason marker on the refusal
+     * path. There is one process and one log (engine.log) since lane F stage A items A11/A16, but
+     * the remedy sentence is still what the user reads instead of a log.
      */
     private static final String INDEX_SCHEMA_MISMATCH_DETAIL =
             "The search index was built with a different index shape than this version writes, and"
@@ -782,7 +689,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * the reason slot stays a code.
      *
      * <p>{@code readAndClear} deletes the marker, so this observation is unrepeatable — see
-     * {@link io.justsearch.app.services.lifecycle.WorkerCapability#transition} for the latch that keeps
+     * {@link io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle} for the latch that keeps
      * a later generic transition from destroying it.
      */
     private WorkerDown workerDownCode(LifecycleReasonCode generic, String detail) {
@@ -813,15 +720,6 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     /**
-     * Tempdoc 915 R1: whether a verdict is one of the two fatal INDEX causes, which are the ones a
-     * respawn cannot change — the condition lives in the index directory, not in the process.
-     */
-    private static boolean isIndexFatal(LifecycleReasonCode code) {
-        return code == LifecycleReasonCode.WORKER_INDEX_CORRUPT
-                || code == LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH;
-    }
-
-    /**
      * The remedy sentence behind the latched fatal index verdict, or {@code null} if none stands.
      * Read by the Head so {@code knowledgeServerStartError} names the refusal instead of the spawn
      * symptom ("Worker process crashed (exit code 1) before writing port to signal file"), which is
@@ -841,27 +739,13 @@ public final class KnowledgeServerBootstrap implements Closeable {
     /**
      * Applies a {@link #workerDownCode} verdict to the capability as DEGRADED. Visible for tests.
      *
-     * <p>Review F1: this is the ONE funnel for every worker-down verdict this class produces
-     * ({@code start()}'s per-attempt catch, the health-budget branch, {@code startWithRetry}'s final
-     * catch, and {@code checkHealth}'s worker.lost), so the "do not overwrite supervision's terminal
-     * verdict" rule lives here rather than at four call sites that would drift.
-     * {@code worker.restart_exhausted} and the codes below are all {@code FAULT}, so
-     * {@link io.justsearch.app.services.lifecycle.ReasonRetention} lets the incoming one win — and
-     * losing it is not cosmetic: {@link BootRecoveryDecision}'s permanent veto reads this exact slot,
-     * so an overwrite silently converts "supervision gave up, stop for good" into "nobody knows, keep
-     * re-attempting".
-     *
-     * <p>The two fatal INDEX verdicts ({@link #isIndexFatal}) are the exception, and they are computed
-     * BEFORE the guard so the unrepeatable marker is still consumed: they explain WHY supervision
-     * exhausted itself and are strictly better information (their {@code STICKY} class says the same).
-     * Tempdoc 915 R1 widened this from corruption alone — the schema-mismatch refusal is the same kind
-     * of fact, and leaving it out meant a FAIL_CLOSED boot narrated {@code worker.spawn.failed}.
+     * <p>Every worker-down path uses this funnel. Fatal index evidence is consumed before
+     * narration suppression, so a recovery arc can later publish its actual terminal cause.
      */
     void transitionWorkerDown(LifecycleReasonCode generic, String detail) {
         WorkerDown down = workerDownCode(generic, detail);
         if (narrationSuppressed()) {
-            // Review F7: the suppression rule lives in the funnel too, for the same reason the
-            // supervision guard does — it was applied at three of the four worker-down sites and
+            // Review F7: suppression was applied at three of the four worker-down sites and
             // missed the health-budget branch, which is reachable mid-recovery (the attempt's worker
             // spawns and answers gRPC but never becomes healthy) and flapped the arc out of
             // RECOVERING. Any future site inherits the rule instead of having to remember it.
@@ -870,39 +754,48 @@ public final class KnowledgeServerBootstrap implements Closeable {
                 down.code().code());
             return;
         }
-        if (supervisionVerdictHeld() && !isIndexFatal(down.code())) {
-            log.warn(
-                "Not overwriting supervision's terminal {} with {}: the supervisor's verdict stands",
-                LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code(),
-                down.code().code());
-            return;
-        }
-        workerCapability.transition(
-            CapabilityHealth.DEGRADED, down.code().code(), down.detail());
+        indexComponent.transition(
+            ComponentState.FAILED, down.code().code(), down.detail());
     }
 
     public boolean checkHealth() {
-        if (client == null) {
-            return false;
+        initLock.lock();
+        try {
+            if (client == null) return false;
+            boolean healthy;
+            try {
+                healthy = client.isHealthy(ENGINE_CONTEXT);
+            } catch (RuntimeException failure) {
+                observePhysicalLoss("Health check failed: " + failure.getMessage());
+                throw failure;
+            }
+            if (healthy) {
+                physicalHealthy = true;
+                latchedIndexFatalVerdict = null;
+                completeHealthyInitialization();
+                synchronized (clientLeaseMonitor) {
+                    clientVerified = healthyInitializationComplete;
+                }
+            } else {
+                observePhysicalLoss("Health check failed");
+            }
+            return healthy;
+        } finally {
+            initLock.unlock();
         }
-        boolean healthy = client.isHealthy();
-        // Tempdoc 627: feed each poll into the spawner's hang detector. A sustained-unhealthy streak on
-        // a still-alive worker (the "liveness" signal) triggers a budgeted graceful restart — closing
-        // the Worker's observation→actuation loop. This is the only wiring the health monitor needs.
-        if (spawner != null) {
-            spawner.recordHealthResult(healthy);
+    }
+
+    private void observePhysicalLoss(String detail) {
+        synchronized (clientLeaseMonitor) {
+            clientVerified = false;
         }
-        CapabilityHealth current = workerCapability.health();
-        if (healthy && current != CapabilityHealth.READY) {
-            workerCapability.transition(CapabilityHealth.READY, null);
-            log.info("Knowledge Server recovered to READY state");
-        } else if (!healthy && current == CapabilityHealth.READY) {
-            // Tempdoc 837 §3.1: this branch is guarded on current == READY, so the worker WAS serving
-            // and stopped answering — worker.lost, never worker.spawn.failed.
-            transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
+        boolean wasHealthy = physicalHealthy;
+        physicalHealthy = false;
+        healthyInitializationComplete = false;
+        if (wasHealthy) {
+            transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, detail);
             log.warn("Knowledge Server health check failed");
         }
-        return healthy;
     }
 
     @Override
@@ -911,67 +804,120 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     /** Ordered close that reports whether Worker process termination required force. */
-    public WorkerSpawner.ShutdownOutcome closeForUpgrade() {
+    public ShutdownOutcome closeForUpgrade() {
+        initLock.lock();
+        try {
+            return closeLocked();
+        } finally {
+            initLock.unlock();
+        }
+    }
+
+    private ShutdownOutcome closeLocked() {
         log.info("Shutting down Knowledge Server integration...");
-        WorkerSpawner.ShutdownOutcome outcome = WorkerSpawner.ShutdownOutcome.GRACEFUL;
+        ShutdownOutcome outcome = ShutdownOutcome.GRACEFUL;
+
+        // Close capture admission under the same writer that orders settings and serving views.
+        // Waiting for actual holders happens after releasing that writer.
+        publicationLock.writeLock().lock();
+        try {
+            synchronized (clientLeaseMonitor) {
+                clientRetiring = true;
+                clientVerified = false;
+            }
+        } finally {
+            publicationLock.writeLock().unlock();
+        }
+        if (!awaitClientDrain()) {
+            log.warn("Knowledge Server client still has active request holders; retaining index owner");
+            return ShutdownOutcome.FAILED;
+        }
+
+        // Stop the energy poll before the signal bus goes: its transitional MMF write would
+        // otherwise race the unmap. The poller is restartable, and the last polled state survives,
+        // so a boot-recovery restart resumes without a UNKNOWN window.
+        try {
+            energyPoller.close();
+        } catch (Exception e) {
+            log.warn("Error stopping energy-state poller", e);
+        }
 
         if (client != null) {
             try {
                 client.close();
             } catch (Exception e) {
                 log.warn("Error closing client", e);
+                return ShutdownOutcome.FAILED;
             }
-            client = null;
-        }
-
-        if (spawner != null) {
+            publicationLock.writeLock().lock();
             try {
-                outcome = spawner.shutdownForUpgrade();
-            } catch (Exception e) {
-                log.warn("Error closing spawner", e);
-                outcome = WorkerSpawner.ShutdownOutcome.FAILED;
+                synchronized (clientLeaseMonitor) { client = null; }
+            } finally {
+                publicationLock.writeLock().unlock();
             }
-            spawner = null;
         }
 
-        // Signal bus is closed by spawner, but ensure cleanup
-        signalBus = null;
+        if (workerHost != null) {
+            // Lane F item A6: the index half is in this JVM, so "shutdown" is an ordered close, not
+            // a process termination — GRACEFUL is the only outcome that can be reported honestly.
+            try {
+                workerHost.close();
+            } catch (RuntimeException e) {
+                log.warn("Error closing in-process worker host", e);
+                outcome = ShutdownOutcome.FAILED;
+            }
+        }
 
-        // Release app lock last (after we have stopped all components that might touch the data dir).
-        if (appLock != null) {
+
+        // The in-process index still owns its data directory after a refused native or runtime
+        // close. Keep the exclusion lock and startup state so an ordered retry can finish it.
+        if (outcome == ShutdownOutcome.GRACEFUL && appLock != null) {
             try {
                 appLock.close();
+                appLock = null;
             } catch (Exception e) {
                 log.warn("Error releasing app lock", e);
+                outcome = ShutdownOutcome.FAILED;
             }
-            appLock = null;
         }
 
         try {
             // Suppressed between boot attempts AND across boot-recovery cycles (tempdoc 825): a retry
             // would immediately re-enter PENDING, and the OFFLINE flap in between is narration of a
             // state the Head was never actually in.
-            if (!narrationSuppressed()) {
-                workerCapability.transition(
-                    CapabilityHealth.OFFLINE,
+            if (outcome == ShutdownOutcome.GRACEFUL && !narrationSuppressed()) {
+                indexComponent.transition(
+                    ComponentState.ABSENT,
                     LifecycleReasonCode.WORKER_SHUT_DOWN.code(),
                     "Worker shut down");
             }
         } finally {
             // Must clear even if a capability listener throws: a stranded started=true would make
             // the next start() throw "already started" and replace the real cause in the log.
-            started.set(false);
-            // Tempdoc 825 (charter item 4 / #439 review finding E): the generation counter outlived
-            // the teardown it describes. A later start() on this same instance — which is now the
-            // NORMAL path, not a hypothetical, because boot recovery re-starts this instance — would
-            // take the generation>=1 "recovery" branch of completeReadyInitialization and skip
-            // tryIngestHelpFiles for the whole process lifetime. close() drops the client, the
-            // spawner and the signal bus; the generation describes that same connection, so it is
-            // reset with them. Re-running help ingest is free: it is marker-file idempotent.
-            initGeneration.set(0);
+            if (outcome == ShutdownOutcome.GRACEFUL) started.set(false);
+            physicalHealthy = false;
+            healthyInitializationComplete = false;
         }
         log.info("Knowledge Server integration shutdown complete");
         return outcome;
+    }
+
+    private boolean awaitClientDrain() {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        synchronized (clientLeaseMonitor) {
+            while (clientHolders != 0) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) return false;
+                try {
+                    java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(clientLeaseMonitor,
+                        remaining);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     /** Version stamp for built-in help files. Bump when help content changes. */
@@ -988,7 +934,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      */
     // Package-private for unit tests (KnowledgeServerBootstrapEvalModeTest).
     // Not intended as a stable API surface.
-    void tryIngestHelpFiles(RemoteKnowledgeClient client, KnowledgeServerConfig config) {
+    void tryIngestHelpFiles(KnowledgeClient client, KnowledgeServerConfig config) {
         try {
             // Skip help-file auto-ingest in eval mode so a "fresh" index truly starts empty.
             // The 5 bundled help docs would otherwise pollute baseline measurements
@@ -1033,7 +979,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             }
 
             // Ingest with collection tag
-            client.submitBatch(helpFiles, true, HELP_COLLECTION);
+            client.submitBatch(helpFiles, true, HELP_COLLECTION, ENGINE_CONTEXT);
             Files.writeString(marker, HELP_FILES_VERSION);
             log.info("Ingested {} built-in help files (collection={})", helpFiles.size(), HELP_COLLECTION);
 

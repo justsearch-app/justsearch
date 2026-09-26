@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.ner;
 
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
 
 /**
@@ -20,6 +21,13 @@ final class NerModelDiscovery {
     var shared =
         io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
             explicitPath, "ner", "ner/distilbert-multilingual-ner-hrl");
+    return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
+  }
+
+  static Result resolve(ResolvedConfig config, String explicitPath) {
+    var shared =
+        io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
+            config, explicitPath, "ner", "ner/distilbert-multilingual-ner-hrl");
     return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
   }
 }

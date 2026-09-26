@@ -3,11 +3,16 @@ package io.justsearch.reranker;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.reranker.RerankerConfig.ChunkRerankerConfig;
 import io.justsearch.reranker.RerankerConfig.RerankOrder;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class RerankerConfigTest {
 
@@ -125,6 +130,39 @@ class RerankerConfigTest {
     assertFalse(config.gpuEnabled());
     assertEquals(0, config.gpuDeviceId());
     assertEquals(RerankOrder.AUTO, config.order());
+  }
+
+  @Test
+  void chunkSnapshotDiscoveryDoesNotFollowReplacementGlobal(
+      @TempDir Path capturedModels, @TempDir Path replacementModels) throws IOException {
+    Path capturedModel = capturedModels.resolve("onnx").resolve("reranker");
+    Path replacementModel = replacementModels.resolve("onnx").resolve("reranker");
+    createCompleteModel(capturedModel);
+    createCompleteModel(replacementModel);
+    ResolvedConfig captured =
+        new ResolvedConfigBuilder()
+            .putDefault("justsearch.models.dir", capturedModels.toString())
+            .build();
+    ResolvedConfig replacement =
+        new ResolvedConfigBuilder()
+            .putDefault("justsearch.models.dir", replacementModels.toString())
+            .build();
+    ConfigStore previous = ConfigStore.globalOrNull();
+    ConfigStore installed = new ConfigStore(replacement);
+    ConfigStore.setGlobal(installed);
+    try {
+      ChunkRerankerConfig config = ChunkRerankerConfig.from(captured);
+
+      assertEquals(capturedModel, config.modelPath());
+      assertNotEquals(replacementModel, config.modelPath());
+      assertTrue(config.enabled());
+      var healthModel = WorkerModelDiscovery.discoverAll(captured).stream()
+          .filter(model -> model.modelName().equals("reranker")).findFirst().orElseThrow();
+      assertTrue(healthModel.found());
+      assertEquals(capturedModel.toString(), healthModel.path());
+    } finally {
+      ConfigStore.restoreGlobal(installed, previous);
+    }
   }
 
   @Test
@@ -437,6 +475,12 @@ class RerankerConfigTest {
       restoreProperty("justsearch.rerank.enabled", prevEnabled);
       TestResolvedConfigHelper.restoreGlobal(prevStore);
     }
+  }
+
+  private static void createCompleteModel(Path directory) throws IOException {
+    Files.createDirectories(directory);
+    Files.createFile(directory.resolve("model.onnx"));
+    Files.createFile(directory.resolve("tokenizer.json"));
   }
 
   private static void restoreProperty(String key, String previous) {

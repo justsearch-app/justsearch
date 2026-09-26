@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -54,11 +56,12 @@ final class McpAnswerLegibilityTest {
     DocumentService documents = mock(DocumentService.class);
     ArgumentCaptor<RetrieveContextParams> captor =
         ArgumentCaptor.forClass(RetrieveContextParams.class);
-    when(documents.retrieveContext(captor.capture()))
+    when(documents.retrieveContext(captor.capture(), any(EngineContext.class)))
         .thenReturn(CompletableFuture.completedFuture(canned));
     WorkerServices workers = new WorkerServices(null, documents, null, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
+    McpAnswerCaptureFixture.bind(facade, documents);
 
     McpToolSurface surface =
         new McpToolSurface(
@@ -67,7 +70,7 @@ final class McpAnswerLegibilityTest {
             () -> null,
             () -> facade,
             FIXED_CLOCK);
-    Map<String, Object> result = surface.callTool("justsearch_answer", args, "s1");
+    Map<String, Object> result = surface.callTool("justsearch_answer", args, "s1", TestRequestContexts.mcp("s1"));
     return new Invocation(result, captor.getValue());
   }
 

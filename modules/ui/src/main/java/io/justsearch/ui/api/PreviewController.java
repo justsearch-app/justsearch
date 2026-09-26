@@ -149,7 +149,7 @@ public final class PreviewController {
 
       DocumentService.DocumentIdPage page =
           documentService()
-              .listAllDocumentIds((int) offsetLong, (int) limitLong)
+              .listAllDocumentIds((int) offsetLong, (int) limitLong, RequestEngineContext.get(ctx))
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       if (page == null) {
@@ -252,7 +252,7 @@ public final class PreviewController {
     try {
       DocumentService.DocumentSlice slice =
           documentService()
-              .fetchSlice(docId, offsetChars, maxChars)
+              .fetchSlice(docId, offsetChars, maxChars, RequestEngineContext.get(ctx))
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
 

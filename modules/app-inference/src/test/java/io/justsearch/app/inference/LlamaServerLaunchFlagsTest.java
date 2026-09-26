@@ -2,6 +2,7 @@
 package io.justsearch.app.inference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -35,8 +36,51 @@ final class LlamaServerLaunchFlagsTest {
     return b.build();
   }
 
+  private static ResolvedConfig config(
+      int contextSetting, int slots, String kvType, boolean thinking, int reasoningBudget) {
+    ResolvedConfigBuilder b = ResolvedConfig.builder();
+    b.putDefault("justsearch.context.size", String.valueOf(contextSetting));
+    b.putDefault("justsearch.llm.slots", String.valueOf(slots));
+    b.putDefault("justsearch.llm.kv_type", kvType);
+    b.putDefault("justsearch.llm.use_thinking", String.valueOf(thinking));
+    b.putDefault("justsearch.llm.reasoning_budget", String.valueOf(reasoningBudget));
+    return b.build();
+  }
+
   private static InferenceConfig inference(boolean vduMode) {
     return new InferenceConfig(EXE, MODEL, null, 8082, 32768, 99, vduMode);
+  }
+
+  @Test
+  @DisplayName("declared identity covers every applied launch input while argv stays diagnostic")
+  void declaredConfigurationIdentity() {
+    InferenceConfig base = inference(false);
+    ResolvedConfig applied = config(0, 2, "q8_0", true, 512);
+    String hash = ManagedLlamaConfigIdentity.declaredHash(base, applied, 99);
+
+    assertEquals(hash, ManagedLlamaConfigIdentity.declaredHash(base, applied, 99));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
+        new InferenceConfig(Path.of("other.exe"), MODEL, null, 8082, 32768, 99, false), applied, 99));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
+        new InferenceConfig(EXE, Path.of("other.gguf"), null, 8082, 32768, 99, false), applied, 99));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
+        new InferenceConfig(EXE, MODEL, Path.of("vision.gguf"), 8082, 32768, 99, false), applied, 99));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
+        new InferenceConfig(EXE, MODEL, null, 8083, 32768, 99, false), applied, 99));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(base, applied, 0));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(inference(true), applied, 99));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
+        base, config(16384, 2, "q8_0", true, 512), 99));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
+        base, config(0, 1, "q8_0", true, 512), 99));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
+        base, config(0, 2, "q4_0", true, 512), 99));
+    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
+        base, config(0, 2, "q8_0", false, 0), 99));
+
+    assertNotEquals(
+        ManagedLlamaConfigIdentity.realizedArgvHash(List.of("llama", "-c", "32768")),
+        ManagedLlamaConfigIdentity.realizedArgvHash(List.of("llama", "-c", "16384")));
   }
 
   @Test

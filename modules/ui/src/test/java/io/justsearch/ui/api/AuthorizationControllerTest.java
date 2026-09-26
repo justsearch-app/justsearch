@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import io.javalin.http.Context;
 import io.justsearch.agent.api.registry.GateBehavior;
+import io.justsearch.agent.api.registry.ExecutorTag;
 import io.justsearch.agent.api.registry.OperationCatalog;
 import io.justsearch.agent.api.registry.OperationDispatcher;
 import io.justsearch.agent.api.registry.OperationResult;
@@ -15,12 +16,14 @@ import io.justsearch.app.services.intent.ConsentCapsuleService;
 import io.justsearch.app.services.intent.DurableGrantStore;
 import io.justsearch.app.services.intent.PendingAuthorizationStore;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
+import io.justsearch.core.context.EngineContext;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -53,14 +56,105 @@ class AuthorizationControllerTest {
     catalogs = List.of(new AgentToolsOperationCatalog());
   }
 
+  @Test
+  void approvedExecutionReportsLockedPreparationAsUnlockRequired() throws Exception {
+    var dispatcher = mock(OperationDispatcher.class);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any()))
+        .thenThrow(new io.justsearch.agent.api.encryption.KeyLockedException());
+    String id = createPending("core.ingest-files");
+    var controller = new AuthorizationController(capsuleService, pendingStore, null, dispatcher, catalogs);
+    var ctx = mockContextWithBody("{\"pendingId\":\"" + id + "\",\"execute\":true}");
+    controller.handleApprove(ctx);
+    var response = capturedJson(ctx);
+    assertEquals(false, response.get("executed")); assertEquals(false, response.get("executeSuccess"));
+    assertEquals("STORE_LOCKED", response.get("executeErrorCode"));
+    assertEquals("STORE_LOCKED", response.get("executeErrorClass"));
+    assertEquals(false, response.get("executeRetryable"));
+  }
+
+  @Test
+  void preparedApprovalBindsServerNonceAndNeverAuthorizesPublicArgumentsAlone() throws Exception {
+    var context = TestRequestContexts.mcp("prepared-approval");
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK);
+    var nonce = java.util.UUID.randomUUID();
+    String args = "{\"paths\":[\"C:/tmp\"]}";
+    String id = pendingStore.create("core.ingest-paths", args, SourceTier.UNTRUSTED, RiskTier.MEDIUM,
+        GateBehavior.TYPED_CONFIRM, "approve", null, io.justsearch.agent.api.registry.TransportTag.MCP,
+        context, TestRequestContexts.provenance(context, ExecutorTag.AGENT), key, false, nonce);
+    var controller = new AuthorizationController(capsuleService, pendingStore);
+    var ctx = mockContextWithBody("{\"pendingId\":\"" + id + "\"}");
+    controller.handleApprove(ctx);
+    var response = capturedJson(ctx);
+    String token = (String) response.get("capsule");
+    assertFalse(capsuleService.verifyAndConsume(token, "core.ingest-paths", args),
+        "An approval for a frozen target cannot authorize an arbitrary preparation of the public input");
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args, key, java.util.UUID.randomUUID()));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args,
+        io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK), nonce));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", "{}", key, nonce));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args, key, null));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args, "invalid", nonce));
+    assertTrue(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths",
+        " { \"paths\" : [ \"C:/tmp\" ] } ", key, nonce));
+    assertFalse(capsuleService.verifyPreparedAndConsume(token, "core.ingest-paths", args, key, nonce));
+    assertEquals(key, response.get("operationKey"));
+    assertEquals(nonce.toString(), response.get("preparationNonce"));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void unsupportedPreparedDispatcherCannotDiscardNonce(boolean undo) {
+    var dispatcher = mock(OperationDispatcher.class, CALLS_REAL_METHODS);
+    var context = TestRequestContexts.mcp("unsupported-prepared");
+    var provenance = TestRequestContexts.provenance(context, ExecutorTag.AGENT);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK);
+    var nonce = java.util.UUID.randomUUID();
+    if (undo) {
+      assertThrows(UnsupportedOperationException.class,
+          () -> dispatcher.undo(null, "exec", provenance, Optional.empty(), context, key, nonce));
+      verify(dispatcher, never()).undo(any(), any(), any(), any(), any(), any());
+    } else {
+      assertThrows(UnsupportedOperationException.class,
+          () -> dispatcher.dispatch(null, "{}", provenance, Optional.empty(), context, key, nonce));
+      verify(dispatcher, never()).dispatch(any(), any(), any(), any(), any(), any());
+    }
+  }
+
+  @Test
+  void publicCapsuleCannotImpersonatePreparedBindingJson() {
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK);
+    var nonce = java.util.UUID.randomUUID();
+    String shapedPublicInput = MAPPER.writeValueAsString(Map.of("operationKey", key, "preparationNonce", nonce.toString(),
+        "publicDigest", io.justsearch.app.api.operations.CanonicalOperationArguments.digest("{}")));
+    String ordinary = capsuleService.mint("core.ingest-files", shapedPublicInput);
+    assertFalse(capsuleService.verifyPreparedAndConsume(ordinary, "core.ingest-files", "{}", key, nonce),
+        "Caller JSON matching the binding representation must remain ordinary consent");
+    assertTrue(capsuleService.verifyAndConsume(ordinary, "core.ingest-files", shapedPublicInput));
+  }
+
+  @Test
+  void unsupportedCapsuleAuthorityRefusesPreparedConsent() {
+    var authority = mock(io.justsearch.agent.api.registry.ConsentCapsuleAuthority.class, CALLS_REAL_METHODS);
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(FIXED_CLOCK);
+    var nonce = java.util.UUID.randomUUID();
+    assertThrows(UnsupportedOperationException.class,
+        () -> authority.mintPrepared("core.ingest-files", "{}", SourceTier.UNTRUSTED, key, nonce));
+    assertFalse(authority.verifyPreparedAndConsume("token", "core.ingest-files", "{}", key, nonce));
+    verify(authority, never()).mint(any(), any(), any());
+    verify(authority, never()).verifyAndConsume(any(), any(), any());
+  }
+
   private String createPending(String operationId) {
+    var context = TestRequestContexts.mcp("approval-test");
     return pendingStore.create(
         operationId,
         "{\"paths\":[\"C:/tmp\"]}",
         SourceTier.UNTRUSTED,
         RiskTier.MEDIUM,
         GateBehavior.TYPED_CONFIRM,
-        "Confirmation required for operation " + operationId);
+        "Confirmation required for operation " + operationId,
+        context,
+        TestRequestContexts.provenance(context, ExecutorTag.AGENT));
   }
 
   private Context mockContextWithBody(String body) {
@@ -68,6 +162,16 @@ class AuthorizationControllerTest {
     when(ctx.body()).thenReturn(body);
     when(ctx.contentType(anyString())).thenReturn(ctx);
     when(ctx.status(anyInt())).thenReturn(ctx);
+    Map<String, Object> attributes = new java.util.HashMap<>();
+    when(ctx.attribute(anyString()))
+        .thenAnswer(invocation -> attributes.get(invocation.getArgument(0)));
+    doAnswer(
+            invocation -> {
+              attributes.put(invocation.getArgument(0), invocation.getArgument(1));
+              return null;
+            })
+        .when(ctx)
+        .attribute(anyString(), any());
     return ctx;
   }
 
@@ -77,6 +181,13 @@ class AuthorizationControllerTest {
     verify(ctx, atLeastOnce()).result(captor.capture());
     byte[] last = captor.getAllValues().get(captor.getAllValues().size() - 1);
     return MAPPER.readValue(last, Map.class);
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> capturedJsonObject(Context ctx) {
+    ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+    verify(ctx, atLeastOnce()).json(captor.capture());
+    return captor.getAllValues().get(captor.getAllValues().size() - 1);
   }
 
   /**
@@ -96,7 +207,7 @@ class AuthorizationControllerTest {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, null, dispatcher, catalogs, FIXED_CLOCK);
+            capsuleService, pendingStore, null, dispatcher, catalogs);
     String pendingId = createPending("core.ingest-files");
 
     Context ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\"}");
@@ -109,16 +220,73 @@ class AuthorizationControllerTest {
   }
 
   @Test
+  void approvedDispatchRetainsTypedKeyFailureWithoutItsPrivateCause() throws Exception {
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1);
+    var dispatcher = mock(OperationDispatcher.class);
+    when(dispatcher.dispatch(any(), any(), any(), any(), any()))
+        .thenThrow(new io.justsearch.app.api.operations.OperationStoreException(
+            io.justsearch.app.api.operations.OperationStoreException.Code.OPERATION_KEY_REUSED,
+            new IllegalStateException("private prepared content")));
+    var controller = new AuthorizationController(capsuleService, pendingStore, null, dispatcher, catalogs, admission);
+    String pendingId = createPending("core.ingest-files");
+    var ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+    when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
+    controller.handleApprove(ctx);
+    var body = capturedJson(ctx);
+    assertEquals(Boolean.FALSE, body.get("executeSuccess"));
+    assertEquals("OPERATION_KEY_REUSED", body.get("executeErrorCode"));
+    assertEquals("CONFLICT", body.get("executeErrorClass"));
+    assertFalse(body.toString().contains("private prepared content"));
+  }
+
+  @Test
   void approve_withExecuteTrue_dispatchesUsingStoredArgsAndReportsSuccess() throws Exception {
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1);
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
-    when(dispatcher.dispatch(any(), any(), any(), any()))
+    when(dispatcher.dispatch(any(), any(), any(), any(), any()))
         .thenReturn(OperationResult.success("Indexed 1 item", Map.of()));
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, null, dispatcher, catalogs, FIXED_CLOCK);
-    String pendingId = createPending("core.ingest-files");
+            capsuleService, pendingStore, null, dispatcher, catalogs, admission);
+    // The pending was created by an MCP caller; the approving request is a separate browser
+    // gesture. Both the origin context and its exact invocation provenance must survive that
+    // handoff, so approval cannot silently upgrade the dispatch to the browser's trusted context.
+    EngineContext pendingContext =
+        new EngineContext(
+            EngineContext.ClientKind.MCP_CLIENT,
+            "mcp-client-7",
+            Optional.of("session-7"),
+            Optional.of("grant-7"),
+            "UNTRUSTED",
+            "MCP",
+            EngineContext.Survival.DURABLE,
+            EngineContext.Urgency.BACKGROUND);
+    try (var original = admission.admit(pendingContext, false)) {
+      pendingContext = original.context();
+    }
+    Instant pendingOccurredAt = Instant.parse("2026-07-02T11:59:30Z");
+    var pendingProvenance =
+        io.justsearch.agent.api.registry.InvocationProvenance.fromEngineContext(
+            pendingContext,
+            ExecutorTag.AGENT,
+            pendingOccurredAt,
+            Optional.of("signed-intent-7"));
+    String pendingId =
+        pendingStore.create(
+            "core.ingest-files",
+            "{\"paths\":[\"C:/tmp\"]}",
+            SourceTier.UNTRUSTED,
+            RiskTier.MEDIUM,
+            GateBehavior.TYPED_CONFIRM,
+            "Confirmation required for operation core.ingest-files",
+            "MCP client",
+            io.justsearch.agent.api.registry.TransportTag.MCP,
+            pendingContext,
+            pendingProvenance);
 
     Context ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+    EngineContext approvingContext = TestRequestContexts.browser();
+    when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(approvingContext);
     controller.handleApprove(ctx);
 
     Map<String, Object> body = capturedJson(ctx);
@@ -129,8 +297,86 @@ class AuthorizationControllerTest {
 
     // Dispatched with the PENDING's own stored args, not anything the caller supplied.
     ArgumentCaptor<String> argsCaptor = ArgumentCaptor.forClass(String.class);
-    verify(dispatcher).dispatch(any(), argsCaptor.capture(), any(), any());
+    ArgumentCaptor<io.justsearch.agent.api.registry.InvocationProvenance> provenanceCaptor =
+        ArgumentCaptor.forClass(io.justsearch.agent.api.registry.InvocationProvenance.class);
+    ArgumentCaptor<EngineContext> contextCaptor = ArgumentCaptor.forClass(EngineContext.class);
+    verify(dispatcher)
+        .dispatch(
+            any(),
+            argsCaptor.capture(),
+            provenanceCaptor.capture(),
+            any(),
+            contextCaptor.capture());
     assertEquals("{\"paths\":[\"C:/tmp\"]}", argsCaptor.getValue());
+
+    EngineContext dispatchedContext = contextCaptor.getValue();
+    assertNotEquals(approvingContext, dispatchedContext);
+    assertTrue(dispatchedContext.workId().isPresent());
+    assertNotEquals(pendingContext.workId(), dispatchedContext.workId());
+    assertEquals(pendingContext.withWorkId(dispatchedContext.workId().orElseThrow()), dispatchedContext);
+    assertThrows(io.justsearch.app.api.EngineAdmissionException.class, () -> admission.attach(dispatchedContext),
+        "the approval dispatch must release its child after completion");
+    assertEquals(EngineContext.ClientKind.MCP_CLIENT, dispatchedContext.clientKind());
+    assertEquals("mcp-client-7", dispatchedContext.clientId());
+    assertEquals(Optional.of("session-7"), dispatchedContext.sessionId());
+    assertEquals(Optional.of("grant-7"), dispatchedContext.grantReference());
+    assertEquals("UNTRUSTED", dispatchedContext.sourceTier());
+    assertEquals("MCP", dispatchedContext.transport());
+    assertEquals(EngineContext.Survival.DURABLE, dispatchedContext.survival());
+    assertEquals(EngineContext.Urgency.BACKGROUND, dispatchedContext.urgency());
+
+    var dispatchedProvenance = provenanceCaptor.getValue();
+    assertEquals(pendingProvenance, dispatchedProvenance);
+    assertEquals(io.justsearch.agent.api.registry.TransportTag.MCP, dispatchedProvenance.transport());
+    assertEquals(ExecutorTag.AGENT, dispatchedProvenance.executor());
+    assertEquals(Optional.of("mcp-client-7"), dispatchedProvenance.initiator());
+    assertEquals(pendingOccurredAt, dispatchedProvenance.occurredAt());
+    assertEquals(Optional.of("signed-intent-7"), dispatchedProvenance.signedIntentToken());
+    assertEquals(Optional.of("session-7"), dispatchedProvenance.correlationId());
+  }
+
+  @Test
+  void childAdmissionRefusalLeavesTheSingleUsePendingAvailableForRetry() {
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(1, 1, 1);
+    var dispatcher = mock(OperationDispatcher.class);
+    var controller = new AuthorizationController(capsuleService, pendingStore, null, dispatcher, catalogs, admission);
+    String pendingId = createPending("core.ingest-files");
+    try (var _ = admission.admit(TestRequestContexts.browser(), false)) {
+      var ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+      controller.handleApprove(ctx);
+      verify(ctx).status(429);
+      verify(ctx).header("Retry-After", "1");
+      assertEquals(Boolean.TRUE, capturedJsonObject(ctx).get("retrySafe"));
+      assertTrue(pendingStore.peek(pendingId).isPresent());
+      verifyNoInteractions(dispatcher);
+    }
+  }
+
+  @Test
+  void approve_lateAdmissionFailureAfterConsume_isUnsafeAndPendingIsConsumed() {
+    ConsentCapsuleService failingCapsuleService = mock(ConsentCapsuleService.class);
+    when(failingCapsuleService.mint(anyString(), anyString(), any(SourceTier.class)))
+        .thenThrow(
+            new io.justsearch.app.api.EngineAdmissionException(
+                io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 1));
+    OperationDispatcher dispatcher = mock(OperationDispatcher.class);
+    var admission = new io.justsearch.app.engine.EngineAdmissionController(2, 2, 1);
+    var controller =
+        new AuthorizationController(
+            failingCapsuleService, pendingStore, null, dispatcher, catalogs, admission);
+    String pendingId = createPending("core.ingest-files");
+
+    Context ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
+    controller.handleApprove(ctx);
+
+    verify(ctx).status(429);
+    Map<String, Object> refusal = capturedJsonObject(ctx);
+    assertEquals(Boolean.FALSE, refusal.get("retrySafe"));
+    assertTrue(
+        pendingStore.peek(pendingId).isEmpty(),
+        "late failure must not restore the consumed pending");
+    verify(failingCapsuleService).mint(anyString(), anyString(), any(SourceTier.class));
+    verifyNoInteractions(dispatcher);
   }
 
   @Test
@@ -153,7 +399,7 @@ class AuthorizationControllerTest {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, null, dispatcher, catalogs, FIXED_CLOCK);
+            capsuleService, pendingStore, null, dispatcher, catalogs);
     String pendingId = createPending("core.does-not-exist");
 
     Context ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
@@ -169,11 +415,11 @@ class AuthorizationControllerTest {
   @Test
   void approve_withExecuteTrue_dispatchThrows_reportsFailureButApprovalStands() throws Exception {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
-    when(dispatcher.dispatch(any(), any(), any(), any()))
+    when(dispatcher.dispatch(any(), any(), any(), any(), any()))
         .thenThrow(new RuntimeException("disk full"));
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, null, dispatcher, catalogs, FIXED_CLOCK);
+            capsuleService, pendingStore, null, dispatcher, catalogs);
     String pendingId = createPending("core.ingest-files");
 
     Context ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\",\"execute\":true}");
@@ -201,7 +447,7 @@ class AuthorizationControllerTest {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     var controller =
         new AuthorizationController(
-            mockCapsuleService, pendingStore, durableGrantStore, dispatcher, catalogs, FIXED_CLOCK);
+            mockCapsuleService, pendingStore, durableGrantStore, dispatcher, catalogs);
 
     Context ctx = mockContextWithBody("{\"pendingId\":\"pa-does-not-exist\"}");
     controller.handleApprove(ctx);
@@ -230,7 +476,10 @@ class AuthorizationControllerTest {
             SourceTier.UNTRUSTED,
             RiskTier.MEDIUM,
             GateBehavior.TYPED_CONFIRM,
-            "Confirmation required for operation core.ingest-files");
+            "Confirmation required for operation core.ingest-files",
+            TestRequestContexts.mcp("approval-expiry"),
+            TestRequestContexts.provenance(
+                TestRequestContexts.mcp("approval-expiry"), ExecutorTag.AGENT));
     // Advance the SAME clock instance the store consults past its 5-minute TTL — this is the
     // real expiry path (PendingAuthorizationStore#consume's isExpired check), not a stand-in
     // for "unknown id".
@@ -241,7 +490,7 @@ class AuthorizationControllerTest {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     var controller =
         new AuthorizationController(
-            mockCapsuleService, expiringStore, durableGrantStore, dispatcher, catalogs, mutableClock);
+            mockCapsuleService, expiringStore, durableGrantStore, dispatcher, catalogs);
 
     Context ctx = mockContextWithBody("{\"pendingId\":\"" + pendingId + "\"}");
     controller.handleApprove(ctx);
@@ -351,7 +600,10 @@ class AuthorizationControllerTest {
             RiskTier.MEDIUM,
             GateBehavior.TYPED_CONFIRM,
             "Confirmation required",
-            "Claude Code");
+            "Claude Code",
+            io.justsearch.agent.api.registry.TransportTag.MCP,
+            TestRequestContexts.mcp("claude-code"),
+            TestRequestContexts.provenance(TestRequestContexts.mcp("claude-code"), ExecutorTag.AGENT));
 
     Context ctx = mock(Context.class);
     when(ctx.pathParam("id")).thenReturn(pendingId);
@@ -387,7 +639,7 @@ class AuthorizationControllerTest {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, store, dispatcher, catalogs, FIXED_CLOCK);
+            capsuleService, pendingStore, store, dispatcher, catalogs);
 
     Context ctx =
         mockContextWithBody(
@@ -404,7 +656,7 @@ class AuthorizationControllerTest {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, store, dispatcher, catalogs, FIXED_CLOCK);
+            capsuleService, pendingStore, store, dispatcher, catalogs);
 
     Context ctx =
         mockContextWithBody(
@@ -425,7 +677,7 @@ class AuthorizationControllerTest {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, store, dispatcher, catalogs, FIXED_CLOCK);
+            capsuleService, pendingStore, store, dispatcher, catalogs);
 
     Context ctx =
         mockContextWithBody(
@@ -444,7 +696,7 @@ class AuthorizationControllerTest {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, store, dispatcher, catalogs, FIXED_CLOCK);
+            capsuleService, pendingStore, store, dispatcher, catalogs);
     String pendingId = createPending("core.file-operations");
 
     Context ctx =
@@ -462,7 +714,7 @@ class AuthorizationControllerTest {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     var controller =
         new AuthorizationController(
-            capsuleService, pendingStore, store, dispatcher, catalogs, FIXED_CLOCK);
+            capsuleService, pendingStore, store, dispatcher, catalogs);
     String pendingId = createPending("core.ingest-files");
 
     Context ctx =

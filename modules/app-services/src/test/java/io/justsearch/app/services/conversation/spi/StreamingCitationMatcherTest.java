@@ -18,11 +18,15 @@ import io.justsearch.app.api.DocumentService.ContextInclusion;
 import io.justsearch.app.api.DocumentService.DocumentRecord;
 import io.justsearch.app.api.DocumentService.ScorerKind;
 import io.justsearch.app.api.DocumentService.TextSource;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -274,7 +278,7 @@ final class StreamingCitationMatcherTest {
     @Test
     @DisplayName("a 59-ordinal chunk in a 5-source turn emits a position < 5 (the gap-report defect)")
     void misNumberingFixture() {
-      var citations = new java.util.ArrayList<ContextCitation>();
+      var citations = new ArrayList<ContextCitation>();
       for (int i = 0; i < 5; i++) {
         citations.add(citation("doc-" + i, 55 + i, "JustSearch indexes your files locally"));
       }
@@ -305,6 +309,11 @@ final class StreamingCitationMatcherTest {
 
   private static ConversationContext stubCtx(Map<String, Object> attrs) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> a = new HashMap<>(attrs);
 
       @Override
@@ -381,10 +390,51 @@ final class StreamingCitationMatcherTest {
     assertNotEquals(0.01, seen[0], 1e-9, "the old local floor must not come back");
   }
 
+  @Test
+  @DisplayName("D1: one matcher observes same-store cutoff swaps once per eligible answer")
+  void liveThresholdReadsCurrentSnapshotOncePerEligibleAnswer() {
+    ConfigStore store =
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(
+                Map.of("justsearch.citation.match_threshold", "0.61")));
+    AtomicInteger reads = new AtomicInteger();
+    List<Double> seen = new ArrayList<>();
+    var matcher =
+        new StreamingCitationMatcher(
+            thresholdCapturingDocs(seen),
+            () -> {
+              reads.incrementAndGet();
+              return store.get().rag().citationMatchThreshold();
+            });
+    var ctx = ctxWithCitations(List.of(citation("doc-1", 0, "supported text")));
+
+    matcher.onDone("First supported sentence.", ctx);
+    store.update(
+        TestResolvedConfigHelper.fromEntries(
+            Map.of("justsearch.citation.match_threshold", "0.79")));
+    matcher.onDone("Second supported sentence.", ctx);
+
+    assertEquals(List.of(0.61, 0.79), seen);
+    assertEquals(2, reads.get());
+  }
+
+  @Test
+  @DisplayName("D1: ineligible citation completion does not read the cutoff supplier")
+  void ineligibleCompletionDoesNotReadThreshold() {
+    AtomicInteger reads = new AtomicInteger();
+    var matcher =
+        new StreamingCitationMatcher(stubDocs(null), () -> reads.incrementAndGet() / 10.0);
+
+    matcher.onDone("", ctxWithCitations(List.of(citation("doc-1", 0, "supported text"))));
+    matcher.onDone("No sources", stubCtx(Map.of()));
+
+    assertEquals(0, reads.get());
+  }
+
   private static DocumentService thresholdCapturingDocs(double[] sink) {
     return new DocumentService() {
       @Override
-      public CompletionStage<DocumentRecord> fetch(String docId) {
+      public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
         return CompletableFuture.completedFuture(null);
       }
 
@@ -392,9 +442,32 @@ final class StreamingCitationMatcherTest {
       public CompletionStage<CitationMatchResult> matchCitationsAgainst(
           String answerText,
           List<DocumentService.VerificationSource> sources,
-          double threshold) {
+          double threshold,
+          io.justsearch.core.context.EngineContext engineContext) {
         sink[0] = threshold;
         return CompletableFuture.completedFuture(null);
+      }
+    };
+  }
+
+  private static DocumentService thresholdCapturingDocs(List<Double> sink) {
+    return new DocumentService() {
+      @Override
+      public CompletionStage<DocumentRecord> fetch(
+          String docId, io.justsearch.core.context.EngineContext engineContext) {
+        return CompletableFuture.completedFuture(null);
+      }
+
+      @Override
+      public CompletionStage<CitationMatchResult> matchCitationsAgainst(
+          String answerText,
+          List<DocumentService.VerificationSource> sources,
+          double threshold,
+          io.justsearch.core.context.EngineContext engineContext) {
+        sink.add(threshold);
+        return CompletableFuture.completedFuture(
+            new CitationMatchResult(
+                List.of(), 0, 0, 0L, 0, ScorerKind.CROSS_ENCODER, List.of()));
       }
     };
   }
@@ -402,7 +475,7 @@ final class StreamingCitationMatcherTest {
   private static DocumentService stubDocs(CitationMatchResult result) {
     return new DocumentService() {
       @Override
-      public CompletionStage<DocumentRecord> fetch(String docId) {
+      public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
         return CompletableFuture.completedFuture(null);
       }
 
@@ -410,7 +483,8 @@ final class StreamingCitationMatcherTest {
       public CompletionStage<CitationMatchResult> matchCitationsAgainst(
           String answerText,
           List<DocumentService.VerificationSource> sources,
-          double threshold) {
+          double threshold,
+          io.justsearch.core.context.EngineContext engineContext) {
         return CompletableFuture.completedFuture(result);
       }
     };
@@ -419,7 +493,7 @@ final class StreamingCitationMatcherTest {
   private static DocumentService failingDocs() {
     return new DocumentService() {
       @Override
-      public CompletionStage<DocumentRecord> fetch(String docId) {
+      public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
         return CompletableFuture.failedFuture(new RuntimeException("down"));
       }
 
@@ -427,7 +501,8 @@ final class StreamingCitationMatcherTest {
       public CompletionStage<CitationMatchResult> matchCitationsAgainst(
           String answerText,
           List<DocumentService.VerificationSource> sources,
-          double threshold) {
+          double threshold,
+          io.justsearch.core.context.EngineContext engineContext) {
         return CompletableFuture.failedFuture(new RuntimeException("down"));
       }
     };

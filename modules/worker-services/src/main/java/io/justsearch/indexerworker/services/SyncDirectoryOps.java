@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.services;
 
 import static io.justsearch.indexerworker.services.IngestResponses.*;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.PruneOps;
@@ -29,7 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Sync-directory orchestration helper for {@link GrpcIngestService}.
+ * Sync-directory orchestration helper for {@link WorkerIngestService}.
  *
  * <p>Contains the prune-walk-commit pipeline: root validation, orphan pruning,
  * indexed-path scanning, disk walk with enqueue, and terminal-state handling.
@@ -97,13 +96,19 @@ final class SyncDirectoryOps {
 
   /**
    * Executes the full sync-directory pipeline: validate root, prune orphans, walk disk,
-   * enqueue missing files, commit, and respond.
+   * enqueue missing files, commit, and return the terminal response.
+   *
+   * <p>Lane F stage A item A3: every outcome here — including an invalid root, a prune abort, a
+   * skipped delete-detection scan and an interrupted walk — is carried in the response, never as a
+   * transport status. So the conversion is a pure return-instead-of-onNext and this class throws
+   * no {@link WorkerServiceException}. The phase helpers below return the terminal response, or
+   * {@code null} for "no terminal state, continue".
    */
-  void execute(
-      String rootPath, boolean force, StreamObserver<SyncDirectoryResponse> responseObserver) {
-    Path root = resolveSyncRootOrReplyInvalid(rootPath, responseObserver);
+  SyncDirectoryResponse execute(
+      String rootPath, boolean force, JobQueue.EnqueueProvenance provenance) {
+    Path root = resolveSyncRoot(rootPath);
     if (root == null) {
-      return;
+      return syncDirectoryErrorResponse("Root path does not exist or is not a directory");
     }
 
     int filesAdded = 0;
@@ -113,8 +118,9 @@ final class SyncDirectoryOps {
       // STEP 1: Prune orphans (reuse existing logic with throttle + abort)
       int pruneResult = pruneOrphansForSync(rootPath, force);
 
-      if (handleSyncPruneAbortIfNeeded(pruneResult, force, responseObserver)) {
-        return;
+      SyncDirectoryResponse pruneAbort = handleSyncPruneAbortIfNeeded(pruneResult, force);
+      if (pruneAbort != null) {
+        return pruneAbort;
       }
       filesDeleted = Math.max(0, pruneResult);
 
@@ -122,20 +128,24 @@ final class SyncDirectoryOps {
       // set (can be large). We enqueue all disk files and rely on IndexingLoop's "unchanged"
       // fast-path.
       Set<String> indexedPaths = indexedPathsForSync(rootPath, force);
-      if (handleSyncIndexedPathsScanSkipIfNeeded(
-          rootPath, force, indexedPaths, filesDeleted, responseObserver)) {
-        return;
+      SyncDirectoryResponse scanSkip =
+          handleSyncIndexedPathsScanSkipIfNeeded(rootPath, force, indexedPaths, filesDeleted);
+      if (scanSkip != null) {
+        return scanSkip;
       }
       if (!force) {
         log.debug("syncDirectory: found {} indexed paths under {}", indexedPaths.size(), rootPath);
       }
 
       // STEP 3: Walk disk and find missing files
-      SyncWalkPhaseResult walk = walkAndEnqueueMissingFiles(root, force, indexedPaths);
+      SyncWalkPhaseResult walk =
+          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance);
       filesAdded = walk.filesAdded();
 
-      if (handleSyncWalkTerminalState(walk, filesDeleted, filesAdded, responseObserver)) {
-        return;
+      SyncDirectoryResponse walkTerminal =
+          handleSyncWalkTerminalState(walk, filesDeleted, filesAdded);
+      if (walkTerminal != null) {
+        return walkTerminal;
       }
 
       // Commit after deletions
@@ -148,38 +158,28 @@ final class SyncDirectoryOps {
           rootPath,
           filesDeleted,
           filesAdded);
-      responseObserver.onNext(syncDirectoryResultResponse(filesDeleted, filesAdded));
-      responseObserver.onCompleted();
+      return syncDirectoryResultResponse(filesDeleted, filesAdded);
 
     } catch (Exception e) {
       log.error("syncDirectory failed for {}", rootPath, e);
-      responseObserver.onNext(
-          syncDirectoryErrorResponse(filesDeleted, filesAdded, e.getMessage()));
-      responseObserver.onCompleted();
+      return syncDirectoryErrorResponse(filesDeleted, filesAdded, e.getMessage());
     }
   }
 
   // ==================== Phase helpers ====================
 
-  private boolean handleSyncPruneAbortIfNeeded(
-      int pruneResult, boolean force, StreamObserver<SyncDirectoryResponse> responseObserver) {
+  private SyncDirectoryResponse handleSyncPruneAbortIfNeeded(int pruneResult, boolean force) {
     if (pruneResult < 0 && !force) {
       log.info("syncDirectory aborted during prune phase (user activity)");
-      responseObserver.onNext(syncDirectorySkippedResponse());
-      responseObserver.onCompleted();
-      return true;
+      return syncDirectorySkippedResponse();
     }
-    return false;
+    return null;
   }
 
-  private boolean handleSyncIndexedPathsScanSkipIfNeeded(
-      String rootPath,
-      boolean force,
-      Set<String> indexedPaths,
-      int filesDeleted,
-      StreamObserver<SyncDirectoryResponse> responseObserver) {
+  private SyncDirectoryResponse handleSyncIndexedPathsScanSkipIfNeeded(
+      String rootPath, boolean force, Set<String> indexedPaths, int filesDeleted) {
     if (force || indexedPaths != null) {
-      return false;
+      return null;
     }
     log.warn(
         "syncDirectory: skipping missing-file detection for {} "
@@ -187,33 +187,23 @@ final class SyncDirectoryOps {
         rootPath,
         filesDeleted);
     // Tempdoc 626 §Axis-B/C — surface the skip instead of returning a silent skipped/healthy result.
-    responseObserver.onNext(syncDirectoryDeleteUnverifiedResponse(filesDeleted, 0));
-    responseObserver.onCompleted();
-    return true;
+    return syncDirectoryDeleteUnverifiedResponse(filesDeleted, 0);
   }
 
-  private boolean handleSyncWalkTerminalState(
-      SyncWalkPhaseResult walk,
-      int filesDeleted,
-      int filesAdded,
-      StreamObserver<SyncDirectoryResponse> responseObserver) {
+  private SyncDirectoryResponse handleSyncWalkTerminalState(
+      SyncWalkPhaseResult walk, int filesDeleted, int filesAdded) {
     if (walk.walkInterrupted()) {
       Thread.currentThread().interrupt();
-      responseObserver.onNext(syncDirectoryErrorResponse(filesDeleted, filesAdded, "Interrupted"));
-      responseObserver.onCompleted();
-      return true;
+      return syncDirectoryErrorResponse(filesDeleted, filesAdded, "Interrupted");
     }
-    return false;
+    return null;
   }
 
-  private Path resolveSyncRootOrReplyInvalid(
-      String rootPath, StreamObserver<SyncDirectoryResponse> responseObserver) {
+  /** The validated sync root, or {@code null} when it does not exist or is not a directory. */
+  private Path resolveSyncRoot(String rootPath) {
     Path root = Path.of(rootPath);
     if (!Files.exists(root) || !Files.isDirectory(root)) {
       log.warn("syncDirectory: root does not exist or is not a directory: {}", rootPath);
-      responseObserver.onNext(
-          syncDirectoryErrorResponse("Root path does not exist or is not a directory"));
-      responseObserver.onCompleted();
       return null;
     }
     return root;
@@ -260,7 +250,8 @@ final class SyncDirectoryOps {
 
   @SuppressWarnings("PMD.CognitiveComplexity")
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
-      Path root, boolean force, Set<String> indexedPaths) throws IOException {
+      Path root, boolean force, Set<String> indexedPaths,
+      JobQueue.EnqueueProvenance provenance) throws IOException {
     // 391/E-J-N12: collect the full list first, sort by absolute path, then
     // enqueue in deterministic batches. Filesystem-order enumeration varies
     // across runs of the same unchanged corpus (NTFS MFT state, OS cache),
@@ -302,7 +293,7 @@ final class SyncDirectoryOps {
             if (!Files.isReadable(file)) return FileVisitResult.CONTINUE;
             if (IngestionSkipPolicy.shouldSkip(file)) return FileVisitResult.CONTINUE;
             if (isCloudPlaceholder(file)) {
-              recordCloudPlaceholderObservation(file);
+              recordCloudPlaceholderObservation(file, provenance);
               return FileVisitResult.CONTINUE;
             }
 
@@ -334,7 +325,7 @@ final class SyncDirectoryOps {
             if (force
                 || (indexedPathsFinal != null && !indexedPathsFinal.contains(normalizedPath))) {
               // 813 Slice B: the walk already holds the size — no extra stat.
-              collected.add(new JobQueue.EnqueueEntry(file, attrs.size()));
+              collected.add(new JobQueue.EnqueueEntry(file, attrs.size(), provenance));
             }
             return FileVisitResult.CONTINUE;
           }
@@ -460,11 +451,16 @@ final class SyncDirectoryOps {
     }
   }
 
-  /** Delegates to the shared {@link CloudPlaceholderRecorder}; retained for direct test access. */
-  void recordCloudPlaceholderObservation(Path file) {
+  /** Delegates the observation and its admission attribution to the shared recorder. */
+  void recordCloudPlaceholderObservation(
+      Path file, JobQueue.EnqueueProvenance provenance) {
     if (cloudPlaceholderRecorder == null) {
       return;
     }
-    cloudPlaceholderRecorder.record(file);
+    if (provenance == null) {
+      cloudPlaceholderRecorder.record(file);
+    } else {
+      cloudPlaceholderRecorder.record(file, null, provenance);
+    }
   }
 }

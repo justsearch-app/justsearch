@@ -11,12 +11,17 @@ import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.DocumentService.DocumentRecord;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -94,7 +99,7 @@ final class BatchDocAccessTest {
   void truncation() {
     String huge = "x".repeat(BatchDocAccess.MAX_CONTENT_CHARS * 2);
     var docs = new StubDocs(Map.of("doc", new DocumentRecord("doc", huge, Map.of())));
-    var injector = new BatchDocAccess(docs);
+    var injector = new BatchDocAccess(docs, () -> Integer.MAX_VALUE);
 
     InjectorResult result = injector.inject(stubCtx(Map.of("docIds", List.of("doc"))));
 
@@ -119,10 +124,82 @@ final class BatchDocAccessTest {
     assertEquals(1, ctx.attributes().get("batch.fileCount"));
   }
 
+  @Test
+  @DisplayName("rejects the exact untruncated batch against one configured input-limit read")
+  void rejectsUntruncatedBatch() {
+    String source = "dense-source".repeat(20);
+    var docs = new StubDocs(Map.of("doc", new DocumentRecord("doc", source, Map.of())));
+    AtomicInteger reads = new AtomicInteger();
+    var injector =
+        new BatchDocAccess(
+            docs,
+            () -> {
+              reads.incrementAndGet();
+              return 2;
+            });
+    var ctx = stubCtx(Map.of("docIds", List.of("doc")));
+
+    InjectorResult result = injector.inject(ctx);
+
+    var error = result.terminalError().orElseThrow();
+    assertEquals("CONTEXT_TOO_LARGE", error.payload().get("errorCode"));
+    assertEquals(2, error.payload().get("maxTokens"));
+    assertEquals(
+        io.justsearch.core.util.TokenEstimation.estimateTokens(
+            "--- File: doc ---\n" + source + "\n\n"),
+        error.payload().get("estimatedTokens"),
+        "the guard estimates the exact concatenated input, not an additive approximation");
+    assertTrue(
+        error.payload().get("error").toString()
+            .contains("configured summary source-input limit of 2 tokens"));
+    assertEquals(1, reads.get());
+    assertFalse(ctx.attributes().containsKey("batch.docIds"));
+    assertFalse(ctx.attributes().containsKey("batch.fileCount"));
+  }
+
+  @Test
+  @DisplayName("D1: summary limit uses the work-bound config after the live store changes")
+  void summaryLimitUsesWorkBoundConfig() {
+    ConfigStore store =
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(
+                Map.of("justsearch.summary.max_tokens", "2")));
+    Map<UUID, ResolvedConfig> captured = new HashMap<>();
+    ConversationConfigProvider provider =
+        context ->
+            captured.computeIfAbsent(context.workId().orElseThrow(), ignored -> store.get());
+    var engineContext =
+        io.justsearch.app.services.TestEngineContexts.internal().withWorkId(UUID.randomUUID());
+    provider.resolve(engineContext);
+    store.update(
+        TestResolvedConfigHelper.fromEntries(
+            Map.of("justsearch.summary.max_tokens", "20000")));
+    String source = "dense-source".repeat(20);
+    var docs = new StubDocs(Map.of("doc", new DocumentRecord("doc", source, Map.of())));
+
+    InjectorResult result =
+        new BatchDocAccess(docs, provider)
+            .inject(stubCtx(Map.of("docIds", List.of("doc")), engineContext));
+
+    var error = result.terminalError().orElseThrow();
+    assertEquals("CONTEXT_TOO_LARGE", error.payload().get("errorCode"));
+    assertEquals(2, error.payload().get("maxTokens"));
+  }
+
   // ---- fixtures ----
 
   private static ConversationContext stubCtx(Map<String, Object> body) {
+    return stubCtx(body, io.justsearch.app.services.TestEngineContexts.internal());
+  }
+
+  private static ConversationContext stubCtx(
+      Map<String, Object> body, io.justsearch.core.context.EngineContext engineContext) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return engineContext;
+      }
+
       private final Map<String, Object> attrs = new HashMap<>();
       private final Map<String, Object> bodyCopy = new LinkedHashMap<>(body);
 
@@ -166,12 +243,12 @@ final class BatchDocAccessTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(docs.get(docId));
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       Map<String, DocumentRecord> out = new LinkedHashMap<>();
       for (String id : docIds) {
         DocumentRecord r = docs.get(id);

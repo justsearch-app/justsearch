@@ -8,17 +8,20 @@
           "type" : [ "string", "null" ]
         },
         "state" : {
-          "$ref" : "#/$defs/LifecycleState-nullable"
+          "anyOf" : [ {
+            "type" : "null"
+          }, {
+            "$ref" : "#/$defs/ComponentState"
+          } ]
+        },
+        "state_since" : {
+          "type" : [ "string", "null" ]
         }
       }
     },
-    "LifecycleState-nullable" : {
-      "anyOf" : [ {
-        "type" : "null"
-      }, {
-        "type" : "string",
-        "enum" : [ "LIFECYCLE_STATE_UNSPECIFIED", "LIFECYCLE_STATE_STARTING", "LIFECYCLE_STATE_READY", "LIFECYCLE_STATE_DEGRADED", "LIFECYCLE_STATE_ERROR", "LIFECYCLE_STATE_STOPPING", "LIFECYCLE_STATE_STOPPED", "UNRECOGNIZED" ]
-      } ]
+    "ComponentState" : {
+      "type" : "string",
+      "enum" : [ "ABSENT", "STARTING", "READY", "RELOADING", "FAILED", "UNAVAILABLE" ]
     },
     "MigrationEnumeratorView-nullable" : {
       "type" : [ "object", "null" ],
@@ -144,13 +147,16 @@
     "components" : {
       "type" : "object",
       "properties" : {
-        "head" : {
+        "api" : {
           "$ref" : "#/$defs/Component-nullable"
         },
-        "inference" : {
+        "encoders" : {
           "$ref" : "#/$defs/Component-nullable"
         },
-        "worker" : {
+        "generative" : {
+          "$ref" : "#/$defs/Component-nullable"
+        },
+        "index" : {
           "$ref" : "#/$defs/Component-nullable"
         }
       }
@@ -347,7 +353,12 @@
           "type" : [ "string", "null" ]
         },
         "state" : {
-          "$ref" : "#/$defs/LifecycleState-nullable"
+          "anyOf" : [ {
+            "type" : "null"
+          }, {
+            "type" : "string",
+            "enum" : [ "LIFECYCLE_STATE_UNSPECIFIED", "LIFECYCLE_STATE_STARTING", "LIFECYCLE_STATE_READY", "LIFECYCLE_STATE_DEGRADED", "LIFECYCLE_STATE_ERROR", "LIFECYCLE_STATE_STOPPING", "LIFECYCLE_STATE_STOPPED", "UNRECOGNIZED" ]
+          } ]
         }
       }
     },
@@ -531,6 +542,51 @@
               },
               "state" : {
                 "type" : [ "string", "null" ]
+              }
+            }
+          }
+        },
+        "engineComponents" : {
+          "type" : [ "object", "null" ],
+          "additionalProperties" : {
+            "type" : "object",
+            "properties" : {
+              "appliedVersion" : {
+                "type" : "string"
+              },
+              "deadlineMs" : {
+                "type" : "integer"
+              },
+              "desiredVersion" : {
+                "type" : "string"
+              },
+              "evidence" : {
+                "type" : "string"
+              },
+              "footprintBytes" : {
+                "type" : "integer"
+              },
+              "freeBytes" : {
+                "type" : "integer"
+              },
+              "mode" : {
+                "type" : "string",
+                "enum" : [ "BESIDE", "IN_PLACE" ]
+              },
+              "reason" : {
+                "type" : "string"
+              },
+              "reasonCode" : {
+                "type" : "string"
+              },
+              "recoveryAttempts" : {
+                "type" : "integer"
+              },
+              "state" : {
+                "$ref" : "#/$defs/ComponentState"
+              },
+              "stateSince" : {
+                "type" : "string"
               }
             }
           }

@@ -12,14 +12,12 @@ import io.justsearch.agent.api.registry.OperationCatalog;
 import io.justsearch.agent.api.registry.RequiredCapability;
 import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.services.observability.rules.RuleRunner;
-import io.justsearch.agent.tools.AgentToolsOperationCatalog;
-import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.preview.CapabilityAvailability;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.RemoteIndexingJobsBridge;
 import io.justsearch.app.services.mcphost.McpHostService;
 import io.justsearch.app.services.mcphost.McpServerConfig;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.telemetry.Telemetry;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,7 +57,7 @@ public final class SubstratePhase {
       // Tempdoc 560 §10.4: the composed plugin-contributed DiagnosticChannels (snapshot of the shared
       // ContributionRegistry's diagnosticChannels axis after all installs). Empty in the common case;
       // the example plugin (dev-gated) is the first contributor. Threaded to the ChannelSubstrate so
-      // RegistryController serves plugin channels alongside core.head-log.
+      // RegistryController serves plugin channels alongside core.engine-log.
       List<DiagnosticChannel> pluginDiagnosticChannels,
       // Tempdoc 560 §10.4: likewise the composed plugin Surfaces + ConversationShapes — served alongside
       // the core catalogs at /api/registry/{surfaces,shapes} (a plugin RAIL surface renders in the rail).
@@ -76,9 +74,13 @@ public final class SubstratePhase {
    * otherwise Ready. No clear Degraded scenario at the surface today.
    */
   public static io.justsearch.app.services.bootstrap.PhaseOutcome<Output> runWithOutcome(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.app.api.EngineAdmissionService admission,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       Supplier<IndexingService> indexingServiceSupplier,
       Supplier<io.justsearch.app.api.ExcludesService> excludesServiceSupplier,
       Supplier<io.justsearch.app.api.SettingsService> settingsServiceSupplier,
@@ -93,10 +95,13 @@ public final class SubstratePhase {
       AgentToolFactory.Output agentTools,
       Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.app.api.OperationLeaseService operationLeaseService,
-      List<McpServerConfig> mcpServers) {
+      List<McpServerConfig> mcpServers, io.justsearch.agent.api.encryption.StoreCipher preparationCipher,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion) {
     try {
       return new io.justsearch.app.services.bootstrap.PhaseOutcome.Ready<>(
           runInternal(
+              operations, attempts, admission, executors,
               telemetry,
               knowledgeServerSupplier,
               knowledgeClientSupplier,
@@ -114,7 +119,7 @@ public final class SubstratePhase {
               agentTools,
               capabilityResolver,
               operationLeaseService,
-              mcpServers));
+              mcpServers, preparationCipher, authority, recordedIngestion));
     } catch (RuntimeException e) {
       return io.justsearch.app.services.bootstrap.PhaseOutcome.Failed.of(e);
     }
@@ -125,9 +130,13 @@ public final class SubstratePhase {
    * the single entry point is the sealed-sum {@code runWithOutcome(...)} above.
    */
   private static Output runInternal(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.app.api.EngineAdmissionService admission,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       Supplier<IndexingService> indexingServiceSupplier,
       Supplier<io.justsearch.app.api.ExcludesService> excludesServiceSupplier,
       Supplier<io.justsearch.app.api.SettingsService> settingsServiceSupplier,
@@ -142,7 +151,9 @@ public final class SubstratePhase {
       AgentToolFactory.Output agentTools,
       Function<RequiredCapability, Boolean> capabilityResolver,
       io.justsearch.app.api.OperationLeaseService operationLeaseService,
-      List<McpServerConfig> mcpServers) {
+      List<McpServerConfig> mcpServers, io.justsearch.agent.api.encryption.StoreCipher preparationCipher,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion) {
     // Operation registry inputs (consumed by OperationSubstrateInit).
     HandlerRegistry operationHandlers = new HandlerRegistry();
     OperationHandlerRegistrations.registerWorker(
@@ -159,14 +170,14 @@ public final class SubstratePhase {
         policyServiceSupplier,
         runtimeSpecStoreSupplier,
         runtimeReconcilerSupplier,
-        operationLeaseService);
+        operationLeaseService, recordedIngestion, authority.roots());
     AgentToolHandlers.registerEager(operationHandlers, agentTools);
     // Tempdoc 560 WS4 — the operation-catalog collapse + two-phase composition. Core + agent-tools +
     // the MCP-host's contributions compose into the ONE ContributionRegistry, and capability-derived
     // availability is applied ONCE over the full merged set (tempdoc 550 E3), closing the pre-WS4 gap
     // where MCP (or any post-merge) ops bypassed the gate because derivation ran before the merge.
-    CoreOperationCatalog coreBase = new CoreOperationCatalog();
-    AgentToolsOperationCatalog agentToolsBase = new AgentToolsOperationCatalog();
+    OperationCatalog coreBase = OperationCatalogComposition.forRecordedIngestionOwner(authority.coreOperations(), recordedIngestion);
+    OperationCatalog agentToolsBase = OperationCatalogComposition.forRecordedIngestionOwner(authority.agentOperations(), recordedIngestion);
 
     // MCP-host first consumer (tempdoc 560 §6): connect to any configured external MCP servers and
     // project their tools onto EXECUTABLE Operation declarations — Path B, through the executor +
@@ -217,24 +228,25 @@ public final class SubstratePhase {
     // Resource + Metric substrates (no cross-deps; independent).
     ResourceSubstrateInit.Output resourceOut =
         ResourceSubstrateInit.run(BootstrapHelpers.initialRuntimeContext());
-    MetricSubstrateInit.Output metricsOut = MetricSubstrateInit.run(telemetry);
+    MetricSubstrateInit.Output metricsOut = MetricSubstrateInit.run(executors, telemetry);
 
     // Operation substrate — needs handlers + 2 catalogs + capability resolver.
     // Runs BEFORE the indexing-jobs bridge so its ActionLedgerChangeRegistry is available to the
     // bridge's terminal-outcome translator (tempdoc 550 thesis I); neither depends on the other.
     OperationSubstrateInit.Output operationOut =
-        OperationSubstrateInit.run(
+        OperationSubstrateInit.run(operations, attempts, admission, executors,
             operationHandlers,
             operationCatalog,
             agentToolsCatalog,
             capabilityResolver,
             // Tempdoc 550 WA-4: surface catalog (built above) keys navigation gating.
-            resourceOut.coreSurfaceCatalog());
+            resourceOut.coreSurfaceCatalog(), preparationCipher, authority);
 
     // Indexing-jobs bridge — needs Worker client (lazy) + resource change registry + the unified
     // action-ledger registry (terminal indexing outcomes fan into the ONE log; tempdoc 550 thesis I).
     var bridgeOut =
         IndexingJobsBridgeWiring.wire(
+            executors,
             knowledgeClientSupplier,
             resourceOut.indexingJobsChangeRegistry(),
             operationOut.actionLedgerChangeRegistry());
@@ -242,7 +254,7 @@ public final class SubstratePhase {
     // Health substrate — needs healthRecoveryProjector + advisoryChangeRegistry + advisoryLogs
     // (from operationOut) + conditionRecoveryIndexChangeRegistry (from resourceOut).
     HealthSubstrateInit.Output healthOut =
-        HealthSubstrateInit.run(
+        HealthSubstrateInit.run(executors,
             BootstrapHelpers.resolveOccurrenceBufferSize(),
             operationOut.healthRecoveryProjector(),
             operationOut.advisoryChangeRegistry(),
@@ -251,7 +263,7 @@ public final class SubstratePhase {
 
     // Rule runner — needs telemetry + health condition store/registry/source.
     RuleRunner ruleRunner =
-        RuleRunnerBuilder.build(
+        RuleRunnerBuilder.build(executors,
             telemetry,
             healthOut.conditionStore(),
             healthOut.healthEventChangeRegistry(),

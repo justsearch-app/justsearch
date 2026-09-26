@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineFutures;
+
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.ContextChunk;
@@ -18,51 +21,172 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * DocumentService implementation that fetches documents via gRPC from the Worker process.
+ * DocumentService implementation that fetches documents through the knowledge port rather than
+ * opening the index itself.
  *
- * <p>This implementation avoids the index locking issue by routing all document fetches
- * through the Worker process, which owns the Lucene index. The Main process no longer
- * needs direct access to the index files.
+ * <p>The application half never touches Lucene: every fetch goes through {@link KnowledgeClient}
+ * to the index half, which owns the runtimes and the {@code write.lock}. Until lane F stage A that
+ * port was a gRPC channel to a second JVM; since item A6 it is a direct call inside the Engine
+ * ({@code EngineKnowledgeClient}). The rule the class exists to keep is the same either way — one
+ * owner of the index — which is why the routing survived the transport that motivated it.
  *
- * <p>Benefits:
- * <ul>
- *   <li>No MMapDirectory conflicts between Main and Worker</li>
- *   <li>No write.lock contention</li>
- *   <li>Worker is single source of truth for indexed data</li>
- * </ul>
- *
- * @see RemoteKnowledgeClient#fetchDocuments(List)
+ * @see KnowledgeClient#fetchDocuments(List)
  */
 public final class RemoteDocumentService implements DocumentService {
   private static final Logger log = LoggerFactory.getLogger(RemoteDocumentService.class);
 
-  private final Supplier<RemoteKnowledgeClient> clientSupplier;
-  private final RagMetricCatalog catalog;
-
-  /**
-   * Creates a new RemoteDocumentService without telemetry (backward compatible).
-   *
-   * @param clientSupplier supplier for the gRPC client; resolves at use-time per §31 supplier-aware
-   */
-  public RemoteDocumentService(Supplier<RemoteKnowledgeClient> clientSupplier) {
-    this(clientSupplier, RagMetricCatalog.noop());
+  /** Narrow capture seam for retaining one physical Worker client across an async operation. */
+  @FunctionalInterface
+  public interface ClientCaptureSupplier {
+    ClientCapture capture();
   }
+
+  /** A physical client retained until the operation's returned stage has actually completed. */
+  public interface ClientCapture extends AutoCloseable {
+    KnowledgeClient client();
+
+    /** Bind the captured Worker's serving view for every RPC in this logical operation. */
+    default <T> T withClient(java.util.function.Function<KnowledgeClient, T> action) {
+      return action.apply(client());
+    }
+
+    @Override
+    void close();
+  }
+
+  @FunctionalInterface
+  private interface ClientWork<T> {
+    T run(KnowledgeClient client);
+  }
+
+  private final ClientCaptureSupplier captureSupplier;
+  private final RagMetricCatalog catalog;
+  private final Executor foregroundExecutor;
+  private final Executor backgroundExecutor;
 
   /**
    * Creates a new RemoteDocumentService with observability catalog.
    *
-   * @param clientSupplier supplier for the gRPC client
+   * @param foregroundExecutor executor for foreground document work
+   * @param backgroundExecutor executor for background document work
+   * @param clientSupplier supplier for the knowledge-port client
    * @param catalog RAG metric catalog (use {@link RagMetricCatalog#noop()} when not wired)
    */
   public RemoteDocumentService(
-      Supplier<RemoteKnowledgeClient> clientSupplier, RagMetricCatalog catalog) {
-    this.clientSupplier = Objects.requireNonNull(clientSupplier, "clientSupplier");
+      Executor foregroundExecutor,
+      Executor backgroundExecutor,
+      Supplier<KnowledgeClient> clientSupplier,
+      RagMetricCatalog catalog) {
+    this.foregroundExecutor = Objects.requireNonNull(foregroundExecutor, "foregroundExecutor");
+    this.backgroundExecutor = Objects.requireNonNull(backgroundExecutor, "backgroundExecutor");
+    this.captureSupplier = legacyCaptureSupplier(clientSupplier);
     this.catalog = Objects.requireNonNull(catalog, "catalog");
+  }
+
+  /**
+   * Five-argument compatibility form for composition roots that retain the existing client
+   * supplier while supplying a physical capture. The client supplier is not consulted for these
+   * operations; the capture is the lifetime authority.
+   */
+  public RemoteDocumentService(
+      Executor foregroundExecutor,
+      Executor backgroundExecutor,
+      Supplier<KnowledgeClient> clientSupplier,
+      RagMetricCatalog catalog,
+      ClientCaptureSupplier captureSupplier) {
+    this.foregroundExecutor = Objects.requireNonNull(foregroundExecutor, "foregroundExecutor");
+    this.backgroundExecutor = Objects.requireNonNull(backgroundExecutor, "backgroundExecutor");
+    this.captureSupplier = Objects.requireNonNull(captureSupplier, "captureSupplier");
+    this.catalog = Objects.requireNonNull(catalog, "catalog");
+    Objects.requireNonNull(clientSupplier, "clientSupplier");
+  }
+
+  /** Creates a new RemoteDocumentService without telemetry. */
+  public RemoteDocumentService(
+      Executor foregroundExecutor,
+      Executor backgroundExecutor,
+      Supplier<KnowledgeClient> clientSupplier) {
+    this(foregroundExecutor, backgroundExecutor, clientSupplier, RagMetricCatalog.noop());
+  }
+
+  private static ClientCaptureSupplier legacyCaptureSupplier(
+      Supplier<KnowledgeClient> clientSupplier) {
+    Objects.requireNonNull(clientSupplier, "clientSupplier");
+    return () -> {
+      KnowledgeClient client = Objects.requireNonNull(clientSupplier.get(), "knowledge client");
+      return new ClientCapture() {
+        @Override
+        public KnowledgeClient client() {
+          return client;
+        }
+
+        @Override
+        public void close() {
+          // Legacy supplier callers do not own the client lifetime.
+        }
+      };
+    };
+  }
+
+  /**
+   * Borrows an already-retained Head capture for one enclosing operation. The caller keeps that
+   * capture open through every returned stage; individual document methods do not reacquire a
+   * possibly newer serving generation or close the enclosing operation's lease.
+   */
+  public DocumentService boundTo(ClientCapture enclosing) {
+    Objects.requireNonNull(enclosing, "enclosing");
+    return new RemoteDocumentService(foregroundExecutor, backgroundExecutor,
+        enclosing::client, catalog, () -> new ClientCapture() {
+          @Override public KnowledgeClient client() { return enclosing.client(); }
+          @Override public <T> T withClient(java.util.function.Function<KnowledgeClient, T> action) {
+            return enclosing.withClient(action);
+          }
+          @Override public void close() { /* The enclosing operation owns the capture. */ }
+        });
+  }
+
+  private <T> CompletableFuture<T> supplyWithCapturedClient(
+      EngineContext engineContext, ClientWork<T> work) {
+    Executor executor = executorFor(engineContext);
+    ClientCapture capture = null;
+    AtomicBoolean released = new AtomicBoolean();
+    try {
+      capture = Objects.requireNonNull(captureSupplier.capture(), "client capture");
+      Objects.requireNonNull(capture.client(), "captured client");
+      ClientCapture retainedCapture = capture;
+      Runnable release = () -> {
+        if (released.compareAndSet(false, true)) {
+          retainedCapture.close();
+        }
+      };
+      return EngineFutures.supplyAsync(
+          () -> retainedCapture.withClient(work::run), executor, release);
+    } catch (RuntimeException | Error failure) {
+      if (capture != null) {
+        try {
+          if (released.compareAndSet(false, true)) {
+            capture.close();
+          }
+        } catch (RuntimeException | Error closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
+      return CompletableFuture.failedFuture(failure);
+    }
+  }
+
+  private Executor executorFor(EngineContext engineContext) {
+    Objects.requireNonNull(engineContext, "engineContext");
+    return engineContext.urgency() == EngineContext.Urgency.FOREGROUND
+        ? foregroundExecutor
+        : backgroundExecutor;
   }
 
   private void recordRagSuccess() {
@@ -78,26 +202,26 @@ public final class RemoteDocumentService implements DocumentService {
   }
 
   @Override
-  public CompletionStage<DocumentRecord> fetch(String docId) {
-    return fetchBatch(List.of(docId))
+  public CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
+    return fetchBatch(List.of(docId), engineContext)
         .thenApply(map -> map.getOrDefault(docId,
             new DocumentRecord(docId, "", Map.of("error", "Not found"))));
   }
 
   @Override
-  public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+  public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, EngineContext engineContext) {
     if (docIds == null || docIds.isEmpty()) {
       return CompletableFuture.completedFuture(Map.of());
     }
 
-    return CompletableFuture.supplyAsync(() -> {
+    return supplyWithCapturedClient(engineContext, client -> {
       try {
-        log.debug("Fetching {} documents via gRPC", docIds.size());
+        log.debug("Fetching {} documents through the knowledge port", docIds.size());
         // Tempdoc 885 item 6 [R6b]: this list is caller-supplied (a search result set, a citation
         // set), so nothing here bounds it. Paged under the byte budget so the reply can never reach
         // the transport ceiling regardless of how many ids arrive.
         FetchDocumentsResponse response =
-            BoundedDocumentFetch.fetchAll(ids -> clientSupplier.get().fetchDocuments(ids), docIds);
+            BoundedDocumentFetch.fetchAll(ids -> client.fetchDocuments(ids, engineContext), docIds);
 
         Map<String, DocumentRecord> results = new LinkedHashMap<>();
         for (DocumentContent doc : response.getDocumentsList()) {
@@ -108,7 +232,10 @@ public final class RemoteDocumentService implements DocumentService {
             metadata.put("error", doc.getError());
             metadata.put("contentSource", "none");
           } else {
-            metadata.put("contentSource", "grpc");
+            // Lane F stage A: this said "grpc" and named a transport that no longer exists. The
+            // value is provenance for a preview, so it names WHERE the bytes came from — the index
+            // half, through the knowledge port — not how they got here.
+            metadata.put("contentSource", "index");
             metadata.put("contentLength", doc.getContent().length());
           }
 
@@ -116,18 +243,18 @@ public final class RemoteDocumentService implements DocumentService {
               new DocumentRecord(doc.getDocId(), doc.getContent(), metadata));
         }
 
-        log.debug("Fetched {} documents via gRPC", results.size());
+        log.debug("Fetched {} documents through the knowledge port", results.size());
         return results;
 
       } catch (Exception e) {
-        log.error("Failed to fetch documents via gRPC", e);
+        log.error("Failed to fetch documents from the index half", e);
         throw new UnavailableException("Failed to fetch documents via Worker: " + e.getMessage(), e);
       }
     });
   }
 
   @Override
-  public CompletionStage<DocumentSlice> fetchSlice(String docId, int offsetChars, int maxChars) {
+  public CompletionStage<DocumentSlice> fetchSlice(String docId, int offsetChars, int maxChars, EngineContext engineContext) {
     if (docId == null || docId.isBlank()) {
       return CompletableFuture.completedFuture(
           new DocumentSlice("", "", Map.of(), false, false, 0, 0, "missing_doc_id"));
@@ -135,10 +262,11 @@ public final class RemoteDocumentService implements DocumentService {
     int offset = Math.max(0, offsetChars);
     int max = maxChars <= 0 ? 20_000 : maxChars;
 
-    return CompletableFuture.supplyAsync(
-        () -> {
+    return supplyWithCapturedClient(
+        engineContext,
+        client -> {
           try {
-            var response = clientSupplier.get().fetchDocumentSlice(docId, offset, max);
+            var response = client.fetchDocumentSlice(docId, offset, max, engineContext);
 
             Map<String, Object> metadata = new HashMap<>(response.getMetadataMap());
             metadata.put("found", response.getFound());
@@ -146,7 +274,7 @@ public final class RemoteDocumentService implements DocumentService {
               metadata.put("error", response.getError());
               metadata.put("contentSource", "none");
             } else {
-              metadata.put("contentSource", "grpc_slice");
+              metadata.put("contentSource", "index_slice");
               metadata.put("contentLength", response.getContent().length());
             }
 
@@ -171,22 +299,23 @@ public final class RemoteDocumentService implements DocumentService {
                 error);
 
           } catch (Exception e) {
-            log.error("Failed to fetch document slice via gRPC", e);
+            log.error("Failed to fetch document slice from the index half", e);
             throw new UnavailableException("Failed to fetch document slice via Worker: " + e.getMessage(), e);
           }
         });
   }
 
   @Override
-  public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit) {
-    return CompletableFuture.supplyAsync(
-        () -> {
+  public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit, EngineContext engineContext) {
+    return supplyWithCapturedClient(
+        engineContext,
+        client -> {
           try {
-            var response = clientSupplier.get().listAllDocumentIds(offset, limit);
+            var response = client.listAllDocumentIds(offset, limit, engineContext);
             return new DocumentIdPage(
                 response.getDocIdsList(), response.getTotalCount(), response.getTookMs());
           } catch (Exception e) {
-            log.error("Failed to list document IDs via gRPC", e);
+            log.error("Failed to list document IDs from the index half", e);
             throw new UnavailableException(
                 "Failed to list document IDs via Worker: " + e.getMessage(), e);
           }
@@ -194,7 +323,7 @@ public final class RemoteDocumentService implements DocumentService {
   }
 
   /**
-   * Retrieves relevant context for Q&A using RAG (chunk search) via gRPC,
+   * Retrieves relevant context for Q&A using RAG (chunk search) over the knowledge port,
    * with metadata about chunk usage.
    *
    * <p>Overrides the default implementation to use the Worker's BM25 chunk search
@@ -207,8 +336,8 @@ public final class RemoteDocumentService implements DocumentService {
    * @return result containing context and chunk usage metadata
    */
   @Override
-  public CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK) {
-    return retrieveContextWithMeta(question, docIds, topK, 0);
+  public CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK, EngineContext engineContext) {
+    return retrieveContextWithMeta(question, docIds, topK, 0, engineContext);
   }
 
   /**
@@ -224,18 +353,18 @@ public final class RemoteDocumentService implements DocumentService {
    * @return result containing context and chunk usage metadata
    */
   @Override
-  public CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK, int maxContextTokens) {
+  public CompletionStage<ContextResult> retrieveContextWithMeta(String question, Set<String> docIds, int topK, int maxContextTokens, EngineContext engineContext) {
     if (question == null || question.isBlank() || docIds == null || docIds.isEmpty()) {
       return CompletableFuture.completedFuture(new ContextResult("", 0, 0, 0, List.of(),
           "", "EMPTY_REQUEST", false, List.of()));
     }
 
-    return CompletableFuture.supplyAsync(() -> {
+    return supplyWithCapturedClient(engineContext, client -> {
       try {
-        log.debug("Retrieving RAG context via gRPC: question='{}', docIds={}, topK={}, maxTokens={}",
+        log.debug("Retrieving RAG context: question='{}', docIds={}, topK={}, maxTokens={}",
             question, docIds.size(), topK, maxContextTokens);
 
-        RetrieveContextResponse response = clientSupplier.get().retrieveContext(question, docIds, topK, maxContextTokens);
+        RetrieveContextResponse response = client.retrieveContext(question, docIds, topK, maxContextTokens, engineContext);
 
         // Semantics:
         // - chunksFound = total hits found (may exceed returned chunks list)
@@ -277,24 +406,24 @@ public final class RemoteDocumentService implements DocumentService {
             sections);
 
       } catch (Exception e) {
-        log.error("Failed to retrieve context via gRPC, falling back to default", e);
+        log.error("Failed to retrieve context from the index half, falling back to default", e);
         // Record fallback counter
         recordRagFallback();
         // Fall back to default implementation (concatenate full docs)
-        return retrieveContextFallback(docIds);
+        return retrieveContextFallback(docIds, engineContext, client);
       }
     });
   }
 
   @Override
   public CompletionStage<ContextResult> retrieveContext(
-      io.justsearch.app.api.RetrieveContextParams params) {
+      io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
     if (params.question() == null || params.question().isBlank()) {
       return CompletableFuture.completedFuture(new ContextResult("", 0, 0, 0, List.of(),
           "", "EMPTY_REQUEST", false, List.of()));
     }
 
-    return CompletableFuture.supplyAsync(() -> {
+    return supplyWithCapturedClient(engineContext, client -> {
       try {
         // When doc_ids are empty, do a pre-search to find relevant documents.
         // This is necessary because entity/path/date filters are indexed on parent
@@ -302,7 +431,7 @@ public final class RemoteDocumentService implements DocumentService {
         // then the RAG pipeline searches chunks within those docs.
         var effectiveParams = params;
         if (params.docIds().isEmpty()) {
-          Set<String> discoveredDocIds = preSearchForDocIds(params, params.topK() * 2);
+          Set<String> discoveredDocIds = preSearchForDocIds(params, params.topK() * 2, engineContext, client);
           if (!discoveredDocIds.isEmpty()) {
             effectiveParams = new io.justsearch.app.api.RetrieveContextParams(
                 params.question(), discoveredDocIds, params.topK(), params.maxContextTokens(),
@@ -315,27 +444,30 @@ public final class RemoteDocumentService implements DocumentService {
           }
         }
 
-        log.debug("Retrieving RAG context via gRPC (rich params): question='{}', topK={}, "
+        log.debug("Retrieving RAG context (rich params): question='{}', topK={}, "
             + "docIds={}, autoEntityExtract={}, format={}",
             effectiveParams.question(), effectiveParams.topK(), effectiveParams.docIds().size(),
             effectiveParams.autoEntityExtract(), effectiveParams.contextFormat());
 
-        RetrieveContextResponse response = clientSupplier.get().retrieveContext(effectiveParams);
+        RetrieveContextResponse response = client.retrieveContext(effectiveParams, engineContext);
         return mapRetrieveContextResponse(response);
       } catch (Exception e) {
-        log.error("Failed to retrieve context via gRPC (rich params), falling back", e);
+        log.error("Failed to retrieve context from the index half (rich params), falling back", e);
         recordRagFallback();
-        return retrieveContextFallback(params.docIds());
+        return retrieveContextFallback(params.docIds(), engineContext, client);
       }
     });
   }
 
   /**
    * Pre-search to discover relevant document IDs for open retrieval.
-   * Uses the existing gRPC search with optional filters to find top-matching documents.
+   * Uses the existing port search with optional filters to find top-matching documents.
    */
   private Set<String> preSearchForDocIds(
-      io.justsearch.app.api.RetrieveContextParams params, int limit) {
+      io.justsearch.app.api.RetrieveContextParams params,
+      int limit,
+      EngineContext engineContext,
+      KnowledgeClient client) {
     try {
       // Build a search request with the same filters as the RAG request
       var searchBuilder = io.justsearch.ipc.SearchRequest.newBuilder()
@@ -412,7 +544,7 @@ public final class RemoteDocumentService implements DocumentService {
         searchBuilder.setFilters(filtersBuilder.build());
       }
 
-      var searchResponse = clientSupplier.get().search(searchBuilder.build());
+      var searchResponse = client.search(searchBuilder.build(), engineContext);
       // Tempdoc 731 I1: preserve rank order (LinkedHashSet, not HashSet) so the discovered doc
       // universe forwarded to the downstream RetrieveContextRequest reflects the pipeline's
       // ranking, not an arbitrary hash order.
@@ -432,7 +564,7 @@ public final class RemoteDocumentService implements DocumentService {
     }
   }
 
-  /** Maps a gRPC RetrieveContextResponse to the Head-side ContextResult. */
+  /** Maps a wire RetrieveContextResponse to the Head-side ContextResult. */
   private ContextResult mapRetrieveContextResponse(RetrieveContextResponse response) {
     int chunksFound = response.getChunksFound();
     int chunksUsed = response.getUsedChunks() ? response.getChunksCount() : 0;
@@ -491,16 +623,17 @@ public final class RemoteDocumentService implements DocumentService {
   }
 
   /**
-   * Fallback context retrieval when gRPC fails.
+   * Fallback context retrieval when chunk retrieval fails.
    * Uses fetchBatch and concatenates documents.
    *
    * @return ContextResult with chunksUsed=0 to indicate fallback was used
    */
-  private ContextResult retrieveContextFallback(Set<String> docIds) {
+  private ContextResult retrieveContextFallback(
+      Set<String> docIds, EngineContext engineContext, KnowledgeClient client) {
     try {
       Map<String, DocumentRecord> docs =
           BoundedDocumentFetch.fetchAll(
-                  ids -> clientSupplier.get().fetchDocuments(ids), List.copyOf(docIds))
+                  ids -> client.fetchDocuments(ids, engineContext), List.copyOf(docIds))
           .getDocumentsList().stream()
           .collect(java.util.stream.Collectors.toMap(
               DocumentContent::getDocId,
@@ -549,8 +682,8 @@ public final class RemoteDocumentService implements DocumentService {
    */
   @Override
   public CompletionStage<CitationMatchResult> matchCitationsAgainst(
-      String answerText, List<VerificationSource> sources, double threshold) {
-    return CompletableFuture.supplyAsync(() -> {
+      String answerText, List<VerificationSource> sources, double threshold, EngineContext engineContext) {
+    return supplyWithCapturedClient(engineContext, client -> {
       if (answerText == null || answerText.isBlank() || sources == null || sources.isEmpty()) {
         return new CitationMatchResult(List.of(), 0, 0, 0, 0, ScorerKind.NONE, List.of());
       }
@@ -567,12 +700,12 @@ public final class RemoteDocumentService implements DocumentService {
           anyText |= s.suppliesText();
         }
         MatchCitationsResponse resp =
-            clientSupplier.get().matchCitations(
+            client.matchCitations(
                 answerText,
                 chunkDocIds,
                 chunkIndices,
                 anyText ? passageTexts : List.of(),
-                threshold);
+                threshold, engineContext);
         List<CitationMatchEntry> entries = new ArrayList<>(resp.getMatchesCount());
         for (var m : resp.getMatchesList()) {
           entries.add(new CitationMatchEntry(
@@ -602,7 +735,7 @@ public final class RemoteDocumentService implements DocumentService {
             ScorerKind.fromWire(resp.getScorer()),
             coverage);
       } catch (Exception e) {
-        log.warn("Citation matching via gRPC failed", e);
+        log.warn("Citation matching failed in the index half", e);
         return new CitationMatchResult(List.of(), 0, 0, 0, 0, ScorerKind.NONE, List.of());
       }
     });

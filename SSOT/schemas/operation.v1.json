@@ -254,8 +254,24 @@
             "required" : [ "kind" ]
           } ]
         },
+        "declaredSurvival" : {
+          "anyOf" : [ {
+            "type" : "null"
+          }, {
+            "type" : "string",
+            "enum" : [ "INTERACTIVE", "DURABLE" ]
+          } ]
+        },
         "inverseOperationRef" : {
           "$ref" : "#/$defs/OperationRef-nullable"
+        },
+        "recordKind" : {
+          "anyOf" : [ {
+            "type" : "null"
+          }, {
+            "type" : "string",
+            "enum" : [ "operation", "reconfigure", "reindex", "ingest", "settings-apply", "accept-gaps", "scheduled-run", "memory", "note" ]
+          } ]
         },
         "requiredCapabilities" : {
           "type" : [ "array", "null" ],

@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -18,29 +20,49 @@ import io.justsearch.app.api.AiInstallService;
 import io.justsearch.app.api.AiInstallStatus;
 import io.justsearch.app.api.InstallPlanPreview;
 import io.justsearch.app.api.OnlineAiService;
+import io.justsearch.app.api.OnlineAiRuntimeControl;
+import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
+import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.worker.OnnxModelStatus;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.app.services.ai.runtime.RuntimeActivationService;
 import io.justsearch.app.api.EnterprisePolicyService;
+import io.justsearch.app.api.EffectivePolicy;
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
 import io.justsearch.app.services.policy.EnterprisePolicyServiceImpl;
+import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
+import io.justsearch.app.services.settings.SettingsServiceImpl;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.model.DownloadProfile;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.InstallContract;
 import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.model.ModelRegistry;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+import io.justsearch.core.execution.TestEngineExecutors;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentSnapshot;
+import io.justsearch.core.component.TestEngineComponents;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 class RuntimeActivationServiceTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
 
   @TempDir Path tmp;
 
@@ -57,6 +79,7 @@ class RuntimeActivationServiceTest {
       else System.setProperty(entry.getKey(), entry.getValue());
     }
     prevProps.clear();
+    processExecutors.close();
   }
 
   @Test
@@ -71,7 +94,7 @@ class RuntimeActivationServiceTest {
         """);
 
     RuntimeActivationService service =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -110,7 +133,7 @@ class RuntimeActivationServiceTest {
 
     EnterprisePolicyService policy = new EnterprisePolicyServiceImpl();
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -146,7 +169,7 @@ class RuntimeActivationServiceTest {
 
     EnterprisePolicyService policy = new EnterprisePolicyServiceImpl();
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null,
@@ -156,6 +179,204 @@ class RuntimeActivationServiceTest {
     AiRuntimeActivationStatus st = awaitDone(svc);
     assertEquals("failed", st.state);
     assertEquals("POLICY_ONLINE_AI_DISABLED", st.errorCode);
+  }
+
+  @Test
+  void unsetChatIntentAllowsActivationAttemptWithoutInventingAComponentFailure() throws Exception {
+    setHome(tmp);
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY);
+    assertNull(settings.inspect().settings().getChatEnabled());
+    try (var components = TestEngineComponents.fourComponents()) {
+      var handle = new ReasonRetainingComponentHandle(components.handle("generative"));
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
+          settings, null, policy, null, handle);
+      service.startActivate("cuda12");
+      assertEquals("POLICY_ONLINE_AI_DISABLED", awaitDone(service).errorCode);
+      assertEquals(ComponentState.ABSENT, handle.snapshot().state());
+      // Completion releases the single-flight guard even with unspecified intent.
+      service.startActivate("cuda12");
+      assertEquals("POLICY_ONLINE_AI_DISABLED", awaitDone(service).errorCode);
+    }
+  }
+
+  @Test
+  void startingPublicationFailureReleasesTheActivationGuardBeforeAnyOwnerThread() throws Exception {
+    setHome(tmp);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("publication-failure"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = org.mockito.Mockito.spy(
+          new ReasonRetainingComponentHandle(components.handle("generative")));
+      var failure = new IllegalStateException("component publication unavailable");
+      org.mockito.Mockito.doThrow(failure).doCallRealMethod().when(handle).snapshot();
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
+          intent.settings(), null, policy, null, handle);
+      org.junit.jupiter.api.Assertions.assertSame(failure,
+          org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+              () -> service.startActivate("cuda12")));
+      assertEquals("failed", service.getActivationStatus().state);
+      service.startActivate("cuda12");
+      assertEquals("POLICY_ONLINE_AI_DISABLED", awaitDone(service).errorCode);
+      assertEquals(ComponentState.UNAVAILABLE, handle.snapshot().state());
+    }
+  }
+
+  @Test
+  void terminalFailureWaitsForItsComponentObservation() throws Exception {
+    setHome(tmp);
+    CountDownLatch publicationEntered = new CountDownLatch(1);
+    CountDownLatch releasePublication = new CountDownLatch(1);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("failure-publication-order"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = org.mockito.Mockito.spy(
+          new ReasonRetainingComponentHandle(components.handle("generative")));
+      org.mockito.Mockito.doAnswer(call -> {
+        if (call.getArgument(1) == ComponentState.UNAVAILABLE) {
+          publicationEntered.countDown();
+          if (!releasePublication.await(5, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("Timed out waiting for failure publication");
+          }
+        }
+        return call.callRealMethod();
+      }).when(handle).transitionIfUnchanged(
+          org.mockito.ArgumentMatchers.any(EngineComponentSnapshot.Component.class),
+          org.mockito.ArgumentMatchers.any(ComponentState.class),
+          org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.anyString());
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
+          intent.settings(), null, policy, null, handle);
+
+      service.startActivate("cuda12");
+      try {
+        assertTrue(publicationEntered.await(5, TimeUnit.SECONDS), "failure reached component owner");
+        assertEquals("running", service.getActivationStatus().state);
+      } finally {
+        releasePublication.countDown();
+      }
+      assertEquals("POLICY_ONLINE_AI_DISABLED", awaitDone(service).errorCode);
+      assertEquals(ComponentState.UNAVAILABLE, handle.snapshot().state());
+    }
+  }
+
+  @Test
+  void failedComponentPublicationReportsOwnerFailureInsteadOfPreciseObservation() throws Exception {
+    setHome(tmp);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("failure-publication-throws"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = org.mockito.Mockito.spy(
+          new ReasonRetainingComponentHandle(components.handle("generative")));
+      var publicationFailure = new IllegalStateException("component publisher closed");
+      org.mockito.Mockito.doAnswer(call -> {
+        if (call.getArgument(1) == ComponentState.UNAVAILABLE) throw publicationFailure;
+        return call.callRealMethod();
+      }).when(handle).transitionIfUnchanged(
+          org.mockito.ArgumentMatchers.any(EngineComponentSnapshot.Component.class),
+          org.mockito.ArgumentMatchers.any(ComponentState.class),
+          org.mockito.ArgumentMatchers.anyString(),
+          org.mockito.ArgumentMatchers.anyString());
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(processExecutors, OnlineAiService.unavailable(),
+          intent.settings(), null, policy, null, handle);
+
+      var attempt = service.startActivate("cuda12");
+      var completionFailure = org.junit.jupiter.api.Assertions.assertThrows(
+          java.util.concurrent.CompletionException.class,
+          () -> attempt.completion().toCompletableFuture().join());
+      org.junit.jupiter.api.Assertions.assertSame(publicationFailure, completionFailure.getCause());
+      assertEquals("RUNTIME_ACTIVATION_FAILED", service.getActivationStatus().errorCode);
+      assertEquals(ComponentState.STARTING, handle.snapshot().state());
+    }
+  }
+
+  @Test
+  void policyRefusalPublishesPreciseUnavailableObservation() throws Exception {
+    setHome(tmp);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("policy-observation"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = new ReasonRetainingComponentHandle(components.handle("generative"));
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(false);
+      when(effective.gpuAccelerationEnabled()).thenReturn(true);
+      when(policy.snapshot()).thenReturn(effective);
+      var service = new RuntimeActivationService(
+          processExecutors,
+          OnlineAiService.unavailable(),
+          intent.settings(),
+          null,
+          policy,
+          null,
+          handle);
+
+      service.startActivate("cuda-12.4");
+      awaitDone(service);
+
+      assertEquals(ComponentState.UNAVAILABLE, handle.snapshot().state());
+      assertEquals(LifecycleReasonCode.INFERENCE_POLICY_ONLINE_AI_DISABLED.code(),
+          handle.snapshot().reasonCode());
+    }
+  }
+
+  @Test
+  void olderActivationFailureCannotOverwriteDisableReenableObservation() throws Exception {
+    setHome(tmp);
+    CountDownLatch policyEntered = new CountDownLatch(1);
+    CountDownLatch releasePolicy = new CountDownLatch(1);
+    try (var intent = new RuntimeIntentTestFixture(tmp.resolve("activation-aba"), true);
+        var components = TestEngineComponents.fourComponents()) {
+      var handle = new ReasonRetainingComponentHandle(components.handle("generative"));
+      var policy = mock(EnterprisePolicyService.class);
+      var effective = mock(EffectivePolicy.class);
+      when(effective.onlineAiEnabled()).thenReturn(true);
+      when(effective.gpuAccelerationEnabled()).thenReturn(true);
+      when(policy.snapshot()).thenAnswer(ignored -> {
+        policyEntered.countDown();
+        if (!releasePolicy.await(5, TimeUnit.SECONDS)) {
+          throw new IllegalStateException("Timed out waiting for settings ABA");
+        }
+        return effective;
+      });
+      var service = new RuntimeActivationService(
+          processExecutors,
+          OnlineAiService.unavailable(),
+          intent.settings(),
+          null,
+          policy,
+          null,
+          handle);
+
+      service.startActivate("missing-variant");
+      assertTrue(policyEntered.await(5, TimeUnit.SECONDS), "activation reached policy owner");
+      intent.spec().setChatEnabled(false);
+      handle.transition(ComponentState.ABSENT,
+          LifecycleReasonCode.INFERENCE_DEACTIVATED.code(), "newer disabled intent");
+      intent.spec().setChatEnabled(true);
+      handle.transition(ComponentState.STARTING,
+          LifecycleReasonCode.INFERENCE_STARTING.code(), "newer activation intent");
+      assertEquals(2L, intent.settings().inspect().witness().acceptedRevision(),
+          "real accepted writes distinguish same-value ABA");
+      releasePolicy.countDown();
+
+      AiRuntimeActivationStatus status = awaitDone(service);
+      assertEquals("RUNTIME_VARIANT_NOT_INSTALLED", status.errorCode);
+      assertEquals(ComponentState.STARTING, handle.snapshot().state());
+      assertEquals(LifecycleReasonCode.INFERENCE_STARTING.code(),
+          handle.snapshot().reasonCode(), "old failure is fenced by the settings witness");
+    }
   }
 
   // --------------- ONNX feature status tests (D-4, tempdoc 215) ---------------
@@ -203,7 +424,7 @@ class RuntimeActivationServiceTest {
     setHome(tmp);
     // 4-arg constructor — no WorkerFeatureCache
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null, null);
@@ -257,8 +478,32 @@ class RuntimeActivationServiceTest {
     assertEquals("not_found", features.get(1).reason());
   }
 
+  @Test
+  void onnxStatusReadsCommittedPathsWithoutPropertyPromotions() {
+    setHome(tmp);
+    clearProp("justsearch.rerank.model_path");
+    clearProp("justsearch.citation.scorer.model_path");
+    var previous = ConfigStore.globalOrNull();
+    var settings = new UiSettings();
+    settings.setRerankerModelPath(tmp.resolve("reranker").toString());
+    settings.setCitationScorerModelPath(tmp.resolve("citation").toString());
+    var published = new ConfigStore(ConfigStoreRebuilder.prepare(settings));
+    try {
+      ConfigStore.setGlobal(published);
+      var features = createServiceWithCache(List::of).getStatus().onnxFeatures();
+      assertEquals("explicit_path", features.get(0).reason());
+      assertEquals(settings.getRerankerModelPath(), features.get(0).modelPath());
+      assertEquals("explicit_path", features.get(1).reason());
+      assertEquals(settings.getCitationScorerModelPath(), features.get(1).modelPath());
+      assertFalse(features.get(0).modelActive(), "persisted path cannot fabricate a live session");
+      assertFalse(features.get(1).modelActive());
+    } finally {
+      ConfigStore.restoreGlobal(published, previous);
+    }
+  }
+
   private RuntimeActivationService createServiceWithCache(WorkerFeatureCache cache) {
-    return new RuntimeActivationService(
+    return new RuntimeActivationService(processExecutors,
         OnlineAiService.unavailable(),
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
         null, null, cache);
@@ -502,7 +747,7 @@ class RuntimeActivationServiceTest {
     Files.writeString(variantDir.resolve("BITAA6D.tmp"), "partial-download", StandardCharsets.UTF_8);
 
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
             null, null);
@@ -591,12 +836,12 @@ class RuntimeActivationServiceTest {
     Path settingsFile = tmp.resolve("settings.json");
     UiSettingsStore store =
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsFile);
-    io.justsearch.app.api.UiSettings s = store.load();
+    UiSettings s = store.load();
     s.setLlmModelPath(chosen.toAbsolutePath().toString());
-    store.save(s);
+    store.replacePrepared(store.prepare(s, new SettingsWitness(0, null)));
 
     RuntimeActivationService svc =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(), store, null, new EnterprisePolicyServiceImpl());
     svc.startActivate("cuda12");
     AiRuntimeActivationStatus st = awaitDone(svc, 60_000);
@@ -634,8 +879,71 @@ class RuntimeActivationServiceTest {
         st.message);
   }
 
+  @Test
+  void deactivationPersistsExplicitBaselineWithoutPostCommitRuntimeApply() throws Exception {
+    setHome(tmp);
+    clearProp("justsearch.server.exe");
+    clearProp("justsearch.server.exe.source");
+    Path baseline = tmp.resolve("native-bin/llama-server/llama-server.exe");
+    Files.createDirectories(baseline.getParent());
+    Files.writeString(baseline, "cpu", StandardCharsets.UTF_8);
+    Path cuda = createVariantExe("cuda12");
+    UiSettingsStore settings =
+        new UiSettingsStore(
+            UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("deactivate-settings.json"));
+    UiSettings initial = settings.load();
+    initial.setServerExecutablePath(cuda.toAbsolutePath().toString());
+    initial.setGpuLayers(99);
+    settings.replacePrepared(settings.prepare(initial, new SettingsWitness(0, null)));
+
+    ConfigStoreRebuilder.rememberAutoDetected(Map.of("justsearch.gpu.layers", "99",
+        "justsearch.server.exe", cuda.toAbsolutePath().toString(), "justsearch.context.size", "32768"));
+    ConfigStore previous = ConfigStore.globalOrNull();
+    ConfigStore config = new ConfigStore(ConfigStoreRebuilder.prepare(initial));
+    ConfigStore.setGlobal(config);
+    try (var fixture =
+        new RuntimeIntentTestFixture(
+            tmp.resolve("deactivate-intent"), settings, config)) {
+      RecordingRuntimeControl control = new RecordingRuntimeControl(settings);
+      RuntimeActivationService service =
+          new RuntimeActivationService(
+              processExecutors,
+              control,
+              settings,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              new SettingsServiceImpl(settings, fixture.runner()));
+
+      service.startDeactivate();
+      AiRuntimeActivationStatus status = awaitDone(service);
+
+      assertEquals("completed", status.state, "message=" + status.message);
+      UiSettings persisted = settings.load();
+      assertEquals(baseline.toAbsolutePath().toString(), persisted.getServerExecutablePath());
+      assertEquals(0, persisted.getGpuLayers());
+      assertEquals(io.justsearch.app.inference.ContextWindowPolicy.CPU_TOP_RUNG,
+          ConfigStore.global().get().ai().contextSize());
+      assertTrue(control.modelPaths.isEmpty(), "physical work belongs inside prepared settings composition");
+      assertTrue(control.gpuLayers.isEmpty());
+      assertTrue(control.publishedServerExecutables.isEmpty());
+      assertTrue(control.publishedGpuLayers.isEmpty());
+      assertTrue(control.settingsServerExecutables.isEmpty());
+      assertEquals(baseline.toAbsolutePath(), ConfigStore.global().get().ai().serverExe());
+      assertEquals(0, ConfigStore.global().get().ai().gpuLayers());
+      assertNull(System.getProperty("justsearch.server.exe"));
+      assertNull(System.getProperty("justsearch.server.exe.source"));
+    } finally {
+      TestResolvedConfigHelper.restoreGlobal(previous);
+      ConfigStoreRebuilder.rememberAutoDetected(Map.of());
+    }
+  }
+
   private RuntimeActivationService createServiceWithSettingsFile() {
-    return new RuntimeActivationService(
+    return new RuntimeActivationService(processExecutors,
         OnlineAiService.unavailable(),
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json")),
         null,
@@ -687,7 +995,7 @@ class RuntimeActivationServiceTest {
   }
 
   private RuntimeActivationService createServiceWithInstallHelper(AiInstallService installService) {
-    return new RuntimeActivationService(
+    return new RuntimeActivationService(processExecutors,
         OnlineAiService.unavailable(),
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE),
         null,
@@ -748,7 +1056,7 @@ class RuntimeActivationServiceTest {
     }
 
     @Override
-    public void startInstall(boolean acceptTerms) {
+    public AiInstallService.Attempt startInstall(boolean acceptTerms) {
       throw new UnsupportedOperationException("not used by this test");
     }
 
@@ -758,7 +1066,7 @@ class RuntimeActivationServiceTest {
     }
 
     @Override
-    public void repair(boolean acceptTerms) throws AiInstallException {
+    public AiInstallService.Attempt repair(boolean acceptTerms) throws AiInstallException {
       throw new UnsupportedOperationException("not used by this test");
     }
 
@@ -784,6 +1092,11 @@ class RuntimeActivationServiceTest {
     System.setProperty(key, value);
   }
 
+  private void clearProp(String key) {
+    prevProps.putIfAbsent(key, System.getProperty(key));
+    System.clearProperty(key);
+  }
+
   private void setHome(Path home) {
     prevHome = System.getProperty("justsearch.home");
     System.setProperty("justsearch.home", home.toAbsolutePath().toString());
@@ -806,6 +1119,59 @@ class RuntimeActivationServiceTest {
     }
     fail("Timed out waiting for runtime activation to finish");
     return svc.getActivationStatus();
+  }
+
+  private static final class RecordingRuntimeControl
+      implements OnlineAiService, OnlineAiRuntimeControl {
+    private final UiSettingsStore settings;
+    private final java.util.ArrayList<String> modelPaths = new java.util.ArrayList<>();
+    private final java.util.ArrayList<Integer> gpuLayers = new java.util.ArrayList<>();
+    private final java.util.ArrayList<Path> publishedServerExecutables = new java.util.ArrayList<>();
+    private final java.util.ArrayList<Integer> publishedGpuLayers = new java.util.ArrayList<>();
+    private final java.util.ArrayList<String> settingsServerExecutables = new java.util.ArrayList<>();
+
+    private RecordingRuntimeControl(UiSettingsStore settings) {
+      this.settings = settings;
+    }
+
+    @Override
+    public void applyRuntimeOverrides(
+        String llmModelPath,
+        Integer contextLength,
+        Integer gpuLayerCount,
+        RestartPolicy restartPolicy) {
+      modelPaths.add(llmModelPath);
+      gpuLayers.add(gpuLayerCount);
+      var published = ConfigStore.global().get().ai();
+      publishedServerExecutables.add(published.serverExe());
+      publishedGpuLayers.add(published.gpuLayers());
+      settingsServerExecutables.add(settings.load().getServerExecutablePath());
+    }
+
+    @Override
+    public DetachExternalServerResult detachExternalServer() {
+      throw new UnsupportedOperationException("not used by this test");
+    }
+
+    @Override
+    public CompletableFuture<String> summarize(String content) {
+      throw new UnsupportedOperationException("not used by this test");
+    }
+
+    @Override
+    public CompletableFuture<String> askQuestion(String question, String context) {
+      throw new UnsupportedOperationException("not used by this test");
+    }
+
+    @Override
+    public boolean isAvailable() {
+      return true;
+    }
+
+    @Override
+    public boolean isStartingUp() {
+      return false;
+    }
   }
 
 }

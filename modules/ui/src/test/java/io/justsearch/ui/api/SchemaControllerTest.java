@@ -49,6 +49,21 @@ final class SchemaControllerTest {
   }
 
   @Test
+  void advertisedRecoverySchemaIsServedWithConditionArguments() throws Exception {
+    Context ctx = mock(Context.class);
+    when(ctx.pathParam("name")).thenReturn("condition-recovery-index.v1.json");
+    when(ctx.contentType(anyString())).thenReturn(ctx);
+    when(ctx.header(anyString(), anyString())).thenReturn(ctx);
+    controller.handle(ctx);
+    var body = org.mockito.ArgumentCaptor.forClass(byte[].class);
+    verify(ctx).result(body.capture());
+    verify(ctx, never()).status(404);
+    var schema = new tools.jackson.databind.ObjectMapper().readTree(body.getValue());
+    assertEquals("string", schema.at(
+        "/properties/entries/items/properties/conditions/items/properties/defaultArgsJson/type").asString());
+  }
+
+  @Test
   @DisplayName("unknown schema returns 404 envelope without leaking ETag")
   void unknownSchemaReturns404() {
     Context ctx = mock(Context.class);
@@ -128,11 +143,13 @@ final class SchemaControllerTest {
     assertTrue(names.contains("failed-indexing-jobs-response.v1.json"));
     // Tempdoc 899 D6: canonical public response schemas embedded into the generated runtime SDK.
     assertTrue(names.contains("api-error-response.v1.json"));
-    assertTrue(names.contains("lifecycle-snapshot.v1.json"));
+    assertTrue(names.contains("lifecycle-snapshot.v2.json"));
     assertTrue(names.contains("runtime-live-response.v1.json"));
-    assertTrue(names.contains("runtime-manifest-public.v1.json"));
+    assertTrue(names.contains("runtime-manifest-public.v2.json"));
     assertTrue(names.contains("runtime-ready-response.v1.json"));
-    assertEquals(17, names.size());
+    assertTrue(names.contains("operation-outcome-view.v1.json"));
+    assertTrue(names.contains("condition-recovery-index.v1.json"));
+    assertEquals(19, names.size());
     assertFalse(names.contains("nonexistent.v1.json"));
   }
 }

@@ -35,6 +35,9 @@ abstract class LocalApiIntegrationTestBase {
 
   protected Path aiHome;
   protected LocalApiServer server;
+  private final io.justsearch.core.execution.TestEngineExecutors executors = new io.justsearch.core.execution.TestEngineExecutors();
+  private io.justsearch.app.observability.operations.SqliteOperationStore operations;
+  private io.justsearch.app.engine.DefaultEngineProcessResources settingsResources;
   protected HttpClient client;
   protected String baseUrl;
 
@@ -75,13 +78,71 @@ abstract class LocalApiIntegrationTestBase {
     Path indexBase = tmp.resolve("index");
     Files.createDirectories(indexBase);
 
-    server = configureServer(LocalApiServer.builder(settingsStore, indexBase)).build();
+    operations =
+        new io.justsearch.app.observability.operations.SqliteOperationStore(
+            aiHome.resolve("operations.db"));
+    var config = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    if (config == null) {
+      config =
+          new io.justsearch.configuration.resolved.ConfigStore(
+              io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(
+                  settingsStore.inspect().settings()));
+    }
+    var settingsConfig = config;
+    settingsResources = new io.justsearch.app.engine.DefaultEngineProcessResources(
+        settingsConfig.publicationLock());
+    var generativeObservation = settingsResources.components().register(
+        io.justsearch.app.services.HeadAssembly.generativeSpec());
+    var settingsComponents = new io.justsearch.app.services.settings.FixedSettingsComponentComposer(
+        settingsResources.components());
+    settingsComponents.register("generative",
+        new io.justsearch.app.services.GenerativeSettingsComponentOwner(
+            null, generativeObservation,
+            io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.resolveBaseDir(
+                settingsConfig.get(), System.getProperty("user.dir")), false));
+    settingsComponents.seal();
+    var settingsOwner =
+        new io.justsearch.app.services.settings.SettingsCommitCoordinator(
+            settingsStore,
+            settingsConfig,
+            () -> {
+              throw new AssertionError("Unexpected settings restart");
+            },
+            candidate -> {
+              var projection =
+                  io.justsearch.app.services.settings.SettingsV2Projection.toSettingsV2(
+                      candidate, settingsStore.mode());
+              return io.justsearch.agent.api.registry.OperationResult.success(
+                  "Settings committed",
+                  Map.of(
+                      "ui", projection.ui(),
+                      "llm", projection.llm(),
+                      "indexPaths", projection.indexPaths(),
+                      "settingsMode", projection.settingsMode()));
+            }, settingsResources.admission()::isClosing, settingsComponents);
+    var settingsAttempts =
+        new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+            operations,
+            java.time.Clock.systemUTC(),
+            java.util.Set.of(
+                io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+                io.justsearch.agent.api.registry.OperationKind.RECONFIGURE),
+            settingsOwner);
+    var settingsService =
+        new io.justsearch.app.services.settings.SettingsServiceImpl(
+            settingsStore, settingsAttempts);
+    server =
+        configureServer(
+                LocalApiServer.builder(executors, settingsStore, indexBase)
+                    .settingsService(settingsService))
+            .build();
     baseUrl = "http://127.0.0.1:" + server.getPort();
     client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
   }
 
   @AfterEach
-  void stopServer() {
+  void stopServer() throws Exception {
+    Exception closeFailure = null;
     if (server != null) {
       try {
         server.stop();
@@ -92,6 +153,26 @@ abstract class LocalApiIntegrationTestBase {
       }
     }
 
+    if (operations != null) {
+      try {
+        operations.close();
+      } catch (Exception failure) {
+        closeFailure = failure;
+      } finally {
+        operations = null;
+      }
+    }
+
+    if (settingsResources != null) {
+      try { settingsResources.close(); }
+      catch (Exception failure) {
+        if (closeFailure == null) closeFailure = failure;
+        else closeFailure.addSuppressed(failure);
+      } finally { settingsResources = null; }
+    }
+
+    executors.close();
+
     // Best-effort cleanup: remove any machine policy file created during the test, but only inside the sandbox.
     cleanupMachinePolicySandboxBestEffort();
 
@@ -101,6 +182,9 @@ abstract class LocalApiIntegrationTestBase {
     restoreProp("justsearch.llm.model_path", prevLlmModelPath);
     extraProps.forEach(LocalApiIntegrationTestBase::restoreProp);
     extraProps.clear();
+    if (closeFailure != null) {
+      throw closeFailure;
+    }
   }
 
   /**
@@ -113,6 +197,15 @@ abstract class LocalApiIntegrationTestBase {
   /** Hook for subclasses that need to customize the server under test (e.g. a session token). */
   protected LocalApiServer.Builder configureServer(LocalApiServer.Builder builder) {
     return builder;
+  }
+
+  /** Reads the durable operation receipt owned by this fixture's real SQLite substrate. */
+  protected io.justsearch.app.api.operations.OperationOutcomeView operationOutcome(
+      String operationKey) {
+    if (operations == null) {
+      throw new IllegalStateException("Operation store is not running");
+    }
+    return operations.outcome(operationKey);
   }
 
   /** Sets a system property for the duration of the test, recording the previous value. */

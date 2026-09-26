@@ -28,7 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Citation matching logic extracted from {@link GrpcSearchService}.
+ * Citation matching logic extracted from {@link WorkerSearchService}.
  *
  * <p>Manages the lazy-initialized {@link CitationScorer} (CPU-only ONNX cross-encoder)
  * and provides an embedding-based cosine similarity fallback path.
@@ -113,6 +113,12 @@ final class CitationMatchOps {
     setCrossEncoderProducer(scorer == null ? null : scorer::scoreAll);
     if (scorer != null && citationScorerConfig != null) {
       var config = citationScorerConfig;
+      if (config.modelPath() == null) {
+        // The scorer can be composed from an installed model even when this consumer's
+        // optional path setting is absent. Fingerprint reporting must not abort readiness.
+        log.info("Citation scorer wired (consumer model path unavailable)");
+        return;
+      }
       // Tempdoc 374 sandbox round 4 issue H: resolve via ModelManifest so the
       // fingerprint identifies whichever variant Install AI placed on disk.
       Path modelOnnx =
@@ -191,8 +197,9 @@ final class CitationMatchOps {
       List<String> chunkDocIds,
       List<Integer> chunkIndices,
       List<String> passageTexts,
-      double threshold) {
+      double requestedThreshold) {
     long startTime = System.currentTimeMillis();
+    double threshold = effectiveThreshold(requestedThreshold);
 
     log.debug("MatchCitations request: answerLen={}, chunks={}, supplied={}, threshold={}",
         answerText.length(), chunkDocIds.size(), countSupplied(passageTexts), threshold);
@@ -333,6 +340,17 @@ final class CitationMatchOps {
       log.warn("MatchCitations failed", e);
       return errorResponse(startTime, e, sourceCoverage(prepared, false));
     }
+  }
+
+  private double effectiveThreshold(double requestedThreshold) {
+    if (requestedThreshold > 0) {
+      return requestedThreshold;
+    }
+    CitationScorerConfig config = citationScorerConfig;
+    double configuredThreshold = config != null ? config.threshold() : Double.NaN;
+    return configuredThreshold > 0 && configuredThreshold <= 1
+        ? configuredThreshold
+        : DEFAULT_SIMILARITY_THRESHOLD;
   }
 
   /**

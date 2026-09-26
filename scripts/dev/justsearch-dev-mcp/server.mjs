@@ -254,7 +254,8 @@ async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, callerSe
         const staleRemedy =
           'STALE BACKEND: the running Head is serving an OLDER build than your source — behaviour may ' +
           'reflect old code. Run `./gradlew.bat :modules:ui:installDist` then restart/reload before ' +
-          'trusting results. (Stamp covers the head dist only; the worker dist is not stamped.)';
+          'trusting results. (Lane F stage A item A13: the head dist is the ONLY distribution now, ' +
+          'so this stamp covers everything the Engine loads.)';
         ownership.recommendedAction = ownership.recommendedAction
           ? `${staleRemedy} [then: ${ownership.recommendedAction}]`
           : staleRemedy;
@@ -412,7 +413,7 @@ function httpGetTextLimited(urlStr, { timeoutMs, maxBytes, method = 'GET' }) {
   });
 }
 
-function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, method = 'POST' }) {
+function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, method = 'POST', headers = {} }) {
   return new Promise((resolve) => {
     let u;
     try {
@@ -441,6 +442,7 @@ function httpPostJsonLimited(urlStr, body, { timeoutMs, maxBytes, method = 'POST
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(bodyStr),
           Accept: 'application/json',
+          ...headers,
         },
       },
       (res) => collectLimited(res, { statusCode: typeof res.statusCode === 'number' ? res.statusCode : null, maxBytes, finish }),
@@ -727,7 +729,6 @@ export const API_CALL_ALLOWLIST = [
   // Inference
   { path: '/api/inference/status', methods: ['GET'] },
   { path: '/api/inference/mode', methods: ['POST'] },
-  { path: '/api/inference/reload', methods: ['POST'] },
   // Worker
   { path: '/api/worker/restart', methods: ['POST'] },
   // AI install
@@ -765,6 +766,11 @@ export const API_CALL_ALLOWLIST = [
   // Diagnostics & knowledge
   { path: '/api/diagnostics/export', methods: ['POST'] },
   { path: '/api/knowledge/status', methods: ['GET'] },
+  {
+    path: '/api/operation-history/{operationKey}',
+    pattern: /^\/api\/operation-history\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    methods: ['GET'],
+  },
   // Wire schemas (tempdoc 913 T2). SchemaController serves the JSON Schema a route's response
   // record projects to (LocalApiServer.java:664); it is the primary-source way to check a wire
   // shape from the dev tools instead of inferring it from one sampled response body. The schema
@@ -777,7 +783,7 @@ export const API_CALL_ALLOWLIST = [
   },
   // Debug & telemetry
   { path: '/api/debug/events', methods: ['GET'] },
-  { path: '/api/debug/worker-log', methods: ['GET'] },
+  { path: '/api/debug/engine-log', methods: ['GET'] },
   { path: '/api/telemetry/health', methods: ['GET'] },
   // Action ledger — read-only activity/change feed (tempdoc 618 §8)
   { path: '/api/action-ledger', methods: ['GET'] },
@@ -977,9 +983,10 @@ export async function resolveReloadTarget({ mainRepoRoot, runJson }) {
           : hr
           ? 'This stack was started with hotReload: false, so its Worker has no JDWP listener — '
             + 'there is nothing to push bytecode to. (The old instructions claimed reload still '
-            + 'pushed method-body changes without it; WorkerSpawner\'s early return guards the '
-            + '-agentlib:jdwp flag too, so that was never true.) Stop and start again; hotReload '
-            + 'now defaults true.'
+            + 'pushed method-body changes without it; WorkerSpawner\'s early return used to guard '
+            + 'the -agentlib:jdwp flag too, so that was never true — item A11 has since deleted '
+            + 'WorkerSpawner and the Worker child process it launched.) Stop and start again; '
+            + 'hotReload now defaults true.'
           : 'This run record predates the per-run hot-reload record (tempdoc 844 R3), so the JDWP '
             + 'port and target identity of its Worker are unknown. Refusing to attach to a port on '
             + 'the assumption that it is 5005 and belongs to this run. Stop and start again.',
@@ -1147,8 +1154,7 @@ export function classifyHotSwapOutcome({ exitCode, stdout = '', stderr = '', ide
         + 'record names, but WITHOUT the hot-reload classes dir on its classpath, so nothing was '
         + 'pushed. That means the process was launched from a stale distribution predating the '
         + 'hot-reload classpath. Remedy: rebuild the dist in that tree '
-        + '(./gradlew.bat :modules:ui:installDist :modules:indexer-worker:installDist) and restart '
-        + 'the stack.',
+        + '(./gradlew.bat :modules:ui:installDist) and restart the stack.',
     } };
   }
   if (exitCode === 3) {
@@ -1868,7 +1874,10 @@ export async function main() {
   mcpServer.registerTool(
     'justsearch.dev.ingest',
     {
-      description: 'Index documents into the knowledge base. Paths must be repo-relative. Requires a running dev stack.',
+      description:
+        'Submit repo-relative paths to the knowledge base. Returns the durable operation response and key; '
+        + 'use justsearch.dev.api_call with GET /api/operation-history/{operationKey} to check progress. '
+        + 'Requires a running dev stack.',
       inputSchema: IngestInputSchema,
       annotations: { destructiveHint: true, openWorldHint: false },
     },
@@ -1897,7 +1906,13 @@ export async function main() {
       });
 
       const url = new URL('/api/knowledge/ingest', base).toString();
-      const body = { paths: absPaths };
+      const body = {
+        paths: absPaths,
+        ...(input.collection !== undefined ? { collection: input.collection } : {}),
+        ...(input.idempotencyKey !== undefined ? { idempotencyKey: input.idempotencyKey } : {}),
+        ...(input.confirmationToken !== undefined ? { confirmationToken: input.confirmationToken } : {}),
+        ...(input.preparationNonce !== undefined ? { preparationNonce: input.preparationNonce } : {}),
+      };
 
       maybeAppendNdjson(mainRepoRoot, {
         event: 'tool_start',
@@ -1906,62 +1921,62 @@ export async function main() {
         pathCount: absPaths.length,
       });
 
-      const res = await httpPostJsonLimited(url, body, { timeoutMs, maxBytes });
+      const res = await httpPostJsonLimited(url, body, {
+        timeoutMs,
+        maxBytes,
+        headers: { 'X-JustSearch-Transport': 'MCP' },
+      });
 
-      if (!res.ok || res.statusCode !== 200) {
-        const out = IngestOutputSchema.parse({
-          ok: false,
-          runId: effectiveRunId,
-          url,
-          statusCode: res.statusCode,
-          error: ToolErrorSchema.parse({ message: res.error?.message || `HTTP ${res.statusCode}` }),
-        });
-        return toToolResult(out);
+      let operationResponse;
+      let parseError = null;
+      if (res.truncated !== true && typeof res.text === 'string') {
+        try {
+          operationResponse = JSON.parse(res.text || '');
+        } catch {
+          parseError = 'Invalid JSON response';
+        }
       }
 
-      // Tempdoc 844 B4b: declare a maxBytes truncation as itself, not as a parse failure.
-      if (res.truncated === true) {
-        return toToolResult(IngestOutputSchema.parse({
-          ok: false,
-          runId: effectiveRunId,
-          url,
-          statusCode: res.statusCode,
-          truncated: true,
-          bytesRead: res.bytesRead,
-          maxBytesLimit: maxBytes,
-          error: ToolErrorSchema.parse(truncationNotice({ bytesRead: res.bytesRead, maxBytes })),
-        }));
-      }
-
-      let parsed;
-      try {
-        parsed = JSON.parse(res.text || '');
-      } catch {
-        const out = IngestOutputSchema.parse({
-          ok: false,
-          runId: effectiveRunId,
-          url,
-          statusCode: res.statusCode,
-          error: ToolErrorSchema.parse({ message: 'Invalid JSON response' }),
-        });
-        return toToolResult(out);
-      }
+      const httpSuccess = res.statusCode >= 200 && res.statusCode < 300;
+      const succeeded = res.ok === true && httpSuccess && operationResponse?.success === true;
+      const operationMessage = typeof operationResponse?.message === 'string'
+        ? operationResponse.message
+        : null;
+      const operationErrorCode = typeof operationResponse?.errorCode === 'string'
+        ? operationResponse.errorCode
+        : null;
+      const error = succeeded
+        ? undefined
+        : res.truncated === true
+          ? ToolErrorSchema.parse(truncationNotice({ bytesRead: res.bytesRead, maxBytes }))
+          : ToolErrorSchema.parse({
+          ...(operationErrorCode ? { code: operationErrorCode } : {}),
+          message: parseError
+            || res.error?.message
+            || operationMessage
+            || (httpSuccess ? 'Operation invocation failed' : `HTTP ${res.statusCode}`),
+          });
 
       const out = IngestOutputSchema.parse({
-        ok: true,
+        ok: succeeded,
         runId: effectiveRunId,
         url,
         statusCode: res.statusCode,
-        accepted: parsed.accepted ?? 0,
-        ...(parsed.error ? { error: parsed.error } : {}),
+        ...(operationResponse !== undefined ? { operationResponse } : {}),
+        ...(res.truncated === true ? {
+          truncated: true,
+          bytesRead: res.bytesRead,
+          maxBytesLimit: maxBytes,
+        } : {}),
+        ...(!succeeded ? { error } : {}),
       });
 
       maybeAppendNdjson(mainRepoRoot, {
         event: 'tool_ingest_result',
         tool: 'justsearch.dev.ingest',
         runId: effectiveRunId,
-        ok: true,
-        accepted: out.accepted,
+        ok: out.ok,
+        ...(operationErrorCode ? { errorCode: operationErrorCode } : {}),
       });
       return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId: input.sessionId || resolveAgentSessionIdForMcp(repoRoot) }));
     },
@@ -1999,23 +2014,12 @@ export async function main() {
       }
       const distCheckRoot = distRoot.repoRoot;
 
-      // 1a. Worker distribution exists
-      const workerBin = path.join(distCheckRoot, 'modules', 'indexer-worker', 'build', 'install', 'indexer-worker', 'bin',
-        process.platform === 'win32' ? 'indexer-worker.bat' : 'indexer-worker');
-      const workerObservation = await observePath(workerBin);
-      if (workerObservation.state === FILE_OBSERVATION.PRESENT) {
-        setCheck('workerDist', 'PASS', `OK (${workerBin})`);
-      } else if (workerObservation.state === FILE_OBSERVATION.ABSENT) {
-        setCheck('workerDist', 'FAIL', `Missing: ${workerBin}. Run: ./gradlew.bat assemble`);
-      } else {
-        setCheck(
-          'workerDist',
-          'UNKNOWN',
-          `Could not verify Worker distribution (${workerObservation.state}): ${workerObservation.error?.message}`,
-        );
-      }
-
-      // 1b. Head (UI) distribution exists — the dev-runner spawns from installDist, not gradlew
+      // 1. Head (UI) distribution exists — the dev-runner spawns from installDist, not gradlew.
+      //    Lane F stage A item A13: there used to be a `workerDist` check here (1a) probing
+      //    modules/indexer-worker/build/install/indexer-worker/bin/indexer-worker(.bat). The Worker
+      //    process, its `application` plugin and that start script are gone, so the check is
+      //    retired rather than repointed: a second probe of the one dist would be a duplicate
+      //    dressed as independent evidence. This check is now the whole dist truth.
       const headBin = path.join(distCheckRoot, 'modules', 'ui', 'build', 'install', 'ui', 'bin',
         process.platform === 'win32' ? 'ui.bat' : 'ui');
       const headObservation = await observePath(headBin);
@@ -2189,7 +2193,7 @@ export async function main() {
       const checks = Object.fromEntries(
         Object.entries(checkStates).map(([name, state]) => [name, state === 'PASS']),
       );
-      const ready = ['workerDist', 'headDist', 'noStaleRun', 'modelsDir', 'noInferenceOrphan']
+      const ready = ['headDist', 'noStaleRun', 'modelsDir', 'noInferenceOrphan']
         .every((name) => checkStates[name] === 'PASS');
       return toToolResult(PreflightOutputSchema.parse({
         ready,
@@ -2896,7 +2900,14 @@ export async function main() {
       }
       const module = recordedModule || 'worker-services';
       const debugPort = input.debugPort || recordedPort;
-      const signalFile = dataDir ? path.join(dataDir, 'worker_signal.lock') : null;
+      // Lane F stage A review S2. The reload trigger used to be a byte at offset 29 of the
+      // memory-mapped worker_signal.lock, which only worked because the Worker was a second
+      // process sharing that region. It is one JVM now, and the request is a file in the runtime
+      // directory: InProcessWorkerSignalBus polls for it and deletes it on consumption
+      // (RELOAD_REQUEST_FILENAME). Existence is the entire payload, so the write is a create.
+      const reloadRequestFile = dataDir
+        ? path.join(dataDir, 'runtime', 'dev-reload.request')
+        : null;
       const classesDir = path.join(runRoot, 'modules', module, 'build', 'classes', 'java', 'main');
       // The pusher is the tool THIS server ships with, not whatever copy the run's tree happens to
       // hold: an older copy would silently skip the identity check it does not have. The bytecode
@@ -2964,16 +2975,21 @@ export async function main() {
         result.restartRequired = 'Structural change (added/removed methods or fields) — standard HotSwap cannot apply it. Restart the dev stack.';
       }
 
-      // 4. 371: If hot-swap succeeded, propagate the current build stamp to the Worker
+      // 4. 371: If hot-swap succeeded, propagate the current build stamp to the Engine
       //    so it reports the correct stamp after reload (avoids false-positive staleness warnings).
-      //    On structural-change failure, skip — the Worker is genuinely stale.
-      //    MUST happen BEFORE the MMF signal: the Worker reads this file during performReload(),
-      //    which starts as soon as the sentinel detects the signal byte.
+      //    On structural-change failure, skip — the running code is genuinely stale.
+      //    MUST happen BEFORE the reload request is written: the Engine reads this file during
+      //    performReload(), which starts as soon as the sentinel sees the request file.
       //    Tempdoc 844 §5.6 #2: the stamp is read from the RUN's tree, not the caller's — copying
       //    the caller's stamp into a peer's data dir is what defeated 371's stale-JVM detection.
+      //    Lane F stage A item A13: the ADR-0021 `generateBuildStamp` task moved from the Worker
+      //    distribution to the one surviving distribution, so the file is now
+      //    modules/ui/build/install/ui/build-stamp.txt. It is still the Gradle content hash — NOT
+      //    the dev-runner's mtime-based `computeHeadDistStamp` provenance value, which is a
+      //    different stamp on a different property (`justsearch.head.stamp`).
       if (result.hotSwapOk && dataDir) {
         try {
-          const stampPath = path.join(runRoot, 'modules', 'indexer-worker', 'build', 'install', 'indexer-worker', 'build-stamp.txt');
+          const stampPath = path.join(runRoot, 'modules', 'ui', 'build', 'install', 'ui', 'build-stamp.txt');
           const stamp = (await fsp.readFile(stampPath, 'utf8')).trim();
           if (stamp) {
             await fsp.writeFile(path.join(dataDir, 'reload-build-stamp.txt'), stamp, 'utf8');
@@ -2983,31 +2999,33 @@ export async function main() {
         }
       }
 
-      // 5. Write reload signal to MMF (triggers Worker's DevReloadManager).
-      //    Tempdoc 844 §5.6 #3 / R5: this used to be gated only on `signalFile` being non-null,
+      // 5. Ask the Engine to reconstruct its services (triggers DevReloadManager).
+      //    Tempdoc 844 §5.6 #3 / R5: this used to be gated only on the signal file being non-null,
       //    with a comment saying reconstruction should happen anyway — so a FAILED push still
       //    quiesced and reconstructed the Worker's services. Tearing services down is not a
       //    consolation prize for a push that did not land, and on a peer's stack it was an
       //    unauthorized teardown. It now happens only when new bytecode actually went in, and the
       //    skip is stated rather than silent.
-      if (result.hotSwapOk && signalFile) {
+      if (result.hotSwapOk && reloadRequestFile) {
         try {
-          const fh = await fsp.open(signalFile, 'r+');
+          await fsp.mkdir(path.dirname(reloadRequestFile), { recursive: true });
+          // 'w' and not 'wx': a leftover request from a reload that was interrupted before the
+          // Engine consumed it must not make the next reload look like it failed to ask.
+          const fh = await fsp.open(reloadRequestFile, 'w');
           try {
-            const buf = Buffer.from([1]);
-            await fh.write(buf, 0, 1, 29); // OFFSET_RELOAD_SIGNAL = 29
+            await fh.writeFile(new Date().toISOString() + ' reload requested\n', 'utf8');
             result.signalWritten = true;
           } finally {
             await fh.close();
           }
         } catch (err) {
-          result.signalError = `Failed to write signal: ${err.message}`;
+          result.signalError = `Failed to write reload request: ${err.message}`;
         }
       } else if (!result.hotSwapOk) {
         result.signalSkippedReason = 'No new bytecode was pushed, so services were NOT reconstructed '
           + '— the running stack is unchanged.';
-      } else if (!signalFile) {
-        result.signalSkippedReason = 'The run record has no dataDir, so the reload signal file could '
+      } else if (!reloadRequestFile) {
+        result.signalSkippedReason = 'The run record has no dataDir, so the reload request file could '
           + 'not be located; bytecode was pushed but services were NOT reconstructed.';
       }
 

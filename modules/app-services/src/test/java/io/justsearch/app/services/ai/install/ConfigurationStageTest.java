@@ -143,8 +143,13 @@ final class ConfigurationStageTest {
         .apply();
 
     assertEquals(
-        List.of("apply|Applying configuration...", "restart_worker|Restarting worker..."),
+        List.of(
+            "apply|Applying configuration...",
+            "restart_worker|Applied — restart JustSearch to use the new configuration"),
         phases,
-        "the FE keys off phase — these two strings are the contract");
+        "the FE keys off phase — these two strings are the contract. The second message changed"
+            + " at lane F stage A: nothing restarts a worker any more, so it states the outcome"
+            + " and the user action (restart_required) instead of narrating a restart. Pinned"
+            + " exactly, so a re-introduction of the old over-claim fails here.");
   }
 }

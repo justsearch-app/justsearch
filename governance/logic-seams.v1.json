@@ -104,30 +104,6 @@
       "note": "Functional-core extraction from BackfillScheduler (the System.currentTimeMillis next-retry timestamp stays in the scheduler)."
     },
     {
-      "id": "worker-supervision",
-      "gradlePath": ":modules:app-services",
-      "targetClass": "io.justsearch.app.services.worker.SupervisionDecision",
-      "targetTests": [
-        "io.justsearch.app.services.worker.SupervisionDecisionTest"
-      ],
-      "pure": true,
-      "law": "A recoverable Worker fault never dead-ends at a status flag (Observation-Actuation Closure, tempdoc 627): given (processAlive, consecutiveUnhealthy, restartAttempts, lastStartKnown, msSinceLastStart) and the policy, decide() yields RESTART (graceful for a hang, respawn for death) while within the shared cap, GIVE_UP once the cap is exceeded, and resets the budget after the stability window. Death and hang draw from ONE cap. Backoff = min(base << (attempt-1), max). A flipped comparison or off-by-one silently never-recovers (hung worker stuck) or never-gives-up (restart storm).",
-      "guard": "test:SupervisionDecisionTest",
-      "note": "The Worker's recovery-contract authority (functional core); the impure shell (WorkerSpawner.superviseTick/doRestart) interprets the Decision verbatim. Brain side (BrainSupervisionPolicy) is policy-declared but not a seam — its decision is a trivial >= branch entangled with orchestration (tempdoc 627 investigation)."
-    },
-    {
-      "id": "worker-liveness-suicide",
-      "gradlePath": ":modules:worker-services",
-      "targetClass": "io.justsearch.indexerworker.loop.WorkerLivenessDecision",
-      "targetTests": [
-        "io.justsearch.indexerworker.loop.WorkerLivenessDecisionTest"
-      ],
-      "pure": true,
-      "law": "The Worker self-exits iff an explicit shutdown is signalled, OR — past the startup grace — the Main (Head) heartbeat is stale AND Head is not known-alive (tempdoc 630). A stale heartbeat ALONE does not kill: it must be corroborated by Head-PID death (HeadLiveness != ALIVE), because an OS suspend/resume yields a benign stale beat while Head (PID persisting across suspend) is alive. HeadLiveness.UNKNOWN (no PID signal) preserves the pre-630 heartbeat-only behavior. A flipped Head-liveness comparison silently re-introduces the false-suicide-on-every-wake, or (the unsafe direction) lets a real orphan outlive a dead Head.",
-      "guard": "test:WorkerLivenessDecisionTest",
-      "note": "The Worker's heartbeat-suicide functional core; the impure shell (MmfWorkerSignalBus.shouldDie + headLiveness) gathers nowMs/heartbeat/Head-PID-liveness and interprets the boolean verbatim. The liveness-continuity precondition (tempdoc 630) dual to the 627 Observation-Actuation Closure: an invalid (suspend-confounded) staleness observation must not actuate."
-    },
-    {
       "id": "legibility-floor-check",
       "gradlePath": ":modules:app-services",
       "targetClass": "io.justsearch.app.services.vdu.LegibilityMeasures",
@@ -176,6 +152,18 @@
       "law": "permitsTier(t) iff 1 <= t <= maxFallbackTiers (tier 0 = structured extraction is never charged); exhausted(elapsedMs) iff elapsedMs >= perDocBudgetMs (boundary inclusive); permitsTierNow(t, elapsedMs) = permitsTier(t) AND NOT exhausted(elapsedMs). Negative bounds are rejected, never clamped. A silent widening lets one pathological document consume unbounded OCR/GPU time; a silent narrowing disables the fallback chain that recovers empty extractions.",
       "guard": "test:ExtractionFallbackBudgetTest + test:ExtractionDropoutFallbackChainTest",
       "note": "Tempdoc 790 item 2: the per-document bound on the dropout fallback chain, nested inside TimeboxedContentExtractor's whole-extraction timeout."
+    },
+    {
+      "id": "extraction-process-routing",
+      "gradlePath": ":modules:worker-services",
+      "targetClass": "io.justsearch.indexerworker.extract.RoutingExtractionSandbox",
+      "targetTests": [
+        "io.justsearch.indexerworker.extract.ExtractionRoutingTest"
+      ],
+      "pure": true,
+      "law": "The routing verdict is total over IndexingDocumentOps.classifyFileKind: pdf, office, archive, image and binary require process isolation; text, markdown and code stay in process. Null and unrecognized kind labels are not process families. The router delegates exactly once to the sandbox selected by that verdict, so a negated condition cannot silently run a wedge-prone parser inside the Engine.",
+      "guard": "test:ExtractionRoutingTest",
+      "note": "Lane F C1-14. The registered pure law is requiresProcessIsolation; extract only projects the existing classifier into that decision. The two sandbox owners and their cleanup remain IO boundaries, not a new taxonomy."
     },
     {
       "id": "install-completeness",

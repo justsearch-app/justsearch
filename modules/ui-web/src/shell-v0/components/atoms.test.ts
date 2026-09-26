@@ -87,7 +87,7 @@ describe('jf-button (574 atom)', () => {
 });
 
 describe('jf-status-badge (574 atom)', () => {
-  it('projects tinted bg + solid fg from the tone', async () => {
+  it('projects tinted bg + text-grade fg from the tone', async () => {
     const el = await mount<StatusBadge>('jf-status-badge', (c) => {
       c.status = 'completed';
       c.label = 'Healthy';
@@ -95,7 +95,8 @@ describe('jf-status-badge (574 atom)', () => {
     const badge = el.shadowRoot!.querySelector('.badge') as HTMLElement;
     const style = badge.getAttribute('style') ?? '';
     expect(style).toContain('--accent-success-16');
-    expect(style).toContain('var(--accent-success)');
+    expect(style).toContain('--badge-fg: var(--text-success)');
+    expect(style).not.toContain('--badge-fg: var(--accent-success)');
     expect(badge.textContent).toContain('Healthy');
   });
   it('projects the originator accent from the `origin` axis (originatorTone authority)', async () => {

@@ -8,7 +8,7 @@ import io.justsearch.app.observability.ai.AiPackImportResourceCatalog;
 import io.justsearch.app.observability.diagnostic.DiagnosticChannelAppender;
 import io.justsearch.app.observability.diagnostic.DiagnosticChannelAppenderInstaller;
 import io.justsearch.app.observability.diagnostic.DiagnosticChannelStreamRegistry;
-import io.justsearch.app.observability.diagnostic.HeadLogDiagnosticChannelCatalog;
+import io.justsearch.app.observability.diagnostic.EngineLogDiagnosticChannelCatalog;
 import io.justsearch.app.observability.health.ConditionRecoveryIndexCatalog;
 import io.justsearch.app.observability.health.ConditionRecoveryIndexChangeRegistry;
 import io.justsearch.app.observability.health.HealthResourceCatalog;
@@ -55,7 +55,7 @@ public final class ResourceSubstrateInit {
       IndexedRootsResourceCatalog indexedRootsResourceCatalog,
       ConditionRecoveryIndexCatalog conditionRecoveryIndexResourceCatalog,
       ConditionRecoveryIndexChangeRegistry conditionRecoveryIndexChangeRegistry,
-      HeadLogDiagnosticChannelCatalog headLogDiagnosticChannelCatalog,
+      EngineLogDiagnosticChannelCatalog engineLogDiagnosticChannelCatalog,
       DiagnosticChannelStreamRegistry diagnosticChannelStreamRegistry,
       DiagnosticChannelAppender diagnosticChannelAppender,
       DiagnosticChannelAppenderInstaller diagnosticChannelAppenderInstaller,
@@ -89,12 +89,12 @@ public final class ResourceSubstrateInit {
         new ConditionRecoveryIndexCatalog();
     ConditionRecoveryIndexChangeRegistry conditionRecoveryIndexChangeRegistry =
         new ConditionRecoveryIndexChangeRegistry();
-    HeadLogDiagnosticChannelCatalog headLogDiagnosticChannelCatalog =
-        new HeadLogDiagnosticChannelCatalog();
+    EngineLogDiagnosticChannelCatalog engineLogDiagnosticChannelCatalog =
+        new EngineLogDiagnosticChannelCatalog();
     DiagnosticChannelStreamRegistry diagnosticChannelStreamRegistry =
-        new DiagnosticChannelStreamRegistry(headLogDiagnosticChannelCatalog);
+        new DiagnosticChannelStreamRegistry(engineLogDiagnosticChannelCatalog);
     DiagnosticChannelAppender diagnosticChannelAppender =
-        new DiagnosticChannelAppender(diagnosticChannelStreamRegistry, headLogDiagnosticChannelCatalog);
+        new DiagnosticChannelAppender(diagnosticChannelStreamRegistry, engineLogDiagnosticChannelCatalog);
     DiagnosticChannelAppenderInstaller diagnosticChannelAppenderInstaller =
         new DiagnosticChannelAppenderInstaller(diagnosticChannelAppender);
     diagnosticChannelAppenderInstaller.attach();
@@ -115,7 +115,7 @@ public final class ResourceSubstrateInit {
         indexedRootsResourceCatalog,
         conditionRecoveryIndexResourceCatalog,
         conditionRecoveryIndexChangeRegistry,
-        headLogDiagnosticChannelCatalog,
+        engineLogDiagnosticChannelCatalog,
         diagnosticChannelStreamRegistry,
         diagnosticChannelAppender,
         diagnosticChannelAppenderInstaller,

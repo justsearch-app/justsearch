@@ -2,8 +2,12 @@ package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import io.justsearch.indexerworker.fixtures.FormatCapabilityFixtureFactory;
 import io.justsearch.indexerworker.fixtures.FormatCapabilityFixtureFactory.FormatId;
@@ -39,7 +43,8 @@ final class ExtractionRoutingTest {
     RoutingExtractionSandbox router =
         new RoutingExtractionSandbox(inProcess, outOfProcess, new ContentExtractor());
 
-    router.extract(copyFixture("/fixtures/pdf/pdf-text-layer.pdf", "doc.pdf"));
+    assertEquals(inProcess.policy(), router.policy());
+    assertEquals("out", router.extract(copyFixture("/fixtures/pdf/pdf-text-layer.pdf", "doc.pdf")).parserId());
     router.extract(copyFixture("/fixtures/office/office-marker.docx", "doc.docx"));
     router.extract(copyFixture("/fixtures/office/office-marker.pptx", "deck.pptx"));
     for (FormatId id : FormatId.values()) {
@@ -64,7 +69,7 @@ final class ExtractionRoutingTest {
         outOfProcess.seen,
         "wedge-prone families must be parsed out of process");
 
-    router.extract(write("notes.txt", "plain text"));
+    assertEquals("in", router.extract(write("notes.txt", "plain text")).parserId());
     router.extract(write("readme.md", "# heading"));
     router.extract(write("App.java", "class App {}"));
     router.extract(write("rows.csv", "a,b\n1,2\n"));
@@ -88,6 +93,33 @@ final class ExtractionRoutingTest {
     assertFalse(RoutingExtractionSandbox.requiresProcessIsolation(null));
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+      "false,false,false,false", "true,false,false,false", "false,true,false,false",
+      "true,true,false,false", "true,true,true,false", "true,true,false,true"
+  })
+  void closeAttemptsBothOwnersAndPreservesFailureIdentity(
+      boolean firstThrows, boolean secondThrows, boolean fatal, boolean sharedFailure) {
+    var inProcess = mock(ExtractionSandbox.class);
+    var outOfProcess = mock(ExtractionSandbox.class);
+    var router = new RoutingExtractionSandbox(inProcess, outOfProcess, mock(ContentExtractorProvider.class));
+    Throwable first = fatal ? new AssertionError("first close") : new IllegalStateException("first close");
+    Throwable second = sharedFailure ? first : new IllegalStateException("second close");
+    if (firstThrows) doThrow(first).when(inProcess).close();
+    if (secondThrows) doThrow(second).when(outOfProcess).close();
+    if (firstThrows || secondThrows) {
+      Throwable expected = firstThrows ? first : second;
+      assertSame(expected, assertThrows(expected.getClass(), router::close));
+      org.junit.jupiter.api.Assertions.assertArrayEquals(
+          firstThrows && secondThrows && !sharedFailure ? new Throwable[] {second} : new Throwable[0],
+          expected.getSuppressed());
+    } else {
+      router.close();
+    }
+    verify(inProcess).close();
+    verify(outOfProcess).close();
+  }
+
   /**
    * The mode switch, asserted on an observable difference rather than on a getter: only the
    * in-process mode tolerates an empty child command, because the other two build a child pool.
@@ -95,7 +127,7 @@ final class ExtractionRoutingTest {
   @Test
   void modeSwitchSelectsTheSandbox() {
     try (TimeboxedContentExtractor inProcess =
-        ExtractionSandboxFactory.create(
+        ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             ExtractionSandboxFactory.Mode.IN_PROCESS,
             TikaExtractionPolicy.defaults(),
             Duration.ofSeconds(5),
@@ -109,7 +141,7 @@ final class ExtractionRoutingTest {
       assertThrows(
           IllegalArgumentException.class,
           () ->
-              ExtractionSandboxFactory.create(
+              ExtractionSandboxFactory.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
                   mode,
                   TikaExtractionPolicy.defaults(),
                   Duration.ofSeconds(5),
@@ -121,14 +153,14 @@ final class ExtractionRoutingTest {
 
   /**
    * The startup probe, both ways. Spawning is lazy, so without it a broken child command is
-   * invisible until the first file and then fails every file; the Worker uses this verdict to fall
-   * back to in-process extraction for the session instead.
+   * invisible until the first routed file. A failed probe is reported at startup; routed families
+   * remain confined and fail with SANDBOX_FAILED while decoder-only formats remain usable.
    */
   @Test
   void startupProbeAnswersForAWorkingChildAndNamesTheFailureForABrokenOne() {
     assertEquals(
         java.util.Optional.empty(),
-        ExtractionSandboxFactory.probeChildCommand(
+        ExtractionSandboxFactory.probeChildCommand(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             PersistentExtractionSandboxTest.javaCommand(ExtractionSandboxChild.class),
             TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(),
@@ -136,7 +168,7 @@ final class ExtractionRoutingTest {
         "the shipped child command must pass its own probe");
 
     java.util.Optional<String> broken =
-        ExtractionSandboxFactory.probeChildCommand(
+        ExtractionSandboxFactory.probeChildCommand(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             List.of("this-binary-does-not-exist", "--serve"),
             TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(),

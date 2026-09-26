@@ -166,6 +166,8 @@ const TARGETS = [
   // Phase B: the Operation wire is the UIOperationView record (the emitter builds + serializes it),
   // so this schema == the live /api/registry/operations entry shape (was the divergent emitter, §13.2).
   { schema: 'SSOT/schemas/operation-wire.v1.json', outFile: 'operation.ts', rootName: 'OperationWire' },
+  // Recorded migration gaps use the same outcome record served by operation-history.
+  { schema: 'SSOT/schemas/operation-outcome-view.v1.json', outFile: 'operation-outcome-view.ts', rootName: 'OperationOutcomeView' },
   // DiagnosticChannel slice (tempdoc 560 §4c): the Logs surface's registry primitive — the
   // UIDiagnosticChannelView record's projection, retiring the hand-mirrored types/diagnostic.ts.
   { schema: 'SSOT/schemas/diagnostic-channel.v1.json', outFile: 'diagnostic-channel.ts', rootName: 'DiagnosticChannelWire' },

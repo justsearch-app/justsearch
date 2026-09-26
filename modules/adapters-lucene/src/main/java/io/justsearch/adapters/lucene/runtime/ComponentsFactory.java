@@ -290,6 +290,24 @@ final class ComponentsFactory {
       long reopenTargetMs = nrtMode == NrtMode.ON_DEMAND ? nrtBackgroundMs : nrtTargetMs;
       long reopenHardMs = nrtMode == NrtMode.ON_DEMAND ? nrtBackgroundMs : nrtHardMs;
       NrtReopenStats stats = nrtStats != null ? nrtStats : new NrtReopenStats();
+      IndexRuntimeConfiguration runtimeConfiguration =
+          IndexRuntimeConfiguration.fromFactory(
+              idx,
+              dir,
+              cfg,
+              tmp,
+              mergePolicy,
+              fieldMapper,
+              kf,
+              knnVectorsFormatOverride == null,
+              hnswM,
+              efConstruction,
+              softDeleteFieldResolved,
+              nrtTargetMs,
+              nrtHardMs,
+              nrtMode,
+              nrtBackgroundMs,
+              nrtOnDemandMaxStaleMs);
 
       if (readOnly) {
         try {
@@ -329,7 +347,8 @@ final class ComponentsFactory {
             nrtMode,
             nrtOnDemandMaxStaleMs,
             reopenTargetMs,
-            reopenHardMs);
+            reopenHardMs,
+            runtimeConfiguration);
       }
 
       w = new IndexWriter(dir, cfg);
@@ -338,6 +357,12 @@ final class ComponentsFactory {
       // outside the integrity-tier block above — whether the next boot scans is a separate question
       // from whether this session could dirty the index.
       CleanShutdownMarker.consume(resolvedPath);
+      // A fresh writer has no durable index until its first commit. Publish only after creating a
+      // neutral empty commit so crash recovery can reopen this generation read-only. The first real
+      // CommitOps commit replaces its metadata; zero-doc parity deliberately ignores that metadata.
+      if (!DirectoryReader.indexExists(dir)) {
+        w.commit();
+      }
       softDeletesReader =
           new SoftDeletesDirectoryReaderWrapper(
               DirectoryReader.open(w, /*applyAllDeletes=*/ true, /*writeAllDeletes=*/ true),
@@ -365,7 +390,8 @@ final class ComponentsFactory {
           nrtMode,
           nrtOnDemandMaxStaleMs,
           reopenTargetMs,
-          reopenHardMs);
+          reopenHardMs,
+          runtimeConfiguration);
     } catch (Exception e) {
       // Best-effort cleanup to avoid leaking file handles (especially on Windows).
       try {

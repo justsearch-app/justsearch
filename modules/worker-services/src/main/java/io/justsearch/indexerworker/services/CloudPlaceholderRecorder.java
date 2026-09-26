@@ -48,6 +48,10 @@ class CloudPlaceholderRecorder {
    * best-effort — a probe failure falls through to insert; an insert failure is logged and dropped.
    */
   void record(Path file) {
+    record(file, null, CallContext.none().provenance());
+  }
+
+  void record(Path file, String collection, JobQueue.EnqueueProvenance provenance) {
     String normalizedPath = PathNormalizer.normalizePath(file.toAbsolutePath().toString());
     String pathHash = sha256Hex(normalizedPath);
     long since = System.currentTimeMillis() - DEDUP_WINDOW_MS;
@@ -62,7 +66,8 @@ class CloudPlaceholderRecorder {
             "Cloud-only placeholder; reading would hydrate over network");
     JobQueue.IngestionLedgerEntry entry =
         new JobQueue.IngestionLedgerEntry(
-            pathHash, null, null, null, "CLOUD_PLACEHOLDER", "NOT_CREATED", "n/a", "n/a");
+            pathHash, collection, null, null, "CLOUD_PLACEHOLDER", "NOT_CREATED", "n/a", "n/a",
+            provenance.originator(), provenance.transport());
     try {
       jobQueue.recordIngestionEvent(file, outcome, entry);
     } catch (OutcomeWriteException e) {

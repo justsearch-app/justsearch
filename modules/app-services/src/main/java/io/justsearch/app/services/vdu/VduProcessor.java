@@ -7,6 +7,7 @@ import io.justsearch.app.api.OnlineAiRuntimeIntrospection;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.util.TempFileManager;
+import io.justsearch.core.execution.EngineFutures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +75,7 @@ public class VduProcessor {
      * </ol>
      *
      * @see io.justsearch.ui.api.SummaryController#MAX_CONTENT_CHARS 6K summarization limit
-     * @see io.justsearch.indexerworker.services.GrpcSearchService#MAX_CONTENT_CHARS 200K transport
+     * @see io.justsearch.indexerworker.services.WorkerSearchService#MAX_CONTENT_CHARS 200K transport
      */
     private static final int MAX_CONTEXT_CHARS = 8000;
 
@@ -154,12 +155,13 @@ public class VduProcessor {
         }
     }
 
-    /** Exit VDU mode (restores normal server configuration). Logs, does not throw, on failure. */
+    /** Exit VDU mode (restores normal server configuration). */
     public void exitVduMode() {
         try {
             lifecycleControl.exitVduMode();
         } catch (ModeTransitionException e) {
-            LOG.error("Failed to exit VDU mode; server may remain in vision-safe config", e);
+            throw new IllegalStateException(
+                "Failed to exit VDU mode; server may remain in vision-safe config", e);
         }
     }
 
@@ -177,7 +179,7 @@ public class VduProcessor {
      * @return extracted and enriched content
      * @throws VduException if processing fails
      */
-    public VduResult process(Path filePath) throws VduException {
+    public VduResult process(Path filePath, io.justsearch.core.context.EngineContext engineContext) throws VduException {
         if (!hasVisionCapability()) {
             throw new VduException(
                 "Vision capability not available — no vision projector (mmproj) configured. "
@@ -256,10 +258,10 @@ public class VduProcessor {
                     LOG.debug("Processing page {}/{}", idx + 1, pageImages.size());
 
                     byte[] imageBytes = imagePreparer.prepare(pageImages.get(idx));
-                    OnlineAiService.VisionCompletionResult pageResult =
-                        aiService.visionCompletionDetailed(PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS)
-                            .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                            .join();
+                    OnlineAiService.VisionCompletionResult pageResult = EngineFutures.await(
+                        aiService.visionCompletionDetailed(PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS,
+                                SamplingParams.VDU, null, engineContext)
+                            .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS));
                     sentPageResults.add(pageResult);
 
                     if (pageImages.size() > 1) {
@@ -297,7 +299,7 @@ public class VduProcessor {
             // pass, and processing continues into Pass 2 exactly as the PASS band would.
             GateVerdict resolvedVerdict = stage1Verdict;
             if (stage1Verdict.band() == GateVerdict.Band.AMBIGUOUS) {
-                resolvedVerdict = runAgreementProbe(legiblePageIndices, pageImages, sentPageResults, filePath);
+                resolvedVerdict = runAgreementProbe(legiblePageIndices, pageImages, sentPageResults, filePath, engineContext);
                 if (resolvedVerdict.rejected()) {
                     LOG.info("VDU Stage 2 rejected output for {} (agreement={}, probedPage={})",
                         filePath.getFileName(), resolvedVerdict.agreement(), resolvedVerdict.probedPage());
@@ -312,13 +314,12 @@ public class VduProcessor {
             try {
                 String pass2Prompt = String.format(PASS2_PROMPT_TEMPLATE,
                     truncateForPrompt(extractedText, MAX_CONTEXT_CHARS));
-                enrichment = aiService.chatCompletion(
-                    List.of(Map.of("role", "user", "content", pass2Prompt)),
-                    PASS2_MAX_TOKENS,
-                    SamplingParams.VDU
-                )
-                    .orTimeout(VDU_CHAT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    .join();
+                enrichment = EngineFutures.await(
+                    aiService.chatCompletion(
+                            List.of(Map.of("role", "user", "content", pass2Prompt)),
+                            PASS2_MAX_TOKENS,
+                            SamplingParams.VDU, engineContext)
+                        .orTimeout(VDU_CHAT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             } finally {
                 catalog.pass2DurationMs.record(elapsedMs(pass2StartNanos), VduPassTags.of());
             }
@@ -337,6 +338,7 @@ public class VduProcessor {
             LOG.error("VDU I/O error for: {}", filePath, e);
             throw new VduException("Failed to read/render document: " + e.getMessage(), e);
         } catch (Exception e) {
+            EngineFutures.rethrowCancellation(e);
             // Check for timeout (wrapped in CompletionException)
             Throwable cause = e.getCause();
             if (cause instanceof TimeoutException || e instanceof TimeoutException) {
@@ -505,18 +507,17 @@ public class VduProcessor {
         List<Integer> legiblePageIndices,
         List<Path> pageImages,
         List<OnlineAiService.VisionCompletionResult> sentPageResults,
-        Path filePath) throws IOException {
+        Path filePath, io.justsearch.core.context.EngineContext engineContext) throws IOException {
         int worstIdx = worstSignalIndex(sentPageResults);
         int pageIndex = legiblePageIndices.get(worstIdx);
         String originalPageText = sentPageResults.get(worstIdx).content();
 
         byte[] imageBytes = imagePreparer.prepare(pageImages.get(pageIndex));
-        OnlineAiService.VisionCompletionResult probeResult =
+        OnlineAiService.VisionCompletionResult probeResult = EngineFutures.await(
             aiService.visionCompletionDetailed(
                     PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS,
-                    SamplingParams.VDU_PROBE, STAGE2_PROBE_SEED)
-                .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .join();
+                    SamplingParams.VDU_PROBE, STAGE2_PROBE_SEED, engineContext)
+                .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         double agreement = VduAbstentionGate.jaccardAgreement(originalPageText, probeResult.content());
         LOG.info("VDU Stage 2 agreement probe for {} page {}: agreement={}",

@@ -58,20 +58,20 @@ final class ValidatorRunnerTest {
   static void loadFixture() {
     HandlerRegistry handlers = new HandlerRegistry();
     handlers.register(CoreOperationCatalog.RESTART_WORKER, new RestartWorkerHandler());
-    // Slice 429 follow-up: BulkReindex now requires an IndexingService supplier.
-    // For validator tests (structural checks of the catalog), pass an unavailable
-    // service — the validator doesn't invoke handlers.
+    // Validator tests inspect registrations without invoking them; both durable bulk profiles
+    // share the prepared recorded handler.
     handlers.register(
         CoreOperationCatalog.BULK_REINDEX,
         new BulkReindexHandler(
-            io.justsearch.app.api.IndexingService::unavailable,
-            io.justsearch.app.api.OperationLeaseService.noOp()));
-    // Slice 447-followup §X.11.5 Phase 7: rebuild-index parameterless wrapper handler.
+            io.justsearch.app.api.operations.RecordedBulkPlan.Profile.USER_BULK,
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            ignored -> List.of(), io.justsearch.app.api.IndexingService::unavailable, List::of));
     handlers.register(
         CoreOperationCatalog.REBUILD_INDEX,
-        new io.justsearch.app.services.registry.operations.handlers.RebuildIndexHandler(
-            io.justsearch.app.api.IndexingService::unavailable,
-            io.justsearch.app.api.OperationLeaseService.noOp()));
+        new BulkReindexHandler(
+            io.justsearch.app.api.operations.RecordedBulkPlan.Profile.RECOVERY_REBUILD,
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            ignored -> List.of(), io.justsearch.app.api.IndexingService::unavailable, List::of));
     handlers.register(CoreOperationCatalog.PING_BACKEND, new PingBackendHandler());
     // Slice 3a-2-c precondition: ClearFailedJobs handler. Same supplier pattern as
     // BulkReindex.
@@ -82,7 +82,8 @@ final class ValidatorRunnerTest {
     handlers.register(
         CoreOperationCatalog.REINDEX,
         new io.justsearch.app.services.registry.operations.handlers.ReindexHandler(
-            io.justsearch.app.api.IndexingService::unavailable));
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            context -> List.of(), context -> "generation-test", List::of));
     // Tempdoc 626 §Recency added core.reconcile-root to CoreOperationCatalog; register its handler so
     // ExecutorBindingValidator resolves the binding (the validator does not invoke handlers). Mirrors
     // the production wiring in OperationHandlerRegistrations.
@@ -128,11 +129,7 @@ final class ValidatorRunnerTest {
         CoreOperationCatalog.APPLY_EXCLUDES,
         new io.justsearch.app.services.registry.operations.handlers.ApplyExcludesHandler(
             () -> null));
-    // Slice 3a-2-c BrainRuntime cluster (reload-inference + switch-inference-mode).
-    handlers.register(
-        CoreOperationCatalog.RELOAD_INFERENCE,
-        new io.justsearch.app.services.registry.operations.handlers.ReloadInferenceHandler(
-            () -> null));
+    // The remaining inference mode operation writes runtime intent.
     handlers.register(
         CoreOperationCatalog.SWITCH_INFERENCE_MODE,
         new io.justsearch.app.services.registry.operations.handlers.SwitchInferenceModeHandler(
@@ -170,6 +167,16 @@ final class ValidatorRunnerTest {
         new io.justsearch.app.services.registry.operations.handlers.StartAiInstallHandler(
             () -> null));
     handlers.register(
+        CoreOperationCatalog.ACTIVATE_INSTALLED_MODELS,
+        new io.justsearch.app.services.registry.operations.handlers.ActivateInstalledModelsHandler(
+            () -> null,
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            ignored -> List.of(), io.justsearch.app.api.IndexingService::unavailable, List::of));
+    handlers.register(
+        CoreOperationCatalog.ACCEPT_GAPS,
+        new io.justsearch.app.services.registry.operations.handlers.AcceptGapsHandler(
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable()));
+    handlers.register(
         CoreOperationCatalog.CANCEL_AI_INSTALL,
         new io.justsearch.app.services.registry.operations.handlers.CancelAiInstallHandler(
             () -> null));
@@ -190,6 +197,12 @@ final class ValidatorRunnerTest {
     handlers.register(
         CoreOperationCatalog.RESET_SETTINGS,
         new io.justsearch.app.services.registry.operations.handlers.ResetSettingsHandler(
+            () -> null));
+    // D1-4: core.reconfigure is production-registered beside reset-settings. Keep the
+    // validator fixture aligned so ExecutorBindingValidator checks the complete core catalog.
+    handlers.register(
+        CoreOperationCatalog.RECONFIGURE,
+        new io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler(
             () -> null));
     // Slice 445: TABULAR Resource item Operations + privacy resolver. Same
     // unavailable-supplier pattern (validator only checks structural shape).
@@ -232,7 +245,8 @@ final class ValidatorRunnerTest {
     OperationHandler stubHandler =
         new OperationHandler() {
           @Override
-          public OperationResult execute(String argumentsJson) {
+          public OperationResult execute(
+              String argumentsJson, io.justsearch.core.context.EngineContext engineContext) {
             return OperationResult.success("stub");
           }
         };

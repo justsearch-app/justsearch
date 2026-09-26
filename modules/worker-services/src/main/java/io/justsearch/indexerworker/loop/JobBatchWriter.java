@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.loop;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
@@ -22,6 +23,7 @@ import io.opentelemetry.api.trace.Tracer;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
+import java.util.concurrent.locks.Lock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +65,8 @@ public final class JobBatchWriter {
   // Tempdoc 931 §E item 8 — a SUPPLIER, not a snapshot: rag.chunk_splade.enabled is read from the
   // live resolved config on every write, so flipping it takes effect without a worker restart.
   private final BooleanSupplier chunkSpladeEnabledSupplier;
+  private final Supplier<RunningRuntime> activeLexicalSource;
+  private final Lock fileMutationFence;
 
   public JobBatchWriter(
       IndexingCoordinator indexingCoordinator,
@@ -79,7 +83,9 @@ public final class JobBatchWriter {
       LongConsumer indexedDelta,
       IndexingDocumentOps.StageRecorder stageRecorder,
       BooleanSupplier detailedTracingSupplier,
-      BooleanSupplier chunkSpladeEnabledSupplier) {
+      BooleanSupplier chunkSpladeEnabledSupplier,
+      Supplier<RunningRuntime> activeLexicalSource,
+      Lock fileMutationFence) {
     this.indexingCoordinator = indexingCoordinator;
     this.documentFieldOps = documentFieldOps;
     this.signalBus = signalBus;
@@ -95,6 +101,8 @@ public final class JobBatchWriter {
     this.stageRecorder = stageRecorder;
     this.detailedTracingSupplier = detailedTracingSupplier;
     this.chunkSpladeEnabledSupplier = chunkSpladeEnabledSupplier;
+    this.activeLexicalSource = activeLexicalSource;
+    this.fileMutationFence = fileMutationFence;
   }
 
   /** Builds and writes an already-extracted job. Mirrors prior IndexingLoop.writeExtractedJob. */
@@ -103,9 +111,19 @@ public final class JobBatchWriter {
     writeSpan.setAttribute("doc.path", ex.filePath().toString());
     String embeddingSource = precomputedEmbedding != null ? "batch" : "inline_or_pending";
     writeSpan.setAttribute("embedding.source", embeddingSource);
+    fileMutationFence.lock();
     try {
+      if (!jobQueue.ownsClaimForPublication(ex.claim())) {
+        journal.recordOutcomeSafely(ex.filePath(), "SUPERSEDED_BEFORE_WRITE",
+            () -> jobQueue.markClaimDone(ex.claim(),
+                journal.skipped(IngestionReasonCodes.DELETED_AFTER_SNAPSHOT),
+                LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(), ex.artifact(),
+                    contentExtractor.extractionPolicy(), ex.provenance())));
+        batchStats.recordSkipped();
+        return;
+      }
       if (staleResolver.tryHandleStale(
-          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write")) {
+          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write", ex.provenance(), ex.claim())) {
         batchStats.recordSkipped();
         return;
       }
@@ -130,6 +148,23 @@ public final class JobBatchWriter {
               ex.docUid());
 
       long writeStart = System.currentTimeMillis();
+      RunningRuntime lexicalSource = activeLexicalSource.get();
+      if (lexicalSource != null) {
+        // A is a separate generation. The accepted B claim also projects text to the
+        // still-serving A, without placing B's vector or sparse model output in A.
+        var lexicalMetadata = IndexingDocumentOps.deriveParentMetadata(
+            ex.filePath(), ex.artifact().result(), null, log);
+        var lexicalDocument = IndexingDocumentOps.buildDocument(
+            ex.filePath(), ex.artifact(), ex.collection(), signalBus, null, false, null,
+            lexicalMetadata, stageRecorder, log, null,
+            new IndexingDocumentOps.SourceFileMetadata(
+                ex.envelope().sizeBytes(), ex.envelope().modifiedAtMs(), ex.sourceSha256()),
+            ex.docUid());
+        lexicalSource.indexingCoordinator().indexSingle(lexicalDocument);
+        IndexingDocumentOps.indexChunks(ex.filePath(), ex.artifact().result(),
+            lexicalSource.documentFieldOps(), lexicalSource.indexingCoordinator(),
+            lexicalMetadata, ex.collection(), ex.docUid(), false);
+      }
       indexingCoordinator.indexSingle(doc);
       // Tempdoc 819 / 821 §O.1 (+ #470 D2): when the document carries a completed embedding (the
       // migration/blue-green inline-embed path), that IS the success evidence the attestation must
@@ -158,9 +193,10 @@ public final class JobBatchWriter {
 
       journal.enqueueTransition(
           new JobQueue.IngestionLedgerTransition(
-              ex.filePath(),
+              ex.claim(),
               LedgerEntryFactory.forEnvelope(
-                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy())));
+                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance()),
+              ex.sourceSha256()));
 
       long latencyMs = System.currentTimeMillis() - ex.startTime();
       metrics.recordDocumentIndexed(latencyMs);
@@ -168,15 +204,19 @@ public final class JobBatchWriter {
           ex.artifact().result().content() != null ? ex.artifact().result().content().length() : 0);
       log.debug("Indexed successfully: {} in {}ms", ex.filePath(), latencyMs);
 
-    } catch (RuntimeException e) {
+    } catch (RuntimeException | Error e) {
+      if (e instanceof VirtualMachineError fatal) throw fatal;
       log.error("Failed to write: {}", ex.filePath(), e);
+      // An observer failure after handoff cannot turn an already written effect into a retry
+      // or release its live claim before the journal confirms the Lucene commit.
+      if (journal.ownsPendingCommit(ex.claim())) return;
       if (isDrainingWriteRejection(e)) {
         journal.recordOutcomeSafely(
             ex.filePath(),
             "WRITE_UNAVAILABLE_DRAINING",
             () ->
-                jobQueue.defer(
-                    ex.filePath(),
+                jobQueue.deferClaim(
+                    ex.claim(),
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_UNAVAILABLE_DRAINING,
                         IngestionReasonCodes.WRITE_UNAVAILABLE_DRAINING,
@@ -186,14 +226,14 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy())));
+                        contentExtractor.extractionPolicy(), ex.provenance())));
       } else {
         journal.recordOutcomeSafely(
             ex.filePath(),
             "WRITE_FAILED",
             () ->
-                jobQueue.markFailed(
-                    ex.filePath(),
+                jobQueue.markClaimFailed(
+                    ex.claim(),
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_FAILED,
                         IngestionReasonCodes.WRITE_FAILED,
@@ -203,12 +243,13 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy())));
+                        contentExtractor.extractionPolicy(), ex.provenance())));
         journal.recordFailedMetric(ex.filePath(), ex.artifact().result().mimeType());
         batchStats.recordFailed();
       }
     } finally {
-      writeSpan.end();
+      try { writeSpan.end(); }
+      finally { fileMutationFence.unlock(); }
     }
   }
 
@@ -247,7 +288,7 @@ public final class JobBatchWriter {
     return e.getClass().getSimpleName() + ": " + message;
   }
 
-  private static boolean isDrainingWriteRejection(RuntimeException e) {
+  private static boolean isDrainingWriteRejection(Throwable e) {
     return e instanceof IndexRuntimeIOException indexRuntimeIOException
         && indexRuntimeIOException.reason() == IndexRuntimeIOException.Reason.DRAINING;
   }

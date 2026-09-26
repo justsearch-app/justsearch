@@ -261,10 +261,12 @@ export class MultiplexedStream {
     let nextPayload: unknown;
     try {
       nextPayload = entry.reducer(entry.payload, envelope);
-    } catch {
-      // Reducer error — keep prior payload, advance seq + resumeToken anyway (mirrors
-      // EnvelopeStream.handleFrame's contract) so the next reconnect doesn't replay from stale.
-      nextPayload = entry.payload;
+    } catch (failure) {
+      // Only this logical stream needs a fresh snapshot. The physical stream's
+      // existing recovery owner detaches/reconnects; other entries retain their cursors.
+      entry.seq = envelope.seq;
+      entry.resumeToken = null;
+      throw failure;
     }
     entry.payload = nextPayload;
     entry.seq = envelope.seq;

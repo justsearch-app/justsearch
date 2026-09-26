@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssot.justsearch/v2/schemas/lifecycle-snapshot.v2.json",
+  "title": "JustSearch lifecycle snapshot schema 2",
+  "type": "object",
+  "$defs": {
+    "state": {
+      "type": "string",
+      "enum": [
+        "LIFECYCLE_STATE_STARTING",
+        "LIFECYCLE_STATE_READY",
+        "LIFECYCLE_STATE_DEGRADED",
+        "LIFECYCLE_STATE_ERROR",
+        "LIFECYCLE_STATE_STOPPING",
+        "LIFECYCLE_STATE_STOPPED"
+      ]
+    },
+    "component": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/componentState"
+        },
+        "reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state_since": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "state",
+        "reason_code",
+        "state_since"
+      ],
+      "additionalProperties": false
+    },
+    "componentState": {
+      "type": "string",
+      "enum": [
+        "ABSENT",
+        "STARTING",
+        "READY",
+        "RELOADING",
+        "FAILED",
+        "UNAVAILABLE"
+      ]
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lifecycle": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/state"
+        },
+        "reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "components": {
+      "type": "object",
+      "properties": {
+        "api": {
+          "$ref": "#/$defs/component"
+        },
+        "index": {
+          "$ref": "#/$defs/component"
+        },
+        "encoders": {
+          "$ref": "#/$defs/component"
+        },
+        "generative": {
+          "$ref": "#/$defs/component"
+        }
+      },
+      "required": [
+        "api",
+        "index",
+        "encoders",
+        "generative"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "observed_at",
+    "lifecycle",
+    "components"
+  ],
+  "additionalProperties": true
+}

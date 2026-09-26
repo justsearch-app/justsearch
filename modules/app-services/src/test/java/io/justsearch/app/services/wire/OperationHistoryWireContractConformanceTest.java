@@ -45,6 +45,26 @@ final class OperationHistoryWireContractConformanceTest {
         io.justsearch.contract.wire.InvocationProvenance.getDescriptor());
   }
 
+  @Test
+  @DisplayName("Every Java operation outcome, including undo, has a proto enum value")
+  void everyProducedOutcomeHasAProtoValue() {
+    Set<String> declared = io.justsearch.contract.wire.OperationOutcome.getDescriptor()
+        .getValues().stream().map(value -> value.getName()).collect(Collectors.toUnmodifiableSet());
+    List<String> missing = Arrays.stream(io.justsearch.app.observability.operations.OperationOutcome.values())
+        .map(value -> "OPERATION_OUTCOME_" + value.name())
+        .filter(value -> !declared.contains(value)).toList();
+    assertTrue(missing.isEmpty(), () -> "Operation outcomes missing from the retained proto: " + missing);
+  }
+
+  @Test
+  void acceptedInvocationKeyIsAnAdditiveOptionalField() {
+    var field = io.justsearch.contract.wire.OperationHistoryEntry.getDescriptor().findFieldByName("operation_key");
+    org.junit.jupiter.api.Assertions.assertNotNull(field);
+    org.junit.jupiter.api.Assertions.assertEquals(11, field.getNumber());
+    assertTrue(field.toProto().getProto3Optional());
+    org.junit.jupiter.api.Assertions.assertEquals("operationKey", field.getJsonName());
+  }
+
   /**
    * Asserts every JSON field name the record can emit is present in the proto descriptor (matched
    * by {@code json_name}). The record component name is the Jackson JSON key for these records

@@ -22,6 +22,7 @@ Two traps the experiment found, encoded here so they can't recur:
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -320,12 +321,27 @@ def _surfaces_catalog_body() -> str:
 # non-`enriching` variant still serves.
 _ROUTES: tuple[tuple[str, str], ...] = (
     ("/api/diagnostics/ingestion/summary", '{"rollups": [], "count": 0}'),
+    ("/api/operation-history/", '{"historySince": 0, "state": "unknown"}'),
     ("/api/indexing-roots/substrate", _BODY_INDEXED_ROOTS),
     ("/api/registry/surfaces", _surfaces_catalog_body()),
     ("/api/registry/operations", _help_operations_catalog_body()),
     ("/api/registry/resources", _empty_catalog("Resource")),
     ("/api/registry/diagnostic-channels", _empty_catalog("DiagnosticChannel")),
 )
+
+_GAP_BUILDING_GENERATION = "g-0199abc1-2345-7abc-8abc-0123456789ab"
+_GAP_OUTCOME = json.dumps({
+    "historySince": 0,
+    "state": "running",
+    "phase": "awaiting_acceptance",
+    "result": {
+        "gapListHash": "a" * 64,
+        "gaps": [
+            {"unitId": "notes/old-draft.txt", "reason": "CANDIDATE_PROJECTION_MISSING"},
+            {"unitId": "notes/deleted-draft.txt", "reason": "DELETE_NOT_APPLIED"},
+        ],
+    },
+})
 
 # Seed: dismiss the first-run 'welcome' walkthrough (id per canonicalManifest.ts) so
 # the overlay never clutters the deterministic capture, and pin the inspector tab.
@@ -666,6 +682,11 @@ def _status_body(variant: str) -> str:
 
     `degraded-detailed` needs the identical readiness state — the banner it expands is the same
     one this transform gives something to render."""
+    if variant == "gap-decision":
+        d = json.loads(_BODY_STATUS)
+        d["worker"]["migration"]["migrationState"] = "AWAITING_ACCEPTANCE"
+        d["worker"]["migration"]["buildingGenerationId"] = _GAP_BUILDING_GENERATION
+        return json.dumps(d)
     if variant == "enriching":
         d = json.loads(_BODY_STATUS)
         core = d["worker"]["core"]
@@ -771,9 +792,53 @@ def _settings_body(variant: str) -> str:
     return _BODY_SETTINGS
 
 
+def _install_preview_bodies() -> dict[str, str]:
+    """A deterministic two-component install scenario, using registry labels/terms/sizes.
+
+    This is fixture plan selection, not the hardware planner: select CPU embedding and
+    reranking so the required and improves-results groups both have a concrete row.
+    """
+    registry_path = _FIX_DIR.parents[3] / "configuration/src/main/resources/ai/model-registry.v2.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    packages = [p for p in registry["packages"] if p["id"] in ("embedding", "reranker")]
+    components = []
+    for package in packages:
+        variant = next(v for v in package["variants"] if v.get("targetEP") == "CPU")
+        size = variant["sizeBytes"] + sum(f["sizeBytes"] for f in package.get("supportingFiles", []))
+        components.append({
+            "id": package["id"], "label": package["label"], "description": package["description"],
+            "tier": package["tier"], "necessity": package["necessity"],
+            "declinable": package["necessity"] != "required", "declined": False,
+            "totalBytes": size, "downloadBytes": size, "state": "to-download", "unavailableReason": "",
+        })
+    tier_labels = {"retrieval-core": "Core retrieval", "retrieval-enrichment": "Retrieval enrichment"}
+    preview = {"intent": "full-desktop", "downloadProfile": "CPU_ONLY", "resumableBytes": 0,
+               "totalDownloadBytes": sum(c["downloadBytes"] for c in components), "components": components,
+               "tiers": [{"tier": c["tier"], "label": tier_labels[c["tier"]], "includedByIntent": True,
+                          "totalBytes": c["totalBytes"], "downloadBytes": c["downloadBytes"]}
+                         for c in components]}
+    return {
+        "/api/ai/install/manifest": json.dumps({**registry, "packages": packages}),
+        "/api/ai/install/plan-preview": json.dumps(preview),
+        "/api/ai/install/status": json.dumps({"state": "idle", "installedFully": False,
+            "resumableBytes": 0, "downloadedBytes": 0, "totalBytes": 0, "packages": [],
+            "stages": [], "readyCapabilities": [], "bytesPerSecond": -1, "remainingSeconds": -1}),
+    }
+
+
 def fixture_body(url: str, variant: str = "default") -> str:
     """The deterministic body for a given /api URL under a data variant. Unmapped
     endpoints get an empty object (the structural steps don't depend on their contents)."""
+    if variant == "install-preview":
+        path = urlparse(url).path
+        if path in ("/api/ai/install/manifest", "/api/ai/install/plan-preview", "/api/ai/install/status"):
+            return _install_preview_bodies()[path]
+        if path == "/api/status":
+            status = json.loads(_BODY_STATUS)
+            status["inference"].update({"phase": "OFFLINE", "identity": None,
+                "engineState": "Down", "engineReason": "not-installed", "chatEnabledSpec": False})
+            status["aiReady"] = False
+            return json.dumps(status)
     if "/api/inference/status" in url:
         return _inference_body(variant)
     if "/api/status" in url:
@@ -788,10 +853,62 @@ def fixture_body(url: str, variant: str = "default") -> str:
         return _thread_body(variant)
     if "/api/chat/agent/tools" in url and variant == "agent-run":
         return _AGENT_TOOLS_BODY
+    if "/api/operation-history/" in url and variant == "gap-decision":
+        return _GAP_OUTCOME
     for needle, body in _ROUTES:
         if needle in url:
             return body
     return "{}"
+
+
+class _SettingsFixtureState:
+    """One browser context's witnessed settings document and keyed receipts."""
+
+    def __init__(self, variant: str):
+        self._settings = json.loads(_settings_body(variant))
+        self._receipts: dict[str, tuple[str, dict]] = {}
+
+    def get_body(self) -> str:
+        observation = deepcopy(self._settings)
+        observation["operationKey"] = None
+        observation["state"] = None
+        return json.dumps(observation)
+
+    def post(self, raw_body: str) -> tuple[int, str]:
+        request = json.loads(raw_body)
+        key = request.get("operationKey")
+        canonical = json.dumps(request, sort_keys=True, separators=(",", ":"))
+        if not isinstance(key, str):
+            return 400, json.dumps({"error": "Missing operation key", "errorCode": "INVALID_REQUEST"})
+        prior = self._receipts.get(key)
+        if prior is not None:
+            if prior[0] != canonical:
+                return 409, json.dumps({"error": "Operation key reused", "errorCode": "OPERATION_KEY_REUSED"})
+            return 200, json.dumps(prior[1])
+
+        witness = request.get("witness")
+        if witness != self._settings.get("witness"):
+            return 409, json.dumps({
+                "error": "Settings changed elsewhere", "errorCode": "VERSION_CONFLICT", "retryable": False,
+            })
+        for section in ("ui", "llm"):
+            patch = request.get(section)
+            if isinstance(patch, dict):
+                current = self._settings.get(section)
+                self._settings[section] = {**(current if isinstance(current, dict) else {}), **patch}
+        if "indexPaths" in request:
+            self._settings["indexPaths"] = deepcopy(request["indexPaths"])
+
+        accepted_revision = int(witness["acceptedRevision"]) + 1
+        self._settings["witness"] = {
+            "acceptedRevision": accepted_revision,
+            "lastCommittedOperationKey": key,
+        }
+        receipt = deepcopy(self._settings)
+        receipt["operationKey"] = key
+        receipt["state"] = "COMPLETE"
+        self._receipts[key] = (canonical, deepcopy(receipt))
+        return 200, json.dumps(receipt)
 
 
 async def install_fixtures(ctx, variant: str = "default") -> None:
@@ -805,6 +922,7 @@ async def install_fixtures(ctx, variant: str = "default") -> None:
     # the fixture conversation (`_thread_body`), so no other step's boot changes.
     if variant in _THREAD_RECORD_VARIANTS:
         await ctx.add_init_script(THREAD_POINTER_SEED)
+    settings = _SettingsFixtureState(variant)
 
     async def _handler(route):
         req = route.request
@@ -817,6 +935,13 @@ async def install_fixtures(ctx, variant: str = "default") -> None:
         # `/stream`-ish branch (this path contains no "/stream") and before the JSON branch.
         if "/api/chat/dispatch" in req.url and variant == "agent-run":
             await route.fulfill(status=200, content_type="text/event-stream", body=DONE_RUN_BODY)
+            return
+        if "/api/settings/v2" in req.url:
+            if req.method == "POST":
+                status, body = settings.post(req.post_data or "{}")
+            else:
+                status, body = 200, settings.get_body()
+            await route.fulfill(status=status, content_type="application/json", body=body)
             return
         accept = req.headers.get("accept") or ""
         if "/stream" in req.url or "text/event-stream" in accept:

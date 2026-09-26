@@ -1,5 +1,6 @@
 package io.justsearch.app.services.intent;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -8,6 +9,14 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import io.justsearch.agent.api.registry.ConsentCapsuleAuthority;
+import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.observability.ledger.ActionEvent;
 import org.junit.jupiter.api.Test;
 
 /** Security-critical unit coverage for {@link ConsentCapsuleService} (tempdoc 550 A1). */
@@ -49,7 +58,7 @@ final class ConsentCapsuleServiceTest {
     // Tempdoc 550 thesis IV / F3 — revokeNonUser (the hard-stop's revoke) cancels a pending
     // non-user grant before it is consumed; verification then fails closed. (2-arg mint defaults
     // to UNTRUSTED, so the grant is non-user.)
-    java.util.List<io.justsearch.app.observability.ledger.ActionEvent> events =
+    List<ActionEvent> events =
         new java.util.ArrayList<>();
     ConsentCapsuleService svc = svc();
     svc.setGrantEventSink(events::add);
@@ -60,7 +69,7 @@ final class ConsentCapsuleServiceTest {
         events.stream()
             .anyMatch(
                 e ->
-                    e instanceof io.justsearch.app.observability.ledger.ActionEvent.Grant g
+                    e instanceof ActionEvent.Grant g
                         && "REVOKED".equals(g.action()));
     assertTrue(revoked, "REVOKED is recorded in the one action-event log");
   }
@@ -88,19 +97,153 @@ final class ConsentCapsuleServiceTest {
   @Test
   void grantLifecycleIssuedAndConsumedAreRecorded() {
     // Tempdoc 550 thesis IV — one audit. The capsule's lifecycle is recorded as Grant ActionEvents.
-    java.util.List<io.justsearch.app.observability.ledger.ActionEvent> events =
+    List<ActionEvent> events =
         new java.util.ArrayList<>();
     ConsentCapsuleService svc = svc();
     svc.setGrantEventSink(events::add);
     String capsule = svc.mint(OP, ARGS);
     assertTrue(svc.verifyAndConsume(capsule, OP, ARGS));
-    java.util.List<String> actions =
+    List<String> actions =
         events.stream()
-            .filter(e -> e instanceof io.justsearch.app.observability.ledger.ActionEvent.Grant)
-            .map(e -> ((io.justsearch.app.observability.ledger.ActionEvent.Grant) e).action())
+            .filter(e -> e instanceof ActionEvent.Grant)
+            .map(e -> ((ActionEvent.Grant) e).action())
             .toList();
     assertTrue(actions.contains("ISSUED"), "mint records ISSUED");
     assertTrue(actions.contains("CONSUMED"), "verify records CONSUMED");
+  }
+
+  @Test
+  void deferredConsumptionSpendsBeforePublishingAndPublishesOnceAtConsumptionTime() {
+    Instant t0 = Instant.parse("2026-09-20T00:00:00Z");
+    MutableClock clock = new MutableClock(t0);
+    List<ActionEvent> events = new java.util.ArrayList<>();
+    ConsentCapsuleService svc = new ConsentCapsuleService(clock, Duration.ofMinutes(5));
+    svc.setGrantEventSink(events::add);
+    String capsule = svc.mint(OP, ARGS);
+    events.clear();
+
+    clock.advance(Duration.ofMinutes(1));
+    var pendingAudit = svc.consumeDeferred(capsule, OP, ARGS);
+    assertTrue(pendingAudit.isPresent(), "valid capsule is atomically consumed");
+    assertTrue(events.isEmpty(), "deferred consumption publishes no event before acceptance");
+    assertFalse(svc.verifyAndConsume(capsule, OP, ARGS), "capsule is spent before publication");
+    assertTrue(events.isEmpty(), "a rejected second use publishes nothing");
+
+    clock.advance(Duration.ofMinutes(1));
+    var consumption = pendingAudit.orElseThrow();
+    consumption.publish();
+    consumption.publish();
+
+    assertEquals(1, events.size(), "repeated publication is idempotent");
+    assertTrue(events.get(0) instanceof ActionEvent.Grant);
+    ActionEvent.Grant event = (ActionEvent.Grant) events.get(0);
+    assertEquals("CONSUMED", event.action());
+    assertEquals(OP, event.subject());
+    assertEquals(t0.plus(Duration.ofMinutes(1)), event.occurredAt(),
+        "event retains the time the capsule was consumed");
+  }
+
+  @Test
+  void deferredConsumptionAllowsOnlyOneConcurrentSpend() throws Exception {
+    List<ActionEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+    ConsentCapsuleService svc = svc();
+    svc.setGrantEventSink(events::add);
+    String capsule = svc.mint(OP, ARGS);
+    events.clear();
+
+    var executor = Executors.newFixedThreadPool(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      var first = executor.submit(() -> {
+        start.await();
+        return svc.consumeDeferred(capsule, OP, ARGS);
+      });
+      var second = executor.submit(() -> {
+        start.await();
+        return svc.consumeDeferred(capsule, OP, ARGS);
+      });
+      start.countDown();
+      var firstConsumption = first.get();
+      var secondConsumption = second.get();
+
+      assertEquals(1, List.of(firstConsumption, secondConsumption).stream().filter(java.util.Optional::isPresent).count(),
+          "atomic removal permits exactly one concurrent winner");
+      assertTrue(events.isEmpty(), "the winning consumption remains unpublished");
+      firstConsumption.or(() -> secondConsumption).orElseThrow().publish();
+      assertEquals(1, events.size());
+      assertTrue(events.get(0) instanceof ActionEvent.Grant grant && "CONSUMED".equals(grant.action()));
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  void preparedAndPublicDeferredConsentRemainSeparateBindings() {
+    ConsentCapsuleService svc = svc();
+    String key = OperationKeys.generate(Clock.fixed(
+        Instant.parse("2026-09-20T00:00:00Z"), ZoneOffset.UTC));
+    UUID nonce = UUID.randomUUID();
+
+    String publicCapsule = svc.mint(OP, ARGS);
+    assertTrue(svc.consumePreparedDeferred(publicCapsule, OP, ARGS, key, nonce).isEmpty(),
+        "ordinary public consent cannot authorize a frozen preparation");
+    svc.consumeDeferred(publicCapsule, OP, ARGS).orElseThrow().publish();
+
+    String preparedCapsule = svc.mintPrepared(OP, ARGS,
+        io.justsearch.agent.api.registry.SourceTier.TRUSTED, key, nonce);
+    assertTrue(svc.consumeDeferred(preparedCapsule, OP, ARGS).isEmpty(),
+        "prepared consent cannot authorize public arguments");
+    assertTrue(svc.consumePreparedDeferred(preparedCapsule, OP, ARGS, key, UUID.randomUUID()).isEmpty(),
+        "prepared consent is bound to its preparation nonce");
+    assertTrue(svc.consumePreparedDeferred(preparedCapsule, OP, ARGS, key + "x", nonce).isEmpty(),
+        "prepared consent is bound to its operation key");
+    svc.consumePreparedDeferred(preparedCapsule, OP, ARGS, key, nonce).orElseThrow().publish();
+    assertFalse(svc.verifyPreparedAndConsume(preparedCapsule, OP, ARGS, key, nonce),
+        "successful deferred prepared consumption is single-use");
+  }
+
+  @Test
+  void deferredConsumptionRefusesNullAndMalformedInputsAndUnsupportedAuthoritiesFailClosed() {
+    ConsentCapsuleService svc = svc();
+    String publicCapsule = svc.mint(OP, ARGS);
+    assertTrue(svc.consumeDeferred(null, OP, ARGS).isEmpty());
+    assertTrue(svc.consumeDeferred("malformed", OP, ARGS).isEmpty());
+    assertTrue(svc.consumeDeferred(publicCapsule, null, ARGS).isEmpty());
+    assertTrue(svc.consumeDeferred(publicCapsule, OP, null).isEmpty());
+    var publicConsumption = svc.consumeDeferred(publicCapsule, OP, ARGS);
+    assertTrue(publicConsumption.isPresent(),
+        "invalid attempts leave the valid capsule available");
+    publicConsumption.orElseThrow().publish();
+
+    String key = OperationKeys.generate(Clock.systemUTC());
+    UUID nonce = UUID.randomUUID();
+    String preparedCapsule = svc.mintPrepared(OP, ARGS,
+        io.justsearch.agent.api.registry.SourceTier.TRUSTED, key, nonce);
+    assertTrue(svc.consumePreparedDeferred(null, OP, ARGS, key, nonce).isEmpty());
+    assertTrue(svc.consumePreparedDeferred(preparedCapsule, null, ARGS, key, nonce).isEmpty());
+    assertTrue(svc.consumePreparedDeferred(preparedCapsule, OP, null, key, nonce).isEmpty());
+    assertTrue(svc.consumePreparedDeferred(preparedCapsule, OP, ARGS, null, nonce).isEmpty());
+    assertTrue(svc.consumePreparedDeferred(preparedCapsule, OP, ARGS, key, null).isEmpty());
+    assertTrue(svc.consumePreparedDeferred(preparedCapsule, OP, ARGS, "malformed-key", nonce).isEmpty());
+    svc.consumePreparedDeferred(preparedCapsule, OP, ARGS, key, nonce).orElseThrow().publish();
+
+    AtomicInteger synchronousChecks = new AtomicInteger();
+    ConsentCapsuleAuthority unsupported = new ConsentCapsuleAuthority() {
+      @Override
+      public String mint(String operationId, String argumentsJson,
+          io.justsearch.agent.api.registry.SourceTier sourceTier) {
+        return "unused";
+      }
+
+      @Override
+      public boolean verifyAndConsume(String token, String operationId, String argumentsJson) {
+        synchronousChecks.incrementAndGet();
+        return true;
+      }
+    };
+    assertTrue(unsupported.consumeDeferred("token", OP, ARGS).isEmpty());
+    assertTrue(unsupported.consumePreparedDeferred("token", OP, ARGS, key, nonce).isEmpty());
+    assertEquals(0, synchronousChecks.get(), "default deferred methods never fall back to synchronous checks");
   }
 
   @Test

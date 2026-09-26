@@ -2,13 +2,18 @@
 package io.justsearch.configuration.persistence;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /** Sibling-temp replacement that preserves the prior target until the replacement is complete. */
 public final class AtomicFileWrites {
@@ -20,11 +25,27 @@ public final class AtomicFileWrites {
     replace(target, content, NIO);
   }
 
+  /** Forces the temporary bytes and refuses replacement when atomic move is unavailable.
+   * This does not promise parent-directory durability across physical power loss.
+   */
+  public static void replaceStrict(Path target, byte[] content) throws IOException {
+    replaceStrict(target, content, NIO);
+  }
+
+  static void replaceStrict(Path target, byte[] content, FileAccess files) throws IOException {
+    replace(target, content, files, true);
+  }
+
   public static void replaceUtf8(Path target, String content) throws IOException {
     replace(target, content.getBytes(StandardCharsets.UTF_8), NIO);
   }
 
   static void replace(Path target, byte[] content, FileAccess files) throws IOException {
+    replace(target, content, files, false);
+  }
+
+  private static void replace(Path target, byte[] content, FileAccess files, boolean strict)
+      throws IOException {
     Objects.requireNonNull(target, "target");
     Objects.requireNonNull(content, "content");
     Objects.requireNonNull(files, "files");
@@ -35,17 +56,56 @@ public final class AtomicFileWrites {
     files.createDirectories(parent);
 
     Path temp = files.createTempFile(parent, absoluteTarget.getFileName().toString() + ".", ".tmp");
-    boolean moved = false;
     try {
-      files.write(temp, content);
+      if (strict) files.writeForced(temp, content);
+      else files.write(temp, content);
       try {
-        files.moveAtomicReplace(temp, absoluteTarget);
+        moveAtomicReplace(temp, absoluteTarget, files);
       } catch (AtomicMoveNotSupportedException unsupported) {
+        if (strict) throw unsupported;
         files.moveReplace(temp, absoluteTarget);
       }
-      moved = true;
-    } finally {
-      if (!moved) files.deleteIfExists(temp);
+    } catch (IOException | RuntimeException | Error failure) {
+      try {
+        files.deleteIfExists(temp);
+      } catch (IOException | RuntimeException | Error cleanup) {
+        if (cleanup != failure) failure.addSuppressed(cleanup);
+      }
+      throw failure;
+    }
+  }
+
+  private static void moveAtomicReplace(Path temp, Path target, FileAccess files) throws IOException {
+    long started = System.nanoTime();
+    long budget = TimeUnit.SECONDS.toNanos(2);
+    AccessDeniedException firstDenial = null;
+    for (;;) {
+      if (Thread.currentThread().isInterrupted()) {
+        var interrupted = new InterruptedIOException("Interrupted before replacing " + target);
+        if (firstDenial != null) interrupted.addSuppressed(firstDenial);
+        throw interrupted;
+      }
+      if (firstDenial != null && System.nanoTime() - started >= budget) throw firstDenial;
+      try {
+        files.moveAtomicReplace(temp, target);
+        return;
+      } catch (AccessDeniedException denied) {
+        // Windows refuses atomic replacement while an ordinary reader has the old file open.
+        // Keep the completed temp and prior authority; never turn this into a non-atomic move.
+        // A permanent permission denial remains the original failure after the bounded wait.
+        if (firstDenial == null) firstDenial = denied;
+        long remaining = budget - (System.nanoTime() - started);
+        if (remaining <= 0) throw firstDenial;
+        try {
+          TimeUnit.NANOSECONDS.sleep(Math.min(TimeUnit.MILLISECONDS.toNanos(10), remaining));
+        } catch (InterruptedException stopped) {
+          Thread.currentThread().interrupt();
+          var interrupted = new InterruptedIOException("Interrupted while replacing " + target);
+          interrupted.initCause(stopped);
+          interrupted.addSuppressed(firstDenial);
+          throw interrupted;
+        }
+      }
     }
   }
 
@@ -55,6 +115,8 @@ public final class AtomicFileWrites {
     Path createTempFile(Path directory, String prefix, String suffix) throws IOException;
 
     void write(Path path, byte[] content) throws IOException;
+
+    void writeForced(Path path, byte[] content) throws IOException;
 
     void moveAtomicReplace(Path source, Path target) throws IOException;
 
@@ -81,6 +143,16 @@ public final class AtomicFileWrites {
           content,
           StandardOpenOption.WRITE,
           StandardOpenOption.TRUNCATE_EXISTING);
+    }
+
+    @Override
+    public void writeForced(Path path, byte[] content) throws IOException {
+      try (FileChannel channel = FileChannel.open(
+          path, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        while (buffer.hasRemaining()) channel.write(buffer);
+        channel.force(true);
+      }
     }
 
     @Override

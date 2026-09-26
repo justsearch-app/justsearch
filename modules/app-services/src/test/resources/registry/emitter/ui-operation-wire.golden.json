@@ -49,11 +49,18 @@
   "intf" : {
     "inputs" : {
       "type" : "object",
+      "additionalProperties" : false,
       "properties" : {
+        "source" : {
+          "type" : "string",
+          "enum" : [ "corrupt_index_rebuild", "embedding_model_change", "schema_mismatch", "user_requested_rebuild", "user_requested_bulk_reindex", "manual" ]
+        },
         "corpusIds" : {
           "type" : "array",
           "items" : {
-            "type" : "string"
+            "type" : "string",
+            "minLength" : 1,
+            "maxLength" : 256
           }
         }
       },
@@ -86,6 +93,58 @@
   "audience" : "OPERATOR",
   "consumers" : [ ]
 }, {
+  "id" : "core.accept-gaps",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.accept-gaps.label",
+    "descriptionKey" : "ops.accept-gaps.description",
+    "iconHint" : "warning",
+    "category" : "destructive"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "reindexKey" : {
+          "type" : "string",
+          "minLength" : 36,
+          "maxLength" : 36
+        },
+        "gapListHash" : {
+          "type" : "string",
+          "pattern" : "^[0-9a-f]{64}$"
+        }
+      },
+      "required" : [ "reindexKey", "gapListHash" ]
+    },
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "HIGH",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "OPERATOR",
+  "consumers" : [ ]
+}, {
   "id" : "core.rebuild-index",
   "type" : "operation",
   "presentation" : {
@@ -94,7 +153,14 @@
   },
   "intf" : {
     "inputs" : {
-      "type" : "object"
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "source" : {
+          "type" : "string",
+          "enum" : [ "corrupt_index_rebuild", "embedding_model_change", "schema_mismatch", "user_requested_rebuild", "user_requested_bulk_reindex", "manual" ]
+        }
+      }
     },
     "result" : { },
     "errors" : [ ],
@@ -667,51 +733,6 @@
   "audience" : "USER",
   "consumers" : [ ]
 }, {
-  "id" : "core.reload-inference",
-  "type" : "operation",
-  "presentation" : {
-    "labelKey" : "ops.reload-inference.label",
-    "descriptionKey" : "ops.reload-inference.description"
-  },
-  "intf" : {
-    "inputs" : {
-      "type" : "object",
-      "properties" : { }
-    },
-    "result" : {
-      "type" : "object",
-      "properties" : {
-        "mode" : {
-          "type" : "string"
-        }
-      }
-    },
-    "errors" : [ ],
-    "uiHints" : { }
-  },
-  "policy" : {
-    "risk" : "MEDIUM",
-    "confirm" : {
-      "kind" : "INLINE"
-    },
-    "audit" : "METADATA_ONLY",
-    "undoSupported" : false,
-    "inverseOperationId" : null
-  },
-  "availability" : { },
-  "lineage" : {
-    "affects" : [ ],
-    "supersedes" : [ ]
-  },
-  "provenance" : {
-    "tier" : "CORE",
-    "contributorId" : "core",
-    "version" : "1.0"
-  },
-  "executors" : [ "UI" ],
-  "audience" : "USER",
-  "consumers" : [ ]
-}, {
   "id" : "core.switch-inference-mode",
   "type" : "operation",
   "presentation" : {
@@ -1078,6 +1099,51 @@
   "audience" : "USER",
   "consumers" : [ ]
 }, {
+  "id" : "core.activate-installed-models",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.activate-installed-models.label",
+    "descriptionKey" : "ops.activate-installed-models.description"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "source" : {
+          "type" : "string",
+          "enum" : [ "installer_model_activation" ]
+        }
+      },
+      "required" : [ "source" ]
+    },
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "HIGH",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
+}, {
   "id" : "core.cancel-ai-install",
   "type" : "operation",
   "presentation" : {
@@ -1306,6 +1372,59 @@
   },
   "executors" : [ "UI" ],
   "audience" : "OPERATOR",
+  "consumers" : [ ]
+}, {
+  "id" : "core.reconfigure",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.reconfigure.label",
+    "descriptionKey" : "ops.reconfigure.description"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "required" : [ "settings", "modeIntent" ],
+      "properties" : {
+        "settings" : {
+          "type" : "object",
+          "required" : [ "witness", "operationKey" ]
+        },
+        "modeIntent" : {
+          "type" : [ "string", "null" ]
+        },
+        "refreshInference" : {
+          "type" : "boolean"
+        }
+      }
+    },
+    "result" : {
+      "type" : "object"
+    },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "MEDIUM",
+    "confirm" : {
+      "kind" : "NONE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "USER",
   "consumers" : [ ]
 }, {
   "id" : "core.cancel-indexing-job",

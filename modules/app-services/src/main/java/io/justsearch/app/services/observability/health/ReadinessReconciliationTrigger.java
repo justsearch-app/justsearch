@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.observability.health;
 
-import io.justsearch.app.services.lifecycle.InferenceCapability;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.component.EngineComponentRegistry;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * rather than this trigger being a second way to reach what a request would have done.
  *
  * <p>The shape mirrors {@code CapabilityHealthBridge.wireListeners} one layer down: subscribe to
- * {@link WorkerCapability} / {@link InferenceCapability} transitions, and replay current state at
+ * component-registry transitions, and replay current state at
  * wire time so a transition that happened before the listener existed is not lost. Here the replay
  * is {@link #attach(Runnable)}'s self-seed — the ui side supplies its thunk late, well after the
  * capabilities have been driven.
@@ -54,13 +55,44 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
   private static final Logger log =
       LoggerFactory.getLogger(ReadinessReconciliationTrigger.class);
 
-  private final ExecutorService executor =
-      Executors.newSingleThreadExecutor(
-          runnable -> {
-            Thread thread = new Thread(runnable, "readiness-reconcile");
-            thread.setDaemon(true);
-            return thread;
-          });
+  private final EngineExecutorRegistry.Registration executorRegistration;
+  private final ExecutorService executor;
+  private volatile Thread reconciliationThread;
+  private EngineComponentRegistry.Subscription componentSubscription;
+
+  public ReadinessReconciliationTrigger(EngineExecutorRegistry processExecutors) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.readiness-reconcile",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.PLATFORM,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ExecutorService executor =
+          registration.open(
+              runnable -> {
+                Thread thread = new Thread(runnable, "readiness-reconcile");
+                thread.setDaemon(true);
+                reconciliationThread = thread;
+                return thread;
+              });
+      this.executorRegistration = registration;
+      this.executor = executor;
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
 
   /** Coalescing latch: true while exactly one reconcile is queued and not yet started. */
   private final AtomicBoolean pending = new AtomicBoolean(false);
@@ -83,16 +115,17 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
   }
 
   /**
-   * Subscribes {@link #request()} to worker + inference capability transitions. Null-tolerant on
-   * either argument (test wiring supplies partial capability graphs).
+   * Observes all component owners directly. Registry callbacks run synchronously on the publishing
+   * thread, allowing self-publication to be suppressed without dropping concurrent external work.
+   * The trigger owns this subscription and releases it before its executor.
    */
-  public void wireTo(WorkerCapability worker, InferenceCapability inference) {
-    if (worker != null) {
-      worker.addListener((prev, next) -> request());
+  public synchronized void wireTo(EngineComponentRegistry components) {
+    Objects.requireNonNull(components, "components");
+    if (closed.get()) throw new IllegalStateException("Readiness trigger is closed");
+    if (componentSubscription != null) {
+      throw new IllegalStateException("Readiness trigger is already subscribed to components");
     }
-    if (inference != null) {
-      inference.addListener((prev, next) -> request());
-    }
+    componentSubscription = components.subscribe(snapshot -> request());
   }
 
   /**
@@ -101,7 +134,7 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
    * running the thunk, so a transition arriving mid-run schedules exactly one follow-up.
    */
   public void request() {
-    if (closed.get() || reconcile == null) {
+    if (closed.get() || reconcile == null || Thread.currentThread() == reconciliationThread) {
       return;
     }
     if (!pending.compareAndSet(false, true)) {
@@ -134,6 +167,13 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
     if (!closed.compareAndSet(false, true)) {
       return;
     }
+    synchronized (this) {
+      if (componentSubscription != null) {
+        componentSubscription.close();
+        componentSubscription = null;
+      }
+    }
     executor.shutdownNow();
+    executorRegistration.close();
   }
 }

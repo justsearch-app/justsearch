@@ -5,9 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.grpc.Server;
-import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
-import io.grpc.stub.StreamObserver;
 import io.justsearch.app.api.RetrieveContextParams;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
@@ -17,12 +14,6 @@ import io.justsearch.ipc.RetrieveContextResponse;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
 import io.justsearch.ipc.SearchResult;
-import io.justsearch.ipc.SearchServiceGrpc;
-import io.justsearch.ipc.mmf.MmfWorkerSignalLayoutV1;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.lang.reflect.Field;
-import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -43,18 +34,16 @@ import org.junit.jupiter.api.Test;
  * default hybrid preset (sparse+dense RRF). A doc that hybrid search ranks highly could therefore
  * be structurally absent from the evidence pack's candidate universe.
  *
- * <p>This test spins up a real gRPC {@code SearchService} (mirrors {@link
- * RemoteDocumentServiceContextBudgetTest}'s harness — the actual producer wire path, not a mocked
- * interface) and pins the wire shape the fix produces. It fails RED if {@code
- * preSearchForDocIds} is reverted to the bare request: {@code hasPipeline()} goes false and every
- * {@link PipelineConfig} accessor below reads back its zero-value default.
+ * <p>Lane F stage A item A10: the harness was a real Netty {@code SearchService} plus a
+ * memory-mapped signal bus, and is now {@link TestKnowledgeClient} — the request still arrives
+ * exactly as {@code preSearchForDocIds} assembled it, which is what "wire shape" named. It fails
+ * RED if {@code preSearchForDocIds} is reverted to the bare request: {@code hasPipeline()} goes
+ * false and every {@link PipelineConfig} accessor below reads back its zero-value default.
  */
 @DisplayName("RemoteDocumentService pre-search: pipeline wire shape + rank order (tempdoc 731 I1)")
 final class RemoteDocumentServicePreSearchPipelineTest {
 
-  private Server server;
-  private MainSignalBus signalBus;
-  private RemoteKnowledgeClient client;
+  private KnowledgeClient client;
   private String prevDataDir;
   private Path tempDataDir;
   private ConfigStore prevConfigStore;
@@ -74,32 +63,16 @@ final class RemoteDocumentServicePreSearchPipelineTest {
     tempDataDir = Files.createTempDirectory("justsearch-731-i1-presearch-test-");
     System.setProperty("justsearch.data.dir", tempDataDir.toString());
 
-    CapturingSearchService service =
-        new CapturingSearchService(capturedSearchRequest, capturedRetrieveContextRequest);
-    server = NettyServerBuilder.forPort(0).addService(service).build().start();
-
-    Path signalPath = tempDataDir.resolve("signals").resolve("worker-signal.mmf");
-    signalBus = new MainSignalBus(signalPath);
-    signalBus.open();
-    writePortForTests(signalBus, server.getPort());
-
-    client = new RemoteKnowledgeClient(signalBus, /*deadlineMs=*/ 5000, /*maxRetries=*/ 1);
-    client.connect(server.getPort());
+    client =
+        new TestKnowledgeClient(
+            new io.justsearch.core.execution.TestEngineExecutors(), new CapturingSearchCalls());
   }
 
   @AfterEach
-  void tearDown() throws Exception {
+  void tearDown() {
     if (client != null) {
       client.close();
       client = null;
-    }
-    if (signalBus != null) {
-      signalBus.close();
-      signalBus = null;
-    }
-    if (server != null) {
-      server.shutdownNow().awaitTermination();
-      server = null;
     }
     if (prevDataDir == null) {
       System.clearProperty("justsearch.data.dir");
@@ -112,10 +85,10 @@ final class RemoteDocumentServicePreSearchPipelineTest {
   @Test
   @DisplayName("open retrieval pre-search sends an explicit hybrid pipeline, not a bare request")
   void preSearchSendsExplicitHybridPipeline() throws Exception {
-    RemoteDocumentService service = new RemoteDocumentService(() -> client);
+    RemoteDocumentService service = new RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
 
     RetrieveContextParams params = RetrieveContextParams.of("what is the policy?", 5, 4096);
-    service.retrieveContext(params).toCompletableFuture().get(6, TimeUnit.SECONDS);
+    service.retrieveContext(params, io.justsearch.app.services.TestEngineContexts.internal()).toCompletableFuture().get(6, TimeUnit.SECONDS);
 
     SearchRequest sent = capturedSearchRequest.get();
     assertTrue(sent != null, "Pre-search must have issued a search() RPC");
@@ -135,10 +108,10 @@ final class RemoteDocumentServicePreSearchPipelineTest {
   @Test
   @DisplayName("open retrieval pre-search preserves search rank order into the discovered doc set")
   void preSearchPreservesRankOrder() throws Exception {
-    RemoteDocumentService service = new RemoteDocumentService(() -> client);
+    RemoteDocumentService service = new RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
 
     RetrieveContextParams params = RetrieveContextParams.of("what is the policy?", 5, 4096);
-    service.retrieveContext(params).toCompletableFuture().get(6, TimeUnit.SECONDS);
+    service.retrieveContext(params, io.justsearch.app.services.TestEngineContexts.internal()).toCompletableFuture().get(6, TimeUnit.SECONDS);
 
     RetrieveContextRequest forwarded = capturedRetrieveContextRequest.get();
     assertTrue(forwarded != null, "Discovered doc IDs must be forwarded to retrieveContext()");
@@ -152,53 +125,26 @@ final class RemoteDocumentServicePreSearchPipelineTest {
         "Discovered doc IDs must preserve the pre-search's rank order");
   }
 
-  private static void writePortForTests(MainSignalBus bus, int port) throws Exception {
-    Field f = MainSignalBus.class.getDeclaredField("segment");
-    f.setAccessible(true);
-    MemorySegment segment = (MemorySegment) f.get(bus);
-    segment.set(
-        ValueLayout.JAVA_INT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
-        MmfWorkerSignalLayoutV1.OFFSET_WORKER_GRPC_PORT,
-        port);
-    segment.force();
-
-    // Sanity: ensure the normal public read path sees it (protects against endian mistakes).
-    assertEquals(port, bus.readPort());
-  }
-
   /**
-   * Fake Worker {@code SearchService}: captures the request shape sent by pre-search, and returns
-   * a fixed rank-ordered result set so rank-order preservation is independently observable.
+   * Captures the request shape sent by pre-search, and returns a fixed rank-ordered result set so
+   * rank-order preservation is independently observable.
    */
-  private static final class CapturingSearchService extends SearchServiceGrpc.SearchServiceImplBase {
-    private final AtomicReference<SearchRequest> searchCapture;
-    private final AtomicReference<RetrieveContextRequest> retrieveContextCapture;
-
-    private CapturingSearchService(
-        AtomicReference<SearchRequest> searchCapture,
-        AtomicReference<RetrieveContextRequest> retrieveContextCapture) {
-      this.searchCapture = searchCapture;
-      this.retrieveContextCapture = retrieveContextCapture;
-    }
+  private final class CapturingSearchCalls extends TestKnowledgeClient.SearchCalls {
 
     @Override
-    public void search(SearchRequest request, StreamObserver<SearchResponse> responseObserver) {
-      searchCapture.set(request);
+    public SearchResponse search(SearchRequest request) {
+      capturedSearchRequest.set(request);
       SearchResponse.Builder resp = SearchResponse.newBuilder();
       for (String path : List.of("doc-c", "doc-a", "doc-b")) {
         resp.addResults(SearchResult.newBuilder().setId(path).putFields("path", path).build());
       }
-      responseObserver.onNext(resp.build());
-      responseObserver.onCompleted();
+      return resp.build();
     }
 
     @Override
-    public void retrieveContext(
-        RetrieveContextRequest request,
-        StreamObserver<RetrieveContextResponse> responseObserver) {
-      retrieveContextCapture.set(request);
-      responseObserver.onNext(RetrieveContextResponse.newBuilder().build());
-      responseObserver.onCompleted();
+    public RetrieveContextResponse retrieveContext(RetrieveContextRequest request) {
+      capturedRetrieveContextRequest.set(request);
+      return RetrieveContextResponse.newBuilder().build();
     }
   }
 }

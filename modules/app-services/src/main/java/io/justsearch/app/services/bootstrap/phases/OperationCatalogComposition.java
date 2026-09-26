@@ -63,6 +63,15 @@ public final class OperationCatalogComposition {
   /** The partitioned dual-catalog result every downstream consumer still reads. */
   public record Result(OperationCatalog operationCatalog, OperationCatalog agentToolsCatalog) {}
 
+  /** A tooling facade without the finite ingestion owner cannot offer its durable operations. */
+  public static OperationCatalog forRecordedIngestionOwner(OperationCatalog catalog,
+      io.justsearch.app.api.operations.RecordedIngestionService ingestion) {
+    if (ingestion.hasOwner()) return catalog;
+    return OperationCatalog.of(catalog.namespace(), catalog.definitions().stream()
+        .filter(operation -> operation.policy().recordKind() != io.justsearch.agent.api.registry.OperationKind.INGEST
+            && operation.policy().recordKind() != io.justsearch.agent.api.registry.OperationKind.REINDEX).toList());
+  }
+
   /**
    * Phase 1: install the two static catalogs into the one registry as CORE-owner contributions.
    * Idempotent only across distinct registries — call once per boot. Both are CORE-tier so they may

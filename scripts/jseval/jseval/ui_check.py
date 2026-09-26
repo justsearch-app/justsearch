@@ -43,7 +43,7 @@ class AppNotMountedError(Exception):
 async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
     """Block until the app shell has mounted (rail button visible), else raise
     AppNotMountedError with the best-available reason (Vite stderr tail / error-overlay
-    text / honest fallback). ONE gate, reused by every capture path."""
+    text / failed resource status / honest fallback). ONE gate, reused by every capture path."""
     try:
         await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(
             state="visible", timeout=timeout_ms)
@@ -75,10 +75,23 @@ async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
         stderr_tail = ""
     # (2) Vite's in-page error overlay (615 §28 U3 — confirmed channel, no false positive).
     overlay = None
+    failed_resources = []
     try:
-        overlay = await page.evaluate(
-            "() => { const o = document.querySelector('vite-error-overlay');"
-            " return o ? (o.shadowRoot?.textContent || o.textContent || 'present').slice(0,400) : null; }")
+        diagnostics = await page.evaluate("""() => {
+            const overlay = document.querySelector('vite-error-overlay');
+            return {
+                overlay: overlay
+                    ? (overlay.shadowRoot?.textContent || overlay.textContent || 'present').slice(0, 400)
+                    : null,
+                failedResources: performance.getEntriesByType('resource')
+                    .filter(entry => entry.responseStatus >= 400
+                        && new URL(entry.name).origin === location.origin)
+                    .slice(0, 3)
+                    .map(entry => `${entry.responseStatus} ${new URL(entry.name).pathname}`)
+            };
+        }""")
+        overlay = diagnostics["overlay"]
+        failed_resources = diagnostics["failedResources"]
     except Exception:
         overlay = None
 
@@ -86,6 +99,12 @@ async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
         reason = f"app shell never mounted within {secs}s; vite stderr tail: {stderr_tail}"
     elif overlay:
         reason = f"app shell never mounted within {secs}s; vite error overlay: {overlay.strip()}"
+    elif failed_resources:
+        # Optimizer 504s can prevent every app module from evaluating without an overlay
+        # or server stderr. Read the browser's completed requests, including those before
+        # this gate began; no extra listener lifetime or retry can hide the failed mount.
+        reason = (f"app shell never mounted within {secs}s; failed same-origin resources: "
+                  + "; ".join(failed_resources))
     else:
         reason = (f"app shell never mounted within {secs}s; no Vite stderr or error overlay "
                   "captured (a server may be serving non-app content, or the bundle failed silently)")
@@ -272,22 +291,51 @@ def _demo_url(ui_url: str, **extra: str) -> str:
 
 
 async def _type_and_search(page, query: str = "justsearch") -> None:
-    # tempdoc 615 §6.1b: the live Lit shell lands on the chat surface, so navigate to the search
-    # surface first (rail click, hash-route fallback) before reaching for the search input.
+    # Search v3 owns retrieval. Its composer does not use the retired `search-input` testid and a
+    # draft is not a search until the command palette's explicit "Search this text" action runs.
     await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(state="visible", timeout=15_000)
-    try:
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.dispatch_event("click")
-    except Exception:
-        # Search Thread S5b — the standalone `core.search-surface` rail surface is retired; the
-        # retrieve tier folded into the one window (matches S.RAIL_SURFACE_SEARCH above).
-        await page.evaluate("() => { location.hash = 'justsearch://surface/core.unified-chat-surface'; }")
-    # tempdoc 615 §11 HARDEN: resolve the search input by accessible role+name first
-    # (stable across testid churn), falling back to the testid.
-    inp = await S.SEARCH_INPUT.locate(page)
+    await page.evaluate("() => { location.hash = 'justsearch://surface/core.search-v3-surface'; }")
+    window = page.locator(S.CSS_SV3_WINDOW)
+    await window.first.wait_for(state="visible", timeout=15_000)
+    inp = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
     await inp.wait_for(state="visible", timeout=10_000)
-    await inp.click()
-    await inp.type(query, delay=30)
-    await page.locator(S.CSS_SEARCH_RESULT_ROW).first.wait_for(state="visible", timeout=30_000)
+    await inp.fill(query)
+    await window.get_by_role("button", name="Open command palette", exact=True).click()
+    async with page.expect_response("**/api/knowledge/search", timeout=30_000):
+        await page.locator(S.CSS_SV3_PALETTE).get_by_role(
+            "option", name="Search this text", exact=True
+        ).click()
+    await page.locator(S.CSS_SV3_RESULT_ROW).first.wait_for(state="visible", timeout=30_000)
+
+
+async def _set_density_in_settings(page, label: str) -> None:
+    """Select one FE-local Density stop and prove the control projected it."""
+    slider = page.locator(S.CSS_DENSITY_SLIDER).first
+    await slider.wait_for(state="visible", timeout=10_000)
+    await slider.fill(str({"Compact": 0, "Comfortable": 1, "Spacious": 2}[label]))
+    if await slider.get_attribute("aria-valuetext") != label:
+        raise AssertionError(f"Density slider did not select {label}")
+
+
+async def _set_detail_level_in_settings(page, label: str) -> None:
+    """Select the header's backend-persisted detail level and await its witnessed receipt."""
+    # The reachable authority is Shell's persistent header toggle: a named group of pressed
+    # buttons. Settings also projects the value, but this header control is always reachable.
+    group = page.get_by_role("group", name="Detail level").first
+    btn = group.get_by_role("button", name=label, exact=True)
+    await btn.wait_for(state="visible", timeout=10_000)
+    if await btn.get_attribute("aria-pressed") == "true":
+        return
+    async with page.expect_response(
+        lambda response: "/api/settings/v2" in response.url
+        and response.request.method == "POST",
+        timeout=15_000,
+    ) as response_info:
+        await btn.click()
+    response = await response_info.value
+    receipt = await response.json()
+    if response.status != 200 or receipt.get("state") != "COMPLETE":
+        raise AssertionError(f"Detail-level settings write did not complete: {receipt!r}")
 
 
 async def _navigate_and_search(page, url: str, query: str = "justsearch", *, timeout_ms: int = 60_000) -> None:
@@ -427,6 +475,98 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     """Build the complete flat step list."""
     demo = _demo_url(ui_url)
     ai_init = "localStorage.setItem('justsearch-inspector-tab', 'ai');"
+
+    async def setup_engine_recovery(page):
+        # Capture the real desktop boot path with a deterministic native command boundary.
+        # The initial browser shell satisfies the common harness mount check; reload then
+        # starts main.jsx without an Engine binding. This is UI proof, not an installed updater.
+        await page.context.add_init_script("""(() => {
+          let nextCallback = 0;
+          window.__TAURI_INTERNALS__ = {
+            transformCallback: () => ++nextCallback,
+            unregisterCallback: () => {},
+            invoke: async (command) => {
+              if (command === 'plugin:event|listen') return ++nextCallback;
+              if (command === 'plugin:event|unlisten') return null;
+              if (command === 'api_port') return null;
+              if (command === 'supervisor_state') return {
+                schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri',
+                state: 'exhausted', incarnation: 1, restartCount: 3, maxRestartAttempts: 3
+              };
+              if (command === 'app_update_status') return {
+                state: 'available', currentVersion: '0.3.0', availableVersion: '0.3.1'
+              };
+              throw new Error('Unexpected native command in recovery capture: ' + command);
+            }
+          };
+        })();""")
+        await page.reload(wait_until="domcontentloaded")
+        await page.get_by_test_id("engine-recovery").wait_for(state="visible", timeout=15_000)
+        await page.get_by_text("JustSearch could not restart", exact=True).wait_for()
+        await page.get_by_text("Install update", exact=True).wait_for()
+
+    async def setup_engine_admission_wait(page):
+        """Exercise the real admission-wait emitter and its mounted toast projection."""
+        await page.evaluate(
+            """() => {
+              const events = [];
+              window.__justsearchAdmissionWaitEvents = events;
+              window.__justsearchAdmissionWaitListener = (event) => {
+                const detail = event.detail || {};
+                events.push({
+                  classId: detail.classId,
+                  message: detail.message,
+                  severity: detail.severity,
+                  supersede: detail.supersede,
+                });
+              };
+              document.addEventListener(
+                'jf-advisory-ephemeral', window.__justsearchAdmissionWaitListener
+              );
+            }"""
+        )
+        # SES blocks import expressions evaluated as page JavaScript. A module script is the
+        # trusted served-module boundary used by the app itself; expose only this named helper for
+        # the next page evaluation, which merely invokes it and observes the real event channel.
+        await page.add_script_tag(
+            type="module",
+            content="""
+              import { reportAdmissionWait } from '/src/shell-v0/state/admissionWaitNotice.ts';
+              globalThis.__justsearchReportAdmissionWait = reportAdmissionWait;
+            """,
+        )
+        emitted = await page.evaluate(
+            """() => {
+              if (typeof globalThis.__justsearchReportAdmissionWait !== 'function') {
+                throw new Error('served admission-wait module did not expose its helper');
+              }
+              globalThis.__justsearchReportAdmissionWait(false, 250);
+              globalThis.__justsearchReportAdmissionWait(true, 500);
+              return globalThis.__justsearchAdmissionWaitEvents;
+            }"""
+        )
+        if len(emitted) != 2:
+            raise AssertionError(f"expected two admission-wait emissions, got {emitted!r}")
+        if any(event.get("classId") != "core.engine.wait" for event in emitted):
+            raise AssertionError(f"admission-wait emissions used the wrong class: {emitted!r}")
+        if any(event.get("severity") != "info" for event in emitted):
+            raise AssertionError(f"admission-wait emissions were not informational: {emitted!r}")
+        if any(event.get("supersede") is not True for event in emitted):
+            raise AssertionError(f"admission-wait emissions did not supersede: {emitted!r}")
+
+        toast = page.locator(S.CSS_TOAST)
+        await toast.first.wait_for(state="visible", timeout=10_000)
+        await asyncio.sleep(0.2)
+        if await toast.count() != 1:
+            raise AssertionError("same-class admission waits must leave one visible toast")
+        toast_text = await toast.first.inner_text()
+        if "preparing an update" not in toast_text:
+            raise AssertionError(f"latest admission-wait notice was not rendered: {toast_text!r}")
+        notice = toast.first.locator("jf-system-notice")
+        if await notice.get_attribute("tone") != "neutral":
+            raise AssertionError("informational admission wait must use the canonical neutral tone")
+        if await notice.get_attribute("live") != "status":
+            raise AssertionError("admission-wait toast must use polite status announcement")
 
     # === Shared-browser chain (sequential, depends_on linkage) ===
 
@@ -678,25 +818,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 if cooldown_ms > 0:
                     await asyncio.sleep(cooldown_ms / 1000)
             if view_name == "ai-brain-advanced":
-                # Tempdoc 923 — Brain now projects the shared app-wide detail level through its
-                # accessible header control. The retired Simple-panel "Switch to Advanced" hook
-                # no longer exists; select the current user-facing Detailed choice instead.
-                detail_level = page.get_by_role("group", name="Detail level").first
-                b = detail_level.get_by_role("button", name="Detailed", exact=True)
-                await b.wait_for(state="visible", timeout=10_000)
-                await b.click(timeout=5_000)
-                if cooldown_ms > 0:
-                    await asyncio.sleep(cooldown_ms / 1000)
-            # tempdoc 840 Phase 5 — the per-component install list: what each piece of the ~7 GB is,
-            # what it costs, and what you lose by declining it. Scroll it into the capture.
-            #
-            # KNOWN LIMITATION: on a profile that has not dismissed it, the first-run walkthrough
-            # floats over the lower ~200px and occludes the last rows. Its dismissal lives in
-            # UserStateDocument (not a storage key an init_script can set), and a click-through
-            # attempt did not reach the button inside the card's shadow root. The required and
-            # improves-results groups — what these steps exist to verify — are above the overlay and
-            # capture cleanly; axe still reports 0 violations. Left as a limitation rather than a
-            # swallowed exception that would look handled.
+                await _set_detail_level_in_settings(page, "Detailed")
+            if view_name in ("ai-brain-components", "ai-brain-consent"):
+                # These controls live in the Simple panel; the captured settings fixture starts
+                # Detailed. Select the panel through the shared witnessed header control first.
+                await _set_detail_level_in_settings(page, "Simple")
             if view_name == "ai-brain-components":
                 lst = page.get_by_test_id(S.TID_INSTALL_COMPONENT_LIST)
                 await lst.wait_for(state="visible", timeout=10_000)
@@ -728,6 +854,67 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     _DENSITY_LABEL = {"compact": "Compact", "comfort": "Comfortable",
                       "comfortable": "Comfortable", "rich": "Spacious"}
     _MODE_LABEL = {"simple": "Simple", "advanced": "Detailed"}
+
+    async def setup_health_recovery(page):
+        # Exercise the actual REST projection and catalog confirmation through transport fixtures.
+        catalog = json.loads(ui_fixtures.fixture_body("http://localhost/api/registry/operations"))
+        template = catalog["entries"][0]
+        catalog["entries"] = []
+        for operation_id, high in (("core.reindex", False), ("core.rebuild-index", True)):
+            entry = json.loads(json.dumps(template))
+            entry["id"] = operation_id
+            entry["presentation"]["labelKey"] = f"ops.{operation_id.removeprefix('core.')}.label"
+            entry["policy"]["risk"] = "HIGH" if high else "LOW"
+            entry["policy"]["confirm"] = {"kind": "INLINE" if high else "NONE"}
+            entry["intf"]["inputs"] = {"type": "object"}
+            entry["intf"]["result"] = {"type": "object"}
+            catalog["entries"].append(entry)
+        recovery = {"catalogVersion": 1, "entries": [
+            {"target": "core.reindex", "conditions": [{
+                "conditionId": "schema.reindex-required", "subject": "worker.schema",
+                "severity": "WARNING", "since": "2026-09-14T00:00:00Z",
+                "defaultArgsJson": '{"force":true}',
+            }]},
+            {"target": "core.rebuild-index", "conditions": [{
+                "conditionId": "embedding.blocked", "subject": "worker.embedding",
+                "severity": "WARNING", "since": "2026-09-14T00:00:00Z",
+                "defaultArgsJson": '{}',
+            }]},
+        ]}
+        invoked = []
+
+        async def operations(route):
+            await route.fulfill(status=200, content_type="application/json", body=json.dumps(catalog))
+
+        async def recommendations(route):
+            await route.fulfill(status=200, content_type="application/json", body=json.dumps(recovery))
+
+        async def empty_stream(route):
+            await route.fulfill(status=200, content_type="text/event-stream", body=": ready\n\n")
+
+        async def invoke(route):
+            invoked.append(route.request.url)
+            await route.fulfill(status=200, content_type="application/json",
+                                body=json.dumps({"success": True, "message": "Completed"}))
+
+        await page.route("**/api/registry/operations", operations)
+        await page.route("**/api/condition-recovery-index", recommendations)
+        await page.route("**/api/condition-recovery-index/stream", empty_stream)
+        await page.route("**/api/operations/*/invoke", invoke)
+        # Catalog bootstrap must consume the overridden transport, not a cached earlier catalog.
+        await page.reload()
+        await _goto_surface(page, S.RAIL_SURFACE_HEALTH)
+        panel = page.locator("jf-health-surface .recommended")
+        low = panel.locator('jf-operation[operation-id="core.reindex"]')
+        await low.wait_for(state="visible", timeout=15_000)
+        async with page.expect_request("**/api/operations/*/invoke") as request:
+            await low.locator("jf-action-button button.invoke").click()
+        assert (await request.value).post_data_json["args"] == {"force": True}
+        high = panel.locator('jf-operation[operation-id="core.rebuild-index"]')
+        await high.locator("jf-action-button button.invoke").click()
+        await high.locator(".confirm-row").wait_for(state="visible")
+        assert len(invoked) == 1, "Rebuild must wait for catalog inline confirmation"
+        await panel.scroll_into_view_if_needed()
 
     async def setup_health_completion(page):
         # Exercise the real Health SSE consumer and Lit projection with a finite
@@ -816,19 +1003,26 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         assert "CLOUD_PLACEHOLDER" not in await panel.inner_text()
         await panel.scroll_into_view_if_needed()
 
+    async def setup_library_gap_decision(page):
+        await _goto_surface(page, S.RAIL_SURFACE_LIBRARY)
+        decision = page.locator(".gap-decision")
+        await decision.get_by_role("heading", name="New index — activation requires your decision").wait_for(
+            timeout=15_000)
+        await decision.get_by_text("notes/old-draft.txt: CANDIDATE_PROJECTION_MISSING").wait_for()
+        await decision.get_by_text("notes/deleted-draft.txt: DELETE_NOT_APPLIED").wait_for()
+        await decision.get_by_role("button", name="Accept gaps and activate").wait_for()
+        await decision.scroll_into_view_if_needed()
+
     def _density_setup(density: str):
         async def setup(page):
-            # tempdoc 615 §6.1b: density is a LIVE Settings control (the Accessibility section's
-            # `button.option-btn` Compact/Comfortable/Spacious -> applyAdaptationProfile, persisted
-            # server-side), not the retired `__JUSTSEARCH_STORES__` global. Set it in Settings, then search.
+            # Density is the Accessibility discrete slider and persists in the FE-local profile.
             await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(state="visible", timeout=15_000)
             await _goto_surface(page, S.RAIL_SURFACE_SETTINGS)
-            # Density lives in the Accessibility section as an `option-btn` (Compact/Comfortable/Spacious);
-            # the cards carry sub-labels, so match by leading text on the button class, not the full name.
+            await page.locator(S.CSS_SETTINGS_WINDOW_CONTENT).first.wait_for(
+                state="attached", timeout=10_000
+            )
             label = _DENSITY_LABEL.get(density, "Comfortable")
-            btn = page.locator("button.option-btn", has_text=label)
-            await btn.first.wait_for(state="visible", timeout=10_000)
-            await btn.first.click(timeout=10_000)
+            await _set_density_in_settings(page, label)
             if cooldown_ms > 0:
                 await asyncio.sleep(cooldown_ms / 1000)
             await _goto_surface(page, S.RAIL_SURFACE_SEARCH)
@@ -837,15 +1031,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     def _mode_setup(mode: str):
         async def setup(page):
-            # tempdoc 923: UI mode is the live Settings Simple/Detailed `option-btn` (the compatible
-            # wire value remains `advanced`; the control persists via
-            # `/api/settings/v2` `ui.mode`), not the retired store + filter toggle. Set it, then search.
+            # UI mode is the persistent header's "Detail level" pressed-button group. Its async
+            # patch is complete only
+            # after the witnessed settings POST returns a COMPLETE receipt.
             await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(state="visible", timeout=15_000)
-            await _goto_surface(page, S.RAIL_SURFACE_SETTINGS)
-            # The Simple/Detailed cards are `option-btn`s with sub-labels; match by leading text.
-            btn = page.locator("button.option-btn", has_text=_MODE_LABEL.get(mode, "Simple"))
-            await btn.first.wait_for(state="visible", timeout=10_000)
-            await btn.first.click()
+            await _set_detail_level_in_settings(page, _MODE_LABEL.get(mode, "Simple"))
             if cooldown_ms > 0:
                 await asyncio.sleep(cooldown_ms / 1000)
             await _goto_surface(page, S.RAIL_SURFACE_SEARCH)
@@ -1988,9 +2178,14 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     ]
 
     return [
+        Step("engine-recovery", setup=setup_engine_recovery, isolated=True),
+        Step("engine-admission-wait", setup=setup_engine_admission_wait, isolated=True),
         Step("health-completion", setup=setup_health_completion, isolated=True),
+        Step("health-recovery", setup=setup_health_recovery, isolated=True),
         Step("search-failure", setup=setup_search_failure, isolated=True),
         Step("library-ingestion", setup=setup_library_ingestion, isolated=True),
+        Step("library-gap-decision", setup=setup_library_gap_decision, isolated=True,
+             fixtures_variant="gap-decision"),
         # --- Shared-browser chain (demo flow) ---
         Step("search-results",       setup=setup_search_results),
         Step("command-mode",         setup=setup_command_mode,       depends_on="search-results"),
@@ -2007,8 +2202,12 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # -filtered steps are retired rather than repointed.
 
         # --- Isolated: main views (dark + light) ---
-        *[Step(f"{v}", setup=_view_setup(v), isolated=True) for v in views],
-        *[Step(f"{v}-light", setup=_view_setup(v, "light"), isolated=True, color_scheme="light") for v in views],
+        *[Step(f"{v}", setup=_view_setup(v), isolated=True,
+               fixtures_variant="install-preview" if v in ("ai-brain-components", "ai-brain-consent") else "default")
+          for v in views],
+        *[Step(f"{v}-light", setup=_view_setup(v, "light"), isolated=True, color_scheme="light",
+               fixtures_variant="install-preview" if v in ("ai-brain-components", "ai-brain-consent") else "default")
+          for v in views],
         Step("help-narrow", setup=setup_help_narrow, isolated=True),
 
         # --- Isolated: density/mode variants ---

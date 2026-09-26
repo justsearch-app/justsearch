@@ -1,0 +1,544 @@
+{
+  "baseRevision": "40d1b75cd8ce52a08d92c564c7d0c2db6fdf86c8",
+  "testedSource": "Base plus source hashes below; final compatibility1231 follows byte-identical mutant restoration. After1231 only comments in MultiplexedSseWriter/RunStreamWriter were corrected; behavior is unchanged.",
+  "runs": [
+    {
+      "revision": "40d1b75cd + snapshot boundary regressions only",
+      "command": "./gradlew.bat :modules:ui:test --tests '*SseSnapshotBoundaryTest' --console=plain",
+      "summary": {
+        "tests": 6,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 6,
+          "failures": 4,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ],
+      "result": "EXPECTED_FAILURE",
+      "executedCases": 6,
+      "failures": [
+        {
+          "class": "io.justsearch.ui.api.SseSnapshotBoundaryTest",
+          "name": "[1] false",
+          "message": "org.opentest4j.AssertionFailedError: disconnect after connected must still replay n=2 ==> expected: <c3VyZmFjZTpzbmFwc2hvdC1ib3VuZGFyeTox> but was: <c3VyZmFjZTpzbmFwc2hvdC1ib3VuZGFyeToz>"
+        },
+        {
+          "class": "io.justsearch.ui.api.SseSnapshotBoundaryTest",
+          "name": "[2] true",
+          "message": "org.opentest4j.AssertionFailedError: disconnect after connected must still replay n=2 ==> expected: <c3VyZmFjZTpzbmFwc2hvdC1ib3VuZGFyeTox> but was: <c3VyZmFjZTpzbmFwc2hvdC1ib3VuZGFyeToz>"
+        },
+        {
+          "class": "io.justsearch.ui.api.SseSnapshotBoundaryTest",
+          "name": "[1] false",
+          "message": "org.opentest4j.AssertionFailedError: expected: <1> but was: <0>"
+        },
+        {
+          "class": "io.justsearch.ui.api.SseSnapshotBoundaryTest",
+          "name": "[2] true",
+          "message": "org.opentest4j.AssertionFailedError: expected: <1> but was: <0>"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-negative1226.txt",
+          "bytes": 53631,
+          "sha256": "ae36f64315be45f5fa9b7e799d26c4933e7d391faca257e11f2205e70824a86e"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-negative1226-xml.zip",
+          "bytes": 2479,
+          "sha256": "eb38f2b4eacf3a85087681c18f3d8af61bbb72f6419e1014e6cb5cd095154128"
+        }
+      ]
+    },
+    {
+      "revision": "40d1b75cd + snapshot/retirement diff",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*Sse*Test' --tests '*ResumeToken*Test' --tests '*RunRetirementRegistrationTest' :modules:app-agent:test --tests '*AgentSessionRegistryDetachTest' :modules:ui:test --tests '*Sse*Test' --tests '*RunStreamWriterTest' --tests '*HealthEventStreamControllerTest' --continue -PincludeStress=true --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 63,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 9
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 63,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 9
+        }
+      ],
+      "result": "FAILED",
+      "executedCases": 63,
+      "failures": [],
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-focused1227.txt",
+          "bytes": 60462,
+          "sha256": "af0f44ba91770e2954a86dddc28d3a0e8eb06e450805c20138d6a88c05735048"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-focused1227-xml.zip",
+          "bytes": 13809,
+          "sha256": "a1da23673790a860983823f7e5ae9f9114bda059779961c26fa6ae7aaad50385"
+        }
+      ]
+    },
+    {
+      "revision": "40d1b75cd + snapshot/retirement diff",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*Sse*Test' --tests '*ResumeToken*Test' --tests '*RunRetirementRegistrationTest' :modules:app-agent:test --tests '*AgentSessionRegistryDetachTest' :modules:ui:test --tests '*Sse*Test' --tests '*RunStreamWriterTest' --tests '*HealthEventStreamControllerTest' --continue -PincludeStress=true --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 156,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 23
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 63,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 9
+        },
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 91,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        }
+      ],
+      "result": "FAILED",
+      "executedCases": 93,
+      "failures": [
+        {
+          "class": "io.justsearch.ui.api.HealthEventStreamControllerTest",
+          "name": "Fix C: subscribe with valid in-window token replays from the buffer",
+          "message": "org.opentest4j.AssertionFailedError: replay UPDATE frame expected: [{\"streamId\":\"surface:health-events\",\"frameKind\":\"LIFECYCLE\",\"seq\":2,\"ts\":\"2026-09-13T15:24:24.747446Z\",\"payload\":{\"kind\":\"connected\"},\"resumeToken\":\"c3VyZmFjZTpoZWFsdGgtZXZlbnRzOjE6NmQ0MWRmMzYtOGFkOS00NDA1LTg1ZmQtNzU1NmE3OTA4OTAy\"}] ==> expected: <true> but was: <false>"
+        },
+        {
+          "class": "io.justsearch.ui.api.SseEnvelopeWriterTest",
+          "name": "attemptResumeAndSubscribe with a seq=0 cursor replays the full buffer",
+          "message": "org.mockito.exceptions.verification.TooFewActualInvocations: \nsseClient.sendEvent(\n    \"frame\",\n    <any java.lang.String>\n);\nWanted 3 times:\n-> at io.javalin.http.sse.SseClient.sendEvent(SseClient.kt)\nBut was 1 time:\n-> at io.justsearch.ui.api.SseEnvelopeWriter.sendWire(SseEnvelopeWriter.java:212)\n"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-focused1228.txt",
+          "bytes": 9784,
+          "sha256": "e269a30a63c07eaaa94679b5a4e8efbadc256158a943df7f9377068e7094e2c0"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-focused1228-xml.zip",
+          "bytes": 25245,
+          "sha256": "4594cc6777392ef29776fde3bbee9d34618542d7b7ac96fd0c0ed303c74f6ea1"
+        }
+      ]
+    },
+    {
+      "revision": "40d1b75cd + snapshot/retirement diff",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*Sse*Test' --tests '*ResumeToken*Test' --tests '*RunRetirementRegistrationTest' :modules:app-agent:test --tests '*AgentSessionRegistryDetachTest' :modules:ui:test --tests '*Sse*Test' --tests '*RunStreamWriterTest' --tests '*HealthEventStreamControllerTest' :modules:app-api:spotlessCheck :modules:app-agent-api:spotlessCheck :modules:app-agent:spotlessCheck :modules:app-observability:spotlessCheck :modules:ui:spotlessCheck :modules:app-api:pmdMain :modules:app-agent-api:pmdMain :modules:app-agent:pmdMain :modules:app-agent:pmdTest :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava --continue -PincludeStress=true --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 156,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 23
+      },
+      "tasks": [
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 63,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 9
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 91,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        }
+      ],
+      "result": "FAILED",
+      "executedCases": 91,
+      "failures": [],
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-focused1229.txt",
+          "bytes": 41448,
+          "sha256": "8abbb39ef49b81f5cb10988b4937ed2964530c28818a1556ec72b89851acd99b"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-focused1229-xml.zip",
+          "bytes": 24462,
+          "sha256": "460019d9d7a014ed97b3be28f254105e4714577b209b0fcdb4b9a75625bd9a7b"
+        }
+      ]
+    },
+    {
+      "revision": "40d1b75cd + deliberate late ownership and registry lock mutants",
+      "command": "./gradlew.bat :modules:ui:test --tests '*SseConnectionTest.replayOverflowClosesRequestBeforeInitialAttachmentReturns' --tests '*RunStreamWriterTest.prefixOverflowClosesRequestBeforeBlockedRunStartedReturns' :modules:app-agent:test --tests '*AgentSessionRegistryDetachTest.rawPrimerOverflowSignalsDetachBeforeBlockedCallbackReturns' :modules:app-observability:test --tests '*RunRetirementRegistrationTest.lateRegistrationCompletesWhileAnEarlierRetirementCallbackIsBlocked' --continue --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 8,
+        "failures": 5,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 6
+      },
+      "tasks": [
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 5,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        }
+      ],
+      "result": "EXPECTED_FAILURE",
+      "executedCases": 8,
+      "failures": [
+        {
+          "class": "io.justsearch.agent.AgentSessionRegistryDetachTest",
+          "name": "rawPrimerOverflowSignalsDetachBeforeBlockedCallbackReturns()",
+          "message": "org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+        },
+        {
+          "class": "io.justsearch.app.observability.stream.run.RunRetirementRegistrationTest",
+          "name": "lateRegistrationCompletesWhileAnEarlierRetirementCallbackIsBlocked()",
+          "message": "java.util.concurrent.TimeoutException"
+        },
+        {
+          "class": "io.justsearch.ui.api.RunStreamWriterTest",
+          "name": "prefixOverflowClosesRequestBeforeBlockedRunStartedReturns()",
+          "message": "org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+        },
+        {
+          "class": "io.justsearch.ui.api.SseConnectionTest",
+          "name": "[1] false",
+          "message": "org.opentest4j.AssertionFailedError: ownership must exist before replay can block ==> expected: <true> but was: <false>"
+        },
+        {
+          "class": "io.justsearch.ui.api.SseConnectionTest",
+          "name": "[2] true",
+          "message": "org.opentest4j.AssertionFailedError: ownership must exist before replay can block ==> expected: <true> but was: <false>"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-retirement-negative1230.txt",
+          "bytes": 42788,
+          "sha256": "8dcdf1196ade676d9a68d6a74f5190f4932afdbf5edd0c37ff0c53e036005b9a"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-retirement-negative1230-xml.zip",
+          "bytes": 12300,
+          "sha256": "7f6a92fc8140b41e0bdf91c3a361edde48c1509aa042f40e02731e16f82decca"
+        }
+      ]
+    },
+    {
+      "revision": "40d1b75cd + final snapshot/retirement diff",
+      "command": "./gradlew.bat :modules:app-observability:test :modules:app-agent:test --tests '*AgentSessionRegistryDetachTest' --tests '*AgentLoopServiceTest' :modules:ui:test --tests '*Sse*Test' --tests '*RunStreamWriterTest' --tests '*HealthEventStreamControllerTest' :modules:app-api:spotlessCheck :modules:app-agent-api:spotlessCheck :modules:app-agent:spotlessCheck :modules:app-observability:spotlessCheck :modules:ui:spotlessCheck :modules:app-api:pmdMain :modules:app-agent-api:pmdMain :modules:app-agent:pmdMain :modules:app-agent:pmdTest :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava --continue -PincludeStress=true --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 756,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 96
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "FROM-CACHE",
+          "tests": 91,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        },
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 145,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 520,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 81
+        }
+      ],
+      "result": "PASS",
+      "executedCases": 665,
+      "failures": [],
+      "artifacts": [
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-compatibility1231.txt",
+          "bytes": 40863,
+          "sha256": "06cb34cc26cfbc1d20457f7bd7df33271641811f657f937cbb46aa0820994fd6"
+        },
+        {
+          "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-compatibility1231-xml.zip",
+          "bytes": 122066,
+          "sha256": "c68f93aa55fc841fd1d5359db3368aedb2f1084483bbb079f3a70e247148537f"
+        }
+      ]
+    }
+  ],
+  "sourceHashes": [
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-agent-api/src/main/java/io/justsearch/agent/api/RunObservation.java",
+      "bytes": 5458,
+      "sha256": "ae939c7f9c1c1b8faa637c2e5663c01535d6f569bb94640443eaedc309b67d81"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-agent/src/main/java/io/justsearch/agent/AgentSessionRegistry.java",
+      "bytes": 11319,
+      "sha256": "9db218f20f6ea4b7f9ad751d7b56a4a44b45d4eb39416f3d29a17a96b2f9d59a"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-agent/src/test/java/io/justsearch/agent/AgentSessionRegistryDetachTest.java",
+      "bytes": 4047,
+      "sha256": "46e36428b1eed8cbc8e6aaa9790eceae7191193c80177e173914f69bf3a72aa1"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-api/src/main/java/io/justsearch/app/api/stream/SseEnvelope.java",
+      "bytes": 2591,
+      "sha256": "b8ca1155a3e6fcba496db658a7624eac9b7fcc0292c02935b4869f9560a278d8"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/FrameHistoryRingBuffer.java",
+      "bytes": 8807,
+      "sha256": "be28065d82e552763c2f6223445efc590ab131ba1064d1456972a238ed1bf096"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/ResumeTokenCodec.java",
+      "bytes": 3267,
+      "sha256": "d9fb762301e1cff5bf26d0f14b407adfba45500685904ea5e00b9bb0adda2944"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/SseStreamChannel.java",
+      "bytes": 14173,
+      "sha256": "39cbbee1d7e700e581c346f9d8e506b7bcf905f504ba129a7605f617de8fdcf2"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/run/AbstractRunChannel.java",
+      "bytes": 6031,
+      "sha256": "07d723cb82834818674ad340bad656544fcf38e92995f9fb94f0f7c6bf3482de"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/run/RunChannel.java",
+      "bytes": 5170,
+      "sha256": "d8e2c7ca84326dfec4c2de9eee44b02f30c10da15cf273d403dab3f74ec9edc9"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/run/RunChannelObservation.java",
+      "bytes": 6869,
+      "sha256": "4535ab33585fbdc1de794848dcd6e860f9ffdfd71eeffa0444188e7a777df107"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/run/RunChannelRegistry.java",
+      "bytes": 10205,
+      "sha256": "cdccbeefa9c9146b8080859aca5472368af7d8823c57b31203244a6e5f943117"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/test/java/io/justsearch/app/observability/stream/ResumeTokenCodecPropertyTest.java",
+      "bytes": 1996,
+      "sha256": "a0aebf4b9de5cd60c4723930a27f235730f27b9adc0119a1f8757f223ed7d2f4"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/test/java/io/justsearch/app/observability/stream/ResumeTokenCodecTest.java",
+      "bytes": 2465,
+      "sha256": "c76735288428505838b207297066c0463c8ee48ab374cc4b07339d279e1b6c12"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStrongCursorTest.java",
+      "bytes": 6994,
+      "sha256": "aaca99ba272f45f06b50f150e818a98b20977532f321bae07e836c3522784170"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseSubscriptionRetirementTest.java",
+      "bytes": 3704,
+      "sha256": "afc0f62b68436f45aebf5181366a3fbecb7b7aaaf4eed788dcd38a308a97aee4"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/test/java/io/justsearch/app/observability/stream/run/RunRetirementRegistrationTest.java",
+      "bytes": 6410,
+      "sha256": "9103ca4ef34a9118bb21e5d4e6cb89efc7f3dc58bfb2ea80e8e83c1ada52ad92"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/main/java/io/justsearch/ui/api/MultiplexedSseWriter.java",
+      "bytes": 4451,
+      "sha256": "2b67d7fbcddaf0393a72af6ccdba094b3e30dc2877a7111398cfe23cbf896451"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/main/java/io/justsearch/ui/api/RunStreamWriter.java",
+      "bytes": 12812,
+      "sha256": "6f6b362f876e426d5a5007efb5ed8ec94245efe32bca629380c3349036e9a557"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/main/java/io/justsearch/ui/api/SseConnection.java",
+      "bytes": 2450,
+      "sha256": "d09f9ae7205ddb0ae6fcc21b7accde74a5024af4f8677f6f68d66c5d0b1f1b56"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/main/java/io/justsearch/ui/api/SseEnvelopeWriter.java",
+      "bytes": 8216,
+      "sha256": "e1cd7e69e005ba0a9467902ca48320b2da631201566cc14ccc8e97a7fea6b893"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/test/java/io/justsearch/ui/api/HealthEventStreamControllerTest.java",
+      "bytes": 9739,
+      "sha256": "a929d18c388ab2104d3a437f4780108c0e4646f5bc7213999bb35783552c31cd"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/test/java/io/justsearch/ui/api/MultiplexedSseWriterTest.java",
+      "bytes": 23726,
+      "sha256": "9caad56d83d46f6a76e22bae3157e91e366c4c163dc494bf029a6c93ec680d90"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/test/java/io/justsearch/ui/api/RunStreamWriterTest.java",
+      "bytes": 22875,
+      "sha256": "afd581b6cf85c3a78b043568e4e062e8319403c6e9f11ea4981f8a6dfe153760"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/test/java/io/justsearch/ui/api/SseConnectionTest.java",
+      "bytes": 11945,
+      "sha256": "59396e84ca0f259dba723b1728cce31a3c00181801ccac2fe1913e4a376ca102"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/test/java/io/justsearch/ui/api/SseEnvelopeWriterAtomicResumeTest.java",
+      "bytes": 7993,
+      "sha256": "b2a5a1044e771794b96bba545d382d43f5899d3c05a2cadae41c5d4a0162e025"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/test/java/io/justsearch/ui/api/SseEnvelopeWriterTest.java",
+      "bytes": 16671,
+      "sha256": "3c718363ee3828a689ec399e5e6e8cd8dba72960fecde2cc8538eba68a78c07c"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui/src/test/java/io/justsearch/ui/api/SseSnapshotBoundaryTest.java",
+      "bytes": 5093,
+      "sha256": "420a30d144637b2e0a12c896e244519284257ca5102b47cfe4d0486cfbbb76e6"
+    }
+  ],
+  "negativeHarness": {
+    "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-retirement-negative1230.py",
+    "bytes": 1338,
+    "sha256": "64338d545c0c597641a0fa2f6a81edbee1dafe020d88be8edeac38feba7105b2"
+  },
+  "restoredSource": [
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/SseStreamChannel.java",
+      "bytes": 14173,
+      "sha256": "39cbbee1d7e700e581c346f9d8e506b7bcf905f504ba129a7605f617de8fdcf2"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/app-observability/src/main/java/io/justsearch/app/observability/stream/run/RunChannelRegistry.java",
+      "bytes": 10205,
+      "sha256": "cdccbeefa9c9146b8080859aca5472368af7d8823c57b31203244a6e5f943117"
+    }
+  ],
+  "canonicalChecks": {
+    "command": "node scripts/docs/llmstxt-generate.mjs; node scripts/docs/skills-sync.mjs; node scripts/docs/llmstxt-generate.mjs --check; node scripts/docs/skills-sync.mjs --check; node scripts/docs/verify-canonical-doc-links.mjs",
+    "result": "PASS",
+    "artifact": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-snapshot-docs1233.txt",
+      "bytes": 266,
+      "sha256": "138a4d753d677006f3b5bc0c75342693ce6034fe6bcda3974afc58e7b9d8c5d2"
+    }
+  },
+  "review": "Independent Sol/high read-only reviewer refuted prefix ownership, terminal-during-replay and registry-monitor callback gaps; all corrected and re-read with no remaining substantive finding. Root added focused regressions and retained execution proof separately.",
+  "retention": "Retain raw artifacts through lane acceptance plus 30 days; export before worktree release.",
+  "advisories": "1227 required real AgentSession instead of unavailable Mockito plus a fixture import.1228 exposed two migrated zero-cursor fixtures captured after publication.1229 tests passed but PMD rejected one redundant test qualifier. Those runs remain FAILED. Compilation also emitted inherited advisory warnings; none suppressed.",
+  "limits": [
+    "Full1202 predates this source; coherent full/stress rerun remains owed.",
+    "Live standalone/multiplexed reconnect/restart and rendered overlap proof remain owed.",
+    "Installed schema-v5 and hosted proof remain required; GitHub CI/CLA await runner allocation.",
+    "Raw detach signals promptly but cannot interrupt an already-blocked synchronous socket callback."
+  ]
+}

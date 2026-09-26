@@ -5,8 +5,13 @@ import io.javalin.http.Context;
 import io.justsearch.agent.api.AgentService;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
+import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
+import io.justsearch.app.services.lifecycle.LifecycleProjection;
 import io.justsearch.contract.wire.LifecycleState;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentRegistry;
+import io.justsearch.core.component.EngineComponentSnapshot;
 import io.justsearch.app.api.lifecycle.ReadinessDimension;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.gpl.GplStatusProvider;
@@ -89,10 +94,21 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private final OnlineAiService onlineAi;
   private final AgentService agentService;
   private final Supplier<InferenceRuntimeView> inferenceSnapshotSupplier;
-  private final io.justsearch.app.services.lifecycle.WorkerCapability workerCapability;
-  private final io.justsearch.app.services.lifecycle.InferenceCapability inferenceCapability;
+  private final io.justsearch.app.api.lifecycle.Capability workerCapability;
+  private final io.justsearch.app.api.lifecycle.Capability inferenceCapability;
   private volatile KnowledgeServerBootstrap knowledgeServer;
   private volatile String knowledgeServerStartError;
+  private EngineComponentRegistry componentRegistry;
+  private ComponentHandle indexComponent;
+
+  /** Called once during composition, before the sampler is attached. */
+  void setIndexComponent(EngineComponentRegistry registry, ComponentHandle handle) {
+    this.componentRegistry = java.util.Objects.requireNonNull(registry);
+    this.indexComponent = java.util.Objects.requireNonNull(handle);
+    if (!"index".equals(handle.spec().name())) {
+      throw new IllegalArgumentException("readiness requires the index component owner");
+    }
+  }
 
   /**
    * Tempdoc 333 §4 (deferred there, filled by 821 §3-C1): epoch-ms of the newest SUCCESSFUL Worker
@@ -127,6 +143,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   /** The sampler's last observation; {@code null} until the first one. */
   private volatile WorkerViewSample lastWorkerSample;
+  private final Object workerSamplingLock = new Object();
 
   /**
    * Wall clock for sample stamping and age. Injectable so the age-based staleness rule is testable:
@@ -193,15 +210,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private volatile io.justsearch.app.services.observability.health.IndexDriftHealthTap
       indexDriftTap;
 
-  /**
-   * Tempdoc 501 Phase 26 (§13.7 Q5) — late-bound runtime manifest publisher.
-   * When non-null and {@code current() != null}, the overall lifecycle
-   * projection is read from the manifest rather than re-derived locally.
-   * Eliminates the duplicate state-projection surface that the §13.4.3 audit
-   * found. Null on test-only paths and during the brief window between
-   * {@link LocalApiServer} construction and the publisher's first publish.
-   */
-  private volatile io.justsearch.ui.runtime.RuntimeManifestPublisher runtimeManifestPublisher;
+
 
   StatusLifecycleHandler(
       OnlineAiService onlineAi,
@@ -215,8 +224,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       Supplier<RerankerService> lambdamartRerankerSupplier,
       Supplier<GplStatusProvider> gplCoordinatorSupplier,
       Supplier<GpuCapabilitiesService> gpuCapabilitiesSupplier,
-      io.justsearch.app.services.lifecycle.WorkerCapability workerCapability,
-      io.justsearch.app.services.lifecycle.InferenceCapability inferenceCapability) {
+      io.justsearch.app.api.lifecycle.Capability workerCapability,
+      io.justsearch.app.api.lifecycle.Capability inferenceCapability) {
     // Tempdoc 412 Phase 3: engineMonitorSupplier removed (Phase 0 finding 2: EngineMonitor was
     // dead code; setters never called in production, so the supplier was always null in
     // practice). Inference status is now sourced from {@link InferenceLifecycleManager}'s
@@ -319,18 +328,6 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     this.conversationProtectionStateSupplier = supplier;
   }
 
-  /**
-   * Tempdoc 501 Phase 26 (§13.7 Q5): wire the runtime manifest publisher
-   * so the overall lifecycle projection can be read from one canonical
-   * source instead of re-derived per request. Late-bound because
-   * {@link LocalApiServer} constructs this handler before the publisher
-   * is in scope.
-   */
-  void setRuntimeManifestPublisher(
-      io.justsearch.ui.runtime.RuntimeManifestPublisher publisher) {
-    this.runtimeManifestPublisher = publisher;
-  }
-
   void setVduCapabilitySnapshotSupplier(
       Supplier<io.justsearch.app.services.vdu.VduCapabilityState.Snapshot> supplier) {
     this.vduCapabilitySnapshotSupplier = supplier;
@@ -412,7 +409,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // Tempdoc 885 item 6: the request thread reads the internal sampler's last snapshot. The one
     // debug escape hatch is ?fresh=true, which forces a synchronous sample.
     boolean fresh = "true".equalsIgnoreCase(ctx.queryParam("fresh"));
-    ctx.json(fresh ? buildStatusMap(true) : buildStatusMap(false));
+    ctx.json(fresh ? sampleAndBuildStatusSnapshot() : buildStatusMap(false));
   }
 
   @Override
@@ -428,7 +425,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * every health tap — the request thread reads what it left behind.
    */
   StatusResponse sampleAndBuildStatusSnapshot() {
-    return buildStatusMap(true);
+    synchronized (workerSamplingLock) {
+      return buildStatusMap(true);
+    }
   }
 
   /**
@@ -475,12 +474,16 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // Stamped BEFORE the call, not after it, so the age reported to consumers is never younger
     // than the observation actually is (the 821 §3-C1 convention, preserved).
     long sampledAtMs = clockMs.getAsLong();
-    if (!workerCapability.available()) {
+    KnowledgeServerBootstrap server = knowledgeServer;
+    if (server == null || !server.hasClient()) {
       return new WorkerViewSample(
           WorkerOperationalView.fallback(workerCapability.health().name()), true, null, sampledAtMs);
     }
-    try {
-      WorkerOperationalView view = knowledgeServer.client().getWorkerOperationalView();
+    try (var lease = server.captureClient()) {
+      WorkerOperationalView view = lease.withClient(client -> client.getWorkerOperationalView(
+          io.justsearch.app.services.intent.EngineProvenance.internal("status-sampler",
+              io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+              io.justsearch.core.context.EngineContext.Urgency.BACKGROUND)));
       lastWorkerObservationAtMs = sampledAtMs;
       return new WorkerViewSample(view, false, null, sampledAtMs);
     } catch (Exception e) {
@@ -505,9 +508,6 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    *     lands still reports the truth. That can happen at most once per process.
    */
   private StatusResponse buildStatusMap(boolean sampleWorker) {
-    // Appendix D: stable lifecycle subset (schema v1).
-    LifecycleSnapshotV1 lifecycleSnapshot = computeLifecycleSnapshot();
-
     long uptimeMs = System.currentTimeMillis() - startTime.toEpochMilli();
 
     // JVM Memory
@@ -527,11 +527,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // when available.
     // Keep this field for UI backwards-compat, but treat it as "Worker-connected index available".
     // Tempdoc 885 item 6: the Worker observation is the sampler's, not this thread's.
-    WorkerViewSample sample = lastWorkerSample;
-    if (sampleWorker || sample == null) {
-      sample = observeWorker();
-      lastWorkerSample = sample;
-    }
+    WorkerViewSample sample = workerSample(sampleWorker);
+    // Sampling may publish index readiness. Capture all served component surfaces afterward,
+    // once, so diagnostics, lifecycle and engineComponents share that observation.
+    LifecycleProjection.Projection projection = projectCurrentComponents();
+    LifecycleSnapshotV2 lifecycleSnapshot = projection.lifecycle();
 
     boolean indexAvailable = !sample.failed();
     String indexStatusReason = sample.failureReason();
@@ -558,7 +558,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
             : WorkerContact.observed(workerRpcAtMs);
 
     ReadinessEnvelopeView readiness =
-        buildReadinessEnvelope(workerView, lifecycleSnapshot, workerContact);
+        buildReadinessEnvelope(workerView, projection, workerContact);
 
     // Tempdoc 885 item 6: the taps reconcile on the SAMPLER path only. Before this item they
     // reconciled on whichever thread happened to call buildStatusMap, which meant GET /api/status
@@ -589,6 +589,65 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         embeddingReady,
         workerRpcAtMs,
         workerRpcStale);
+  }
+
+  private WorkerViewSample workerSample(boolean fresh) {
+    WorkerViewSample cached = lastWorkerSample;
+    if (!fresh && cached != null) {
+      return acceptWorkerSample(componentSnapshot(), cached, false);
+    }
+    // Only fresh observations share RPC ownership. Cached HTTP reads never acquire this lock.
+    synchronized (workerSamplingLock) {
+      cached = lastWorkerSample;
+      if (!fresh && cached != null) {
+        return acceptWorkerSample(componentSnapshot(), cached, false);
+      }
+      EngineComponentSnapshot before = componentSnapshot();
+      return acceptWorkerSample(before, observeWorker(), true);
+    }
+  }
+
+  private EngineComponentSnapshot componentSnapshot() {
+    return componentRegistry == null ? null : componentRegistry.snapshot();
+  }
+
+  /** Serialize only cache/publication here; cached readers never wait for an RPC. */
+  private synchronized WorkerViewSample acceptWorkerSample(
+      EngineComponentSnapshot before, WorkerViewSample sampled, boolean fresh) {
+    WorkerViewSample sample = !fresh && lastWorkerSample != null ? lastWorkerSample : sampled;
+    boolean stale = sample.failed() || clockMs.getAsLong() - sample.sampledAtMs()
+        > (long) SAMPLE_STALE_PERIODS * samplingPeriodMs();
+    if (!publishIndexReadiness(before, sample, stale, fresh)) {
+      return new WorkerViewSample(WorkerOperationalView.fallback("UNAVAILABLE"), true,
+          "Component observation superseded during sampling", sample.sampledAtMs());
+    }
+    if (fresh) lastWorkerSample = sample;
+    return sample;
+  }
+
+  private boolean publishIndexReadiness(
+      EngineComponentSnapshot before, WorkerViewSample sample, boolean stale, boolean fresh) {
+    if (before == null) return true;
+    var index = before.components().stream()
+        .filter(component -> "index".equals(component.spec().name())).findFirst().orElseThrow();
+    boolean apiReady = before.components().stream()
+        .anyMatch(component -> "api".equals(component.spec().name())
+            && component.state() == ComponentState.READY);
+    boolean ready = apiReady && !sample.failed() && !stale
+        && sample.view().core() != null && sample.view().core().indexHealthy();
+    if (ready && fresh && index.state() != ComponentState.ABSENT
+        && index.state() != ComponentState.RELOADING) {
+      return indexComponent.transitionIfUnchanged(before, ComponentState.READY, null, null);
+    } else if (!ready && index.state() == ComponentState.READY) {
+      String reason = (sample.failed() || stale)
+          ? LifecycleReasonCode.WORKER_LOST.code() : LifecycleReasonCode.WORKER_UNAVAILABLE.code();
+      String evidence = sample.failureReason() != null ? sample.failureReason()
+          : "apiReady=" + apiReady + ", contactFresh=" + !stale
+              + ", indexHealthy=" + (sample.view().core() != null && sample.view().core().indexHealthy());
+      return indexComponent.transitionIfUnchanged(before, ComponentState.UNAVAILABLE,
+          reason, evidence);
+    }
+    return before.equals(componentRegistry.snapshot());
   }
 
   /**
@@ -676,7 +735,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   private StatusResponse buildStatusResponse(
-      LifecycleSnapshotV1 lifecycleSnapshot,
+      LifecycleSnapshotV2 lifecycleSnapshot,
       long uptimeMs,
       long usedMemory,
       long totalMemory,
@@ -1133,9 +1192,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     };
   }
 
-  /** Handles GET /api/health - stable, machine-oriented lifecycle surface (Appendix D schema v1). */
+  /** Handles GET /api/health - stable, machine-oriented lifecycle surface (schema 2). */
   void handleHealth(Context ctx) {
-    LifecycleSnapshotV1 snapshot = computeLifecycleSnapshot();
+    LifecycleSnapshotV2 snapshot = computeLifecycleSnapshot();
     int httpStatus = healthHttpStatus(snapshot.lifecycle().state());
     ctx.status(httpStatus).json(snapshot);
   }
@@ -1206,41 +1265,6 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     return gate;
   }
 
-  /**
-   * Forward whichever specific cause the producer set, falling back to the generic
-   * {@code INFERENCE_OFFLINE} for an unrecognized reason. The worker twin is
-   * {@link #resolveWorkerReasonCode}.
-   *
-   * <p>Tempdoc 656 added this filter because the reason slot could hold arbitrary free prose from
-   * the mode-change callback ("Inference offline", "GPU allocated to indexing"), which it silently
-   * substituted the generic code for — deleting the cause. After tempdoc 837 S4/S5 swept the
-   * producers, every non-test writer passes a {@link LifecycleReasonCode}, so the fallback is
-   * defensive rather than routine: the slot now carries {@code inference.crashed} /
-   * {@code inference.deactivated} / {@code inference.gpu_yielded_to_indexing} where it used to
-   * carry one sentence the consumer had to discard.
-   */
-  private static String resolveInferenceReasonCode(
-      io.justsearch.app.services.lifecycle.InferenceCapability inferenceCapability) {
-    String reason = inferenceCapability.pendingReason();
-    return LifecycleReasonCode.isKnown(reason) ? reason : LifecycleReasonCode.INFERENCE_OFFLINE.code();
-  }
-
-  /**
-   * Tempdoc 837 §3.2: the worker twin of {@link #resolveInferenceReasonCode}. Every reason-bearing
-   * worker {@code transition(...)} site now passes a {@link LifecycleReasonCode}, so this forwards
-   * whatever specific cause the producer knew — {@code worker.lost} (it was serving and stopped),
-   * {@code worker.index_corrupt}, {@code worker.restart_exhausted}, {@code worker.shut_down} — and
-   * falls back to the caller's generic code only for an unrecognized reason. Replaces the inlined
-   * one-code special case (tempdoc 627) that could publish exactly {@code worker.restart_exhausted}
-   * and collapsed everything else onto {@code worker.spawn.failed}.
-   */
-  private static String resolveWorkerReasonCode(
-      io.justsearch.app.services.lifecycle.WorkerCapability workerCapability,
-      LifecycleReasonCode fallback) {
-    String reason = workerCapability.pendingReason();
-    return LifecycleReasonCode.isKnown(reason) ? reason : fallback.code();
-  }
-
   static String throughputReadinessReason(WorkerOperationalView workerView) {
     if (workerView == null || !hasActiveIndexWork(workerView)) {
       return null;
@@ -1278,111 +1302,16 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     return inferenceSnapshotSupplier.get();
   }
 
-  /** Visible for tests (tempdoc 837 §3.2 asserts the worker arm's reason_code per producer state). */
-  LifecycleSnapshotV1 computeLifecycleSnapshot() {
-    Instant now = Instant.now();
-
-    // Head component: this process is running if we're in this handler.
-    LifecycleSnapshotV1.Component head =
-        new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY, null);
-
-    // Worker component: derived from capability health. The bootstrap now keeps
-    // workerCapability in sync with every health transition, so capability
-    // health is always current — even in integration tests that create a real bootstrap.
-    LifecycleSnapshotV1.Component worker = switch (workerCapability.health()) {
-      case READY -> new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY, null);
-      // Tempdoc 837 §3.2 (was 627's one-code special case): forward whichever specific cause the
-      // producer set — worker.lost, worker.index_corrupt, worker.restart_exhausted — and fall back to
-      // worker.spawn.failed only for an unrecognized reason. worker.spawn.failed thereby becomes TRUE
-      // for the first time: it now fires only when the worker actually failed to start.
-      case DEGRADED -> new LifecycleSnapshotV1.Component(
-          LifecycleState.LIFECYCLE_STATE_ERROR,
-          resolveWorkerReasonCode(workerCapability, LifecycleReasonCode.WORKER_SPAWN_FAILED));
-      // Tempdoc 627: RECOVERING is transient (a supervised restart is in flight). Surface it as a
-      // distinct, calm reason (worker.recovering) at DEGRADED severity — NOT ERROR/spawn-failed — so the
-      // FE verdict renders a routine self-heal as "Restarting…" instead of "Service degraded".
-      case RECOVERING -> new LifecycleSnapshotV1.Component(
-          LifecycleState.LIFECYCLE_STATE_DEGRADED, LifecycleReasonCode.WORKER_RECOVERING.code());
-      // Tempdoc 837 S3: OFFLINE covers two different truths — "never set up" (worker.not_configured)
-      // and "we stopped it" (worker.shut_down, on an orderly teardown). Forward the specific one.
-      case OFFLINE -> new LifecycleSnapshotV1.Component(
-          LifecycleState.LIFECYCLE_STATE_DEGRADED,
-          resolveWorkerReasonCode(workerCapability, LifecycleReasonCode.WORKER_NOT_CONFIGURED));
-      case PENDING -> new LifecycleSnapshotV1.Component(
-          LifecycleState.LIFECYCLE_STATE_STARTING, LifecycleReasonCode.WORKER_STARTING.code());
-    };
-
-    // Inference component: derived from capability health (migrated from OnlineAiService).
-    // Tempdoc 656: mirrors the WORKER component's pattern just above (prefer a specific known
-    // reason over the generic fallback) — previously every non-READY/non-STARTING state hardcoded
-    // INFERENCE_OFFLINE regardless of what inferenceCapability.pendingReason() actually held,
-    // which is why RuntimeActivationService's now-wired precise reasons (Task 2) weren't reaching
-    // this composite/the FE degradation banner even after the runtime-manifest fix landed.
-    LifecycleSnapshotV1.Component inference = switch (inferenceCapability.health()) {
-      case READY -> new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY, null);
-      case PENDING -> onlineAi != null && onlineAi.isStartingUp()
-          ? new LifecycleSnapshotV1.Component(
-              LifecycleState.LIFECYCLE_STATE_STARTING, LifecycleReasonCode.INFERENCE_STARTING.code())
-          : new LifecycleSnapshotV1.Component(
-              LifecycleState.LIFECYCLE_STATE_DEGRADED, resolveInferenceReasonCode(inferenceCapability));
-      case DEGRADED, RECOVERING, OFFLINE -> new LifecycleSnapshotV1.Component(
-          LifecycleState.LIFECYCLE_STATE_DEGRADED, resolveInferenceReasonCode(inferenceCapability));
-    };
-
-    LifecycleSnapshotV1.Components components =
-        new LifecycleSnapshotV1.Components(head, worker, inference);
-
-    // Tempdoc 501 Phase 26 (§13.7 Q5): prefer the runtime manifest's overall
-    // lifecycle projection. The publisher composes it from the same
-    // capability sources via LifecycleProjection.derive, but eliminating the
-    // re-derivation here means /api/status and /api/runtime/manifest are
-    // guaranteed to agree on the discriminator. Fall back to direct
-    // derivation when the publisher isn't wired (test-only Builder) or
-    // hasn't produced its first manifest yet (brief boot window).
-    LifecycleState overallState = readManifestLifecycle();
-    if (overallState == null) {
-      overallState =
-          io.justsearch.app.services.lifecycle.LifecycleProjection.derive(
-              workerCapability, inferenceCapability);
-    }
-    LifecycleSnapshotV1.Lifecycle lifecycle =
-        new LifecycleSnapshotV1.Lifecycle(overallState, resolveOverallReason(overallState, worker, inference), null);
-
-    return new LifecycleSnapshotV1(
-        LifecycleSnapshotV1.SCHEMA_VERSION, now.toString(), lifecycle, components);
+  /** Samples through the same cached/fresh path before projecting the health response. */
+  LifecycleSnapshotV2 computeLifecycleSnapshot() {
+    workerSample(false);
+    return projectCurrentComponents().lifecycle();
   }
 
-  /** Phase 26: read overall lifecycle from manifest; null on unwired/no-publish/unrecognized string. Package-private for Phase 39 test coverage. */
-  LifecycleState readManifestLifecycle() {
-    io.justsearch.ui.runtime.RuntimeManifestPublisher pub = this.runtimeManifestPublisher;
-    if (pub == null) {
-      return null;
-    }
-    io.justsearch.app.api.runtime.RuntimeManifest m = pub.current();
-    if (m == null || m.lifecycle() == null) {
-      return null;
-    }
-    try {
-      return LifecycleState.valueOf(m.lifecycle());
-    } catch (IllegalArgumentException unrecognized) {
-      log.debug("manifest lifecycle string not a LifecycleState: {}", m.lifecycle());
-      return null;
-    }
-  }
-
-  private static String resolveOverallReason(
-      LifecycleState overall,
-      LifecycleSnapshotV1.Component worker,
-      LifecycleSnapshotV1.Component inference) {
-    if (overall == LifecycleState.LIFECYCLE_STATE_READY) {
-      return null;
-    }
-    // Worker problems take priority — if the worker component is unhealthy, use its reason.
-    if (worker.state() != LifecycleState.LIFECYCLE_STATE_READY) {
-      return worker.reason_code();
-    }
-    // Otherwise the inference component drove the degradation.
-    return inference.reason_code();
+  private LifecycleProjection.Projection projectCurrentComponents() {
+    EngineComponentRegistry registry = java.util.Objects.requireNonNull(
+        componentRegistry, "Status requires the Engine component registry");
+    return LifecycleProjection.project(registry.snapshot(), Instant.now());
   }
 
   // Package-private for StatusLifecycleHandlerTest (tempdoc 600): lets the test drive a
@@ -1391,8 +1320,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   // unit test for `compatBlockedReason` alone does not cover.
   ReadinessEnvelopeView buildReadinessEnvelope(
       WorkerOperationalView workerView,
-      LifecycleSnapshotV1 lifecycleSnapshot,
+      LifecycleProjection.Projection projection,
       WorkerContact workerContact) {
+    LifecycleSnapshotV2 lifecycleSnapshot = projection.lifecycle();
     String observedAt = lifecycleSnapshot.observed_at();
 
     // Compute all components via exhaustive switch — adding a new ReadinessDimension
@@ -1426,7 +1356,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       composites.put(entry.getKey(), readinessComposite(members));
     }
 
-    return new ReadinessEnvelopeView(1, observedAt, components, composites);
+    return new ReadinessEnvelopeView(2, observedAt, projection.engineComponents(), components, composites);
   }
 
   /**
@@ -1510,7 +1440,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * <p>This makes the {@code retrieval} composite a faithful projection of the Worker's own issuance
    * predicate {@code denseServiceable = allowQueryEmbeddings()(==COMPATIBLE) && embeddingProvider.isAvailable()}
    * — reconstructed here from {@code embeddingCompatState} + {@code embeddingReady} (which equals
-   * {@code isAvailable()} on the Worker, GrpcHealthService) — so the search banner stops claiming "fully
+   * {@code isAvailable()} on the Worker, WorkerHealthService) — so the search banner stops claiming "fully
    * semantic" while AUTO has degraded to keyword. It does NOT fire for {@code BLOCKED_*} (handled by
    * {@link #compatBlockedReason} with the rebuild remedy), {@code REBUILDING} (handled by
    * {@link #embeddingRebuildReason}, whose remedy is to wait), or an UNKNOWN/empty compat or {@code null}
@@ -1542,20 +1472,19 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private ReadinessComponentView computeComponent(
       ReadinessDimension dim,
       WorkerOperationalView workerView,
-      LifecycleSnapshotV1 lifecycleSnapshot,
+      LifecycleSnapshotV2 lifecycleSnapshot,
       String observedAt) {
     return switch (dim) {
       case WORKER_CONTROL_PLANE ->
           readinessComponent(
-              mapWorkerLifecycleToReadiness(lifecycleSnapshot.components().worker().state()),
-              lifecycleSnapshot.components().worker().reason_code(),
+              mapComponentToReadiness(lifecycleSnapshot.components().index().state()),
+              lifecycleSnapshot.components().index().reason_code(),
               dim.source(),
               observedAt);
 
       case INDEX_SERVING -> {
-        boolean indexHealthy = workerView.core().indexHealthy();
-        String indexState = workerView.core().indexState();
-        String workerReason = lifecycleSnapshot.components().worker().reason_code();
+        boolean indexHealthy = lifecycleSnapshot.components().index().state() == ComponentState.READY;
+        String workerReason = lifecycleSnapshot.components().index().reason_code();
         String throughputReason = throughputReadinessReason(workerView);
         String compatBlockedReason = compatBlockedReason(workerView);
         String embeddingRebuildReason = embeddingRebuildReason(workerView);
@@ -1563,16 +1492,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         String state;
         String reason;
 
-        // Tempdoc 837 S3: worker.shut_down joins worker.not_configured here — both mean "no worker is
-        // serving and that is not a fault", which is the NOT_CONFIGURED verdict this branch encodes.
-        // Without it an orderly teardown would fall through to the ERROR-shaped branches below.
-        if (LifecycleReasonCode.WORKER_NOT_CONFIGURED.code().equals(workerReason)
-            || LifecycleReasonCode.WORKER_SHUT_DOWN.code().equals(workerReason)) {
-          // 821 §3-C1: this one branch derives head-side (the lifecycle snapshot's worker reason),
-          // yet the dimension is classified worker-observed as a whole, so it is marked stale here
-          // too. Deliberate: over-marking a NOT_CONFIGURED verdict is the safe direction, and
-          // splitting the classification per-branch would put the decision back inline.
-          state = READINESS_NOT_CONFIGURED;
+        if (!indexHealthy) {
+          state = mapComponentToReadiness(lifecycleSnapshot.components().index().state());
           reason = workerReason;
         } else if (compatBlockedReason != null) {
           // Tempdoc 600 Design A: a serving index can be HEALTHY for keyword search yet have its
@@ -1582,7 +1503,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           // retrieval-composite reason code so the ONE verdict authority (595) names the real cause.
           state = READINESS_DEGRADED;
           reason = compatBlockedReason;
-        } else if (indexHealthy && embeddingRebuildReason != null) {
+        } else if (embeddingRebuildReason != null) {
           // An in-place embedding rebuild: keyword serving is intact, but the Worker refuses dense
           // queries until it finishes. Nothing else in readiness observes this window, so without
           // this branch the composite claims full semantic retrieval while queries fall back to
@@ -1590,41 +1511,31 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           // exclusive embedding-compat states.
           state = READINESS_DEGRADED;
           reason = embeddingRebuildReason;
-        } else if (indexHealthy && denseUnavailableReason != null) {
+        } else if (denseUnavailableReason != null) {
           // Tempdoc 598 reopen (B-3): the index serves keyword fine, but the dense leg can't run for a
           // non-rebuild reason (no embedding model / embedder down). Degrade the `retrieval` composite so
           // the banner reflects "semantic unavailable" instead of over-claiming "fully semantic". Ranked
           // below compatBlockedReason (a rebuild-fixable block is the more actionable cause).
           state = READINESS_DEGRADED;
           reason = denseUnavailableReason;
-        } else if (indexHealthy && throughputReason != null) {
+        } else if (throughputReason != null) {
           state = READINESS_DEGRADED;
           reason = throughputReason;
-        } else if (indexHealthy) {
+        } else {
           state = READINESS_READY;
           reason = null;
-        } else if ("STARTING".equalsIgnoreCase(indexState)) {
-          state = READINESS_NOT_READY;
-          reason = LifecycleReasonCode.WORKER_STARTING.code();
-        } else if ("NOT_STARTED".equalsIgnoreCase(indexState)) {
-          state = READINESS_NOT_CONFIGURED;
-          reason = LifecycleReasonCode.WORKER_NOT_STARTED.code();
-        } else if ("ERROR".equalsIgnoreCase(indexState)
-            || "UNAVAILABLE".equalsIgnoreCase(indexState)) {
-          state = READINESS_NOT_READY;
-          reason = LifecycleReasonCode.WORKER_UNAVAILABLE.code();
-        } else {
-          state = READINESS_NOT_READY;
-          reason = LifecycleReasonCode.INDEX_NOT_HEALTHY.code();
         }
         yield readinessComponent(state, reason, dim.source(), observedAt);
       }
 
       case AI -> {
-        String state =
-            mapInferenceLifecycleToReadiness(
-                lifecycleSnapshot.components().inference().state());
-        String reason = lifecycleSnapshot.components().inference().reason_code();
+        String state = switch (lifecycleSnapshot.components().generative().state()) {
+          case READY -> READINESS_READY;
+          case ABSENT -> READINESS_NOT_CONFIGURED;
+          case STARTING -> READINESS_NOT_READY;
+          case RELOADING, FAILED, UNAVAILABLE -> READINESS_DEGRADED;
+        };
+        String reason = lifecycleSnapshot.components().generative().reason_code();
         yield readinessComponent(state, reason, dim.source(), observedAt);
       }
 
@@ -1953,27 +1864,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     return READINESS_READY;
   }
 
-  private static String mapWorkerLifecycleToReadiness(LifecycleState state) {
-    if (state == null) return READINESS_UNKNOWN;
+  private static String mapComponentToReadiness(ComponentState state) {
     return switch (state) {
-      case LIFECYCLE_STATE_READY -> READINESS_READY;
-      case LIFECYCLE_STATE_DEGRADED -> READINESS_DEGRADED;
-      case LIFECYCLE_STATE_STARTING -> READINESS_NOT_READY;
-      case LIFECYCLE_STATE_ERROR, LIFECYCLE_STATE_STOPPING, LIFECYCLE_STATE_STOPPED ->
-          READINESS_NOT_READY;
-      case LIFECYCLE_STATE_UNSPECIFIED, UNRECOGNIZED -> READINESS_UNKNOWN;
-    };
-  }
-
-  private static String mapInferenceLifecycleToReadiness(LifecycleState state) {
-    if (state == null) return READINESS_UNKNOWN;
-    return switch (state) {
-      case LIFECYCLE_STATE_READY -> READINESS_READY;
-      case LIFECYCLE_STATE_DEGRADED -> READINESS_DEGRADED;
-      case LIFECYCLE_STATE_STARTING -> READINESS_NOT_READY;
-      case LIFECYCLE_STATE_ERROR, LIFECYCLE_STATE_STOPPING, LIFECYCLE_STATE_STOPPED ->
-          READINESS_NOT_READY;
-      case LIFECYCLE_STATE_UNSPECIFIED, UNRECOGNIZED -> READINESS_UNKNOWN;
+      case READY -> READINESS_READY;
+      case ABSENT -> READINESS_NOT_CONFIGURED;
+      case STARTING, RELOADING, FAILED, UNAVAILABLE -> READINESS_NOT_READY;
     };
   }
 

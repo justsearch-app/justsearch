@@ -3,6 +3,7 @@ package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.ExcludesService;
@@ -69,6 +70,13 @@ final class ExcludePatternsResolutionTest {
     ConfigStore.setGlobal(new ConfigStore(builder.build()));
   }
 
+  private static void publishRawResolvedExcludePatterns(String raw) {
+    ResolvedConfigBuilder builder = ResolvedConfig.builder();
+    builder.put("justsearch.ui.exclude_patterns", ResolvedConfigBuilder.ORDINAL_SETTINGS_JSON,
+        "settings.json", null, raw);
+    ConfigStore.setGlobal(new ConfigStore(builder.build()));
+  }
+
   @Test
   @DisplayName("ResolvedConfig.Ui exposes the settings list at ordinal 300")
   void resolvedConfigExposesTheList() {
@@ -81,20 +89,56 @@ final class ExcludePatternsResolutionTest {
   }
 
   @Test
-  @DisplayName("RemoteKnowledgeClient reads the resolved list, not the sysprop")
+  @DisplayName("KnowledgeClient reads the resolved list, not the sysprop")
   void remoteKnowledgeClientReadsTheResolvedList() {
     publishSettings(List.of("**/*.tmp"));
 
     assertNull(System.getProperty(KEY));
-    assertEquals("[\"**/*.tmp\"]", RemoteKnowledgeClient.resolvedExcludePatterns());
+    assertEquals("[\"**/*.tmp\"]", KnowledgeClient.resolvedExcludePatterns());
   }
 
   @Test
-  @DisplayName("RemoteKnowledgeClient tolerates a store that is not published yet")
+  @DisplayName("KnowledgeClient tolerates a store that is not published yet")
   void remoteKnowledgeClientToleratesNoStore() {
     TestResolvedConfigHelper.restoreGlobal(null);
 
-    assertEquals("", RemoteKnowledgeClient.resolvedExcludePatterns());
+    assertEquals("", KnowledgeClient.resolvedExcludePatterns());
+  }
+
+  @Test
+  @DisplayName("Recorded capture refuses an unavailable exclusion policy")
+  void recordedCaptureRefusesMissingConfigStore() {
+    TestResolvedConfigHelper.restoreGlobal(null);
+
+    IllegalStateException failure = assertThrows(IllegalStateException.class,
+        KnowledgeClient::captureRecordedExcludePatterns);
+    assertEquals("Recorded exclusion policy is unavailable", failure.getMessage());
+  }
+
+  @Test
+  @DisplayName("Recorded capture refuses malformed, object, and non-string exclusion JSON")
+  void recordedCaptureRefusesMalformedShapes() {
+    publishRawResolvedExcludePatterns("{}");
+    assertThrows(IllegalArgumentException.class, KnowledgeClient::captureRecordedExcludePatterns,
+        "an object is not a recorded string-array policy");
+
+    publishRawResolvedExcludePatterns("[\"*.tmp\", 7]");
+    assertThrows(IllegalArgumentException.class, KnowledgeClient::captureRecordedExcludePatterns,
+        "a non-string array member is not a recorded string-array policy");
+
+    publishRawResolvedExcludePatterns("[broken");
+    assertThrows(RuntimeException.class, KnowledgeClient::captureRecordedExcludePatterns,
+        "malformed JSON must refuse instead of becoming an empty policy");
+  }
+
+  @Test
+  @DisplayName("Recorded capture uses resolved settings and preserves strict normalization")
+  void recordedCaptureUsesResolvedSettingsAndNormalization() {
+    publishRawResolvedExcludePatterns("[\"  **\\\\cache\\\\** \",\"*.LOG\",\"*.LOG\"]");
+
+    assertEquals(List.of("**/cache/**", "**/*.LOG"),
+        KnowledgeClient.captureRecordedExcludePatterns());
+    assertNull(System.getProperty(KEY), "recorded capture must not consult a promoted sysprop");
   }
 
   @Test
@@ -109,7 +153,8 @@ final class ExcludePatternsResolutionTest {
     RecordingIndexingService indexing =
         new RecordingIndexingService(List.of(new IndexingService.WatchedRoot("default", root)));
     ExcludesService.ExcludesResult result =
-        new ExcludesServiceImpl(() -> indexing).applyExcludes(true);
+        new ExcludesServiceImpl(() -> indexing)
+            .applyExcludes(true, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(1, result.patterns(), "the settings pattern must have been picked up");
     assertEquals(1, result.matchedFiles());
@@ -126,37 +171,37 @@ final class ExcludePatternsResolutionTest {
     }
 
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(io.justsearch.core.context.EngineContext engineContext) {
       return roots.stream().map(WatchedRoot::path).toList();
     }
 
     @Override
-    public List<WatchedRoot> getWatchedRoots() {
+    public List<WatchedRoot> getWatchedRoots(io.justsearch.core.context.EngineContext engineContext) {
       return roots;
     }
 
     @Override
-    public void addWatchedPath(Path path) {
+    public void addWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       throw new UnsupportedOperationException("not needed");
     }
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       throw new UnsupportedOperationException("not needed");
     }
 
     @Override
-    public void flush() {
+    public void flush(io.justsearch.core.context.EngineContext engineContext) {
       // no-op
     }
 
     @Override
-    public int deleteDocsByPathPrefix(Path pathPrefix) {
+    public int deleteDocsByPathPrefix(Path pathPrefix, io.justsearch.core.context.EngineContext engineContext) {
       throw new UnsupportedOperationException("dry run must not delete");
     }
 
     @Override
-    public boolean deleteDocById(String docId) {
+    public boolean deleteDocById(String docId, io.justsearch.core.context.EngineContext engineContext) {
       throw new UnsupportedOperationException("dry run must not delete");
     }
   }

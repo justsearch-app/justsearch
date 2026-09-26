@@ -2,6 +2,7 @@
 package io.justsearch.app.services.bootstrap;
 
 import java.util.OptionalLong;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -69,6 +70,11 @@ public final class Memoized<T> implements Supplier<T> {
    */
   public boolean isResolved() {
     return resolved;
+  }
+
+  /** The completed value, absent while pending or when resolution threw. Never runs the body. */
+  public Optional<T> resolvedValue() {
+    return resolved && failure.get() == null ? Optional.ofNullable(cached.get()) : Optional.empty();
   }
 
   /**

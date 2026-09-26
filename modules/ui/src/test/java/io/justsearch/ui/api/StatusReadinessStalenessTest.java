@@ -9,8 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
-import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
 import io.justsearch.app.api.lifecycle.ReadinessDimension;
 import io.justsearch.app.api.status.CompatibilityStatusView;
 import io.justsearch.app.api.status.CoreIndexView;
@@ -30,8 +28,9 @@ import io.justsearch.app.api.status.VisualExtractionView;
 import io.justsearch.app.api.status.WorkerOperationalView;
 import io.justsearch.app.api.status.WorkerOperationalViewBuilder;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
-import io.justsearch.contract.wire.LifecycleState;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.app.services.lifecycle.LifecycleProjection;
+import io.justsearch.core.component.ComponentState;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -93,7 +92,7 @@ final class StatusReadinessStalenessTest {
     ReadinessEnvelopeView env =
         handler.buildReadinessEnvelope(
             healthyWorkerView(),
-            readySnapshot(),
+            readyProjection(),
             StatusLifecycleHandler.WorkerContact.lost(now - 5_000L, now, now - 60_000L));
 
     for (ReadinessDimension dim : ReadinessDimension.values()) {
@@ -109,7 +108,8 @@ final class StatusReadinessStalenessTest {
   void workerRpcFailureMarksWorkerDimensionsStale(@TempDir Path indexBase) {
     Instant headStart = Instant.now().minusSeconds(60);
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
-    when(ks.client()).thenThrow(new IllegalStateException("worker gone"));
+    when(ks.hasClient()).thenReturn(true);
+    when(ks.captureClient()).thenThrow(new IllegalStateException("worker gone"));
 
     StatusLifecycleHandler handler = newHandler(indexBase, headStart, true);
     handler.setKnowledgeServer(ks, null);
@@ -164,9 +164,10 @@ final class StatusReadinessStalenessTest {
     // the numbers below would be ~10 minutes, so this distinguishes the right reason.
     Instant headStart = Instant.now().minusSeconds(600);
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
-    when(ks.client()).thenReturn(client);
+    when(ks.hasClient()).thenReturn(true);
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
+    BootstrapLeaseFixtures.bind(ks, client);
 
     StatusLifecycleHandler handler = newReachableHandler(indexBase, headStart, ks);
 
@@ -177,7 +178,7 @@ final class StatusReadinessStalenessTest {
     // Contact is lost after that successful observation. Tempdoc 885 item 6: contact loss is
     // discovered by the internal sampler, not by a request — a request only reports what the last
     // sample found, so the sampler is what has to run here.
-    when(ks.client()).thenThrow(new IllegalStateException("worker gone"));
+    when(ks.captureClient()).thenThrow(new IllegalStateException("worker gone"));
     StatusResponse stale = handler.sampleAndBuildStatusSnapshot();
     long afterFailure = System.currentTimeMillis();
 
@@ -207,7 +208,7 @@ final class StatusReadinessStalenessTest {
     ReadinessEnvelopeView env =
         handler.buildReadinessEnvelope(
             healthyWorkerView(),
-            readySnapshot(),
+            readyProjection(),
             StatusLifecycleHandler.WorkerContact.lost(now - 5_000L, now, now - 60_000L));
 
     for (var entry : env.composites().entrySet()) {
@@ -267,9 +268,10 @@ final class StatusReadinessStalenessTest {
 
   private static StatusLifecycleHandler reachableHandler(Path indexBase, Instant headStart) {
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    when(client.getWorkerOperationalView()).thenReturn(healthyWorkerView());
-    when(ks.client()).thenReturn(client);
+    when(ks.hasClient()).thenReturn(true);
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
+    BootstrapLeaseFixtures.bind(ks, client);
     return newReachableHandler(indexBase, headStart, ks);
   }
 
@@ -286,16 +288,16 @@ final class StatusReadinessStalenessTest {
 
   private static StatusLifecycleHandler newHandler(
       Path indexBase, Instant headStart, boolean workerAvailable) {
-    io.justsearch.app.services.lifecycle.WorkerCapability worker =
-        mock(io.justsearch.app.services.lifecycle.WorkerCapability.class);
-    when(worker.available()).thenReturn(workerAvailable);
-    when(worker.health())
-        .thenReturn(workerAvailable ? CapabilityHealth.READY : CapabilityHealth.OFFLINE);
-    io.justsearch.app.services.lifecycle.InferenceCapability inference =
-        mock(io.justsearch.app.services.lifecycle.InferenceCapability.class);
-    when(inference.health()).thenReturn(CapabilityHealth.READY);
-
-    return new StatusLifecycleHandler(
+    for (String name : java.util.List.of("api", "encoders", "generative")) {
+      COMPONENTS.transition(name, ComponentState.READY, null, name + " ready");
+    }
+    COMPONENTS.transition(
+        "index",
+        workerAvailable ? ComponentState.READY : ComponentState.UNAVAILABLE,
+        workerAvailable ? null : "worker.unavailable",
+        workerAvailable ? "Worker serving" : "Worker unavailable");
+    var graph = COMPONENTS.capabilities();
+    StatusLifecycleHandler handler = new StatusLifecycleHandler(
         mock(io.justsearch.app.api.OnlineAiService.class),
         mock(io.justsearch.agent.api.AgentService.class),
         () -> null,
@@ -307,16 +309,19 @@ final class StatusReadinessStalenessTest {
         null,
         null,
         null,
-        worker,
-        inference);
+        graph.worker(),
+        graph.inference());
+    COMPONENTS.attach(handler);
+    return handler;
   }
 
-  private static LifecycleSnapshotV1 readySnapshot() {
-    LifecycleSnapshotV1.Component ready =
-        new LifecycleSnapshotV1.Component(LifecycleState.LIFECYCLE_STATE_READY);
-    return LifecycleSnapshotV1.now(
-        new LifecycleSnapshotV1.Lifecycle(LifecycleState.LIFECYCLE_STATE_READY),
-        new LifecycleSnapshotV1.Components(ready, ready, ready));
+  private static final StatusComponentFixture COMPONENTS = new StatusComponentFixture();
+
+  private static LifecycleProjection.Projection readyProjection() {
+    for (String name : java.util.List.of("api", "index", "encoders", "generative")) {
+      COMPONENTS.transition(name, ComponentState.READY, null, name + " ready");
+    }
+    return COMPONENTS.projection();
   }
 
   private static WorkerOperationalView healthyWorkerView() {

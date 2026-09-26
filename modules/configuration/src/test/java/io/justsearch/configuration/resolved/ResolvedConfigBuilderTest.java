@@ -191,13 +191,27 @@ final class ResolvedConfigBuilderTest {
   class Build {
 
     @Test
+    void promisedInputAndHistoryLimitsHaveDefaultsAndMinimums() {
+      var defaults = new ResolvedConfigBuilder().build();
+      assertEquals(20_000, defaults.summary().maxTokens());
+      assertEquals(90, defaults.paths().pathResolutionRetentionDays());
+      for (int value : new int[] {-1, 0, 1, 17}) {
+        var builder = new ResolvedConfigBuilder();
+        builder.putDefault("justsearch.summary.max_tokens", Integer.toString(value));
+        builder.putDefault("justsearch.path_resolution.retention_days", Integer.toString(value));
+        var resolved = builder.build();
+        assertEquals(Math.max(1, value), resolved.summary().maxTokens());
+        assertEquals(Math.max(1, value), resolved.paths().pathResolutionRetentionDays());
+      }
+    }
+
+    @Test
     @DisplayName("build() produces ResolvedConfig with all sub-records")
     void buildProducesCompleteConfig() {
       ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
       builder.putDefault("justsearch.data.dir", "/tmp/data");
       builder.putDefault("justsearch.api.port", "9090");
       builder.putDefault("justsearch.llm.enabled", "true");
-      builder.putDefault("justsearch.search.pipeline.profile", "bm25");
       builder.putDefault("justsearch.prod", "true");
 
       ResolvedConfig config = builder.build();
@@ -220,7 +234,6 @@ final class ResolvedConfigBuilderTest {
       assertEquals(Path.of("/tmp/data"), config.paths().dataDir());
       assertEquals(9090, config.ports().apiPort());
       assertTrue(config.ai().llmEnabled());
-      assertEquals("bm25", config.search().profile());
       assertTrue(config.policy().prodMode());
       // 691 §N/F-031: embed GPU mem default raised 3072 → 6144 to
       // accommodate gte-multilingual-base FP16 activations (post-358).
@@ -708,6 +721,46 @@ final class ResolvedConfigBuilderTest {
     }
   }
 
+  @Test
+  @DisplayName("device memory ceiling is optional, honors precedence, and preserves explicit zero")
+  void deviceMemoryCeilingIsOptionalAndUsesExistingPrecedence() {
+    String key = EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.configKey();
+
+    ResolvedConfig absent = new ResolvedConfigBuilder().build();
+    assertNull(absent.ai().deviceMemoryCeilingMb());
+
+    ResolvedConfig resolved =
+        new ResolvedConfigBuilder()
+            .put(key, ResolvedConfigBuilder.ORDINAL_YAML, "yaml", "application.yaml", "2048")
+            .put(
+                key,
+                ResolvedConfigBuilder.ORDINAL_ENV_VAR,
+                "env_var",
+                EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.envVar(),
+                "4096")
+            .put(key, ResolvedConfigBuilder.ORDINAL_JVM_ARG, "jvm_arg", key, "0")
+            .build();
+    assertEquals(0L, resolved.ai().deviceMemoryCeilingMb());
+    assertEquals("jvm_arg", resolved.resolution(key).sourceName());
+  }
+
+  @Test
+  @DisplayName("negative device memory ceiling is treated as absent")
+  void negativeDeviceMemoryCeilingIsAbsent() {
+    String key = EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.configKey();
+    ResolvedConfig config =
+        new ResolvedConfigBuilder()
+            .put(
+                key,
+                ResolvedConfigBuilder.ORDINAL_ENV_VAR,
+                "env_var",
+                EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.envVar(),
+                "-1")
+            .build();
+
+    assertNull(config.ai().deviceMemoryCeilingMb());
+  }
+
   // ==================== EnvRegistry Integration ====================
 
   @Nested
@@ -787,6 +840,25 @@ final class ResolvedConfigBuilderTest {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
+    }
+
+    @Test
+    @DisplayName("indexBasePath uses the primary configured collection")
+    void indexBasePathUsesPrimaryCollection() {
+      ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
+      builder.putDefault("justsearch.data.dir", "/tmp/data");
+      builder.contributeYaml(parseYaml(
+          """
+          index:
+            collections:
+              - name: research
+                roots: [/tmp/research]
+          """));
+
+      ResolvedConfig config = builder.build();
+
+      assertEquals(Path.of("/tmp/data/index/research"), config.paths().indexBasePath());
+      assertEquals("research", config.collections().items().get(0).name());
     }
 
     @Test
@@ -1060,7 +1132,6 @@ final class ResolvedConfigBuilderTest {
             writer:
               ram_buffer_mb: 256
             commit:
-              debounce_ms: 1000
               meta:
                 enabled: false
             vector:
@@ -1148,126 +1219,26 @@ final class ResolvedConfigBuilderTest {
       // Worker defaults
       // AI defaults — must match RuntimePolicyConfigFactory defaults
       assertTrue(config.ai().llmEnabled(), "llmEnabled default must be true (matches factory)");
-    }
-  }
-
-  // ==================== Worker Snapshot ====================
-
-  @Nested
-  @DisplayName("Worker snapshot")
-  class WorkerSnapshot {
-
-    @Test
-    @DisplayName("toWorkerSnapshot and contributeWorkerSnapshot round-trip")
-    void roundTrip(@TempDir Path tempDir) {
-      ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
-      builder.putDefault("justsearch.data.dir", "/data");
-      builder.putDefault("justsearch.api.port", "9090");
-      builder.putDefault("justsearch.llm.enabled", "true");
-
-      ResolvedConfig original = builder.build();
-      Path snapshotFile = tempDir.resolve("worker-snapshot.json");
-      original.toWorkerSnapshot(snapshotFile);
-
-      // Worker-side: load snapshot at ordinal 450
-      ResolvedConfigBuilder workerBuilder = new ResolvedConfigBuilder();
-      workerBuilder.contributeWorkerSnapshot(snapshotFile);
-      ResolvedConfig workerConfig = workerBuilder.build();
-
-      assertEquals(Path.of("/data").toAbsolutePath().normalize(), workerConfig.paths().dataDir());
-      assertEquals(9090, workerConfig.ports().apiPort());
+      assertFalse(config.search().queryUnderstandingEnabled());
+      assertFalse(config.search().filterNormalizationEnabled());
     }
 
     @Test
-    @DisplayName("worker snapshot includes derived and explicit path values")
-    void workerSnapshotIncludesResolvedPaths(@TempDir Path tempDir) {
-      ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
-      builder.putDefault("justsearch.data.dir", "/data");
-      builder.putDefault("justsearch.models.dir", "/shared/models");
-      builder.putDefault("justsearch.repo.root", "/repo");
-      builder.putDefault("justsearch.rerank.model_path", "/models/onnx/reranker");
+    @DisplayName("query feature flags honor explicit true and false values")
+    void queryFeatureFlagsHonorExplicitValues() {
+      ResolvedConfigBuilder queryUnderstandingEnabled = new ResolvedConfigBuilder();
+      queryUnderstandingEnabled.putDefault("justsearch.qu.enabled", "true");
+      queryUnderstandingEnabled.putDefault("justsearch.filter_norm.enabled", "false");
+      ResolvedConfig first = queryUnderstandingEnabled.build();
+      assertTrue(first.search().queryUnderstandingEnabled());
+      assertFalse(first.search().filterNormalizationEnabled());
 
-      ResolvedConfig config = builder.build();
-      Path snapshotFile = tempDir.resolve("worker-snapshot.json");
-      config.toWorkerSnapshot(snapshotFile);
-
-      Map<String, String> snapshot = ResolvedConfig.loadWorkerSnapshot(snapshotFile);
-      assertEquals(Path.of("/data").toAbsolutePath().normalize().toString(), snapshot.get("justsearch.data.dir"));
-      assertEquals(
-          Path.of("/data").toAbsolutePath().normalize().resolve("index").resolve("default").toString(),
-          snapshot.get("justsearch.index.base_path"));
-      assertEquals(
-          Path.of("/shared/models").toAbsolutePath().normalize().toString(),
-          snapshot.get("justsearch.models.dir"));
-      assertEquals(
-          Path.of("/repo").toAbsolutePath().normalize().toString(),
-          snapshot.get("justsearch.repo.root"));
-      assertEquals(
-          Path.of("/models/onnx/reranker").toAbsolutePath().normalize().toString(),
-          snapshot.get("justsearch.rerank.model_path"));
-    }
-
-    @Test
-    @DisplayName("worker snapshot ordinal 450 beats env (400) but loses to JVM (500)")
-    void snapshotOrdinalPriority(@TempDir Path tempDir) {
-      // Create a snapshot with a known value
-      ResolvedConfigBuilder headBuilder = new ResolvedConfigBuilder();
-      headBuilder.putDefault("test.key", "from-snapshot");
-      ResolvedConfig headConfig = headBuilder.build();
-      Path snapshotFile = tempDir.resolve("snapshot.json");
-      headConfig.toWorkerSnapshot(snapshotFile);
-
-      // Worker loads snapshot (450) + a default (100) + a JVM arg (500)
-      ResolvedConfigBuilder workerBuilder = new ResolvedConfigBuilder();
-      workerBuilder.putDefault("test.key", "from-default");
-      workerBuilder.contributeWorkerSnapshot(snapshotFile);
-      workerBuilder.put(
-          "test.key", ResolvedConfigBuilder.ORDINAL_JVM_ARG, "jvm_arg", "test.key", "from-jvm");
-
-      ConfigResolution r = workerBuilder.resolve("test.key");
-      assertEquals("from-jvm", r.value()); // JVM (500) beats snapshot (450)
-      assertEquals(500, r.sourceOrdinal());
-    }
-
-    @Test
-    @DisplayName("missing snapshot file is ignored")
-    void missingFileIgnored(@TempDir Path tempDir) {
-      ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
-      builder.putDefault("justsearch.data.dir", "/fallback");
-      builder.contributeWorkerSnapshot(tempDir.resolve("nonexistent.json"));
-
-      ResolvedConfig config = builder.build();
-      assertEquals(Path.of("/fallback"), config.paths().dataDir());
-    }
-
-    @Test
-    @DisplayName("snapshot round-trips Windows paths containing backslash-n and backslash-r")
-    void roundTripsWindowsPaths(@TempDir Path tempDir) {
-      ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
-      // Paths with segments that look like escape sequences after escaping
-      builder.put("test.path", 500, "test", "test", "C:\\new\\results");
-      builder.put("test.unc", 500, "test", "test", "\\\\server\\share");
-      builder.put("test.rpath", 500, "test", "test", "C:\\reports\\new");
-      builder.put("test.tab", 500, "test", "test", "C:\\tmp\\test");
-
-      ResolvedConfig config = builder.build();
-      Path snapshotFile = tempDir.resolve("snapshot.json");
-      config.toWorkerSnapshot(snapshotFile);
-
-      ResolvedConfigBuilder workerBuilder = new ResolvedConfigBuilder();
-      workerBuilder.contributeWorkerSnapshot(snapshotFile);
-
-      ConfigResolution r1 = workerBuilder.resolve("test.path");
-      assertEquals("C:\\new\\results", r1.value(), "backslash-n segment corrupted");
-
-      ConfigResolution r2 = workerBuilder.resolve("test.unc");
-      assertEquals("\\\\server\\share", r2.value(), "UNC path corrupted");
-
-      ConfigResolution r3 = workerBuilder.resolve("test.rpath");
-      assertEquals("C:\\reports\\new", r3.value(), "backslash-r segment corrupted");
-
-      ConfigResolution r4 = workerBuilder.resolve("test.tab");
-      assertEquals("C:\\tmp\\test", r4.value(), "backslash-t segment corrupted");
+      ResolvedConfigBuilder filterNormalizationEnabled = new ResolvedConfigBuilder();
+      filterNormalizationEnabled.putDefault("justsearch.qu.enabled", "false");
+      filterNormalizationEnabled.putDefault("justsearch.filter_norm.enabled", "true");
+      ResolvedConfig second = filterNormalizationEnabled.build();
+      assertFalse(second.search().queryUnderstandingEnabled());
+      assertTrue(second.search().filterNormalizationEnabled());
     }
   }
 
@@ -1430,6 +1401,18 @@ final class ResolvedConfigBuilderTest {
       ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
       builder.putDefault("index.migration.cutover.max_failed_jobs", "-10");
       assertEquals(-1, builder.build().index().migrationCutoverMaxFailedJobs());
+    }
+
+    @Test
+    @DisplayName("Indexer service version and index tracing level are captured in typed owners")
+    void processOwnerInputsAreCapturedAndNormalized() {
+      ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
+      builder.putDefault("indexer.worker.version", "9.9.9-test");
+      builder.putDefault("justsearch.index.tracing_level", "FULL");
+
+      ResolvedConfig config = builder.build();
+      assertEquals("9.9.9-test", config.workerIndexer().serviceVersion());
+      assertEquals("full", config.index().tracingLevel());
     }
 
     @Test
@@ -1756,46 +1739,48 @@ final class ResolvedConfigBuilderTest {
     }
 
     @Test
-    @DisplayName("Master fallthrough via worker snapshot at ord 450 (mimics round-6 sandbox)")
-    void masterFallthroughViaWorkerSnapshot(@TempDir Path tempDir)
-        throws Exception {
-      // Round-6 sandbox: worker-config-snapshot.json has justsearch.gpu.enabled=true but
-      // embed.gpuEnabled=false at the worker. Mimic exact worker setup: snapshot at 450 +
-      // envRegistry (no sysprop, no per-feature key set anywhere).
+    @DisplayName("Master GPU flag falls through to every per-feature flag when only it is set")
+    void masterGpuFlagFallsThroughToPerFeatureFlags() {
+      // Lane F item A19 retargeted this test, and kept it. It was
+      // "masterFallthroughViaWorkerSnapshot", and it reproduced a round-6 sandbox defect where a
+      // worker-config-snapshot.json carried justsearch.gpu.enabled=true while embed.gpuEnabled read
+      // false. The SNAPSHOT is gone with the process boundary it crossed — but the property it
+      // pinned is not about snapshots at all: it is that the master GPU flag, set from a source
+      // that is NOT a sysprop and NOT a per-feature key, still reaches every per-feature flag.
+      // That fallthrough is exactly what broke in round 6, and it is still live, so the test now
+      // contributes the master flag at the YAML ordinal instead of the deleted 450 tier. Deleting
+      // it with its mechanism would have retired a real regression pin along with a dead one.
       String prevMaster = System.getProperty("justsearch.gpu.enabled");
       String prevEmbed = System.getProperty("justsearch.embed.gpu.enabled");
       String prevSplade = System.getProperty("justsearch.splade.gpu_enabled");
       String prevNer = System.getProperty("justsearch.ner.gpu_enabled");
       String prevPolicy = System.getProperty("policy.gpu_acceleration_enabled");
       try {
-        // Crucially: master is in the SNAPSHOT, NOT a sysprop. Per-feature keys unset everywhere.
+        // Crucially: master arrives from a NON-sysprop source (YAML, below). Per-feature keys
+        // unset everywhere. The A19 retarget above left a @TempDir write of a
+        // worker-config-snapshot.json here; the builder never read it — the master flag comes
+        // from the ORDINAL_YAML put — so it set up state nothing asserted on and is removed.
         System.clearProperty("justsearch.gpu.enabled");
         System.clearProperty("justsearch.embed.gpu.enabled");
         System.clearProperty("justsearch.splade.gpu_enabled");
         System.clearProperty("justsearch.ner.gpu_enabled");
         System.clearProperty("policy.gpu_acceleration_enabled");
 
-        // Write a snapshot file with master=true (and a few other realistic keys).
-        Path snapshotFile = tempDir.resolve("worker-config-snapshot.json");
-        String snapshotJson = "{\n"
-            + "  \"justsearch.gpu.enabled\": \"true\",\n"
-            + "  \"justsearch.gpu.layers\": \"99\",\n"
-            + "  \"justsearch.rerank.gpu.enabled\": \"true\"\n"
-            + "}\n";
-        Files.writeString(snapshotFile, snapshotJson);
-
         ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
-        builder.contributeAutoDetected(Map.of()); // empty (worker probe failed)
-        builder.contributeWorkerSnapshot(snapshotFile);
+        builder.contributeAutoDetected(Map.of()); // empty (the hardware probe found nothing)
+        builder.put("justsearch.gpu.enabled", ResolvedConfigBuilder.ORDINAL_YAML, "yaml",
+            "application.yaml", "true");
+        builder.put("justsearch.rerank.gpu.enabled", ResolvedConfigBuilder.ORDINAL_YAML, "yaml",
+            "application.yaml", "true");
         builder.contributeEnvRegistry();
         ResolvedConfig config = builder.build();
 
         assertTrue(config.ai().embedding().gpuEnabled(),
-            "embed.gpuEnabled at worker must fall through to master via snapshot ord 450");
+            "embed.gpuEnabled must fall through to the master flag");
         assertTrue(config.ai().splade().gpuEnabled(),
-            "splade.gpuEnabled at worker must fall through to master via snapshot ord 450");
+            "splade.gpuEnabled must fall through to the master flag");
         assertTrue(config.ai().ner().gpuEnabled(),
-            "ner.gpuEnabled at worker must fall through to master via snapshot ord 450");
+            "ner.gpuEnabled must fall through to the master flag");
       } finally {
         restoreSysprop("justsearch.gpu.enabled", prevMaster);
         restoreSysprop("justsearch.embed.gpu.enabled", prevEmbed);
@@ -1948,6 +1933,42 @@ final class ResolvedConfigBuilderTest {
       assertFalse(
           config.index().indexAutoRecovery(),
           "documents the pre-fix divergence: env-only standalone defaulted recovery off");
+    }
+  }
+
+  @Nested
+  @DisplayName("Extraction capture")
+  class ExtractionCapture {
+
+    @Test
+    void capturesAllDeclaredSandboxAndSkipInputsWithoutInventingRuntimeDefaults() {
+      ResolvedConfig config =
+          new ResolvedConfigBuilder()
+              .putDefault("justsearch.extraction.sandbox.mode", "process")
+              .putDefault("justsearch.extraction.sandbox.command", "worker --child")
+              .putDefault("justsearch.extraction.sandbox.heap", "768m")
+              .putDefault("justsearch.extraction.sandbox.pool", "3")
+              .putDefault("justsearch.extraction.sandbox.max_requests", "41")
+              .putDefault("justsearch.ingestion.skip.patterns", "cache,temp")
+              .putDefault("justsearch.ingestion.skip.extensions", "bak,old")
+              .putDefault("justsearch.ingestion.skip.directory_names", "vendor,generated")
+              .build();
+
+      assertEquals("process", config.extraction().sandboxMode());
+      assertEquals("worker --child", config.extraction().sandboxCommand());
+      assertEquals("768m", config.extraction().sandboxHeap());
+      assertEquals(3, config.extraction().sandboxPoolSize());
+      assertEquals(41, config.extraction().sandboxMaxRequestsPerChild());
+      assertEquals("cache,temp", config.extraction().ingestionSkipPatterns());
+      assertEquals("bak,old", config.extraction().ingestionSkipExtensions());
+      assertEquals("vendor,generated", config.extraction().ingestionSkipDirectoryNames());
+
+      ResolvedConfig.Extraction absent = new ResolvedConfigBuilder().build().extraction();
+      assertNull(absent.sandboxMode());
+      assertNull(absent.sandboxCommand());
+      assertNull(absent.sandboxHeap());
+      assertNull(absent.sandboxPoolSize());
+      assertNull(absent.sandboxMaxRequestsPerChild());
     }
   }
 

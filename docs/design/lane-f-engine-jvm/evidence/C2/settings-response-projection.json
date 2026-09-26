@@ -1,0 +1,154 @@
+{
+  "recorded": "2026-09-13",
+  "base": "85e1de8ff",
+  "tested": "29d4c8233 + mapper diff; final controller documentation cleanup verified in1368",
+  "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+  "sources": [
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsV2Projection.java",
+      "sha256": "f9e920f24bfd830a494026573e916d9c49902976336c1fdebf781cd4a2262614",
+      "bytes": 1676
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsV2ProjectionTest.java",
+      "sha256": "c0f9a97ffc42a37a9adf96e2687eebe92dd4e646626fe775a20f2b611cabd68d",
+      "bytes": 3584
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SettingsController.java",
+      "sha256": "4e75512083031708e2b317393b28c37b3dd9d8ea4e699aca34041bb841127a49",
+      "bytes": 14328
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsV2ContractTest.java",
+      "sha256": "43f8a3e9cc503f05ab7dcb8921c618b2c49bef915f4ac734ae52e2d0de62f0e5",
+      "bytes": 4601
+    }
+  ],
+  "final": {
+    "revision": "29d4c8233 + final mapper diff",
+    "command": "./gradlew.bat :modules:app-services:test --tests '*SettingsV2ProjectionTest' :modules:ui:test --tests '*SettingsV2ContractTest' --tests '*SettingsControllerSpecNudgeTest' :modules:ui:compileIntegrationTestJava :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:app-services:spotlessCheck :modules:ui:spotlessCheck --console=plain",
+    "summary": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 8
+    },
+    "tasks": [
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      {
+        "module": "ui",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 3
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "tmp/c2-settings-projection1364.txt",
+      "sha256": "c363cbae46a441decf60a3ecab2fbb14598f8f9c5ed0b877fdb1519add4085f6",
+      "bytes": 41541
+    },
+    {
+      "path": "tmp/c2-settings-projection1364-counts.json",
+      "sha256": "cc6d3915a33a61dbaea10c5e0416e0b90543ac625480a2e4b9fbf0d971f6c08e",
+      "bytes": 713
+    },
+    {
+      "path": "tmp/c2-settings-projection1364-xml.zip",
+      "sha256": "f4aa0ece052b50de29e0c795f6ea7571e2b4203fbc15f348d129d28471e33cb2",
+      "bytes": 41365
+    },
+    {
+      "path": "tmp/c2-settings-projection1365.txt",
+      "sha256": "445a16617a53d2e6cfe6b11fdde324716919f32b7979977a6780db05ddffcf16",
+      "bytes": 39787
+    },
+    {
+      "path": "tmp/c2-settings-projection1365-counts.json",
+      "sha256": "777bdea000cce9bcec6720a5c9e8f3d289837b9b4ccfde6e41ae64c136193597",
+      "bytes": 1053
+    },
+    {
+      "path": "tmp/c2-settings-projection1365-xml.zip",
+      "sha256": "63046a56adeef2576031fc756996a9b5060414af34daa48e230b98c67d0f4843",
+      "bytes": 39600
+    },
+    {
+      "path": "tmp/c2-settings-projection1366.txt",
+      "sha256": "7a0c8c90d71d9ae0739f60ec842e6fd55146fffaa5491d0a81fd43140f1c00b5",
+      "bytes": 37728
+    },
+    {
+      "path": "tmp/c2-settings-projection1366-counts.json",
+      "sha256": "c8713087ad933a2e4ef3d61988efe946d0143b1ee8d72990d3f60135bf499950",
+      "bytes": 570
+    },
+    {
+      "path": "tmp/c2-settings-projection1366-xml.zip",
+      "sha256": "087a48a260c301233b461c1aaec1fd9caa9fc8c878af8b5ccb161ca80baffc61",
+      "bytes": 37472
+    },
+    {
+      "path": "tmp/c2-settings-projection1367.txt",
+      "sha256": "04c219299851ce33037083a1efe496818d9756ef4e688b93b856ee4c3d44ce37",
+      "bytes": 39732
+    },
+    {
+      "path": "tmp/c2-settings-projection1367-counts.json",
+      "sha256": "6f7074d770fe4772652fc3426474e660d8b6fde5095d373b64625b9d73e76677",
+      "bytes": 999
+    },
+    {
+      "path": "tmp/c2-settings-projection1367-xml.zip",
+      "sha256": "ad5fc48f0c9668c740ef79e48f2e59f977f29842b6b194e9940faf3a8dba5223",
+      "bytes": 39600
+    },
+    {
+      "path": "tmp/c2-settings-projection1368.txt",
+      "sha256": "49fc2a33ba07f0251c54ee946035213caa827b2530098e634516045fcb6f3c8e",
+      "bytes": 40189
+    },
+    {
+      "path": "tmp/c2-settings-projection1368-counts.json",
+      "sha256": "358502eb2d054ad5d70434286a6b98c6956b856aa1166724c557943e44d4bbc7",
+      "bytes": 983
+    },
+    {
+      "path": "tmp/c2-settings-projection1368-xml.zip",
+      "sha256": "78ee63cb574c614d4ebe11c099d535253a238ee413fef29939d7faa39fdb578f",
+      "bytes": 39598
+    },
+    {
+      "path": "tmp/c2-projection-contract1366.txt",
+      "sha256": "2deb84934bb7394e9a45ea669be42eb949695e164bfc1d20bfcd6269af526416",
+      "bytes": 339
+    },
+    {
+      "path": "tmp/c2-projection1365-sources.json",
+      "sha256": "c28afc627223d743423a8604840ff9bf7863368524bc7d6ea950efe461e5317e",
+      "bytes": 641
+    },
+    {
+      "path": "tmp/c2-projection1367-restoration.json",
+      "sha256": "c28afc627223d743423a8604840ff9bf7863368524bc7d6ea950efe461e5317e",
+      "bytes": 641
+    }
+  ],
+  "retention": "Lane acceptance plus 30 days; export before release"
+}

@@ -99,12 +99,26 @@ public final class TracingBootstrap implements AutoCloseable {
 			.setTracerProvider(tracerProvider)
 			.setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
 			.build();
-		GlobalOpenTelemetry.set(sdk);
+		try {
+			GlobalOpenTelemetry.set(sdk);
+		} catch (RuntimeException | Error failure) {
+			try {
+				sdk.close();
+			} catch (RuntimeException | Error cleanupFailure) {
+				if (cleanupFailure != failure) failure.addSuppressed(cleanupFailure);
+			}
+			throw failure;
+		}
 	}
 
 	@Override
 	public void close() {
 		tracerProvider.close();
+	}
+
+	/** Description of the sampler installed in this bootstrap's actual provider. */
+	public String samplerDescription() {
+		return tracerProvider.getSampler().getDescription();
 	}
 
 	/**

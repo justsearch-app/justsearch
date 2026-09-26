@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.AgentErrorClass;
 import io.justsearch.agent.api.AgentErrorCode;
 import io.justsearch.agent.api.AgentEvent;
@@ -43,7 +45,7 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
   /** The loop entry point a resumed snapshot re-enters (bound to {@code AgentLoopService::runAgent}). */
   @FunctionalInterface
   interface SessionRunner {
-    void run(AgentRequest request, Consumer<AgentEvent> eventConsumer);
+    void run(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext);
   }
 
   private final AgentRunStore runStore;
@@ -92,7 +94,7 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
   }
 
   @Override
-  public OperationResult undoOperation(String toolName, String executionId) {
+  public OperationResult undoOperation(String toolName, String executionId, EngineContext engineContext) {
     var op = operationCatalog.findByWireName(toolName).orElse(null);
     if (op == null) {
       return OperationResult.failure("Unknown tool: " + toolName);
@@ -105,11 +107,9 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
     return operationExecutor.undo(
         op,
         executionId,
-        io.justsearch.agent.api.registry.InvocationProvenance.fromTransport(
-            io.justsearch.agent.api.registry.TransportTag.AGENT_LOOP,
-            java.util.Optional.empty(),
-            java.time.Instant.now()),
-        java.util.Optional.empty());
+        io.justsearch.agent.api.registry.InvocationProvenance.fromEngineContext(engineContext,
+            io.justsearch.agent.api.registry.ExecutorTag.AGENT, java.time.Instant.now(), java.util.Optional.empty()),
+        java.util.Optional.empty(), engineContext);
   }
 
   @Override
@@ -151,7 +151,7 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
   }
 
   @Override
-  public void resumeLastSession(Consumer<AgentEvent> eventConsumer) {
+  public void resumeLastSession(Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
     Map<String, Object> snapshot = runStore.readLastSnapshot();
     if (snapshot == null) {
       errorEmitter.emitError(
@@ -163,11 +163,11 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
           null);
       return;
     }
-    resumeFromSnapshot(snapshot, eventConsumer);
+    resumeFromSnapshot(snapshot, eventConsumer, engineContext);
   }
 
   @Override
-  public void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer) {
+  public void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
     Map<String, Object> snapshot = runStore.readSnapshot(sessionId);
     if (snapshot == null) {
       errorEmitter.emitError(
@@ -179,17 +179,17 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
           null);
       return;
     }
-    resumeFromSnapshot(snapshot, eventConsumer);
+    resumeFromSnapshot(snapshot, eventConsumer, engineContext);
   }
 
   /**
    * Shared resume implementation. Tempdoc 415 follow-up (C20). Extracted from
-   * {@link #resumeLastSession(Consumer)} so {@link #resumeSession(String, Consumer)} inherits the
+   * {@link #resumeLastSession(Consumer, EngineContext)} so {@link #resumeSession(String, Consumer, EngineContext)} inherits the
    * same state-gate semantics (only WAITING_APPROVAL / READY_FOR_LLM / AFTER_TOOL_RESULT) without
    * duplication.
    */
   private void resumeFromSnapshot(
-      Map<String, Object> snapshot, Consumer<AgentEvent> eventConsumer) {
+      Map<String, Object> snapshot, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
     String state = String.valueOf(snapshot.getOrDefault("state", "UNKNOWN"));
     if (!"WAITING_APPROVAL".equals(state)
         && !"READY_FOR_LLM".equals(state)
@@ -254,7 +254,7 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
     sessionRunner.run(
         resumedRequest(snapshot, resumeMessages, selectedTools, maxIterations, agentProfiles,
             resumeAgentId),
-        eventConsumer);
+        eventConsumer, engineContext);
   }
 
   /**
@@ -329,7 +329,7 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
    * a half-finished turn.
    */
   @Override
-  public void forkSession(String sessionId, String editedMessage, Consumer<AgentEvent> eventConsumer) {
+  public void forkSession(String sessionId, String editedMessage, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
     Map<String, Object> snapshot = runStore.readSnapshot(sessionId);
     if (snapshot == null || snapshot.isEmpty()) {
       errorEmitter.emitError(
@@ -374,7 +374,7 @@ final class AgentRunQueryService implements io.justsearch.agent.api.AgentRunQuer
     String agentId = snapshot.get("activeAgentId") instanceof String s ? s : null;
     sessionRunner.run(
         resumedRequest(snapshot, forked, selectedTools, maxIterations, agentProfiles, agentId),
-        eventConsumer);
+        eventConsumer, engineContext);
   }
 
   /**

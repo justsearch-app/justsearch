@@ -8,12 +8,18 @@ import org.junit.jupiter.api.Test;
 class EnvRegistryTest {
 
     @Test
+    void serverExecutableOwnershipMarkerIsRetired() {
+        assertTrue(java.util.Arrays.stream(EnvRegistry.values())
+            .noneMatch(key -> "justsearch.server.exe.source".equals(key.sysProp())));
+        var builder = io.justsearch.configuration.resolved.ResolvedConfig.builder();
+        builder.contributeEnvRegistry();
+        assertNull(builder.build().resolution("justsearch.server.exe.source"));
+    }
+
+    @Test
     void sysProp_returnsCorrectValue() {
         assertEquals("justsearch.data.dir", EnvRegistry.DATA_DIR.sysProp());
         assertEquals("justsearch.ssot.path", EnvRegistry.SSOT_PATH.sysProp());
-        assertEquals("justsearch.summary.pipeline", EnvRegistry.SUMMARY_PIPELINE.sysProp());
-        assertEquals(
-            "justsearch.embed.dimension", EnvRegistry.EMBED_DIMENSION_OVERRIDE.sysProp());
         assertEquals("justsearch.vram.threshold.12gb", EnvRegistry.VRAM_THRESHOLD_12GB.sysProp());
         assertEquals("justsearch.vram.threshold.8gb", EnvRegistry.VRAM_THRESHOLD_8GB.sysProp());
         assertEquals("justsearch.vram.threshold.4gb", EnvRegistry.VRAM_THRESHOLD_4GB.sysProp());
@@ -23,8 +29,6 @@ class EnvRegistryTest {
     void envVar_returnsCorrectValue() {
         assertEquals("JUSTSEARCH_DATA_DIR", EnvRegistry.DATA_DIR.envVar());
         assertEquals("JUSTSEARCH_SSOT_PATH", EnvRegistry.SSOT_PATH.envVar());
-        assertEquals("JUSTSEARCH_SUMMARY_PIPELINE", EnvRegistry.SUMMARY_PIPELINE.envVar());
-        assertEquals("JUSTSEARCH_EMBED_DIM", EnvRegistry.EMBED_DIMENSION_OVERRIDE.envVar());
         assertEquals("JUSTSEARCH_VRAM_THRESHOLD_12GB", EnvRegistry.VRAM_THRESHOLD_12GB.envVar());
         assertEquals("JUSTSEARCH_VRAM_THRESHOLD_8GB", EnvRegistry.VRAM_THRESHOLD_8GB.envVar());
         assertEquals("JUSTSEARCH_VRAM_THRESHOLD_4GB", EnvRegistry.VRAM_THRESHOLD_4GB.envVar());
@@ -55,8 +59,13 @@ class EnvRegistryTest {
 
     @Test
     void getLong_readsSystemProperty() {
-        withSysProp(EnvRegistry.HEAD_PID.sysProp(), "1234", () ->
-            assertEquals(1234L, EnvRegistry.HEAD_PID.getLong(900L)));
+        // The key here is a FIXTURE for the accessor, not the accessor's owner: getLong parses
+        // whatever key it is handed. It used to be HEAD_PID, which lane F stage A item A10 deleted
+        // along with its last reader (the Worker process's heartbeat suicide-pact needed Head's
+        // PID; one JVM does not). No key is read as a long in production today, so pinning the
+        // accessor to a numeric key that IS read keeps the test honest about what it covers.
+        withSysProp(EnvRegistry.API_PORT.sysProp(), "1234", () ->
+            assertEquals(1234L, EnvRegistry.API_PORT.getLong(900L)));
     }
 
     @Test
@@ -96,6 +105,19 @@ class EnvRegistryTest {
         assertEquals("JUSTSEARCH_EMBED_GPU_MEM_MB", EnvRegistry.EMBED_GPU_MEM_MB.envVar());
         assertEquals(1024, EnvRegistry.EMBED_GPU_MEM_MB.getInt(1024),
             "EMBED_GPU_MEM_MB default should be 1024");
+    }
+
+    @Test
+    void gpuDeviceMemoryCeiling_hasMappingsAndNoDefault() {
+        assertEquals(
+            "justsearch.gpu.device_memory_ceiling_mb",
+            EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.sysProp());
+        assertEquals(
+            "JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB",
+            EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.envVar());
+        assertNull(
+            EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.defaultValue(),
+            "the device-memory ceiling is optional and must not impose a machine-independent default");
     }
 
     @Test

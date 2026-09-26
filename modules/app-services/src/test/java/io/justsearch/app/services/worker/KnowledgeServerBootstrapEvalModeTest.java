@@ -67,15 +67,16 @@ final class KnowledgeServerBootstrapEvalModeTest {
     System.setProperty(EVAL_MODE_PROP, "true");
     Path dataDir = Files.createDirectories(tempDir.resolve("data"));
     KnowledgeServerConfig config = configFor(dataDir, tempDir.resolve("working"));
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
 
-    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(config);
-    bootstrap.tryIngestHelpFiles(client, config);
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(config)) {
+      fixture.bootstrap().tryIngestHelpFiles(client, config);
+    }
 
     assertFalse(
         Files.exists(dataDir.resolve(".help-ingested-version")),
         "Marker file must NOT be written when eval.mode=true");
-    verify(client, never()).submitBatch(any(), anyBoolean(), anyString());
+    verify(client, never()).submitBatch(any(), anyBoolean(), anyString(), any());
   }
 
   @Test
@@ -90,16 +91,40 @@ final class KnowledgeServerBootstrapEvalModeTest {
     KnowledgeServerConfig config = configFor(dataDir, workingDir);
 
     // Don't stub submitBatch — default null return is fine; production ignores the return value.
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
 
-    KnowledgeServerBootstrap bootstrap = new KnowledgeServerBootstrap(config);
-    bootstrap.tryIngestHelpFiles(client, config);
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(config)) {
+      fixture.bootstrap().tryIngestHelpFiles(client, config);
+    }
 
     assertTrue(
         Files.exists(dataDir.resolve(".help-ingested-version")),
         "Marker file must be written after successful ingest");
     // Production calls submitBatch exactly once with the full path list — no batching at this layer.
-    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString());
+    verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), any());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void onlyExplicitFaultFixtureCompositionSuppressesAutomaticRootProducers(boolean isolated) throws Exception {
+    System.setProperty(EVAL_MODE_PROP, "true");
+    var config = configFor(tempDir.resolve("data"), tempDir.resolve("working"));
+    var client = mock(KnowledgeClient.class);
+    try (var fixture =
+        KnowledgeServerBootstrapTestFixture.create(
+            config, null, WorkerHost.unavailable(), !isolated)) {
+      var bootstrap = fixture.bootstrap();
+      var clientField = KnowledgeServerBootstrap.class.getDeclaredField("client");
+      clientField.setAccessible(true);
+      clientField.set(bootstrap, client);
+      org.mockito.Mockito.when(client.isHealthy(any())).thenReturn(true);
+      bootstrap.checkHealth();
+      bootstrap.checkHealth();
+      verify(client, times(2)).isHealthy(any());
+      verify(client, times(isolated ? 0 : 1)).reindexPersistedRoots(any());
+      verify(client, times(isolated ? 0 : 1)).startPeriodicSync();
+      org.mockito.Mockito.verifyNoMoreInteractions(client);
+    }
   }
 
   /** Build a minimal KnowledgeServerConfig pointing at the temp directories. */
@@ -109,12 +134,9 @@ final class KnowledgeServerBootstrapEvalModeTest {
         /* dataDir */ dataDir,
         /* libDir */ dataDir, // unused by tryIngestHelpFiles
         /* workingDirectory */ workingDir,
-        /* workerLibDir */ dataDir, // unused by tryIngestHelpFiles
-        /* signalFilePath */ dataDir.resolve("worker_signal.lock"),
         /* deadlineMs */ 5_000L,
         /* portDiscoveryTimeoutMs */ 15_000L,
         /* maxRetries */ 3,
-        /* workerHeapSize */ "256m",
         /* workerShutdownTimeoutMs */ 5_000L,
         /* pidValidationTimeoutMs */ 5_000L,
         /* stabilityWindowMs */ 300_000L,

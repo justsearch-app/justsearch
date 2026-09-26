@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,9 +94,17 @@ public final class QueryUnderstandingService {
   }
 
   private final OnlineAiService aiService;
+  private final BooleanSupplier enabled;
 
   public QueryUnderstandingService(OnlineAiService aiService) {
+    this(
+        aiService,
+        () -> io.justsearch.configuration.EnvRegistry.QU_ENABLED.getBoolean(false));
+  }
+
+  public QueryUnderstandingService(OnlineAiService aiService, BooleanSupplier enabled) {
     this.aiService = Objects.requireNonNull(aiService, "aiService");
+    this.enabled = Objects.requireNonNull(enabled, "enabled");
     if (PROMPT_TEMPLATE != null && QU_SAMPLING != null) {
       log.info("QueryUnderstandingService initialized (prompt loaded, schema loaded)");
     } else {
@@ -108,10 +117,7 @@ public final class QueryUnderstandingService {
    * available. Disabled by default (366 — experimental). Enable via JUSTSEARCH_QU_ENABLED=true.
    */
   public boolean isAvailable() {
-    return io.justsearch.configuration.EnvRegistry.QU_ENABLED.getBoolean(false)
-        && PROMPT_TEMPLATE != null
-        && QU_SAMPLING != null
-        && aiService.isAvailable();
+    return isAvailable(enabled.getAsBoolean());
   }
 
   /**
@@ -122,9 +128,33 @@ public final class QueryUnderstandingService {
    *     or empty to skip grounding
    * @return a future containing the boost filters, or null if extraction failed or was skipped
    */
-  public CompletableFuture<QuResult> extract(String query, String indexSnapshot) {
-    if (!isAvailable()) {
-      return CompletableFuture.completedFuture(null);
+  public CompletableFuture<QuResult> extract(String query, String indexSnapshot,
+      io.justsearch.core.context.EngineContext engineContext) {
+    CompletableFuture<QuResult> extraction =
+        extractIfAvailable(query, indexSnapshot, engineContext);
+    return extraction != null ? extraction : CompletableFuture.completedFuture(null);
+  }
+
+  /**
+   * Extracts filters when query understanding is available for this operation.
+   *
+   * @return the extraction future, or {@code null} when the captured availability decision is
+   *     disabled or unavailable
+   */
+  CompletableFuture<QuResult> extractIfAvailable(
+      String query,
+      String indexSnapshot,
+      io.justsearch.core.context.EngineContext engineContext) {
+    return extractIfAvailable(query, indexSnapshot, engineContext, enabled.getAsBoolean());
+  }
+
+  CompletableFuture<QuResult> extractIfAvailable(
+      String query,
+      String indexSnapshot,
+      io.justsearch.core.context.EngineContext engineContext,
+      boolean enabledForOperation) {
+    if (!isAvailable(enabledForOperation)) {
+      return null;
     }
 
     String systemPrompt = buildSystemPrompt(indexSnapshot);
@@ -135,7 +165,7 @@ public final class QueryUnderstandingService {
 
     long startNs = System.nanoTime();
     return aiService
-        .chatCompletion(messages, QU_MAX_TOKENS, QU_SAMPLING)
+        .chatCompletion(messages, QU_MAX_TOKENS, QU_SAMPLING, engineContext)
         .orTimeout(QU_DEADLINE_MS, TimeUnit.MILLISECONDS)
         .thenApply(
             json -> {
@@ -145,10 +175,18 @@ public final class QueryUnderstandingService {
             })
         .exceptionally(
             ex -> {
+              io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(ex);
               long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
               log.debug("QU extraction failed after {}ms: {}", elapsedMs, ex.getMessage());
               return null;
             });
+  }
+
+  private boolean isAvailable(boolean enabledForOperation) {
+    return enabledForOperation
+        && PROMPT_TEMPLATE != null
+        && QU_SAMPLING != null
+        && aiService.isAvailable();
   }
 
   /** Result of query understanding extraction. */

@@ -21,5 +21,13 @@
     "llamaLibPath" : null
   },
   "indexPaths" : [ "C:/docs", "D:/papers" ],
-  "settingsMode" : "read_write"
+  "settingsMode" : "read_write",
+  "witness" : {
+    "acceptedRevision" : 0,
+    "lastCommittedOperationKey" : null
+  },
+  "operationKey" : null,
+  "state" : null,
+  "apiPort" : null,
+  "restartScheduled" : null
 }

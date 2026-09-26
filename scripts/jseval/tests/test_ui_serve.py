@@ -338,16 +338,18 @@ class _FakeLocator:
 
 
 class _FakePage:
-    def __init__(self, rail_raises: bool, overlay=None, url="http://localhost:5174"):
+    def __init__(self, rail_raises: bool, overlay=None, url="http://localhost:5174",
+                 failed_resources=()):
         self._rail_raises = rail_raises
         self._overlay = overlay
         self.url = url
+        self._failed_resources = failed_resources
 
     def locator(self, _sel):
         return _FakeLocator(self._rail_raises)
 
     async def evaluate(self, _js):
-        return self._overlay
+        return {"overlay": self._overlay, "failedResources": self._failed_resources}
 
 
 def test_await_app_ready_passes_when_rail_visible():
@@ -418,3 +420,14 @@ def test_await_app_ready_falls_back_when_no_signal(tmp_path, monkeypatch):
     except ui_check.AppNotMountedError as e:
         assert "never mounted" in str(e)
         assert "no Vite stderr or error overlay" in str(e)
+
+
+def test_await_app_ready_reports_optimizer_failure_without_overlay(tmp_path, monkeypatch):
+    monkeypatch.setattr(ui_shot, "_SERVER_INFO_PATH", tmp_path / "absent.json")
+    page = _FakePage(rail_raises=True, failed_resources=["504 /node_modules/.vite/deps/lit.js"])
+    try:
+        asyncio.run(ui_check._await_app_ready(page, timeout_ms=10))
+        assert False, "expected AppNotMountedError"
+    except ui_check.AppNotMountedError as error:
+        assert "failed same-origin resources: 504 /node_modules/.vite/deps/lit.js" in str(error)
+        assert "no Vite stderr" not in str(error)

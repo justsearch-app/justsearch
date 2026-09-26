@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -12,6 +14,9 @@ import io.justsearch.app.api.knowledge.FolderFilesResponse;
 import io.justsearch.app.api.knowledge.KnowledgeSearchRequest;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponse;
 import io.justsearch.app.api.knowledge.KnowledgeSearchResponseBuilder;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
+import io.justsearch.app.api.operations.RecordedIngestionService;
+import io.justsearch.app.api.operations.RecordedRootPlan;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,7 +54,7 @@ final class AgentToolPathRoundTripTest {
     target = root.resolve("explanation").resolve("overview.md");
     rootsView =
         AgentToolPaths.RootsView.of(
-            () -> List.of(new BrowseTool.RootInfo(root.toString(), root.getFileName().toString())));
+            context -> List.of(new BrowseTool.RootInfo(root.toString(), root.getFileName().toString())));
   }
 
   @Test
@@ -69,9 +74,9 @@ final class AgentToolPathRoundTripTest {
 
   /** What the model actually reads off a {@code core_browse_folders} file listing. */
   private String pathAsBrowseEmitsIt() {
-    BrowseTool.BrowseCallback browse = req -> null;
+    BrowseTool.BrowseCallback browse = (req, context) -> null;
     BrowseTool.FilesCallback files =
-        req ->
+        (req, context) ->
             new FolderFilesResponse(
                 List.of(
                     new FolderFilesResponse.FileEntry(
@@ -85,7 +90,7 @@ final class AgentToolPathRoundTripTest {
         tool.execute(
             "{\"parent_path\":\""
                 + root.resolve("explanation").toString().replace("\\", "\\\\")
-                + "\",\"list_files\":true}");
+                + "\",\"list_files\":true}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
 
     for (String line : result.message().split("\\R")) {
@@ -101,13 +106,13 @@ final class AgentToolPathRoundTripTest {
     var captured = new AtomicReference<KnowledgeSearchRequest>();
     KnowledgeSearchResponse response = KnowledgeSearchResponseBuilder.builder().tookMs(1).build();
     SearchTool.SearchCallback search =
-        req -> {
+        (req, context) -> {
           captured.set(req);
           return response;
         };
     OperationResult result =
         new SearchTool(search, rootsView)
-            .execute("{\"query\":\"anything\",\"path_prefix\":\"" + emitted + "\"}");
+            .execute("{\"query\":\"anything\",\"path_prefix\":\"" + emitted + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertNotNull(captured.get(), "search must have been dispatched");
@@ -118,14 +123,14 @@ final class AgentToolPathRoundTripTest {
   private String readDocumentResolves(String emitted) {
     var seen = new AtomicReference<String>();
     ReadDocumentTool.SliceFetcher fetch =
-        (docId, offset, max) -> {
+        (docId, offset, max, context) -> {
           seen.set(docId);
           return CompletableFuture.completedFuture(
               new DocumentService.DocumentSlice(
                   docId, "page text", Map.of(), true, false, 9, 9, null));
         };
     OperationResult result =
-        new ReadDocumentTool(fetch, rootsView).execute("{\"path\":\"" + emitted + "\"}");
+        new ReadDocumentTool(fetch, rootsView).execute("{\"path\":\"" + emitted + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     return seen.get();
@@ -138,8 +143,8 @@ final class AgentToolPathRoundTripTest {
 
     FileOperationsTool tool =
         new FileOperationsTool(
-            () -> List.of(root),
-            mappings -> mappings.size(),
+            context -> List.of(root),
+            (mappings, context) -> mappings.size(),
             new FileOperationLog(tempDir.resolve("data").resolve("file-operations")),
             rootsView);
 
@@ -149,7 +154,7 @@ final class AgentToolPathRoundTripTest {
                 + scratch.toString().replace("\\", "\\\\")
                 + "\",\"destination\":\""
                 + emitted
-                + "\"}]}");
+                + "\"}]}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(
         result.success(),
@@ -172,32 +177,18 @@ final class AgentToolPathRoundTripTest {
     Files.createDirectories(realFile.getParent());
     Files.writeString(realFile, "the file the model named");
 
-    var accepted = new java.util.ArrayList<Path>();
-    IngestTool.IngestCallback ingest =
-        (files, collection) -> {
-          accepted.addAll(files);
-          return new io.justsearch.app.api.knowledge.KnowledgeIngestResponse(files.size(), null);
-        };
-    IngestTool tool =
-        new IngestTool(
-            ingest,
-            (rootPath, collection, excludeGlobs) ->
-                new io.justsearch.app.api.knowledge.KnowledgeIngestResponse(0, "no scan expected"),
-            () ->
-                List.of(
-                    new BrowseTool.RootInfo(emptyDocsRoot.toString(), "docs"),
-                    new BrowseTool.RootInfo(otherRoot.toString(), "B")));
+    var bindings = List.of(
+        new IngestCollectionPolicy.RootBinding(emptyDocsRoot, null),
+        new IngestCollectionPolicy.RootBinding(otherRoot, null));
+    IngestTool tool = new IngestTool(RecordedIngestionService.unavailable(),
+        ignored -> bindings, ignored -> "generation-1", List::of);
 
-    OperationResult result = tool.execute("{\"paths\":[\"docs/x.md\"]}");
+    var prepared = tool.prepare("{\"paths\":[\"docs/x.md\"]}",
+        io.justsearch.agent.api.registry.InvocationProvenance.agentLoop(java.time.Instant.EPOCH),
+        EngineContextTestFixtures.AGENT_LOOP);
+    var plan = RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson());
 
-    assertTrue(result.success(), result.message());
-    assertFalse(
-        result.message().contains("skipped"),
-        "the named file exists under an indexed root; skipping it is the name-collision bug: "
-            + result.message());
-    assertEquals(
-        List.of(realFile.normalize()),
-        accepted,
+    assertEquals(realFile.toAbsolutePath().normalize(), plan.roots().get(0).path(),
         "resolution must fall through a name match that does not exist, to the path that does");
   }
 }

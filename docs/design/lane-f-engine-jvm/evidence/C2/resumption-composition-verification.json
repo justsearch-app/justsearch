@@ -1,0 +1,498 @@
+{
+  "baseRevision": "657b6b89a85570b39f7de8cdd6b116a4519d274e",
+  "sourceSha256": {
+    "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java": "fbb1ac0ad92982fe51b9cf33ec7e5602df71ae545f62b1334e2f52ef402fd26f",
+    "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java": "8d3ef0bc88ac83df81ac452e3fdb79441a87057295fbd3f688460225c00c085a",
+    "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationWorkHandoffTest.java": "71b0fc6edc63efb47ebbd951a0d6ee7e6bb444f712550215c17e2803726b9095",
+    "modules/ui/src/test/java/io/justsearch/agent/DeclaredSurvivalCallerIntegrationTest.java": "472072df0eacddf7d040f39f593e5233a27ad18aeddaf4574422de85e3ae450b",
+    "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredSurvivalFrontIntegrationTest.java": "6a750c0ee9b1857ece0346011161ed578c74d7f1ff231b2c59baf6c7ec8d93e0"
+  },
+  "environment": "Windows local lane-f-pr1-verify; raw artifacts retained in tmp through lane acceptance plus 30 days, export before worktree release",
+  "limits": "Inert prepared effect; agent loop rebase and downstream real composition are separate tests. No index effect, model query or installed recovery claimed.",
+  "runs": [
+    {
+      "revision": "657b6b89a + restored composed tests and admission callback contract clarification",
+      "command": "gradlew.bat -PtestParallelism=1 --continue build -x test",
+      "summary": {
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 9,
+        "suites": 10
+      },
+      "tasks": [
+        {
+          "module": "indexing",
+          "task": "integrationTest",
+          "status": "UP-TO-DATE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "reranker",
+          "task": "integrationTest",
+          "status": "UP-TO-DATE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 9,
+          "suites": 2
+        },
+        {
+          "module": "app-services",
+          "task": "integrationTest",
+          "status": "EXECUTED",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "ui",
+          "task": "integrationTest",
+          "status": "EXECUTED",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        }
+      ],
+      "id": 1971,
+      "log": "tmp/1971.txt",
+      "xml": "tmp/1971-xml"
+    },
+    {
+      "revision": "657b6b89a plus composition diff",
+      "command": "gradlew.bat -PtestParallelism=1 :modules:ui:test --tests '*DeclaredSurvival*Test' :modules:app-agent:test --tests '*AgentLoopServiceTest.*CallerContext*' :modules:app-services:test --tests '*OperationWorkHandoffTest' spotlessJavaCheck",
+      "summary": {
+        "tests": 42,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 13
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 29,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 7
+        },
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        }
+      ],
+      "id": 1972,
+      "log": "tmp/1972.txt",
+      "xml": "tmp/1972-xml"
+    },
+    {
+      "revision": "657b6b89a plus composition diff minus INGEST survival declaration",
+      "command": "gradlew.bat -PtestParallelism=1 :modules:ui:test --tests '*DeclaredSurvivalCallerIntegrationTest' --tests '*DeclaredSurvivalFrontIntegrationTest' (INGEST survival declaration removed, restored in finally)",
+      "summary": {
+        "tests": 8,
+        "failures": 5,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 4
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "FAILED",
+          "tests": 8,
+          "failures": 5,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        }
+      ],
+      "id": 1973,
+      "log": "tmp/1973.txt",
+      "xml": "tmp/1973-xml"
+    },
+    {
+      "revision": "657b6b89a plus final composition proof diff",
+      "command": "gradlew.bat -PtestParallelism=1 --continue test -PincludeStress=true",
+      "summary": {
+        "tests": 11083,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 30,
+        "suites": 1744
+      },
+      "tasks": [
+        {
+          "module": "core",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 102,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 17
+        },
+        {
+          "module": "adapters-lucene",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 725,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 103
+        },
+        {
+          "module": "ai-backend",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 62,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        },
+        {
+          "module": "api-contract-projection-java",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 692,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 53
+        },
+        {
+          "module": "app-agent-api",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 243,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 42
+        },
+        {
+          "module": "app-api",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 236,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 47
+        },
+        {
+          "module": "app-config",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-engine",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 306,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 57
+        },
+        {
+          "module": "app-inference",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 323,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 30
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 94,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 23
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 576,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 87
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2956,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3,
+          "suites": 435
+        },
+        {
+          "module": "app-util",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "benchmarks",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 104,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        },
+        {
+          "module": "configuration",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 272,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 32
+        },
+        {
+          "module": "core-contracts",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "dead-code-audit",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "extension-substrate",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "gpu-bridge",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 77,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 661,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 15,
+          "suites": 101
+        },
+        {
+          "module": "indexing",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 84,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 19
+        },
+        {
+          "module": "infra-core",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "ipc-common",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "ort-common",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 171,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 36
+        },
+        {
+          "module": "prompt-support",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "reranker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 68,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 7
+        },
+        {
+          "module": "ssot-tools",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "system-tests",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 96,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 29
+        },
+        {
+          "module": "telemetry",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 94,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 26
+        },
+        {
+          "module": "test-support",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1277,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 196
+        },
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1390,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 258
+        }
+      ],
+      "id": 1974,
+      "log": "tmp/1974.txt",
+      "xml": "tmp/1974-xml"
+    }
+  ]
+}

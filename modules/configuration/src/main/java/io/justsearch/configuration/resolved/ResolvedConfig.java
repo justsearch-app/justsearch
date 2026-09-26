@@ -56,6 +56,7 @@ public record ResolvedConfig(
     Ui ui,
     Watcher watcher,
     Ocr ocr,
+    Extraction extraction,
     Index index,
     Rag rag,
     HybridSearch hybridSearch,
@@ -63,7 +64,6 @@ public record ResolvedConfig(
     Collections collections,
     WorkerIndexer workerIndexer,
     InfraHealth infraHealth,
-    InfraGrpc infraGrpc,
     Map<String, ConfigResolution> resolutions) {
 
   public ResolvedConfig {
@@ -78,6 +78,7 @@ public record ResolvedConfig(
     Objects.requireNonNull(ui, "ui");
     Objects.requireNonNull(watcher, "watcher");
     Objects.requireNonNull(ocr, "ocr");
+    Objects.requireNonNull(extraction, "extraction");
     Objects.requireNonNull(index, "index");
     Objects.requireNonNull(rag, "rag");
     Objects.requireNonNull(hybridSearch, "hybridSearch");
@@ -85,7 +86,6 @@ public record ResolvedConfig(
     Objects.requireNonNull(collections, "collections");
     Objects.requireNonNull(workerIndexer, "workerIndexer");
     Objects.requireNonNull(infraHealth, "infraHealth");
-    Objects.requireNonNull(infraGrpc, "infraGrpc");
     resolutions = Map.copyOf(resolutions);
   }
 
@@ -94,70 +94,21 @@ public record ResolvedConfig(
     return resolutions.get(key);
   }
 
+  /** Keep the currently bound API port in a serving snapshot until a successor boots. */
+  public ResolvedConfig retainingApiPortFrom(ResolvedConfig serving) {
+    Objects.requireNonNull(serving, "serving");
+    Map<String, ConfigResolution> traces = new LinkedHashMap<>(resolutions);
+    ConfigResolution prior = serving.resolution("justsearch.api.port");
+    if (prior == null) traces.remove("justsearch.api.port");
+    else traces.put("justsearch.api.port", prior);
+    return new ResolvedConfig(paths, new Ports(serving.ports().apiPort(), ports.serverPort()), ai,
+        agent, summary, search, telemetry, policy, ui, watcher, ocr, extraction, index, rag,
+        hybridSearch, worker, collections, workerIndexer, infraHealth, traces);
+  }
+
   /** Creates a new builder for constructing a {@link ResolvedConfig}. */
   public static ResolvedConfigBuilder builder() {
     return new ResolvedConfigBuilder();
-  }
-
-  private static final ObjectMapper SNAPSHOT_MAPPER =
-      JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
-
-  private static final TypeReference<LinkedHashMap<String, String>> MAP_TYPE =
-      new TypeReference<>() {};
-
-  /**
-   * Writes resolved config values to a JSON file for Head→Worker propagation.
-   *
-   * <p>The snapshot contains all resolved (non-null) key-value pairs as a flat JSON object. The
-   * Worker process loads this file at ordinal 450 via {@link
-   * ResolvedConfigBuilder#contributeWorkerSnapshot(Path)}.
-   *
-   * @param snapshotPath path to write the snapshot file
-   * @throws UncheckedIOException if writing fails
-   */
-  public void toWorkerSnapshot(Path snapshotPath) {
-    Map<String, String> snapshot = new LinkedHashMap<>();
-    for (Map.Entry<String, ConfigResolution> entry : resolutions.entrySet()) {
-      if (entry.getValue().value() != null) {
-        snapshot.put(entry.getKey(), entry.getValue().value());
-      }
-    }
-    putPath(snapshot, "justsearch.data.dir", paths.dataDir());
-    putPath(snapshot, "justsearch.index.base_path", paths.indexBasePath());
-    putPath(snapshot, "justsearch.home", paths.home());
-    putPath(snapshot, "justsearch.models.dir", paths.modelsDir());
-    putPath(snapshot, "justsearch.ssot.path", paths.ssotPath());
-    putPath(snapshot, "justsearch.repo.root", paths.repoRoot());
-    putPath(snapshot, "justsearch.onnxruntime.native_path", paths.ortNativePath());
-    putPath(snapshot, "justsearch.server.exe", ai.serverExe());
-    putPath(snapshot, "justsearch.llm.model_path", ai.llmModelPath());
-    putPath(snapshot, "justsearch.rerank.model_path", ai.reranker().modelPath());
-    putPath(snapshot, "justsearch.ner.model_path", ai.ner().modelPath());
-    putPath(snapshot, "justsearch.splade.model_path", ai.splade().modelPath());
-    putPath(snapshot, "justsearch.splade.evidence_path", ai.splade().evidencePath());
-    putPath(snapshot, "justsearch.rerank.chunks.model_path", ai.reranker().chunks().modelPath());
-    putPath(snapshot, "justsearch.citation.scorer.model_path", ai.citationScorer().modelPath());
-    try {
-      AtomicFileWrites.replace(snapshotPath, SNAPSHOT_MAPPER.writeValueAsBytes(snapshot));
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to write worker config snapshot", e);
-    }
-  }
-
-  /**
-   * Loads a worker config snapshot from a JSON file.
-   *
-   * @param snapshotPath path to the snapshot file
-   * @return key-value pairs from the snapshot, or empty map if file doesn't exist
-   */
-  static Map<String, String> loadWorkerSnapshot(Path snapshotPath) {
-    if (!Files.exists(snapshotPath)) return new LinkedHashMap<>();
-    try {
-      return SNAPSHOT_MAPPER.readValue(snapshotPath.toFile(), MAP_TYPE);
-    } catch (Exception e) {
-      // Best-effort; return empty map on read failure
-      return new LinkedHashMap<>();
-    }
   }
 
   // ==================== Sub-records ====================
@@ -171,6 +122,7 @@ public record ResolvedConfig(
    * @param modelsDir directory for AI model files
    * @param ssotPath path to SSOT directory
    * @param repoRoot repository root path (for dev/test)
+   * @param pathResolutionRetentionDays removed path-history retention, at least one day
    */
   public record Paths(
       Path dataDir,
@@ -179,12 +131,8 @@ public record ResolvedConfig(
       Path modelsDir,
       Path ssotPath,
       Path repoRoot,
-      Path ortNativePath) {}
-
-  private static void putPath(Map<String, String> snapshot, String key, Path value) {
-    if (value == null) return;
-    snapshot.put(key, value.toAbsolutePath().normalize().toString());
-  }
+      Path ortNativePath,
+      int pathResolutionRetentionDays) {}
 
   /**
    * Network ports for API and inference services.
@@ -220,7 +168,6 @@ public record ResolvedConfig(
       boolean useThinking,
       int reasoningBudget,
       String onnxruntimeVariantId,
-      String serverExeSource,
       long vramThreshold12gb,
       long vramThreshold8gb,
       long vramThreshold4gb,
@@ -244,7 +191,14 @@ public record ResolvedConfig(
       // arguments the engine used to choose for itself; naming them makes the choice reviewable
       // and the argv reproducible.
       int llmSlots,
-      String llmKvType) {
+      String llmKvType,
+      // D1: preserve the two shared inputs that derive every per-role GPU decision. These are
+      // projections of existing keys, not new settings.
+      boolean masterGpuEnabled,
+      boolean gpuAccelerationAllowed,
+      // D1-14: optional nonnegative cap for the device-memory line used by encoder composition.
+      // Null means the reported device capacity is unmodified; zero is an explicit cap.
+      Long deviceMemoryCeilingMb) {
 
     /** BGE-M3 multi-vector retrieval configuration. */
     public record BgeM3(
@@ -436,15 +390,14 @@ public record ResolvedConfig(
       int contextCompressionMinChars,
       int contextCompressionKeepLastResults) {}
 
-  /** Summary pipeline configuration. */
-  public record Summary(String pipeline, int maxTokens) {}
+  /** Summary size configuration. */
+  public record Summary(int maxTokens) {
+    public static final int DEFAULT_MAX_TOKENS = 20_000;
+  }
 
   /**
    * Search pipeline configuration.
    *
-   * @param profile search pipeline profile name
-   * @param pipeline search pipeline definition file path
-   * @param collection primary index collection name
    * @param queryClassificationEnabled 306: enable query classification for CE/expansion gating
    * @param titleBoost 306: title field boost in DisjunctionMaxQuery (0 to disable)
    * @param evidenceSpanEnabled 775: enable answer-bearing EvidenceSpan-backed excerpt selection
@@ -456,11 +409,10 @@ public record ResolvedConfig(
    *     (default {@link Search#DEFAULT_MCP_DELIVERY_BUDGET_BYTES}; 0 disables the governor)
    * @param mcpFraming 789 Phase 2: the agent-delivery framing flags (all default OFF)
    * @param mcpEntityCarriage 771 item (b): the MCP entity-carriage settings (default OFF)
+   * @param queryUnderstandingEnabled whether query-understanding inference is enabled
+   * @param filterNormalizationEnabled whether filter-normalization inference is enabled
    */
   public record Search(
-      String profile,
-      String pipeline,
-      String collection,
       boolean queryClassificationEnabled,
       double titleBoost,
       boolean chunkAwareEnabled,
@@ -487,7 +439,9 @@ public record ResolvedConfig(
       // on email) because long documents bury the bridge sentence past the 4 KB content_preview
       // window — so even a successful hop-1 retrieval could not seed hop-2. Default OFF.
       EntityCarriage mcpEntityCarriage,
-      Corrections corrections) {
+      Corrections corrections,
+      boolean queryUnderstandingEnabled,
+      boolean filterNormalizationEnabled) {
 
     /**
      * Default MCP delivery-governor budget (tempdoc 775 §E, settled by the orchestrator's live
@@ -651,6 +605,23 @@ public record ResolvedConfig(
   }
 
   /**
+   * Declared extraction sandbox and ingestion-admission inputs captured in this snapshot.
+   *
+   * <p>These are source values, not a second set of runtime defaults. The extraction owner applies
+   * its existing mode, command, pool and skip-policy normalizers exactly once when it constructs
+   * the runtime configuration.
+   */
+  public record Extraction(
+      String sandboxMode,
+      String sandboxCommand,
+      String sandboxHeap,
+      Integer sandboxPoolSize,
+      Integer sandboxMaxRequestsPerChild,
+      String ingestionSkipPatterns,
+      String ingestionSkipExtensions,
+      String ingestionSkipDirectoryNames) {}
+
+  /**
    * Index writer, commit, NRT, soft-delete, and vector configuration.
    *
    * @param writerRamBufferMb RAM buffer size for IndexWriter
@@ -700,6 +671,7 @@ public record ResolvedConfig(
    *     §C.6). Temporary absence — an unmounted drive, a sync client hiding a file — must not
    *     permanently break identity, and a confirmed replacement must not inherit the old
    *     document's feedback; the window is what separates the two.
+   * @param tracingLevel normalized index tracing level used when registering index spans
    */
   public record Index(
       Integer writerRamBufferMb,
@@ -736,7 +708,8 @@ public record ResolvedConfig(
       int nrtBackgroundReopenMs,
       int nrtOnDemandMaxStaleMs,
       int commitTimerIntervalMs,
-      long identityDeletionGraceMs) {
+      long identityDeletionGraceMs,
+      String tracingLevel) {
 
     /** Default deletion grace for document identity: 30 days in ms (tempdoc 931 §C.6). */
     public static final long DEFAULT_IDENTITY_DELETION_GRACE_MS = 2_592_000_000L;
@@ -794,18 +767,13 @@ public record ResolvedConfig(
     }
   }
 
-  /** Indexer worker gRPC client connection config (Head→Body). */
-  public record WorkerIndexer(
-      boolean enabled, String host, int port, long deadlineMs,
-      int queueSize, int maxInFlightBytes, String backpressureMode) {}
+  /** Advertised index service version. */
+  public record WorkerIndexer(String serviceVersion) {}
 
   /** Infrastructure health check thresholds from YAML {@code infra.health.*}. */
   public record InfraHealth(
       long pollIntervalMs, long nrtStaleMs, long translatorHandshakeStaleMs,
       int annCacheReadyPercent) {}
-
-  /** Infrastructure health gRPC server binding from YAML {@code infra.health.grpc.*}. */
-  public record InfraGrpc(String host, int port) {}
 
   /**
    * RAG (Retrieval-Augmented Generation) retrieval configuration.
@@ -934,7 +902,7 @@ public record ResolvedConfig(
    * Worker ingest limits.
    *
    * <p>{@code maxBatchSize} / {@code maxQueueDepth} were removed by tempdoc 799 §N.2: both were
-   * shadowed by {@code GrpcIngestService}'s hardcoded {@code MAX_BATCH_SIZE} / {@code
+   * shadowed by {@code WorkerIngestService}'s hardcoded {@code MAX_BATCH_SIZE} / {@code
    * MAX_QUEUE_DEPTH}, and gRPC batching is an internal transport concern rather than a user
    * preference. {@code maxContentLength} / {@code maxFileSize} are retained and wired — those are
    * genuine user-facing choices about which files to index.

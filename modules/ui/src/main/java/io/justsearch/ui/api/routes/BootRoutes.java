@@ -179,8 +179,9 @@ public final class BootRoutes {
         Map<String, Object> p = phases.get(i);
         if ("agent-tools-registration".equals(p.get("name"))) {
           Map<String, Object> synthesized = new LinkedHashMap<>(p);
-          synthesized.put("outcome", PhaseRecord.READY);
-          synthesized.put("reasonCode", "resolved");
+          boolean registered = Boolean.TRUE.equals(memoized.resolvedValue().orElse(false));
+          synthesized.put("outcome", registered ? PhaseRecord.READY : PhaseRecord.DEGRADED);
+          synthesized.put("reasonCode", registered ? "resolved" : "agent_tools.registration_failed");
           // §12.G: populate timing from the Memoized's captured resolution timestamps.
           memoized
               .startedAtMs()

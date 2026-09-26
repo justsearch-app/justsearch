@@ -4,16 +4,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.ipc.ScanRootProgress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
@@ -264,6 +270,122 @@ final class WorkerScanOpsTest {
             + waitCalls.get());
   }
 
+  @Test
+  void capturedWalkKeepsBatchesAndHashesMembersWithoutWaitingOnFullQueue() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("captured-full-queue"));
+    Path known = Files.writeString(root.resolve("known.txt"), "captured-source-bytes");
+    for (int i = 0; i < 2_000; i++) {
+      Files.writeString(root.resolve("member-" + i + ".txt"), "source-" + i);
+    }
+    RecordingQueue queue = new RecordingQueue();
+    AtomicInteger depthCalls = new AtomicInteger();
+    AtomicInteger waitCalls = new AtomicInteger();
+    WorkerScanOps ops = new WorkerScanOps(
+        queue,
+        new CloudPlaceholderRecorder(queue),
+        file -> false,
+        () -> {
+          depthCalls.incrementAndGet();
+          return WorkerScanOps.QUEUE_HIGH_WATERMARK + 1L;
+        },
+        () -> false,
+        millis -> {
+          waitCalls.incrementAndGet();
+          return false;
+        },
+        paths -> {},
+        () -> {});
+    List<ScanRootProgress> frames = new ArrayList<>();
+
+    ScanRootProgress terminal = ops.scan(capturedRequest(root, "captured-high-queue", 1), frames::add);
+
+    assertTrue(terminal.getComplete());
+    assertEquals("", terminal.getTerminalReasonCode());
+    assertEquals(2_001L, terminal.getFilesAdmitted());
+    assertEquals(0, depthCalls.get(), "captured entries cannot be drained before enumeration completes");
+    assertEquals(0, waitCalls.get(), "a full captured queue must not deadlock on consumer backpressure");
+    assertEquals(List.of(2_000, 1), queue.recordedBatchSizes);
+    assertEquals(2_001, queue.recordedEntries.size());
+    assertTrue(queue.recordedEntries.stream().allMatch(entry ->
+        entry.plannedSourceSha256() != null && entry.plannedSourceSha256().matches("[0-9a-f]{64}")));
+    assertEquals(sha256("captured-source-bytes"), queue.recordedEntries.stream()
+        .filter(entry -> entry.path().equals(known)).findFirst().orElseThrow().plannedSourceSha256());
+    assertEquals("captured-high-queue", queue.lastRecordedKey);
+    assertEquals(1L, queue.lastRecordedEpoch);
+  }
+
+  @Test
+  void capturedCloudPlaceholderRefusesBeforeAdmissionOrDeferredLedgerRecording() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("captured-cloud"));
+    Path placeholder = Files.writeString(root.resolve("only-in-cloud.txt"), "stub");
+    RecordingQueue queue = new RecordingQueue();
+    AtomicInteger recordCalls = new AtomicInteger();
+    CloudPlaceholderRecorder recorder = new CloudPlaceholderRecorder(queue) {
+      @Override
+      void record(Path file, String collection, JobQueue.EnqueueProvenance provenance) {
+        recordCalls.incrementAndGet();
+      }
+    };
+    WorkerScanOps ops = new WorkerScanOps(
+        queue, recorder, file -> file.equals(placeholder), () -> 0L, () -> false,
+        millis -> true, paths -> {}, () -> {});
+
+    assertThrows(java.io.IOException.class,
+        () -> ops.scan(capturedRequest(root, "captured-cloud", 1), ignored -> {}));
+
+    assertTrue(queue.recordedEntries.isEmpty(), "a placeholder cannot enter the captured manifest");
+    assertTrue(queue.recordedBatchSizes.isEmpty());
+    assertEquals(0, recordCalls.get(), "captured refusal must not convert the placeholder into a skip");
+  }
+
+  @Test
+  void capturedCancellationAfterFirstBatchStopsWithNonemptyTerminalReason() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("captured-cancel-after-batch"));
+    for (int i = 0; i < 2_500; i++) {
+      Files.writeString(root.resolve("member-" + i + ".txt"), "source-" + i);
+    }
+    RecordingQueue queue = new RecordingQueue();
+    AtomicBoolean cancelled = new AtomicBoolean();
+    AtomicInteger depthCalls = new AtomicInteger();
+    AtomicInteger waitCalls = new AtomicInteger();
+    queue.afterRecordedEnqueue = () -> cancelled.set(true);
+    WorkerScanOps ops = new WorkerScanOps(
+        queue, new CloudPlaceholderRecorder(queue), file -> false,
+        () -> {
+          depthCalls.incrementAndGet();
+          return WorkerScanOps.QUEUE_HIGH_WATERMARK + 1L;
+        }, cancelled::get, millis -> {
+          waitCalls.incrementAndGet();
+          return false;
+        }, paths -> {}, () -> {});
+    List<ScanRootProgress> frames = new ArrayList<>();
+
+    ScanRootProgress terminal = ops.scan(capturedRequest(root, "captured-cancel", 1), frames::add);
+
+    assertTrue(terminal.getComplete(), "the terminal frame closes the stream even for cancellation");
+    assertEquals("CLIENT_CANCELLED", terminal.getTerminalReasonCode());
+    assertEquals(2_000L, terminal.getFilesAdmitted());
+    assertEquals(List.of(2_000), queue.recordedBatchSizes);
+    assertEquals(0, depthCalls.get());
+    assertEquals(0, waitCalls.get());
+    assertEquals(terminal, frames.getLast());
+  }
+
+  private static WorkerScanOps.ScanRequest capturedRequest(Path root, String scanId, long epoch) {
+    return new WorkerScanOps.ScanRequest(root, "docs", WorkerScanOps.ScanMode.FORCE_REINDEX, List.of(),
+        scanId, new JobQueue.EnqueueProvenance("system", "test"), epoch, List.of(), false,
+        WorkerIngestService.RecordedScanMode.CAPTURED);
+  }
+
+  private static String sha256(String value) {
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+          .digest(value.getBytes(StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException impossible) {
+      throw new AssertionError(impossible);
+    }
+  }
+
   /**
    * B-H.3 defect C — cancellation returns terminal CLIENT_CANCELLED and stops walking before
    * the full tree is consumed. The {@code isCancelled} flag flips to true after the first batch
@@ -327,7 +449,7 @@ final class WorkerScanOpsTest {
     CloudPlaceholderRecorder stubRecorder =
         new CloudPlaceholderRecorder(queue) {
           @Override
-          void record(Path file) {
+          void record(Path file, String collection, JobQueue.EnqueueProvenance provenance) {
             recordCalls.incrementAndGet();
             recordedFiles.add(file);
           }
@@ -352,7 +474,7 @@ final class WorkerScanOpsTest {
   /**
    * Tempdoc 419 / T2 — every emitted {@link ScanRootProgress} carries the same {@code scan_id}
    * value supplied via the {@link WorkerScanOps.ScanRequest}. The gRPC entry point
-   * ({@code GrpcIngestService.scanRoot}) allocates a UUID per RPC; this test pins the
+   * ({@code WorkerIngestService.scanRoot}) allocates a UUID per RPC; this test pins the
    * propagation contract end-to-end at the WorkerScanOps level.
    */
   @Test
@@ -517,6 +639,21 @@ final class WorkerScanOpsTest {
     }
   }
 
+  @Test
+  void refusedAdmissionCannotProduceCleanCompletionOrAdmittedProgress() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("refused"));
+    for (int i = 0; i < 101; i++) Files.writeString(root.resolve(i + ".txt"), "data");
+    JobQueue refused = org.mockito.Mockito.mock(JobQueue.class);
+    List<ScanRootProgress> progress = new ArrayList<>();
+    var failure = assertThrows(WorkerServiceException.class, () -> new WorkerScanOps(refused).scan(
+        new WorkerScanOps.ScanRequest(root, null, WorkerScanOps.ScanMode.INITIAL, List.of()),
+        progress::add));
+    assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
+    assertTrue(progress.stream().noneMatch(ScanRootProgress::getComplete));
+    assertTrue(progress.stream().allMatch(frame -> frame.getFilesAdmitted() == 0));
+    assertFalse(progress.isEmpty(), "exercise the progress-before-flush branch too");
+  }
+
   private static String normalizedKey(Path p) {
     return io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
         p.toAbsolutePath().normalize().toString());
@@ -525,11 +662,19 @@ final class WorkerScanOpsTest {
   private static final class RecordingQueue implements JobQueue {
     final List<Path> enqueuedPaths = new ArrayList<>();
     final List<EnqueueEntry> enqueuedEntries = new ArrayList<>();
+    final List<EnqueueEntry> recordedEntries = new ArrayList<>();
+    final List<Integer> recordedBatchSizes = new ArrayList<>();
     String lastCollection;
     String lastScanId;
+    String lastRecordedKey;
+    long lastRecordedEpoch;
+    Runnable afterRecordedEnqueue = () -> {};
 
     @Override
     public void open() {}
+
+    @Override
+    public void returnUnfinishedClaims(java.util.Collection<IndexJob> claims) {}
 
     @Override
     public int enqueue(List<Path> paths, String collection) {
@@ -550,6 +695,17 @@ final class WorkerScanOpsTest {
       // the sized path so 813's size assertions keep seeing every entry.
       lastScanId = scanId;
       return enqueueEntries(entries, collection);
+    }
+
+    @Override
+    public int enqueueRecordedEntries(String operationKey, long epoch,
+        List<EnqueueEntry> entries, String collection) {
+      lastRecordedKey = operationKey;
+      lastRecordedEpoch = epoch;
+      recordedBatchSizes.add(entries.size());
+      recordedEntries.addAll(entries);
+      afterRecordedEnqueue.run();
+      return entries.size();
     }
 
     @Override

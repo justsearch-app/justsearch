@@ -22,15 +22,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Boot recovery CONVERGENCE against a real Head + a real Worker (tempdoc 825, top rung of the §D4
+ * Boot recovery CONVERGENCE against a real Engine with its index half (tempdoc 825, top rung of the §D4
  * ladder below the live dev-stack leg).
  *
  * <p>The pure decision test pins the law and the component test pins the arc; neither can prove the
  * half that matters most to the acceptance criterion — that a boot which exhausts the #439 retries
  * <em>comes back</em>, in the same process, without a restart. That needs a worker which fails a
  * bounded number of times and then succeeds, which is exactly what the countdown fault injector
- * ({@code justsearch.worker.boot.faultInjectAttempts}) provides: the first N PID validations throw
- * the confirmed 821 §O.4 signature, then the injector stops. The pre-825 knob
+ * ({@code justsearch.worker.boot.faultInjectAttempts}) provides: the first N index-composition attempts fail, then the injector stops. The pre-825 knob
  * ({@code pid_validation_timeout_ms}) fails EVERY attempt and so can only ever prove the pin.
  *
  * <p>N=3 consumes the ENTIRE boot-time retry budget
@@ -62,17 +61,19 @@ class WorkerBootRecoveryE2ETest {
   @Test
   @DisplayName("a boot that exhausts its retries recovers to a READY worker in the same process")
   void bootRecoveryConvergesWithoutAProcessRestart() throws Exception {
-    // start() is itself the primary assertion: awaitWorkerReady blocks on components.worker.state =
+    // start() is itself the primary assertion: awaitWorkerReady blocks on components.index.state =
     // READY inside the fixture's 90s worker gate, and (tempdoc 825) fails FAST if the Head narrates
     // worker.spawn_recovery_exhausted — the give-up this run must not reach.
     BACKEND.withSystemProperty("justsearch.worker.boot.faultInjectAttempts", INJECTED_BOOT_FAULTS);
     BACKEND.start();
 
     String health = get("/api/health");
-    assertTrue(
-        health.contains("\"worker\":{\"state\":\"LIFECYCLE_STATE_READY\"")
-            || health.contains("\"worker\":{\"state\":\"READY\""),
-        "the worker must be serving after recovery; body: " + health);
+    var healthBody = new tools.jackson.databind.ObjectMapper().readTree(health);
+    assertEquals(2, healthBody.path("schema_version").asInt(), "health must use schema 2");
+    assertEquals(
+        "READY",
+        healthBody.path("components").path("index").path("state").asText(),
+        "the index must be serving after recovery; body: " + health);
     assertFalse(
         health.contains("worker.spawn_recovery_exhausted"),
         "the recovery budget must not have been spent; body: " + health);
@@ -81,7 +82,7 @@ class WorkerBootRecoveryE2ETest {
     assertTrue(
         snapshot.contains("worker.restart-attempted"),
         "READY must be the recovery arm's doing, not a boot that quietly succeeded anyway — the"
-            + " injector fires on PID validation, so a missing occurrence means the injected"
+            + " injector fails attempts before index composition, so a missing occurrence means the injected"
             + " failures never happened and this run proves nothing. Snapshot: "
             + snapshot);
     assertTrue(
@@ -103,20 +104,33 @@ class WorkerBootRecoveryE2ETest {
 
     // Review F3: the READY transition fires INSIDE the recovery attempt, before the handover has
     // populated HeadAssembly's reference, so a currentKnowledgeServer()-only supplier published
-    // worker.state=ready with a null gRPC port — a manifest that says the worker is serving and
-    // cannot say where. Read from the manifest the way every real consumer does.
+    // worker.state=ready with nothing identifying what it was serving — a manifest that says the
+    // worker is ready and cannot say where. Read from the manifest the way every real consumer does.
+    //
+    // F3 asserted this through worker.grpcPort. Lane F item A11 left that field with no producer
+    // (the index half is composed in this JVM: no process, no port, no channel), so the assertion
+    // would now be pinning a fabricated number. The property is unchanged and still worth pinning
+    // — a READY worker projection must identify what it is serving — so it is asserted through the
+    // locator that survived the collapse: the index base path. The port was never the property.
     String manifest =
         Files.readString(
             BACKEND.dataDir().resolve("runtime").resolve("manifest.json"), StandardCharsets.UTF_8);
-    java.util.regex.Matcher grpcPort =
-        java.util.regex.Pattern.compile("\"grpcPort\"\\s*:\\s*(\\d+)").matcher(manifest);
+    java.util.regex.Matcher indexBasePath =
+        java.util.regex.Pattern.compile("\"indexBasePath\"\\s*:\\s*\"([^\"]+)\"")
+            .matcher(manifest);
     assertTrue(
-        grpcPort.find(),
-        "the runtime manifest must carry a real worker gRPC port after recovery. Manifest: "
+        indexBasePath.find(),
+        "the runtime manifest must identify the index the worker is serving after recovery."
+            + " Manifest: "
             + manifest);
-    assertTrue(
-        Integer.parseInt(grpcPort.group(1)) > 0,
-        "…and it must be a live port, not a placeholder. Manifest: " + manifest);
+    assertFalse(
+        indexBasePath.group(1).isBlank(),
+        "…and it must be a real path, not a placeholder. Manifest: " + manifest);
+    assertFalse(
+        manifest.contains("\"grpcPort\""),
+        "there is no worker port in the Engine; a manifest carrying one means something"
+            + " fabricated it. Manifest: "
+            + manifest);
   }
 
   private static int countOccurrences(String haystack, String needle) {

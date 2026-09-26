@@ -1,18 +1,29 @@
 package io.justsearch.agent.tools;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.agent.EngineContextTestFixtures;
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.OperationExecution;
+import io.justsearch.agent.api.registry.OperationPreparation;
+import io.justsearch.agent.api.registry.OperationPreparationRefused;
+import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
-import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
-import io.justsearch.app.api.knowledge.KnowledgeIngestResponse;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
+import io.justsearch.app.api.operations.RecordedIngestionService;
+import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.core.context.EngineContext;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
-import java.util.stream.Stream;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -20,438 +31,189 @@ class IngestToolTest {
 
   @TempDir Path tempDir;
 
-  /**
-   * Test factory — substitutes the production Worker-side {@link IngestTool.ScanRootCallback}
-   * with a local-walk fallback that mirrors the pre-Slice-D back-compat behaviour. Production
-   * code now requires the 3-arg {@link IngestTool} constructor; tests that don't exercise the
-   * scan path still need a callback that expands directories so the existing assertions hold.
-   */
-  private static IngestTool toolWithLocalScan(IngestTool.IngestCallback ingestCallback) {
-    return toolWithLocalScan(ingestCallback, List::of);
+  @Test
+  void prepareCapturesDirectoryAndNestedWatchedCollection() throws IOException {
+    Path root = Files.createDirectories(tempDir.resolve("docs"));
+    Path nested = Files.createDirectories(root.resolve("private"));
+    Files.writeString(nested.resolve("note.md"), "content");
+    IngestTool tool = tool(List.of(new RootBinding(root, "public"), new RootBinding(nested, "private")),
+        new RecordingIngestion(), ignored -> "generation-1", () -> List.of("*.tmp"));
+
+    OperationPreparation prepared = tool.prepare(arguments(root, null),
+        InvocationProvenance.agentLoop(java.time.Instant.EPOCH), EngineContextTestFixtures.AGENT_LOOP);
+    RecordedRootPlan plan = RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson());
+
+    assertEquals("generation-1", plan.generation());
+    assertEquals(2, plan.roots().size());
+    assertTrue(plan.roots().stream().noneMatch(RecordedRootPlan.Root::singleFile));
+    assertEquals(root.toAbsolutePath().normalize(), plan.roots().get(0).path());
+    assertEquals("public", plan.roots().get(0).collection());
+    assertEquals(nested.toAbsolutePath().normalize(), plan.roots().get(1).path());
+    assertEquals("private", plan.roots().get(1).collection());
+    assertTrue(plan.roots().stream().allMatch(r -> r.excludePatterns().equals(List.of("*.tmp"))));
   }
 
-  private static IngestTool toolWithLocalScan(
-      IngestTool.IngestCallback ingestCallback,
-      Supplier<List<BrowseTool.RootInfo>> rootsSupplier) {
-    return new IngestTool(ingestCallback, localScan(ingestCallback), rootsSupplier);
+  @Test
+  void explicitCollectionCollapsesNestedPolicy() throws IOException {
+    Path root = Files.createDirectories(tempDir.resolve("docs"));
+    Path nested = Files.createDirectories(root.resolve("private"));
+    Files.writeString(nested.resolve("note.md"), "content");
+    IngestTool tool = tool(List.of(new RootBinding(root, "public"), new RootBinding(nested, "private")),
+        new RecordingIngestion(), ignored -> "generation-1", List::of);
+
+    OperationPreparation prepared = tool.prepare(arguments(root, " research "), InvocationProvenance.agentLoop(java.time.Instant.EPOCH),
+        EngineContextTestFixtures.AGENT_LOOP);
+    RecordedRootPlan.Root planned = RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson())
+        .roots().get(0);
+
+    assertEquals("research", planned.collection());
+    assertTrue(planned.excludedSubtrees().isEmpty(), "same-policy nested root collapses into its parent");
+    assertEquals(1, RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson()).roots().size());
   }
 
-  /** Tempdoc 811 (C-2a): variant that also supplies the watched-root collection bindings. */
-  private static IngestTool toolWithLocalScan(
-      IngestTool.IngestCallback ingestCallback,
-      Supplier<List<BrowseTool.RootInfo>> rootsSupplier,
-      Supplier<List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier) {
-    return new IngestTool(
-        ingestCallback, localScan(ingestCallback), rootsSupplier, rootBindingsSupplier);
+  @Test
+  void relativeNameResolutionUsesExistingRootCandidate() throws IOException {
+    Path emptyDocsRoot = Files.createDirectories(tempDir.resolve("A").resolve("docs"));
+    Path realFile = tempDir.resolve("B").resolve("docs").resolve("x.md");
+    Files.createDirectories(realFile.getParent());
+    Files.writeString(realFile, "content");
+    IngestTool tool = tool(List.of(new RootBinding(emptyDocsRoot, null),
+        new RootBinding(tempDir.resolve("B"), null)), new RecordingIngestion(),
+        ignored -> "generation-1", List::of);
+
+    OperationPreparation prepared = tool.prepare("{\"paths\":[\"docs/x.md\"]}",
+        InvocationProvenance.agentLoop(java.time.Instant.EPOCH), EngineContextTestFixtures.AGENT_LOOP);
+    RecordedRootPlan plan = RecordedRootPlan.fromReplayPayload(prepared.replayPayloadJson());
+
+    assertEquals(realFile.toAbsolutePath().normalize(), plan.roots().get(0).path());
   }
 
-  /**
-   * Test-local ceiling on the stubbed directory walk, so a stray large temp directory can never
-   * turn one of these unit tests into an unbounded scan. Deliberately test-local: the production
-   * expansion cap it used to borrow from {@code IngestTool} was unreachable (MAX_PATHS = 100 caps
-   * the array long before it) and was deleted in tempdoc 877 §2.1.
-   */
-  private static final int STUB_SCAN_CAP = 10_000;
+  @Test
+  void invalidPathRefusesBeforeAnyPartialPreparationEffect() throws IOException {
+    Path valid = tempDir.resolve("valid.md");
+    Files.writeString(valid, "content");
+    RecordingIngestion ingestion = new RecordingIngestion();
+    IngestTool tool = tool(List.of(new RootBinding(tempDir, "docs")), ingestion,
+        ignored -> "generation-1", List::of);
 
-  private static IngestTool.ScanRootCallback localScan(IngestTool.IngestCallback ingest) {
-    return (rootPath, collection, excludeGlobs) -> {
-      List<Path> expanded = new ArrayList<>();
-      try (Stream<Path> stream = Files.walk(Path.of(rootPath))) {
-        stream
-            .filter(Files::isRegularFile)
-            .filter(Files::isReadable)
-            .forEach(
-                p -> {
-                  if (expanded.size() < STUB_SCAN_CAP) {
-                    expanded.add(p);
-                  }
-                });
-      } catch (IOException e) {
-        return new KnowledgeIngestResponse(0, "Local scan fallback failed: " + e.getMessage());
-      }
-      if (expanded.isEmpty()) {
-        return new KnowledgeIngestResponse(0, "");
-      }
-      return ingest.ingest(expanded, collection);
+    OperationPreparationRefused refused = assertThrows(OperationPreparationRefused.class,
+        () -> tool.prepare(toJson(Map.of("paths", List.of(valid.toString(), "missing.md"))),
+            InvocationProvenance.agentLoop(java.time.Instant.EPOCH), EngineContextTestFixtures.AGENT_LOOP));
+
+    assertEquals("BAD_REQUEST", refused.refusal().errorCode().orElseThrow());
+    assertTrue(refused.refusal().message().contains("missing.md"), "must reject the unresolved path, not malformed JSON");
+    assertEquals(0, ingestion.calls);
+  }
+
+  @Test
+  void rootSupplierFailureRefusesPreparation() {
+    IngestTool tool = new IngestTool(RecordedIngestionService.unavailable(),
+        ignored -> { throw new IllegalStateException("roots unavailable"); }, ignored -> "generation-1",
+        List::of);
+
+    assertThrows(IllegalStateException.class,
+        () -> tool.prepare("{\"paths\":[\"/tmp/note.md\"]}", InvocationProvenance.agentLoop(java.time.Instant.EPOCH),
+            EngineContextTestFixtures.AGENT_LOOP));
+  }
+
+  @Test
+  void replayUsesFrozenPlanAfterInputAndSuppliersChange() throws IOException {
+    Path file = tempDir.resolve("note.md");
+    Files.writeString(file, "content");
+    AtomicInteger rootReads = new AtomicInteger();
+    AtomicInteger generationReads = new AtomicInteger();
+    AtomicInteger exclusionReads = new AtomicInteger();
+    RecordingIngestion ingestion = new RecordingIngestion();
+    IngestTool tool = new IngestTool(ingestion,
+        ignored -> { rootReads.incrementAndGet(); return List.of(new RootBinding(tempDir, "docs")); },
+        ignored -> { generationReads.incrementAndGet(); return "generation-1"; },
+        () -> { exclusionReads.incrementAndGet(); return List.of("*.tmp"); });
+
+    OperationPreparation prepared = tool.prepare(arguments(file, null),
+        InvocationProvenance.agentLoop(java.time.Instant.EPOCH), EngineContextTestFixtures.AGENT_LOOP);
+    Files.delete(file);
+    OperationRecordHandle record = new OperationRecordHandle() {
+      @Override public long id() { return 7; }
+      @Override public String key() { return "ingest-key"; }
+      @Override public void checkpoint(String cursor, long completed, long failed) {}
     };
+    OperationExecution execution = tool.executePrepared(prepared, InvocationProvenance.agentLoop(java.time.Instant.EPOCH),
+        EngineContextTestFixtures.AGENT_LOOP, record);
+
+    assertSame(ingestion.execution, execution);
+    assertSame(record, ingestion.record);
+    assertSame(EngineContextTestFixtures.AGENT_LOOP, ingestion.context);
+    assertEquals(1, ingestion.calls);
+    assertEquals(1, rootReads.get());
+    assertEquals(1, generationReads.get());
+    assertEquals(1, exclusionReads.get());
+    assertFalse(ingestion.completion.isDone());
   }
 
   @Test
-  void executeWithValidPaths() throws IOException {
-    Path file = tempDir.resolve("test.txt");
+  void directExecutionAndMissingAcceptedRecordHaveNoEffect() throws IOException {
+    Path file = tempDir.resolve("note.md");
     Files.writeString(file, "content");
+    RecordingIngestion ingestion = new RecordingIngestion();
+    IngestTool tool = tool(List.of(new RootBinding(tempDir, "docs")), ingestion,
+        ignored -> "generation-1", List::of);
+    OperationPreparation prepared = tool.prepare(arguments(file, null),
+        InvocationProvenance.agentLoop(java.time.Instant.EPOCH), EngineContextTestFixtures.AGENT_LOOP);
 
-    var capturedFiles = new AtomicReference<List<Path>>();
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> {
-              capturedFiles.set(files);
-              return new KnowledgeIngestResponse(files.size(), "");
-            });
-
-    String json =
-        "{\"paths\": [\"%s\"]}"
-            .formatted(file.toString().replace("\\", "\\\\"));
-
-    OperationResult result = tool.execute(json);
-    assertTrue(result.success(), result.message());
-    assertNotNull(capturedFiles.get());
-    assertEquals(1, capturedFiles.get().size());
-    assertTrue(result.message().contains("1 files"));
+    assertThrows(IllegalStateException.class,
+        () -> tool.execute(prepared.argumentsJson(), EngineContextTestFixtures.AGENT_LOOP));
+    assertThrows(NullPointerException.class,
+        () -> tool.executePrepared(prepared, InvocationProvenance.agentLoop(java.time.Instant.EPOCH),
+            EngineContextTestFixtures.AGENT_LOOP, null));
+    assertEquals(0, ingestion.calls);
   }
 
   @Test
-  void executeWithEmptyPaths() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
-    OperationResult result = tool.execute("{\"paths\": []}");
-    assertFalse(result.success());
-    assertTrue(result.message().contains("required"));
+  void validationChecksPublicArgumentsAgainstFrozenPayload() throws IOException {
+    Path file = tempDir.resolve("note.md");
+    Files.writeString(file, "content");
+    IngestTool tool = tool(List.of(new RootBinding(tempDir, "docs")), new RecordingIngestion(),
+        ignored -> "generation-1", List::of);
+    OperationPreparation prepared = tool.prepare(arguments(file, "docs"), InvocationProvenance.agentLoop(java.time.Instant.EPOCH),
+        EngineContextTestFixtures.AGENT_LOOP);
+    OperationPreparation tampered = new OperationPreparation(
+        arguments(file, "other"),
+        prepared.replaySchema(), prepared.replayPayloadJson());
+
+    assertThrows(IllegalArgumentException.class, () -> tool.validatePreparation(tampered));
   }
 
-  @Test
-  void executeWithMissingPathsField() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
-    OperationResult result = tool.execute("{}");
-    assertFalse(result.success());
-    assertTrue(result.message().contains("required"));
+  private static String arguments(Path path, String collection) {
+    return toJson(collection == null ? Map.of("paths", List.of(path.toString()))
+        : Map.of("paths", List.of(path.toString()), "collection", collection));
   }
 
-  @Test
-  void executeWithDirectoryExpansion() throws IOException {
-    Path dir = tempDir.resolve("subdir");
-    Files.createDirectories(dir);
-    Files.writeString(dir.resolve("a.txt"), "aaa");
-    Files.writeString(dir.resolve("b.txt"), "bbb");
-    Files.createDirectories(dir.resolve("nested"));
-    Files.writeString(dir.resolve("nested").resolve("c.txt"), "ccc");
-
-    var capturedFiles = new AtomicReference<List<Path>>();
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> {
-              capturedFiles.set(files);
-              return new KnowledgeIngestResponse(files.size(), "");
-            });
-
-    String json =
-        "{\"paths\": [\"%s\"]}"
-            .formatted(dir.toString().replace("\\", "\\\\"));
-
-    OperationResult result = tool.execute(json);
-    assertTrue(result.success(), result.message());
-    assertEquals(3, capturedFiles.get().size(), "Should expand dir to 3 files");
-    assertTrue(result.message().contains("3 files"));
+  private static String toJson(Map<String, ?> value) {
+    return tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(value);
   }
 
-  @Test
-  void executeWithNonexistentPaths() throws IOException {
-    Path existing = tempDir.resolve("exists.txt");
-    Files.writeString(existing, "data");
-    Path missing = tempDir.resolve("missing.txt");
-
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> new KnowledgeIngestResponse(files.size(), ""));
-
-    String json =
-        "{\"paths\": [\"%s\", \"%s\"]}"
-            .formatted(
-                existing.toString().replace("\\", "\\\\"),
-                missing.toString().replace("\\", "\\\\"));
-
-    OperationResult result = tool.execute(json);
-    assertTrue(result.success(), result.message());
-    assertTrue(result.message().contains("1 files"), "Should ingest only existing file: " + result.message());
-    assertTrue(result.message().contains("skipped"), "Should mention skipped: " + result.message());
+  private static IngestTool tool(List<RootBinding> bindings, RecordingIngestion ingestion,
+      java.util.function.Function<EngineContext, String> generation,
+      java.util.function.Supplier<List<String>> exclusions) {
+    return new IngestTool(ingestion, ignored -> bindings, generation, exclusions);
   }
 
-  @Test
-  void executeAllPathsMissing() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
+  private static final class RecordingIngestion implements RecordedIngestionService {
+    private int calls;
+    private OperationRecordHandle record;
+    private EngineContext context;
+    private final CompletableFuture<OperationResult> completion = new CompletableFuture<>();
+    private final OperationExecution execution = new OperationExecution(OperationResult.success("started"), completion);
 
-    String json = "{\"paths\": [\"/no/such/file.txt\"]}";
-    OperationResult result = tool.execute(json);
-    assertFalse(result.success());
-    assertTrue(result.message().contains("No readable files"));
-  }
-
-  @Test
-  void executeWithIngestError() throws IOException {
-    Path file = tempDir.resolve("error-test.txt");
-    Files.writeString(file, "data");
-
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> new KnowledgeIngestResponse(0, "Worker connection lost"));
-
-    String json =
-        "{\"paths\": [\"%s\"]}"
-            .formatted(file.toString().replace("\\", "\\\\"));
-
-    OperationResult result = tool.execute(json);
-    assertTrue(result.success(), "Should succeed even with error (accepted=0 is valid response)");
-    assertTrue(result.message().contains("Worker connection lost"), result.message());
-  }
-
-  @Test
-  void executeInvalidJson() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
-    OperationResult result = tool.execute("not json");
-    assertFalse(result.success());
-    assertTrue(result.message().contains("error"));
-  }
-
-  @Test
-  void executeBatchLimitExceeded() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
-
-    var sb = new StringBuilder("{\"paths\": [");
-    for (int i = 0; i <= IngestTool.MAX_PATHS; i++) {
-      if (i > 0) sb.append(",");
-      sb.append("\"file-").append(i).append(".txt\"");
+    @Override
+    public OperationExecution execute(OperationRecordHandle record, EngineContext context) {
+      calls++;
+      this.record = record;
+      this.context = context;
+      return execution;
     }
-    sb.append("]}");
 
-    OperationResult result = tool.execute(sb.toString());
-    assertFalse(result.success());
-    assertTrue(result.message().contains("exceeds limit"), result.message());
-    assertTrue(result.message().contains(String.valueOf(IngestTool.MAX_PATHS)));
+    @Override
+    public void maintain() {}
   }
-
-  @Test
-  void executeNoArgs() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
-    OperationResult result = tool.execute("");
-    assertFalse(result.success());
-  }
-
-  @Test
-  void relativePathResolvedAgainstRoot() throws IOException {
-    // Create a file under tempDir that simulates an indexed root
-    Path docsDir = tempDir.resolve("docs");
-    Files.createDirectories(docsDir);
-    Files.writeString(docsDir.resolve("readme.md"), "content");
-
-    var capturedFiles = new AtomicReference<List<Path>>();
-    var roots = List.of(new BrowseTool.RootInfo(tempDir.toString(), "root"));
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> {
-              capturedFiles.set(files);
-              return new KnowledgeIngestResponse(files.size(), "");
-            },
-            () -> roots);
-
-    // Pass a relative path — should resolve against the root
-    String json = "{\"paths\": [\"docs/readme.md\"]}";
-    OperationResult result = tool.execute(json);
-    assertTrue(result.success(), result.message());
-    assertEquals(1, capturedFiles.get().size());
-    assertEquals(
-        docsDir.resolve("readme.md").normalize(),
-        capturedFiles.get().get(0).normalize());
-  }
-
-  @Test
-  void relativePathWithRootNamePrefixStripped() throws IOException {
-    // Simulates: indexed root = ".../docs", user passes "docs/explanation/file.md"
-    // The leading "docs/" component matches the root folder name → should be stripped.
-    Path docsRoot = tempDir.resolve("docs");
-    Path explanationDir = docsRoot.resolve("explanation");
-    Files.createDirectories(explanationDir);
-    Files.writeString(explanationDir.resolve("file.md"), "content");
-
-    var capturedFiles = new AtomicReference<List<Path>>();
-    var roots = List.of(new BrowseTool.RootInfo(docsRoot.toString(), "docs"));
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> {
-              capturedFiles.set(files);
-              return new KnowledgeIngestResponse(files.size(), "");
-            },
-            () -> roots);
-
-    // Path includes the root folder name as a prefix — IngestTool should strip it
-    String json = "{\"paths\": [\"docs/explanation/file.md\"]}";
-    OperationResult result = tool.execute(json);
-    assertTrue(result.success(), result.message());
-    assertEquals(1, capturedFiles.get().size());
-    assertEquals(
-        explanationDir.resolve("file.md").normalize(),
-        capturedFiles.get().get(0).normalize());
-  }
-
-  @Test
-  void relativePathNoMatchingRoot() {
-    var roots = List.of(new BrowseTool.RootInfo(tempDir.toString(), "root"));
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> new KnowledgeIngestResponse(0, ""),
-            () -> roots);
-
-    // Relative path that doesn't exist under any root
-    String json = "{\"paths\": [\"nonexistent/file.txt\"]}";
-    OperationResult result = tool.execute(json);
-    assertFalse(result.success());
-    assertTrue(result.message().contains("No readable files"));
-  }
-
-  // ===================================================================================
-  // Tempdoc 811 (C-2a) — collection tagging. Pre-811 EVERY ingest through this tool wrote
-  // collection=null: unlabeled, absent from Library>Folders, passing every collection clause,
-  // and unreachable by any prune path.
-  // ===================================================================================
-
-  @Test
-  void outOfRootIngestIsTaggedMcpIngest() throws IOException {
-    Path file = tempDir.resolve("loose.txt");
-    Files.writeString(file, "content");
-
-    var capturedCollection = new AtomicReference<String>("<never called>");
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> {
-              capturedCollection.set(collection);
-              return new KnowledgeIngestResponse(files.size(), "");
-            },
-            List::of,
-            List::of); // no watched roots → every path is out-of-root
-
-    OperationResult result =
-        tool.execute("{\"paths\": [\"%s\"]}".formatted(file.toString().replace("\\", "\\\\")));
-    assertTrue(result.success(), result.message());
-    assertEquals(
-        IngestCollectionPolicy.OUT_OF_ROOT,
-        capturedCollection.get(),
-        "an out-of-root ingest must carry a real collection, not the pre-811 null");
-  }
-
-  @Test
-  void inRootIngestInheritsTheRootCollection() throws IOException {
-    Path rootDir = tempDir.resolve("watched");
-    Files.createDirectories(rootDir);
-    Path file = rootDir.resolve("note.txt");
-    Files.writeString(file, "content");
-
-    var capturedCollection = new AtomicReference<String>("<never called>");
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> {
-              capturedCollection.set(collection);
-              return new KnowledgeIngestResponse(files.size(), "");
-            },
-            List::of,
-            () -> List.of(new IngestCollectionPolicy.RootBinding(rootDir, "work-notes")));
-
-    OperationResult result =
-        tool.execute("{\"paths\": [\"%s\"]}".formatted(file.toString().replace("\\", "\\\\")));
-    assertTrue(result.success(), result.message());
-    assertEquals(
-        "work-notes",
-        capturedCollection.get(),
-        "a path under a watched root must inherit that root's collection, not fork a second label");
-  }
-
-  @Test
-  void explicitCollectionIsThreadedThrough() throws IOException {
-    Path file = tempDir.resolve("explicit.txt");
-    Files.writeString(file, "content");
-
-    var capturedCollection = new AtomicReference<String>("<never called>");
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> {
-              capturedCollection.set(collection);
-              return new KnowledgeIngestResponse(files.size(), "");
-            },
-            List::of,
-            () -> List.of(new IngestCollectionPolicy.RootBinding(tempDir, "root-collection")));
-
-    OperationResult result =
-        tool.execute(
-            "{\"paths\": [\"%s\"], \"collection\": \"  research  \"}"
-                .formatted(file.toString().replace("\\", "\\\\")));
-    assertTrue(result.success(), result.message());
-    assertEquals(
-        "research",
-        capturedCollection.get(),
-        "an explicit collection wins over root inheritance and is trimmed");
-  }
-
-  @Test
-  void reservedCollectionIsRejectedServerSide() throws IOException {
-    Path file = tempDir.resolve("impersonator.txt");
-    Files.writeString(file, "content");
-
-    var called = new AtomicReference<Boolean>(false);
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> {
-              called.set(true);
-              return new KnowledgeIngestResponse(files.size(), "");
-            });
-
-    for (String reserved : List.of("agent-history", "justsearch-help", "AGENT-HISTORY")) {
-      OperationResult result =
-          tool.execute(
-              "{\"paths\": [\"%s\"], \"collection\": \"%s\"}"
-                  .formatted(file.toString().replace("\\", "\\\\"), reserved));
-      assertFalse(result.success(), "reserved collection " + reserved + " must be rejected");
-      assertTrue(result.message().contains("reserved"), result.message());
-    }
-    assertFalse(called.get(), "a rejected ingest must not reach the worker");
-  }
-
-  @Test
-  void blankExplicitCollectionIsRejected() throws IOException {
-    Path file = tempDir.resolve("blank.txt");
-    Files.writeString(file, "content");
-
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(1, ""));
-    OperationResult result =
-        tool.execute(
-            "{\"paths\": [\"%s\"], \"collection\": \"   \"}"
-                .formatted(file.toString().replace("\\", "\\\\")));
-    assertFalse(result.success());
-    assertTrue(result.message().contains("non-empty"), result.message());
-  }
-
-  @Test
-  void mixedInRootAndOutOfRootFilesAreGroupedByCollection() throws IOException {
-    Path rootDir = tempDir.resolve("watched2");
-    Files.createDirectories(rootDir);
-    Path inRoot = rootDir.resolve("in.txt");
-    Files.writeString(inRoot, "a");
-    Path outside = tempDir.resolve("out.txt");
-    Files.writeString(outside, "b");
-
-    var byCollection = new java.util.LinkedHashMap<String, List<Path>>();
-    var tool =
-        toolWithLocalScan(
-            (files, collection) -> {
-              byCollection.put(String.valueOf(collection), List.copyOf(files));
-              return new KnowledgeIngestResponse(files.size(), "");
-            },
-            List::of,
-            () -> List.of(new IngestCollectionPolicy.RootBinding(rootDir, "watched-coll")));
-
-    OperationResult result =
-        tool.execute(
-            "{\"paths\": [\"%s\", \"%s\"]}"
-                .formatted(
-                    inRoot.toString().replace("\\", "\\\\"),
-                    outside.toString().replace("\\", "\\\\")));
-    assertTrue(result.success(), result.message());
-    assertEquals(
-        java.util.Set.of("watched-coll", IngestCollectionPolicy.OUT_OF_ROOT),
-        byCollection.keySet(),
-        "one call must not force a single label onto paths with different containment");
-    assertEquals(List.of(inRoot), byCollection.get("watched-coll"));
-    assertEquals(List.of(outside), byCollection.get(IngestCollectionPolicy.OUT_OF_ROOT));
-  }
-
-  // Tempdoc 877 §2.1: the "schema advertises the optional collection tag" assertion moved to
-  // AgentToolCatalogContractTest#ingestFilesAdvertisesTheOptionalCollectionTag (app-services) —
-  // the catalog Interface is the only schema the model is shown, so that is the schema that has to
-  // advertise `collection`.
 }

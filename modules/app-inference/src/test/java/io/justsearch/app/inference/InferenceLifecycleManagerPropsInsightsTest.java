@@ -6,14 +6,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class InferenceLifecycleManagerPropsInsightsTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private ConfigStore previousStore;
+
+  @BeforeEach
+  void installResolvedConfig() {
+    previousStore = ConfigStore.globalOrNull();
+    TestResolvedConfigHelper.storeFromEnvironment();
+  }
+
+  @AfterEach
+  void restoreResolvedConfig() {
+    TestResolvedConfigHelper.restoreGlobal(previousStore);
+  }
 
   @Test
   void updateFromPropsBestEffort_populatesExternalDiagnosticsForMismatchedModel() throws Exception {
@@ -74,6 +90,7 @@ class InferenceLifecycleManagerPropsInsightsTest {
       assertEquals("b8571", manager.expectedLlamaServerBuild());
       assertEquals(null, manager.actualLlamaServerBuild(), "no /props observed yet");
 
+      setUsingExternalServer(manager, true);
       invokeUpdateFromPropsBestEffort(
           manager, MAPPER.readTree("{\"build_info\":\"b8600-0abc123\",\"n_ctx\":4096}"));
       assertEquals("b8600", manager.actualLlamaServerBuild());
@@ -91,6 +108,7 @@ class InferenceLifecycleManagerPropsInsightsTest {
         newManager(Path.of("bin", "llama-server.exe"), Path.of("models", "m.gguf"), 4096);
     try {
       assertEquals(null, manager.expectedLlamaServerBuild());
+      setUsingExternalServer(manager, true);
       invokeUpdateFromPropsBestEffort(
           manager, MAPPER.readTree("{\"build_info\":\"b8571-0abc123\",\"n_ctx\":4096}"));
       assertEquals("b8571", manager.actualLlamaServerBuild());
@@ -115,11 +133,30 @@ class InferenceLifecycleManagerPropsInsightsTest {
             contextSize,
             0,
             false);
-    return new InferenceLifecycleManager(config);
+    return new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
   }
 
-  private static void setUsingExternalServer(InferenceLifecycleManager manager, boolean value) {
-    manager.setUsingExternalServerForTest(value);
+  private static void setUsingExternalServer(InferenceLifecycleManager manager, boolean value)
+      throws Exception {
+    java.lang.reflect.Field field =
+        InferenceLifecycleManager.class.getDeclaredField("serverOps");
+    field.setAccessible(true);
+    LlamaServerOps serverOps = (LlamaServerOps) field.get(manager);
+    if (value) {
+      LlamaServerOps.StartResult owner =
+          new LlamaServerOps.StartResult(
+              new LlamaServerConfigContext(manager.currentConfig(), ConfigStore.global().get()),
+              LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL,
+              LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL,
+              null);
+      java.lang.reflect.Method install =
+          LlamaServerOps.class.getDeclaredMethod(
+              "installActive", LlamaServerOps.StartResult.class, Process.class,
+              ProcessHandle.class);
+      install.setAccessible(true);
+      install.invoke(serverOps, owner, null, null);
+    }
+    serverOps.setUsingExternal(value);
   }
 
   private static void invokeUpdateFromPropsBestEffort(

@@ -1,0 +1,156 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.app.api.settings;
+
+import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.operations.OperationAttemptRunner;
+import io.justsearch.app.api.operations.OperationRecord;
+import io.justsearch.app.api.operations.OperationStore;
+import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
+import java.io.IOException;
+import java.util.Optional;
+import io.justsearch.agent.api.registry.OperationResult;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Fixed settings collaborator of the attempt runner; never a producer's terminal writer. */
+public interface SettingsCommitOwner {
+  enum RecoveryReason { UNREADABLE_WITNESS, CONTRADICTORY_WITNESS, INVALID_PREPARATION, COMPOSITION_FAILED, MULTIPLE_ARMED_ROWS, PERSISTENCE_DISABLED }
+
+  /** Bounded Health projection of the first unresolved recovery; settings bytes stay in the store. */
+  record RecoveryIssue(RecoveryReason reason, Long operationRecordId) {}
+
+  /** Sticky first recovery issue, published outside the apply mutex; no restart loop at boot. */
+  java.util.concurrent.CompletionStage<RecoveryIssue> recoveryIssue();
+
+  /** Opaque identity issued by this owner after durable revision validation, before SQL arming. */
+  interface Reservation { long expectedRevision(); }
+
+  /** Prebuilt before replacement and published to the runner at the exact commitment boundary. */
+  record Receipt(String operationKey, long acceptedRevision, OperationResult response) {
+    public Receipt {
+      io.justsearch.app.api.operations.OperationKeys.timestampMillis(operationKey);
+      if (acceptedRevision <= 0) throw new IllegalArgumentException("Committed revision must be positive");
+      Objects.requireNonNull(response, "response");
+      if (!response.success()) throw new IllegalArgumentException("Committed settings require a successful result");
+      Map<String, Object> data = new java.util.LinkedHashMap<>(response.structuredData());
+      if ((data.containsKey("operationKey") && !operationKey.equals(data.get("operationKey")))
+          || (data.containsKey("acceptedRevision") && !Long.valueOf(acceptedRevision).equals(data.get("acceptedRevision")))) {
+        throw new IllegalArgumentException("Settings result contradicts its commitment witness");
+      }
+      data.put("witness", new SettingsWitness(acceptedRevision, operationKey));
+      data.put("operationKey", operationKey);
+      data.put("acceptedRevision", acceptedRevision);
+      response = new OperationResult(true, response.message(), response.executionId(), data,
+          response.errorCode(), response.errorDetails(), response.retryable());
+    }
+
+    public Receipt(String operationKey, long acceptedRevision) {
+      this(operationKey, acceptedRevision, OperationResult.success("Settings committed"));
+    }
+  }
+
+  /** Typed precommit refusal. Only its bounded code/execution id is persisted in the row. */
+  final class Refused extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+    private final OperationResult response;
+
+    public Refused(OperationResult response) {
+      super(Objects.requireNonNull(response, "response").message());
+      if (response.success() || !OperationResult.isDurableOutcomeCode(response.errorCode().orElse(null))) {
+        throw new IllegalArgumentException("Settings refusal requires a bounded failure code");
+      }
+      this.response = response;
+    }
+
+    public OperationResult response() { return response; }
+  }
+
+  /** Issued only by the runner to its fixed owner; never exposed to a handler. */
+  interface AttemptControl {
+    /** Arbitrate precommit cancellation and validate the exact prepared receipt before replacement. */
+    boolean admitCommit(Receipt receipt);
+    void committed(Receipt receipt);
+    void uncertain();
+  }
+
+  /** Compare both persisted witness fields before the runner may arm its numeric SQL marker. */
+  Reservation reserve(long id, String key, SettingsWitness expected);
+
+  /** Decode the actual accepted fixed reset invocation before reserving its witnessed base. */
+  Reservation reserveReset(OperationRecord row, OperationStore.Preparation accepted);
+
+  /** Compare transient physical intent with this row's accepted private preparation. */
+  void verifyCandidatePreparation(OperationRecord row,
+      Optional<OperationStore.Preparation> accepted, SettingsCandidateContext context);
+
+  /** Validate the exact accepted installer plan before its runner may arm a settings marker. */
+  default void verifyInstallerGenerationPreparation(OperationRecord row,
+      Optional<OperationStore.Preparation> accepted, RecordedInstallerGenerationPlan plan) {
+    throw new UnsupportedOperationException("Installer generation settings are unavailable");
+  }
+
+  /**
+   * A non-terminal file/config projection owned by the recorded generation operation. The
+   * generation pointer is its commitment witness; this collaborator never completes the row.
+   */
+  interface PreparedGenerationProjection {
+    /** Establish prepared component owner locks before the runtime/state/publication lock order. */
+    default void withOwnerLocks(Runnable publication) { publication.run(); }
+
+    /** Final witness, shutdown and cancellation arbitration while publication excludes captures. */
+    void admitBeforePointer();
+
+    /** Roll the accepted settings and prepared config forward after the pointer is committed. */
+    void afterPointerCommitted() throws IOException;
+
+    /** Deliver observations and retire superseded components after runtime publication unlocks. */
+    default void afterRuntimePublished() {}
+
+    /** Dispose only while the exact generation pointer is proven unchanged. */
+    void abortBeforePointer();
+  }
+
+  /** Build all fallible settings work privately from an already reserved installer candidate. */
+  default PreparedGenerationProjection prepareInstallerGenerationProjection(Reservation reservation,
+      UiSettings candidate, AttemptControl control) {
+    throw new UnsupportedOperationException("Installer generation settings are unavailable");
+  }
+
+  /** Read-only terminal guard for the generation owner after B is serving. */
+  default boolean installerGenerationProjected(RecordedInstallerGenerationPlan plan) {
+    return false;
+  }
+
+  /** Build the fixed reset candidate only after reservation and durable SQL arming. */
+  void applyReset(Reservation reservation, AttemptControl control);
+
+  /** Prepare, replace and publish synchronously; arbitrary notifications run outside owner locks. */
+  void apply(Reservation reservation, UiSettings candidate, AttemptControl control);
+
+  /** The runner's internal transient intent follows the same witness and commit control. */
+  void apply(Reservation reservation, UiSettings candidate, AttemptControl control,
+      SettingsCandidateContext candidateContext);
+
+  /** Finish a committed internal candidate after fixed owners are composed; false fences serving. */
+  boolean recoverCommittedComposition();
+
+  /** Called after durable terminal persistence, before the runner publishes completion futures. */
+  void releaseAfterTerminal(long id);
+
+  /** Retain any matching fence and request the composition root's ordered restart outside locks. */
+  void retainForRestart(long id, Throwable failure);
+
+  /** Private boot input; the runner reads accepted preparation before calling the owner outside SQL locks. */
+  record RecoveryInput(OperationRecord row, Optional<OperationStore.Preparation> preparation) {
+    public RecoveryInput {
+      Objects.requireNonNull(row, "row");
+      Objects.requireNonNull(preparation, "preparation");
+    }
+  }
+
+  /** Inspect the complete open settings set before any per-row reconciliation or producer starts. */
+  void inspectRecovery(List<RecoveryInput> rows);
+
+  OperationAttemptRunner.Reconciliation reconcile(OperationRecord row);
+}

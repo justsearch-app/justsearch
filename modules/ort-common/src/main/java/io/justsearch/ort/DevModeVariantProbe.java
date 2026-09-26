@@ -5,6 +5,7 @@ import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.model.VariantSelection;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Locale;
 import org.slf4j.Logger;
@@ -101,6 +102,43 @@ public final class DevModeVariantProbe {
       return VariantSelection.optimal(cpuModelFile, precision, ExecutionProvider.CPU);
     }
     return null;
+  }
+
+  /**
+   * Selects one already-bound generation file without falling back to a sibling CPU/GPU variant.
+   * The caller verifies the file's recorded content identity before using this projection.
+   */
+  public static VariantSelection probeExact(Path modelFile, boolean gpuEnabled) {
+    if (modelFile == null || !Files.isRegularFile(modelFile, LinkOption.NOFOLLOW_LINKS)) {
+      return null;
+    }
+    Path modelDir = modelFile.getParent();
+    if (modelDir == null) return null;
+    ModelManifest manifest = ModelManifest.loadOrDefault(modelDir);
+    Path cpuFile = manifest.resolveModelPath(modelDir, false).normalize();
+    Path gpuFile = manifest.resolveModelPath(modelDir, true).normalize();
+      boolean dedicatedGpuFile = manifest.gpu() != null && !manifest.gpu().isBlank()
+          && !gpuFile.equals(cpuFile);
+      boolean selectedGpuFile = dedicatedGpuFile && modelFile.normalize().equals(gpuFile);
+      boolean selectedCpuFile = modelFile.normalize().equals(cpuFile);
+      if (!selectedGpuFile && !selectedCpuFile) {
+        log.warn("Exact generation model {} is not declared by its model manifest", modelFile);
+        return null;
+      }
+      String declaredPrecision = selectedGpuFile
+        ? manifest.capabilities().gpuPrecision() : manifest.capabilities().cpuPrecision();
+    ModelPrecision precision = declaredOrGuessedPrecision(
+        declaredPrecision, modelFile.getFileName().toString());
+    if (!gpuEnabled && precision == ModelPrecision.FP16) {
+      log.warn("Exact generation model {} requires FP16 but CUDA is unavailable", modelFile);
+      return null;
+    }
+    if (gpuEnabled && !selectedGpuFile) {
+      return VariantSelection.degraded(modelFile, precision, ExecutionProvider.CUDA,
+          "Generation-bound CPU variant selected on CUDA");
+    }
+    return VariantSelection.optimal(modelFile, precision,
+        gpuEnabled ? ExecutionProvider.CUDA : ExecutionProvider.CPU);
   }
 
   /**

@@ -22,6 +22,7 @@ import io.justsearch.agent.api.registry.Provenance;
 import io.justsearch.agent.api.registry.ResourceRef;
 import io.justsearch.agent.api.registry.RetryPolicy;
 import io.justsearch.agent.api.registry.RiskTier;
+import io.justsearch.core.context.EngineContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -336,11 +337,11 @@ public final class AgentToolsOperationCatalog implements OperationCatalog {
         INGEST_FILES,
         Presentation.forId(INGEST_FILES),
         Interface.of(
-            // Tempdoc 811 (C-2a): `collection` is an OPTIONAL tag. Omitted → the containing indexed
+            // Tempdoc 811 (C-2a): `collection` is an OPTIONAL tag. Omitted/null → the containing indexed
             // root's collection, or `mcp-ingest` for out-of-root paths. Reserved app-internal names
             // are rejected server-side in IngestTool, not by this schema.
             "{\"type\":\"object\",\"properties\":{\"paths\":{\"type\":\"array\","
-                + "\"items\":{\"type\":\"string\"}},\"collection\":{\"type\":\"string\"}},"
+                + "\"items\":{\"type\":\"string\"}},\"collection\":{\"type\":[\"string\",\"null\"]}},"
                 + "\"required\":[\"paths\"]}",
             "{\"type\":\"object\"}"),
         new OperationPolicy(
@@ -357,13 +358,15 @@ public final class AgentToolsOperationCatalog implements OperationCatalog {
             // Tempdoc 875 C.3: and even for this member the grant only covers invocations whose
             // `paths` canonicalize inside an indexed root (IndexedRootGrantScope); an out-of-root
             // ingest still runs, it just costs an approval that names the path (811 C-2a preserved).
-            .withCapabilityFamily("file-operations"),
+            .withCapabilityFamily("file-operations")
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.INGEST)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         OperationAvailability.empty(),
         // Tempdoc 879: lineage is not inert — the FE renders `affects` in the operation button and
         // hover preview — and ingest queues indexing work, so it affects the indexing-jobs Resource
         // exactly as core.rebuild-index declares. NOT core.indexed-roots: that Resource is the list
-        // of WATCHED roots, changed only by the add/remove-watched-root gestures; ingest dispatches a
-        // one-shot ScanRoot over a path (IngestTool.scanRootCallback) and registers nothing.
+        // of WATCHED roots, changed only by the add/remove-watched-root gestures; ingest dispatches
+        // a prepared recorded root plan and registers no watched roots.
         new OperationLineage(Set.of(new ResourceRef("core.indexing-jobs")), Set.of()),
         Binding.of(INGEST_FILES),
         Provenance.core("1.0"),

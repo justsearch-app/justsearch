@@ -1,12 +1,19 @@
 package io.justsearch.app.services.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.UiSettings;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 import io.justsearch.configuration.resolved.ConfigResolution;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -115,6 +122,22 @@ final class ConfigStoreRebuilderTest {
   }
 
   @Test
+  @DisplayName("desired API port contributes zero at the settings ordinal")
+  void explicitEphemeralApiPortContributesAtSettingsOrdinal() {
+    ResolvedConfigBuilder builder = new ResolvedConfigBuilder();
+    builder.contributeEnvRegistry();
+    UiSettings settings = new UiSettings();
+    settings.setApiPort(0);
+
+    ConfigStoreRebuilder.contributeUiSettings(builder, settings);
+    ConfigResolution resolution = builder.build().resolution("justsearch.api.port");
+
+    assertEquals("0", resolution.value());
+    assertEquals("settings.json", resolution.sourceName());
+    assertEquals(ResolvedConfigBuilder.ORDINAL_SETTINGS_JSON, resolution.sourceOrdinal());
+  }
+
+  @Test
   @DisplayName("rebuild re-contributes the remembered hardware probe at ordinal 150")
   void rebuildPreservesTheDerivedWindow() {
     try {
@@ -172,5 +195,45 @@ final class ConfigStoreRebuilderTest {
         config.ai().contextSize(),
         "0 = auto is the resolver's default; a second shipped number here is what let 8192 and"
             + " 4096 disagree for six months");
+  }
+
+  @Test
+  @DisplayName("preparation failure propagates without publishing a partial snapshot")
+  void preparationFailureDoesNotPublish() throws ReflectiveOperationException {
+    ResolvedConfig initial = new ResolvedConfigBuilder().build();
+    ConfigStore store = new ConfigStore(initial);
+    UiSettings settings = new UiSettings();
+
+    // UiSettings normally cleans incoming values. Install a cyclic list directly so the real
+    // exclude-pattern serializer fails during preparation, exercising the no-swallowed-failure
+    // boundary without introducing a production-only test serializer.
+    List<Object> cyclic = new ArrayList<>();
+    cyclic.add(cyclic);
+    Field patterns = UiSettings.class.getDeclaredField("excludePatterns");
+    patterns.setAccessible(true);
+    patterns.set(settings, cyclic);
+
+    assertThrows(RuntimeException.class, () -> ConfigStoreRebuilder.rebuild(store, settings));
+    assertSame(initial, store.get(), "failed preparation must not publish a new snapshot");
+  }
+
+  @Test
+  @DisplayName("snapshot swap and listener notification are independently ordered")
+  void swapSeparatesPublicationFromNotification() {
+    ResolvedConfig initial = new ResolvedConfigBuilder().build();
+    ConfigStore store = new ConfigStore(initial);
+    List<Object> observed = new ArrayList<>();
+    store.addListener(observed::add);
+    ResolvedConfig next = new ResolvedConfigBuilder().build();
+
+    var event = store.swap(next);
+
+    assertSame(next, store.get());
+    assertTrue(observed.isEmpty(), "swap must not invoke listeners");
+
+    store.notifyListeners(event);
+
+    assertFalse(observed.isEmpty(), "explicit notification must invoke listeners");
+    assertSame(event, observed.getFirst());
   }
 }

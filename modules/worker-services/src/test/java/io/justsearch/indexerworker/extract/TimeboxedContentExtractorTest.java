@@ -2,6 +2,12 @@ package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
+import io.justsearch.core.execution.EngineExecutorRejectedException.Reason;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineExecutorSpec.Kind;
+import io.justsearch.core.execution.EngineExecutorSpec.Mode;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor.ExtractionTimeoutException;
 import java.io.IOException;
@@ -9,6 +15,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,7 +61,7 @@ class TimeboxedContentExtractorTest {
     Path textFile = tempDir.resolve("test.txt");
     Files.writeString(textFile, "Hello World");
 
-    extractor = new TimeboxedContentExtractor(delegate, Duration.ofSeconds(5), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate, Duration.ofSeconds(5), null);
     ExtractionResult result = extractor.extract(textFile);
 
     assertEquals("Hello World", result.content().trim());
@@ -65,7 +75,7 @@ class TimeboxedContentExtractorTest {
   void ioExceptionPropagated() {
     Path nonExistent = tempDir.resolve("missing.txt");
 
-    extractor = new TimeboxedContentExtractor(delegate, Duration.ofSeconds(5), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate, Duration.ofSeconds(5), null);
 
     assertThrows(IOException.class, () -> {
       extractor.extract(nonExistent);
@@ -79,7 +89,7 @@ class TimeboxedContentExtractorTest {
   void extractSafeOnIoException() {
     Path nonExistent = tempDir.resolve("missing.txt");
 
-    extractor = new TimeboxedContentExtractor(delegate, Duration.ofSeconds(5), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate, Duration.ofSeconds(5), null);
     ExtractionResult result = extractor.extractSafe(nonExistent);
 
     assertEquals("", result.content());
@@ -95,7 +105,7 @@ class TimeboxedContentExtractorTest {
 
     // Try to set a timeout below minimum (100ms < 5s minimum)
     // The extractor should use the minimum timeout instead
-    extractor = new TimeboxedContentExtractor(delegate, Duration.ofMillis(100), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate, Duration.ofMillis(100), null);
     ExtractionResult result = extractor.extract(textFile);
 
     assertEquals("Content", result.content().trim());
@@ -109,7 +119,7 @@ class TimeboxedContentExtractorTest {
     Path textFile = tempDir.resolve("test.txt");
     Files.writeString(textFile, "Content");
 
-    extractor = new TimeboxedContentExtractor(delegate, null, null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate, null, null);
     ExtractionResult result = extractor.extract(textFile);
 
     assertEquals("Content", result.content().trim());
@@ -122,7 +132,7 @@ class TimeboxedContentExtractorTest {
     Path textFile = tempDir.resolve("document.txt");
     Files.writeString(textFile, "plain text content");
 
-    extractor = new TimeboxedContentExtractor(delegate);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate);
     String mime = extractor.detectMimeType(textFile);
 
     assertTrue(mime.startsWith("text/"));
@@ -132,7 +142,7 @@ class TimeboxedContentExtractorTest {
   @DisplayName("close shuts down executor cleanly")
   @Timeout(5)
   void closeShutdownsExecutor() {
-    extractor = new TimeboxedContentExtractor(delegate);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate);
     extractor.close();
     // Should not throw
   }
@@ -144,7 +154,7 @@ class TimeboxedContentExtractorTest {
     Path textFile = tempDir.resolve("test.txt");
     Files.writeString(textFile, "Content");
 
-    extractor = new TimeboxedContentExtractor(delegate);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate);
     ExtractionResult result = extractor.extract(textFile);
 
     assertEquals("Content", result.content().trim());
@@ -157,7 +167,7 @@ class TimeboxedContentExtractorTest {
     Path mdFile = tempDir.resolve("readme.md");
     Files.writeString(mdFile, "# Title\n\nSome **bold** text.");
 
-    extractor = new TimeboxedContentExtractor(delegate, Duration.ofSeconds(10), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate, Duration.ofSeconds(10), null);
     ExtractionResult result = extractor.extract(mdFile);
 
     assertTrue(result.content().contains("Title"));
@@ -171,7 +181,7 @@ class TimeboxedContentExtractorTest {
     Path emptyFile = tempDir.resolve("empty.txt");
     Files.writeString(emptyFile, "");
 
-    extractor = new TimeboxedContentExtractor(delegate, Duration.ofSeconds(5), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate, Duration.ofSeconds(5), null);
     ExtractionResult result = extractor.extract(emptyFile);
 
     assertEquals("", result.content());
@@ -184,7 +194,7 @@ class TimeboxedContentExtractorTest {
     Path htmlFile = tempDir.resolve("page.html");
     Files.writeString(htmlFile, "<html><body><p>Hello World</p></body></html>");
 
-    extractor = new TimeboxedContentExtractor(delegate, Duration.ofSeconds(10), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate, Duration.ofSeconds(10), null);
     ExtractionResult result = extractor.extract(htmlFile);
 
     assertTrue(result.content().contains("Hello World"));
@@ -196,7 +206,7 @@ class TimeboxedContentExtractorTest {
   @DisplayName("timeout count starts at zero")
   @Timeout(5)
   void timeoutCountStartsAtZero() {
-    extractor = new TimeboxedContentExtractor(delegate);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate);
     assertEquals(0, extractor.getTimeoutCount());
   }
 
@@ -207,7 +217,7 @@ class TimeboxedContentExtractorTest {
     Path textFile = tempDir.resolve("test.txt");
     Files.writeString(textFile, "Test content");
 
-    extractor = new TimeboxedContentExtractor(delegate);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate);
     ExtractionResult result = extractor.extract(textFile);
 
     assertTrue(result.isTextBased());
@@ -222,7 +232,7 @@ class TimeboxedContentExtractorTest {
     Path textFile = tempDir.resolve("safe-test.txt");
     Files.writeString(textFile, "Safe content");
 
-    extractor = new TimeboxedContentExtractor(delegate, Duration.ofSeconds(5), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), delegate, Duration.ofSeconds(5), null);
     ExtractionResult result = extractor.extractSafe(textFile);
 
     assertEquals("Safe content", result.content().trim());
@@ -245,7 +255,7 @@ class TimeboxedContentExtractorTest {
           }
         };
 
-    extractor = new TimeboxedContentExtractor(stubProvider, Duration.ofSeconds(5), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), stubProvider, Duration.ofSeconds(5), null);
     Path file = tempDir.resolve("test.txt");
     Files.writeString(file, "ignored");
 
@@ -269,7 +279,7 @@ class TimeboxedContentExtractorTest {
                 new ExtractionResult("sandbox content", "sandbox title", "text/plain"),
                 "InjectedSandbox");
 
-    extractor = new TimeboxedContentExtractor(sandbox, Duration.ofSeconds(5), null);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), sandbox, Duration.ofSeconds(5), null);
 
     ExtractionArtifact artifact = extractor.extractArtifact(file);
     assertEquals("sandbox content", artifact.result().content());
@@ -324,7 +334,7 @@ class TimeboxedContentExtractorTest {
           }
         };
 
-    extractor = new TimeboxedContentExtractor(slowDelegate, Duration.ofMillis(50), null, false);
+    extractor = new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), slowDelegate, Duration.ofMillis(50), null, false);
 
     assertThrows(ExtractionTimeoutException.class, () -> extractor.extract(file));
     assertEquals(1, extractor.getTimeoutCount());
@@ -358,7 +368,7 @@ class TimeboxedContentExtractorTest {
         };
 
     extractor =
-        new TimeboxedContentExtractor(null, wedgingSandbox, Duration.ofMillis(200), null, false);
+        new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, wedgingSandbox, Duration.ofMillis(200), null, false);
     try {
       assertThrows(ExtractionTimeoutException.class, () -> extractor.extractArtifact(file));
       assertEquals(1, extractor.getTimeoutCount());
@@ -368,6 +378,99 @@ class TimeboxedContentExtractorTest {
       assertEquals(1, extractor.getTimeoutCount(), "the second extraction must not have timed out");
     } finally {
       release.set(true);
+    }
+  }
+
+  @Test
+  @DisplayName("a second wedge exhausts the two-generation bound without hiding its timeout")
+  @Timeout(10)
+  void thirdGenerationIsRefusedAndLaterExtractionGetsTypedClosedRefusal() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("two-wedges.bin"), "x");
+    AtomicBoolean release = new AtomicBoolean();
+    CountDownLatch entered = new CountDownLatch(2);
+    ExtractionSandbox sandbox =
+        path -> {
+          entered.countDown();
+          while (!release.get()) {
+            LockSupport.parkNanos(1_000_000L);
+          }
+          return ExtractionArtifact.full(
+              new ExtractionResult("late", null, "text/plain"), "wedged");
+        };
+    CappedTimeboxRegistration registration = new CappedTimeboxRegistration();
+    extractor =
+        new TimeboxedContentExtractor(
+            registration, null, sandbox, Duration.ofMillis(100), null, false);
+
+    try {
+      assertThrows(ExtractionTimeoutException.class, () -> extractor.extractArtifact(file));
+      assertThrows(
+          ExtractionTimeoutException.class,
+          () -> extractor.extractArtifact(file),
+          "the extraction which discovers the instance limit retains its timeout outcome");
+      assertEquals(0, entered.getCount(), "both admitted generations must reach the parser");
+
+      EngineExecutorRejectedException refusal =
+          assertThrows(
+              EngineExecutorRejectedException.class, () -> extractor.extractArtifact(file));
+      assertEquals(Reason.CLOSED, refusal.reason());
+      assertEquals(2, registration.openedCount());
+    } finally {
+      release.set(true);
+    }
+  }
+
+  private static final class CappedTimeboxRegistration
+      implements EngineExecutorRegistry.Registration {
+    private static final EngineExecutorSpec SPEC =
+        new EngineExecutorSpec("test-timebox-cap", Kind.BACKGROUND, Mode.PLATFORM, 1, 4, 2);
+
+    private final java.util.List<ExecutorService> instances = new java.util.ArrayList<>();
+
+    @Override
+    public EngineExecutorSpec spec() {
+      return SPEC;
+    }
+
+    @Override
+    public synchronized ExecutorService open(ThreadFactory threadFactory) {
+      instances.removeIf(ExecutorService::isTerminated);
+      if (instances.size() >= SPEC.maxInstances()) {
+        throw new EngineExecutorRejectedException(Reason.INSTANCE_LIMIT, SPEC.name(), 1);
+      }
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(
+              1,
+              1,
+              0,
+              TimeUnit.MILLISECONDS,
+              new java.util.concurrent.ArrayBlockingQueue<>(SPEC.queueCapacity()),
+              threadFactory,
+              (task, owner) -> {
+                Reason reason = owner.isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT;
+                throw new EngineExecutorRejectedException(reason, SPEC.name(), 1);
+              });
+      instances.add(executor);
+      return executor;
+    }
+
+    int openedCount() {
+      return instances.size();
+    }
+
+    @Override
+    public ScheduledExecutorService openScheduled(ThreadFactory threadFactory) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ExecutorService openVirtual() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public synchronized void close() {
+      instances.forEach(ExecutorService::shutdownNow);
     }
   }
 }

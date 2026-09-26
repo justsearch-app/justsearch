@@ -257,7 +257,7 @@ final class McpEntityCarriageTest {
           surface()
               .buildSearchContent(
                   resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L,
-                  CARRIAGE_ON);
+                  CARRIAGE_ON, null);
       String concise = McpToolSurface.renderSearchText(resp, content, true);
       assertFalse(concise.contains("Preview:"), concise);
       assertTrue(concise.contains(BRIDGE), concise);
@@ -271,7 +271,7 @@ final class McpEntityCarriageTest {
           surface()
               .buildSearchContent(
                   resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L,
-                  CARRIAGE_ON);
+                  CARRIAGE_ON, null);
       Map<String, Object> structured = McpEvidenceProjection.searchEvidence(resp, content, false);
       @SuppressWarnings("unchecked")
       List<Map<String, Object>> results = (List<Map<String, Object>>) structured.get("results");
@@ -283,7 +283,7 @@ final class McpEntityCarriageTest {
           surface()
               .buildSearchContent(
                   resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L,
-                  CARRIAGE_OFF);
+                  CARRIAGE_OFF, null);
       @SuppressWarnings("unchecked")
       List<Map<String, Object>> offResults =
           (List<Map<String, Object>>)
@@ -302,14 +302,15 @@ final class McpEntityCarriageTest {
       McpSearchResponseContent withoutCarriage =
           surface()
               .buildSearchContent(
-                  resp, Map.of("query", "power station upper wetlands"), f1, -1L, CARRIAGE_OFF);
+                  resp, Map.of("query", "power station upper wetlands"), f1, -1L, CARRIAGE_OFF, null);
       assertNull(withoutCarriage.hits().get(0).continuation());
 
       // With carriage the same F1 setting now marks the bridge entity as a hop-2 candidate.
       McpSearchResponseContent withCarriage =
           surface()
               .buildSearchContent(
-                  resp, Map.of("query", "power station upper wetlands"), f1, -1L, CARRIAGE_ON);
+                  resp, Map.of("query", "power station upper wetlands"), f1, -1L, CARRIAGE_ON,
+                  null);
       assertNotNull(withCarriage.hits().get(0).continuation());
       assertTrue(withCarriage.hits().get(0).continuation().contains(BRIDGE));
     }
@@ -389,7 +390,7 @@ final class McpEntityCarriageTest {
     McpSearchResponseContent content =
         surface()
             .buildSearchContent(
-                resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L, carriage);
+                resp, Map.of("query", "power station upper wetlands"), FRAMING_OFF, -1L, carriage, null);
     return McpToolSurface.renderSearchText(resp, content, false);
   }
 

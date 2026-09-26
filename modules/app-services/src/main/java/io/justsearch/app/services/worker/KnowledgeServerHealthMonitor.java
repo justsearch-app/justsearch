@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.io.Closeable;
-import java.util.concurrent.Executors;
+import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -15,9 +17,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Background health monitor for the Worker process. Polls {@link
- * KnowledgeServerBootstrap#checkHealth()} and triggers deferred auxiliary initialization
- * on ERROR→READY recovery transitions.
+ * Background health monitor for the Worker (the index half, in-process since lane F stage A item
+ * A6). Polls {@link KnowledgeServerBootstrap#checkHealth()} and triggers deferred auxiliary
+ * initialization on ERROR→READY recovery transitions.
+ *
+ * <p>Item A11 note: this class survives the Worker's deletion as a process because two of its
+ * three jobs are not process-shaped — the health poll that drives the worker component's
+ * READY/LOST transitions on {@code /api/health}, and the boot-recovery arm (an in-process start
+ * can still fail on a Lucene open, and the surface must say so). What it lost is every
+ * channel/port/process-shaped path: the post-resume reconnect, and the escalation from a lost
+ * worker to a respawn. A lost worker component now reports itself lost and stays that way until
+ * the user restarts the Engine — stage A §10 records that as a deliberate loss until stage B.
  *
  * <p>Tempdoc 630 (latency-hardening): this periodic loop doubles as the Head-side <b>resume
  * detector</b>. Because it wakes every {@code pollIntervalMs}, an inter-tick wall-clock gap far
@@ -49,6 +59,8 @@ import org.slf4j.LoggerFactory;
  * structural here, not a convention.
  */
 public final class KnowledgeServerHealthMonitor implements Closeable, WorkerRecoveryAuthority {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "engine-health-monitor", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServerHealthMonitor.class);
 
   static final long DEFAULT_POLL_INTERVAL_MS = 10_000;
@@ -65,6 +77,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   /** Floor for the variable tick interval (tempdoc 885 item 6) — a supplier cannot make it spin. */
   static final long MIN_TICK_INTERVAL_MS = 1_000;
+  private static final long START_ADMISSION_BUDGET_MS = 5_000;
 
   /**
    * Tempdoc 885 item 6: variable inter-tick delay, installed by the composition root. Null (the
@@ -74,6 +87,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   private final KnowledgeServerBootstrap bootstrap;
   private final long pollIntervalMs;
+  private final EngineExecutorRegistry.Registration executorRegistration;
   private final ScheduledExecutorService executor;
   private final LongSupplier nowMs;
   private final BootRecoveryPolicy recoveryPolicy;
@@ -89,6 +103,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   private volatile Consumer<KnowledgeServerBootstrap> onRecoveryConnected;
 
   private volatile Runnable onTick = () -> {};
+  private volatile Consumer<RecoveryOccurrence> onRecoveryOccurrence = occurrence -> {};
+  // Correlates an episode's events only; never gates lifecycle or readiness.
+  private RecoveryContext activeRecoveryContext;
 
   // --- boot-recovery arm state. Mutated only by the single executor thread (the CAS below admits
   // one attempt at a time), but READ by requestRecoveryNow on the caller's thread, so volatile. ---
@@ -113,13 +130,19 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * Worker JVM after the coordinator had already closed the bootstrap — an orphan nothing owns.
    */
   private volatile boolean closed;
+  private final AtomicBoolean startClaimed = new AtomicBoolean();
+  private long nextTickAtNanos;
 
-  public KnowledgeServerHealthMonitor(KnowledgeServerBootstrap bootstrap) {
-    this(bootstrap, DEFAULT_POLL_INTERVAL_MS);
+  public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors, KnowledgeServerBootstrap bootstrap) {
+    this(processExecutors, bootstrap, DEFAULT_POLL_INTERVAL_MS);
   }
 
-  public KnowledgeServerHealthMonitor(KnowledgeServerBootstrap bootstrap, long pollIntervalMs) {
-    this(bootstrap, pollIntervalMs, System::currentTimeMillis);
+  public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
+      KnowledgeServerBootstrap bootstrap,
+      long pollIntervalMs) {
+    this(processExecutors, bootstrap, pollIntervalMs, System::currentTimeMillis);
   }
 
   /**
@@ -127,8 +150,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    *     unit-testable without a real clock or a real OS suspend (tempdoc 630)
    */
   public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
       KnowledgeServerBootstrap bootstrap, long pollIntervalMs, LongSupplier nowMs) {
-    this(bootstrap, pollIntervalMs, nowMs, BootRecoveryPolicy.defaults());
+    this(processExecutors, bootstrap, pollIntervalMs, nowMs, BootRecoveryPolicy.defaults());
   }
 
   /**
@@ -136,6 +160,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    *     test can exercise the give-up path without waiting out the production backoff
    */
   public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
       KnowledgeServerBootstrap bootstrap,
       long pollIntervalMs,
       LongSupplier nowMs,
@@ -147,52 +172,90 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     this.pollIntervalMs = pollIntervalMs > 0 ? pollIntervalMs : DEFAULT_POLL_INTERVAL_MS;
     this.nowMs = nowMs;
     this.recoveryPolicy = recoveryPolicy != null ? recoveryPolicy : BootRecoveryPolicy.defaults();
-    this.executor =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "knowledge-server-health-monitor");
-              t.setDaemon(true);
-              return t;
-            });
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.knowledge-server-health-monitor",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      this.executorRegistration = registration;
+      this.executor =
+          registration.openScheduled(
+              r -> {
+                Thread t = new Thread(r, "knowledge-server-health-monitor");
+                t.setDaemon(true);
+                return t;
+              });
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
   public void start() {
-    log.info("Knowledge Server health monitor started (poll interval: {}ms)", pollIntervalMs);
-    scheduleNextTick(pollIntervalMs);
+    if (closed || !startClaimed.compareAndSet(false, true)) return;
+    boolean installed = false;
+    nextTickAtNanos = System.nanoTime();
+    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(START_ADMISSION_BUDGET_MS);
+    io.justsearch.core.execution.EngineExecutorRejectedException lastRefusal = null;
+    try {
+      while (!closed) {
+        if (lastRefusal != null && System.nanoTime() - deadline >= 0) throw lastRefusal;
+        try {
+          @SuppressWarnings("unused")
+          var ignored = executor.scheduleWithFixedDelay(this::tickIfDue, pollIntervalMs,
+              Math.min(MIN_TICK_INTERVAL_MS, pollIntervalMs), TimeUnit.MILLISECONDS);
+          installed = true;
+          log.info("Knowledge Server health monitor started (poll interval: {}ms)", pollIntervalMs);
+          return;
+        } catch (io.justsearch.core.execution.EngineExecutorRejectedException refusal) {
+          if (refusal.reason() == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+            log.debug("Health monitor start refused after owner close");
+            throw refusal;
+          }
+          long waitNanos = TimeUnit.SECONDS.toNanos(refusal.retryAfterSeconds());
+          if (deadline - System.nanoTime() <= waitNanos) throw refusal;
+          lastRefusal = refusal;
+          log.warn("Health monitor start retained for capacity retry (reason={})", refusal.reason());
+          try {
+            TimeUnit.NANOSECONDS.sleep(waitNanos);
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted waiting to start health monitor", interrupted);
+          }
+        }
+      }
+    } finally {
+      if (!installed) startClaimed.set(false);
+    }
   }
 
   /**
-   * Tempdoc 885 item 6: install a variable inter-tick delay. The monitor re-arms itself after every
-   * tick with {@code supplier.getAsLong()} clamped to {@code [MIN_TICK_INTERVAL_MS, pollIntervalMs]}
-   * — so the health sampler it now hosts can observe at 2 s while indexing is in flight and fall
-   * back to the configured 10 s when idle, without a second executor.
-   *
-   * <p>Resume detection deliberately keeps using the CONFIGURED {@code pollIntervalMs} as its
-   * reference (not the actual delay): shrinking the reference alongside the delay would shrink the
-   * gap threshold to 6 s and turn a long GC pause into a false "the machine resumed" reconnect.
-   * With the reference pinned, a faster tick can only make resume detection more conservative.
+   * Chooses the actual sampling delay on one retained periodic timer. The heartbeat checks a
+   * monotonic due time, so changing sampling cadence does not need another timer reservation.
+   * Resume detection still compares wall-clock gaps against the configured poll interval.
    */
   public void tickIntervalSupplier(LongSupplier supplier) {
     this.tickIntervalSupplier = supplier;
   }
 
-  private void scheduleNextTick(long delayMs) {
-    if (closed) {
-      return;
-    }
-    try {
-      @SuppressWarnings("unused")
-      var ignored = executor.schedule(this::tickAndReschedule, delayMs, TimeUnit.MILLISECONDS);
-    } catch (java.util.concurrent.RejectedExecutionException e) {
-      log.debug("Health monitor tick not rescheduled (monitor closing): {}", e.getMessage());
-    }
-  }
-
-  private void tickAndReschedule() {
+  private void tickIfDue() {
+    if (closed || System.nanoTime() - nextTickAtNanos < 0) return;
     try {
       tick();
     } finally {
-      scheduleNextTick(nextTickDelayMs());
+      nextTickAtNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(nextTickDelayMs());
     }
   }
 
@@ -213,10 +276,13 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   }
 
   void tick() {
+    if (closed) return;
     try {
-      // Tempdoc 630: detect an OS suspend/resume by the inter-tick wall-clock gap, and eagerly
-      // re-validate the Worker surface BEFORE the health check (so a stale post-wake channel does
-      // not flip the capability to DEGRADED).
+      // Tempdoc 630: detect an OS suspend/resume by the inter-tick wall-clock gap and eagerly
+      // re-validate BEFORE the health check. Item A11 removed the channel half of that
+      // re-validation (there is no channel); the filesystem half is why this survives — a watcher
+      // frozen through a suspend missed every event in the window, and only a reconcile walk
+      // catches up. That is a property of the machine sleeping, not of a process boundary.
       long now = nowMs.getAsLong();
       long gap = ResumeDetector.resumeGapMs(lastTickWallMs, now, pollIntervalMs, RESUME_TOLERANCE_FACTOR);
       lastTickWallMs = now;
@@ -231,28 +297,13 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         return;
       }
 
-      CapabilityHealth before = bootstrap.workerCapability().health();
-      bootstrap.checkHealth();
-      CapabilityHealth after = bootstrap.workerCapability().health();
-      if (before != CapabilityHealth.READY && after == CapabilityHealth.READY) {
-        log.info(
-            "Knowledge Server recovered to READY ({}→{}); running deferred auxiliary"
-                + " initialization",
-            before,
-            after);
-        bootstrap.completeReadyInitializationFromMonitor();
-      }
+      // The bootstrap owns physical-health initialization. Sampled readiness is an output,
+      // not the trigger for catch-up work (an API restart must not reindex persisted roots).
+      if (bootstrap.checkHealth()) completeRecoveryEpisode();
     } catch (Exception e) {
       log.warn("Knowledge Server health monitor tick failed: {}", e.getMessage(), e);
-      WorkerCapability cap = bootstrap.workerCapability();
-      if (cap.health() == CapabilityHealth.READY) {
-        // Tempdoc 837 §3.1: guarded on READY — the worker was serving, so this is "lost", not
-        // "never started". The exception text is the detail behind the code.
-        cap.transition(
-            CapabilityHealth.DEGRADED,
-            LifecycleReasonCode.WORKER_LOST.code(),
-            "Health monitor tick exception: " + e.getMessage());
-      }
+      // checkHealth owns physical-loss reporting; setup/resume exceptions are not evidence
+      // that the index stopped serving. Leave pending initialization available for the next poll.
     }
     // Tempdoc 876 §C.8: the worker's operational view has just been refreshed, so this is the
     // moment the readiness snapshot can change WITHOUT a capability transition — INDEX_SERVING
@@ -263,7 +314,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     // failed check is precisely when the snapshot most needs re-deriving. Fail-soft — the trigger
     // coalesces and swallows, but a broken callback must never stop the monitor.
     try {
-      onTick.run();
+      if (!closed) onTick.run();
     } catch (RuntimeException e) {
       log.debug("Readiness reconcile request from monitor tick failed: {}", e.getMessage());
     }
@@ -282,6 +333,26 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * Tempdoc 825: install the handover the composition root performs once a recovery attempt has
    * bound a client. Called before {@link #start()} by {@code HeadlessApp}.
    */
+  public void onRecoveryOccurrence(Consumer<RecoveryOccurrence> observer) {
+    this.onRecoveryOccurrence = Objects.requireNonNull(observer, "observer");
+  }
+
+  private void emitRecoveryOccurrence(RecoveryOccurrence occurrence) {
+    if (closed) return;
+    try { onRecoveryOccurrence.accept(occurrence); }
+    catch (RuntimeException failure) {
+      log.warn("Recovery occurrence delivery failed: {}", occurrence.kind(), failure);
+    }
+  }
+
+  private void completeRecoveryEpisode() {
+    RecoveryContext completed = activeRecoveryContext;
+    activeRecoveryContext = null;
+    if (completed != null) {
+      emitRecoveryOccurrence(new RecoveryOccurrence(RecoveryOccurrence.Kind.RECOVERED, completed));
+    }
+  }
+
   public void onRecoveryConnected(Consumer<KnowledgeServerBootstrap> handover) {
     this.onRecoveryConnected = handover;
   }
@@ -302,11 +373,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
               "Boot recovery attempt {} due in {}ms",
               decision.nextAttempt(),
               decision.waitMs());
-      case STAND_DOWN ->
-          // Review F2(a): this cycle only. No narration, no latch — the next tick re-asks, so a
-          // supervised arc that ends without bringing the worker back does not strand recovery.
-          log.info(
-              "Boot recovery yielding this cycle: a supervisor is live and holds the restart budget");
       case ATTEMPT -> attemptBootRecovery(false, false);
       case GIVE_UP -> narrateGiveUp(decision.veto());
     }
@@ -321,18 +387,14 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * @param operatorRequested when true, the {@link BootRecoveryDecision.Veto#INDEX_FATAL} veto is
    *     withheld: the operator's remedy for both fatal index causes is a settings or filesystem
    *     change the NEXT spawn reads, so an explicit request is the one input that can make a
-   *     deterministic refusal stop being deterministic (tempdoc 915 R1). The budget and the two
-   *     supervision vetoes are untouched — this is a reason to try again, not a reason to try more.
+   *     deterministic refusal stop being deterministic (tempdoc 915 R1). The local
+   *     attempt bound remains unchanged — this is a reason to try again, not to try more.
    */
   private BootRecoveryDecision.Input currentRecoveryInput(boolean operatorRequested) {
     long sinceLastAttempt =
         lastRecoveryAttemptMs < 0 ? Long.MAX_VALUE : nowMs.getAsLong() - lastRecoveryAttemptMs;
     return new BootRecoveryDecision.Input(
         bootstrap.hasClient(),
-        bootstrap.supervisionActive(),
-        LifecycleReasonCode.WORKER_RESTART_EXHAUSTED
-            .code()
-            .equals(bootstrap.workerCapability().pendingReason()),
         !operatorRequested && bootstrap.indexFatalCode() != null,
         recoveryAttemptsMade,
         // Withholding the veto is not enough on its own: the give-up it produced has already latched,
@@ -400,20 +462,11 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
       gaveUpVeto = null;
       recoveryAttemptsMade = recoveryAttemptsMade + 1;
       lastRecoveryAttemptMs = nowMs.getAsLong();
-      WorkerCapability cap = bootstrap.workerCapability();
-      // Park the forensic context first: the capability-health bridge reads it synchronously from
-      // inside the transition below, to attach attempt/kind attributes to the occurrence.
-      cap.setRecoveryContext(
-          new RecoveryContext(
-              attemptNo, "boot", BootRecoveryDecision.backoffMs(attemptNo, recoveryPolicy)));
-      cap.transition(
-          CapabilityHealth.RECOVERING,
+      bootstrap.indexComponent().transition(
+          ComponentState.STARTING,
           LifecycleReasonCode.WORKER_RECOVERING.code(),
-          "Retrying knowledge server start (attempt "
-              + attemptNo
-              + " of "
-              + recoveryPolicy.maxAttempts()
-              + ")");
+          "Retrying knowledge server start (attempt " + attemptNo
+              + " of " + recoveryPolicy.maxAttempts() + ")");
       log.info(
           "Boot recovery: re-attempting Knowledge Server start ({}/{})",
           attemptNo,
@@ -422,17 +475,29 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         // Last gate before the spawn: close() may have landed while we narrated.
         return;
       }
+      RecoveryContext context = new RecoveryContext(
+          attemptNo, "boot", BootRecoveryDecision.backoffMs(attemptNo, recoveryPolicy));
+      boolean firstAttemptInEpisode = activeRecoveryContext == null;
+      activeRecoveryContext = context;
+      if (firstAttemptInEpisode) {
+        emitRecoveryOccurrence(new RecoveryOccurrence(RecoveryOccurrence.Kind.ATTEMPTED, context));
+      }
+      boolean physicallyHealthy;
       try {
-        bootstrap.startForRecovery();
+        physicallyHealthy = bootstrap.startForRecovery();
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         log.warn("Boot recovery attempt {} interrupted", attemptNo);
         return;
       } catch (Exception e) {
         log.warn("Boot recovery attempt {} failed: {}", attemptNo, e.toString());
-        settleAfterFailedAttempt();
+        if (!closed) settleAfterFailedAttempt();
         return;
       }
+      // A host may finish after the bounded shutdown wait, even if it ignored interruption.
+      // Its client is still owned by the bootstrap; Head callbacks are no longer available.
+      if (closed) return;
+      if (physicallyHealthy) completeRecoveryEpisode();
       if (bootstrap.hasClient()) {
         // The bootstrap is up. Hand it to the surfaces that were late-bound with null at boot, then
         // reset the budget: the arc is over, and any LATER fault is supervision's (the spawner now
@@ -447,10 +512,11 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   }
 
   private void handOverRecoveredWorker(int attemptNo) {
+    if (closed) return;
     log.info(
         "Boot recovery succeeded on attempt {} — knowledge server is bound (health: {})",
         attemptNo,
-        bootstrap.workerCapability().health());
+        bootstrap.indexComponent().snapshot().state());
     Consumer<KnowledgeServerBootstrap> handover = this.onRecoveryConnected;
     if (handover == null) {
       return;
@@ -464,31 +530,14 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     }
   }
 
-  /**
-   * The one terminal narration of this arc. A veto means another authority's verdict already stands
-   * ({@code worker.restart_exhausted}, or supervision holding the budget), so we stop trying WITHOUT
-   * overwriting it — tempdoc 825 §D5 decision 2.
-   */
+  /** Narrates the local budget exhaustion or the fatal index cause once per recovery arc. */
   private void narrateGiveUp(BootRecoveryDecision.Veto veto) {
     if (recoveryGaveUp) {
       // The terminal state is narrated exactly once per arc. Reachable when a manual request and a
       // periodic tick both resolve to GIVE_UP before either has run.
       return;
     }
-    // The latch is set per-arm, not up front: a SUPERVISION_ENGAGED give-up must never latch
-    // (review F2(a) — that is the permanent-silence bug), so it stays out of the two arms below.
     switch (veto) {
-      case RESTART_EXHAUSTED ->
-          // Permanent and silent BY DESIGN, and honest only because the state is already on the wire
-          // under supervision's own terminal code — which the fixture now fails fast on too, so this
-          // path no longer costs a blind wait (review F2(b)).
-      {
-        latchGaveUp(veto);
-        log.warn(
-            "Boot recovery giving up: supervision has already declared {} — that verdict is"
-                + " terminal and is not superseded",
-            LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code());
-      }
       // Tempdoc 915 R1. The one veto this authority NARRATES, because it is the one whose cause the
       // Head owns and may never have said out loud: the bootstrap latched it from the dying worker's
       // fatal-reason marker, and that read can land inside a suppressed boot arc (all three
@@ -510,18 +559,13 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
           // the RECOVERING this arm had set before the spawn. The reason was right and the state was
           // a lie: readinessNotice.ts renders it as "recovering" for a condition that never recovers
           // on its own, which live R2 watched sit there for two minutes. This cannot double-narrate:
-          // WorkerCapability.transition fires listeners only when the health OR the effective reason
+          // RegistryBackedCapability notifies consumers only when projected health OR effective reason
           // changes, and the sticky reason is retained, so the already-terminal case is a no-op.
           bootstrap
-              .workerCapability()
-              .transition(CapabilityHealth.DEGRADED, cause.code(), bootstrap.indexFatalDetail());
+              .indexComponent()
+              .transition(ComponentState.FAILED, cause.code(), bootstrap.indexFatalDetail());
         }
       }
-      case SUPERVISION_ENGAGED ->
-          // Unreachable: a live supervisor yields STAND_DOWN, which never reaches this method
-          // (review F2(a)). Kept for switch totality, and it must NOT latch a give-up, so it is
-          // deliberately not routed here by the decision.
-          log.warn("Boot recovery give-up requested while a supervisor is live — ignoring");
       case NONE -> {
         latchGaveUp(veto);
         log.error(
@@ -529,9 +573,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
                 + " again in this process",
             recoveryAttemptsMade);
         bootstrap
-            .workerCapability()
+            .indexComponent()
             .transition(
-                CapabilityHealth.DEGRADED,
+                ComponentState.FAILED,
                 LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
                 "Knowledge server failed to start and "
                     + recoveryAttemptsMade
@@ -576,6 +620,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   /** Records the terminal state AND which veto produced it, so the two can never disagree. */
   private void latchGaveUp(BootRecoveryDecision.Veto veto) {
+    activeRecoveryContext = null;
     gaveUpVeto = veto;
     recoveryGaveUp = true;
   }
@@ -585,13 +630,12 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * the periodic arm uses, so a manual request can never race a tick into two concurrent spawns, and
    * returns what the recovery authority decided rather than blocking an HTTP request on a spawn.
    *
-   * <p>An operator's explicit request also clears the backoff wait — but not the budget, and not the
-   * vetoes: "the operator asked" is a reason to try sooner, never a reason to try more times than the
-   * declared policy or to overrule supervision's terminal verdict.
+   * <p>An operator's explicit request clears the backoff wait and may retry a repaired fatal index
+   * cause, but cannot exceed the local attempt budget.
    */
   @Override
   public Verdict requestRecoveryNow() {
-    if (bootstrap.hasClient()) {
+    if (closed || bootstrap.hasClient()) {
       return Verdict.NOT_APPLICABLE;
     }
     // Reserve the single attempt slot on the CALLER's thread and hand it to the runnable. Checking a
@@ -608,22 +652,12 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     try {
       return switch (decision.action()) {
         case NONE -> recoveryGaveUp ? Verdict.EXHAUSTED : Verdict.NOT_APPLICABLE;
-        // Review F2(c): a live supervisor is a TEMPORARY refusal — say so, and do not latch anything.
-        // The operator can retry in a moment; the caller renders it differently from the terminal one.
-        case STAND_DOWN -> Verdict.VETOED_SUPERVISION;
         case GIVE_UP -> {
           // Narrate on the executor (the arm's own thread) so the manual path lands the same
           // terminal state the periodic path would, exactly once, and no capability write happens
           // off-thread.
           executor.execute(() -> narrateGiveUp(decision.veto()));
-          yield switch (decision.veto()) {
-            case RESTART_EXHAUSTED -> Verdict.VETOED_RESTART_EXHAUSTED;
-            case SUPERVISION_ENGAGED -> Verdict.VETOED_SUPERVISION;
-            // INDEX_FATAL is withheld from the operator input above, so this arm is unreachable from
-            // here by construction; it is mapped to the terminal answer for switch totality rather
-            // than growing a Verdict constant no caller can ever observe.
-            case NONE, INDEX_FATAL -> Verdict.EXHAUSTED;
-          };
+          yield Verdict.EXHAUSTED;
         }
         // WAIT is an ATTEMPT whose backoff has not elapsed; the request is what makes it due. The
         // decision is re-run on the executor before anything spawns, so this is a hint, not a
@@ -634,12 +668,19 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
           yield Verdict.ACCEPTED;
         }
       };
-    } catch (java.util.concurrent.RejectedExecutionException e) {
-      // The monitor is closed (shutdown in progress). Nothing will recover, but an HTTP request must
-      // not become a 500 because the process is on its way out — the caller falls back to its own
-      // unavailable answer.
-      log.debug("Worker recovery request rejected — the monitor is shut down");
-      return Verdict.NOT_APPLICABLE;
+    } catch (io.justsearch.core.execution.EngineExecutorRejectedException refusal) {
+      if (refusal.reason() == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+        log.debug("Worker recovery request rejected after owner close");
+        return Verdict.NOT_APPLICABLE;
+      }
+      log.warn("Worker recovery request refused by executor capacity (reason={})", refusal.reason());
+      var failure = new io.justsearch.app.api.EngineAdmissionException(
+          io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, refusal.retryAfterSeconds());
+      failure.initCause(refusal);
+      throw failure;
+    } catch (java.util.concurrent.RejectedExecutionException refusal) {
+      if (closed || executor.isShutdown()) return Verdict.NOT_APPLICABLE;
+      throw refusal;
     } finally {
       // Every path that did NOT hand the slot to a runnable must release it, or one refused request
       // would wedge the arm for the life of the process.
@@ -650,50 +691,46 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   }
 
   /**
-   * Tempdoc 630: on a detected resume, eagerly close the two stale-after-suspend windows using the
-   * existing actuators — reconnect the gRPC channel ({@link RemoteKnowledgeClient#reconnect()}) and
-   * re-register watchers + kick a (freshness-skipping) reconcile walk ({@link
-   * RemoteKnowledgeClient#reindexPersistedRoots()}, which catches filesystem events missed while the
-   * watcher was frozen). Each step is best-effort and independently guarded so a transient failure
-   * never aborts the tick or the other step; the reactive paths (first-RPC reconnect, periodic sync)
-   * remain the backstop.
+   * Tempdoc 630: on a detected resume, close the stale-after-suspend window that survives one
+   * process — re-register watchers and kick a (freshness-skipping) reconcile walk ({@link
+   * KnowledgeClient#reindexPersistedRoots()}), which catches filesystem events missed while the
+   * watcher was frozen. Best-effort and guarded so a transient failure never aborts the tick; the
+   * periodic sync remains the backstop.
+   *
+   * <p>Item A11 removed the second actuator, a channel reconnect: there is no channel.
    */
   private void eagerlyRevalidateAfterResume(long gapMs) {
+    if (bootstrap.automaticRootProducersSuppressed()) return;
     log.info(
-        "Resume detected (process frozen ~{}ms); eagerly reconnecting gRPC + re-registering"
-            + " watchers and reconciling",
-        gapMs);
+        "Resume detected (process frozen ~{}ms); re-registering watchers and reconciling", gapMs);
     // Tempdoc 630: stamp the resume so /api/status can surface a brief "Catching up after sleep"
     // transient while the reconcile below runs (auto-clears after the notice window).
     bootstrap.markResumed(nowMs.getAsLong());
-    RemoteKnowledgeClient client;
+    KnowledgeServerBootstrap.ClientLease lease;
     try {
-      client = bootstrap.client();
-    } catch (RuntimeException e) {
-      // Worker not started/ready (client() throws IllegalStateException) — nothing to re-validate;
-      // the normal start/spawn path owns bringing it up. Benign on resume.
-      log.debug("Post-resume re-validation skipped — worker client not available: {}", e.getMessage());
+      lease = bootstrap.captureClient();
+    } catch (IllegalStateException unavailable) {
+      log.debug("Post-resume re-validation skipped — worker client not available: {}",
+          unavailable.getMessage());
       return;
     }
-    try {
-      client.reconnect();
-    } catch (RuntimeException e) {
-      log.warn("Post-resume gRPC reconnect failed (will retry on next call): {}", e.getMessage());
-    }
-    try {
-      client.reindexPersistedRoots();
+    // Item A11: the channel reconnect that used to run here is gone. Hold the current in-process
+    // client until this reconcile actually returns; recovery may be retiring it concurrently.
+    try (lease) {
+      lease.withClient(client -> {
+        client.reindexPersistedRoots(ENGINE_CONTEXT);
+        return null;
+      });
     } catch (RuntimeException e) {
       log.warn("Post-resume watcher re-register + reconcile failed: {}", e.getMessage());
     }
   }
 
   /**
-   * Review F4: close is now ORDERED, not just requested. The flag stops an attempt that has not
-   * spawned yet; the bounded await makes the return value mean "no recovery is in flight any more",
-   * which is what {@code performOrderedShutdown} needs before it closes the bootstrap underneath us.
-   * Bounded at {@value #CLOSE_AWAIT_MS}ms so a wedged attempt delays shutdown rather than blocking
-   * it; {@code shutdownNow} has already interrupted it, and the Worker's own Job Object / heartbeat
-   * suicide-pact is the backstop for a process that still slips through.
+   * Stop new recovery work and wait up to {@value #CLOSE_AWAIT_MS}ms for an admitted attempt.
+   * An attempt that ignores interruption can still be unwinding after this returns; it must not
+   * deliver recovery or readiness callbacks to the Head owners that shutdown closes next.
+   * The bootstrap retains ownership of any late client and serializes its own teardown with start.
    */
   @Override
   public void close() {
@@ -708,6 +745,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    } finally {
+      executorRegistration.close();
     }
   }
 }

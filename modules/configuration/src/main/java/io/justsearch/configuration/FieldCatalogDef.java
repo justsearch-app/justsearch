@@ -80,6 +80,9 @@ public final class FieldCatalogDef {
                 new FieldDef("content", "text", true, false, List.of("highlight"), null, "icu", false),
                 // Tempdoc 931 §C.6: the parent content revision feedback is keyed against.
                 new FieldDef("content_sha256", "keyword", true, false, List.of(), null, null, false),
+                new FieldDef("projection_source_id", "keyword", true, false, List.of(), null, null, false),
+                new FieldDef("projection_source_revision", "keyword", true, false, List.of(), null, null, false),
+                new FieldDef("projection_digest", "keyword", true, false, List.of(), null, null, false),
                 new FieldDef("content_preview", "text", true, false, List.of("highlight"), null, "icu", false),
                 new FieldDef("modified_at", "long", true, true, List.of("filter", "sort"), null, null, false),
                 new FieldDef("indexed_at", "long", true, true, List.of("filter", "sort"), null, null, false),

@@ -132,7 +132,7 @@ public final class RunChannelObservation implements RunObservation {
     }
 
     @Override
-    public Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer) {
+    public Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer, Runnable onDetached) {
       Consumer<SseEnvelope> listener =
           envelope -> {
             RunFrame frame =
@@ -143,22 +143,13 @@ public final class RunChannelObservation implements RunObservation {
                                 "A run channel carried a non-run frame: " + envelope.payload()));
             observer.accept(new WireFrame(frame.event(), frame.data()));
           };
-      // The window is checked BEFORE the primer so a miss costs the observer nothing: the caller's
-      // job on empty is to re-attach from 0, and emitting the primer here would hand it a SECOND
-      // one on the retry. (A publish between this check and the subscribe can still close the
-      // window — then the retry does re-prime, which is a rare duplicate rather than a lost frame.)
-      if (!channel.channel().isWithinResumeWindow(sinceSeq)) {
-        return Optional.empty();
-      }
-      // §6.1 — the primer precedes the replay, because the ring evicts oldest and a run parked at a
-      // gate after thousands of frames can no longer replay the frame carrying its callId.
-      channel
-          .snapshot()
-          .ifPresent(
-              snapshot ->
-                  observer.accept(
-                      new WireFrame(SNAPSHOT_EVENT, snapshot.fields())));
-      return channel.observe(listener, sinceSeq).map(subscription -> subscription::unsubscribe);
+      // Validate/register before the primer, so a blocked primer cannot open a replay gap.
+      // A rejected cursor emits nothing; the caller's zero-tail fallback primes exactly once.
+      return channel.observe(listener, sinceSeq,
+          () -> channel.snapshot().ifPresent(snapshot ->
+              observer.accept(new WireFrame(SNAPSHOT_EVENT, snapshot.fields()))),
+          subscription -> subscription.onRetire(onDetached))
+          .map(subscription -> subscription::unsubscribe);
     }
 
     @Override

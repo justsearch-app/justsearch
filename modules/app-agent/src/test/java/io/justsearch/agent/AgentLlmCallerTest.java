@@ -1,5 +1,7 @@
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -517,7 +519,7 @@ class AgentLlmCallerTest {
     var session =
         new AgentSession(
             new java.util.ArrayList<>(List.of(java.util.Map.<String, Object>of("role", "user", "content", "q"))),
-            8000);
+            8000, EngineContextTestFixtures.AGENT_LOOP);
 
     // Two searches, their tool messages appended — and NO compression pass recorded yet, which is
     // the state the budget-edge path finds the session in when the budget trips mid-iteration.

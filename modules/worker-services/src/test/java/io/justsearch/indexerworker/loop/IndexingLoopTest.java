@@ -3,11 +3,13 @@ package io.justsearch.indexerworker.loop;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.extract.ContentExtractor;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
@@ -28,6 +30,8 @@ import io.justsearch.indexerworker.loop.ops.IndexingDocumentOps;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferSyncRoot;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.io.IOException;
@@ -39,6 +43,10 @@ import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -804,6 +812,225 @@ class IndexingLoopTest {
     }
 
     @Test
+    void parkedGreenClaimProjectsLexicalDocumentToActiveGenerationBeforeGreen() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-lexical", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      CommitOps activeCommits = mock(CommitOps.class);
+      when(active.indexingCoordinator()).thenReturn(activeWrites);
+      when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+      when(active.commitOps()).thenReturn(activeCommits);
+      loop.wireActiveLexicalSource(active);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      var lexical = org.mockito.ArgumentCaptor.forClass(IndexDocument.class);
+      var candidate = org.mockito.ArgumentCaptor.forClass(IndexDocument.class);
+      verify(activeWrites).indexSingle(lexical.capture());
+      verify(queue.indexingCoordinator).indexSingle(candidate.capture());
+      var order = inOrder(activeWrites, queue.indexingCoordinator);
+      order.verify(activeWrites).indexSingle(any());
+      order.verify(queue.indexingCoordinator).indexSingle(any());
+      assertEquals("body", lexical.getValue().fields().get(SchemaFields.CONTENT));
+      assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
+          lexical.getValue().fields().get(SchemaFields.EMBEDDING_STATUS));
+      assertFalse(lexical.getValue().fields().containsKey(SchemaFields.VECTOR),
+          "B's embedding must never be written into A");
+      assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
+          candidate.getValue().fields().get(SchemaFields.EMBEDDING_STATUS));
+      assertFalse(candidate.getValue().fields().containsKey(SchemaFields.VECTOR),
+          "the parked producer cannot reuse B's unloaded native set");
+      assertNull(queue.lastOutcome, "neither generation may acknowledge before commit");
+      invokeFinishIdleCommit(loop);
+      assertTrue(queue.done, "A and Green commits must precede the durable queue ACK");
+      loop.commitActiveLexicalSource(
+          CommitReason.MIGRATION_CUTOVER);
+      verify(activeCommits).commitAndTrack(
+          CommitReason.MIGRATION_CUTOVER);
+    }
+
+    @Test
+    void failedActiveLexicalWriteCannotAcknowledgeGreenClaim() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-fail", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      when(active.indexingCoordinator()).thenReturn(activeWrites);
+      doThrow(new RuntimeException("A write failed")).when(activeWrites).indexSingle(any());
+      loop.wireActiveLexicalSource(active);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+      assertEquals(IngestionOutcomeClass.WRITE_FAILED, queue.lastOutcome.outcomeClass());
+      assertFalse(queue.done);
+    }
+
+    @Test
+    void changedClaimSourceCannotProduceAProjectionOfDifferentAcceptedBytes() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-planned-source", ".txt"), "first");
+      String acceptedHash = SourceContentHash.sha256(file);
+      Files.writeString(file, "second");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("second"));
+      var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
+          1L, false, acceptedHash);
+
+      assertNull(invokeExtractJob(loop, claim));
+      assertTrue(queue.deferred);
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+    }
+
+    @Test
+    void changedStreamingCandidateSourceRoutesStableNewHashToAtomicQueueTransition() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-streaming-source", ".txt"), "first");
+      String acceptedHash = SourceContentHash.sha256(file);
+      Files.writeString(file, "second");
+      RecordingQueue queue = new RecordingQueue();
+      queue.acceptStreamingSupersession = true;
+      IndexingLoop loop = newLoop(queue, providerReturning("second"));
+      var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
+          1L, false, acceptedHash);
+
+      assertNull(invokeExtractJob(loop, claim));
+      assertEquals(SourceContentHash.sha256(file), queue.supersededSourceHash);
+      assertFalse(queue.deferred);
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+    }
+
+    @Test
+    void revokedClaimCannotPublishAfterAnAdministrativeDelete() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-revoked-claim", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      queue.claimRevoked = true;
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      loop.wireActiveLexicalSource(active);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      verify(active, never()).indexingCoordinator();
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+      assertTrue(queue.done);
+    }
+
+    @Test
+    void directDeleteFenceWaitsForClaimedWriteThroughBothGenerations() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-held-claim", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      when(active.indexingCoordinator()).thenReturn(activeWrites);
+      when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+      loop.wireActiveLexicalSource(active);
+      CountDownLatch activeWriteEntered = new CountDownLatch(1);
+      CountDownLatch releaseActiveWrite = new CountDownLatch(1);
+      AtomicBoolean greenWritten = new AtomicBoolean();
+      doAnswer(invocation -> {
+        activeWriteEntered.countDown();
+        assertTrue(releaseActiveWrite.await(5, TimeUnit.SECONDS));
+        return null;
+      }).when(activeWrites).indexSingle(any());
+      doAnswer(invocation -> {
+        greenWritten.set(true);
+        return null;
+      }).when(queue.indexingCoordinator).indexSingle(any());
+      Object extracted = extractedJob(file, "body");
+      FutureTask<Void> write = new FutureTask<>(() -> {
+        invokeWriteExtractedJob(loop, extracted);
+        return null;
+      });
+      Thread writer = new Thread(write, "held-candidate-write-test");
+      writer.start();
+      assertTrue(activeWriteEntered.await(5, TimeUnit.SECONDS));
+      CountDownLatch deleteStarted = new CountDownLatch(1);
+      FutureTask<Boolean> delete = new FutureTask<>(() -> {
+        deleteStarted.countDown();
+        return loop.withFileMutationFence(greenWritten::get);
+      });
+      Thread deleter = new Thread(delete, "held-direct-delete-test");
+      deleter.start();
+      try {
+        assertTrue(deleteStarted.await(5, TimeUnit.SECONDS));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (deleter.getState() != Thread.State.WAITING && System.nanoTime() < deadline) {
+          Thread.sleep(5);
+        }
+        assertEquals(Thread.State.WAITING, deleter.getState(),
+            "delete must actually wait on the claimed writer's fence");
+        assertFalse(delete.isDone());
+      } finally {
+        releaseActiveWrite.countDown();
+      }
+      write.get(5, TimeUnit.SECONDS);
+      assertTrue(delete.get(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void idleCommitKeepsGreenClaimPendingUntilActiveLexicalCommitSucceeds() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-idle", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      CommitOps activeCommits = mock(CommitOps.class);
+      CommitOps greenCommits = mock(CommitOps.class);
+      when(active.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
+      when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+      when(active.commitOps()).thenReturn(activeCommits);
+      loop.wireActiveLexicalSource(active);
+      replaceCommitOps(loop, greenCommits);
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      doThrow(new RuntimeException("A idle commit failed")).doNothing()
+          .when(activeCommits).commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      invokeFinishIdleCommit(loop);
+      verify(greenCommits, never()).commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      assertFalse(queue.done);
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+
+      invokeFinishIdleCommit(loop);
+      var commits = inOrder(activeCommits, greenCommits);
+      commits.verify(activeCommits, times(2)).commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      commits.verify(greenCommits).commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      assertTrue(queue.done);
+      assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
+    }
+
+    @Test
+    void shutdownCommitKeepsGreenClaimPendingUntilActiveLexicalCommitSucceeds() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-shutdown", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      CommitOps activeCommits = mock(CommitOps.class);
+      CommitOps greenCommits = mock(CommitOps.class);
+      when(active.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
+      when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+      when(active.commitOps()).thenReturn(activeCommits);
+      loop.wireActiveLexicalSource(active);
+      replaceCommitOps(loop, greenCommits);
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      doThrow(new RuntimeException("A shutdown commit failed")).doNothing()
+          .when(activeCommits).commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+      invokeFinalizeShutdownCommit(loop);
+      verify(greenCommits, never()).commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+      assertFalse(queue.done);
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+
+      invokeFinalizeShutdownCommit(loop);
+      var commits = inOrder(activeCommits, greenCommits);
+      commits.verify(activeCommits, times(2)).commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+      commits.verify(greenCommits).commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+      assertTrue(queue.done);
+      assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
+    }
+
+    @Test
     void writeFeedsSuccessEvidenceToTheEccOnlyForCompletedEmbeddings() throws Exception {
       // #470 D1: the attestation's success evidence flows through JobBatchWriter.write() -> the
       // ECC seam on EmbeddingProviderLifecycle. This test exercises the PRODUCTION wiring (real
@@ -864,6 +1091,95 @@ class IndexingLoopTest {
       assertNotNull(queue.lastEntry);
       assertEquals("SUCCESS_FULL", queue.lastEntry.artifactStatus());
       assertEquals("test-structured", queue.lastEntry.parserId());
+      assertNotNull(queue.lastTransition);
+      assertEquals(SourceContentHash.sha256(file), queue.lastTransition.committedContentHash());
+    }
+
+    @Test
+    void idleCommitRetriesCommittedOutcomeWithoutAnotherWriteOrCommit() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-idle-outcome-retry", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      CommitOps commitOps = mock(CommitOps.class);
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      replaceCommitOps(loop, commitOps);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+      assertNull(queue.lastOutcome);
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+
+      doThrow(new RuntimeException("first idle commit failure"))
+          .doNothing()
+          .when(commitOps)
+          .commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      invokeFinishIdleCommit(loop);
+      assertEquals(0, queue.markDoneTransitionCalls, "a failed index commit must skip outcome drain");
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+
+      queue.transientOutcomeWriteFailures = 2;
+      invokeFinishIdleCommit(loop);
+      assertEquals(2, queue.markDoneTransitionCalls, "batch and singleton outcome writes should retry");
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertEquals(
+          SourceContentHash.sha256(file),
+          loop.getJournal().pendingTransitionsForTest().getFirst().committedContentHash());
+
+      invokeFinishIdleCommit(loop);
+      assertEquals(3, queue.markDoneTransitionCalls);
+      assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
+      assertEquals(SourceContentHash.sha256(file), queue.lastTransition.committedContentHash());
+      verify(commitOps, times(2))
+          .commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+    }
+
+    @Test
+    void shutdownRetriesCommittedOutcomeWithoutAnotherWrite() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-shutdown-outcome-retry", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      CommitOps commitOps = mock(CommitOps.class);
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      replaceCommitOps(loop, commitOps);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+      queue.transientOutcomeWriteFailures = 2;
+      invokeFinishIdleCommit(loop);
+      assertEquals(0L, indexedSinceCommit(loop));
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertEquals(2, queue.markDoneTransitionCalls);
+
+      invokeFinalizeShutdownCommit(loop);
+
+      assertTrue(loop.getJournal().pendingTransitionsForTest().isEmpty());
+      assertEquals(3, queue.markDoneTransitionCalls);
+      assertEquals(SourceContentHash.sha256(file), queue.lastTransition.committedContentHash());
+      verify(commitOps)
+          .commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+      verify(commitOps, never())
+          .commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+    }
+
+    @Test
+    void failedShutdownCommitDoesNotDrainCommittedOutcome() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-shutdown-commit-fail", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      CommitOps commitOps = mock(CommitOps.class);
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      replaceCommitOps(loop, commitOps);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+      doThrow(new RuntimeException("shutdown commit failure"))
+          .when(commitOps)
+          .commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+
+      invokeFinalizeShutdownCommit(loop);
+
+      assertEquals(0, queue.markDoneTransitionCalls, "a failed shutdown commit must skip outcome drain");
+      assertNull(queue.lastOutcome);
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertEquals(
+          SourceContentHash.sha256(file),
+          loop.getJournal().pendingTransitionsForTest().getFirst().committedContentHash());
+      verify(commitOps)
+          .commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
     }
 
     @Test
@@ -1176,10 +1492,10 @@ class IndexingLoopTest {
       IndexCountOps indexCountOps = mock(IndexCountOps.class);
       WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
       queue.indexingCoordinator = mock(IndexingCoordinator.class);
-      when(indexCountOps.countByField(any(), any())).thenReturn(0);
+      when(indexCountOps.countByFieldOrThrow(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
-          new IndexingLoop(
+          new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               queue,
               queue.indexingCoordinator,
               commitOps,
@@ -1192,7 +1508,7 @@ class IndexingLoopTest {
               null,
               null,
               null,
-              new TimeboxedContentExtractor(
+              new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                   providerReturning("unused"),
                   Duration.ofSeconds(5),
                   (io.justsearch.indexerworker.extract.ExtractionMetricCatalog) null),
@@ -1217,7 +1533,7 @@ class IndexingLoopTest {
       // Tempdoc 516 Slice 4c: maybeFinalize is now a wrapper that delegates to the
       // lifecycle's tryFinalizeRebuild() and resets the commit-driver counters on true.
       // Tempdoc 726 F1: the lifecycle debounces certification with a two-consecutive-reads guard
-      // (pendingEmbeddings==0 twice — indexCountOps is a mock defaulting countByField()→0), so the
+      // (pendingEmbeddings==0 twice — indexCountOps explicitly supplies strict zero counts), so the
       // first invocation confirms and the second certifies + commits.
       Method finalize =
           IndexingLoop.class.getDeclaredMethod("tryFinalizeEmbeddingRebuild");
@@ -1226,7 +1542,7 @@ class IndexingLoopTest {
       finalize.invoke(loop); // second consecutive read — certifies
 
       verify(commitOps)
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_REBUILD_STAMP);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_REBUILD_STAMP);
       verify(ecc).onFingerprintStamped();
       assertEquals(
           0L,
@@ -1252,10 +1568,10 @@ class IndexingLoopTest {
       IndexCountOps indexCountOps = mock(IndexCountOps.class);
       WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
       queue.indexingCoordinator = mock(IndexingCoordinator.class);
-      when(indexCountOps.countByField(any(), any())).thenReturn(0);
+      when(indexCountOps.countByFieldOrThrow(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
-          new IndexingLoop(
+          new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               queue,
               queue.indexingCoordinator,
               commitOps,
@@ -1268,7 +1584,7 @@ class IndexingLoopTest {
               null,
               null,
               null,
-              new TimeboxedContentExtractor(
+              new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                   providerReturning("unused"),
                   Duration.ofSeconds(5),
                   (io.justsearch.indexerworker.extract.ExtractionMetricCatalog) null),
@@ -1297,12 +1613,128 @@ class IndexingLoopTest {
       finalizeShutdown.invoke(loop);
 
       verify(commitOps)
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_REBUILD_STAMP);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_REBUILD_STAMP);
       verify(ecc).onFingerprintStamped();
       // The indexedSinceCommit == 0 branch of the shutdown block must NOT also fire a redundant
       // INDEXING_LOOP_SHUTDOWN commit.
       verify(commitOps, never())
-          .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.INDEXING_LOOP_SHUTDOWN);
+          .commitAndTrack(CommitReason.INDEXING_LOOP_SHUTDOWN);
+    }
+
+    @Test
+    void stoppedBatchReturnsEveryUnvisitedClaim() throws Exception {
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var claims = List.of(new JobQueue.IndexJob(Path.of("one.txt"), null),
+          new JobQueue.IndexJob(Path.of("two.txt"), null));
+      invokeProcessBatch(loop, claims);
+      assertEquals(2, queue.returnedClaims.size());
+      assertTrue(claims.stream().allMatch(claim -> queue.returnedClaims.stream().anyMatch(returned -> returned == claim)));
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+    }
+
+    @Test
+    void stopDuringWriteReturnsRemainderButRetainsWrittenCommitOwner() throws Exception {
+      Path first = Files.writeString(Files.createTempFile("js-stop-first", ".txt"), "one");
+      Path second = Files.writeString(Files.createTempFile("js-stop-second", ".txt"), "two");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var claims = List.of(new JobQueue.IndexJob(first, null), new JobQueue.IndexJob(second, null));
+      setRunning(loop, true);
+      doAnswer(call -> { setRunning(loop, false); return null; })
+          .when(queue.indexingCoordinator).indexSingle(any());
+      invokeProcessBatch(loop, claims);
+      assertEquals(1, queue.returnedClaims.size());
+      assertSame(claims.get(1), queue.returnedClaims.getFirst());
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertSame(claims.getFirst(), loop.getJournal().pendingTransitionsForTest().getFirst().claim());
+      verify(queue.indexingCoordinator, times(1)).indexSingle(any());
+      assertNull(queue.lastOutcome, "the written effect still needs its commit");
+    }
+
+    @Test
+    void recoverableWriteErrorDoesNotAbandonLaterBatchUnits() throws Exception {
+      Path first = Files.writeString(Files.createTempFile("js-error-first", ".txt"), "one");
+      Path second = Files.writeString(Files.createTempFile("js-error-second", ".txt"), "two");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var claims = List.of(new JobQueue.IndexJob(first, null), new JobQueue.IndexJob(second, null));
+      setRunning(loop, true);
+      doThrow(new AssertionError("isolated write failure")).doNothing()
+          .when(queue.indexingCoordinator).indexSingle(any());
+      invokeProcessBatch(loop, claims);
+      assertEquals(IngestionOutcomeClass.WRITE_FAILED, queue.lastOutcome.outcomeClass());
+      assertEquals(1, loop.getJournal().pendingTransitionsForTest().size());
+      assertSame(claims.get(1), loop.getJournal().pendingTransitionsForTest().getFirst().claim());
+      verify(queue.indexingCoordinator, times(2)).indexSingle(any());
+    }
+
+    @Test
+    void fatalWriteErrorPropagatesWithoutClaimingSafeBatchExit() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-fatal", ".txt"), "one");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      setRunning(loop, true);
+      var fatal = new InternalError("fatal fixture");
+      doThrow(fatal).when(queue.indexingCoordinator).indexSingle(any());
+      var thrown = assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> invokeProcessBatch(loop, List.of(new JobQueue.IndexJob(file, null))));
+      assertSame(fatal, thrown.getCause());
+      assertTrue(queue.returnedClaims.isEmpty());
+      assertNull(queue.lastOutcome);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void postHandoffObserverFailureKeepsPendingCommitOwner(boolean error) throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-observer-failure", ".txt"), "one");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var metrics = mock(io.justsearch.indexerworker.metrics.OperationalMetrics.class);
+      var field = JobBatchWriter.class.getDeclaredField("metrics");
+      field.setAccessible(true);
+      field.set(loop.getWriter(), metrics);
+      Throwable failure = error ? new AssertionError("observer") : new IllegalStateException("observer");
+      doThrow(failure).when(metrics).recordDocumentIndexed(anyLong());
+      ExtractedJob job = (ExtractedJob) extractedJob(file, "one");
+      loop.getWriter().write(job, null);
+      loop.getJournal().returnBatchClaims(List.of(job.claim()));
+      assertNull(queue.lastOutcome, "observer failure cannot rewrite the written effect as failed");
+      assertTrue(queue.returnedClaims.isEmpty());
+      assertTrue(loop.getJournal().ownsPendingCommit(job.claim()));
+      loop.getJournal().drainPending();
+      assertEquals(IngestionOutcomeClass.SUCCESS_FULL, queue.lastOutcome.outcomeClass());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void batchEmbeddingErrorFallsBackUnlessFatal(boolean fatal) throws Exception {
+      Path first = Files.writeString(Files.createTempFile("js-embed-first", ".txt"), "one");
+      Path second = Files.writeString(Files.createTempFile("js-embed-second", ".txt"), "two");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      var provider = mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
+      when(provider.isAvailable()).thenReturn(true);
+      Error failure = fatal ? new InternalError("fatal embedding fixture") : new AssertionError("batch embedding fixture");
+      when(provider.embedDocumentBatch(anyList())).thenThrow(failure);
+      loop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
+      var migration = IndexingLoop.class.getDeclaredField("migrationActiveSupplier");
+      migration.setAccessible(true);
+      migration.set(loop, (java.util.function.BooleanSupplier) () -> true);
+      setRunning(loop, true);
+      var claims = List.of(new JobQueue.IndexJob(first, null), new JobQueue.IndexJob(second, null));
+      if (fatal) {
+        var thrown = assertThrows(java.lang.reflect.InvocationTargetException.class,
+            () -> invokeProcessBatch(loop, claims));
+        assertSame(failure, thrown.getCause());
+        verify(queue.indexingCoordinator, never()).indexSingle(any());
+        assertTrue(queue.returnedClaims.isEmpty());
+      } else {
+        invokeProcessBatch(loop, claims);
+        verify(queue.indexingCoordinator, times(2)).indexSingle(any());
+        assertEquals(2, loop.getJournal().pendingTransitionsForTest().size());
+        assertTrue(queue.returnedClaims.isEmpty());
+      }
     }
 
     private IndexingLoop newLoop(RecordingQueue queue, ContentExtractorProvider provider) {
@@ -1319,7 +1751,7 @@ class IndexingLoopTest {
                 return new DocumentIdentityStore.Identity(hash, "test-uid-" + hash, now, now);
               });
       queue.indexingCoordinator = mock(IndexingCoordinator.class);
-      return new IndexingLoop(
+      return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
           queue,
           queue.indexingCoordinator,
           mock(CommitOps.class),
@@ -1332,7 +1764,7 @@ class IndexingLoopTest {
           null,
           null,
           null,
-          new TimeboxedContentExtractor(
+          new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               provider,
               Duration.ofSeconds(5),
               (io.justsearch.indexerworker.extract.ExtractionMetricCatalog) null),
@@ -1341,17 +1773,47 @@ class IndexingLoopTest {
     }
 
     private Object invokeExtractJob(IndexingLoop loop, Path file) throws Exception {
+      return invokeExtractJob(loop, new JobQueue.IndexJob(file, null));
+    }
+
+    private Object invokeExtractJob(IndexingLoop loop, JobQueue.IndexJob claim) throws Exception {
       // W5.2: extractJob moved to JobBatchExtractor. Call via the package-private accessor
       // + reflection on the now-private extractJob method on the extractor.
       Method method =
-          JobBatchExtractor.class.getDeclaredMethod("extractJob", Path.class, String.class);
+          JobBatchExtractor.class.getDeclaredMethod("extractJob", JobQueue.IndexJob.class);
       method.setAccessible(true);
-      return method.invoke(loop.getExtractor(), file, null);
+      var extracted = method.invoke(loop.getExtractor(), claim);
+      if (extracted instanceof ExtractedJob job) assertSame(claim, job.claim());
+      return extracted;
     }
 
     private void invokeWriteExtractedJob(IndexingLoop loop, Object extractedJob) throws Exception {
       // W5.1: writeExtractedJob moved to JobBatchWriter.write.
       loop.getWriter().write((ExtractedJob) extractedJob, null);
+    }
+
+    private void invokeFinishIdleCommit(IndexingLoop loop) throws Exception {
+      Method finishIdleCommit = IndexingLoop.class.getDeclaredMethod("finishIdleCommit");
+      finishIdleCommit.setAccessible(true);
+      finishIdleCommit.invoke(loop);
+    }
+
+    private void invokeFinalizeShutdownCommit(IndexingLoop loop) throws Exception {
+      Method finalizeShutdown = IndexingLoop.class.getDeclaredMethod("finalizeShutdownCommit");
+      finalizeShutdown.setAccessible(true);
+      finalizeShutdown.invoke(loop);
+    }
+
+    private void replaceCommitOps(IndexingLoop loop, CommitOps commitOps) throws Exception {
+      var commitOpsField = IndexingLoop.class.getDeclaredField("commitOps");
+      commitOpsField.setAccessible(true);
+      commitOpsField.set(loop, commitOps);
+    }
+
+    private long indexedSinceCommit(IndexingLoop loop) throws Exception {
+      var indexedField = IndexingLoop.class.getDeclaredField("indexedSinceCommit");
+      indexedField.setAccessible(true);
+      return indexedField.getLong(loop);
     }
 
     private void invokeProcessBatch(IndexingLoop loop, List<JobQueue.IndexJob> jobs) throws Exception {
@@ -1363,7 +1825,7 @@ class IndexingLoopTest {
     private void setRunning(IndexingLoop loop, boolean value) throws Exception {
       var field = IndexingLoop.class.getDeclaredField("running");
       field.setAccessible(true);
-      ((java.util.concurrent.atomic.AtomicBoolean) field.get(loop)).set(value);
+      ((AtomicBoolean) field.get(loop)).set(value);
     }
 
     private Object extractedJob(Path file, String content) throws Exception {
@@ -1393,6 +1855,7 @@ class IndexingLoopTest {
           artifact,
           System.currentTimeMillis(),
           envelope,
+          SourceContentHash.sha256(file),
           "00000000-0000-4000-8000-000000000001");
     }
 
@@ -1479,8 +1942,7 @@ class IndexingLoopTest {
           new java.util.concurrent.atomic.AtomicInteger(0);
       java.util.concurrent.atomic.AtomicInteger polls =
           new java.util.concurrent.atomic.AtomicInteger(0);
-      java.util.concurrent.CountDownLatch batchBClaimed =
-          new java.util.concurrent.CountDownLatch(1);
+      CountDownLatch batchBClaimed = new CountDownLatch(1);
 
       JobQueue queue = mock(JobQueue.class);
       lenient()
@@ -1510,7 +1972,7 @@ class IndexingLoopTest {
       loop.start();
       try {
         assertTrue(
-            batchBClaimed.await(20, java.util.concurrent.TimeUnit.SECONDS),
+            batchBClaimed.await(20, TimeUnit.SECONDS),
             "the indexing loop must return from background enrichment and claim batch B."
                 + " Pre-fix the combined tight loop continued on `written > 0` — activity, not"
                 + " progress — so pollPending was never reached again (tempdoc 798). Observed"
@@ -1586,7 +2048,7 @@ class IndexingLoopTest {
       encoderBindings.bindSpladeEncoder(mock(SpladeEncoder.class));
       encoderBindings.bindNerService(nerService);
 
-      return new IndexingLoop(
+      return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
           queue,
           coordinator,
           commitOps,
@@ -1599,7 +2061,7 @@ class IndexingLoopTest {
           null,
           null,
           null,
-          new TimeboxedContentExtractor(
+          new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
               new ContentExtractorProvider() {
                 @Override
                 public ExtractionResult extract(Path file) {
@@ -1667,23 +2129,9 @@ class IndexingLoopTest {
     @Override
     public void open() {}
 
-    @Override
-    public void writePort(int port) {}
 
-    @Override
-    public long readHeartbeat() {
-      return 0L;
-    }
 
-    @Override
-    public boolean isShutdownRequested() {
-      return false;
-    }
 
-    @Override
-    public boolean shouldDie() {
-      return false;
-    }
 
     @Override
     public boolean isMainGpuActive() {
@@ -1699,9 +2147,10 @@ class IndexingLoopTest {
     public void close() {}
   }
 
-  private static final class RecordingQueue implements JobQueue {
+  private static final class RecordingQueue implements SwitchBufferCapableQueue {
     IngestionOutcome lastOutcome;
     IngestionLedgerEntry lastEntry;
+    IngestionLedgerTransition lastTransition;
     /**
      * Slice G.1 — every outcome-bearing markDone* call is appended here so tests can assert on
      * the full sequence (the prior single-{@code lastOutcome} field collapsed multiple calls
@@ -1712,9 +2161,29 @@ class IndexingLoopTest {
     boolean done;
     boolean terminalFailed;
     boolean deferred;
+    boolean acceptStreamingSupersession;
+    String supersededSourceHash;
+    boolean claimRevoked;
     boolean failOutcomeWrites;
     boolean failOutcomeWritesAsIllegalArgument;
+    int transientOutcomeWriteFailures;
+    int markDoneTransitionCalls;
     IndexingCoordinator indexingCoordinator;
+
+    @Override
+    public boolean supersedeStreamingRecordedSource(IndexJob claim, String observedSha256,
+        IngestionOutcome staleOutcome, IngestionLedgerEntry entry) {
+      supersededSourceHash = observedSha256;
+      return acceptStreamingSupersession;
+    }
+
+    @Override public boolean putSwitchBuffer(String key, String op, String payload) { return false; }
+    @Override public boolean putSyncRoot(String key, SwitchBufferSyncRoot payload) { return false; }
+    @Override public long switchBufferDepth() { return 0L; }
+    @Override public List<SwitchBufferOp> listSwitchBufferOps() { return List.of(); }
+    @Override public int removeReplayedSwitchBufferOps(List<SwitchBufferOp> replayed) { return 0; }
+
+    @Override public boolean ownsClaimForPublication(IndexJob claim) { return !claimRevoked; }
 
     private void maybeFail(String op) {
       if (failOutcomeWritesAsIllegalArgument) {
@@ -1725,10 +2194,22 @@ class IndexingLoopTest {
         throw new io.justsearch.indexerworker.queue.OutcomeWriteException(
             "simulated rollback during " + op, null);
       }
+      if (transientOutcomeWriteFailures > 0) {
+        transientOutcomeWriteFailures--;
+        throw new io.justsearch.indexerworker.queue.OutcomeWriteException(
+            "simulated transient rollback during " + op, null);
+      }
     }
 
     @Override
     public void open() {}
+
+    final List<IndexJob> returnedClaims = new java.util.ArrayList<>();
+
+    @Override
+    public void returnUnfinishedClaims(java.util.Collection<IndexJob> claims) {
+      returnedClaims.addAll(claims);
+    }
 
     @Override
     public int enqueue(List<Path> paths, String collection) {
@@ -1770,12 +2251,17 @@ class IndexingLoopTest {
     @Override
     public void markDoneTransitions(
         java.util.Collection<IngestionLedgerTransition> transitions, IngestionOutcome outcome) {
+      markDoneTransitionCalls++;
       maybeFail("markDoneTransitions");
       record(outcome);
       lastEntry =
           transitions == null || transitions.isEmpty()
               ? null
               : transitions.iterator().next().entry();
+      lastTransition =
+          transitions == null || transitions.isEmpty()
+              ? null
+              : transitions.iterator().next();
       done = true;
     }
 

@@ -36,11 +36,19 @@
                 "type" : [ "string", "null" ]
               },
               "state" : {
-                "$ref" : "#/components/schemas/lifecycle-snapshot/$defs/state"
+                "$ref" : "#/components/schemas/lifecycle-snapshot/$defs/componentState"
+              },
+              "state_since" : {
+                "format" : "date-time",
+                "type" : "string"
               }
             },
-            "required" : [ "state" ],
+            "required" : [ "state", "reason_code", "state_since" ],
             "type" : "object"
+          },
+          "componentState" : {
+            "enum" : [ "ABSENT", "STARTING", "READY", "RELOADING", "FAILED", "UNAVAILABLE" ],
+            "type" : "string"
           },
           "state" : {
             "enum" : [ "LIFECYCLE_STATE_STARTING", "LIFECYCLE_STATE_READY", "LIFECYCLE_STATE_DEGRADED", "LIFECYCLE_STATE_ERROR", "LIFECYCLE_STATE_STOPPING", "LIFECYCLE_STATE_STOPPED" ],
@@ -52,17 +60,20 @@
           "components" : {
             "additionalProperties" : false,
             "properties" : {
-              "head" : {
+              "api" : {
                 "$ref" : "#/components/schemas/lifecycle-snapshot/$defs/component"
               },
-              "inference" : {
+              "encoders" : {
                 "$ref" : "#/components/schemas/lifecycle-snapshot/$defs/component"
               },
-              "worker" : {
+              "generative" : {
+                "$ref" : "#/components/schemas/lifecycle-snapshot/$defs/component"
+              },
+              "index" : {
                 "$ref" : "#/components/schemas/lifecycle-snapshot/$defs/component"
               }
             },
-            "required" : [ "head", "worker", "inference" ],
+            "required" : [ "api", "index", "encoders", "generative" ],
             "type" : "object"
           },
           "lifecycle" : {
@@ -86,11 +97,11 @@
             "type" : "string"
           },
           "schema_version" : {
-            "const" : 1
+            "const" : 2
           }
         },
         "required" : [ "schema_version", "observed_at", "lifecycle", "components" ],
-        "title" : "JustSearch lifecycle snapshot",
+        "title" : "JustSearch lifecycle snapshot schema 2",
         "type" : "object"
       },
       "runtime-live-response" : {
@@ -258,11 +269,6 @@
           "worker" : {
             "additionalProperties" : true,
             "properties" : {
-              "grpcPort" : {
-                "maximum" : 65535,
-                "minimum" : 1,
-                "type" : "integer"
-              },
               "indexBasePath" : {
                 "type" : "string"
               },
@@ -294,6 +300,11 @@
           },
           "head" : {
             "additionalProperties" : false,
+            "dependentRequired" : {
+              "apiBaseUrl" : [ "apiPort", "readyAt" ],
+              "apiPort" : [ "apiBaseUrl", "readyAt" ],
+              "readyAt" : [ "apiPort", "apiBaseUrl" ]
+            },
             "properties" : {
               "apiBaseUrl" : {
                 "pattern" : "^https?://(127\\.0\\.0\\.1|localhost|\\[::1\\])(?::[0-9]+)?$",
@@ -311,7 +322,6 @@
                 "type" : "string"
               }
             },
-            "required" : [ "apiPort", "apiBaseUrl", "readyAt" ],
             "type" : "object"
           },
           "instanceId" : {
@@ -334,7 +344,7 @@
             "$ref" : "#/components/schemas/runtime-manifest-public/$defs/runtimeContract"
           },
           "schemaVersion" : {
-            "const" : 1
+            "const" : 2
           },
           "startedAt" : {
             "type" : "string"
@@ -645,6 +655,6 @@
     }
   },
   "x-justsearch-runtime-contract" : {
-    "supportedVersions" : [ "0.2.0" ]
+    "supportedVersions" : [ "0.4.0" ]
   }
 }

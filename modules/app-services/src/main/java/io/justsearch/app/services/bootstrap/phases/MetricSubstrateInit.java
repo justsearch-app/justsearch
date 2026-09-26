@@ -50,13 +50,13 @@ public final class MetricSubstrateInit {
       TimeseriesSnapshotHolder gpuMemoryUtilizationMetricHolder,
       GpuMemoryUtilizationMetricProducer gpuMemoryUtilizationMetricProducer) {}
 
-  public static Output run(Telemetry telemetry) {
+  public static Output run(io.justsearch.core.execution.EngineExecutorRegistry executors, Telemetry telemetry) {
     JobQueueDepthMetricResourceCatalog jqdCatalog = new JobQueueDepthMetricResourceCatalog();
     JobQueueDepthMetricChangeRegistry jqdChanges = new JobQueueDepthMetricChangeRegistry();
     TimeseriesSnapshotHolder jqdHolder = new TimeseriesSnapshotHolder();
     JobQueueDepthMetricProducer jqdProducer =
         (telemetry instanceof LocalTelemetry ltJqd)
-            ? new JobQueueDepthMetricProducer(ltJqd::getRrdStore, jqdHolder, jqdChanges)
+            ? new JobQueueDepthMetricProducer(executors, ltJqd::getRrdStore, jqdHolder, jqdChanges)
             : null;
     if (jqdProducer != null) {
       jqdProducer.start();
@@ -69,7 +69,7 @@ public final class MetricSubstrateInit {
     TimeseriesSnapshotHolder dirHolder = new TimeseriesSnapshotHolder();
     DocumentsIndexedRateMetricProducer dirProducer =
         (telemetry instanceof LocalTelemetry ltDir)
-            ? new DocumentsIndexedRateMetricProducer(ltDir::getRrdStore, dirHolder, dirChanges)
+            ? new DocumentsIndexedRateMetricProducer(executors, ltDir::getRrdStore, dirHolder, dirChanges)
             : null;
     if (dirProducer != null) {
       dirProducer.start();
@@ -80,7 +80,7 @@ public final class MetricSubstrateInit {
     TimeseriesSnapshotHolder guHolder = new TimeseriesSnapshotHolder();
     GpuUtilizationMetricProducer guProducer =
         (telemetry instanceof LocalTelemetry ltGu)
-            ? new GpuUtilizationMetricProducer(ltGu::getRrdStore, guHolder, guChanges)
+            ? new GpuUtilizationMetricProducer(executors, ltGu::getRrdStore, guHolder, guChanges)
             : null;
     if (guProducer != null) {
       guProducer.start();
@@ -93,7 +93,7 @@ public final class MetricSubstrateInit {
     TimeseriesSnapshotHolder gmHolder = new TimeseriesSnapshotHolder();
     GpuMemoryUtilizationMetricProducer gmProducer =
         (telemetry instanceof LocalTelemetry ltGm)
-            ? new GpuMemoryUtilizationMetricProducer(ltGm::getRrdStore, gmHolder, gmChanges)
+            ? new GpuMemoryUtilizationMetricProducer(executors, ltGm::getRrdStore, gmHolder, gmChanges)
             : null;
     if (gmProducer != null) {
       gmProducer.start();

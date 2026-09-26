@@ -1,0 +1,253 @@
+{
+  "date": "2026-09-14",
+  "base": "f15b66455c4374730797ffb9c8b83d5e74d0382c",
+  "environment": "Windows, Java25; no owned dev stack; quick1407 ABSENT with no foreign runs",
+  "testedSources": {
+    "modules/app-api/src/main/java/io/justsearch/app/api/OnlineAiRuntimeControl.java": "1cf1e725889ed1d5531603b18db4c8460214b701ad420d868b1da342a1c195a2",
+    "modules/app-api/src/main/java/io/justsearch/app/api/UiSettings.java": "5405a05e3aeabaef1a13e2369bbfa87b7acd2cf77c0f9cc57948bcc6f9ec83b1",
+    "modules/app-api/src/main/java/io/justsearch/app/api/settings/LlmSettingsV2.java": "e0e5470e8a6319d588f10013c4948cae2f933f3515061c06e656fe778fb71e96",
+    "modules/app-inference/src/main/java/io/justsearch/app/inference/OnlineAiServiceImpl.java": "ca698d4994a166d8006b4c11d1e3a8a5633b9019ff78f877d66e823b1b5db492",
+    "modules/app-inference/src/test/java/io/justsearch/app/inference/OnlineAiServiceImplTest.java": "dfee80bc2b6fbe4387ff728c5d52c8b2e75e46669c1158e9e05c4529fbbc6f42",
+    "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java": "77b9c03289a058c392ff0293658e93436f29075c674ba7332abdd27a625c824d",
+    "modules/app-services/src/main/java/io/justsearch/app/services/ai/pack/AiPackImportService.java": "3730d0109883f90cc55b7bd37d8801d6ff6a35a8d00c9f18aadedca3578dc26d",
+    "modules/app-services/src/main/java/io/justsearch/app/services/ai/runtime/RuntimeActivationService.java": "0bff0ab2b5aab822ef96ffea87da08de86b1c99f6ca837b8e723bf7cd6284571",
+    "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/ServicePhase.java": "2cfe41bcc69845ae974f28d2aaa995167327a2d5863f8abcfda16d9039605cae",
+    "modules/app-services/src/main/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImpl.java": "babc2da9a99131008e302f5903ca0db485825bd4557641508e41693b52eb4b98",
+    "modules/app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java": "a6eee0a5506a50bc513d0c9bd4d060861c0c21bdbfc3431bd21ebc87222906da",
+    "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsResetDefaults.java": "f84bec50f0471f9c02a67eb1e2caa4553cecf92c5d4b86629ac0a3919cd9dfcc",
+    "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsV2Projection.java": "478663bd594285fca6106fe963417425c5a86b98065f24e7e2102e0908e8fcab",
+    "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java": "c9a2d73f5d90d67c8d5946974ba872198c60a4ce4ca3b72e84fe6f0a4775026f",
+    "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceCudaServerExeGuardTest.java": "98fe64fceebf03061f13893c5e16ce8c2dc52f061e17e42f32ffb8440d96f613",
+    "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java": "cc2def2f3b1b3722f3601258d545ee3b56037e37be1a86eed7457cfc0144010e",
+    "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java": "047fa619851f9f1dd52e25f2d1445205f35996e635a5ca26fa10719b7ea34e83",
+    "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsV2ProjectionTest.java": "1183796faf48130d653a2b942ee069140c3d4e4c980f452699ec3869dd1f9c23",
+    "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsGpuOverrideMigrationTest.java": "b1d4d3c2c6aba578e10d3b6026120dc0e9ca5ac6701411143950ff30508dd567",
+    "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java": "6585de7211b21f1c98d04d868ee45fa27ceb8bac993976c75d1c9c2e430746f4",
+    "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java": "e3ec5e2baa7da1783644a8b8ce1a1aa2abb576b1bba6bf250280629ddefe7b26",
+    "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java": "70743f1a4b6d2b6371ef04c2f74afd1c03a6f7a4a133be7c25bf079eb31a0f54",
+    "modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java": "eee462304d14a9fed5216be6aea95d6259b3fafaa3558f1b0ad5f3663aed9edd",
+    "modules/configuration/src/main/java/io/justsearch/configuration/ModelPathSource.java": "174c90450c819727c50e3f15bfd2ce4b069aefc81c4635fc58d20aeaa64c566a",
+    "modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfig.java": "7c27c42d80490c4b6de69d15c4e0b7f92fbb18fed503bbbe4acc18272f1fa079",
+    "modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java": "536a333396ae5a0b61cedb0fbfb65c133b51ebf3068f09addd8ee5de703c73f7",
+    "modules/configuration/src/test/java/io/justsearch/configuration/EnvRegistryTest.java": "e1fa0bc1681c4a071eb9795c236b738c50c3f08d5570643a850caa1bcf68d99e",
+    "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java": "c7666e26a76a1916a3077353623da1ca97e6cc26ba7ae12329b7082820e7bc70",
+    "modules/ui/src/main/java/io/justsearch/ui/api/EffectiveConfigController.java": "3aac47fa4240a228f8612b5b72b1fa8846c7f3ce0ed9bd1f0bb7385cd9e84763",
+    "modules/ui/src/main/java/io/justsearch/ui/api/InferenceHandlers.java": "b15e727ca031c4b6c451110ee998004767980652769fdf3464c754685f1fe556",
+    "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppConfigRebuildOrderingTest.java": "ffe771f9b537e24aa4ed9d884caef38d5691ca574a1ef04473dc60394a81ca90",
+    "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppContextWindowAutoDetectTest.java": "1fbc9b8f3b0991140e707a470060988dffebeedc739c629061ee45b4d8339ab7",
+    "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppServerAutoSelectionTest.java": "b50f0b0fe023cd94164e58a47fc6b0a2bb0bd920abd19f2ca101e5306fd4f063",
+    "scripts/docs/runtime-config-matrix-lib.mjs": "8043db3342e47703972204d4ec404e4878a3e175ea65346a7b1ec79331eccb7d"
+  },
+  "command": "./gradlew.bat :modules:app-services:test :modules:app-inference:test :modules:app-api:test :modules:configuration:test :modules:ui:test :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:app-inference:pmdMain :modules:app-inference:pmdTest :modules:configuration:pmdMain :modules:configuration:pmdTest :modules:app-services:spotlessCheck :modules:app-api:spotlessCheck :modules:ui:spotlessCheck :modules:configuration:spotlessCheck :modules:app-inference:spotlessCheck :modules:ui:compileIntegrationTestJava --console=plain",
+  "result": "PASS",
+  "counts": {
+    "revision": "f15b66455-dirty",
+    "command": "Full five affected suites plus PMD/format/integration compilation; exact task graph in log",
+    "summary": {
+      "tests": 4851,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "suites": 715
+    },
+    "tasks": [
+      {
+        "module": "configuration",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 272,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 32
+      },
+      {
+        "module": "app-api",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 204,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 42
+      },
+      {
+        "module": "app-inference",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 323,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 30
+      },
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 2833,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 3,
+        "suites": 426
+      },
+      {
+        "module": "ui",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 1219,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 185
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1409.txt",
+      "sha256": "d8a3df8dfd814c9d95f8a8546de7fe4130073ba8947caaca60b8eb996bac6e39",
+      "bytes": 64714
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1409-counts.json",
+      "sha256": "a1ed472578ba4ddd28763c5d5de3bb08ecf86f38920a25f0cefa1de39da3d4e2",
+      "bytes": 898
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1409-xml.zip",
+      "sha256": "073249c38d6b890bd726c902e74bd6b5a9f8c3d11b96fae23ee104f44f57cf7c",
+      "bytes": 157067
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1410.txt",
+      "sha256": "64a319416a9370776d6e797f945087973750f3d4697264a32600c7f1d216ce41",
+      "bytes": 46263
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1410-counts.json",
+      "sha256": "ea2a5add2523a95a23695cdbfa445d730426a1806e6fc124ba11230a4003fc41",
+      "bytes": 1095
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1410-xml.zip",
+      "sha256": "b99769a9c44bf02ce0bc773ba65c67347b9439cba25207467984c1f8e156845a",
+      "bytes": 160011
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1411.txt",
+      "sha256": "907eaaa349d61fbcc315b7a3892fa63d94a6e333ec0a214037204401b46812d1",
+      "bytes": 41243
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1411-counts.json",
+      "sha256": "d298dc1e8a6a2820a742a0394903676eb1054c815a06965885f5c8596b2f47ae",
+      "bytes": 1099
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1411-xml.zip",
+      "sha256": "e6ef9b420ebff737cc3ffe04d4cc9eeedc50a5c38c281b38849d722c59672d56",
+      "bytes": 160011
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1413.txt",
+      "sha256": "1e657970e8b847603fd0eeacdf701bf2695e39cf3b527d4e4e3c115746420847",
+      "bytes": 54885
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1413-counts.json",
+      "sha256": "cb66ecc88c2f0ee482eea1ddb22c2187debab61d4550a67d0e0c0333a0e96621",
+      "bytes": 1117
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1413-xml.zip",
+      "sha256": "3d6976a6164fd7f727e3e27cdd93769cf785e84bb23d9473fad9271730a383c6",
+      "bytes": 170078
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1414-mutant.txt",
+      "sha256": "30b97ee2cf54d2fd11f50b620498f4dcb9e767f867bac428915fb5238fb1bec6",
+      "bytes": 43208
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1414-mutant-counts.json",
+      "sha256": "de83a19ced827d43ca0c6aac0552663fcaed3ae4b657dc72698983061f5b2ca5",
+      "bytes": 499
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1414-mutant-xml.zip",
+      "sha256": "fa2ed28b4243d2ad1b099154736676af63386b9609472313c039a0ca74482a0d",
+      "bytes": 75641
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1416.txt",
+      "sha256": "3193264e34ebe5d0cc36f04bf8042d0f1d7c205386c6df809885f43cc320c2da",
+      "bytes": 50360
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1416-counts.json",
+      "sha256": "6c349785bbc6e5990c663a2878312ff40da35dba031fe1e885791917e8cf56fd",
+      "bytes": 914
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1416-xml.zip",
+      "sha256": "de6416875b3bfa98c084e8f39201e9c7d0697ac8be1177f9763745a2627c9c08",
+      "bytes": 77097
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1417.txt",
+      "sha256": "b2d9a11a9279f35f4d00c9c4a76e91e145db7205ebbd8ad59e4358a5ad127734",
+      "bytes": 46003
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1417-counts.json",
+      "sha256": "13ac1afea45d4f8df63288d51007c3255965f1835957ec0a739740f4c7f9b062",
+      "bytes": 1299
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1417-xml.zip",
+      "sha256": "a020b1b98b9db578f60e373744aba155836451bab4a4e109f259d03cbcbffeba",
+      "bytes": 1379587
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1418.txt",
+      "sha256": "97f015164914cb53d7b9f2d504087f0b89aefa57814c785eee5ebee71233bf91",
+      "bytes": 47161
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1418-counts.json",
+      "sha256": "1c1850f3d607f836091aca6cc323aa345c781584bfaf16a844db7d09886d2f76",
+      "bytes": 1299
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1418-xml.zip",
+      "sha256": "712cad2b739fe579e4ee01cf793016df1e99c87c1bf3af6c80364323eb4a03cd",
+      "bytes": 1371914
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1420.txt",
+      "sha256": "cf06c4989c57262363dfffca942a51b7dd623b280bdb177baa0303afda81ad45",
+      "bytes": 49459
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1420-counts.json",
+      "sha256": "7163000292ad90b3f931e9bfe6e8ae11e69c53ff36020f06caf24ca73204961b",
+      "bytes": 1299
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/c2-activation1420-xml.zip",
+      "sha256": "e7f52656abdd2325de0a911bbe54ffdbb809ed56477e2c752dd5a3046be8c75e",
+      "bytes": 1383002
+    }
+  ],
+  "review": "c2_witness_final_review: bounded source review clear after corrections; reviewer ran no tools that execute tests",
+  "negativeProof": "1414 deliberately restored client-kind authority, mutable candidate alias and omitted GPU zero. Four expected regression failures. Byte-exact restoration verified before green reruns.",
+  "limits": [
+    "Four pre-existing skips",
+    "Three test tasks reused applicable executed results from prior generations; see task statuses",
+    "Existing compiler/native library warnings remain visible in raw logs",
+    "No new hosted-success, live-model or installed successor claim",
+    "C2-6 other writers and subsequent stages remain open"
+  ],
+  "retention": "Retain raw artifacts through lane acceptance plus30days; export before worktree release."
+}

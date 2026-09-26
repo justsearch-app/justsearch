@@ -1,11 +1,17 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.gpl;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineFutures;
+
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.gpl.GplStatusProvider;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import java.util.Objects;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
@@ -21,7 +27,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -50,7 +58,10 @@ import org.slf4j.LoggerFactory;
  * <p>The cross-encoder reranker supplier is optional. When it returns {@code null}, all triples
  * receive a default score of {@code 1.0f}.
  */
-public final class GplJobCoordinator implements GplStatusProvider {
+public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "gpl-job-coordinator", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+
 
   private static final Logger log = LoggerFactory.getLogger(GplJobCoordinator.class);
 
@@ -63,7 +74,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
   /** Default cross-encoder deadline per query-doc pair. */
   private static final long RERANK_DEADLINE_MS = 5_000L;
 
-  /** Timeout for collecting a single streaming LLM call. */
+  /** Timeout for collecting a single LLM completion call. */
   private static final long STREAM_TIMEOUT_SECONDS = 30L;
 
   /** Max time to wait for AI to become available during a job (exponential backoff). */
@@ -135,7 +146,9 @@ public final class GplJobCoordinator implements GplStatusProvider {
    */
   private record GplRunSnapshot(long processedDocs, long totalDocs, Instant lastRunAt, String lastError) {}
 
-  private final Supplier<RemoteKnowledgeClient> knowledgeClientSupplier;
+  private final Supplier<KnowledgeClient> knowledgeClientSupplier;
+  private final EngineExecutorRegistry.Registration executorRegistration;
+  private final ExecutorService executor;
   private final OnlineAiService onlineAiService;
   private final boolean rerankerAvailable;
   private final GplTrainingTripleStore tripleStore;
@@ -148,6 +161,8 @@ public final class GplJobCoordinator implements GplStatusProvider {
   private final AtomicReference<GplRunSnapshot> runSnapshot =
       new AtomicReference<>(new GplRunSnapshot(0L, 0L, null, null));
   private final CountDownLatch terminalLatch = new CountDownLatch(1);
+  private volatile CompletableFuture<?> jobFuture;
+  private volatile boolean closed;
 
   /**
    * Creates a new coordinator.
@@ -158,11 +173,18 @@ public final class GplJobCoordinator implements GplStatusProvider {
    * @param tripleStore persistent NDJSON store for training triples
    */
   public GplJobCoordinator(
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      EngineExecutorRegistry processExecutors,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       OnlineAiService onlineAiService,
       boolean rerankerAvailable,
       GplTrainingTripleStore tripleStore) {
-    this(knowledgeClientSupplier, onlineAiService, rerankerAvailable, tripleStore, null);
+    this(
+        processExecutors,
+        knowledgeClientSupplier,
+        onlineAiService,
+        rerankerAvailable,
+        tripleStore,
+        null);
   }
 
   /**
@@ -175,25 +197,59 @@ public final class GplJobCoordinator implements GplStatusProvider {
    * @param onJobCompleted invoked on the job thread after {@link GplJobStatus.Status#COMPLETED}; may be null
    */
   public GplJobCoordinator(
-      Supplier<RemoteKnowledgeClient> knowledgeClientSupplier,
+      EngineExecutorRegistry processExecutors,
+      Supplier<KnowledgeClient> knowledgeClientSupplier,
       OnlineAiService onlineAiService,
       boolean rerankerAvailable,
       GplTrainingTripleStore tripleStore,
       Runnable onJobCompleted) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
     this.knowledgeClientSupplier =
         Objects.requireNonNull(knowledgeClientSupplier, "knowledgeClientSupplier");
     this.onlineAiService = onlineAiService;
     this.rerankerAvailable = rerankerAvailable;
     this.tripleStore = tripleStore;
     this.onJobCompleted = onJobCompleted;
+
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.gpl-job-coordinator",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.PLATFORM,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      this.executorRegistration = registration;
+      this.executor =
+          registration.open(
+              runnable -> {
+                Thread thread = new Thread(runnable, "gpl-job-coordinator");
+                thread.setDaemon(true);
+                return thread;
+              });
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
   /**
-   * Submits the GPL job to run asynchronously on a virtual thread.
+   * Submits the GPL job to run asynchronously on the bounded GPL platform executor.
    *
    * @return {@code true} if the job was submitted; {@code false} if it is already running
    */
   public boolean runAsync() {
+    if (closed) {
+      throw new IllegalStateException("GPL coordinator is closed");
+    }
     GplJobStatus.Status current = status.get();
     if (current == GplJobStatus.Status.RUNNING) {
       log.info("GPL job already running; skipping new submission");
@@ -205,19 +261,67 @@ public final class GplJobCoordinator implements GplStatusProvider {
     }
     runSnapshot.set(new GplRunSnapshot(0, 0L, Instant.now(), null));
 
-    CompletableFuture.runAsync(this::runJob)
-        .whenComplete(
-            (v, ex) -> {
-              if (ex != null) {
-                String msg = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
-                GplRunSnapshot prev = runSnapshot.get();
-                runSnapshot.set(new GplRunSnapshot(prev.processedDocs(), prev.totalDocs(), prev.lastRunAt(), msg));
-                status.set(GplJobStatus.Status.FAILED);
-                terminalLatch.countDown();
-                log.error("GPL job failed after processing {} docs", runSnapshot.get().processedDocs(), ex);
-              }
-            });
+    try {
+      CompletableFuture<Void> submitted =
+          EngineFutures.supplyAsync(
+              () -> {
+                runJob();
+                return null;
+              },
+              executor);
+      jobFuture = submitted;
+      submitted.whenComplete(
+          (v, ex) -> {
+            if (ex != null) {
+              markFailed(ex);
+              log.error(
+                  "GPL job failed after processing {} docs",
+                  runSnapshot.get().processedDocs(),
+                  ex);
+            }
+          });
+    } catch (RuntimeException | Error failure) {
+      markFailed(failure);
+      throw failure;
+    }
     return true;
+  }
+
+  private void markFailed(Throwable failure) {
+    Throwable cause = failure;
+    while (cause.getCause() != null
+        && (cause instanceof java.util.concurrent.CompletionException
+            || cause instanceof java.util.concurrent.ExecutionException)) {
+      cause = cause.getCause();
+    }
+    String msg = cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName();
+    GplRunSnapshot prev = runSnapshot.get();
+    runSnapshot.set(new GplRunSnapshot(prev.processedDocs(), prev.totalDocs(), prev.lastRunAt(), msg));
+    status.set(GplJobStatus.Status.FAILED);
+    terminalLatch.countDown();
+  }
+
+  /** Cancels queued/in-flight work and releases this coordinator's registry registration. */
+  @Override
+  public synchronized void close() {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    CompletableFuture<?> future = jobFuture;
+    if (future != null) {
+      future.cancel(true);
+    }
+    executor.shutdownNow();
+    try {
+      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        log.warn("GPL job executor did not terminate within 5s");
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+    } finally {
+      executorRegistration.close();
+    }
   }
 
   /**
@@ -259,6 +363,10 @@ public final class GplJobCoordinator implements GplStatusProvider {
   // ========== Core job loop ==========
 
   private void runJob() {
+    if (closed || Thread.currentThread().isInterrupted()) {
+      markFailed(new CancellationException("GPL job cancelled before execution"));
+      return;
+    }
     // 360: reranker now runs in the Worker via gRPC
     if (!rerankerAvailable) {
       log.warn(
@@ -292,10 +400,10 @@ public final class GplJobCoordinator implements GplStatusProvider {
       while (!aiTimedOut) {
         ListAllDocumentIdsResponse page =
             offset == 0
-                ? knowledgeClientSupplier.get().listAllDocumentIds(0, BATCH_SIZE)
+                ? knowledgeClientSupplier.get().listAllDocumentIds(0, BATCH_SIZE, ENGINE_CONTEXT)
                 : knowledgeClientSupplier
                     .get()
-                    .listAllDocumentIds(offset, BATCH_SIZE, snapshotToken);
+                    .listAllDocumentIds(offset, BATCH_SIZE, snapshotToken, ENGINE_CONTEXT);
         List<String> docIds = page.getDocIdsList();
 
         if (localTotal == 0L) {
@@ -319,7 +427,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
         // paged under a byte budget rather than handed over whole.
         FetchDocumentsResponse fetchResp =
             io.justsearch.app.services.worker.BoundedDocumentFetch.fetchAll(
-                ids -> knowledgeClientSupplier.get().fetchDocuments(ids), docIds);
+                ids -> knowledgeClientSupplier.get().fetchDocuments(ids, ENGINE_CONTEXT), docIds);
 
         for (DocumentContent doc : fetchResp.getDocumentsList()) {
           if (!doc.getFound() || doc.getContent().isBlank()) {
@@ -399,6 +507,8 @@ public final class GplJobCoordinator implements GplStatusProvider {
             localProcessed,
             localTotal,
             elapsedMs);
+      } else if (closed || Thread.currentThread().isInterrupted()) {
+        markFailed(new CancellationException("GPL job cancelled during execution"));
       } else {
         log.info(
             "GPL job complete: {} docs processed, {} triples written in {}ms",
@@ -459,7 +569,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
               // deprecated debug flag, which the worker still honors as a transitional alias).
               .setIncludeDetail(true)
               .build();
-      searchResp = knowledgeClientSupplier.get().search(req);
+      searchResp = knowledgeClientSupplier.get().search(req, ENGINE_CONTEXT);
     } catch (Exception e) {
       if (isTransientWorkerUnavailable(e)) {
         throw new IllegalStateException(
@@ -683,7 +793,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
    */
   private String fetchSingleDocContent(String docId) {
     try {
-      FetchDocumentsResponse resp = knowledgeClientSupplier.get().fetchDocuments(List.of(docId));
+      FetchDocumentsResponse resp = knowledgeClientSupplier.get().fetchDocuments(List.of(docId), ENGINE_CONTEXT);
       for (DocumentContent doc : resp.getDocumentsList()) {
         if (doc.getFound() && !doc.getContent().isBlank()) {
           return doc.getContent();
@@ -707,20 +817,16 @@ public final class GplJobCoordinator implements GplStatusProvider {
     List<Map<String, Object>> messages =
         List.of(Map.of("role", "user", "content", prompt));
 
-    StringBuilder sb = new StringBuilder();
-    CompletableFuture<String> future = new CompletableFuture<>();
-
-    onlineAiService.streamChat(
-        messages,
-        GPL_MAX_TOKENS,
-        chunk -> sb.append(chunk),
-        fr -> future.complete(sb.toString()),
-        err -> future.completeExceptionally(err),
-        GPL_SAMPLING);
+    CompletableFuture<String> completion =
+        Objects.requireNonNull(
+            onlineAiService.chatCompletion(
+                messages, GPL_MAX_TOKENS, GPL_SAMPLING, ENGINE_CONTEXT),
+            "onlineAiService.chatCompletion returned null");
 
     try {
-      return future.get(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      return completion.get(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     } catch (Exception e) {
+      completion.cancel(true);
       log.warn("GPL query generation timed out or failed", e);
       return null;
     }
@@ -734,7 +840,7 @@ public final class GplJobCoordinator implements GplStatusProvider {
     }
     try {
       RerankResponse result =
-          knowledgeClientSupplier.get().rerank(query, List.of(docContent), RERANK_DEADLINE_MS);
+          knowledgeClientSupplier.get().rerank(query, List.of(docContent), RERANK_DEADLINE_MS, ENGINE_CONTEXT);
       if (!result.getSkipped() && result.getScoresCount() > 0) {
         return result.getScores(0);
       }
@@ -773,16 +879,28 @@ public final class GplJobCoordinator implements GplStatusProvider {
     }
   }
 
-  private static boolean isTransientWorkerUnavailable(Throwable t) {
+  /**
+   * Whether a failed re-query means "the index half is busy or gone", as opposed to "this query is
+   * bad". The distinction is load-bearing: a transient failure aborts the GPL pass
+   * (:464-467) so the run is retried later, while any other failure writes the positive triple with
+   * zero features — which would poison the training set if it were really a transient outage.
+   *
+   * <p><b>Retargeted at lane F stage A item A14.</b> This used to walk the cause chain for
+   * {@code io.grpc.StatusRuntimeException} / {@code io.grpc.StatusException} and match
+   * {@code UNAVAILABLE} / {@code DEADLINE_EXCEEDED}. Since item A6 the client boundary is
+   * in-process and {@code EngineKnowledgeClient} translates every worker failure into
+   * {@link KnowledgeClientException} (see that class's javadoc), so no gRPC status type can reach
+   * this chain any more and the method could only ever return false — the abort branch was
+   * unreachable and every transient outage silently wrote a zero-feature triple. The two status
+   * constants are 1:1 copies of the gRPC codes this replaced
+   * ({@code KnowledgeClientException.Status.UNAVAILABLE} / {@code DEADLINE_EXCEEDED}), so the
+   * classification is the same one, reached through the type that actually arrives.
+   */
+  static boolean isTransientWorkerUnavailable(Throwable t) {
     for (Throwable cur = t; cur != null; cur = cur.getCause()) {
-      io.grpc.Status.Code code = null;
-      if (cur instanceof io.grpc.StatusRuntimeException sre) {
-        code = sre.getStatus().getCode();
-      } else if (cur instanceof io.grpc.StatusException se) {
-        code = se.getStatus().getCode();
-      }
-      if (code == io.grpc.Status.Code.UNAVAILABLE
-          || code == io.grpc.Status.Code.DEADLINE_EXCEEDED) {
+      if (cur instanceof KnowledgeClientException kce
+          && (kce.status() == KnowledgeClientException.Status.UNAVAILABLE
+              || kce.status() == KnowledgeClientException.Status.DEADLINE_EXCEEDED)) {
         return true;
       }
     }
