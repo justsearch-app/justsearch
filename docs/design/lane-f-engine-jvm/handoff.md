@@ -119,7 +119,9 @@ and later scope refusal, not ordinary user cancellation or D2-5 durable
 projection acknowledgement. The fixture uses NRT and a graceful handoff before
 scope-refusal recovery. The preceding `a708b9592` fixture checkpoint passed
 [hosted CI 36271896979](https://github.com/justsearch-app/justsearch/actions/runs/36271896979)
-on its exact SHA; hosted proof for this newer runtime repair is pending.
+on its exact SHA. The newer runtime repair at `68ba418504c196385b6e5cd96f0b45dff88a5374`
+also passed all hosted CI jobs in
+[run 36276054178](https://github.com/justsearch-app/justsearch/actions/runs/36276054178).
 The first stress-enabled integrated attempt, `tmp/3778`, passed app-engine and
 app-observability but failed at `:modules:indexer-worker:compileTestJava` because
 the new negative assertion named the wrong `CallContext` package. The corrected
@@ -130,6 +132,61 @@ passed `test -PincludeStress=true --max-workers=1` (196 tasks, 15 executed).
 tasks, 7 executed). Store recoverability, regeneration, docs validation and
 `git diff --check` also passed locally. The integrated run used the final
 production source; the subsequent edits were evidence prose only.
+
+**2026-09-27 ordinary post-handoff cancellation (local).** The original
+caller's admission handle cannot address a durable bulk after another Engine
+attaches it. The owner now exposes a webview-only key-scoped cancellation
+through the operator `core.cancel-reindex` catalog operation. This is an
+ordinary unrecorded invocation with inline consent: it returns success only
+after the original reindex row has a durable `cancelled` refusal or terminal
+receipt. The existing row, runner and switch journal remain the sole durable
+authorities; a separate request marker would add another writer without
+improving the acknowledgement. The owner rejects a committed B pointer,
+does not pump promotion before observing cancellation, and calls the current
+work handle outside its coordinator lock, so callback
+maintenance can seal the refusal. The catalog, handler, localization and UI
+operation wire golden were updated together. The first app-services run
+`tmp/3795` exposed missing validator-fixture binding, i18n and intentional
+golden projection; focused rerun `tmp/3797` passed. Focused owner denial and
+durable-seal test `tmp/3801` passed after removing a fixture reopen assertion
+that assumed the row remained nonterminal (`tmp/3800`); installed recovery is
+the separate proof.
+
+The first installed attempt `tmp/3798-cancel-write-trace.txt` stopped before
+the cancel call because the fixture minted a prepared capsule for this
+unrecorded operation. Correct ordinary capsule minting and a fresh A copy
+passed `tmp/3799-cancel-write-trace.txt` with
+`INSTALLED_PROJECTION_CANCEL_WRITE_PASS`. A's standard model answered VECTOR
+10 before B; successor A accepted a no-file update, delete and addition while
+B awaited an incomplete source; the operator operation checkpointed
+`cancelled`; a further JVM retired B and reopened A with the accepted effects
+and VECTOR 1. Independent pointer, SQLite and directory reads found exact A
+IDLE, bulk `CANCELLED/settled/cancelled`, zero switch rows and no B directory.
+This is local NRT proof with graceful handoffs. D2-5 durable writes, observed
+interruption inside deletion and the remaining D1-9 crash cuts stay open.
+The ordering review after this pass found two narrower cancellation races and
+stopped the first integrated run `tmp/3803` before it could be used as proof.
+The owner no longer pumps maintenance before capturing the current handle:
+that pump could promote an approved candidate ahead of the request. Focused
+proof `tmp/3804` and a fresh installed rerun `tmp/3805` passed on that change.
+Independent inspection of the pointer-only promoted state then found that the
+old writable-B predicate could permit precommit refusal after the pointer had
+already committed B. The exact pointer-without-writer regression was red on
+the old predicate (`tmp/3806`) and green after separating irreversible pointer
+commitment from later writable completion (`tmp/3807`); the full coordinator
+class passed `tmp/3808`. This is the plan delta after two substantive
+corrections: preserve the existing first-wins row/refusal and serialized
+promotion boundary, with no new state or persistent cancellation marker.
+The complete stress-enabled Gradle `test` rerun passed at
+`tmp/3813-cancel-integrated-stress-rerun.txt` (196 tasks, three executed), and
+`build -x test` passed at `tmp/3814-cancel-build.txt` (333 tasks, seven executed).
+The initial full run `tmp/3810` had one UI catalog regression: its test assumed
+the former literal operation count of 34. The repaired test compares the exact
+emitted IDs to `CoreOperationCatalog.definitions()` and rejects duplicates;
+its focused rerun passed at `tmp/3811`, and static analysis passed at `tmp/3812`.
+The final suite, build, store-recoverability check, regeneration check and docs
+validation passed on this source. Hosted proof remains pending for the new
+checkpoint; D1-9 and D2-5 acceptance remain open.
 
 **Partial retirement recovery, 2026-09-26 (constructed disk cut).** A fresh
 after-live self-exit left B committed and A as predecessor at `tmp/3763`. With

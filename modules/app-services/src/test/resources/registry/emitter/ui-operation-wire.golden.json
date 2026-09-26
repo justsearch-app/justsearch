@@ -189,6 +189,54 @@
   "audience" : "USER",
   "consumers" : [ ]
 }, {
+  "id" : "core.cancel-reindex",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.cancel-reindex.label",
+    "descriptionKey" : "ops.cancel-reindex.description",
+    "iconHint" : "warning",
+    "category" : "destructive"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "reindexKey" : {
+          "type" : "string",
+          "minLength" : 36,
+          "maxLength" : 36
+        }
+      },
+      "required" : [ "reindexKey" ]
+    },
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "HIGH",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "OPERATOR",
+  "consumers" : [ ]
+}, {
   "id" : "core.ping-backend",
   "type" : "operation",
   "presentation" : {

@@ -1323,6 +1323,67 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     };
   }
 
+  @Override public OperationResult cancelReindex(String reindexKey, EngineContext context) {
+    if (context == null || context.clientKind() != EngineContext.ClientKind.WEBVIEW) {
+      return OperationResult.failure("Only the webview can cancel a rebuild",
+          "REINDEX_CANCEL_REQUIRES_USER", Map.of(), false);
+    }
+    // The physical attachment already owns recovery maintenance. Do not pump it here: that could
+    // promote an approved B before this request reaches the cancellation/promotion boundary.
+    final OperationRecord row;
+    final EngineWorkHandle work;
+    synchronized (lock) {
+      try { row = operations.find(reindexKey).orElse(null); }
+      catch (IllegalArgumentException invalid) {
+        return OperationResult.failure("Invalid rebuild key", "BAD_REQUEST", Map.of(), false);
+      }
+      if (row == null || !isBulk(row)) {
+        return OperationResult.failure("Rebuild is unavailable", "REINDEX_CANCEL_UNAVAILABLE",
+            Map.of(), false);
+      }
+      if (row.state() == OperationState.CANCELLED && row.receipt() != null
+          && "cancelled".equals(row.receipt().code())) {
+        return OperationResult.success("Rebuild cancellation already settled");
+      }
+      if (row.state().terminal()) {
+        return OperationResult.failure("Rebuild is already complete", "REINDEX_CANCEL_TOO_LATE",
+            Map.of(), false);
+      }
+      Bulk bulk = bulks.get(reindexKey);
+      Attached physical = attached;
+      if (bulk == null || physical == null || bulk.physical != physical || physical.stopping
+          || bulk.work == null) {
+        return OperationResult.failure("Rebuild owner is temporarily unavailable",
+            "REINDEX_CANCEL_UNAVAILABLE", Map.of(), true);
+      }
+      try {
+        if (committedBulkPointer(reindexKey, physical.bulkRuntime.current())) {
+          return OperationResult.failure("Rebuild pointer is already committed",
+              "REINDEX_CANCEL_TOO_LATE", Map.of(), false);
+        }
+      } catch (IOException unreadable) {
+        return OperationResult.failure("Rebuild pointer is unavailable",
+            "REINDEX_CANCEL_UNAVAILABLE", Map.of(), true);
+      }
+      work = bulk.work;
+    }
+    // The work callback takes the coordinator lock; never invoke it while holding that lock.
+    work.cancel("user cancelled recorded rebuild");
+    maintain();
+    var observed = operations.find(reindexKey).orElseThrow();
+    if (observed.state() == OperationState.CANCELLED
+        || "cancelled".equals(operations.bulkReindexProgress(row.id())
+            .orElseThrow().refusalCode())) {
+      return OperationResult.success("Rebuild cancellation recorded");
+    }
+    if (observed.state().terminal()) {
+      return OperationResult.failure("Rebuild completed before cancellation",
+          "REINDEX_CANCEL_TOO_LATE", Map.of(), false);
+    }
+    return OperationResult.failure("Rebuild cancellation has not been durably recorded",
+        "REINDEX_CANCEL_UNAVAILABLE", Map.of(), true);
+  }
+
   @Override public boolean beforeRecordedPromotion(String operationKey, JobQueue queue) {
     synchronized (lock) {
       Bulk bulk = bulks.get(operationKey);
@@ -1819,6 +1880,13 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     return promotedGeneration(key, runtime) && runtime.orElseThrow().promotedReplaySettled();
   }
 
+  /** Pointer commitment is irreversible even before a successor B writer can prove completion. */
+  private static boolean committedBulkPointer(String key, Optional<BulkRuntime> runtime) {
+    return runtime.isPresent()
+        && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.PROMOTED
+        && ("g-" + key).equals(runtime.orElseThrow().activeGeneration());
+  }
+
   private static boolean promotedGeneration(String key, Optional<BulkRuntime> runtime) {
     return runtime.isPresent() && runtime.orElseThrow().promotedBoot()
         && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.PROMOTED
@@ -1846,7 +1914,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
   private void refuseBulk(Bulk bulk, Attached physical, String reason) {
     try {
-      if (promotedGeneration(bulk.row.key(), physical.bulkRuntime.current())) {
+      if (committedBulkPointer(bulk.row.key(), physical.bulkRuntime.current())) {
         bulkPermissions.remove(bulk.row.key());
         bulk.ready = false;
         return;

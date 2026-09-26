@@ -53,6 +53,7 @@ final class CoreOperationCatalogTest {
         Set.of(
             "core.restart-worker",
             "core.bulk-reindex",
+            "core.cancel-reindex",
             "core.ping-backend",
             "core.clear-failed-jobs",
             "core.reindex",

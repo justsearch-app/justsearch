@@ -73,6 +73,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
   public static final OperationRef RESTART_WORKER = new OperationRef("core.restart-worker");
   public static final OperationRef BULK_REINDEX = new OperationRef("core.bulk-reindex");
   public static final OperationRef ACCEPT_GAPS = new OperationRef("core.accept-gaps");
+  public static final OperationRef CANCEL_REINDEX = new OperationRef("core.cancel-reindex");
   /**
    * Slice 447-followup-bulk-reindex-recovery (Option A) + §X.11.5 Phase 7: parameterless
    * full-corpus rebuild wrapper. {@link #BULK_REINDEX} requires a {@code corpusIds}
@@ -354,6 +355,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
       bulkReindex(),
       acceptGaps(),
       rebuildIndex(),
+      cancelReindex(),
       pingBackend(),
       clearFailedJobs(),
       reindex(),
@@ -465,6 +467,21 @@ public final class CoreOperationCatalog implements OperationCatalog {
             .withRecordKind(io.justsearch.agent.api.registry.OperationKind.ACCEPT_GAPS)
             .withDeclaredSurvival(EngineContext.Survival.DURABLE),
         OperationAvailability.empty(), OperationLineage.empty(), Binding.of(ACCEPT_GAPS),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.OPERATOR);
+  }
+
+  private static Operation cancelReindex() {
+    return new Operation(
+        CANCEL_REINDEX,
+        Presentation.forId(CANCEL_REINDEX, Optional.of("warning"), Optional.of("destructive")),
+        Interface.inputsOnly("""
+            {"type":"object","additionalProperties":false,"properties":{
+              "reindexKey":{"type":"string","minLength":36,"maxLength":36}},
+             "required":["reindexKey"]}
+            """),
+        new OperationPolicy(RiskTier.HIGH, ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(CANCEL_REINDEX),
         Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.OPERATOR);
   }
 

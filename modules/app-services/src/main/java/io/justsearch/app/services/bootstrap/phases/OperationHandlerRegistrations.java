@@ -95,6 +95,8 @@ public final class OperationHandlerRegistrations {
             recordedIngestion, context -> recordedRoots.snapshotBindings(), indexingServiceSupplier,
             io.justsearch.app.services.worker.KnowledgeClient::captureRecordedExcludePatterns));
     handlers.register(CoreOperationCatalog.ACCEPT_GAPS, new AcceptGapsHandler(recordedIngestion));
+    handlers.register(CoreOperationCatalog.CANCEL_REINDEX,
+        new io.justsearch.app.services.registry.operations.handlers.CancelReindexHandler(recordedIngestion));
     handlers.register(
         CoreOperationCatalog.REBUILD_INDEX,
         new BulkReindexHandler(io.justsearch.app.api.operations.RecordedBulkPlan.Profile.RECOVERY_REBUILD,

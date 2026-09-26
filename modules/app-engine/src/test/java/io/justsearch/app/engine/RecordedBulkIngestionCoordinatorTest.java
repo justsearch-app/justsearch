@@ -704,6 +704,43 @@ final class RecordedBulkIngestionCoordinatorTest {
   }
 
   @Test
+  void keyScopedUserCancellationSealsOriginalBulkBeforeReportingSuccess() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("user-cancel-by-key"))) {
+      EngineContext mcp = EngineProvenance.context(EngineContext.ClientKind.MCP_CLIENT,
+          "agent", Optional.empty(), Optional.empty(), TransportTag.MCP,
+          EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
+      assertEquals("REINDEX_CANCEL_REQUIRES_USER",
+          harness.coordinator.cancelReindex(harness.key, mcp).errorCode().orElseThrow());
+      assertNull(harness.progress().refusalCode(), "non-user caller cannot seal a refusal");
+
+      EngineContext webview = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+          "operator", Optional.of("bulk-session"), Optional.empty(), TransportTag.BUTTON,
+          EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
+      assertTrue(harness.coordinator.cancelReindex(harness.key, webview).success());
+      assertEquals("cancelled", harness.progress().refusalCode(),
+          "acknowledged cancellation must already be durable");
+      assertEquals(OperationState.CANCELLED,
+          harness.operations.find(harness.key).orElseThrow().state());
+      assertEquals("cancelled", harness.operations.find(harness.key).orElseThrow().receipt().code());
+    }
+  }
+
+  @Test
+  void keyScopedCancellationCannotRefuseCommittedPointerBeforeSuccessorWriter() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("cancel-pointer-before-writer"))) {
+      harness.runtime.set(promotedRuntime(harness.key, false, null, false));
+      EngineContext webview = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW,
+          "operator", Optional.of("bulk-session"), Optional.empty(), TransportTag.BUTTON,
+          EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
+      OperationResult result = harness.coordinator.cancelReindex(harness.key, webview);
+      assertFalse(result.success());
+      assertEquals("REINDEX_CANCEL_TOO_LATE", result.errorCode().orElseThrow());
+      assertNull(harness.progress().refusalCode(),
+          "a committed pointer cannot become a precommit cancellation");
+    }
+  }
+
+  @Test
   void cancellationAfterSettledRefusalCheckpointRecoversTerminalReceiptAndExactQueueAck() throws Exception {
     try (var harness = new BulkHarness(temp.resolve("cancel-after-settled"))) {
       var claim = harness.completeOneCapturedClaim();

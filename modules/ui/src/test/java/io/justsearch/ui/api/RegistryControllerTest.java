@@ -62,11 +62,6 @@ final class RegistryControllerTest {
   @Test
   @DisplayName("/api/registry/operations returns the complete core seed catalog")
   void operationsEnvelope() throws Exception {
-    // Slice 445: CoreOperationCatalog now seeds 26 entries — slice 3a-2-c's 23
-    // plus core.cancel-indexing-job, core.retry-indexing-job, core.resolve-path-hash
-    // (TABULAR Resource item Operations + privacy-axis resolver).
-    // Slice 447-followup §X.11.5 Phase 7: 27 with core.rebuild-index added.
-    // Slice 484 §3.6 / observations.md core.index-gc closure: 28 with core.index-gc.
     Context ctx = mock(Context.class);
     when(ctx.contentType("application/json")).thenReturn(ctx);
 
@@ -80,21 +75,12 @@ final class RegistryControllerTest {
     assertEquals("1.0", envelope.get("schemaVersion").asText());
     assertEquals(0L, envelope.get("catalogVersion").asLong());
     assertTrue(envelope.get("entries").isArray());
-    // Slice 491 §9.D Phase E (C4 / E3): core.navigate-to-surface added; total 29.
-    // Tempdoc 560 WS4: the navigate-to-surface DEFINITION moved to AgentToolsOperationCatalog
-    // (single canonical declaration), so the core catalog alone now seeds 28 (the production wire
-    // still emits navigate-to-surface — it comes from the agent-tools catalog the full boot composes).
-    // Tempdoc 626 §Recency: core.reconcile-root added to CoreOperationCatalog; total 29.
-    // Tempdoc 737 §12b: core.set-chat-enabled added (intent write superseding
-    // switch-inference-mode); total 30.
-    // Tempdoc 899 D5: core.copy-diagnostic-summary added; total 31.
-    // Tempdoc 931 §E item 10: core.settle-index added; total 32. D1-4 adds
-    // core.reconfigure to the canonical core catalog, bringing this fixture to 33.
-    // Lane F's separately approved installer activation brings it to 34;
-    // retiring core.reload-inference returns the catalog to 33. D1-11's
-    // core.accept-gaps decision brings it to 34.
-    assertEquals(34, envelope.get("entries").size());
-    assertTrue(envelope.get("entries").toString().contains("core.activate-installed-models"));
+    var declared = new CoreOperationCatalog().definitions().stream()
+        .map(operation -> operation.id().value()).collect(java.util.stream.Collectors.toSet());
+    var emitted = new java.util.HashSet<String>();
+    for (JsonNode entry : envelope.get("entries")) emitted.add(entry.get("id").asText());
+    assertEquals(declared.size(), envelope.get("entries").size(), "each declaration is emitted once");
+    assertEquals(declared, emitted, "the wire includes every declared core operation");
   }
 
   @Test

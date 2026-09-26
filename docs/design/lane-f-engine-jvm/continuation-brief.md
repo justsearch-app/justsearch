@@ -27,11 +27,21 @@ The newer local `tmp/3776` installed round proves successor A's accepted
 update/delete/addition survive exact B abandonment after a watched-root scope
 refusal and a further Engine restart. It exposed and locally repaired the
 `COMPLETE_WITH_GAPS` refusal checkpoint and FENCED A-writer boot ordering.
-`tmp/3771`, `tmp/3774` and `tmp/3777` are focused regressions; hosted proof
-for this runtime batch remains pending. Ordinary user cancellation after
-successor takeover, observed interruption inside deletion and D2-5 durable
+`tmp/3771`, `tmp/3774` and `tmp/3777` are focused regressions; the repair at
+`68ba41850` passed hosted CI on exact SHA in run 36276054178. An ordinary
+operator cancellation after successor takeover passed locally at `tmp/3799`
+and again at `tmp/3805` after removing a pre-request promotion pump
+with A's accepted no-file update/delete/addition retained, terminal
+`CANCELLED`, exact B absent and an empty scoped journal. Its new operation
+surface and pointer-only cancellation regression (`tmp/3806` red,
+`tmp/3807`–`tmp/3808` green) remain local until the next checkpoint. Observed
+interruption inside deletion, remaining gap crash cuts and D2-5 durable
 acknowledgement remain open. The `a708b9592` prior checkpoint's hosted CI
 passed all jobs on exact SHA in run 36271896979.
+The cancellation slice's final local stress-enabled full suite and build passed
+at `tmp/3813` and `tmp/3814`; static and governance checks also passed. The
+first full run found a stale literal UI catalog count (`tmp/3810`), corrected
+and rerun before this claim. Its own exact-SHA hosted run remains pending.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

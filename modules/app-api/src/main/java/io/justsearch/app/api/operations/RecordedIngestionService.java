@@ -19,6 +19,12 @@ public interface RecordedIngestionService {
     throw new UnsupportedOperationException("Recorded gap acceptance is unavailable");
   }
 
+  /** Request cancellation of an open recorded rebuild by key; success requires a durable refusal. */
+  default io.justsearch.agent.api.registry.OperationResult cancelReindex(
+      String reindexKey, EngineContext context) {
+    throw new UnsupportedOperationException("Recorded rebuild cancellation is unavailable");
+  }
+
   /** Existing operations maintenance cadence retries deferred admission and flushes committed progress. */
   void maintain();
 

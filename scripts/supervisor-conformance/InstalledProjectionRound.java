@@ -69,13 +69,14 @@ public final class InstalledProjectionRound {
         || !("--gap".equals(args[5]) || "--gap-restart".equals(args[5])
             || "--gap-halt".equals(args[5]) || "--gap-resume".equals(args[5])
             || "--cancel".equals(args[5]) || "--abandon-write".equals(args[5])
+            || "--cancel-write".equals(args[5])
             || "--replay-halt".equals(args[5])
             || "--replay-resume".equals(args[5]) || "--pointer-before-halt".equals(args[5])
             || "--pointer-after-halt".equals(args[5]) || "--live-before-halt".equals(args[5])
             || "--live-after-halt".equals(args[5])
             || "--pointer-resume".equals(args[5])))) {
       throw new IllegalArgumentException(
-          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --abandon-write, --replay-halt, --replay-resume, --pointer-before-halt, --pointer-after-halt, --live-before-halt, --live-after-halt or --pointer-resume");
+          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --abandon-write, --cancel-write, --replay-halt, --replay-resume, --pointer-before-halt, --pointer-after-halt, --live-before-halt, --live-after-halt or --pointer-resume");
     }
     Path data = Path.of(args[0]).toAbsolutePath();
     Path index = Path.of(args[1]).toAbsolutePath();
@@ -169,9 +170,10 @@ public final class InstalledProjectionRound {
       runGapRestart(data, index, models, source, key, query);
       return;
     }
-    if (args.length == 6 && "--abandon-write".equals(args[5])) {
+    if (args.length == 6 && ("--abandon-write".equals(args[5])
+        || "--cancel-write".equals(args[5]))) {
       runAbandonWrite(data, index, models, source, key, query, marker,
-          newUpdate, delete, addition);
+          newUpdate, delete, addition, "--cancel-write".equals(args[5]));
       return;
     }
     if (args.length == 6 && "--gap-halt".equals(args[5])) {
@@ -461,7 +463,7 @@ public final class InstalledProjectionRound {
 
   private static void runAbandonWrite(Path data, Path index, Path models, HeldSource source,
       String key, String query, String marker, AcceptedProjection updated,
-      AcceptedProjection deleted, AcceptedProjection added) throws Exception {
+      AcceptedProjection deleted, AcceptedProjection added, boolean userCancel) throws Exception {
     String original = new IndexGenerationManager(index)
         .readStateBestEffort().active_generation();
     source.failEnumerationAfterFirst();
@@ -486,16 +488,24 @@ public final class InstalledProjectionRound {
             .filter(op -> "PROJECTION".equals(op.op())).count() >= 3,
             "B lacks the accepted update, delete and addition obligations");
       }
-      // This isolated fixture revokes the frozen root scope after A accepts the writes.
-      // Recovery must refuse B and transfer its exact journal before physical retirement.
-      second.client.clearAllRoots(context());
+      if (userCancel) {
+        cancelThroughOperation(second, key);
+        require("cancelled".equals(second.operations.bulkReindexProgress(
+            second.operations.find(key).orElseThrow().id()).orElseThrow().refusalCode()),
+            "cancel operation returned without a durable refusal checkpoint");
+      } else {
+        // This isolated fixture revokes the frozen root scope after A accepts the writes.
+        // Recovery must refuse B and transfer its exact journal before physical retirement.
+        second.client.clearAllRoots(context());
+      }
       second.handoff();
     }
     try (Epoch recovered = open(data, index, models, new CountDownLatch(1), source)) {
       require(await(() -> recovered.operations.find(key)
-          .map(row -> row.state() == OperationState.FAILED && row.receipt() != null
-              && "RECOVERY_SCOPE_REFUSED".equals(row.receipt().code()))
-          .orElse(false), WAIT_MS), "recovered scope refusal did not abandon B");
+          .map(row -> row.state() == (userCancel ? OperationState.CANCELLED : OperationState.FAILED)
+              && row.receipt() != null && (userCancel ? "cancelled" : "RECOVERY_SCOPE_REFUSED")
+                  .equals(row.receipt().code()))
+          .orElse(false), WAIT_MS), "recovered refusal did not abandon B");
       recovered.handoff();
     }
     var retired = new IndexGenerationManager(index).readStateBestEffort();
@@ -520,7 +530,33 @@ public final class InstalledProjectionRound {
           + reopened.client.search(query, 10, PipelineConfigs.VECTOR, context())
               .getResultsCount());
     }
-    System.out.println("INSTALLED_PROJECTION_ABANDON_PASS " + key);
+    System.out.println("INSTALLED_PROJECTION_"
+        + (userCancel ? "CANCEL_WRITE" : "ABANDON") + "_PASS " + key);
+  }
+
+  private static void cancelThroughOperation(Epoch epoch, String reindexKey) {
+    Operation operation = new CoreOperationCatalog()
+        .findByIdValue(CoreOperationCatalog.CANCEL_REINDEX.value()).orElseThrow();
+    HandlerRegistry handlers = new HandlerRegistry();
+    handlers.register(CoreOperationCatalog.CANCEL_REINDEX,
+        new io.justsearch.app.services.registry.operations.handlers.CancelReindexHandler(
+            epoch.root.recordedIngestion()));
+    OperationAuthority authority = epoch.root.authority();
+    OperationExecutorImpl executor = new OperationExecutorImpl(epoch.root.operationAttempts(),
+        epoch.root.admission(), handlers, null, Map.of(), CLOCK, authority.trust(),
+        authority.sources(), null, authority.capsules());
+    EngineContext origin = context();
+    var provenance = EngineProvenance.invocation(origin, ExecutorTag.UI,
+        Instant.now(CLOCK), Optional.empty());
+    String arguments = "{\"reindexKey\":\"" + reindexKey + "\"}";
+    String requestKey = OperationKeys.generate(CLOCK);
+    var prepared = (OperationDispatchPlan.Ready) executor.prepare(operation, arguments,
+        provenance, origin, requestKey, true);
+    String capsule = authority.capsules().mint(operation.id().value(), arguments,
+        SourceTier.valueOf(origin.sourceTier()));
+    var result = executor.dispatch(operation, arguments, provenance, Optional.of(capsule),
+        origin, requestKey, prepared.preparationNonce());
+    require(result.success(), "recorded rebuild cancellation failed: " + result);
   }
 
   private static void runGapRestart(Path data, Path index, Path models, HeldSource source,
