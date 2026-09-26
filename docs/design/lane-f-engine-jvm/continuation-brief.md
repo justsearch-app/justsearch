@@ -11,16 +11,27 @@ background, not a work queue. This brief adds no acceptance waiver.
 The before-pointer retained-capacity branch passed against installed standard
 models at `tmp/3751`–`tmp/3752`; an installed precommit cancellation repeat
 also checked exact B journal cleanup at `tmp/3756`. See [handoff](handoff.md)
-for the invalid fixture attempts and proof limits. Continue D1-9's accepted
-writes in the successor's writable A, remaining abandonment and gap crash cuts,
-then the WP3 order below. D1-9 remains open.
+for the invalid fixture attempts and proof limits. Continue D1-9's ordinary
+post-handoff cancellation, remaining deletion and gap crash cuts, then the WP3
+order below. D1-9 remains open.
 
 Local follow-on cuts at `tmp/3758`–`tmp/3762` now cover death immediately
 before and after live serving-view publication, with exact B recovery and A
-physical retirement. Their fixture revision still needs hosted proof. The
-constructed partial-delete state after an actual publication halt also
-recovered at `tmp/3763`–`tmp/3766`; a kill observed inside deletion and the
-accepted-write abandonment case remain open.
+physical retirement. Their fixture revision later passed hosted CI on
+`a708b9592`. The constructed partial-delete state after an actual
+publication halt also recovered at `tmp/3763`–`tmp/3766`; a kill observed
+inside deletion and the
+accepted-write abandonment case were open at that checkpoint.
+
+The newer local `tmp/3776` installed round proves successor A's accepted
+update/delete/addition survive exact B abandonment after a watched-root scope
+refusal and a further Engine restart. It exposed and locally repaired the
+`COMPLETE_WITH_GAPS` refusal checkpoint and FENCED A-writer boot ordering.
+`tmp/3771`, `tmp/3774` and `tmp/3777` are focused regressions; hosted proof
+for this runtime batch remains pending. Ordinary user cancellation after
+successor takeover, observed interruption inside deletion and D2-5 durable
+acknowledgement remain open. The `a708b9592` prior checkpoint's hosted CI
+passed all jobs on exact SHA in run 36271896979.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

@@ -656,10 +656,14 @@ public final class KnowledgeServerMigrationOps {
     return drainSwitchBuffer(context, true, true).applied();
   }
 
-  /** A refused pre-pointer candidate must settle only its own obligations on surviving A. */
+  /**
+   * A refused pre-pointer candidate must settle only its own accepted mutations on surviving A.
+   * Source completeness belongs to B's seed witness; an unreadable source cannot prevent
+   * abandonment once exact journal versions are committed and verified on A.
+   */
   public static boolean drainRefusedCandidateOnSource(DrainSwitchBufferContext context) {
     if (context.replayGeneration() == null || context.replayGeneration().isBlank()) return false;
-    return drainSwitchBuffer(context, true, true, false).applied();
+    return drainSwitchBuffer(context, true, true, false, () -> {}, true).applied();
   }
 
   /** Replay remains durable until the generation pointer commits, so abandonment can replay on A. */
@@ -773,6 +777,13 @@ public final class KnowledgeServerMigrationOps {
   private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
       boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped,
       Runnable firstCandidateProjectionApplied) {
+    return drainSwitchBuffer(context, exactRead, removeAfterReplay, includeUnscoped,
+        firstCandidateProjectionApplied, false);
+  }
+
+  private static ReplayOutcome drainSwitchBuffer(DrainSwitchBufferContext context,
+      boolean exactRead, boolean removeAfterReplay, boolean includeUnscoped,
+      Runnable firstCandidateProjectionApplied, boolean refusedSourceRecovery) {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
       return new ReplayOutcome(false, List.of());
     }
@@ -835,7 +846,7 @@ public final class KnowledgeServerMigrationOps {
           String marker = "projection-source:" + payload.length() + ":" + payload;
           if (op.generation() == null || op.generation().isBlank()
               || !marker.equals(op.key())
-              || !context.projectionSourceReady().test(payload)) {
+              || (!refusedSourceRecovery && !context.projectionSourceReady().test(payload))) {
             allApplied = false;
             context.log().warn("Projection source is missing or incomplete: {}", payload);
           }

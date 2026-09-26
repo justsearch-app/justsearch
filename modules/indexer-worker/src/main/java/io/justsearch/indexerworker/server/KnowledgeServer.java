@@ -1065,19 +1065,19 @@ public final class KnowledgeServer implements Closeable {
             // must be enumerated again from their authority before a resumed promotion.
             this.migrationEnumeratorDone = expectedProjectionSourceIds().isEmpty();
           } else {
-            boolean refusedSourceRecovery = generationBootDisposition
+            boolean fencedSourceRecovery = generationBootDisposition
                 == IndexGenerationManager.BootDisposition.FENCED
                 && bootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
-                && recordedIngestionLifecycle.recordedPrecommitRefused(recorded.operationKey())
                 && recorded.targetFingerprint().equals(recordedCandidate == null
                     ? expectedIndexFingerprintOrNull() : recordedCandidate.target().fingerprint())
                 && recorded.sourceGeneration().equals(state.active_generation())
                 && (buildingGenId == null
                     || IndexGenerationManager.recordedGenerationId(recorded.operationKey())
                         .equals(buildingGenId));
-            if (refusedSourceRecovery) {
-              // The operation remains fenced from new claims, but A needs its writer to replay
-              // accepted B mutations before B can be retired after a process crash.
+            if (fencedSourceRecovery) {
+              // Recovery may seal a refusal only after this runtime opens. A therefore needs its
+              // writer for exact B-journal cleanup even when the precommit refusal is not yet
+              // checkpointed. FENCED still prevents the indexing loop and new candidate claims.
               publishIngestLifecycle(buildIndexRuntime(activeIndexPath, fpSupplier)
                   .withoutRecovery().withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open());
               this.searchLifecycle = this.ingestLifecycle;

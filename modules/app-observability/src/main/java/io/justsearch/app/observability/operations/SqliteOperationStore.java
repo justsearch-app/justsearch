@@ -836,11 +836,17 @@ public final class SqliteOperationStore implements OperationStore {
     Objects.requireNonNull(progress, "progress");
     return locked(() -> transaction(() -> {
       OperationRecord row = rowById(id);
-      if (!bulkRow(row) || row.state() != OperationState.RUNNING
+      if (!bulkRow(row)
           || !progress.generationId().equals("g-" + row.key())
           || row.unitsCompleted() > progress.unitsCompleted()
           || row.unitsFailed() > progress.unitsFailed()) return false;
       var previous = bulkProgressRow(id);
+      boolean gapRefusal = row.state() == OperationState.COMPLETE_WITH_GAPS
+          && previous.isPresent() && progress.refusalCode() != null
+          && previous.orElseThrow().phase() == BulkReindexProgress.Phase.SETTLED
+          && previous.orElseThrow().refusalCode() == null
+          && previous.orElseThrow().withRefusal(progress.refusalCode()).equals(progress);
+      if (row.state() != OperationState.RUNNING && !gapRefusal) return false;
       if (previous.isEmpty()) {
         if (progress.phase() != BulkReindexProgress.Phase.CAPTURING) return false;
       } else {
@@ -867,7 +873,7 @@ public final class SqliteOperationStore implements OperationStore {
             gaps_json = CASE WHEN gaps_list_hash IS NULL THEN ? ELSE gaps_json END,
             processing_history_json = ?, processing_history_counts_json = ?,
             checkpoint_cursor = ?, units_completed = ?, units_failed = ?, updated_at = MAX(updated_at, ?)
-          WHERE id = ? AND state = 'RUNNING'
+          WHERE id = ? AND state IN ('RUNNING', 'COMPLETE_WITH_GAPS')
           """)) {
         update.setString(1, progress.phase().wire());
         update.setString(2, progress.generationId());

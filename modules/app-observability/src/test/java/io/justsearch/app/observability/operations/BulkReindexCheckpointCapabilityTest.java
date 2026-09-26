@@ -16,6 +16,7 @@ import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.core.context.EngineContext;
@@ -245,6 +246,56 @@ final class BulkReindexCheckpointCapabilityTest {
 
       effect.complete(OperationResult.success("complete"));
       assertEquals(OperationState.COMPLETE, running.completion().toCompletableFuture().join().state());
+    }
+  }
+
+  @Test
+  void recoveredGapWaitCanSealExactRefusalBeforeCandidateCleanup() throws Exception {
+    Path database = temp.resolve("recovered-gap-refusal.db");
+    String key;
+    try (var store = new SqliteOperationStore(database, clock, ignored -> {})) {
+      var request = request();
+      var row = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      key = row.key();
+      assertTrue(store.start(row.id()));
+      var target = target("{\"index\":\"gap-refusal\"}");
+      var capturing = capturing(key, target);
+      assertTrue(store.checkpointBulkReindex(row.id(), capturing));
+      var capture = new BulkReindexProgress.Capture("4".repeat(64), 2);
+      var building = new BulkReindexProgress(capturing.generationId(), target,
+          BulkReindexProgress.Phase.BUILDING, capture, null);
+      assertTrue(store.checkpointBulkReindex(row.id(), building));
+      var gap = new OperationOutcomeView.Gap("projection-source:memory", "SOURCE_UNREADABLE");
+      var settlement = new BulkReindexProgress.Settlement(1, "5".repeat(64),
+          0, 0, java.util.List.of(gap), java.util.List.of());
+      var settled = new BulkReindexProgress(capturing.generationId(), target,
+          BulkReindexProgress.Phase.SETTLED, capture, settlement);
+      assertTrue(store.checkpointBulkReindex(row.id(), settled));
+      assertEquals(io.justsearch.app.api.operations.OperationStore.BulkGapDecision.AWAITING_ACCEPTANCE,
+          store.awaitBulkGapDecision(row.id(), java.util.List.of(gap)));
+      var waiting = store.find(key).orElseThrow();
+      assertEquals(OperationState.COMPLETE_WITH_GAPS, waiting.state());
+      String gapHash = store.outcome(key).result().gapListHash();
+      assertFalse(store.checkpointBulkReindex(row.id(), settled),
+          "gap wait must not permit an ordinary replay checkpoint");
+
+      var refused = settled.withRefusal("RECOVERY_SCOPE_REFUSED");
+      var runner = new OperationAttemptRunnerImpl(store, clock, Set.of(OperationKind.REINDEX));
+      runner.reconcile(OperationKind.REINDEX,
+          ignored -> new OperationAttemptRunner.Reconciliation.CheckpointBulkAndWait(refused));
+      var sealed = store.find(key).orElseThrow();
+      assertEquals(OperationState.COMPLETE_WITH_GAPS, sealed.state());
+      assertEquals(gapHash, store.outcome(key).result().gapListHash());
+      assertEquals(Optional.of(refused), store.bulkReindexProgress(row.id()));
+      assertFalse(store.checkpointBulkReindex(row.id(), settled),
+          "a sealed refusal cannot be erased by an older progress witness");
+      runner.reconcile(OperationKind.REINDEX, ignored ->
+          new OperationAttemptRunner.Reconciliation.Failed(
+              new OperationReceipt("RECOVERY_SCOPE_REFUSED", null)));
+      assertEquals(OperationState.FAILED, store.find(key).orElseThrow().state());
+    }
+    try (var reopened = new SqliteOperationStore(database, clock, ignored -> {})) {
+      assertEquals(OperationState.FAILED, reopened.find(key).orElseThrow().state());
     }
   }
 

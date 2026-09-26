@@ -854,9 +854,11 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         continue;
       }
       if (decision instanceof Reconciliation.CheckpointBulkAndWait checkpoint) {
-        if (row.state() != OperationState.RUNNING || control.kind != OperationKind.REINDEX
+        if ((row.state() != OperationState.RUNNING
+                && row.state() != OperationState.COMPLETE_WITH_GAPS)
+            || control.kind != OperationKind.REINDEX
             || control.started.get() || control.done.isDone()) {
-          throw new IllegalArgumentException("Bulk recovery checkpoint requires a running, unstarted reindex control");
+          throw new IllegalArgumentException("Bulk recovery checkpoint requires an open, unstarted reindex control");
         }
         try {
           if (!store.checkpointBulkReindex(control.id, checkpoint.progress())) {

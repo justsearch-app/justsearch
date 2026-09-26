@@ -259,9 +259,10 @@ final class ProjectionCandidateReplayTest extends LuceneExecutorTestBase {
         AcceptedProjection.Kind.DELETE, null);
     ProjectionSeedSource source = new ProjectionSeedSource() {
       @Override public String sourceId() { return "memory"; }
-      @Override public void enumerate(java.util.function.Consumer<AcceptedProjection> sink) {
+      @Override public void enumerate(java.util.function.Consumer<AcceptedProjection> sink)
+          throws java.io.IOException {
         sink.accept(oldUpdated);
-        sink.accept(oldDeleted);
+        throw new java.io.IOException("source unreadable after first projection");
       }
     };
 
@@ -275,7 +276,8 @@ final class ProjectionCandidateReplayTest extends LuceneExecutorTestBase {
       blue.indexingCoordinator().indexSingle(ProjectionDocumentMapper.toIndexDocument(oldDeleted));
       blue.commitOps().commitAndTrack(
           io.justsearch.adapters.lucene.runtime.CommitReason.SWITCH_BUFFER_REPLAY);
-      KnowledgeServerMigrationOps.seedProjectionSource(queue, candidateId, source);
+      assertThrows(KnowledgeServerMigrationOps.ProjectionSeedIncompleteException.class,
+          () -> KnowledgeServerMigrationOps.seedProjectionSource(queue, candidateId, source));
       assertTrue(queue.putSwitchBufferForGeneration(candidateId, newUpdated.journalKey(),
           "PROJECTION", newUpdated.encode()));
       assertTrue(queue.putSwitchBufferForGeneration(candidateId, newDeleted.journalKey(),
@@ -284,7 +286,7 @@ final class ProjectionCandidateReplayTest extends LuceneExecutorTestBase {
           queue, blue, null, IndexingPacing.unthrottled(), base,
           active.activeGenerationPath(), new ObjectMapper(), () -> false, () -> true,
           LoggerFactory.getLogger(getClass()), Long.MAX_VALUE, candidateId,
-          ignored -> true);
+          ignored -> false);
       assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(replay));
       assertEquals("accepted", blue.documentFieldOps().getDocumentField(
           newUpdated.indexId(), SchemaFields.CONTENT));
@@ -299,5 +301,17 @@ final class ProjectionCandidateReplayTest extends LuceneExecutorTestBase {
     assertEquals(active.state().active_generation(), manager.readStateBestEffort().active_generation());
     assertNull(manager.readStateBestEffort().building_generation());
     assertFalse(Files.exists(candidatePath), "only the surviving source generation may retain an index");
+    try (var reopened = schema.atPath(active.activeGenerationPath())
+        .withConfig(new ResolvedConfigBuilder().build())
+        .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      assertEquals("accepted", reopened.documentFieldOps().getDocumentField(
+          newUpdated.indexId(), SchemaFields.CONTENT),
+          "surviving A must retain the accepted update after writer reopen");
+      assertEquals("2", reopened.documentFieldOps().getDocumentField(
+          newUpdated.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION));
+      assertNull(reopened.documentFieldOps().getDocumentField(
+          newDeleted.indexId(), SchemaFields.CONTENT),
+          "surviving A must retain the accepted deletion after writer reopen");
+    }
   }
 }

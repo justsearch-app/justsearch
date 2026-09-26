@@ -68,13 +68,14 @@ public final class InstalledProjectionRound {
     if (args.length != 5 && (args.length != 6
         || !("--gap".equals(args[5]) || "--gap-restart".equals(args[5])
             || "--gap-halt".equals(args[5]) || "--gap-resume".equals(args[5])
-            || "--cancel".equals(args[5]) || "--replay-halt".equals(args[5])
+            || "--cancel".equals(args[5]) || "--abandon-write".equals(args[5])
+            || "--replay-halt".equals(args[5])
             || "--replay-resume".equals(args[5]) || "--pointer-before-halt".equals(args[5])
             || "--pointer-after-halt".equals(args[5]) || "--live-before-halt".equals(args[5])
             || "--live-after-halt".equals(args[5])
             || "--pointer-resume".equals(args[5])))) {
       throw new IllegalArgumentException(
-          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --replay-halt, --replay-resume, --pointer-before-halt, --pointer-after-halt, --live-before-halt, --live-after-halt or --pointer-resume");
+          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --abandon-write, --replay-halt, --replay-resume, --pointer-before-halt, --pointer-after-halt, --live-before-halt, --live-after-halt or --pointer-resume");
     }
     Path data = Path.of(args[0]).toAbsolutePath();
     Path index = Path.of(args[1]).toAbsolutePath();
@@ -166,6 +167,11 @@ public final class InstalledProjectionRound {
 
     if (args.length == 6 && "--gap-restart".equals(args[5])) {
       runGapRestart(data, index, models, source, key, query);
+      return;
+    }
+    if (args.length == 6 && "--abandon-write".equals(args[5])) {
+      runAbandonWrite(data, index, models, source, key, query, marker,
+          newUpdate, delete, addition);
       return;
     }
     if (args.length == 6 && "--gap-halt".equals(args[5])) {
@@ -451,6 +457,70 @@ public final class InstalledProjectionRound {
       }
     }
     System.out.println("INSTALLED_PROJECTION_" + label + "_PASS " + key);
+  }
+
+  private static void runAbandonWrite(Path data, Path index, Path models, HeldSource source,
+      String key, String query, String marker, AcceptedProjection updated,
+      AcceptedProjection deleted, AcceptedProjection added) throws Exception {
+    String original = new IndexGenerationManager(index)
+        .readStateBestEffort().active_generation();
+    source.failEnumerationAfterFirst();
+    try (Epoch second = open(data, index, models, new CountDownLatch(1), source)) {
+      require(await(() -> "awaiting_acceptance".equals(second.operations.outcome(key).phase()),
+          WAIT_MS), "candidate did not retain B at its source-gap wait");
+      var waiting = new IndexGenerationManager(index).readStateBestEffort();
+      require(original.equals(waiting.active_generation())
+          && ("g-" + key).equals(waiting.building_generation()),
+          "accepted-write fixture lost exact A or B before abandonment");
+      source.setRows(List.of(updated, deleted, added));
+      second.client.indexAndReturn(updated, ProjectionDurability.NRT, context());
+      second.client.deleteAndAcknowledge(deleted, ProjectionDurability.NRT, context());
+      second.client.indexAndReturn(added, ProjectionDurability.NRT, context());
+      require(searchable(second.client, marker + "new")
+          && searchable(second.client, marker + "added")
+          && !searchable(second.client, marker + "deleted"),
+          "writable A did not expose all accepted projection effects");
+      try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
+        queue.open();
+        require(queue.listSwitchBufferOpsStrictForGeneration("g-" + key).stream()
+            .filter(op -> "PROJECTION".equals(op.op())).count() >= 3,
+            "B lacks the accepted update, delete and addition obligations");
+      }
+      // This isolated fixture revokes the frozen root scope after A accepts the writes.
+      // Recovery must refuse B and transfer its exact journal before physical retirement.
+      second.client.clearAllRoots(context());
+      second.handoff();
+    }
+    try (Epoch recovered = open(data, index, models, new CountDownLatch(1), source)) {
+      require(await(() -> recovered.operations.find(key)
+          .map(row -> row.state() == OperationState.FAILED && row.receipt() != null
+              && "RECOVERY_SCOPE_REFUSED".equals(row.receipt().code()))
+          .orElse(false), WAIT_MS), "recovered scope refusal did not abandon B");
+      recovered.handoff();
+    }
+    var retired = new IndexGenerationManager(index).readStateBestEffort();
+    require(original.equals(retired.active_generation())
+        && retired.building_generation() == null && retired.previous_generation() == null
+        && !Files.exists(index.resolve("indices/g-" + key)),
+        "refused B still occupies generation capacity");
+    try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
+      queue.open();
+      require(queue.listSwitchBufferOpsStrictForGeneration("g-" + key).isEmpty(),
+          "refused B retained an accepted projection journal version");
+    }
+    try (Epoch reopened = open(data, index, models, new CountDownLatch(1), source)) {
+      require(searchable(reopened.client, marker + "new")
+          && searchable(reopened.client, marker + "added")
+          && !searchable(reopened.client, marker + "old")
+          && !searchable(reopened.client, marker + "deleted"),
+          "reopened A lost an accepted projection after B abandonment");
+      require(await(() -> vectorReady(reopened.client, query), WAIT_MS),
+          "A did not answer VECTOR after B abandonment");
+      System.out.println("INSTALLED_PROJECTION_ABANDON_A_VECTOR "
+          + reopened.client.search(query, 10, PipelineConfigs.VECTOR, context())
+              .getResultsCount());
+    }
+    System.out.println("INSTALLED_PROJECTION_ABANDON_PASS " + key);
   }
 
   private static void runGapRestart(Path data, Path index, Path models, HeldSource source,

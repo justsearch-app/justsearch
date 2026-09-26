@@ -719,7 +719,7 @@ final class KnowledgeServerRecordedIngestionTest {
   }
 
   @Test
-  void refusedRecordedBootReopensSourceWriterToDrainCandidate(@TempDir Path tempDir)
+  void fencedRecordedBootOpensSourceWriterBeforeRefusalIsCheckpointed(@TempDir Path tempDir)
       throws Exception {
     WorkerBootFixture.Layout layout = preparedLayout(tempDir);
     KnowledgeServer nativeBoot = withoutDeferredModels(helperServer(layout));
@@ -740,13 +740,14 @@ final class KnowledgeServerRecordedIngestionTest {
     String active = manager.readStateBestEffort().active_generation();
     String building = manager.startRecordedMigration(operation, "recorded-test", fingerprint,
         active, List.of()).building_generation();
+    var refused = new AtomicBoolean();
     var lifecycle = new RecordedIngestionLifecycle() {
       @Override public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) {
         return new IndexGenerationManager.BootOwnership.Recorded(operation, active,
             "recorded-test", fingerprint, true, false, List.of());
       }
       @Override public boolean recordedPrecommitRefused(String key) {
-        return operation.equals(key);
+        return operation.equals(key) && refused.get();
       }
       @Override public JobQueue.RecordedClaimDecision recordedClaimDecision(String key) {
         return JobQueue.RecordedClaimDecision.DENY;
@@ -766,6 +767,15 @@ final class KnowledgeServerRecordedIngestionTest {
       cleanupWitness.setAccessible(true);
       assertFalse((Boolean) cleanupWitness.invoke(refusedBoot, operation, active),
           "the recorded target still owns capacity before the refusal drain");
+      assertThrows(io.justsearch.indexerworker.services.WorkerServiceException.class,
+          () -> refusedBoot.appServices().ingestService().applyProjection(
+              new io.justsearch.app.api.indexing.AcceptedProjection("memory", "late", 1,
+                  io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+                  "{\"content\":\"must not be admitted\"}"),
+              io.justsearch.app.api.indexing.ProjectionDurability.NRT,
+              io.justsearch.indexerworker.services.CallContext.none()),
+          "the FENCED recovery writer must not admit a new projection");
+      refused.set(true);
       var reconcile = KnowledgeServer.class
           .getDeclaredMethod("reconcileRefusedRecordedCandidate");
       reconcile.setAccessible(true);

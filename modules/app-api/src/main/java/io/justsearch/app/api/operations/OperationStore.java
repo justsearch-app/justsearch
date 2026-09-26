@@ -141,7 +141,10 @@ public interface OperationStore extends AutoCloseable {
   /** A checkpoint describes already committed effects; counts cannot go backwards. */
   boolean checkpoint(long id, String cursor, long unitsCompleted, long unitsFailed);
 
-  /** Runner-only atomic projection of committed bulk progress; bound evidence cannot be replaced. */
+  /**
+   * Runner-only atomic projection of committed bulk progress; bound evidence cannot be replaced.
+   * A settled COMPLETE_WITH_GAPS row permits only its first exact precommit refusal seal.
+   */
   default boolean checkpointBulkReindex(long id, BulkReindexProgress progress) {
     throw new UnsupportedOperationException("Bulk reindex progress is unavailable");
   }

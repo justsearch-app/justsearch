@@ -68,17 +68,68 @@ disk, `COMPLETE/settled` in `operations.db`, and zero `switch_buffer` rows in
 `jobs.db`. The fixture compiled at `tmp/3757` and after the retirement
 assertion at `tmp/3761`. These cuts prove roll-forward around live publication;
 they do not exercise a deletion-incomplete crash or accepted writes during
-abandonment. Hosted proof for this newer fixture revision is pending.
+abandonment. Hosted proof for this fixture revision later passed on `a708b9592`.
 
 The preceding checkpoint `0c35a44eb` completed hosted
 [CI 36270764627](https://github.com/justsearch-app/justsearch/actions/runs/36270764627)
-success on its exact SHA. The newer live-publication fixture code is still
-local. Focused real Lucene refusal/replay tests at `tmp/3767` passed 37 tests
+success on its exact SHA. The live-publication fixture code was local at that
+checkpoint and later passed hosted CI on `a708b9592` below. Focused real
+Lucene refusal/replay tests at `tmp/3767` passed 37 tests
 with zero failures/errors: `ProjectionCandidateReplayTest` proves scoped
 accepted no-file update/delete versions are applied and committed on surviving
 A before B is abandoned, while `SwitchBufferStrictReplayTest` covers strict
 ordering and conditional journal removal. This is component proof; the
-successor-JVM accepted-write abandonment combination is still unproved.
+successor-JVM accepted-write abandonment combination was still unproved at
+that cut.
+
+The same focused refusal/replay suite now reopens the surviving A writer after
+exact B retirement and checks the accepted update's content and source revision
+and the acknowledged delete's continued absence. The local rerun at
+`tmp/3768-refusal-reopen-focused.txt` passed. This closes a weaker component
+proof gap: the prior assertions read through the writer that had just applied
+the replay, so they did not witness reopen persistence. It still does not
+replace the installed successor-JVM combination later recorded below.
+
+**2026-09-26 accepted-write scope-refusal abandonment (local WIP).** The
+installed `--abandon-write` mode waits for B's incomplete-source gap while A
+serves, accepts a newer update, delete and addition through successor A's public
+projection port, and revokes the frozen watched-root scope in the isolated
+fixture before a third boot. `tmp/3770-abandon-write-trace.txt` exposed that a
+recovered `COMPLETE_WITH_GAPS` row could not durably checkpoint its exact
+precommit refusal: the runner required `RUNNING` and threw during boot. The
+store and runner now allow only `SETTLED` gap evidence plus its first refusal
+code on that open state. The focused capability regression passes at `tmp/3771`.
+`tmp/3773-abandon-write-trace.txt` then sealed `RECOVERY_SCOPE_REFUSED` but
+left B retained because a FENCED boot had opened A read-only before that
+refusal was checkpointed. The exact recorded FENCED topology now opens A's
+writer for recovery before the decision; its indexing loop stays stopped. The
+source replay also treats B's incomplete source marker as a B seed obligation,
+while still checking marker identity and every accepted projection version on
+A before clearing the journal. Focused real-Lucene incomplete-source replay
+and the FENCED boot regression pass at `tmp/3774` and `tmp/3777`.
+
+The fresh installed `tmp/3776-abandon-write-trace.txt` exited 0 with
+`INSTALLED_PROJECTION_ABANDON_PASS`: A answered VECTOR 10 before the rebuild,
+then VECTOR 1 after refusal, and reopened A retained the update and addition
+without the old version or deleted projection. Independent `state.json`,
+`operations.db`, `jobs.db` and directory reads found IDLE, exact A active,
+the bulk `FAILED/settled/RECOVERY_SCOPE_REFUSED`, zero switch rows and no B
+directory. This proves accepted-write abandonment through a real successor
+and later scope refusal, not ordinary user cancellation or D2-5 durable
+projection acknowledgement. The fixture uses NRT and a graceful handoff before
+scope-refusal recovery. The preceding `a708b9592` fixture checkpoint passed
+[hosted CI 36271896979](https://github.com/justsearch-app/justsearch/actions/runs/36271896979)
+on its exact SHA; hosted proof for this newer runtime repair is pending.
+The first stress-enabled integrated attempt, `tmp/3778`, passed app-engine and
+app-observability but failed at `:modules:indexer-worker:compileTestJava` because
+the new negative assertion named the wrong `CallContext` package. The corrected
+focused test passed at `tmp/3783`; Spotless and PMD passed at `tmp/3784`.
+The clean integrated rerun `tmp/3785-abandon-integrated-stress-rerun.txt`
+passed `test -PincludeStress=true --max-workers=1` (196 tasks, 15 executed).
+`tmp/3794-abandon-build.txt` passed `build -x test --max-workers=1` (333
+tasks, 7 executed). Store recoverability, regeneration, docs validation and
+`git diff --check` also passed locally. The integrated run used the final
+production source; the subsequent edits were evidence prose only.
 
 **Partial retirement recovery, 2026-09-26 (constructed disk cut).** A fresh
 after-live self-exit left B committed and A as predecessor at `tmp/3763`. With
