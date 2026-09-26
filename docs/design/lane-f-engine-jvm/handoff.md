@@ -19,6 +19,41 @@ re-cut trigger is retired; merge `origin/main` at each checkpoint. See
 
 ## Current D1-9/D1-11 gap batch (2026-09-25)
 
+**2026-09-26 takeover verification.** PR727 and `origin/codex/lane-f-pr1`
+both pointed at `67890842fa7840551c66e38e2825d9b725f55940`; hosted
+[CI 36269109655](https://github.com/justsearch-app/justsearch/actions/runs/36269109655)
+completed success on that exact SHA in all 13 jobs, including Windows-native
+and system integration. This hosts the successor-witness and retained-capacity
+checkpoint below, but does not accept D1-9. `origin/main` had no new commits
+relative to the branch at this check.
+
+The before-pointer capacity branch was rerun against an isolated copy of the
+retained installed standard-model A. `tmp/3751-pointer-before-halt.txt` exited
+at the named `migration-before-pointer-commit` barrier with A active, exact B
+building and no fixture JVM. A separate JVM in
+`tmp/3752-pointer-before-correct-resume.txt` refused a distinct build while B
+occupied capacity, left the pointer unchanged on refusal, recovered exact B,
+cleared its scoped journal, and reopened B with a traced VECTOR query returning
+10 hits. The installed model root was required: an earlier probe using the
+global root committed a different SPLADE digest (`ab1486…` versus A's
+`6399e9…`) and the reopened query correctly reported `FINGERPRINT_MISMATCH`
+(`tmp/3749-vector-probe.txt`, `tmp/3750-index-metadata-probe.txt`). An even
+earlier fixture attempt used a watched directory outside the recorded roots
+and correctly returned `RECOVERY_AUTHORIZATION_REFUSED` (`tmp/3745`). Neither
+setup failure is promotion proof. The accepted before-pointer round covers the
+previously unrerun diagnostic branch after `38d3bbda6`; D1-9's mutation and
+abandonment cases remain open.
+
+The existing installed precommit cancellation round was strengthened to
+require an empty **exact B** switch journal after physical retirement.
+`tmp/3756-cancel-journal.txt` passed: A answered VECTOR 10 before and after,
+the row was terminal `CANCELLED`, B was absent, and its scoped journal was
+empty. A test attempt to admit a new projection from the old JVM after its
+requested restart correctly failed with “current idle serving generation”
+(`tmp/3754-cancel-accepted-projection.txt`); it therefore cannot witness an
+accepted write during abandonment. That remaining cut must use the successor's
+writable A while B exists. The failed attempt did not alter the accepted proof.
+
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor
 `INGEST` row, `superseded_from` linkage and `SUCCESSOR_ROW_MISSING` branch were

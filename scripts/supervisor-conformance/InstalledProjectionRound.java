@@ -149,8 +149,9 @@ public final class InstalledProjectionRound {
           provenance, origin, key, true);
       String capsule = authority.capsules().mintPrepared(operation.id().value(), arguments,
           SourceTier.valueOf(origin.sourceTier()), key, prepared.preparationNonce());
-      require(executor.dispatch(operation, arguments, provenance, Optional.of(capsule),
-          origin, key, prepared.preparationNonce()).success(), "bulk dispatch failed");
+      var dispatched = executor.dispatch(operation, arguments, provenance, Optional.of(capsule),
+          origin, key, prepared.preparationNonce());
+      require(dispatched.success(), "bulk dispatch failed: " + dispatched);
       require(restart.await(WAIT_MS, TimeUnit.MILLISECONDS), "bulk did not request restart");
       var row = first.operations.find(key).orElseThrow();
       var plan = new RecordedBulkPlanResolver().resolve(row,
@@ -336,6 +337,11 @@ public final class InstalledProjectionRound {
         "cancelled installed candidate did not leave exact A alone");
     require(!Files.exists(index.resolve("indices/g-" + key)),
         "cancelled installed candidate still owns B");
+    try (var queue = new SqliteJobQueue(data.resolve("jobs.db"))) {
+      queue.open();
+      require(queue.listSwitchBufferOpsStrictForGeneration("g-" + key).isEmpty(),
+          "cancelled candidate retained accepted projection journal versions");
+    }
     try (Epoch reopened = open(data, index, models, new CountDownLatch(1), source)) {
       require(reopened.operations.find(key).orElseThrow().state() == OperationState.CANCELLED,
           "reopened A lost terminal cancellation");

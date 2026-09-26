@@ -6,6 +6,15 @@ Updated 2026-09-26 for the agent handoff. Start with the
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
 
+**2026-09-26 resumption:** Hosted CI on exact PR head `67890842f` passed all
+13 jobs ([run 36269109655](https://github.com/justsearch-app/justsearch/actions/runs/36269109655)).
+The before-pointer retained-capacity branch passed against installed standard
+models at `tmp/3751`–`tmp/3752`; an installed precommit cancellation repeat
+also checked exact B journal cleanup at `tmp/3756`. See [handoff](handoff.md)
+for the invalid fixture attempts and proof limits. Continue D1-9's accepted
+writes in the successor's writable A, remaining abandonment and gap crash cuts,
+then the WP3 order below. D1-9 remains open.
+
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay
 implementation. Real A/B projection replay and candidate-writer/SQLite reopen
