@@ -1,7 +1,8 @@
 # Lane F continuation brief
 
-Updated 2026-09-25 after the owner re-cut and improvement merge. This is the successor's
-entry point; [handoff](handoff.md) owns current evidence and
+Updated 2026-09-26 for the agent handoff. Start with the
+[2026-09-26 takeover](takeover-2026-09-26.md); this brief owns ordering,
+[handoff](handoff.md) owns the evidence ledger, and
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
 
@@ -39,8 +40,8 @@ and emptied their no-file journals (`tmp/3731`–`tmp/3734`). They exposed and
 corrected an optional citation consumer path dereference during deferred model
 readiness; the regression was red on old code and green on the correction.
 The full serial integrated gate passed at `tmp/3735` (11,991 tests, zero
-failures/errors) and explicit compile passed at `tmp/3736`. This source still
-needs its own hosted gate. D1-9's other cuts
+failures/errors) and explicit compile passed at `tmp/3736`. Exact-source
+hosted CI `36145039780` passed every job. D1-9's other cuts
 and D2-5 durable covering commits remain open.
 
 **D1-8/D1-9 successor-witness correction (2026-09-25, local WIP):** A source

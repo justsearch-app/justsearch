@@ -1,7 +1,7 @@
 # Lane F handoff: implementation orchestrator
 
-Start with the [continuation brief](continuation-brief.md): the next two batches,
-owner boundaries, acceptance endpoints and execution protocol. This handoff owns
+Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
+[continuation brief](continuation-brief.md) for ordering. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
 **Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
@@ -45,11 +45,10 @@ capacity refusal without moving the pointer, then recovered B, answered VECTOR
 10 and completed the operation. The fixture compiled at `tmp/3739`. This
 proves the installed post-pointer capacity branch; its before-pointer diagnostic
 branch has not been rerun after the fixture addition.
-Stop requested by the owner before the next implementation batch. The pushed
-`b065f15a9` hosted run is
-[36145039780](https://github.com/justsearch-app/justsearch/actions/runs/36145039780);
-wait for its final status before pushing this successor-witness/capacity WIP,
-then give the new revision its own hosted run. No PR merge is authorized before
+The owner requested a handoff before the next implementation batch. The pushed
+`b065f15a9` [hosted run 36145039780](https://github.com/justsearch-app/justsearch/actions/runs/36145039780)
+finished success in every job. The successor-witness/capacity checkpoint
+`38d3bbda6` still needs its own hosted run. No PR merge is authorized before
 stage F acceptance. Resume D1-9's remaining mutation/abandon cuts and the
 minimal D2-5 identity/projection seam from the adopted WP3 order.
 
@@ -86,7 +85,8 @@ no fixture JVM remained. The current source passed the full serial
 gate at `tmp/3735-pointer-cuts-integrated.txt` in 24m41s (358 tasks,
 11,991 XML tests, 33 skipped, zero failures/errors). Explicit
 `build -x test` passed at `tmp/3736-pointer-cuts-compile.txt` in 26s
-(333 tasks). Its hosted run remains required. D2-5 durable covering commits and
+(333 tasks). Its [hosted run 36145039780](https://github.com/justsearch-app/justsearch/actions/runs/36145039780)
+passed every job. D2-5 durable covering commits and
 later D1 items remain open.
 
 **Mid-replay process cut, 2026-09-25 (checkpoint `82bb0d8fe`).**
