@@ -54,6 +54,47 @@ requested restart correctly failed with “current idle serving generation”
 accepted write during abandonment. That remaining cut must use the successor's
 writable A while B exists. The failed attempt did not alter the accepted proof.
 
+**2026-09-26 live-publication process cuts (local, after `0c35a44eb`).** The
+installed fixture now selects the two existing `migration-before-live-activation`
+and `migration-after-live-activation` barriers. Each self-exiting JVM reached
+its exact marker with B committed and A named as predecessor
+(`tmp/3758-live-before-halt.txt`, `tmp/3760-live-after-halt.txt`). Separate JVMs
+in `tmp/3759-live-before-resume.txt` and `tmp/3762-live-after-resume.txt`
+refused another build against the retained predecessor, recovered the same B,
+settled its accepted reindex row and scoped journal, and reopened B with VECTOR
+10. The after-live fixture explicitly requires A's alias and physical directory
+absent after lease drain; an independent read of both rounds found only B on
+disk, `COMPLETE/settled` in `operations.db`, and zero `switch_buffer` rows in
+`jobs.db`. The fixture compiled at `tmp/3757` and after the retirement
+assertion at `tmp/3761`. These cuts prove roll-forward around live publication;
+they do not exercise a deletion-incomplete crash or accepted writes during
+abandonment. Hosted proof for this newer fixture revision is pending.
+
+The preceding checkpoint `0c35a44eb` completed hosted
+[CI 36270764627](https://github.com/justsearch-app/justsearch/actions/runs/36270764627)
+success on its exact SHA. The newer live-publication fixture code is still
+local. Focused real Lucene refusal/replay tests at `tmp/3767` passed 37 tests
+with zero failures/errors: `ProjectionCandidateReplayTest` proves scoped
+accepted no-file update/delete versions are applied and committed on surviving
+A before B is abandoned, while `SwitchBufferStrictReplayTest` covers strict
+ordering and conditional journal removal. This is component proof; the
+successor-JVM accepted-write abandonment combination is still unproved.
+
+**Partial retirement recovery, 2026-09-26 (constructed disk cut).** A fresh
+after-live self-exit left B committed and A as predecessor at `tmp/3763`. With
+the fixture JVM gone, a temporary helper invoked the production
+`SafeIndexPathOps.markForDeletion` on that exact A inside the isolated copy,
+then removed its sentinel and generation manifest to represent interruption
+during deletion (`tmp/3764-partial-retirement-cut.txt`). The separate installed
+JVM at `tmp/3766-partial-retirement-resume.txt` refused a third generation,
+recovered B, settled the recorded row and journal, answered VECTOR 10, and
+removed the marked A directory. Independent pointer, directory and SQLite
+reads found only B, `COMPLETE/settled` and no switch rows. The strengthened
+fixture compiled at `tmp/3765`. This is a constructed on-disk cut following
+an actual after-publication process halt; it is not an observed kill inside
+the deletion helper. The exact partial-delete recovery mechanism also has
+unit coverage in `IndexGenerationRetirementTest`.
+
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor
 `INGEST` row, `superseded_from` linkage and `SUCCESSOR_ROW_MISSING` branch were

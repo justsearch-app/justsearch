@@ -15,6 +15,13 @@ for the invalid fixture attempts and proof limits. Continue D1-9's accepted
 writes in the successor's writable A, remaining abandonment and gap crash cuts,
 then the WP3 order below. D1-9 remains open.
 
+Local follow-on cuts at `tmp/3758`–`tmp/3762` now cover death immediately
+before and after live serving-view publication, with exact B recovery and A
+physical retirement. Their fixture revision still needs hosted proof. The
+constructed partial-delete state after an actual publication halt also
+recovered at `tmp/3763`–`tmp/3766`; a kill observed inside deletion and the
+accepted-write abandonment case remain open.
+
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay
 implementation. Real A/B projection replay and candidate-writer/SQLite reopen

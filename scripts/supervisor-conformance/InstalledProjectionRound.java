@@ -70,10 +70,11 @@ public final class InstalledProjectionRound {
             || "--gap-halt".equals(args[5]) || "--gap-resume".equals(args[5])
             || "--cancel".equals(args[5]) || "--replay-halt".equals(args[5])
             || "--replay-resume".equals(args[5]) || "--pointer-before-halt".equals(args[5])
-            || "--pointer-after-halt".equals(args[5])
+            || "--pointer-after-halt".equals(args[5]) || "--live-before-halt".equals(args[5])
+            || "--live-after-halt".equals(args[5])
             || "--pointer-resume".equals(args[5])))) {
       throw new IllegalArgumentException(
-          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --replay-halt, --replay-resume, --pointer-before-halt, --pointer-after-halt or --pointer-resume");
+          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --replay-halt, --replay-resume, --pointer-before-halt, --pointer-after-halt, --live-before-halt, --live-after-halt or --pointer-resume");
     }
     Path data = Path.of(args[0]).toAbsolutePath();
     Path index = Path.of(args[1]).toAbsolutePath();
@@ -82,7 +83,9 @@ public final class InstalledProjectionRound {
     String query = Files.readString(Path.of(args[4])).split("\\s+", 2)[0];
     if (args.length == 6 && ("--replay-halt".equals(args[5])
         || "--pointer-before-halt".equals(args[5])
-        || "--pointer-after-halt".equals(args[5]))) {
+        || "--pointer-after-halt".equals(args[5])
+        || "--live-before-halt".equals(args[5])
+        || "--live-after-halt".equals(args[5]))) {
       require(!Files.exists(data.resolve("runtime/migration-barrier-reached.json"))
           && !Files.exists(data.resolve("runtime/migration-barrier-release")),
           "projection cut fixture has a stale migration barrier marker");
@@ -171,10 +174,14 @@ public final class InstalledProjectionRound {
     }
     if (args.length == 6 && ("--replay-halt".equals(args[5])
         || "--pointer-before-halt".equals(args[5])
-        || "--pointer-after-halt".equals(args[5]))) {
+        || "--pointer-after-halt".equals(args[5])
+        || "--live-before-halt".equals(args[5])
+        || "--live-after-halt".equals(args[5]))) {
       String point = switch (args[5]) {
         case "--pointer-before-halt" -> "migration-before-pointer-commit";
         case "--pointer-after-halt" -> "migration-after-pointer-commit";
+        case "--live-before-halt" -> "migration-before-live-activation";
+        case "--live-after-halt" -> "migration-after-live-activation";
         default -> "migration-after-first-projection-replay";
       };
       runReplayHalt(data, index, models, source, key, marker, point);
@@ -372,7 +379,7 @@ public final class InstalledProjectionRound {
     try (Epoch second = open(data, index, models, new CountDownLatch(1), source)) {
       Path reached = data.resolve("runtime/migration-barrier-reached.json");
       require(await(() -> Files.exists(reached), WAIT_MS),
-          "candidate never applied its first no-file projection before the process cut");
+          "candidate never reached the selected migration process cut: " + point);
       Thread.sleep(1_000);
     }
     throw new AssertionError("projection replay barrier returned without halting the JVM");
@@ -431,6 +438,17 @@ public final class InstalledProjectionRound {
       System.out.println("INSTALLED_PROJECTION_" + label + "_B_VECTOR "
           + reopened.client.search(query, 10, PipelineConfigs.VECTOR, context())
               .getResultsCount());
+    }
+    if ("POINTER".equals(label)) {
+      var retired = new IndexGenerationManager(index).readStateBestEffort();
+      require(retired.previous_generation() == null
+          && !Files.exists(index.resolve("indices").resolve(original)),
+          "recovered B retained the exact predecessor after lease drain");
+      try (var entries = Files.list(index.resolve("indices"))) {
+        require(entries.noneMatch(path -> path.getFileName().toString()
+                .startsWith(original + ".del-")),
+            "recovered B retained a marked predecessor after lease drain");
+      }
     }
     System.out.println("INSTALLED_PROJECTION_" + label + "_PASS " + key);
   }
