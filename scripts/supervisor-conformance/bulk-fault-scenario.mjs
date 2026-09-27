@@ -697,6 +697,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
         reachedFile, releaseFile, migrationBarrier, operationPath, gapCancellation,
         gapRecomposeFailure, semanticSampler });
     } finally {
+      if (process.env.JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE === '1') {
+        fs.writeFileSync(path.join(data, 'runtime', 'restored-a-native-lease-release'), 'release');
+      }
       await semanticSampler?.stop();
     }
     return;
@@ -1213,6 +1216,13 @@ async function exerciseLiveModelGapDecision(c) {
           ? reply : null;
       } catch { return null; }
     });
+  const nativeLeaseProbe = process.env.JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE === '1';
+  if (nativeLeaseProbe) {
+    const reached = await waitFor('restored A issued a native CPU lease', 30000,
+      () => readJson(path.join(data, 'runtime', 'restored-a-native-lease-reached.json')));
+    requireThat(reached?.pid > 0 && reached.inputCount > 0,
+      `restored A native lease probe did not hold a readable session: ${JSON.stringify(reached)}`);
+  }
   const semantic = await semanticSampler?.stop();
   if (semantic) requireThat(semantic.reloadingRefusals > 0
     && semantic.recoveredAfterRefusal
@@ -1271,12 +1281,36 @@ async function exerciseLiveModelGapDecision(c) {
   const capsule = parseJson(approved, 'installer gap approval').capsule;
   requireThat(approved.status === 200 && typeof capsule === 'string',
     `installer gap approval failed: ${approved.text}`);
-  const accept = await request(apiPort, ACCEPT_GAPS_ROUTE, {
+  const acceptAttempt = request(apiPort, ACCEPT_GAPS_ROUTE, {
     method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify({
       ...acceptanceInput, confirmationToken: capsule,
       preparationNonce: pending.preparationNonce,
     }),
-  }, 30000);
+  }, nativeLeaseProbe ? 120000 : 30000).then(value => ({ value }), error => ({ error }));
+  if (nativeLeaseProbe) {
+    const blocked = await waitFor('approved B waits for restored A native lease', 60000,
+      async () => {
+        const state = readJson(path.join(indexBase, 'state.json'));
+        const reply = await request(apiPort, '/api/status', {}, 15000);
+        const encoder = reply.status === 200
+          ? JSON.parse(reply.text)?.components?.encoders : null;
+        return state?.active_generation === sourceGeneration
+          && encoder?.state === 'RELOADING' ? { state, encoder } : null;
+      });
+    requireThat(blocked.state.building_generation === `g-${operationKey}`,
+      `B did not retain its exact candidate while A's native call was held: ${JSON.stringify(blocked)}`);
+    fs.writeFileSync(path.join(data, 'runtime', 'restored-a-native-lease-release'), 'release');
+    const proof = await waitFor('restored A native lease survived B retirement', 30000,
+      () => readJson(path.join(data, 'runtime', 'restored-a-native-lease-proof.json')));
+    requireThat(proof?.ok === true && proof.retirementStatus === 'RETIRING'
+      && proof.inputCount > 0,
+    `restored A native lease proof failed: ${JSON.stringify(proof)}`);
+    console.log('MODEL_LIVE_AB_RESTORED_NATIVE_LEASE', JSON.stringify(proof));
+  }
+  const acceptedAttempt = await acceptAttempt;
+  requireThat(!acceptedAttempt.error,
+    `installer gap acceptance transport failed: ${acceptedAttempt.error?.message}`);
+  const accept = acceptedAttempt.value;
   requireThat(accept.status === 200 && parseJson(accept, 'installer accepted gaps').success,
     `installer gap decision failed: ${accept.text}`);
   const promoted = await waitFor('approved installer gap promotes exact B', 180000, () => {

@@ -30,11 +30,17 @@ provider installation, binds native runtime metadata explicitly, and routes
 physical index-target capture through the Worker owner. Three affected module
 suites and static checks passed at `tmp/3999`; rebuilt installed A/B with real
 vector queries passed at `tmp/4000`. It was pushed as `240284976`; exact-SHA
-CI run `36304369183` is in progress. A second installed `ai` lifecycle
+CI run `36304369183` passed every job. A second installed `ai` lifecycle
 scenario at `tmp/4002` proved forced in-place gap refusal, A semantic
 restoration during approval, and B promotion after approval. The default
-untagged task remains green at `tmp/4003`. See the handoff for limits and counts.
-The owner-set D1-14 wall-clock/fraction bound, installed restored-A held-call,
+untagged task remains green at `tmp/4003`. The gap scenario checkpoint is
+pushed as `3ccc31d8f`, with exact-SHA CI run `36305226947` in progress.
+An installed restored-A native lease hold passed locally at `tmp/4004`:
+the exact A session remained readable in `RETIRING` while approved B waited.
+The final exact-source rerun passed at `tmp/4006`, including PMD/Spotless,
+after an F: disk-capacity and PMD interruption at `tmp/4005`. See the handoff
+for limits and counts.
+The owner-set D1-14 wall-clock/fraction bound,
 full Worker Flow B and remaining D1/D2/E/F acceptance remain open. See
 [handoff](handoff.md) and [D1](stages/D1.md) for exact counts and limits.
 

@@ -52,8 +52,10 @@ final class EngineSupervisedRecoveryE2ETest {
     Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-gap-" + UUID.randomUUID());
     runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
         "INSTALLER_ACTIVATION_FAULT_PASS");
+    var environment = new java.util.HashMap<>(inPlaceModelEnvironment());
+    environment.put("JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE", "1");
     String output = runInstalledModelScenario(repo, work, "model-live-a-b-gap",
-        inPlaceModelEnvironment(), "MODEL_LIVE_AB_GAP_PASS");
+        environment, "MODEL_LIVE_AB_GAP_PASS");
     String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_GAP_PASS "))
         .findFirst().orElseThrow();
     var result = MAPPER.readTree(line.substring("MODEL_LIVE_AB_GAP_PASS ".length()));
@@ -62,6 +64,7 @@ final class EngineSupervisedRecoveryE2ETest {
     assertTrue(result.path("aVectorHits").asInt() > 0, line);
     assertTrue(result.path("bVectorHits").asInt() > 0, line);
     assertTrue(result.path("semantic").path("recoveredAfterRefusal").asBoolean(), line);
+    assertTrue(output.contains("MODEL_LIVE_AB_RESTORED_NATIVE_LEASE "), output);
     System.out.println("LIFECYCLE_IN_PLACE_GAP_RESTORATION_PASS §16 " + line);
   }
 

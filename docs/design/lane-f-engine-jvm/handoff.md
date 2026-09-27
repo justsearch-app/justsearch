@@ -110,7 +110,36 @@ This proves the production metadata cut and real model
 query, not the remaining D1-12/13 Flow B acceptance.
 The cut was pushed as `240284976`; its exact-SHA CI
 [36304369183](https://github.com/justsearch-app/justsearch/actions/runs/36304369183)
-is running.
+passed every job, including Windows-native and system integration. The
+`3ccc31d8f` gap lifecycle scenario checkpoint is pushed; its exact-SHA CI
+run is [36305226947](https://github.com/justsearch-app/justsearch/actions/runs/36305226947).
+
+**2026-09-27 D1-13 installed restored-A native hold (local).** The
+`ai`-tagged installed in-place gap scenario now enables a harness-only Worker
+probe after refused B has recomposed A. The probe borrows the restored set's
+exact CPU ORT handle, confirms its session inputs are readable, and holds the
+lease while an approved B enters `RELOADING` with A still active and the exact
+B generation pending. On release it requires the handle to be `RETIRING` and
+the issued session still readable; only then may B promote. The first fresh
+installed round passed at `tmp/4004-restored-a-native-installed.txt`, with
+`MODEL_LIVE_AB_RESTORED_NATIVE_LEASE {"retirementStatus":"RETIRING","ok":true,"inputCount":2}`,
+A VECTOR two hits during the gap wait, B VECTOR one after promotion,
+29,446/64,481 ms sampled semantic refusal/transition, one JUnit test without
+skips or failures, and both owned processes stopped. The hook was then moved
+outside the published-owner cleanup catch and its failure-marker logging
+tightened. `tmp/4005` failed PMD on that diagnostic and ran out of F: space;
+automatic approval review rejected deleting generated fixture files, so unique
+optimization outputs from this lane's completed fixtures were moved to
+`C:/Users/Elias/AppData/Local/Temp/justsearch-lane-f-fixture-overflow` while
+their logs and proof markers stayed in place. The exact-source rerun passed
+at `tmp/4006-restored-a-native-installed-final.txt`: one JUnit test with no
+skip or failure, Worker/system-test Spotless and PMD, `RETIRING` with two
+readable inputs, A VECTOR two hits, B VECTOR one hit, semantic recovery after
+111 reload refusals in 29,691/64,461 ms, and `STOP 0`. Official health
+returned `ABSENT` without an inference orphan. This is installed restored-A
+retirement proof. D1-13's full
+ordered-shutdown and native-stress acceptance, D1-12's full Flow B, and the
+D1-14 owner-set bound remain separate acceptance items.
 
 **Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
 D1-9 streaming correction and its proofs before further implementation. Stage

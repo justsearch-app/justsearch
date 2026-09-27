@@ -409,6 +409,7 @@ public final class KnowledgeServer implements Closeable {
 
   // Migration enumerator progress (best-effort observability)
   private final AtomicBoolean migrationEnumeratorRunning = new AtomicBoolean(false);
+  private final AtomicBoolean restoredNativeLeaseProbeStarted = new AtomicBoolean();
   private final AtomicLong migrationEnumeratorRootsTotal = new AtomicLong(0L);
   private final AtomicLong migrationEnumeratorRootsDone = new AtomicLong(0L);
   private final AtomicLong migrationEnumeratorFilesSeen = new AtomicLong(0L);
@@ -2333,6 +2334,9 @@ public final class KnowledgeServer implements Closeable {
         try { restored.close(); }
         catch (RuntimeException | Error cleanup) { wiringFailure.addSuppressed(cleanup); }
         throw wiringFailure;
+      }
+      if (restoredNativeLeaseProbeStarted.compareAndSet(false, true)) {
+        RestoredNativeLeaseProbe.start(configuration.paths().dataDir(), restored.owner());
       }
       publishEncoderComposition();
       log.info("Recomposed active A after refused in-place candidate");
