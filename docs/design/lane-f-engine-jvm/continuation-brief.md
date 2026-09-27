@@ -34,12 +34,20 @@ CI run `36304369183` passed every job. A second installed `ai` lifecycle
 scenario at `tmp/4002` proved forced in-place gap refusal, A semantic
 restoration during approval, and B promotion after approval. The default
 untagged task remains green at `tmp/4003`. The gap scenario checkpoint is
-pushed as `3ccc31d8f`, with exact-SHA CI run `36305226947` in progress.
+pushed as `3ccc31d8f`, with exact-SHA CI run `36305226947` green.
 An installed restored-A native lease hold passed locally at `tmp/4004`:
 the exact A session remained readable in `RETIRING` while approved B waited.
 The final exact-source rerun passed at `tmp/4006`, including PMD/Spotless,
 after an F: disk-capacity and PMD interruption at `tmp/4005`. See the handoff
 for limits and counts.
+The native-hold proof `e43908445` reached hosted Public claims, which found
+an unclassified harness data-dir write. A READY ephemeral marker row now
+passes the local store-recoverability gate; its hosted correction remains to
+be pushed after the current system integration job finishes. The same run's
+platform-contracts lane found direct probe environment reads; the exact
+system-access audit and Worker static checks pass locally after routing them
+through `SystemAccess.rawEnvVar` at `tmp/4007`. Installed AI rerun `tmp/4008`
+passed with exact A native retirement evidence and clean stack stop.
 The owner-set D1-14 wall-clock/fraction bound,
 full Worker Flow B and remaining D1/D2/E/F acceptance remain open. See
 [handoff](handoff.md) and [D1](stages/D1.md) for exact counts and limits.

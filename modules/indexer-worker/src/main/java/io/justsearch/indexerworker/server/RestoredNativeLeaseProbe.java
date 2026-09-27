@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.server;
 
+import io.justsearch.configuration.SystemAccess;
 import io.justsearch.core.harness.HarnessBarrierProtocol;
 import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
@@ -21,8 +22,8 @@ final class RestoredNativeLeaseProbe {
   private RestoredNativeLeaseProbe() {}
 
   static void start(Path dataDir, EncoderSet restored) {
-    if (!"1".equals(System.getenv("JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE"))) return;
-    if (!"1".equals(System.getenv("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
+    if (!"1".equals(SystemAccess.rawEnvVar("JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE"))) return;
+    if (!"1".equals(SystemAccess.rawEnvVar("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
       throw new IllegalStateException("Restored native lease probe requires supervisor harness mode");
     }
     var handles = restored.surfaceForOwner().handles();

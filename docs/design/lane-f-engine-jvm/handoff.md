@@ -112,7 +112,8 @@ The cut was pushed as `240284976`; its exact-SHA CI
 [36304369183](https://github.com/justsearch-app/justsearch/actions/runs/36304369183)
 passed every job, including Windows-native and system integration. The
 `3ccc31d8f` gap lifecycle scenario checkpoint is pushed; its exact-SHA CI
-run is [36305226947](https://github.com/justsearch-app/justsearch/actions/runs/36305226947).
+run [36305226947](https://github.com/justsearch-app/justsearch/actions/runs/36305226947)
+passed every job, including Windows-native and system integration.
 
 **2026-09-27 D1-13 installed restored-A native hold (local).** The
 `ai`-tagged installed in-place gap scenario now enables a harness-only Worker
@@ -140,6 +141,28 @@ returned `ABSENT` without an inference orphan. This is installed restored-A
 retirement proof. D1-13's full
 ordered-shutdown and native-stress acceptance, D1-12's full Flow B, and the
 D1-14 owner-set bound remain separate acceptance items.
+The proof was pushed as `e43908445`; exact-SHA hosted run
+[36305935011](https://github.com/justsearch-app/justsearch/actions/runs/36305935011)
+failed Public claims on one unclassified write site in
+`RestoredNativeLeaseProbe.java`. The gate exposed a real register omission:
+the harness writes reached/release/proof markers under the data directory.
+The new `restored-native-lease-harness-barrier` READY row classifies those
+ephemeral files with `RESET` upgrade handling and a fail-loud installed
+fixture. Local store-recoverability gate and all 78 self-test assertions pass;
+the 12 release-descriptor tests also pass. This correction has no hosted
+proof yet; the earlier `e43908445` run cannot count as green.
+The same hosted run's platform-contracts lane found two direct
+`System.getenv` calls in the probe, outside the governed configuration
+funnel. They now use `SystemAccess.rawEnvVar`, matching the existing
+`MigrationTransitionBarrier`. The exact failing `SystemAccessFunnelTest`,
+Worker Spotless and PMD pass locally at
+`tmp/4007-restored-native-hosted-gates.txt`. A fresh installed AI rerun on
+this final source is `tmp/4008-restored-a-native-governance-final.txt`
+and passed: one JUnit test without skips/failures, `RETIRING` with two
+readable session inputs, A VECTOR two hits and B VECTOR one, semantic recovery
+after 109 reload refusals in 29,227/63,995 ms, `STOP 0`, official health
+`ABSENT` with no inference orphan. The `config-surface` governance gate also
+passed locally. Neither gate was weakened or allowlisted.
 
 **Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
 D1-9 streaming correction and its proofs before further implementation. Stage
