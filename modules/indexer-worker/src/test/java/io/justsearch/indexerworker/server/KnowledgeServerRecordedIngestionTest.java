@@ -485,6 +485,55 @@ final class KnowledgeServerRecordedIngestionTest {
   }
 
   @Test
+  @DisplayName("an in-place gap wait parks B and republishes text-only A before its durable state")
+  void inPlaceGapWaitRestoresSourceBeforeAdvertisingAcceptance(@TempDir Path tempDir)
+      throws Exception {
+    KnowledgeServer server = helperServer(preparedLayout(tempDir));
+    var manager = org.mockito.Mockito.mock(IndexGenerationManager.class);
+    org.mockito.Mockito.when(manager.readStateBestEffort()).thenReturn(
+        new IndexGenerationManager.State(1, "g-source", "g-candidate", null, "SWITCHING",
+            false, null, null, System.currentTimeMillis(), null, null, null));
+    var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    var lexical = org.mockito.Mockito.mock(WorkerAppServices.class);
+    Object owner = new Object();
+    org.mockito.Mockito.when(producer.mutationOwnerToken()).thenReturn(owner);
+    org.mockito.Mockito.when(producer.mutationAdmission()).thenReturn(
+        new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner));
+    org.mockito.Mockito.when(producer.pauseProducerForCutover(10_000)).thenReturn(true);
+    server.publishServingView(lexical);
+    server.appServices = producer;
+    setField(server, "inPlaceLexicalServices", lexical);
+    setField(server, "recordedCandidateInPlace", true);
+    setField(server, "indexGenerationManager", manager);
+    var restoredAtDurableTransition = new AtomicBoolean();
+    org.mockito.Mockito.doAnswer(invocation -> {
+      try (var restored = server.captureServingView()) {
+        restoredAtDurableTransition.set(restored.services() == producer);
+      }
+      return null;
+    }).when(manager).updateMigrationState(
+        IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE);
+    try {
+      assertTrue(server.holdInPlaceCandidateForGapDecision());
+      assertTrue(restoredAtDurableTransition.get(),
+          "the durable wait must never precede publication of surviving A");
+      try (var restored = server.captureServingView()) {
+        assertSame(producer, restored.services(),
+            "the wait must publish the surviving source before advertising acceptance");
+      }
+      var order = org.mockito.Mockito.inOrder(producer, manager);
+      order.verify(producer).pauseProducerForCutover(10_000);
+      order.verify(producer).parkCandidateProducerModels();
+      order.verify(manager).updateMigrationState(
+          IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE);
+      assertFalse((Boolean) getField(server, "recordedCandidateInPlace"));
+      assertTrue((Boolean) getField(server, "gapWaitProducerPaused"));
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
   @DisplayName("candidate gap approval drains accepted Green work before freezing its witness")
   void gapAcceptanceFenceDrainsBeforeProducerPause(@TempDir Path tempDir) throws Exception {
     KnowledgeServer server = helperServer(preparedLayout(tempDir));
@@ -1290,6 +1339,12 @@ final class KnowledgeServerRecordedIngestionTest {
 
   private static KnowledgeServer helperServer(WorkerBootFixture.Layout layout) {
     return new KnowledgeServer(new TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()), null);
+  }
+
+  private static Object getField(Object target, String name) throws Exception {
+    var field = target.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(target);
   }
 
   private static void setField(Object target, String name, Object value) throws Exception {

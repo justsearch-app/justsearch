@@ -53,8 +53,17 @@ accessibility, proportion and 27 UI gates passed locally. The combined
 source's final stress-enabled Gradle suite and package build passed at
 `tmp/3830` and `tmp/3837`. The corrected installed jars repeated the actual
 deletion halt and separate recovery at `tmp/3839`–`tmp/3840`; independent
-state reads found exact B IDLE, A absent and an empty journal. Hosted CI for
-this new source remains pending.
+state reads found exact B IDLE, A absent and an empty journal. Exact-SHA
+hosted CI run `36283142872` passed every job on `16ce5602c`.
+The next D1-14 in-place gap fixture is still local WIP: its no-model A
+restoration regression passed at `tmp/3844`. Three installed probes
+`tmp/3851`, `tmp/3854`, `tmp/3857` showed that ordinary user bulk has no
+installer `recordedCandidate` and therefore no device-line decision. The
+replacement installer activation gap round passed twice, finally at
+`tmp/3860`–`tmp/3861`: `IN_PLACE` under the one-megabyte cap, text on A at
+Green drain, A VECTOR during the gap wait, B VECTOR after approval, exact B
+pointer and terminal approved-gap row. Cancel/refusal failure and held native
+lease acceptance remain next.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

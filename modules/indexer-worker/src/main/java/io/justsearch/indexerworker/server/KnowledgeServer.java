@@ -2316,9 +2316,6 @@ public final class KnowledgeServer implements Closeable {
         candidate.close();
         candidateModels = null;
       }
-      EncoderSet.ModelIdentity identity = Objects.requireNonNull(inPlaceSourceIdentity,
-          "Active generation model identity");
-      GenerationModelSelection selection = initialModelSelection;
       if (!inPlaceSourceHadModels) {
         publishEmptySource(producer);
         if (encoderComponent != null) encoderComponent.transition(
@@ -2326,6 +2323,9 @@ public final class KnowledgeServer implements Closeable {
             "Candidate refused; active A remains text-only");
         return;
       }
+      EncoderSet.ModelIdentity identity = Objects.requireNonNull(inPlaceSourceIdentity,
+          "Active generation model identity");
+      GenerationModelSelection selection = initialModelSelection;
       ResolvedConfig configuration = Objects.requireNonNull(startupConfiguration,
           "Active generation configuration");
       Path aiHome = configuration.paths().dataDir();

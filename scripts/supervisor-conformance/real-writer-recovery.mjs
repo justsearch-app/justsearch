@@ -28,7 +28,8 @@ const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
 const bulkGapApproval = scenario === 'bulk-gap-approval';
 const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
-const modelLiveAB = scenario === 'model-live-a-b';
+const modelLiveABGap = scenario === 'model-live-a-b-gap';
+const modelLiveAB = scenario === 'model-live-a-b' || modelLiveABGap;
 const acceptedWriteDuringBuild = modelLiveAB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE === '1';
 const watcherDeleteDuringBuild = acceptedWriteDuringBuild
@@ -36,8 +37,9 @@ const watcherDeleteDuringBuild = acceptedWriteDuringBuild
 // Create the finite MIGRATING load after A's vector readiness check. The named
 // before-SWITCHING barrier holds the monitor while the watcher probe runs.
 const extraBuildFiles = watcherDeleteDuringBuild ? 300 : acceptedWriteDuringBuild ? 80 : 0;
-const distinctModelB = modelLiveAB && process.env.JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B === '1';
-const inPlaceModelB = distinctModelB
+const distinctModelB = modelLiveABGap || modelLiveAB
+  && process.env.JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B === '1';
+const inPlaceModelB = modelLiveABGap || distinctModelB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE === '1';
 const mixedChatInstaller = installerFault
   && process.env.JUSTSEARCH_WRITER_RECOVERY_MIXED_CHAT === '1';
@@ -173,8 +175,10 @@ if (installerFault) {
 if (modelLiveAB) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
-  env.JUSTSEARCH_OPERATION_FAULT_POINT = 'installer-before-marker';
-  if (acceptedWriteDuringBuild) {
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = modelLiveABGap
+    ? 'bulk-before-building-checkpoint' : 'installer-before-marker';
+  if (modelLiveABGap) env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-green-drained';
+  else if (acceptedWriteDuringBuild) {
     env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-before-switching';
   }
   if (distinctModelB) {
@@ -391,7 +395,8 @@ try {
   } else if (modelLiveAB) {
     await exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort, operationKey,
       readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit, distinctModelB,
-      inPlaceModelB, acceptedWriteDuringBuild, watcherDeleteDuringBuild, extraBuildFiles });
+      inPlaceModelB, acceptedWriteDuringBuild, watcherDeleteDuringBuild, extraBuildFiles,
+      gapApproval: modelLiveABGap });
   } else if (modelBoot) {
     const initialStatus = await waitFor('model binding boot status', 60000, async () => {
       try {

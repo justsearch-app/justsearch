@@ -588,7 +588,7 @@ export async function exerciseInstallerActivationFault(c) {
 export async function exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort,
   operationKey, readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
-  watcherDeleteDuringBuild = false,
+  watcherDeleteDuringBuild = false, gapApproval = false,
   extraBuildFiles = 0 }) {
   const runtime = path.join(data, 'runtime');
   const { reachedFile, releaseFile } = barrierFiles(data);
@@ -674,6 +674,15 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     args: input, idempotencyKey: operationKey,
     confirmationToken: prepared.capsule, preparationNonce: prepared.nonce,
   }, sessionHeaders(manifest));
+  if (gapApproval) {
+    requireThat(distinctModelB && inPlaceModelB,
+      'installed model gap proof requires a distinct forced in-place candidate');
+    await exerciseLiveModelGapApproval({ work, data, indexBase, manifest, apiPort,
+      operationKey, sourceGeneration, sourceManifest, marker, file, bRoot, dispatched,
+      readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
+      reachedFile, releaseFile, migrationBarrier, operationPath });
+    return;
+  }
   try {
     const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
     const acceptedMarker = 'lexicalbridgecobalt';
@@ -907,6 +916,141 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     sourceGeneration, activeGeneration: completed.active.active_generation,
     settingsRevision: completed.settings.witness.acceptedRevision,
     bVectorHits: JSON.parse(bVector.text).results.length }));
+}
+
+/** A captured installer file disappears before B builds; A must regain native service at the wait. */
+async function exerciseLiveModelGapApproval(c) {
+  const { work, data, indexBase, manifest, apiPort, operationKey, sourceGeneration,
+    sourceManifest, marker, file, bRoot, dispatched, readJson, waitFor, request, post,
+    requireThat, createOperationKey, matchingHit, reachedFile, releaseFile,
+    migrationBarrier, operationPath } = c;
+  const removed = path.join(work, 'installer-root-b', 'installer-1.txt');
+  try {
+    const reached = await waitFor('installer capture closed before Green build', 180000,
+      () => readJson(reachedFile));
+    const cut = snapshot({ operationPath, jobsPath: path.join(data, 'jobs.db'),
+      indexBase, operationKey });
+    requireThat(reached.phase === 'bulk-before-building-checkpoint'
+      && reached.operationKey === operationKey
+      && cut.walk?.enumeration_outcome === 'COMPLETE'
+      && cut.walk.planned_units >= 2
+      && cut.state.active_generation === sourceGeneration
+      && cut.state.building_generation === `g-${operationKey}`
+      && fs.existsSync(removed),
+    `installer gap did not hold its captured source set: ${JSON.stringify({ reached, cut })}`);
+    fs.unlinkSync(removed);
+  } finally {
+    fs.writeFileSync(releaseFile, 'release');
+  }
+  const dispatch = await dispatched.settled;
+  requireThat(!dispatch.error, `installer gap dispatch failed: ${dispatch.error?.message}`);
+  let floorEvidence;
+  try {
+    const reached = await waitFor('installer Green drained before gap decision', 180000,
+      () => readJson(migrationBarrier.reachedFile));
+    const state = readJson(path.join(indexBase, 'state.json'));
+    const reply = await request(apiPort, '/api/status', {}, 15000);
+    const status = reply.status === 200 ? JSON.parse(reply.text) : null;
+    const encoder = status?.readiness?.engineComponents?.encoders;
+    requireThat(reached.point === 'migration-green-drained'
+      && reached.buildingGeneration === `g-${operationKey}`
+      && state?.active_generation === sourceGeneration
+      && state?.migration_state === 'SWITCHING'
+      && encoder?.mode === 'IN_PLACE'
+      && encoder?.reason === 'candidate_exceeds_free_device_memory'
+      && encoder?.freeBytes <= 1024 * 1024
+      && encoder?.footprintBytes > encoder?.freeBytes
+      && status?.components?.encoders?.state === 'RELOADING',
+    `installer gap missed the forced device line: ${JSON.stringify({ reached, state, encoder,
+      component: status?.components?.encoders })}`);
+    const text = await post(apiPort, '/api/knowledge/search',
+      { query: marker, limit: 10, mode: 'text' }, 30000);
+    requireThat(text.status === 200 && matchingHit(text, file, marker),
+      `in-place A lost lexical service during B composition: ${text.text}`);
+    floorEvidence = { mode: encoder.mode, freeBytes: encoder.freeBytes,
+      footprintBytes: encoder.footprintBytes };
+  } finally {
+    fs.writeFileSync(migrationBarrier.releaseFile, 'release');
+  }
+  const waiting = await waitFor('installer gap keeps A active and B bound', 180000,
+    async () => {
+      const row = operationRows(operationPath, operationKey)[0];
+      const state = readJson(path.join(indexBase, 'state.json'));
+      if (row?.state === 'FAILED' || row?.state === 'CANCELLED') {
+        throw new Error(`installer gap terminated before approval: ${row.failure_reason}`);
+      }
+      if (row?.state !== 'COMPLETE_WITH_GAPS' || row.phase !== 'settled'
+        || state?.active_generation !== sourceGeneration
+        || state?.building_generation !== `g-${operationKey}`
+        || state?.migration_state !== 'AWAITING_ACCEPTANCE') return null;
+      const reply = await request(apiPort, `/api/operation-history/${operationKey}`, {}, 15000);
+      if (reply.status !== 200) return null;
+      const outcome = parseJson(reply, 'installer gap outcome');
+      return outcome.phase === 'awaiting_acceptance' && outcome.state === 'running'
+        && /^[0-9a-f]{64}$/.test(outcome.result?.gapListHash ?? '')
+        && outcome.result?.gaps?.some(gap => gap.unitId && gap.reason)
+        ? { row, state, outcome } : null;
+    });
+  const aVector = await waitFor('recomposed A serves VECTOR during installer gap wait',
+    120000, async () => {
+      try {
+        const reply = await post(apiPort, '/api/knowledge/search',
+          { query: marker, limit: 10, mode: 'vector' }, 30000);
+        return reply.status === 200 && JSON.parse(reply.text).results?.length > 0
+          ? reply : null;
+      } catch { return null; }
+    });
+  const acceptanceKey = createOperationKey();
+  const acceptanceInput = { reindexKey: operationKey,
+    gapListHash: waiting.outcome.result.gapListHash, idempotencyKey: acceptanceKey };
+  const initial = await request(apiPort, ACCEPT_GAPS_ROUTE, {
+    method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify(acceptanceInput),
+  }, 30000);
+  const pending = parseJson(initial, 'installer gap acceptance preparation');
+  requireThat(initial.status === 428 && pending.operationKey === acceptanceKey
+    && typeof pending.pendingId === 'string' && typeof pending.preparationNonce === 'string',
+  `installer gap acceptance lacked a distinct prepared decision: ${initial.text}`);
+  const approved = await post(apiPort, '/api/authorizations/approve',
+    { pendingId: pending.pendingId }, 30000);
+  const capsule = parseJson(approved, 'installer gap approval').capsule;
+  requireThat(approved.status === 200 && typeof capsule === 'string',
+    `installer gap approval failed: ${approved.text}`);
+  const accept = await request(apiPort, ACCEPT_GAPS_ROUTE, {
+    method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify({
+      ...acceptanceInput, confirmationToken: capsule,
+      preparationNonce: pending.preparationNonce,
+    }),
+  }, 30000);
+  requireThat(accept.status === 200 && parseJson(accept, 'installer accepted gaps').success,
+    `installer gap decision failed: ${accept.text}`);
+  const promoted = await waitFor('approved installer gap promotes exact B', 180000, () => {
+    const row = operationRows(operationPath, operationKey)[0];
+    const state = readJson(path.join(indexBase, 'state.json'));
+    return row?.state === 'FAILED' && row.failure_reason === 'PROMOTED_WITH_GAPS'
+      && state?.active_generation === `g-${operationKey}`
+      && state?.migration_state === 'IDLE' ? { row, state } : null;
+  });
+  const bManifest = readJson(path.join(indexBase, 'indices', `g-${operationKey}`,
+    '.justsearch-index-generation.json'));
+  requireThat(bManifest?.models?.embedding?.id?.startsWith(bRoot)
+    && bManifest.models.embedding.sha256 !== sourceManifest.models.embedding.sha256,
+  `installed gap promoted the wrong model set: ${JSON.stringify(bManifest?.models)}`);
+  const bVector = await waitFor('approved installer gap serves B VECTOR', 120000,
+    async () => {
+      try {
+        const reply = await post(apiPort, '/api/knowledge/search',
+          { query: marker, limit: 10, mode: 'vector' }, 30000);
+        return reply.status === 200 && JSON.parse(reply.text).results?.length > 0
+          ? reply : null;
+      } catch { return null; }
+    });
+  console.log('MODEL_LIVE_AB_GAP_PASS', JSON.stringify({ operationKey, acceptanceKey,
+    sourceGeneration, promotedGeneration: promoted.state.active_generation,
+    floor: 'floor simulated by device-memory cap', floorEvidence,
+    aVectorHits: JSON.parse(aVector.text).results.length,
+    bVectorHits: JSON.parse(bVector.text).results.length,
+    gapListHash: waiting.outcome.result.gapListHash,
+    terminalReason: promoted.row.failure_reason }));
 }
 
 function linkRegularFiles(source, target) {

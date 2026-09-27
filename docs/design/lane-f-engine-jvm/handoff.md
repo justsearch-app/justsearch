@@ -266,8 +266,46 @@ exited 73 after removing `_1a.fdm` while B was active and A still previous;
 `tmp/3840-retirement-resume.txt` passed in a separate JVM. Independent final
 reads found IDLE on that same B, no A or marked predecessor, bulk
 `FAILED/settled`, and zero switch rows. This supersedes the earlier
-pre-funnel-correction installed run as the final-source proof. Hosted CI is
-still required for this checkpoint.
+pre-funnel-correction installed run as the final-source proof. Exact-SHA
+hosted run `36283142872` completed SUCCESS on
+`16ce5602c79e960f6f64f8d5f0e2b80edbc07d6b`, including Windows-native,
+system integration, build, public claims and every unit job.
+
+**2026-09-27 D1-14 in-place gap follow-on (local WIP).** A focused gap-wait
+regression first failed at `tmp/3841`: text-only A with no requested model
+could not restore because the code demanded a model identity before taking
+the empty-source branch. Moving that precondition after the branch passed the
+exact test at `tmp/3842`, then the full recorded-ingestion class, PMD and
+Spotless at `tmp/3843`. The regression now captures the surviving A service
+inside the durable `AWAITING_ACCEPTANCE` transition, passing at `tmp/3844`.
+Store recoverability, runtime closure and regeneration passed at
+`tmp/3845`–`tmp/3847`; `build -x test`, UI installDist, Spotless and PMD passed
+at `tmp/3848`. A fresh private installed CPU seed and distinct CUDA B under
+the one-megabyte cap passed at `tmp/3849`–`tmp/3850`. The first gap run
+`tmp/3851` reached `AWAITING_ACCEPTANCE`, but its post-restart status sample
+had lost process-local compose evidence. A fresh seed and CUDA B passed at
+`tmp/3852`–`tmp/3853`; the next gap probe `tmp/3854` held
+`migration-before-switching`, which was before deferred model composition and
+reported STARTING. A third probe at `tmp/3855`–`tmp/3857` captured
+`migration-green-drained` but still showed READY with no compose mode. Source
+review found the actual distinction: `RecordedIngestionCoordinator.recordedCandidate`
+returns empty for ordinary user bulk reindex, so that operation never composes
+an installer B model set and cannot exercise D1-14's device line. The invalid
+variant was retired. A new `model-live-a-b-gap` fixture uses an installer
+activation with distinct CUDA B bytes, removes a captured source file at the
+pre-building barrier, and samples the real in-place candidate at Green drain.
+Fresh private CPU A seed `tmp/3858` and installed gap round `tmp/3859`
+passed: B's footprint was 16,535,624,090 bytes against the one-megabyte cap,
+A served text during `RELOADING`, then A VECTOR answered during the gap wait;
+approved loss promoted exact B. The final fixture added a B VECTOR query and
+passed again on fresh seed `tmp/3860` and installed run
+`tmp/3861-installer-gap-installed-final.txt`: A and B each returned a vector
+hit, the gap hash was bound to distinct approval, and STOP 0 closed private
+ports. Independent pointer, model-manifest and SQLite reads found B IDLE with
+the retained FP16 SHA, no previous-generation pointer, approval COMPLETE and
+the original bulk `FAILED/settled` with `PROMOTED_WITH_GAPS`. This is local
+installed D1-14 gap/A-recompose proof; cancel/refusal failure and held native
+lease cases remain open.
 
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor
