@@ -986,7 +986,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     `promoted B resurrected a watcher deletion: ${removedText.text}`);
   }
   const semantic = await transitionSampler?.stop();
-  if (semantic) requireThat(semantic.reloadingRefusals > 0 && semantic.available > 0
+  if (semantic) requireThat(semantic.reloadingRefusals > 0
+    && semantic.recoveredAfterRefusal
     && semantic.refusalWindowMs > 0 && semantic.refusalWindowMs <= semantic.transitionMs
     && semantic.unexpected === 0,
   `floor transition sampling missed a real refusal and recovery: ${JSON.stringify(semantic)}`);
@@ -1070,27 +1071,33 @@ function sampleSemanticAvailability({ apiPort, post, marker, file, matchingHit }
     if (result) return result;
     running = false;
     await task;
-    const ended = performance.now();
-    const refusals = observations.filter(sample => sample.outcome === 'reloading');
-    const firstRefusal = refusals[0]?.at;
-    const lastRefusal = refusals.at(-1)?.at;
-    const firstRecovery = observations.find(sample => sample.outcome === 'available'
-      && firstRefusal != null && sample.at > lastRefusal)?.at;
-    const transitionMs = Math.round(ended - started);
-    const refusalWindowMs = firstRefusal == null ? 0
-      : Math.round((firstRecovery ?? ended) - firstRefusal);
-    result = { transitionMs, refusalWindowMs,
-      refusedFraction: transitionMs === 0 ? 0 : refusalWindowMs / transitionMs,
-      sampledRequests: observations.length,
-      reloadingRefusals: refusals.length,
-      available: observations.filter(sample => sample.outcome === 'available').length,
-      workerStarting: observations.filter(sample => sample.outcome === 'worker-starting').length,
-      transport: observations.filter(sample => sample.outcome === 'transport').length,
-      unexpected: observations.filter(sample => sample.outcome.startsWith('unexpected-')
-        || sample.outcome === 'available-unmatched').length,
-      unexpectedSamples };
+    result = summarizeSemanticAvailability(observations, started, performance.now(),
+      unexpectedSamples);
     return result;
   } };
+}
+
+/** Keep pre-refusal availability distinct from semantic recovery after the final refusal. */
+export function summarizeSemanticAvailability(observations, started, ended, unexpectedSamples) {
+  const refusals = observations.filter(sample => sample.outcome === 'reloading');
+  const firstRefusal = refusals[0]?.at;
+  const lastRefusal = refusals.at(-1)?.at;
+  const firstRecovery = observations.find(sample => sample.outcome === 'available'
+    && firstRefusal != null && sample.at > lastRefusal)?.at;
+  const transitionMs = Math.round(ended - started);
+  const refusalWindowMs = firstRefusal == null ? 0
+    : Math.round((firstRecovery ?? ended) - firstRefusal);
+  return { transitionMs, refusalWindowMs,
+    refusedFraction: transitionMs === 0 ? 0 : refusalWindowMs / transitionMs,
+    sampledRequests: observations.length,
+    reloadingRefusals: refusals.length,
+    available: observations.filter(sample => sample.outcome === 'available').length,
+    recoveredAfterRefusal: firstRecovery != null,
+    workerStarting: observations.filter(sample => sample.outcome === 'worker-starting').length,
+    transport: observations.filter(sample => sample.outcome === 'transport').length,
+    unexpected: observations.filter(sample => sample.outcome.startsWith('unexpected-')
+      || sample.outcome === 'available-unmatched').length,
+    unexpectedSamples };
 }
 
 /** A captured installer file disappears before B builds; A must regain native service at the wait. */
@@ -1207,7 +1214,8 @@ async function exerciseLiveModelGapDecision(c) {
       } catch { return null; }
     });
   const semantic = await semanticSampler?.stop();
-  if (semantic) requireThat(semantic.reloadingRefusals > 0 && semantic.available > 0
+  if (semantic) requireThat(semantic.reloadingRefusals > 0
+    && semantic.recoveredAfterRefusal
     && semantic.refusalWindowMs > 0 && semantic.refusalWindowMs <= semantic.transitionMs
     && semantic.unexpected === 0,
   `floor semantic sampling missed a real refusal and recovery: ${JSON.stringify(semantic)}`);

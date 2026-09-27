@@ -25,6 +25,17 @@ fraction. The `3d66c74c9` exact-SHA hosted run is
 [CI 36299571929](https://github.com/justsearch-app/justsearch/actions/runs/36299571929);
 check its terminal result before claiming hosted proof.
 
+The first sampler gate could pass on A's availability **before** the refusal;
+that did not prove sampled recovery. The corrected gate requires a matching
+VECTOR result after the final reload refusal. Its two synthetic refutations
+pass in `bulk-fault-semantic.test.mjs`; fresh seed
+`tmp/3983-full-transition-seed.txt` and installed A→B run
+`tmp/3984-full-transition-recovery-gate.txt` passed with
+`recoveredAfterRefusal=true`, 53 reload refusals, 43 available responses,
+14,207/47,469 ms (29.93%), B VECTOR two hits and `STOP 0`. Official health
+returned `ABSENT` with no inference orphan. The correction is locally
+checkpointed; hosted checks on its exact SHA remain pending.
+
 **Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
 D1-9 streaming correction and its proofs before further implementation. Stage
 E now pairs only seven groups against `main`: quality plus workflow fixture;
