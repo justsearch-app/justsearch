@@ -386,8 +386,39 @@ the original CPU embedding SHA. Both private runs ended `STOP 0`. These
 results close the local accepted-write activation/cancellation backfill;
 four-mode fake device-line tests, installed GPU held lease and full D1-12
 Flow B acceptance remain open. Exact-SHA hosted run `36289267749` for
-`32bc8c810192d61e329fbd10edb5e026f04dcaf4` is still running; it does
-not include the new fixture changes.
+`32bc8c810192d61e329fbd10edb5e026f04dcaf4` was cancelled after the next
+push; its completed jobs were green, but it is not a passing hosted run.
+The accepted-write fixture checkpoint is `7cd57e0de0eca439ec68d0e11c14ccb0b0f2020d`;
+exact-SHA hosted CI run `36289987546` completed SUCCESS on every job,
+including Windows-native and system integration.
+
+The next local D1-14 test addition injects the Worker device-memory supplier,
+holds a synthetic composition point, and checks four owner paths: BESIDE keeps
+the original native A view, IN_PLACE publishes lexical A plus `RELOADING`
+before B compose, refusal recomposes and republishes A, and failed A
+recomposition retains both refusal reasons and records a recovery attempt.
+`KnowledgeServerDeviceMemoryLineTest` passed 4/4 at
+`tmp/3898-device-line-four-focused.txt` with zero skips; the first fixture
+attempt `tmp/3895` used a target fingerprint inconsistent with its canonical
+JSON, and `tmp/3897` used an invalid checked exception in a static mock.
+Both test-only errors were repaired. The final 4/4 focused rerun, PMD and
+Spotless passed together at `tmp/3900-device-line-final-focused.txt`; docs
+validation passed at `tmp/3901-device-line-docs.txt`. The full
+`:modules:indexer-worker:test` suite passed at `tmp/3902-device-line-module.txt`
+in 3m16s. This is a Worker publication seam with synthetic model composition;
+the installed A/B runs above supply real model and search evidence.
+
+An isolated installed-library native probe was compiled from
+`scripts/supervisor-conformance/InstalledGpuLeaseRound.java` against the
+installed UI distribution jars at `tmp/3903-installed-gpu-lease-compile.txt`.
+Its run `tmp/3904-installed-gpu-lease.txt` loaded the exact retained FP16 CUDA
+model from `tmp/3890`, acquired a non-CPU ORT session with two inputs, and
+kept that issued session readable while another thread entered RETIRING.
+Fresh lease acquisition refused; release let native close reach RETIRED. It
+exited 0 with `INSTALLED_GPU_LEASE_PASS`. This proves real installed CUDA
+per-handle lifetime, alongside the in-process CPU Worker recompose test.
+An installed held call through the restored A composition, and the wider
+D1-12 Flow B consumer/latch contract, remain open.
 
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor

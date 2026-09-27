@@ -91,8 +91,19 @@ promotion. A fresh seed and cancellation variant at `tmp/3890`–`tmp/3891`
 passed with the same accepted write before pointer publication: original bulk
 `CANCELLED`, exact A IDLE with text and VECTOR, B physically absent, and no
 switch-buffer rows. The fixture source is local WIP. Four-mode fake device-line
-tests, installed GPU held lease and full Flow B remain next; hosted run
-`36289267749` on `32bc8c810` is still in progress and excludes this fixture.
+tests, installed GPU held lease and full Flow B remain next. Hosted run
+`36289267749` on `32bc8c810` was cancelled by the next push and cannot serve
+as terminal proof. The accepted-write fixture checkpoint `7cd57e0de` passed
+every job in exact-SHA hosted CI run `36289987546`.
+The next local Worker device-line class passed four fake-supplier cases at
+`tmp/3900` with PMD/Spotless: beside A publication, in-place
+lexical A/`RELOADING`, A recomposition after B refusal, and both-reason
+failure evidence. The full Worker module suite passed at `tmp/3902`.
+An isolated installed-library GPU probe compiled at `tmp/3903` and passed at
+`tmp/3904`: the actual FP16 CUDA session remained readable during RETIRING,
+new leases refused, and its release completed native retirement. The Worker
+test and installed model/search runs provide the adjacent owner evidence.
+Held native use during restored-A composition and full D1-12 Flow B remain.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay
