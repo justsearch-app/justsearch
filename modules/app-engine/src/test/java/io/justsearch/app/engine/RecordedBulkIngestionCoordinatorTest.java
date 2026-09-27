@@ -165,7 +165,7 @@ final class RecordedBulkIngestionCoordinatorTest {
       assertTrue(queue.pollPending(1).isEmpty(), "No captured member may be claimed before the restart boundary");
       restartObserved.set(true);
     };
-    coordinator.bindBulkProducer(producer, indexing, restart);
+    coordinator.bindBulkProducer(producer, indexing, restart, ignored -> restart.run());
 
     doAnswer(call -> {
       migrationStarts.incrementAndGet();
@@ -223,7 +223,7 @@ final class RecordedBulkIngestionCoordinatorTest {
     runtime.set(buildingRuntime(key));
     attachment = coordinator.attach(queue, () -> Optional.of(SERVING_GENERATION), () -> true,
         () -> Optional.of(runtime.get()));
-    coordinator.bindBulkProducer(producer, indexing, restart);
+    coordinator.bindBulkProducer(producer, indexing, restart, ignored -> restart.run());
     coordinator.maintain();
     assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE, coordinator.recordedClaimDecision(key));
     var claim = queue.pollPending(1).getFirst();
@@ -1136,12 +1136,7 @@ final class RecordedBulkIngestionCoordinatorTest {
     }
 
     private void bindBulkProducer() {
-      coordinator.bindBulkProducer((scope, operationKey, epoch, context, cancellation) -> {
-        producerStarts.incrementAndGet();
-        queue.enqueueRecordedEntries(operationKey, epoch, List.of(new JobQueue.EnqueueEntry(member,
-            memberSize, new JobQueue.EnqueueProvenance("user", TransportTag.BUTTON.name()), sourceHash)), null);
-        return java.util.concurrent.CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
-      }, indexing, () -> {
+      Runnable restart = () -> {
         restartCalls.incrementAndGet();
         if (initialRestartPending.get()) {
           if (failInitialRestartOnce.compareAndSet(true, false)) {
@@ -1157,7 +1152,13 @@ final class RecordedBulkIngestionCoordinatorTest {
           throw new IllegalStateException("injected refusal restart cut");
         }
         refusalRestartSuccesses.incrementAndGet();
-      });
+      };
+      coordinator.bindBulkProducer((scope, operationKey, epoch, context, cancellation) -> {
+        producerStarts.incrementAndGet();
+        queue.enqueueRecordedEntries(operationKey, epoch, List.of(new JobQueue.EnqueueEntry(member,
+            memberSize, new JobQueue.EnqueueProvenance("user", TransportTag.BUTTON.name()), sourceHash)), null);
+        return java.util.concurrent.CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      }, indexing, restart, ignored -> restart.run());
     }
 
     private OperationStore operationStoreWithCrashCut(SqliteOperationStore delegate) {

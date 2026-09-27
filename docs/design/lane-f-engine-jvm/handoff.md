@@ -20,10 +20,13 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
   about 233 GB), and fixtures now prune their own caches after an owned stop. Do not prune whole run
   directories: the raw-evidence inventories hash them through Lane F acceptance.
 - **Next, in order:**
-  1. Continue D1-18 from its revised design and partial live implementation. The prior exact-SHA
+  1. Continue D1-18 from its revised design and partial live implementation. Exact-SHA
      `2020039e8fc5c689f5dbe16734d3c44a97857576` hosted
      [run 36315852135](https://github.com/justsearch-app/justsearch/actions/runs/36315852135)
-     passed all 13 jobs. The current working revision still needs a new checkpoint and hosted run.
+     passed all 13 jobs. The live-start checkpoint `f93af69f8` was pushed to PR727; its
+     [run 36329542381](https://github.com/justsearch-app/justsearch/actions/runs/36329542381)
+     exposed a dead three-argument `bindBulkProducer` overload in the app-ui architecture gate.
+     That overload is removed in the following correction; verify its new exact-SHA hosted run.
   2. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
      `index.dense_unavailable`, but the provisional "rebuilding" verdict takes precedence; observe
      before changing UI.
@@ -34,7 +37,8 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
   `tmp/5053` passed the unrecorded `core.reindex` physical A-search/Green-ingest and post-promotion
   document test without a migration-start restart. `tmp/5054` passed the unrecorded migration
   lifecycle class, Worker restart-response contract, PMD, and Spotless; `tmp/5056` passed integrated
-  `build -x test`. The first in-place attempts
+  `build -x test`. The dead-overload correction passes `RecordedBulkIngestionCoordinatorTest` and
+  `UnreferencedCodeTest` together at `tmp/5060`. The first in-place attempts
   failed due an obsolete indexing-jobs serving lease; `tmp/5044` traced its origin, and D1-18
   records the deferred-upgrade retirement notification fix. No full-suite, hosted, beside-mode,
   kill-cut, or independent-review claim applies to these local changes.

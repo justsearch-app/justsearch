@@ -452,10 +452,6 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
   }
 
-  void bindBulkProducer(Producer producer, IndexingService indexing, Runnable restart) {
-    bindBulkProducer(producer, indexing, restart, ignored -> restart.run());
-  }
-
   /** Dispatches the durable BUILDING checkpoint to the live Worker when available. */
   void bindBulkProducer(Producer producer, IndexingService indexing, Runnable restart,
       java.util.function.Consumer<String> start) {
