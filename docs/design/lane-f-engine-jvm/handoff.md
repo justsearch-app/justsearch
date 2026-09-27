@@ -4,6 +4,23 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 [continuation brief](continuation-brief.md) for ordering. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
+**2026-09-27 pause checkpoint.** User requested a clean pause after the
+D1-12 parity correction. The implementation and evidence are committed as
+`4ebaf0b4c67e6a41483741d080edc514eb022f95` and pushed to PR727 on
+`codex/lane-f-pr1`; only unrelated untracked
+`modules/app-inference/logs/` remains. Exact-SHA
+[CI 36308359820](https://github.com/justsearch-app/justsearch/actions/runs/36308359820)
+was in progress with no failed jobs at the pause check. On resumption,
+verify its terminal result by exact SHA before another push. Then continue
+WP3 batch 4: reconcile D1-12's complete Flow B/serving-generation proof and
+D1-13's selected citation identity caveat, followed by batch 5's connected
+D1-4 reconfigure, interleaved D1 items, D1-17, D2, E and F. The D1-14
+semantic wall-clock/fraction product bound still needs an owner decision;
+the installed measurements below do not set it. The worktree is held for
+resumption. Do not merge before Stage F acceptance. The official dev stack
+was `ABSENT` after the installed run and at closeout; no Lane F Gradle or
+helper process remains.
+
 **2026-09-27 exact-SHA governance correction.** Checkpoint
 `bbc385386065295e45a3ebb62077e2f2eeccd796` passed every hosted job in
 [CI 36306882028](https://github.com/justsearch-app/justsearch/actions/runs/36306882028),
