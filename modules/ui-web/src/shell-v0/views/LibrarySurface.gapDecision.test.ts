@@ -21,6 +21,38 @@ describe('Library recorded migration gap decision', () => {
   beforeEach(() => { document.body.innerHTML = ''; __resetAiStateForTest(); });
   afterEach(() => { document.body.innerHTML = ''; __resetAiStateForTest(); vi.restoreAllMocks(); });
 
+  it('offers exact-key cancellation during a rebuild only after destructive confirmation', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const confirm = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const host = { platform: { capabilities: new Set<string>() },
+      data: { fetch: vi.fn().mockResolvedValue(new Response('{}', { status: 503 })),
+        invokeOperation: invoke }, ui: { showConfirmDialog: confirm } } as unknown as PluginHostApi;
+    __feedForTest({ status: { worker: { migration: {
+      migrationState: 'MIGRATING', buildingGenerationId: `g-${key}`,
+    } } } as unknown as StatusSnapshot });
+    const el = document.createElement('jf-library-surface') as LibrarySurface;
+    el.host_ = host;
+    document.body.appendChild(el);
+    await pump(el);
+
+    const cancel = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? [])
+      .find((button) => button.getAttribute('label') === 'Cancel rebuild') as (Element & { onActivate?: () => void }) | undefined;
+    expect(cancel).toBeDefined();
+    cancel?.onActivate?.();
+    await pump(el);
+    expect(invoke).not.toHaveBeenCalled();
+    cancel?.onActivate?.();
+    await pump(el);
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('current index stays available'),
+      { confirmLabel: 'Cancel rebuild', destructive: true });
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith('core.cancel-reindex',
+      { reindexKey: key }, { consented: true });
+    expect(el.shadowRoot?.textContent).toContain('Rebuild cancellation recorded');
+    el.remove();
+  });
+
   it('shows the exact operation gap list and invokes one approved keyed decision', async () => {
     let accepted = false;
     const invoke = vi.fn().mockImplementation(async () => { accepted = true; return { success: true }; });

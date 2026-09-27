@@ -1,6 +1,6 @@
 # Lane F continuation brief
 
-Updated 2026-09-26 for the agent handoff. Start with the
+Updated 2026-09-27 after the agent handoff. Start with the
 [2026-09-26 takeover](takeover-2026-09-26.md); this brief owns ordering,
 [handoff](handoff.md) owns the evidence ledger, and
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
@@ -34,14 +34,27 @@ and again at `tmp/3805` after removing a pre-request promotion pump
 with A's accepted no-file update/delete/addition retained, terminal
 `CANCELLED`, exact B absent and an empty scoped journal. Its new operation
 surface and pointer-only cancellation regression (`tmp/3806` red,
-`tmp/3807`–`tmp/3808` green) remain local until the next checkpoint. Observed
-interruption inside deletion, remaining gap crash cuts and D2-5 durable
-acknowledgement remain open. The `a708b9592` prior checkpoint's hosted CI
+`tmp/3807`–`tmp/3808` green) were local at that cut. The `a708b9592` prior checkpoint's hosted CI
 passed all jobs on exact SHA in run 36271896979.
 The cancellation slice's final local stress-enabled full suite and build passed
 at `tmp/3813` and `tmp/3814`; static and governance checks also passed. The
 first full run found a stale literal UI catalog count (`tmp/3810`), corrected
-and rerun before this claim. Its own exact-SHA hosted run remains pending.
+and rerun before this claim. Exact-SHA hosted CI for `b26cb99b1` passed all
+jobs in run 36279767130.
+An observed deletion-incomplete installed cut followed at `tmp/3818`–`tmp/3819`:
+the first JVM halted inside exact predecessor payload removal, and another
+recovered B and cleared A after refusing a third generation. It is local
+proof pending integrated/hosted verification and does not settle D2-5.
+The first integrated run exposed a direct harness environment read at
+`tmp/3820`; the repository funnel correction passed focused at `tmp/3823`.
+The active Library view now offers confirmed exact-key cancellation during
+build and gap wait; focused, full frontend (6,603 tests), visual,
+accessibility, proportion and 27 UI gates passed locally. The combined
+source's final stress-enabled Gradle suite and package build passed at
+`tmp/3830` and `tmp/3837`. The corrected installed jars repeated the actual
+deletion halt and separate recovery at `tmp/3839`–`tmp/3840`; independent
+state reads found exact B IDLE, A absent and an empty journal. Hosted CI for
+this new source remains pending.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

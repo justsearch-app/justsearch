@@ -165,6 +165,10 @@ export class LibrarySurface extends JfElement {
     gapDecision: { state: true },
     gapDecisionBusy: { state: true },
     gapDecisionError: { state: true },
+    reindexCancelKey: { state: true },
+    reindexCancelBusy: { state: true },
+    reindexCancelError: { state: true },
+    reindexCancelRecorded: { state: true },
   };
 
   declare apiBase: string;
@@ -230,9 +234,14 @@ export class LibrarySurface extends JfElement {
   declare gapDecision: GapDecisionView | null;
   declare gapDecisionBusy: boolean;
   declare gapDecisionError: string | null;
+  declare reindexCancelKey: string | null;
+  declare reindexCancelBusy: boolean;
+  declare reindexCancelError: string | null;
+  declare reindexCancelRecorded: boolean;
   private observedGapKey: string | null = null;
   private gapRequestSerial = 0;
   private gapDecisionAttemptSerial = 0;
+  private reindexCancelAttemptSerial = 0;
   private gapLoading = false;
   private lastGapReadAtMs = 0;
 
@@ -279,6 +288,10 @@ export class LibrarySurface extends JfElement {
     this.gapDecision = null;
     this.gapDecisionBusy = false;
     this.gapDecisionError = null;
+    this.reindexCancelKey = null;
+    this.reindexCancelBusy = false;
+    this.reindexCancelError = null;
+    this.reindexCancelRecorded = false;
   }
 
   // Tempdoc 571 §11 / 578: Library is a host surface — it delegates layout to <jf-surface-tabs>
@@ -607,6 +620,9 @@ export class LibrarySurface extends JfElement {
     this.gapDecisionAttemptSerial++;
     this.gapLoading = false;
     this.gapDecisionBusy = false;
+    this.reindexCancelAttemptSerial++;
+    this.reindexCancelBusy = false;
+    this.reindexCancelError = null;
   }
 
   override disconnectedCallback(): void {
@@ -827,18 +843,26 @@ export class LibrarySurface extends JfElement {
   private observeGapDecision(migration: { migrationState?: string | null;
     buildingGenerationId?: string | null } | null | undefined): void {
     const building = migration?.buildingGenerationId ?? '';
-    const key = migration?.migrationState === 'AWAITING_ACCEPTANCE'
+    const key = ['MIGRATING', 'SWITCHING', 'AWAITING_ACCEPTANCE'].includes(migration?.migrationState ?? '')
       && /^g-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(building)
       ? building.slice(2) : null;
-    if (key !== this.observedGapKey) {
-      this.observedGapKey = key;
+    if (key !== this.reindexCancelKey) {
+      this.reindexCancelKey = key;
+      this.reindexCancelBusy = false;
+      this.reindexCancelError = null;
+      this.reindexCancelRecorded = false;
+      this.reindexCancelAttemptSerial++;
+    }
+    const gapKey = migration?.migrationState === 'AWAITING_ACCEPTANCE' ? key : null;
+    if (gapKey !== this.observedGapKey) {
+      this.observedGapKey = gapKey;
       this.gapDecision = null;
       this.gapDecisionError = null;
       this.gapRequestSerial++;
       this.lastGapReadAtMs = 0;
     }
-    if (key && !this.gapLoading && Date.now() - this.lastGapReadAtMs >= 4_000) {
-      void this.loadGapDecision(key);
+    if (gapKey && !this.gapLoading && Date.now() - this.lastGapReadAtMs >= 4_000) {
+      void this.loadGapDecision(gapKey);
     }
   }
 
@@ -875,7 +899,7 @@ export class LibrarySurface extends JfElement {
 
   private async acceptCurrentGaps(): Promise<void> {
     const decision = this.gapDecision;
-    if (!decision || this.gapDecisionBusy) return;
+    if (!decision || this.gapDecisionBusy || this.reindexCancelBusy) return;
     const attemptSerial = ++this.gapDecisionAttemptSerial;
     this.gapDecisionBusy = true;
     this.gapDecisionError = null;
@@ -899,6 +923,36 @@ export class LibrarySurface extends JfElement {
       }
     } finally {
       if (attemptSerial === this.gapDecisionAttemptSerial) this.gapDecisionBusy = false;
+    }
+  }
+
+  private async cancelCurrentReindex(): Promise<void> {
+    const key = this.reindexCancelKey;
+    if (!key || this.reindexCancelBusy || this.reindexCancelRecorded || this.gapDecisionBusy) return;
+    const attemptSerial = ++this.reindexCancelAttemptSerial;
+    const confirmed = await this.host_.ui.showConfirmDialog(
+      'Cancel this rebuild? Your current index stays available while the unfinished index is removed.',
+      { confirmLabel: 'Cancel rebuild', destructive: true },
+    );
+    if (!confirmed || !this.isConnected || key !== this.reindexCancelKey
+        || attemptSerial !== this.reindexCancelAttemptSerial) return;
+    this.reindexCancelBusy = true;
+    this.reindexCancelError = null;
+    try {
+      const result = await this.host_.data.invokeOperation('core.cancel-reindex',
+        { reindexKey: key }, { consented: true });
+      if (!result.success) throw new Error(result.message ?? 'Rebuild cancellation failed');
+      if (this.isConnected && key === this.reindexCancelKey
+          && attemptSerial === this.reindexCancelAttemptSerial) {
+        this.reindexCancelRecorded = true;
+      }
+    } catch (failure) {
+      if (this.isConnected && key === this.reindexCancelKey
+          && attemptSerial === this.reindexCancelAttemptSerial) {
+        this.reindexCancelError = failure instanceof Error ? failure.message : String(failure);
+      }
+    } finally {
+      if (attemptSerial === this.reindexCancelAttemptSerial) this.reindexCancelBusy = false;
     }
   }
 
@@ -1388,7 +1442,7 @@ export class LibrarySurface extends JfElement {
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
-      ${this.renderGapDecision()}
+      ${this.renderReindexDecision()}
       ${!this.isTauri
         ? html`<div class="browser-banner">
             ${icon({ name: 'alert-circle', size: 14 })}
@@ -1511,20 +1565,31 @@ export class LibrarySurface extends JfElement {
     `;
   }
 
-  private renderGapDecision(): TemplateResult | typeof nothing {
-    if (!this.observedGapKey) return nothing;
+  private renderReindexDecision(): TemplateResult | typeof nothing {
+    if (!this.reindexCancelKey) return nothing;
     const decision = this.gapDecision;
-    return html`<section class="gap-decision" aria-label="Migration gaps">
-      <h3>New index — activation requires your decision</h3>
-      ${decision ? html`
+    const waitingForGaps = this.observedGapKey === this.reindexCancelKey;
+    return html`<section class="gap-decision" aria-label=${waitingForGaps ? 'Migration gaps' : 'Rebuild control'}>
+      <h3>${waitingForGaps ? 'New index — activation requires your decision' : 'New index is being built'}</h3>
+      ${waitingForGaps && decision ? html`
         <p>${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} could not be
           included in the new index. Your current index stays available until you accept this list.</p>
         <ul>${decision.gaps.map((gap) => html`<li>${gap.unitId}: ${gap.reason}</li>`)}</ul>
+      ` : waitingForGaps ? html`<p>Reading the migration gap list…</p>`
+        : html`<p>Your current index stays available during the rebuild.</p>`}
+      <div class="actions">
+        ${waitingForGaps && decision ? html`
         <jf-button label="Accept gaps and activate" variant="primary"
-          .disabled=${this.gapDecisionBusy}
+          .disabled=${this.gapDecisionBusy || this.reindexCancelBusy || this.reindexCancelRecorded}
           .onActivate=${() => void this.acceptCurrentGaps()}>Accept gaps and activate</jf-button>
-      ` : html`<p>Reading the migration gap list…</p>`}
+        ` : nothing}
+        <jf-button label="Cancel rebuild" variant="danger"
+          .disabled=${this.reindexCancelBusy || this.reindexCancelRecorded || this.gapDecisionBusy}
+          .onActivate=${() => void this.cancelCurrentReindex()}>Cancel rebuild</jf-button>
+      </div>
       ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}</p>` : nothing}
+      ${this.reindexCancelError ? html`<p role="alert">${this.reindexCancelError}</p>` : nothing}
+      ${this.reindexCancelRecorded ? html`<p role="status">Rebuild cancellation recorded. Your current index stays available.</p>` : nothing}
     </section>`;
   }
 }

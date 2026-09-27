@@ -61,6 +61,7 @@ public final class InstalledProjectionRound {
   private static final long WAIT_MS = 180_000;
   private static final String GAP_CUT_FILE = "installed-projection-gap-cut.txt";
   private static final String REPLAY_CUT_FILE = "installed-projection-replay-cut.txt";
+  private static final String RETIREMENT_CUT_FILE = "installed-projection-retirement-cut.txt";
 
   private InstalledProjectionRound() {}
 
@@ -74,9 +75,11 @@ public final class InstalledProjectionRound {
             || "--replay-resume".equals(args[5]) || "--pointer-before-halt".equals(args[5])
             || "--pointer-after-halt".equals(args[5]) || "--live-before-halt".equals(args[5])
             || "--live-after-halt".equals(args[5])
-            || "--pointer-resume".equals(args[5])))) {
+            || "--pointer-resume".equals(args[5])
+            || "--retirement-halt".equals(args[5])
+            || "--retirement-resume".equals(args[5])))) {
       throw new IllegalArgumentException(
-          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --abandon-write, --cancel-write, --replay-halt, --replay-resume, --pointer-before-halt, --pointer-after-halt, --live-before-halt, --live-after-halt or --pointer-resume");
+          "Expected data, index, models root, watched root, vector query file and optional --gap, --gap-restart, --gap-halt, --gap-resume, --cancel, --abandon-write, --cancel-write, --replay-halt, --replay-resume, --pointer-before-halt, --pointer-after-halt, --live-before-halt, --live-after-halt, --pointer-resume, --retirement-halt or --retirement-resume");
     }
     Path data = Path.of(args[0]).toAbsolutePath();
     Path index = Path.of(args[1]).toAbsolutePath();
@@ -116,6 +119,10 @@ public final class InstalledProjectionRound {
           projection("deleted", 1, cut.get(2) + "deleted")));
       resumeReplay(data, index, models, recoveredSource, cut.get(0), cut.get(1),
           cut.get(2), query, "--pointer-resume".equals(args[5]) ? "POINTER" : "REPLAY");
+      return;
+    }
+    if (args.length == 6 && "--retirement-resume".equals(args[5])) {
+      runRetirementResume(data, index, models, query);
       return;
     }
     String marker = "installedprojection" + System.nanoTime();
@@ -166,6 +173,20 @@ public final class InstalledProjectionRound {
       first.handoff();
     }
 
+    if (args.length == 6 && "--retirement-halt".equals(args[5])) {
+      String original = new IndexGenerationManager(index)
+          .readStateBestEffort().active_generation();
+      require("1".equals(System.getenv("JUSTSEARCH_SUPERVISOR_HARNESS"))
+          && original.equals(System.getenv("JUSTSEARCH_RETIREMENT_CUT_GENERATION")),
+          "retirement cut must bind the supervisor harness to exact A");
+      Path cut = data.resolve(RETIREMENT_CUT_FILE);
+      Files.writeString(cut, key + "\n" + original + "\n" + marker + "\n",
+          StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+      try (FileChannel channel = FileChannel.open(cut, StandardOpenOption.WRITE)) {
+        channel.force(true);
+      }
+    }
+
     if (args.length == 6 && "--gap-restart".equals(args[5])) {
       runGapRestart(data, index, models, source, key, query);
       return;
@@ -194,6 +215,10 @@ public final class InstalledProjectionRound {
       };
       runReplayHalt(data, index, models, source, key, marker, point);
       return;
+    }
+    if (args.length == 6 && "--retirement-halt".equals(args[5])) {
+      runGap(data, index, models, source, key, query);
+      throw new AssertionError("retirement cut returned without halting inside payload deletion");
     }
     if (args.length == 6) {
       runGap(data, index, models, source, key, query);
@@ -459,6 +484,67 @@ public final class InstalledProjectionRound {
       }
     }
     System.out.println("INSTALLED_PROJECTION_" + label + "_PASS " + key);
+  }
+
+  private static void runRetirementResume(Path data, Path index, Path models, String query)
+      throws Exception {
+    List<String> cut = Files.readAllLines(data.resolve(RETIREMENT_CUT_FILE));
+    List<String> reached = Files.readAllLines(index.resolve("retirement-cut-reached.txt"));
+    require(cut.size() == 3 && reached.size() == 4 && cut.get(1).equals(reached.get(0)),
+        "observed retirement cut did not name exact predecessor");
+    String key = cut.get(0);
+    String original = cut.get(1);
+    String marker = cut.get(2);
+    var generations = new IndexGenerationManager(index);
+    var before = generations.readStateBestEffort();
+    require(("g-" + key).equals(before.active_generation())
+        && original.equals(before.previous_generation())
+        && "IDLE".equals(before.migration_state()),
+        "retirement cut lost committed B or exact predecessor pointer");
+    String markedName = reached.get(1);
+    require(markedName.startsWith(original + ".del-"),
+        "retirement cut did not enter exact marked predecessor");
+    Path marked = index.resolve("indices").resolve(markedName);
+    require(Files.isDirectory(marked) && !Files.exists(marked.resolve(reached.get(2))),
+        "retirement cut did not remove the observed payload entry");
+    try (var entries = Files.list(marked)) {
+      require(entries.findAny().isPresent(),
+          "retirement cut did not leave a partially deleted predecessor");
+    }
+    try {
+      generations.startFreshMigration("distinct-candidate-during-retirement-recovery");
+      throw new AssertionError("partial predecessor allowed a distinct candidate");
+    } catch (java.io.IOException refusal) {
+      require(refusal.getMessage().contains("Previous generation still occupies build capacity"),
+          "partial predecessor refused for the wrong reason: " + refusal.getMessage());
+    }
+    require(before.equals(generations.readStateBestEffort()),
+        "capacity refusal changed the committed pointer");
+    var source = new HeldSource(List.of(
+        projection("updated", 1, marker + "old"),
+        projection("deleted", 1, marker + "deleted")));
+    try (Epoch recovered = open(data, index, models, new CountDownLatch(1), source)) {
+      var row = recovered.operations.find(key).orElseThrow();
+      require(row.state() == OperationState.FAILED && row.receipt() != null
+          && "PROMOTED_WITH_GAPS".equals(row.receipt().code()),
+          "retirement recovery lost terminal approved-gap diagnostic");
+      require(await(() -> vectorReady(recovered.client, query), WAIT_MS),
+          "retirement recovery B did not answer VECTOR search");
+      require(await(() -> {
+        var state = new IndexGenerationManager(index).readStateBestEffort();
+        return state.previous_generation() == null && !Files.exists(marked);
+      }, WAIT_MS), "retirement recovery did not remove exact predecessor");
+      recovered.handoff();
+    }
+    try (Epoch reopened = open(data, index, models, new CountDownLatch(1), source)) {
+      var row = reopened.operations.find(key).orElseThrow();
+      require(row.state() == OperationState.FAILED && row.receipt() != null
+          && "PROMOTED_WITH_GAPS".equals(row.receipt().code()),
+          "reopened B lost terminal approved-gap diagnostic");
+      require(await(() -> vectorReady(reopened.client, query), WAIT_MS),
+          "reopened B did not answer VECTOR search");
+    }
+    System.out.println("INSTALLED_PROJECTION_RETIREMENT_PASS " + key);
   }
 
   private static void runAbandonWrite(Path data, Path index, Path models, HeldSource source,

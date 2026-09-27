@@ -185,8 +185,11 @@ the former literal operation count of 34. The repaired test compares the exact
 emitted IDs to `CoreOperationCatalog.definitions()` and rejects duplicates;
 its focused rerun passed at `tmp/3811`, and static analysis passed at `tmp/3812`.
 The final suite, build, store-recoverability check, regeneration check and docs
-validation passed on this source. Hosted proof remains pending for the new
-checkpoint; D1-9 and D2-5 acceptance remain open.
+validation passed on this source. Hosted CI on exact checkpoint
+`b26cb99b13f42820205068c63b2bdac9181671a3` passed every job in
+[run 36279767130](https://github.com/justsearch-app/justsearch/actions/runs/36279767130),
+including system integration and Windows-native. D1-9 and D2-5 acceptance
+remain open.
 
 **Partial retirement recovery, 2026-09-26 (constructed disk cut).** A fresh
 after-live self-exit left B committed and A as predecessor at `tmp/3763`. With
@@ -202,6 +205,69 @@ fixture compiled at `tmp/3765`. This is a constructed on-disk cut following
 an actual after-publication process halt; it is not an observed kill inside
 the deletion helper. The exact partial-delete recovery mechanism also has
 unit coverage in `IndexGenerationRetirementTest`.
+
+**2026-09-27 observed retirement deletion cut (local).** The Worker-owned
+`IndexGenerationManager` now has a narrow supervisor-only, exact-generation
+process cut immediately after its first successful predecessor payload
+removal. It requires both `JUSTSEARCH_SUPERVISOR_HARNESS=1` and the exact
+`JUSTSEARCH_RETIREMENT_CUT_GENERATION`; its marker under the isolated index
+base is fixture evidence, not generation state. This is simpler than another
+retirement state or deletion journal: `previous_generation` already binds
+exact A until physical deletion and state cleanup finish. The final fixture
+compiled against the installed distribution jars; Worker Core tests,
+`installDist`, Spotless and PMD passed at `tmp/3815`, and fixture compilation
+passed at `tmp/3816`. A fresh approved-gap B round halted with exit 73 at
+`tmp/3818-retirement-halt.txt`: the marker names the exact marked A and
+removed `_1a.fdm`, while `state.json` still names B active and A previous.
+A separate installed JVM at `tmp/3819-retirement-resume.txt` first refused a
+distinct candidate without changing that pointer, then recovered the same B,
+kept the recorded `PROMOTED_WITH_GAPS` diagnostic, removed A, and reopened B
+with a real VECTOR query. Independent post-run pointer, directory and SQLite
+reads found IDLE on exact B, no A or marked predecessor, the original bulk
+`FAILED/settled`, and zero switch rows. The earlier `tmp/3816` run reached the
+same cut but exposed that the fixture's generic six-argument branch selected
+the gap scenario implicitly; the final fixture names that route explicitly
+and reran fresh at `tmp/3818`–`tmp/3819`. This closes the observed physical
+deletion cut locally. Hosted and integrated proof for this new source, other
+D1-9 crash ordering, and D2-5 durable writes remain open.
+The first integrated stress run `tmp/3820` reached the dead-code-audit gate
+after passing App Engine, then failed `SystemAccessFunnelTest`: the new
+supervisor cut read its two process selectors directly. The correction routes
+both through `SystemAccess`, the repository's process-global configuration
+funnel, without adding a general runtime setting or weakening the gate.
+The exact audit, Worker Core suite, installed distribution, Spotless and PMD
+passed together at `tmp/3823`. The installed `tmp/3818`–`tmp/3819` proof
+exercised the same selected values and deletion owner; a full integrated
+rerun on the corrected source remains due.
+
+**2026-09-27 Library cancellation control (local).** The active Lit Library
+surface now projects an exact UUIDv7 building key from `MIGRATING`, `SWITCHING`
+or `AWAITING_ACCEPTANCE` status. It offers a destructive confirmation and
+then invokes the webview-only `core.cancel-reindex` with that key and inline
+consent. The same panel retains gap approval, makes the two decisions mutually
+exclusive while either is pending, and reports a durable cancellation or
+owner refusal without guessing that a request succeeded. The focused view
+test and typecheck passed, followed by 491 frontend test files / 6,603 tests.
+The affected `jseval ui-shot --fixtures` Library captures include the gap
+panel with both actions; its measurement shows no axe violation, console
+error or document overflow. The full UI accessibility and proportion gates
+passed, as did all 27 UI web gates at `tmp/3827`. The initial bare affected
+capture correctly refused fixture-required Library states; the fixture rerun
+is the visual proof. The combined final source passed
+`test -PincludeStress=true --max-workers=1` at
+`tmp/3830-retirement-ui-integrated-stress.txt` (196 tasks, 12 executed)
+and `build -x test --max-workers=1` at `tmp/3837-retirement-ui-build.txt`
+(333 tasks, 11 executed). The full frontend rerun and typecheck are retained at
+`tmp/3828` and `tmp/3829`; lint passed at `tmp/3831`, all 27 UI gates at
+`tmp/3827`, and runtime-manifest closure, store recoverability, generated-file
+and docs checks passed. The final installed jars and recompiled fixture
+(`tmp/3838`) then repeated the exact cut: `tmp/3839-retirement-halt.txt`
+exited 73 after removing `_1a.fdm` while B was active and A still previous;
+`tmp/3840-retirement-resume.txt` passed in a separate JVM. Independent final
+reads found IDLE on that same B, no A or marked predecessor, bulk
+`FAILED/settled`, and zero switch rows. This supersedes the earlier
+pre-funnel-correction installed run as the final-source proof. Hosted CI is
+still required for this checkpoint.
 
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor

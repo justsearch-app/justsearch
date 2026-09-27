@@ -6,12 +6,15 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import io.justsearch.adapters.lucene.runtime.SafeIndexPathOps;
+import io.justsearch.configuration.SystemAccess;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -1537,7 +1540,7 @@ public final class IndexGenerationManager {
 
     for (Path retired :
         exactRetirementRepresentations(generationId, durablyBound)) {
-      deleteRetirementPayloadBeforeOwnership(retired);
+      deleteRetirementPayloadBeforeOwnership(retired, generationId);
       io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(retired, log);
     }
     if (!exactRetirementRepresentations(generationId, durablyBound).isEmpty()) {
@@ -1652,7 +1655,7 @@ public final class IndexGenerationManager {
     }
   }
 
-  private static void deleteRetirementPayloadBeforeOwnership(Path directory)
+  private void deleteRetirementPayloadBeforeOwnership(Path directory, String generationId)
       throws IOException {
     List<Path> payload;
     try (var entries = Files.list(directory)) {
@@ -1667,6 +1670,9 @@ public final class IndexGenerationManager {
     }
     for (Path entry : payload) {
       io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(entry, log);
+      if (!Files.exists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        haltAfterObservedRetirementDeletion(generationId, directory, entry);
+      }
     }
     for (Path entry : payload) {
       if (Files.exists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
@@ -1674,6 +1680,24 @@ public final class IndexGenerationManager {
             "Predecessor payload remains locked after deletion: " + directory);
       }
     }
+  }
+
+  /** Installed supervisor proof: stop only after this owner actually removes predecessor payload. */
+  @SuppressWarnings("PMD.DoNotTerminateVM")
+  private void haltAfterObservedRetirementDeletion(
+      String generationId, Path directory, Path removed) throws IOException {
+    if (!"1".equals(SystemAccess.envVar("JUSTSEARCH_SUPERVISOR_HARNESS"))
+        || !generationId.equals(SystemAccess.envVar("JUSTSEARCH_RETIREMENT_CUT_GENERATION"))) {
+      return;
+    }
+    Path reached = basePath.resolve("retirement-cut-reached.txt");
+    Files.writeString(reached, generationId + "\n" + directory.getFileName() + "\n"
+        + removed.getFileName() + "\n" + ProcessHandle.current().pid() + "\n",
+        StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+    try (FileChannel channel = FileChannel.open(reached, StandardOpenOption.WRITE)) {
+      channel.force(true);
+    }
+    Runtime.getRuntime().halt(73);
   }
 
   /** Count physical representations, including an abandoned but not yet deleted candidate. */
