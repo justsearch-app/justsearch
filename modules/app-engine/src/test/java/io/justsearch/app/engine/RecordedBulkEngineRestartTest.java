@@ -674,12 +674,24 @@ final class RecordedBulkEngineRestartTest {
   }
 
   private static void awaitBuildingCheckpoint(EngineEpoch epoch, String operationKey,
-      CountDownLatch unexpectedRestart) throws InterruptedException {
+      CountDownLatch unexpectedRestart) throws Exception {
     assertTrue(await(() -> epoch.operations().find(operationKey)
         .flatMap(row -> epoch.operations().bulkReindexProgress(row.id()))
         .map(progress -> progress.phase() == BulkReindexProgress.Phase.BUILDING)
         .orElse(false), WAIT_MS),
         "accepted bulk did not checkpoint its durable BUILDING candidate");
+    String buildingGeneration = "g-" + operationKey;
+    assertTrue(await(() -> {
+      try {
+        return buildingGeneration.equals(epoch.client().getStatus(TestEngineContexts.BACKGROUND)
+            .getMigration().getServingIngestGenerationId());
+      } catch (RuntimeException stillOpening) {
+        return false;
+      }
+    }, WAIT_MS), "the live starter did not publish Green as the physical ingest owner");
+    assertTrue(epoch.root().liveMigrationStartCompletionForTests(buildingGeneration)
+        .get(30, TimeUnit.SECONDS),
+        "the live starter must complete successfully after Green publication");
     assertEquals(1L, unexpectedRestart.getCount(),
         "migration start unexpectedly requested an Engine restart");
   }

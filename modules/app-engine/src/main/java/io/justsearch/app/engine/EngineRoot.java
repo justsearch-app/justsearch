@@ -161,6 +161,18 @@ public final class EngineRoot implements WorkerHost {
 
   private volatile KnowledgeServer server;
   private volatile EngineKnowledgeClient client;
+  private volatile LiveMigrationStartAttempt liveMigrationStartAttempt;
+  private record LiveMigrationStartAttempt(
+      String generation, java.util.concurrent.CompletableFuture<Boolean> completion) {}
+
+  java.util.concurrent.CompletableFuture<Boolean> liveMigrationStartCompletionForTests(
+      String expectedGeneration) {
+    LiveMigrationStartAttempt attempt = liveMigrationStartAttempt;
+    if (attempt == null || !expectedGeneration.equals(attempt.generation())) {
+      throw new IllegalStateException("No live migration start for " + expectedGeneration);
+    }
+    return attempt.completion();
+  }
   private final java.util.List<io.justsearch.app.api.indexing.ProjectionSeedSource>
       projectionSeedSources = new java.util.ArrayList<>();
 
@@ -388,6 +400,7 @@ public final class EngineRoot implements WorkerHost {
     if (server != null) {
       throw new IOException("EngineRoot cannot start while its previous server close is incomplete");
     }
+    liveMigrationStartAttempt = null;
     KnowledgeServer started = serverFactory.create(gpuScheduling, executors, recordedIngestion,
         indexComponent, encoderComponent);
     synchronized (terminalWriterFaultOwnerLock) {
@@ -432,15 +445,17 @@ public final class EngineRoot implements WorkerHost {
         .map(io.justsearch.app.api.indexing.ProjectionSeedSource::sourceId)
         .sorted().toList());
     built.bindLiveMigrationStarter(buildingGeneration ->
-        started.beginUnrecordedBuildingLiveAsync(buildingGeneration,
-            () -> requestRestart(started)));
+        liveMigrationStartAttempt = new LiveMigrationStartAttempt(buildingGeneration,
+            started.beginUnrecordedBuildingLiveAsync(buildingGeneration,
+                () -> requestRestart(started))));
     this.client = built;
     try {
       recordedIngestion.bindProducer(built::enumerateRecordedRoot);
       recordedIngestion.bindBulkProducer(built::enumerateCapturedRoots, built,
           () -> requestRestart(started),
-          operationKey -> started.beginRecordedBuildingLiveAsync(
-              operationKey, () -> requestRestart(started)));
+          operationKey -> liveMigrationStartAttempt = new LiveMigrationStartAttempt(
+              "g-" + operationKey, started.beginRecordedBuildingLiveAsync(
+                  operationKey, () -> requestRestart(started))));
       clientReady = true;
     } catch (RuntimeException | Error failure) {
       try { close(); }

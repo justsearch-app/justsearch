@@ -35,8 +35,14 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
      `bulk-partial-capture` restart fixture. GitHub marked the workflow successful despite that
      red job. Checkpoint `865c33a0d` corrected that fixture and proved installed BESIDE;
      exact-SHA [run 36334076303](https://github.com/justsearch-app/justsearch/actions/runs/36334076303)
-     passed all jobs. Three new live-start boundary scenarios pass installed at `tmp/5083`;
-     complete their remaining D1-18 gates and push for a new exact-SHA hosted run.
+     passed all jobs. Three new live-start boundary scenarios pass installed at `tmp/5083`.
+     Checkpoint `a0c00e4a3` passed exact-SHA
+     [run 36337610338](https://github.com/justsearch-app/justsearch/actions/runs/36337610338)
+     across every job. Independent review found the app-engine no-restart tests could finish
+     before asynchronous Green preparation and pass for the wrong reason. The repaired tests
+     await physical Green ownership and the live starter's terminal completion; focused
+     `tmp/5096` passed. Complete the corrected revision's remaining gates and push for a new
+     exact-SHA hosted run.
   2. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
      `index.dense_unavailable`, but the provisional "rebuilding" verdict takes precedence; observe
      before changing UI.
@@ -63,10 +69,14 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
   `tmp/5089` with an A-visible accepted write, B promotion and zero restarts. Old app-engine
   restart-fixture waits were inverted and its class passes at `tmp/5086`; the full app-engine
   suite exposed one early-model-readiness assertion, corrected and focused green at `tmp/5088`.
-  The earlier checkpoint has full hosted proof;
-  these new local changes have neither full-suite nor hosted nor independent-review proof yet.
-- **D1-18 next:** run the full affected suites and integrated checks at the corrected revision,
-  review, checkpoint/push, then check every hosted job by exact SHA.
+  Exact-SHA hosted CI for `a0c00e4a3` passed every job. The full affected suites at `tmp/5091`
+  and integrated `build -x test` at `tmp/5094` passed before the completion-future repair.
+  Focused terminal-outcome tests pass at `tmp/5096`, and integrated `build -x test` passes at
+  `tmp/5097`; final-revision full `test` passes at `tmp/5098`. Independent review found no
+  remaining actionable completion-future defect. The final-revision system-tests lifecycle
+  class passes at `tmp/5099`, including both kill cuts and the forced refusal fallback;
+  new exact-SHA hosted proof remains pending.
+- **D1-18 next:** checkpoint/push, then check every hosted job by exact SHA.
 
 ## Selected design and remaining implementation/proof
 

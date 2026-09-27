@@ -4820,36 +4820,45 @@ public final class KnowledgeServer implements Closeable {
    * Opens the durable recorded BUILDING generation in this Engine. The coordinator invokes this
    * off its own lock: quiescing the NATIVE loop may wait for a claim to return through that lock.
    */
-  public void beginRecordedBuildingLiveAsync(String operationKey, Runnable restartFallback) {
+  public CompletableFuture<Boolean> beginRecordedBuildingLiveAsync(
+      String operationKey, Runnable restartFallback) {
     Objects.requireNonNull(operationKey, "operationKey");
-    beginBuildingLiveAsync("g-" + operationKey,
+    return beginBuildingLiveAsync("g-" + operationKey,
         operationKey, restartFallback);
   }
 
-  public void beginUnrecordedBuildingLiveAsync(String buildingGeneration,
+  public CompletableFuture<Boolean> beginUnrecordedBuildingLiveAsync(String buildingGeneration,
       Runnable restartFallback) {
-    beginBuildingLiveAsync(Objects.requireNonNull(buildingGeneration, "buildingGeneration"),
+    return beginBuildingLiveAsync(Objects.requireNonNull(buildingGeneration, "buildingGeneration"),
         null, restartFallback);
   }
 
-  private void beginBuildingLiveAsync(String buildingGeneration, String operationKey,
+  private CompletableFuture<Boolean> beginBuildingLiveAsync(String buildingGeneration, String operationKey,
       Runnable restartFallback) {
     Objects.requireNonNull(restartFallback, "restartFallback");
+    CompletableFuture<Boolean> completion = new CompletableFuture<>();
     log.info("Live Green start dispatched: generation={}, recorded={}",
         buildingGeneration, operationKey != null);
     Thread starter = new Thread(() -> {
-      boolean live;
       try {
-        live = beginBuildingLive(buildingGeneration, operationKey);
-      } catch (IOException | RuntimeException failure) {
-        log.warn("Live migration start refused; requesting ordered boot recovery", failure);
-        live = false;
+        boolean live;
+        try {
+          live = beginBuildingLive(buildingGeneration, operationKey);
+        } catch (IOException | RuntimeException failure) {
+          log.warn("Live migration start refused; requesting ordered boot recovery", failure);
+          live = false;
+        }
+        if (live) log.info("Green opened live; no Engine restart");
+        else restartFallback.run();
+        completion.complete(live);
+      } catch (RuntimeException | Error failure) {
+        completion.completeExceptionally(failure);
+        throw failure;
       }
-      if (live) log.info("Green opened live; no Engine restart");
-      else restartFallback.run();
     }, "engine-migration-live-start");
     starter.setDaemon(true);
     starter.start();
+    return completion;
   }
 
   private boolean beginBuildingLive(String buildingGeneration, String operationKey)

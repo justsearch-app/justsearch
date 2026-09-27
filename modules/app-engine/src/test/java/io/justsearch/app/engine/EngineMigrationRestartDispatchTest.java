@@ -26,7 +26,7 @@ final class EngineMigrationRestartDispatchTest {
   private static final String TARGET_FINGERPRINT = "a".repeat(64);
 
   @Test
-  void recordedStartReturnsBuildingWitnessWithoutDispatchingRestart(@TempDir Path dataDir)
+  void bareRecordedRpcReturnsBuildingWitnessWithoutDispatchingRestart(@TempDir Path dataDir)
       throws Exception {
     Path indexBase = dataDir.resolve("index");
     EngineTestHarness.publishConfig(dataDir, indexBase, Map.of());
@@ -63,7 +63,7 @@ final class EngineMigrationRestartDispatchTest {
       assertEquals(
           0,
           restarts.get(),
-          "recorded start leaves the durable owner to open Green live");
+          "bare recorded RPC checkpoints BUILDING; the coordinator owns the later live handoff");
       var persisted = new IndexGenerationManager(indexBase).readStateBestEffort();
       assertEquals(outcome.buildingGenerationId(), persisted.building_generation());
     }
@@ -97,9 +97,34 @@ final class EngineMigrationRestartDispatchTest {
       var start = client.startMigration("manual", TestEngineContexts.FOREGROUND);
       assertTrue(start.accepted());
       assertFalse(start.restartRequired());
-      assertEquals(0, restarts.get(), "the production client opens Green in this Engine");
+      String buildingGeneration = client.getStatus(TestEngineContexts.FOREGROUND)
+          .getMigration().getBuildingGenerationId();
+      awaitServingIngestGeneration(client, buildingGeneration);
+      assertTrue(root.liveMigrationStartCompletionForTests(buildingGeneration)
+          .get(30, TimeUnit.SECONDS), "the live starter must finish after Green publication");
+      assertEquals(0, restarts.get(), "the production client opened Green in this Engine");
       assertTrue(client.requestCutover(true, TestEngineContexts.FOREGROUND).restartRequired());
       assertEquals(0, restarts.get(), "requesting cutover is not promotion");
     }
+  }
+
+  private static void awaitServingIngestGeneration(
+      io.justsearch.app.services.worker.KnowledgeClient client, String buildingGeneration)
+      throws InterruptedException {
+    assertFalse(buildingGeneration.isBlank(), "migration must have a durable building generation");
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+    String lastIngest = "";
+    while (System.nanoTime() < deadline) {
+      try {
+        lastIngest = client.getStatus(TestEngineContexts.FOREGROUND)
+            .getMigration().getServingIngestGenerationId();
+        if (buildingGeneration.equals(lastIngest)) return;
+      } catch (RuntimeException stillOpening) {
+        // The worker can briefly reject status while opening its new serving view.
+      }
+      Thread.sleep(10);
+    }
+    assertEquals(buildingGeneration, lastIngest,
+        "live start must publish Green as the physical ingest owner before no-restart proof");
   }
 }
