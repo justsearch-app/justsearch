@@ -29,12 +29,84 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.Test;
 
 final class DefaultEngineComponentRegistryTest {
+  @Test
+  void combinedSettingsAndEncoderPublicationHasOneRevisionAndCompleteObserverView() {
+    var lock = new ReentrantReadWriteLock();
+    try (var registry = new DefaultEngineComponentRegistry(budget(), lock)) {
+      var generative = registry.register(spec("generative", Set.of()));
+      var encoders = registry.register(spec("encoders", Set.of()));
+      var observed = new AtomicReference<EngineComponentSnapshot>();
+      try (var ignored = registry.subscribe(observed::set)) {
+        long before = registry.snapshot().revision();
+        var generativeBefore = generative.snapshot();
+        var encoderBefore = encoders.snapshot();
+        var prepared = registry.prepareBatch(Map.of(
+            "generative", new EngineComponentSnapshot.Component(generative.spec(),
+                ComponentState.READY, null, generativeBefore.stateSince(),
+                generativeBefore.stateSinceMonotonicNanos(), "chat-b", "chat-b", null, 0, null),
+            "encoders", new EngineComponentSnapshot.Component(encoders.spec(),
+                ComponentState.READY, null, encoderBefore.stateSince(),
+                encoderBefore.stateSinceMonotonicNanos(), "model-b", "model-b", null, 0, null)));
+        lock.writeLock().lock();
+        try {
+          prepared.validate();
+          prepared.install();
+          assertNull(observed.get());
+        } finally { lock.writeLock().unlock(); }
+        prepared.notifyObservers();
+
+        assertEquals(before + 1, registry.snapshot().revision());
+        assertEquals(registry.snapshot(), observed.get());
+        assertEquals(ComponentState.READY, generative.snapshot().state());
+        assertEquals(ComponentState.READY, encoders.snapshot().state());
+        assertEquals("chat-b", generative.snapshot().appliedVersion());
+        assertEquals("model-b", encoders.snapshot().appliedVersion());
+      }
+    }
+  }
+
+  @Test
+  void handleBoundPublicationNotifiesOnlyAfterPhysicalViewAndSharedLockRelease() {
+    var lock = new ReentrantReadWriteLock();
+    try (var registry = new DefaultEngineComponentRegistry(budget(), lock)) {
+      var handle = registry.register(spec("encoders", Set.of()));
+      var physicalViewPublished = new AtomicBoolean();
+      var observed = new AtomicReference<EngineComponentSnapshot>();
+      try (var ignored = registry.subscribe(snapshot -> {
+        assertFalse(lock.isWriteLockedByCurrentThread());
+        assertTrue(physicalViewPublished.get());
+        observed.set(snapshot);
+      })) {
+        var before = handle.snapshot();
+        var desired = new EngineComponentSnapshot.Component(before.spec(), ComponentState.RELOADING,
+            null, before.stateSince(), before.stateSinceMonotonicNanos(), before.appliedVersion(),
+            before.desiredVersion(), before.lastCompose(), before.recoveryAttempts(),
+            "A serves text while B composes");
+        var prepared = handle.prepareReplacement(desired);
+        lock.writeLock().lock();
+        try {
+          prepared.validate();
+          prepared.install();
+          physicalViewPublished.set(true);
+          assertNull(observed.get());
+          assertThrows(IllegalStateException.class, prepared::notifyObservers);
+        } finally {
+          lock.writeLock().unlock();
+        }
+        prepared.notifyObservers();
+        assertEquals(ComponentState.RELOADING, observed.get().components().getFirst().state());
+        assertThrows(IllegalStateException.class, prepared::notifyObservers);
+      }
+    }
+  }
+
   @Test
   void preparedBatchBuildsSnapshotBeforeCommitAndNotifiesOutsideSharedLock() {
     var lock = new ReentrantReadWriteLock();

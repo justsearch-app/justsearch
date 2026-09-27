@@ -286,6 +286,7 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     private final List<Consumer<EngineComponentSnapshot>> observers;
     private final boolean changed;
     private boolean installed;
+    private boolean notified;
 
     private PreparedBatchImpl(long baseRevision, List<PreparedUpdate> updates,
         EngineComponentSnapshot preparedSnapshot,
@@ -342,6 +343,15 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     public void notifyObservers() {
       // Listener delivery intentionally follows physical publication and never runs while either
       // the shared publication lock or the registry monitor is held.
+      if (publicationLock.isWriteLockedByCurrentThread()) {
+        throw new IllegalStateException("component observers require the publication lock released");
+      }
+      synchronized (monitor) {
+        if (!installed || notified) {
+          throw new IllegalStateException("prepared component observers require one installed batch");
+        }
+        notified = true;
+      }
       publish(observers, preparedSnapshot);
     }
 
@@ -405,6 +415,13 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     @Override
     public void transition(ComponentState next, String nextReasonCode, String nextEvidence) {
       transition(null, null, next, nextReasonCode, nextEvidence);
+    }
+
+    @Override
+    public PreparedBatch prepareReplacement(EngineComponentSnapshot.Component replacement) {
+      Objects.requireNonNull(replacement, "replacement");
+      return DefaultEngineComponentRegistry.this.prepareBatch(
+          Map.of(spec.name(), replacement));
     }
 
     @Override

@@ -573,6 +573,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     async def setup_search_results(page):
         await _type_and_search(page)
 
+    async def setup_search_semantic_paused(page):
+        await _view_setup("search")(page)
+        await page.get_by_text("Semantic search paused; keyword search available.", exact=False).first.wait_for(state="visible", timeout=10_000)
+
     async def setup_command_mode(page):
         inp = page.get_by_test_id(S.TID_SEARCH_INPUT)
         await inp.click()
@@ -2183,6 +2187,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         Step("health-completion", setup=setup_health_completion, isolated=True),
         Step("health-recovery", setup=setup_health_recovery, isolated=True),
         Step("search-failure", setup=setup_search_failure, isolated=True),
+        Step("search-semantic-paused", setup=setup_search_semantic_paused, isolated=True,
+             fixtures_variant="semantic-paused"),
+        Step("search-semantic-paused-live", setup=setup_search_semantic_paused, isolated=True),
         Step("library-ingestion", setup=setup_library_ingestion, isolated=True),
         Step("library-gap-decision", setup=setup_library_gap_decision, isolated=True,
              fixtures_variant="gap-decision"),

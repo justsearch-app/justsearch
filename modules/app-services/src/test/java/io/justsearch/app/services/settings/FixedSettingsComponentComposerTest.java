@@ -219,6 +219,43 @@ final class FixedSettingsComponentComposerTest {
     verify(lease, times(1)).close();
   }
 
+  @Test
+  void generationObservationJoinsSettingsOwnerInOnePrecommitBatch() {
+    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
+    EngineComponentRegistry.PreparedBatch batch = mock(EngineComponentRegistry.PreparedBatch.class);
+    AtomicReference<Map<String, EngineComponentSnapshot.Component>> replacements =
+        new AtomicReference<>();
+    when(registry.tryApply()).thenReturn(new Acquired(lease));
+    when(registry.prepareBatch(anyMap())).thenAnswer(invocation -> {
+      replacements.set(invocation.getArgument(0));
+      return batch;
+    });
+    var owner = new RecordingOwner("generative");
+    var composer = new FixedSettingsComponentComposer(registry);
+    composer.register("generative", owner);
+    composer.seal();
+    var prepared = composer.prepare(CANDIDATE, DESIRED,
+        Map.of("generative", Set.of("chatProfile")));
+    var encoderSpec = new ComponentSpec("encoders", false, Set.of(), BESIDE,
+        Duration.ofSeconds(1), 1);
+    var encoder = new EngineComponentSnapshot.Component(encoderSpec, READY, null,
+        Instant.EPOCH, 0, "model-b", "model-b", null, 0, null);
+    prepared.includeObservation(encoder);
+    assertThrows(IllegalStateException.class, () -> prepared.includeObservation(encoder));
+
+    prepared.validate();
+    prepared.install();
+    prepared.notifyObservers();
+    prepared.retire();
+
+    assertEquals(Set.of("generative", "encoders"), replacements.get().keySet());
+    assertEquals(encoder, replacements.get().get("encoders"));
+    verify(registry, times(1)).prepareBatch(anyMap());
+    verify(batch, times(1)).install();
+    verify(lease).close();
+  }
+
   private static FixedSettingsComponentComposer composer(EngineComponentRegistry registry,
       RecordingOwner first, RecordingOwner second) {
     FixedSettingsComponentComposer composer = new FixedSettingsComponentComposer(registry);

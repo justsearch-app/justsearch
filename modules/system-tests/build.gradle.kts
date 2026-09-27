@@ -184,7 +184,6 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   inputs.file(rootProject.file("scripts/supervisor-conformance/processing-replay-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/operation-resume-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/operation-fault-scenario.mjs"))
-  inputs.file(rootProject.file("scripts/supervisor-conformance/bulk-fault-scenario.mjs"))
 
   // Tempdoc 419 / T6.2 wired :modules:indexer-worker:installDist here because
   // IsolatedBackendFixture spawned a HeadlessApp that in turn spawned a Worker subprocess from
@@ -337,8 +336,17 @@ tasks.register<Test>("lifecycleIntegrationTest") {
   group = "verification"
   dependsOn(":modules:ui:installDist")
   inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/bulk-fault-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/barrier-files.mjs"))
+  // The installed lifecycle harness invokes jseval against the worktree Lit source.
+  // Fingerprint both so an edited selector, capture step or notice cannot reuse old proof.
+  inputs.files(fileTree(rootProject.file("scripts/jseval/jseval")) {
+    include("**/*.py", "**/*.json")
+  })
+  inputs.files(fileTree(rootProject.file("modules/ui-web/src/shell-v0")) {
+    include("**/*.ts")
+  })
   testClassesDirs = sourceSets["integrationTest"].output.classesDirs
   classpath = sourceSets["integrationTest"].runtimeClasspath
   filter.includeTestsMatching("io.justsearch.systemtests.supervision.EngineLifecycleE2ETest")

@@ -2,6 +2,9 @@
   "shell-v0/components/EngineRecovery.ts": ["engine-recovery"],
   "boot/desktopRecovery.ts": ["engine-recovery"],
   "shell-v0/state/admissionWaitNotice.ts": ["engine-admission-wait"],
+  "shell-v0/state/verdict.ts": ["search-semantic-paused"],
+  "shell-v0/state/readinessNotice.ts": ["search-semantic-paused"],
+  "shell-v0/views/search-v3/sv3-degradation.ts": ["search-semantic-paused"],
   "api/admissionFetch.ts": ["engine-admission-wait"],
   "shell-v0/api/authorizedFetch.ts": ["engine-admission-wait"],
   "shell-v0/components/searchResults/ResultsCard.ts": [

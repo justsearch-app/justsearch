@@ -2,7 +2,7 @@
 title: Health Readiness Contract
 type: contract
 status: stable
-updated: 2026-09-21
+updated: 2026-09-27
 description: Schema-2 Engine component observations plus diagnostic readiness dimensions and composites.
 ---
 
@@ -129,7 +129,7 @@ Interpretation:
 ## State Mapping Rules
 
 1. Registry `index` state maps to `readiness.components.workerControlPlane.state`.
-2. Registry `index` state supplies the essential part of `readiness.components.indexServing`; compatibility, embedding and throughput observations can still degrade that diagnostic while the registry component remains `READY`.
+2. Registry `index` state supplies the essential part of `readiness.components.indexServing`; compatibility, embedding and throughput observations can still degrade that diagnostic while the registry component remains `READY`. During a Flow B in-place model change, the Worker owned `encoders=RELOADING` state means A's dense encoder has been retired while its lexical view still serves. `indexServing` reports `DEGRADED` with `index.embedding_rebuilding` until the new encoder is published, including while the Green index compatibility probe is `INITIALIZING`. A BESIDE build leaves encoders ready and does not assert this reason.
 3. Registry `generative` state maps to `readiness.components.ai.state` with source `lifecycle_inference`: `READY` → `READY`, `ABSENT` → `NOT_CONFIGURED`, `STARTING` → `NOT_READY`, and `RELOADING`/`FAILED`/`UNAVAILABLE` → `DEGRADED`.
 4. Worker embedding probe maps to `readiness.components.embedding.state` with source `worker_health_check`.
 5. Worker visual extraction status maps missing baseline readable visual text to `readiness.components.visualTextExtraction` with source `worker_status`.
@@ -169,6 +169,7 @@ Common reason codes:
 15. `vdu.insufficient_vram`
 16. `vdu.missing_mmproj`
 17. `vdu.circuit_open`
+18. `index.embedding_rebuilding` — semantic retrieval is paused during an in-place embedding rebuild or Flow B encoder reload; keyword retrieval remains available.
 
 Worker `health_check.ai_ready` remains worker-local telemetry and is non-authoritative for governance readiness.
 

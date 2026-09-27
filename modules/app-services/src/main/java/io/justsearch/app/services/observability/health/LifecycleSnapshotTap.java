@@ -193,6 +193,9 @@ public final class LifecycleSnapshotTap {
         new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "index.dense_unavailable"),
         new ConditionMapping("index.dense-unavailable", "worker", Severity.WARNING));
     MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "index.embedding_rebuilding"),
+        new ConditionMapping("index.embedding-rebuilding", "worker", Severity.WARNING));
+    MAPPING_TABLE.put(
         new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "worker.throughput_stalled"),
         new ConditionMapping(
             "worker.throughput.stalled",

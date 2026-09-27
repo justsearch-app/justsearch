@@ -454,6 +454,10 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       }
       var projection = prepared;
       return new SettingsCommitOwner.PreparedGenerationProjection() {
+        @Override public void includeComponentObservation(
+            io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+          projection.includeComponentObservation(observation);
+        }
         @Override public void withOwnerLocks(Runnable publication) { projection.withOwnerLocks(publication); }
         @Override public void admitBeforePointer() { projection.admitBeforePointer(); }
         @Override public void afterPointerCommitted() throws IOException {

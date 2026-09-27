@@ -74,6 +74,16 @@ const HEALTHY: SystemHealthVerdict = { kind: 'operational', severity: 'ok', reas
 /* ── E1: the banner exists exactly when capability is reduced ────────────────────────────────── */
 
 describe('the window says when capability is reduced, and says nothing when it is not', () => {
+  it('D1-14: projects the paused-semantic transition with its Health remedy', () => {
+    const paused: SystemHealthVerdict = {
+      kind: 'transitioning', severity: 'warn',
+      reasons: ['rebuilding', 'source:embedding_model_change', 'index.embedding_rebuilding'],
+    };
+    const projection = projectSv3Degradation(snapshotFor(paused));
+    expect(projection?.headline).toBe('Semantic search paused; keyword search available.');
+    expect(projection?.causes.map((cause) => cause.code)).toEqual(['index.embedding_rebuilding']);
+    expect(projection?.remedy).toEqual({ target: 'core.health-surface', label: 'Open Health' });
+  });
   it('projects a banner for a degraded verdict and NONE for a healthy one', () => {
     // The mutation probe: this pair fails if the condition inverts, in whichever direction.
     expect(projectSv3Degradation(snapshotFor(degraded(['worker.health.embedding_not_ready'])))).not.toBeNull();

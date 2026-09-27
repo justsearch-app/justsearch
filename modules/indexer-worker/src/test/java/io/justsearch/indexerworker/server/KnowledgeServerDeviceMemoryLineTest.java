@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -20,9 +22,12 @@ import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentSpec;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.DeviceMemoryLine;
+import io.justsearch.core.component.EngineComponentRegistry;
+import io.justsearch.core.component.EngineComponentSnapshot;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.services.CandidateIndexTargetCapture;
@@ -34,12 +39,20 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
@@ -77,19 +90,46 @@ final class KnowledgeServerDeviceMemoryLineTest {
   void insufficientDeviceMemoryPublishesLexicalAAndReloadingBeforeCompose(@TempDir Path dir)
       throws Exception {
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
-        var composition = mockedComposition()) {
+        var composition = mockedComposition();
+        var captureExecutor = Executors.newSingleThreadExecutor()) {
       var sawLexicalA = new AtomicBoolean();
+      var sawNativeAtReloading = new AtomicBoolean();
+      var blockedCapture = new AtomicReference<Future<Boolean>>();
+      doAnswer(ignored -> {
+        try (var serving = fixture.server.captureServingView()) {
+          sawNativeAtReloading.set(serving.services() == fixture.producer
+              && serving.encoderSet() == fixture.sourceOwner);
+        }
+        var started = new CountDownLatch(1);
+        var capture = captureExecutor.submit(() -> {
+          started.countDown();
+          try (var serving = fixture.server.captureServingView()) {
+            return serving.services() == fixture.lexical && serving.encoderSet() == null;
+          }
+        });
+        blockedCapture.set(capture);
+        assertTrue(started.await(2, TimeUnit.SECONDS));
+        assertThrows(TimeoutException.class, () -> capture.get(100, TimeUnit.MILLISECONDS),
+            "a concurrent query must not capture lexical A before RELOADING publishes");
+        return null;
+      }).when(fixture.encoderBatch).install();
       composition.when(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
           any(), any(), any())).thenAnswer(ignored -> {
             try (var serving = fixture.server.captureServingView()) {
               sawLexicalA.set(serving.services() == fixture.lexical
                   && serving.encoderSet() == null);
             }
-            verify(fixture.component).transition(ComponentState.RELOADING, null,
-                "A serves text while candidate native models compose in place");
+            verify(fixture.component).prepareReplacement(argThat(row ->
+                row.state() == ComponentState.RELOADING
+                    && "A serves text while candidate native models compose in place"
+                        .equals(row.evidence())));
             return emptySurface();
           });
       fixture.composeCandidate();
+      assertTrue(sawNativeAtReloading.get(),
+          "RELOADING must publish before a lexical-only view can be captured");
+      assertTrue(blockedCapture.get().get(2, TimeUnit.SECONDS),
+          "the waiting query must capture lexical A after RELOADING publishes");
       assertTrue(sawLexicalA.get(), "text-only A must be published before B native compose");
       assertEquals(ComposeEvidence.Mode.IN_PLACE, fixture.composeEvidence().mode());
       assertTrue(fixture.sourceOwner.isClosed(), "native A must retire before B composition");
@@ -170,8 +210,6 @@ final class KnowledgeServerDeviceMemoryLineTest {
         "standard embedding model is unavailable for native lifetime proof");
     var handle = io.justsearch.ort.testing.InferenceCompositionRootTestHelper.cpuSessionFor(
         "restored-A-held-native", discovery.modelDir());
-    var request = SessionAcquisitionRequest.within(
-        SessionAcquisitionRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(2));
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
         var composition = mockedComposition()) {
       composition.when(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
@@ -188,8 +226,9 @@ final class KnowledgeServerDeviceMemoryLineTest {
             "A's restored native owner must be a new generation");
       }
 
-      var issuedNative = handle.acquireCpu(request);
-      try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      var issuedNative = handle.acquireCpu(SessionAcquisitionRequest.within(
+          SessionAcquisitionRequest.Urgency.FOREGROUND, Duration.ofSeconds(2)));
+      try (var executor = Executors.newSingleThreadExecutor()) {
         try {
           var nextBuild = executor.submit(() -> {
             fixture.beginInPlaceBuild();
@@ -203,7 +242,9 @@ final class KnowledgeServerDeviceMemoryLineTest {
           assertTrue(!nextBuild.isDone(), "B cannot compose while restored A's native call runs");
           assertTrue(!issuedNative.session().getInputNames().isEmpty(),
               "restored A's issued native session stays readable during retirement");
-          assertThrows(SessionRetiredException.class, () -> handle.acquireCpu(request));
+          assertThrows(SessionRetiredException.class, () -> handle.acquireCpu(
+              SessionAcquisitionRequest.within(SessionAcquisitionRequest.Urgency.FOREGROUND,
+                  Duration.ofSeconds(2))));
           issuedNative.close();
           nextBuild.get(5, TimeUnit.SECONDS);
           assertEquals(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED,
@@ -262,6 +303,8 @@ final class KnowledgeServerDeviceMemoryLineTest {
   private static final class Fixture implements AutoCloseable {
     private final TestEngineExecutors executors = new TestEngineExecutors();
     private final ComponentHandle component = mock(ComponentHandle.class);
+    private final EngineComponentRegistry.PreparedBatch encoderBatch =
+        mock(EngineComponentRegistry.PreparedBatch.class);
     private final DefaultWorkerAppServices producer = mock(DefaultWorkerAppServices.class);
     private final WorkerAppServices lexical = mock(WorkerAppServices.class);
     private final EncoderSet sourceOwner;
@@ -271,6 +314,12 @@ final class KnowledgeServerDeviceMemoryLineTest {
 
     private Fixture(Path dir, DeviceMemoryLine line) throws Exception {
       this.dir = dir;
+      var spec = new ComponentSpec("encoders", false, Set.of(),
+          ComponentSpec.ComposeCapability.CHOOSES_PER_APPLY, Duration.ofMinutes(2), 2);
+      when(component.snapshot()).thenReturn(new EngineComponentSnapshot.Component(spec,
+          ComponentState.READY, null, Instant.now(), System.nanoTime(), null, null, null, 0,
+          null));
+      when(component.prepareReplacement(any())).thenReturn(encoderBatch);
       ResolvedConfig configuration = ResolvedConfig.builder().contributeEnvRegistry().build();
       server = new KnowledgeServer(executors, WorkerBootFixture.workerConfig(dir.resolve("data")),
           null, ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null,

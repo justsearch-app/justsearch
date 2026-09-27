@@ -355,7 +355,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (restartRequired) response = withRestartScheduled(response);
       var receipt = new Receipt(active.key, successor.acceptedRevision(), response);
       return new InstallerGenerationProjection(active, control, preparedSettings, preparedConfig,
-          preparedComponents, receipt, restartRequired);
+          preparedComponents, desired, receipt, restartRequired);
     } catch (RuntimeException | Error failure) {
       if (preparedComponents != null) {
         try { preparedComponents.abort(); }
@@ -399,23 +399,40 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     private final AttemptControl control;
     private final UiSettingsStore.PreparedSettings settings;
     private final ConfigStore.PreparedSwap configSwap;
-    private final SettingsComponentComposer.Prepared componentSwap;
+    private SettingsComponentComposer.Prepared componentSwap;
+    private final ResolvedConfig desired;
     private final Receipt receipt;
     private final boolean restartRequired;
     private boolean admitted;
+    private boolean generationObservationIncluded;
     private boolean committed;
     private boolean retired;
 
     private InstallerGenerationProjection(SettingsCommitFence active, AttemptControl control,
         UiSettingsStore.PreparedSettings settings, ConfigStore.PreparedSwap configSwap,
-        SettingsComponentComposer.Prepared componentSwap, Receipt receipt, boolean restartRequired) {
+        SettingsComponentComposer.Prepared componentSwap, ResolvedConfig desired,
+        Receipt receipt, boolean restartRequired) {
       this.active = active;
       this.control = control;
       this.settings = settings;
       this.configSwap = configSwap;
       this.componentSwap = componentSwap;
+      this.desired = desired;
       this.receipt = receipt;
       this.restartRequired = restartRequired;
+    }
+
+    @Override public void includeComponentObservation(
+        io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+      if (active != fence || admitted || generationObservationIncluded) {
+        throw new IllegalStateException("Installer generation observation is no longer preparable");
+      }
+      if (componentSwap == null) {
+        componentSwap = Objects.requireNonNull(components.prepare(settings.settings(), desired,
+            Map.of()), "Prepared installer component observation");
+      }
+      componentSwap.includeObservation(observation);
+      generationObservationIncluded = true;
     }
 
     @Override public void withOwnerLocks(Runnable publication) {

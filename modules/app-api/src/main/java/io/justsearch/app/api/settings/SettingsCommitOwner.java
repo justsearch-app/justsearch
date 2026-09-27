@@ -95,6 +95,11 @@ public interface SettingsCommitOwner {
    * generation pointer is its commitment witness; this collaborator never completes the row.
    */
   interface PreparedGenerationProjection {
+    /** Join a generation-owned observation to the settings batch before pointer admission. */
+    default void includeComponentObservation(
+        io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+      throw new UnsupportedOperationException("Generation component observation is unavailable");
+    }
     /** Establish prepared component owner locks before the runtime/state/publication lock order. */
     default void withOwnerLocks(Runnable publication) { publication.run(); }
 

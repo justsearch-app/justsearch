@@ -29,6 +29,18 @@ const degraded = (
 ): SystemHealthVerdict => ({ kind: 'degraded', severity, reasons });
 
 describe('readinessNotice (595 §4.2) — projects the ONE verdict into the search banner', () => {
+  it('D1-14: shows a keyword-available notice only for a transition with measured dense unavailability', () => {
+    const paused: SystemHealthVerdict = {
+      kind: 'transitioning', severity: 'warn',
+      reasons: ['rebuilding', 'source:embedding_model_change', 'index.embedding_rebuilding'],
+    };
+    const notice = readinessNotice(paused);
+    expect(notice?.headline).toBe('Semantic search paused; keyword search available.');
+    expect(notice?.body).toContain('Keyword search remains available');
+    expect(notice?.causes).toEqual(['Semantic search is being rebuilt — keyword results are complete, semantic ranking resumes when it finishes.']);
+    expect(warrantsSearchDegradationBanner(paused)).toBe(true);
+    expect(readinessNotice({ ...paused, reasons: ['rebuilding', 'source:embedding_model_change'] })).toBeNull();
+  });
   it('returns null for every non-rendering verdict (the banner does not render)', () => {
     for (const kind of ['operational', 'checking', 'connecting'] as const) {
       expect(readinessNotice({ kind, severity: 'info', reasons: [] })).toBeNull();

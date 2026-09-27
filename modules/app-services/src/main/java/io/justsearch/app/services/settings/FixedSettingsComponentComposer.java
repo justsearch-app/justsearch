@@ -116,8 +116,7 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
             "Prepared observation: " + entry.getKey()));
         afterOwnerPrepared.accept(entry.getKey());
       }
-      return new Composite(List.copyOf(prepared),
-          java.util.Collections.unmodifiableMap(new LinkedHashMap<>(observations)), registry, lease);
+      return new Composite(List.copyOf(prepared), observations, registry, lease);
     } catch (RuntimeException | Error failure) {
       int priorSuppressed = failure.getSuppressed().length;
       abortAll(prepared, failure);
@@ -155,7 +154,7 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
         Map<String, EngineComponentSnapshot.Component> observations,
         EngineComponentRegistry registry, EngineComponentRegistry.ApplyLease lease) {
       this.owners = owners;
-      this.observations = observations;
+      this.observations = new LinkedHashMap<>(observations);
       this.registry = registry;
       this.lease = lease;
     }
@@ -168,6 +167,13 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
         publication.run();
       } else {
         owners.get(index).withOwnerLocks(() -> underOwnerLocks(index + 1, publication));
+      }
+    }
+
+    @Override public void includeObservation(EngineComponentSnapshot.Component observation) {
+      Objects.requireNonNull(observation, "observation");
+      if (batch != null || observations.putIfAbsent(observation.spec().name(), observation) != null) {
+        throw new IllegalStateException("Generation component observation is already prepared");
       }
     }
 

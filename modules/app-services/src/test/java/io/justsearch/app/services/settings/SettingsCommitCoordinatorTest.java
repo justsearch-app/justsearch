@@ -216,6 +216,51 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void installerProjectionAddsEncoderToItsSingleSettingsBatchBeforePointer() throws Exception {
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        temp.resolve("installer-combined-components.json"));
+    var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+    var components = org.mockito.Mockito.mock(SettingsComponentComposer.class);
+    var prepared = org.mockito.Mockito.mock(SettingsComponentComposer.Prepared.class);
+    org.mockito.Mockito.when(components.prepare(org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyMap()))
+        .thenReturn(prepared);
+    var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+        candidate -> OperationResult.success("prepared"), () -> false, components);
+    owner.inspectRecovery(List.of());
+    String key = OperationKeys.generate(CLOCK);
+    var projection = owner.prepareInstallerGenerationProjection(
+        owner.reserve(711, key, currentWitness(settings)), new UiSettings(),
+        new ProjectionControl());
+    var spec = new io.justsearch.core.component.ComponentSpec("encoders", false, Set.of(),
+        io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
+        java.time.Duration.ofSeconds(1), 1);
+    var observation = new io.justsearch.core.component.EngineComponentSnapshot.Component(
+        spec, io.justsearch.core.component.ComponentState.READY, null, Instant.EPOCH, 0,
+        "model-b", "model-b", null, 0, null);
+    projection.includeComponentObservation(observation);
+    assertThrows(IllegalStateException.class,
+        () -> projection.includeComponentObservation(observation));
+    assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+    org.mockito.Mockito.verify(components).prepare(org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(Map.of()));
+    org.mockito.Mockito.verify(prepared).includeObservation(observation);
+
+    config.publicationLock().writeLock().lock();
+    try {
+      projection.admitBeforePointer();
+      org.mockito.Mockito.verify(prepared).validate();
+      projection.afterPointerCommitted();
+      org.mockito.Mockito.verify(prepared).install();
+    } finally { config.publicationLock().writeLock().unlock(); }
+    projection.afterRuntimePublished();
+    org.mockito.Mockito.verify(prepared).notifyObservers();
+    org.mockito.Mockito.verify(prepared).retire();
+    assertEquals(new SettingsWitness(1, key), settings.inspect().witness());
+    owner.releaseAfterTerminal(711);
+  }
+
+  @Test
   void installerProjectionRefusesFullWitnessConflictBeforePointer() throws Exception {
     var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
         temp.resolve("installer-projection-conflict.json"));

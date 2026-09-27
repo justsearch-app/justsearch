@@ -1440,6 +1440,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
             new IllegalStateException("Installer activation did not commit its pointer"));
       }
       private final CommittedProjection callbacks = new CommittedProjection() {
+        @Override public void includeComponentObservation(
+            io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+          projection.includeComponentObservation(observation);
+        }
         @Override public void admitBeforePointer() {
           attempts.observeBulkBoundary(bulk.handle,
               OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_ARM);

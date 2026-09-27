@@ -406,6 +406,50 @@ describe('computeVerdict (595 §4.2) — the ONE rollup', () => {
   });
 });
 
+describe('D1-14 — semantic pause during an in-place build', () => {
+  const rebuilding = { kind: 'provisional', cause: 'rebuilding', source: 'embedding_model_change' } as const;
+  const denseOff = known<ReadinessView>({
+    ...readyReadiness,
+    retrieval: 'degraded',
+    reasonCodes: ['index.embedding_rebuilding'],
+  });
+
+  it('carries the measured dense outage through a current rebuild verdict', () => {
+    const verdict = computeVerdict({ phase: 'connected', stability: rebuilding, readiness: denseOff });
+    expect(verdict).toEqual({
+      kind: 'transitioning',
+      severity: 'warn',
+      reasons: ['rebuilding', 'source:embedding_model_change', 'index.embedding_rebuilding'],
+    });
+    expect(verdictBody(verdict)).toContain('keyword search remains available');
+  });
+
+  it('does not infer a dense outage from model-change source alone or stale data', () => {
+    const beside = computeVerdict({ phase: 'connected', stability: rebuilding, readiness: known(readyReadiness) });
+    expect(beside.reasons).not.toContain('index.embedding_rebuilding');
+    expect(verdictBody(beside)).not.toContain('resumes');
+    const stale = computeVerdict({ phase: 'stale', stability: rebuilding, readiness: denseOff });
+    expect(stale.reasons).not.toContain('index.embedding_rebuilding');
+    const restarting = computeVerdict({ phase: 'connected', stability: { kind: 'provisional', cause: 'worker-restart' }, readiness: denseOff });
+    expect(restarting.reasons).not.toContain('index.embedding_rebuilding');
+  });
+
+  it('keeps actionable paused and overdue wording ahead of the dense-pause detail', () => {
+    const paused = computeVerdict({
+      phase: 'connected', stability: rebuilding, readiness: denseOff, migrationPaused: true,
+    });
+    expect(paused.reasons).toContain('index.embedding_rebuilding');
+    expect(verdictBody(paused)).toContain('open Health to resume or investigate');
+
+    const overdue = computeVerdict({
+      phase: 'connected', stability: rebuilding, readiness: denseOff,
+      migrationSwitchingAgeMs: 10_000, migrationSwitchingMaxDurationMs: 5_000,
+    });
+    expect(overdue.reasons).toContain('index.embedding_rebuilding');
+    expect(verdictBody(overdue)).toContain('taking longer than expected');
+  });
+});
+
 describe('severityForCodes (595 §10.5)', () => {
   it('maps the cosmetic codes to info and hard failures to error', () => {
     expect(severityForCodes(['lambdamart.not_configured'])).toBe('info');

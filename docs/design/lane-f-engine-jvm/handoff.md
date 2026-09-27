@@ -6,6 +6,38 @@ current evidence; the brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-27)
 
+Branch `codex/lane-f-pr1` in this dedicated worktree is at the pushed D1-18 checkpoint
+`5776bd2008b454fb84fa38b3e8da1dcc8f31ab3a`; exact-SHA hosted
+[run 36340854808](https://github.com/justsearch-app/justsearch/actions/runs/36340854808)
+passed every job. D1-18 migration-start no-restart proof is complete. PR727 remains open;
+do not merge before Stage F acceptance.
+
+D1-14's semantic-pause notice is implemented in the current uncommitted work. The installed
+BESIDE/IN_PLACE pair passed at `tmp/5106`. The connected Lit Search capture during an
+installed IN_PLACE held cut passed at `tmp/5111-d1-14-connected-ui.txt`, with raw held status,
+screenshot and measure under `tmp/lane-f-takeover/lifecycle-accepted-write-49884f51-fbd6-4913-b6b0-eef81691fbf8/`.
+That run showed `index.embedding_rebuilding`, the visible notice, 128 vector refusals
+over 35.6 s, hybrid 224/224 available, vector recovery, no API outage or Engine restart,
+and owned stop. Its registered UI helper was reaped by the session sweep. The D1-14 section
+holds the implementation and evidence details.
+
+**Next, in order:** complete D1-14 checkpoint gates;
+checkpoint and push, then verify every hosted job by exact SHA. Continue the original
+[WP3 batches 4/5](improvements/WP3-remaining-work-plan.md), then D2, E and F.
+The independent review's registry race is corrected locally with one settings-plus-encoder
+precommit batch; focused tests and static checks pass at `tmp/5128` and `tmp/5129`.
+The first revision-current installed pair at `tmp/5133` failed at the installer seed: the
+operation runner's projection wrapper omitted the new component-observation callback. Its
+delegation is fixed and the same pair passes at `tmp/5135`, including connected Search UI
+evidence. The prior full stress suite passed at `tmp/5131`, before that final wrapper fix;
+the revision-current serial full suite passed at `tmp/5136`, static gate at `tmp/5137`,
+and `build -x test` at `tmp/5138`. Hosted proof remains before
+the D1-14 semantic-notice checkpoint.
+Leave the unrelated untracked `modules/app-inference/logs/` directory alone. Root owns the
+single shared Gradle build and dev-stack lease.
+
+## Prior resumption state (historical)
+
 History up to this point was moved verbatim to
 [handoff-history-2026-09-22-to-27.md](handoff-history-2026-09-22-to-27.md). This section is the
 resumption queue. Owner decisions for handover items 01–03 are recorded in D1-14 and D1-18.

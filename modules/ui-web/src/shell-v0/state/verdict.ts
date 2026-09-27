@@ -274,6 +274,18 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
     // 837 §2.3(ii) — carry the rebuild's source as an EXTRA token, exactly the way `paused` /
     // `overdue` below already are. `reasons[0]` stays the cause, so nothing downstream reorders.
     const sourceToken = i.stability.source ? [`${SOURCE_TOKEN_PREFIX}${i.stability.source}`] : [];
+    // D1-14: an in-place build can keep keyword search serving while its dense leg is
+    // rebuilding. Preserve that measured retrieval fact through the transition verdict;
+    // migration alone is not evidence of a pause (a BESIDE build still serves dense).
+    // A stale poll cannot license a present-tense capability claim.
+    const semanticRebuilding =
+      (cause === 'rebuilding' || cause === 'generation-switch') &&
+      i.phase === 'connected' &&
+      i.readiness.known &&
+      i.readiness.value.retrieval === 'degraded' &&
+      i.readiness.value.reasonCodes.includes('index.embedding_rebuilding')
+        ? ['index.embedding_rebuilding']
+        : [];
     // E4: escalate a STUCK generation rebuild/cutover, using the backend's own
     // paused flag / age-vs-max-duration (the FE only projects them).
     if (cause === 'rebuilding' || cause === 'generation-switch') {
@@ -284,14 +296,14 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
         return {
           kind: 'transitioning',
           severity: 'warn',
-          reasons: [cause, 'paused', ...sourceToken],
+          reasons: [cause, 'paused', ...sourceToken, ...semanticRebuilding],
         };
       }
       if (overdue) {
         return {
           kind: 'transitioning',
           severity: 'warn',
-          reasons: [cause, 'overdue', ...sourceToken],
+          reasons: [cause, 'overdue', ...sourceToken, ...semanticRebuilding],
         };
       }
     }
@@ -303,7 +315,11 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
     if (cause === 'channel-stale') {
       return { kind: 'transitioning', severity: 'warn', reasons: [cause] };
     }
-    return { kind: 'transitioning', severity: 'busy', reasons: [cause, ...sourceToken] };
+    return {
+      kind: 'transitioning',
+      severity: semanticRebuilding.length > 0 ? 'warn' : 'busy',
+      reasons: [cause, ...sourceToken, ...semanticRebuilding],
+    };
   }
   // Settled: roll up the readiness axis.
   if (!i.readiness.known) return { kind: 'checking', severity: 'info', reasons: [] };
@@ -428,6 +444,9 @@ export function verdictBody(v: SystemHealthVerdict): string {
       if (v.reasons.includes('overdue')) {
         return 'The index rebuild is taking longer than expected — open Health to check.';
       }
+      if (v.reasons.includes('index.embedding_rebuilding')) {
+        return 'Semantic search is paused while the index is rebuilt; keyword search remains available.';
+      }
       switch (v.reasons[0]) {
         case 'channel-stale':
           return 'Reconnecting to the backend; holding last-known values.';
@@ -451,7 +470,7 @@ export function verdictBody(v: SystemHealthVerdict): string {
             case 'corrupt_index_rebuild':
               return 'The index was corrupted and is being rebuilt from your files — results are temporarily incomplete.';
             case 'embedding_model_change':
-              return 'The AI embedding model changed, so the index is being rebuilt; semantic ranking resumes when it finishes.';
+              return 'The AI embedding model changed, so the index is being rebuilt; search continues while it finishes.';
             case 'schema_mismatch':
               return 'The index format changed, so the index is being rebuilt; results will settle when it finishes.';
             case 'user_requested_rebuild':

@@ -731,6 +731,17 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
       remedy: OPEN_HEALTH,
     };
   }
+  // D1-14: the worker reports embedding rebuilding during an in-place migration while
+  // keyword serving continues. The verdict carries that real reason through the
+  // transition, so a BESIDE build cannot produce this notice by source alone.
+  if (verdict.kind === 'transitioning' && verdict.reasons.includes('index.embedding_rebuilding')) {
+    return {
+      headline: 'Semantic search paused; keyword search available.',
+      body: 'Keyword search remains available while the index is rebuilt; semantic ranking resumes afterward.',
+      causes: wordCauses(['index.embedding_rebuilding']),
+      remedy: OPEN_HEALTH,
+    };
+  }
   if (verdict.kind !== 'degraded') return null;
   // Tempdoc 600 Design A: the actionable cause now arrives as real reason codes (the worker's
   // embedding/schema compat codes), not a synthetic boolean-derived token — so the `causes` slot

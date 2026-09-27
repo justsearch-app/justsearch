@@ -265,6 +265,31 @@ final class StatusLifecycleHandlerTest {
   // ===== In-place embedding rebuild (embeddingCompatState=REBUILDING) is visible to readiness =====
 
   @Test
+  @DisplayName("D1-14: encoder RELOADING exposes the in-place semantic pause while Green compat initializes")
+  void encoderReloadingDegradesRetrievalUntilPublished() {
+    StatusLifecycleHandler handler = newHandler();
+    WorkerOperationalView view = compatWorkerView(
+        new CompatibilityStatusView("INITIALIZING", "", "", "", "", "", "COMPATIBLE", false, ""),
+        true);
+
+    ReadinessEnvelopeView paused = handler.buildReadinessEnvelope(
+        view, encoderReloadingProjection(), freshContact());
+    assertEquals("DEGRADED", paused.components().get("indexServing").state());
+    assertEquals("index.embedding_rebuilding", paused.components().get("indexServing").reasonCode());
+    assertTrue(paused.composites().get("retrieval").reasonCodes()
+        .contains("index.embedding_rebuilding"));
+    assertEquals("DEGRADED", paused.composites().get("retrieval").state());
+
+    ReadinessEnvelopeView beside = handler.buildReadinessEnvelope(
+        compatWorkerView(
+            new CompatibilityStatusView("COMPATIBLE", "", "", "", "", "", "COMPATIBLE", false, ""),
+            true),
+        readyProjection(), freshContact());
+    assertFalse(beside.composites().get("retrieval").reasonCodes()
+        .contains("index.embedding_rebuilding"));
+  }
+
+  @Test
   @DisplayName("embeddingRebuildReason maps REBUILDING → index.embedding_rebuilding")
   void embeddingRebuildReasonMapsRebuilding() {
     WorkerOperationalView workerView =
@@ -476,6 +501,13 @@ final class StatusLifecycleHandlerTest {
     for (String name : java.util.List.of("api", "index", "encoders", "generative")) {
       COMPONENTS.transition(name, ComponentState.READY, null, name + " ready");
     }
+    return COMPONENTS.projection();
+  }
+
+  private static LifecycleProjection.Projection encoderReloadingProjection() {
+    readyProjection();
+    COMPONENTS.transition("encoders", ComponentState.RELOADING, null,
+        "in-place candidate composes while A serves lexical search");
     return COMPONENTS.projection();
   }
 

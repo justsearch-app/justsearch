@@ -682,6 +682,29 @@ def _status_body(variant: str) -> str:
 
     `degraded-detailed` needs the identical readiness state — the banner it expands is the same
     one this transform gives something to render."""
+    if variant == "semantic-paused":
+        # D1-14: an in-place model-change build serves keyword results while
+        # the dense leg is rebuilding. The reason code, not the migration
+        # source, licenses the notice in the Lit search window.
+        d = json.loads(_BODY_STATUS)
+        d["worker"]["migration"].update({
+            "migrationState": "SWITCHING",
+            "migrationSource": "embedding_model_change",
+            "activeGenerationId": "g1",
+            "buildingGenerationId": "g2",
+            "servingSearchGenerationId": "g2",
+            "servingIngestGenerationId": "g2",
+        })
+        d["worker"]["core"]["indexedDocuments"] = 1
+        d["worker"]["compatibility"]["embeddingCompatState"] = "INITIALIZING"
+        d["components"]["encoders"]["state"] = "RELOADING"
+        d["readiness"]["engineComponents"]["encoders"]["state"] = "RELOADING"
+        d["readiness"]["components"]["indexServing"]["state"] = "DEGRADED"
+        d["readiness"]["composites"]["retrieval"] = {
+            "state": "DEGRADED", "reasonCodes": ["index.embedding_rebuilding"],
+            "stale": False, "maxStalenessMs": 0,
+        }
+        return json.dumps(d)
     if variant == "gap-decision":
         d = json.loads(_BODY_STATUS)
         d["worker"]["migration"]["migrationState"] = "AWAITING_ACCEPTANCE"

@@ -84,6 +84,10 @@ public interface RecordedIngestionLifecycle {
   /** Prepared settings projection for a typed activation. Physical publication calls it in order. */
   @FunctionalInterface
   interface CommittedProjection {
+    default void includeComponentObservation(
+        io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+      throw new UnsupportedOperationException("Generation component observation is unavailable");
+    }
     default void admitBeforePointer() {}
     void afterPointerCommitted() throws IOException;
     default void afterRuntimePublished() {}

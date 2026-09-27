@@ -42,6 +42,7 @@ final class HealthEventEmitCoverageTest {
           "index.unavailable",
           "index.start-error",
           "index.dense-unavailable",
+          "index.embedding-rebuilding",
           "worker.throughput.stalled",
           "worker.throughput.degraded",
           "schema.blocked",
@@ -162,11 +163,11 @@ final class HealthEventEmitCoverageTest {
   }
 
   @Test
-  @DisplayName("canonical list is exactly 33 entries with no duplicates")
-  void canonicalListIs33Unique() {
-    assertEquals(33, CANONICAL_IDS.size(), "CANONICAL_IDS should hold 33 entries");
+  @DisplayName("canonical list is exactly 34 entries with no duplicates")
+  void canonicalListIs34Unique() {
+    assertEquals(34, CANONICAL_IDS.size(), "CANONICAL_IDS should hold 34 entries");
     assertEquals(
-        33,
+        34,
         new HashSet<>(CANONICAL_IDS).size(),
         "CANONICAL_IDS contains a duplicate entry");
   }

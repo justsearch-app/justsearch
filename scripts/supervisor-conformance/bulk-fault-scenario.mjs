@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -908,6 +909,12 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       { query: marker, limit: 10, mode: 'vector' }, 30000);
     const statusReply = await request(apiPort, '/api/status', {}, 15000);
     const status = statusReply.status === 200 ? JSON.parse(statusReply.text) : null;
+    console.log('MODEL_LIVE_AB_HELD_READINESS', JSON.stringify({
+      migration: status?.worker?.migration?.migrationState,
+      compat: status?.worker?.compatibility?.embeddingCompatState,
+      encoders: status?.components?.encoders?.state,
+      retrieval: status?.readiness?.composites?.retrieval,
+    }));
     const composeMode = status?.readiness?.engineComponents?.encoders?.mode;
     requireThat(['IN_PLACE', 'BESIDE'].includes(composeMode)
       && (inPlaceModelB ? composeMode === 'IN_PLACE'
@@ -916,6 +923,12 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       composeMode, encoder: status?.readiness?.engineComponents?.encoders,
     })}`);
     const actualInPlace = composeMode === 'IN_PLACE';
+    const retrieval = status?.readiness?.composites?.retrieval;
+    requireThat(actualInPlace
+      ? retrieval?.state === 'DEGRADED'
+        && retrieval.reasonCodes?.includes('index.embedding_rebuilding')
+      : !retrieval?.reasonCodes?.includes('index.embedding_rebuilding'),
+    `semantic-pause readiness contradicted ${composeMode}: ${JSON.stringify(retrieval)}`);
     const vectorOutcome = actualInPlace
       ? vectorSearch.status === 400
         && JSON.parse(vectorSearch.text).errorCode === 'INVALID_REQUEST'
@@ -927,11 +940,55 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     `serving A violated ${composeMode} mode while B was settled: ${JSON.stringify({
       text: textSearch.text, vector: vectorSearch.text, encoders: status?.components?.encoders,
     })}`);
+    if (actualInPlace && acceptedWriteDuringBuild) {
+      // D1-14's UI acceptance runs against this held installed Engine, not a mocked
+      // status response. The installed harness intentionally has a dummy frontend;
+      // jseval auto-serves this worktree's Lit UI with its proxy pinned to the
+      // installed API, then the registered-helper sweep retires that owned server.
+      const outputDir = path.join(work, 'ui-shot-semantic-paused');
+      const jsevalDir = path.join(process.cwd(), 'scripts', 'jseval');
+      const uiSession = `lane-f-semantic-${first.runId}`;
+      const uiEnv = { ...process.env,
+        PYTHONPATH: [jsevalDir, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+        VITE_JUSTSEARCH_API_PORT: String(apiPort),
+        CLAUDE_CODE_SESSION_ID: uiSession,
+        JUSTSEARCH_AGENT_SESSION_ID: uiSession,
+      };
+      try {
+        const uiOutput = await new Promise((resolve, reject) => {
+          execFile('python', ['-m', 'jseval', 'ui-shot', 'search-semantic-paused-live',
+            '--no-demo', '--output-dir', outputDir],
+          { cwd: work, env: uiEnv, timeout: 90000, maxBuffer: 1024 * 1024 },
+          (error, stdout, stderr) => error
+            ? reject(new Error(`installed semantic-pause UI capture failed: ${stderr || stdout || error.message}`))
+            : resolve(stdout));
+        });
+        const measure = readJson(path.join(outputDir, 'search-semantic-paused-live.measure.json'));
+        requireThat(measure?.axe?.violations?.length === 0
+          && measure?.console_errors?.length === 0,
+        `installed semantic-pause UI measure failed: ${JSON.stringify(measure)}`);
+        console.log('MODEL_LIVE_AB_UI_PASS', JSON.stringify({
+          outputDir, measure: { axeViolations: measure.axe.violations.length,
+            consoleErrors: measure.console_errors.length }, output: uiOutput.trim(),
+        }));
+      } finally {
+        const sweep = await new Promise((resolve, reject) => {
+          execFile('node', ['scripts/dev/agent-spawn-sweep.cjs', '--occasion',
+            'session-closeout', '--session-id', uiSession, '--own-session-only'],
+          { cwd: process.cwd(), timeout: 30000, maxBuffer: 1024 * 1024 },
+          (error, stdout, stderr) => error
+            ? reject(new Error(`semantic-pause UI helper sweep failed: ${stderr || stdout || error.message}`))
+            : resolve(stdout));
+        });
+        console.log('MODEL_LIVE_AB_UI_SWEEP', sweep.trim());
+      }
+    }
     console.log('MODEL_LIVE_AB_CUT', JSON.stringify({ operationKey, sourceGeneration,
       buildingGeneration: bGeneration, aModel: sourceManifest.models.embedding,
       bModel: bManifest.models.embedding, unitsCompleted: inFlight.units_completed,
       unitsFailed: inFlight.units_failed, mode: composeMode,
       encoderState: status?.components?.encoders?.state,
+      retrievalReasons: retrieval?.reasonCodes,
       vectorHits: actualInPlace ? 0 : JSON.parse(vectorSearch.text).results.length }));
     if (cancelBeforePointer) {
       cancellationKey = await cancelReindexWithApproval({ apiPort, manifest,
@@ -1042,6 +1099,13 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       && !matchingHit(removedText, removedFile, removedMarker),
     `promoted B resurrected a watcher deletion: ${removedText.text}`);
   }
+  // The terminal B query above proves recovery at the API, but the independent sampler may be
+  // between its vector and hybrid requests at that instant. Let it witness one post-refusal
+  // vector success before closing the sample window.
+  if (inPlaceModelB && transitionSampler) {
+    await waitFor('semantic sampler observes post-refusal vector recovery', 15000,
+      () => transitionSampler.recovered() ? true : null);
+  }
   const semantic = await transitionSampler?.stop();
   if (semantic) {
     const violations = inPlaceModelB ? inPlaceSemanticViolations(semantic)
@@ -1151,7 +1215,11 @@ function sampleSemanticAvailability({ apiPort, post, request, marker, file, matc
       if (running) await new Promise(resolve => setTimeout(resolve, 250));
     }
   })();
-  return { async stop() {
+  return { recovered() {
+    const lastRefusal = observations.findLastIndex(sample => sample.outcome === 'reloading');
+    return lastRefusal >= 0
+      && observations.slice(lastRefusal + 1).some(sample => sample.outcome === 'available');
+  }, async stop() {
     if (result) return result;
     running = false;
     await task;

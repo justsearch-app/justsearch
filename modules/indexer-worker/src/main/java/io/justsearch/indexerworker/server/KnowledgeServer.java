@@ -2219,11 +2219,31 @@ public final class KnowledgeServer implements Closeable {
         selection);
   }
 
+  /** Preserves the encoder's unaffected fields while preparing one coherent lifecycle revision. */
+  private io.justsearch.core.component.EngineComponentRegistry.PreparedBatch prepareEncoderObservation(
+      io.justsearch.core.component.ComponentState state, String desiredVersion,
+      String appliedVersion, String evidence) {
+    return encoderComponent.prepareReplacement(encoderObservation(state, desiredVersion,
+        appliedVersion, evidence));
+  }
+
+  private io.justsearch.core.component.EngineComponentSnapshot.Component encoderObservation(
+      io.justsearch.core.component.ComponentState state, String desiredVersion,
+      String appliedVersion, String evidence) {
+    var before = encoderComponent.snapshot();
+    return new io.justsearch.core.component.EngineComponentSnapshot.Component(
+        before.spec(), state, null, before.stateSince(), before.stateSinceMonotonicNanos(),
+        appliedVersion == null ? before.appliedVersion() : appliedVersion,
+        desiredVersion == null ? before.desiredVersion() : desiredVersion,
+        before.lastCompose(), before.recoveryAttempts(), evidence);
+  }
+
   /** Publishes lexical A before retiring its exact native owner, then leaves Green's writer alive. */
   private void beginInPlaceCandidateBuild() throws IOException {
     ServingView nativeView;
     DefaultWorkerAppServices producer;
     EncoderSet incumbent;
+    io.justsearch.core.component.EngineComponentRegistry.PreparedBatch encoderPublication = null;
     runtimeSwapLock.lock();
     try {
       publicationLock.writeLock().lock();
@@ -2249,6 +2269,16 @@ public final class KnowledgeServer implements Closeable {
               nativeView.searchRuntime);
           ServingView lexicalView = new ServingView(lexicalServices, nativeView.searchRuntime,
               nativeView.ingestRuntime, nativeView.activeGenerationPath);
+          // Prepare before changing the physical view. Install under the same shared guard,
+          // then notify only after both owner and publication locks are released.
+          if (encoderComponent != null) {
+            var prepared = prepareEncoderObservation(
+                io.justsearch.core.component.ComponentState.RELOADING, null, null,
+                "A serves text while candidate native models compose in place");
+            prepared.validate();
+            prepared.install();
+            encoderPublication = prepared;
+          }
           nativeView.retiring = true;
           nativeView.retireCleanup = nativeView::releaseEncoderSet;
           retiredServingViews.add(nativeView);
@@ -2262,10 +2292,8 @@ public final class KnowledgeServer implements Closeable {
       }
     } finally {
       runtimeSwapLock.unlock();
+      if (encoderPublication != null) encoderPublication.notifyObservers();
     }
-    if (encoderComponent != null) encoderComponent.transition(
-        io.justsearch.core.component.ComponentState.RELOADING, null,
-        "A serves text while candidate native models compose in place");
     notifyServingViewRetirement(nativeView);
     try {
       awaitRetiredNativeView(nativeView);
@@ -2982,6 +3010,28 @@ public final class KnowledgeServer implements Closeable {
   void publishEncoderComposition() {
     EncoderSet owner = initialEncoderSet;
     if (encoderComponent == null || owner == null) return;
+    var publication = encoderPublication(owner, startupConfiguration, initialModelSelection);
+    if (publication.desiredVersion() != null) {
+      encoderComponent.setDesiredVersion(publication.desiredVersion());
+    }
+    if (publication.appliedVersion() != null) {
+      encoderComponent.setAppliedVersion(publication.appliedVersion());
+    }
+    encoderComponent.transition(publication.state(), null, publication.evidence());
+  }
+
+  private record EncoderPublication(io.justsearch.core.component.ComponentState state,
+      String desiredVersion, String appliedVersion, String evidence) {}
+
+  private io.justsearch.core.component.EngineComponentSnapshot.Component encoderCompositionObservation(
+      EncoderSet owner, ResolvedConfig configuration, GenerationModelSelection selection) {
+    var publication = encoderPublication(owner, configuration, selection);
+    return encoderObservation(publication.state(), publication.desiredVersion(),
+        publication.appliedVersion(), publication.evidence());
+  }
+
+  private EncoderPublication encoderPublication(EncoderSet owner, ResolvedConfig configuration,
+      GenerationModelSelection selection) {
     var observation = owner.surfaceForOwner().componentObservation();
     var missing = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
     missing.addAll(observation.missingRoles());
@@ -2996,27 +3046,26 @@ public final class KnowledgeServer implements Closeable {
       };
       if (!wired) missing.add(role);
     }
-    String desiredVersion = startupConfiguration == null
+    String desiredVersion = configuration == null
         ? observation.configurationDigest().orElse(null)
-        : EncoderConfigurationProjection.from(startupConfiguration).digest();
-    if (desiredVersion != null) encoderComponent.setDesiredVersion(desiredVersion);
-    if (observation.configurationDigest().isPresent() && missing.isEmpty()) {
-      encoderComponent.setAppliedVersion(observation.configurationDigest().orElseThrow());
-    }
+        : EncoderConfigurationProjection.from(configuration).digest();
+    String appliedVersion = observation.configurationDigest().isPresent() && missing.isEmpty()
+        ? observation.configurationDigest().orElseThrow() : null;
     boolean ready = observation.configurationDigest().isPresent()
         && observation.hasRequestedRoles() && missing.isEmpty();
     boolean intentionallyAbsent = observation.configurationDigest().isPresent()
         && !observation.hasRequestedRoles();
-    String evidence = initialModelSelection != null
-        && initialModelSelection.hasUnavailableModel() ? "INDEX_MODEL_NOT_INSTALLED"
+    String evidence = selection != null && selection.hasUnavailableModel()
+        ? "INDEX_MODEL_NOT_INSTALLED"
         : observation.configurationDigest().isEmpty() ? "encoder_observation_unknown"
         : missing.isEmpty()
         ? (observation.hasRequestedRoles() ? null : "no_encoder_roles_requested")
         : "missing_roles=" + missing.stream()
             .map(Enum::name).sorted().collect(java.util.stream.Collectors.joining(","));
-    encoderComponent.transition(ready ? io.justsearch.core.component.ComponentState.READY
+    return new EncoderPublication(ready ? io.justsearch.core.component.ComponentState.READY
         : intentionallyAbsent ? io.justsearch.core.component.ComponentState.ABSENT
-        : io.justsearch.core.component.ComponentState.UNAVAILABLE, null, evidence);
+        : io.justsearch.core.component.ComponentState.UNAVAILABLE,
+        desiredVersion, appliedVersion, evidence);
   }
 
 
@@ -5290,6 +5339,16 @@ public final class KnowledgeServer implements Closeable {
                   recorded.operationKey(), jobQueue);
           preparedProjection = prepared;
           var callbacks = prepared == null ? null : prepared.callbacks();
+          GenerationModelSelection promotedSelection = recordedCandidate == null ? null
+              : GenerationModelSelection.accepted(recordedCandidate.models(),
+                  recordedCandidate.configuration().ai().sparseModel(),
+                  Objects.requireNonNull(candidateModels, "Recorded B encoder owner")
+                      .owner().modelIdentity().vectorDimension());
+          if (recordedCandidate != null && encoderComponent != null) {
+            Objects.requireNonNull(callbacks, "Recorded candidate settings projection")
+                .includeComponentObservation(encoderCompositionObservation(
+                    candidateModels.owner(), recordedCandidate.configuration(), promotedSelection));
+          }
           DefaultWorkerAppServices nextServices = successor;
           RecordedIngestionLifecycle.CheckedPromotion publish = () -> {
             runtimeSwapLock.lock();
@@ -5396,9 +5455,7 @@ public final class KnowledgeServer implements Closeable {
                         embeddingCompatController = candidateEmbeddingCompatController;
                         candidateEmbeddingCompatController = null;
                         startupConfiguration = recordedCandidate.configuration();
-                        initialModelSelection = GenerationModelSelection.accepted(
-                            recordedCandidate.models(), startupConfiguration.ai().sparseModel(),
-                            promotedModels.owner().modelIdentity().vectorDimension());
+                        initialModelSelection = promotedSelection;
                         candidateModels = null;
                         recordedCandidateInPlace = false;
                         inPlaceLexicalServices = null;
@@ -5408,7 +5465,6 @@ public final class KnowledgeServer implements Closeable {
                     }
                     committedProjection.set(projection);
                     published.set(true);
-                    if (recordedCandidate != null) publishEncoderComposition();
                     migrationTransitionForPublication("migration-after-live-activation");
                     return promoted;
                   } finally {

@@ -1488,6 +1488,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         String throughputReason = throughputReadinessReason(workerView);
         String compatBlockedReason = compatBlockedReason(workerView);
         String embeddingRebuildReason = embeddingRebuildReason(workerView);
+        boolean encoderReloading =
+            lifecycleSnapshot.components().encoders().state() == ComponentState.RELOADING;
         String denseUnavailableReason = denseUnavailableReason(workerView);
         String state;
         String reason;
@@ -1495,6 +1497,13 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         if (!indexHealthy) {
           state = mapComponentToReadiness(lifecycleSnapshot.components().index().state());
           reason = workerReason;
+        } else if (encoderReloading) {
+          // D1-14 Flow B IN_PLACE: A's native encoder was retired and only its lexical
+          // serving view remains while B composes. The Green compatibility probe can be
+          // INITIALIZING here, so it does not produce embeddingRebuildReason. The owned
+          // encoder component is the direct signal of this semantic pause.
+          state = READINESS_DEGRADED;
+          reason = LifecycleReasonCode.INDEX_EMBEDDING_REBUILDING.code();
         } else if (compatBlockedReason != null) {
           // Tempdoc 600 Design A: a serving index can be HEALTHY for keyword search yet have its
           // dense/semantic leg BLOCKED (a legacy index with no embedding fingerprint, or a

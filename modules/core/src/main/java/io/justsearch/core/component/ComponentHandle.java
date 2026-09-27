@@ -10,6 +10,16 @@ public interface ComponentHandle {
   void transition(ComponentState state, String reasonCode, String evidence);
 
   /**
+   * Prepares one complete replacement for this handle using its owning registry. Callers may
+   * validate and install it with a physical serving-view publication under the shared write lock,
+   * then notify observers only after releasing their owner and publication locks.
+   */
+  default EngineComponentRegistry.PreparedBatch prepareReplacement(
+      EngineComponentSnapshot.Component replacement) {
+    throw new UnsupportedOperationException("prepared component publication is not supported");
+  }
+
+  /**
    * Publishes only while the complete component observation still equals {@code expected}.
    * A matched no-op returns true without publishing; an obsolete observation returns false.
    * Listeners run after the registry releases its publication lock.

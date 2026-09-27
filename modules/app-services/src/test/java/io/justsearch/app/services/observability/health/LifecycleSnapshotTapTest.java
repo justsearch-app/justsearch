@@ -679,4 +679,16 @@ final class LifecycleSnapshotTapTest {
         "the degradation stays visible under its own id rather than vanishing");
   }
 
+  @Test
+  @DisplayName("D1-14: in-place semantic rebuild clears stale index.unavailable but stays visible")
+  void encoderReloadingMapsToServingDegradation() {
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING,
+        component("NOT_READY", "worker.starting")));
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING,
+        component("DEGRADED", "index.embedding_rebuilding")));
+
+    assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+    assertTrue(conditions.find("index.embedding-rebuilding", "worker").isPresent());
+  }
+
 }
