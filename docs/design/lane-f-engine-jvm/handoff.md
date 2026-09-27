@@ -54,9 +54,9 @@ failures/errors/skips); its XML is retained under
 `tmp/3989-per-runtime-adapters-xml`.
 This adapter checkpoint was pushed as `19acc7a5b`; exact-SHA
 [CI 36302591438](https://github.com/justsearch-app/justsearch/actions/runs/36302591438)
-is in progress.
+passed every job, including Windows-native and system integration.
 
-**2026-09-27 D1-16 semantic lifecycle scenario (local WIP).** The
+**2026-09-27 D1-16 semantic lifecycle scenario.** The
 `ai`-tagged lifecycle JUnit test now seeds installed A and runs forced
 in-place distinct-model B in one isolated work directory. Its first run
 reached `MODEL_LIVE_AB_PASS` and `STOP 0` but the wrapper cleanup failed on
@@ -70,8 +70,32 @@ one JUnit test and zero skips/failures. Its XML is at
 without an inference orphan. The default lifecycle task passed at
 `tmp/3995-lifecycle-default-five-pending.txt` (two tests, zero skips or
 failures; XML `tmp/3995-lifecycle-default-xml`). Five feature rows remain
-pending. The owner-set product bound is still needed to judge this
+pending. This was pushed as `4f9d57d43`; exact-SHA CI
+[36303327732](https://github.com/justsearch-app/justsearch/actions/runs/36303327732)
+is running. The owner-set product bound is still needed to judge this
 measurement; D1-16 as a whole remains open.
+
+**2026-09-27 D1-12 Worker metadata owner cut (local).** `KnowledgeServer`
+no longer installs process-wide model and vector-dimension providers at boot.
+Native generations without a model manifest now capture explicit model inputs
+for writable and read-only runtimes, pre-open parity, and serving status.
+`WorkerIngestService.captureIndexTarget` takes the configured target metadata
+from its Worker owner; Green verification receives an explicit expected
+fingerprint and refuses an indeterminate target. The legacy adapter statics
+and no-argument constructors remain for other callers and their retirement
+is still due in D1-17. Focused Worker/worker-services tests, Spotless and PMD
+passed at `tmp/3998-runtime-identity-fallback-focused.txt`; the final three
+module suites and static checks passed at `tmp/3999-runtime-identity-modules.txt`
+(Worker 853 tests/15 skips, worker-services 1,463/2 skips, adapters-lucene
+742/0 skips; zero failures or errors). The installed AI lifecycle test on the
+rebuilt distribution passed at `tmp/4000-runtime-identity-installed-ai.txt`:
+distinct A/B model digests, forced `IN_PLACE`, B VECTOR two hits,
+`recoveredAfterRefusal=true`, 14,790/48,010 ms (30.81%), `STOP 0`, one JUnit
+test with no skip or failure. Official health returned `ABSENT` without an
+inference orphan. The repository `build -x test -PskipWebBuild=true` compile
+and static gate passed at `tmp/4001-runtime-identity-build.txt` (330 tasks).
+This proves the production metadata cut and real model
+query, not the remaining D1-12/13 Flow B acceptance.
 
 **Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
 D1-9 streaming correction and its proofs before further implementation. Stage

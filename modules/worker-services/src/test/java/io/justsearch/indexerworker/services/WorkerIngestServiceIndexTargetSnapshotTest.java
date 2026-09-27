@@ -62,6 +62,22 @@ final class WorkerIngestServiceIndexTargetSnapshotTest {
   }
 
   @Test
+  void workerOwnedTargetIgnoresAChangedProcessProvider() {
+    WorkerIngestService service = worker(
+        "owned-target", mock(RunningRuntime.class), mock(RunningRuntime.class));
+    Map<String, Object> owned = new SsotCommitMetadataSource().build();
+    service.setIndexTargetMetadataSupplier(() -> owned);
+    IndexFingerprint.installModelFingerprintProviders(
+        () -> IndexFingerprint.ModelFingerprint.present("a".repeat(64)),
+        IndexFingerprint.ModelFingerprint::notConfigured,
+        IndexFingerprint.ModelFingerprint::notConfigured);
+
+    assertEquals(new IndexTargetSnapshot((String) owned.get(IndexFingerprint.COMMIT_META_KEY),
+        (String) owned.get(IndexFingerprint.COMMIT_META_INPUTS_KEY)),
+        service.captureIndexTarget(CallContext.none()));
+  }
+
+  @Test
   void missingServingRuntimeRefusesTheTarget() {
     WorkerIngestService service = worker("missing-runtime-index", null, null);
 

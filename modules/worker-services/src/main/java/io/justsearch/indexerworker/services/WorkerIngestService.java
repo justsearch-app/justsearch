@@ -572,6 +572,13 @@ public final class WorkerIngestService {
     statusOps.setExpectedCommitMetadataSupplier(supplier);
   }
 
+  /** Physical target metadata from the Worker that owns the configured model files. */
+  public void setIndexTargetMetadataSupplier(Supplier<Map<String, Object>> supplier) {
+    indexTargetMetadataSupplier = java.util.Objects.requireNonNull(supplier, "supplier");
+  }
+
+  private volatile Supplier<Map<String, Object>> indexTargetMetadataSupplier;
+
   // Tempdoc 931 §E item 8: kept here too (not only forwarded to statusOps) so the VDU chunk
   // regeneration path can read rag.chunk_splade.enabled from the LIVE config on every write.
   private volatile Supplier<io.justsearch.configuration.resolved.ResolvedConfig>
@@ -1002,7 +1009,8 @@ public final class WorkerIngestService {
       Map<String, Object> metadata = null;
       RuntimeException metadataFailure = null;
       try {
-        metadata = new SsotCommitMetadataSource().build();
+        Supplier<Map<String, Object>> supplier = indexTargetMetadataSupplier;
+        metadata = supplier == null ? new SsotCommitMetadataSource().build() : supplier.get();
       } catch (RuntimeException failure) {
         metadataFailure = failure;
       }

@@ -20,11 +20,16 @@ local D1-12 adapter test now writes
 two concurrently open, differently bound Lucene runtimes and checks parity
 at `tmp/3988`.
 The adapter parity checkpoint `19acc7a5b` is pushed; exact-SHA CI run
-`36302591438` is in progress.
+`36302591438` passed every job.
 The D1-16 semantic lifecycle scenario is now active and `ai`-tagged, with a
 fresh installed pass at `tmp/3994` and default untagged harness pass at
-`tmp/3995`; five named feature rows remain pending. These are local checks
-checkpointed for a later hosted run.
+`tmp/3995`; five named feature rows remain pending. This is pushed as
+`4f9d57d43`; exact-SHA CI run `36303327732` is in progress.
+The next local D1-12 cut removes the Worker's boot-time global fingerprint
+provider installation, binds native runtime metadata explicitly, and routes
+physical index-target capture through the Worker owner. Three affected module
+suites and static checks passed at `tmp/3999`; rebuilt installed A/B with real
+vector queries passed at `tmp/4000`. See the handoff for limits and counts.
 The owner-set D1-14 wall-clock/fraction bound, installed restored-A held-call,
 full Worker Flow B and remaining D1/D2/E/F acceptance remain open. See
 [handoff](handoff.md) and [D1](stages/D1.md) for exact counts and limits.

@@ -78,10 +78,22 @@ class KnowledgeServerStartupConfigurationTest {
             captured,
             runtime.resolvedConfig(),
             "the actual opened runtime must retain the capture");
-        assertEquals(
-            1024,
-            IndexFingerprint.effectiveVectorDimension(),
+        assertEquals(1024, runtime.schema().ssotVectorDimension(),
             "the applied sparse selection must not use the replacement global snapshot");
+        var metadataMethod = KnowledgeServer.class.getDeclaredMethod("servingExpectedCommitMetadata");
+        metadataMethod.setAccessible(true);
+        Object expected = metadataMethod.invoke(server);
+        try {
+          IndexFingerprint.installModelFingerprintProviders(
+              () -> IndexFingerprint.ModelFingerprint.present("a".repeat(64)),
+              IndexFingerprint.ModelFingerprint::notConfigured,
+              IndexFingerprint.ModelFingerprint::notConfigured);
+          IndexFingerprint.installEffectiveVectorDimension(() -> 384);
+          assertEquals(expected, metadataMethod.invoke(server),
+              "the serving runtime's identity cannot follow process-wide providers");
+        } finally {
+          IndexFingerprint.resetModelFingerprintProviders();
+        }
         assertTrue(Files.isDirectory(captured.paths().indexBasePath()));
         assertFalse(Files.exists(replacement.paths().indexBasePath()));
       } finally {

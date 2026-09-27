@@ -921,29 +921,6 @@ public final class KnowledgeServer implements Closeable {
       }
       this.recordedCandidate = candidate.orElse(null);
 
-      // The embedding and SPLADE model digests are index_fingerprint inputs, but they are only
-      // knowable in the Worker's model modules. Install them process-wide BEFORE the first commit
-      // metadata is built, so the commit path, the parity guard's expected snapshot and the
-      // green-cutover verification all compute the same fingerprint (tempdoc 915 §C). Tri-state:
-      // a resolvable model file with an unreadable digest is INDETERMINATE, not absent.
-      IndexFingerprint.installModelFingerprintProviders(
-          () ->
-              IndexFingerprint.ModelFingerprint.of(
-                  EmbeddingFingerprint.modelPath().isPresent(), EmbeddingFingerprint.get()),
-          () ->
-              IndexFingerprint.ModelFingerprint.of(
-                  SpladeFingerprint.modelPath().isPresent(), SpladeFingerprint.get()),
-          () ->
-              IndexFingerprint.ModelFingerprint.of(
-                  io.justsearch.indexerworker.ner.NerFingerprint.modelPath().isPresent(),
-                  io.justsearch.indexerworker.ner.NerFingerprint.get()));
-
-      // The effective vector dimension is the other input only this process knows, and it has to be
-      // installed HERE rather than inside buildIndexRuntime: pre-open detection (below) computes the
-      // expected fingerprint before any runtime is built, and a dimension installed later would make
-      // the boot-time comparison disagree with every later one under BGE-M3.
-      IndexFingerprint.installEffectiveVectorDimension(effectiveVectorDimensionSupplier());
-
       IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
       var boot = genManager.initializeForBoot(bootOwnership,
           candidate.map(value -> value.target().fingerprint()).orElseGet(this::expectedIndexFingerprintOrNull));
@@ -1038,17 +1015,17 @@ public final class KnowledgeServer implements Closeable {
       LuceneRuntime blueReadOnly = null;
       if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE) {
         if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED) {
-          publishIngestLifecycle(buildIndexRuntime(activeIndexPath, fpSupplier).withoutRecovery()
+          publishIngestLifecycle(buildIndexRuntime(activeIndexPath).withoutRecovery()
               .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open());
           this.searchLifecycle = this.ingestLifecycle;
         } else {
           if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
             // A remains the lexical serving generation while Green owns the queue producer.
             // The directories are distinct; the producer projects accepted text to A.
-            this.searchLifecycle = buildIndexRuntime(activeIndexPath, fpSupplier)
+            this.searchLifecycle = buildIndexRuntime(activeIndexPath)
                 .withoutRecovery().withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open();
             this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
-            publishIngestLifecycle(buildIndexRuntime(buildingIndexPath, fpSupplier).withoutRecovery()
+            publishIngestLifecycle(buildIndexRuntime(buildingIndexPath).withoutRecovery()
                 .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open());
             // File work was already enumerated for this candidate. Registered no-file sources
             // must be enumerated again from their authority before a resumed promotion.
@@ -1067,7 +1044,7 @@ public final class KnowledgeServer implements Closeable {
               // Recovery may seal a refusal only after this runtime opens. A therefore needs its
               // writer for exact B-journal cleanup even when the precommit refusal is not yet
               // checkpointed. FENCED still prevents the indexing loop and new candidate claims.
-              publishIngestLifecycle(buildIndexRuntime(activeIndexPath, fpSupplier)
+              publishIngestLifecycle(buildIndexRuntime(activeIndexPath)
                   .withoutRecovery().withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open());
               this.searchLifecycle = this.ingestLifecycle;
             } else {
@@ -1085,7 +1062,7 @@ public final class KnowledgeServer implements Closeable {
         this.searchLifecycle = blueReadOnly;
         this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
         publishIngestLifecycle(
-            buildIndexRuntime(buildingIndexPath, fpSupplier)
+            buildIndexRuntime(buildingIndexPath)
                 .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
                 .open());
       } else {
@@ -1111,7 +1088,7 @@ public final class KnowledgeServer implements Closeable {
         boolean useDeferredWriter = hasLuceneSegments(activeIndexPath) && !preOpenMismatch;
         {
           LuceneRuntimeBuilder builder =
-              buildIndexRuntime(activeIndexPath, fpSupplier)
+              buildIndexRuntime(activeIndexPath)
                   .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE);
           publishIngestLifecycle(useDeferredWriter ? builder.openDeferred() : builder.open());
           this.searchLifecycle = this.ingestLifecycle;
@@ -1136,7 +1113,7 @@ public final class KnowledgeServer implements Closeable {
             this.ingestLifecycle.close();
             this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
             publishIngestLifecycle(
-                buildIndexRuntime(buildingIndexPath, fpSupplier)
+                buildIndexRuntime(buildingIndexPath)
                     .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
                     .open());
             startMigrationEnumeratorBestEffort(rc);
@@ -1195,7 +1172,7 @@ public final class KnowledgeServer implements Closeable {
                 this.ingestLifecycle.close();
                 this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
                 publishIngestLifecycle(
-                    buildIndexRuntime(buildingIndexPath, fpSupplier)
+                    buildIndexRuntime(buildingIndexPath)
                         .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
                         .open());
 
@@ -1282,7 +1259,7 @@ public final class KnowledgeServer implements Closeable {
               }
               this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
               publishIngestLifecycle(
-                  buildIndexRuntime(buildingIndexPath, fpSupplier)
+                  buildIndexRuntime(buildingIndexPath)
                       .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
                       .open());
 
@@ -1873,6 +1850,8 @@ public final class KnowledgeServer implements Closeable {
     svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());
     svc.ingestService().setExpectedCommitMetadataSupplier(this::servingExpectedCommitMetadata);
+    svc.ingestService().setIndexTargetMetadataSupplier(
+        () -> configuredTargetCommitMetadata(ConfigStore.global().get()));
 
     // 516 P3 FINAL CUT: wireMigrationActiveSupplier removed — pre-wired via DWAS 2-arg ctor.
 
@@ -3184,8 +3163,11 @@ public final class KnowledgeServer implements Closeable {
         ingestLifecycle != null ? ingestLifecycle.indexCountOps() : null);
   }
 
-  private LuceneRuntimeBuilder buildIndexRuntime(
-      Path indexPath,
+  private LuceneRuntimeBuilder buildIndexRuntime(Path indexPath) {
+    return buildIndexRuntime(indexPath, () -> embeddingFingerprintSupplier.get().get());
+  }
+
+  private LuceneRuntimeBuilder buildIndexRuntime(Path indexPath,
       java.util.function.Supplier<java.util.Optional<String>> fingerprintSupplier) {
     boolean candidateRuntime = recordedCandidate != null
         && (indexPath.equals(buildingIndexPath)
@@ -3198,7 +3180,7 @@ public final class KnowledgeServer implements Closeable {
             "Recorded candidate fingerprint inputs")
         : null;
     var boundSelection = modelSelectionFor(indexPath);
-    var boundInputs = boundSelection == null ? null
+    var boundInputs = boundSelection == null ? configuredRuntimeFingerprintInputs(runtimeConfig)
         : boundSelection.runtimeFingerprintInputs();
     // Load field catalog via centralized configuration loader
     io.justsearch.configuration.JustSearchConfigurationLoader loader =
@@ -3228,14 +3210,12 @@ public final class KnowledgeServer implements Closeable {
                         : candidateEcc.fingerprintForCommit();
                   },
                   () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()));
-            } : boundInputs != null
-            ? () -> new EmbeddingMetadataOverlay(
-                new SsotCommitMetadataSource(runtimeConfig, boundInputs),
-                () -> java.util.Optional.ofNullable(boundInputs.embeddingModel().sha()),
-                () -> java.util.Optional.ofNullable(boundInputs.spladeModel().sha()))
-            : () -> new EmbeddingMetadataOverlay(
-                new SsotCommitMetadataSource(runtimeConfig), fingerprintSupplier,
-                SpladeFingerprint::get);
+            } : () -> new EmbeddingMetadataOverlay(
+                 new SsotCommitMetadataSource(runtimeConfig, boundInputs),
+                 boundSelection == null ? fingerprintSupplier
+                     : () -> java.util.Optional.ofNullable(boundInputs.embeddingModel().sha()),
+                 boundSelection == null ? SpladeFingerprint::get
+                     : () -> java.util.Optional.ofNullable(boundInputs.spladeModel().sha()));
 
     IndexSchema schema =
         new IndexSchema(
@@ -3276,16 +3256,23 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  /**
-   * The vector dimension the {@code FieldMapper} actually builds vector fields with, published
-   * process-wide so {@code index_fingerprint} records the dimension in force rather than the
-   * catalog's declared 768 (tempdoc 915 §C). It used to be an instance setter on one
-   * {@code SsotCommitMetadataSource}, so the status surface's own fresh instance computed a
-   * different fingerprint than the commit path did.
-   */
-  private java.util.function.Supplier<Integer> effectiveVectorDimensionSupplier() {
-    boolean bgeM3 = "bge-m3".equalsIgnoreCase(startupConfiguration.ai().sparseModel());
-    return () -> bgeM3 ? 1024 : null;
+  /** Inputs for a native generation that predates manifest-bound model selection. */
+  private SsotCommitMetadataSource.RuntimeFingerprintInputs configuredRuntimeFingerprintInputs(
+      ResolvedConfig config) {
+    return new SsotCommitMetadataSource.RuntimeFingerprintInputs(
+        "bge-m3".equalsIgnoreCase(config.ai().sparseModel()) ? 1024 : null,
+        IndexFingerprint.ModelFingerprint.of(
+            EmbeddingFingerprint.modelPath().isPresent(), EmbeddingFingerprint.get()),
+        IndexFingerprint.ModelFingerprint.of(
+            SpladeFingerprint.modelPath().isPresent(), SpladeFingerprint.get()),
+        IndexFingerprint.ModelFingerprint.of(
+            io.justsearch.indexerworker.ner.NerFingerprint.modelPath().isPresent(),
+            io.justsearch.indexerworker.ner.NerFingerprint.get()));
+  }
+
+  private Map<String, Object> configuredTargetCommitMetadata(ResolvedConfig config) {
+    var inputs = configuredRuntimeFingerprintInputs(config);
+    return new SsotCommitMetadataSource(config, inputs).build();
   }
 
   /**
@@ -3302,10 +3289,11 @@ public final class KnowledgeServer implements Closeable {
           () -> java.util.Optional.ofNullable(inputs.embeddingModel().sha()),
           () -> java.util.Optional.ofNullable(inputs.spladeModel().sha())).build();
     }
+    var inputs = configuredRuntimeFingerprintInputs(startupConfiguration);
     return new EmbeddingMetadataOverlay(
-            new SsotCommitMetadataSource(startupConfiguration),
+            new SsotCommitMetadataSource(startupConfiguration, inputs),
             fingerprintSupplier,
-            SpladeFingerprint::get)
+            () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()))
         .build();
   }
 
@@ -3318,7 +3306,8 @@ public final class KnowledgeServer implements Closeable {
             && path.equals(activeIndexPath)))
         ? recordedCandidate.configuration() : startupConfiguration;
     if (selection == null) {
-      return new SsotCommitMetadataSource(config).build();
+      return new SsotCommitMetadataSource(config,
+          configuredRuntimeFingerprintInputs(config)).build();
     }
     var inputs = selection.runtimeFingerprintInputs();
     return new EmbeddingMetadataOverlay(new SsotCommitMetadataSource(config, inputs),
@@ -3337,7 +3326,17 @@ public final class KnowledgeServer implements Closeable {
     } else if ("bge-m3".equalsIgnoreCase(startupConfiguration.ai().sparseModel())) {
       catalog = catalog.withVectorDimension(1024);
     }
-    LuceneRuntimeBuilder builder = IndexSchema.fromCatalog(catalog).atPath(indexPath)
+    var inputs = selection == null ? configuredRuntimeFingerprintInputs(startupConfiguration)
+        : selection.runtimeFingerprintInputs();
+    var metadata = new EmbeddingMetadataOverlay(
+        new SsotCommitMetadataSource(startupConfiguration, inputs),
+        () -> java.util.Optional.ofNullable(inputs.embeddingModel().sha()),
+        () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()));
+    LuceneRuntimeBuilder builder = new IndexSchema(
+        new io.justsearch.adapters.lucene.runtime.FieldMapper(catalog),
+        new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(),
+        () -> metadata, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
+        null).atPath(indexPath)
         .withConfig(startupConfiguration).withExecutorRegistrations(luceneExecutors);
     if (telemetry != null) {
       builder.withTelemetry(
@@ -3559,7 +3558,8 @@ public final class KnowledgeServer implements Closeable {
 
   private String expectedIndexFingerprintOrNull() {
     try {
-      Object fp = new SsotCommitMetadataSource(startupConfiguration).build().get(IndexFingerprint.COMMIT_META_KEY);
+      Object fp = configuredTargetCommitMetadata(startupConfiguration)
+          .get(IndexFingerprint.COMMIT_META_KEY);
       String s = fp == null ? null : String.valueOf(fp);
       return s == null || s.isBlank() ? null : s;
     } catch (RuntimeException ex) {
@@ -5256,7 +5256,23 @@ public final class KnowledgeServer implements Closeable {
     var ecc = recordedCandidate == null ? embeddingCompatController
         : candidateEmbeddingCompatController;
     String expectedEmbeddingFp = ecc == null ? null : ecc.currentFingerprint();
-    String expectedIndexFp = recordedCandidate == null ? null : recordedCandidate.target().fingerprint();
+    String expectedIndexFp;
+    if (recordedCandidate != null) {
+      expectedIndexFp = recordedCandidate.target().fingerprint();
+    } else {
+      try {
+        Object value = configuredTargetCommitMetadata(startupConfiguration)
+            .get(IndexFingerprint.COMMIT_META_KEY);
+        expectedIndexFp = value == null ? null : String.valueOf(value);
+      } catch (RuntimeException invalid) {
+        log.warn("Green verification cannot resolve the native generation target", invalid);
+        return false;
+      }
+    }
+    if (expectedIndexFp == null || expectedIndexFp.isBlank()) {
+      log.warn("Green verification cannot attest an indeterminate generation target");
+      return false;
+    }
     return KnowledgeServerMigrationOps.verifyGreenCommitMetadataBestEffort(
         ingestLifecycle, expectedIndexFp, expectedEmbeddingFp, log);
   }
