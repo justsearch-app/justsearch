@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.*;
 
+import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
@@ -67,6 +68,37 @@ final class DevReloadManagerTriggerTest {
     assertFalse(manager.isReloadRequested());
     assertSame(retry, server.appServices);
     verify(retry).startIndexingLoop();
+  }
+
+  @Test
+  void reloadWiresTheCapturedServingGeneration(@TempDir Path tempDir)
+      throws Exception {
+    var bus = busOver(Files.createDirectories(tempDir.resolve("runtime")));
+    var server = spy(serverWith(bus, tempDir.resolve("data")));
+    var old = mock(WorkerAppServices.class);
+    var replacement = mock(DefaultWorkerAppServices.class);
+    server.publishServingView(old);
+    var fingerprint = IndexFingerprint.ModelFingerprint.present("model-b");
+    var owner = new EncoderSet(mock(InferenceSurface.class),
+        new EncoderSet.ModelIdentity(fingerprint, fingerprint, fingerprint, false, 768));
+    var modelB = owner.own(mock(io.justsearch.indexerworker.embed.EmbeddingService.class));
+    owner.bindEmbedding(modelB);
+    var viewField = KnowledgeServer.class.getDeclaredField("servingView");
+    viewField.setAccessible(true);
+    var view = viewField.get(server);
+    var attach = view.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
+    attach.setAccessible(true);
+    attach.invoke(view, owner);
+    server.deferredModelInit = java.util.concurrent.CompletableFuture.completedFuture(null);
+    doReturn(replacement).when(server).newAppServices();
+
+    new DevReloadManager(server).performReload();
+
+    verify(replacement).wireEmbeddingProvider(modelB);
+    verify(replacement).startIndexingLoop();
+    try (var issued = server.captureServingView()) {
+      assertSame(owner, issued.encoderSet());
+    }
   }
 
   /**

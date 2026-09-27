@@ -2,7 +2,16 @@
 package io.justsearch.indexerworker.server;
 
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
+import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
+import io.justsearch.indexerworker.embed.EmbeddingService;
+import io.justsearch.indexerworker.ner.NerService;
+import io.justsearch.indexerworker.splade.SpladeEncoder;
+import io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder;
+import io.justsearch.reranker.CitationScorer;
+import io.justsearch.reranker.CrossEncoderReranker;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +33,14 @@ public final class EncoderSet implements AutoCloseable {
   private final long closeTimeoutNanos;
   private final CountDownLatch modelReadyLatch = new CountDownLatch(1);
   private final Object lifecycleMonitor = new Object();
+  private final List<AutoCloseable> ownedWrappers = new ArrayList<>();
+  private volatile EmbeddingService embedding;
+  private volatile NerService ner;
+  private volatile SpladeEncoder splade;
+  private volatile SpladeIdfQueryEncoder spladeIdf;
+  private volatile BgeM3Encoder bgeM3;
+  private volatile CrossEncoderReranker reranker;
+  private volatile CitationScorer citation;
 
   private int holders;
   private boolean retiring;
@@ -62,6 +79,60 @@ public final class EncoderSet implements AutoCloseable {
   /** Releases this set's readiness barrier after model wiring either succeeds or degrades. */
   public void releaseModelReady() {
     modelReadyLatch.countDown();
+  }
+
+  /** Registers a wrapper whose native resources belong to this exact generation. */
+  <T extends AutoCloseable> T own(T wrapper) {
+    Objects.requireNonNull(wrapper, "wrapper");
+    synchronized (lifecycleMonitor) {
+      if (retiring) {
+        throw new IllegalStateException("Cannot register a wrapper on a retiring encoder set");
+      }
+      for (AutoCloseable existing : ownedWrappers) {
+        if (existing == wrapper) {
+          throw new IllegalArgumentException("Wrapper already belongs to this encoder set");
+        }
+      }
+      ownedWrappers.add(wrapper);
+    }
+    return wrapper;
+  }
+
+  EmbeddingService embedding() { return embedding; }
+  NerService ner() { return ner; }
+  SpladeEncoder splade() { return splade; }
+  SpladeIdfQueryEncoder spladeIdf() { return spladeIdf; }
+  BgeM3Encoder bgeM3() { return bgeM3; }
+  CrossEncoderReranker reranker() { return reranker; }
+  CitationScorer citation() { return citation; }
+
+  void bindEmbedding(EmbeddingService wrapper) { embedding = requireOwned(wrapper); }
+  void bindNer(NerService wrapper) { ner = requireOwned(wrapper); }
+  void bindSplade(SpladeEncoder wrapper) { splade = requireOwned(wrapper); }
+  void bindSpladeIdf(SpladeIdfQueryEncoder queryEncoder) {
+    synchronized (lifecycleMonitor) {
+      if (retiring || splade == null) {
+        throw new IllegalStateException("SPLADE IDF requires a live owned SPLADE wrapper");
+      }
+      spladeIdf = Objects.requireNonNull(queryEncoder, "queryEncoder");
+    }
+  }
+  void bindBgeM3(BgeM3Encoder wrapper) { bgeM3 = requireOwned(wrapper); }
+  void bindReranker(CrossEncoderReranker wrapper) { reranker = requireOwned(wrapper); }
+  void bindCitation(CitationScorer wrapper) { citation = requireOwned(wrapper); }
+
+  void clearEmbeddingAfterHandoff(EmbeddingService expected) {
+    if (embedding == expected) embedding = null;
+  }
+
+  private <T extends AutoCloseable> T requireOwned(T wrapper) {
+    Objects.requireNonNull(wrapper, "wrapper");
+    synchronized (lifecycleMonitor) {
+      if (retiring || ownedWrappers.stream().noneMatch(owned -> owned == wrapper)) {
+        throw new IllegalStateException("Model wrapper is not owned by this active encoder set");
+      }
+    }
+    return wrapper;
   }
 
   /** Captures this exact set for one logical operation. */
@@ -126,6 +197,7 @@ public final class EncoderSet implements AutoCloseable {
     boolean completed = false;
     try {
       surface.close();
+      closeOwnedWrappers();
       completed = true;
     } finally {
       synchronized (lifecycleMonitor) {
@@ -134,6 +206,26 @@ public final class EncoderSet implements AutoCloseable {
         lifecycleMonitor.notifyAll();
       }
     }
+  }
+
+  private void closeOwnedWrappers() {
+    List<AutoCloseable> pending;
+    synchronized (lifecycleMonitor) {
+      pending = List.copyOf(ownedWrappers);
+    }
+    IllegalStateException failure = null;
+    for (AutoCloseable wrapper : pending) {
+      try {
+        wrapper.close();
+        synchronized (lifecycleMonitor) {
+          ownedWrappers.removeIf(owned -> owned == wrapper);
+        }
+      } catch (Exception closeFailure) {
+        if (failure == null) failure = new IllegalStateException("Model wrapper retirement incomplete");
+        failure.addSuppressed(closeFailure);
+      }
+    }
+    if (failure != null) throw failure;
   }
 
   /** A hold on this set's exact surface and identity. */

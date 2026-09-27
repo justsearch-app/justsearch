@@ -145,8 +145,24 @@ modified time; five focused tests plus PMD/Spotless passed at `tmp/3939`.
 Rebuilt installed source seeded A at `tmp/3941` and passed physical
 distinct-model `BESIDE` with exact A vector hits before/after Green, B
 promotion and B vector search at `tmp/3942` (`STOP 0`, health `ABSENT`).
-The full worker-services suite passed at `tmp/3943` (5m53s); exact-SHA
-hosted proof remains due for this revision.
+The full worker-services suite passed at `tmp/3943` (5m53s). Exact-SHA
+hosted run `36295296672` for `a29ce2a3007a814e9581414d7485977b0906b024`
+passed every job, including Windows-native and system integration.
+The next local D1-12 cut moved the native-borrowing wrappers into the exact
+`EncoderSet`, removed server wrapper/surface aliases and duplicate candidate
+closure, and made dev reload capture one serving owner. Focused/static proof
+is `tmp/3956`–`tmp/3958`; the complete Worker suite at `tmp/3959` passed
+851 tests with zero failures and 15 skips. The rebuilt installed source
+(`tmp/3960`) passed fresh A seed and distinct FP32 A / FP16 CUDA B physical
+`BESIDE` at `tmp/3961`–`tmp/3962`: exact A vector hits on both sides of B's
+two completed build units, B promotion/vector, `STOP 0`, health `ABSENT`.
+Interrupted retirement and promoted-A wrapper-only cleanup regressions
+passed at `tmp/3964`; repository compile/static passed at `tmp/3963`.
+Final combined module/stress proof at `tmp/3965` passed Worker 853 tests
+(15 skips), worker-services 1,462 (2 skips), adapters-lucene 742, and
+ort-common 184, with zero failures.
+Checkpoint and hosted proof for this dirty owner source are next; full
+D1-12/D1-13 and downstream D1/D2/E/F remain open.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

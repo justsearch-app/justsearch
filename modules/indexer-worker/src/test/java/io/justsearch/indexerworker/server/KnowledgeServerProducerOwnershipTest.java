@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
+import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.execution.EngineExecutorRegistry;
@@ -41,11 +42,18 @@ final class KnowledgeServerProducerOwnershipTest {
       var server = new KnowledgeServer(registry, WorkerBootFixture.workerConfig(dir), null);
       try {
       var model = mock(io.justsearch.indexerworker.embed.EmbeddingService.class);
-      server.embeddingService = model;
+      var surface = mock(InferenceSurface.class);
+      var fingerprint = IndexFingerprint.ModelFingerprint.present("test-model");
+      var owner = new EncoderSet(surface,
+          new EncoderSet.ModelIdentity(fingerprint, fingerprint, fingerprint, false, 768));
+      owner.own(model);
+      owner.bindEmbedding(model);
+      var ownerField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+      ownerField.setAccessible(true);
+      ownerField.set(server, owner);
       server.startDeferredModelInitialization(() -> {
         entered.countDown();
         awaitExit(release, interrupted);
-        return null;
       });
       CompletableFuture<Void> closed = null;
       try {

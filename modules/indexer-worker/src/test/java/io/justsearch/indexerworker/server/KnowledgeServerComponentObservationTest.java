@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.server;
 
 import static org.mockito.Mockito.*;
 
+import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
@@ -58,12 +59,19 @@ class KnowledgeServerComponentObservationTest {
     try (var executors = new TestEngineExecutors()) {
       var server = new KnowledgeServer(executors, config, null,
           ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, component);
-      server.inferenceSurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+      var surface = new InferenceSurface(Optional.empty(), Optional.empty(),
           Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
           new InferenceSurface.ComponentObservation(known ? Optional.of("digest") : Optional.empty(),
               requested, missing));
-      server.embeddingService = mock(EmbeddingService.class);
-      when(server.embeddingService.isAvailable()).thenReturn(serviceAvailable);
+      var fingerprint = IndexFingerprint.ModelFingerprint.present("test-model");
+      var owner = new EncoderSet(surface,
+          new EncoderSet.ModelIdentity(fingerprint, fingerprint, fingerprint, false, 768));
+      var embedding = owner.own(mock(EmbeddingService.class));
+      owner.bindEmbedding(embedding);
+      when(embedding.isAvailable()).thenReturn(serviceAvailable);
+      var ownerField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+      ownerField.setAccessible(true);
+      ownerField.set(server, owner);
       server.publishEncoderComposition();
       verify(component).transition(expected, null, evidence);
       verify(component, known ? times(1) : never()).setDesiredVersion("digest");

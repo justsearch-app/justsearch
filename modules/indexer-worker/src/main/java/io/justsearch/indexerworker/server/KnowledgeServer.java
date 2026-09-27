@@ -124,7 +124,7 @@ public final class KnowledgeServer implements Closeable {
   // InferenceCompositionRoot.compose so OrtSessionAssembler.buildManager picks it up.
   private io.justsearch.ort.telemetry.OrtSessionTelemetryEvents ortSessionEvents;
   // Tempdoc 413: typed catalog of embedding.runtime.* metrics + façade. Catalog constructed at
-  // boot with a deferred cache-size supplier that tolerates `embeddingService==null` until
+  // boot with a deferred cache-size supplier that tolerates no encoder owner until
   // initDeferredModels wires the service. Façade is passed into EmbeddingService and IndexingLoop.
   // Package-private: DevReloadManager re-wires the events sink after hot-reload reconstruction.
   io.justsearch.indexerworker.embed.EmbeddingMetricCatalog embeddingMetricCatalog;
@@ -169,6 +169,30 @@ public final class KnowledgeServer implements Closeable {
       throw new IllegalStateException("Dev reload refused during server close");
     }
     return new DevReplacementLease();
+  }
+
+  /** Captures the one model owner for a dev replacement under its runtime-swap lease. */
+  EncoderSet captureDevReplacementEncoderSet(WorkerAppServices expectedServices) {
+    if (!runtimeSwapLock.isHeldByCurrentThread()) {
+      throw new IllegalStateException("Dev replacement owner lock is not held");
+    }
+    publicationLock.readLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        if (servingView == null) {
+          if (initialEncoderSet != null) {
+            throw new IllegalStateException("Encoder owner has no serving view");
+          }
+          return null;
+        }
+        if (servingView.services != expectedServices) {
+          throw new IllegalStateException("Dev reload lost its serving view");
+        }
+        return servingView.encoderSet;
+      }
+    } finally {
+      publicationLock.readLock().unlock();
+    }
   }
   private final ReentrantReadWriteLock publicationLock;
   private final Object servingViewMonitor = new Object();
@@ -292,7 +316,6 @@ public final class KnowledgeServer implements Closeable {
   private io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore documentIdentityStore;
   private volatile LuceneRuntime searchLifecycle;
   private volatile LuceneRuntime ingestLifecycle;
-  EmbeddingService embeddingService;
   EmbeddingCompatibilityController embeddingCompatController;
   volatile WorkerAppServices appServices;
   private WorkerServiceConfiguration serviceConfiguration;
@@ -311,15 +334,8 @@ public final class KnowledgeServer implements Closeable {
   private volatile IndexingPacing indexingPacing =
       IndexingPacing.unthrottled();
   io.justsearch.indexerworker.disambiguation.DisambiguationService disambiguationService;
-  io.justsearch.indexerworker.ner.NerService nerServiceInstance;
-  io.justsearch.indexerworker.splade.SpladeEncoder spladeEncoderInstance;
-  io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder spladeIdfQueryEncoder;
-  io.justsearch.indexerworker.bgem3.BgeM3Encoder bgeM3EncoderInstance;
-  io.justsearch.reranker.CrossEncoderReranker searchRerankerInstance;
-  io.justsearch.reranker.CitationScorer citationScorerInstance;
-  // Tempdoc 397 §14.26 T2-C1/C2: surface returned by InferenceCompositionRoot.compose;
-  // owns SessionHandle lifetimes closed on shutdown.
-  volatile InferenceSurface inferenceSurface;
+  // Only the not-yet-attached boot surface lives here; once attached EncoderSet owns it.
+  private volatile InferenceSurface pendingInitialSurface;
   private volatile EncoderSet initialEncoderSet;
   private volatile GenerationModelSelection initialModelSelection;
   // Phase 3c: WorkerOpsMetricCatalog replaces all worker.* gauge / observable-counter fields.
@@ -332,7 +348,7 @@ public final class KnowledgeServer implements Closeable {
    */
   private final CountDownLatch shutdownLatch = new CountDownLatch(1);
   InfraContext infraCtx; // package-private: DevReloadManager
-  volatile CompletableFuture<ModelContext> deferredModelInit; // package-private: DevReloadManager
+  volatile CompletableFuture<Void> deferredModelInit; // package-private: DevReloadManager
   private DevReloadManager devReloadManager;
   private io.justsearch.telemetry.TracingBootstrap tracingBootstrap;
   private Thread sentinelThread;
@@ -474,35 +490,21 @@ public final class KnowledgeServer implements Closeable {
   /** B's native/model view, independent of the model wrappers serving A during its build. */
   private record CandidateModels(
       EncoderSet owner,
-      EmbeddingService embedding,
-      EncoderBindings.Snapshot bindings,
-      io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder spladeIdf,
-      io.justsearch.reranker.CrossEncoderReranker reranker,
-      io.justsearch.reranker.CitationScorer citation,
       GpuDiagnosticSuppliers diagnostics) {
+    EmbeddingService embedding() { return owner.embedding(); }
+    EncoderBindings.Snapshot bindings() {
+      return new EncoderBindings.Snapshot(owner.splade(), owner.bgeM3(), owner.ner(), null);
+    }
+    io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder spladeIdf() {
+      return owner.spladeIdf();
+    }
+    io.justsearch.reranker.CrossEncoderReranker reranker() { return owner.reranker(); }
+    io.justsearch.reranker.CitationScorer citation() { return owner.citation(); }
     void close() {
       owner.close();
-      RuntimeException failure = null;
-      for (AutoCloseable wrapper : new AutoCloseable[] {embedding,
-          bindings.spladeEncoder(), bindings.bgeM3Encoder(), bindings.nerService(),
-          reranker, citation}) {
-        if (wrapper == null) continue;
-        try { wrapper.close(); }
-        catch (Exception cleanup) {
-          if (failure == null) failure = new IllegalStateException(
-              "Candidate model wrapper retirement failed", cleanup);
-          else failure.addSuppressed(cleanup);
-        }
-      }
-      if (failure != null) throw failure;
     }
   }
 
-  private static void closeWrapper(AutoCloseable wrapper) {
-    if (wrapper == null) return;
-    try { wrapper.close(); }
-    catch (Exception failure) { throw new IllegalStateException("Model wrapper retirement failed", failure); }
-  }
   private final java.util.function.Supplier<ResolvedConfig> liveConfiguration;
   private final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors;
 
@@ -773,14 +775,15 @@ public final class KnowledgeServer implements Closeable {
       this.ortSessionEvents =
           io.justsearch.indexerworker.observability.OrtSessionTelemetryAdapter.forAllRoles(
               ortSessionCatalog);
-      // Tempdoc 413: cache-size supplier reads through the deferred this.embeddingService
-      // field — null until initDeferredModels constructs the service. The supplier is invoked at
+      // Tempdoc 413: cache-size supplier reads through the current encoder owner, which is
+      // absent until deferred model composition. The supplier is invoked at
       // every OTel flush, so it tolerates the boot-time null case (returns 0L).
       this.embeddingMetricCatalog =
           new io.justsearch.indexerworker.embed.EmbeddingMetricCatalog(
               workerTelemetry.registry(),
               () -> {
-                EmbeddingService es = this.embeddingService;
+                EncoderSet owner = this.initialEncoderSet;
+                EmbeddingService es = owner == null ? null : owner.embedding();
                 return es != null ? (long) es.cacheSize() : 0L;
               });
       this.embeddingTelemetry =
@@ -1627,14 +1630,17 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /** The executor remains an actual-exit owner even if its exposed completion is canceled. */
-  void startDeferredModelInitialization(java.util.function.Supplier<ModelContext> initializer) {
+  void startDeferredModelInitialization(Runnable initializer) {
     Objects.requireNonNull(initializer, "initializer");
     deferredModelExecutor = workerExecutors.deferredModelInit().open(r -> {
       Thread thread = new Thread(r, "deferred-model-init");
       thread.setDaemon(true);
       return thread;
     });
-    deferredModelInit = io.justsearch.core.execution.EngineFutures.supplyAsync(initializer, deferredModelExecutor);
+    deferredModelInit = io.justsearch.core.execution.EngineFutures.supplyAsync(() -> {
+      initializer.run();
+      return null;
+    }, deferredModelExecutor);
   }
 
   /**
@@ -1838,6 +1844,24 @@ public final class KnowledgeServer implements Closeable {
     throw new IllegalStateException("Search service has no retained serving generation");
   }
 
+  private io.justsearch.ort.PolicySnapshot policySnapshotFor(WorkerAppServices service) {
+    synchronized (servingViewMonitor) {
+      if (servingView != null && servingView.services == service) {
+        EncoderSet owner = servingView.encoderSet;
+        return owner == null ? null : owner.surfaceForOwner().policies();
+      }
+      for (ServingView retired : retiredServingViews) {
+        if (retired.services == service) {
+          EncoderSet owner = retired.encoderSet;
+          return owner == null ? null : owner.surfaceForOwner().policies();
+        }
+      }
+      if (closeStarted) throw new IllegalStateException("Index serving owner is closing");
+      if (servingView == null) return null;
+    }
+    throw new IllegalStateException("Policy service has no retained serving generation");
+  }
+
   /**
    * Apply post-construction wiring to {@code appServices}. Called after the initial
    * boot-time construction and again after any reconstruction (e.g., when
@@ -1858,8 +1882,7 @@ public final class KnowledgeServer implements Closeable {
 
     // Tempdoc 397 §14.28 U4: wire the PolicySnapshot supplier so the getSessionPolicies
     // port can return the index half's authoritative snapshot.
-    svc.wirePolicySnapshotSupplier(
-        () -> inferenceSurface != null ? inferenceSurface.policies() : null);
+    svc.wirePolicySnapshotSupplier(() -> policySnapshotFor(svc));
 
     // Tempdoc 406 — wire the runtime reload trigger so POST /api/admin/runtime/reload
     // can drive a holder swap on the active ingest runtime. Captures the active
@@ -2227,20 +2250,6 @@ public final class KnowledgeServer implements Closeable {
       throw new IOException("A native retirement refused; B composition is excluded", refusal);
     }
     initialEncoderSet = null;
-    closeWrapper(embeddingService);
-    closeWrapper(spladeEncoderInstance);
-    closeWrapper(bgeM3EncoderInstance);
-    closeWrapper(nerServiceInstance);
-    closeWrapper(searchRerankerInstance);
-    closeWrapper(citationScorerInstance);
-    inferenceSurface = null;
-    embeddingService = null;
-    nerServiceInstance = null;
-    spladeEncoderInstance = null;
-    spladeIdfQueryEncoder = null;
-    bgeM3EncoderInstance = null;
-    searchRerankerInstance = null;
-    citationScorerInstance = null;
   }
 
   /** A slow issued call never forces native retirement; restore the untouched A view. */
@@ -2401,8 +2410,7 @@ public final class KnowledgeServer implements Closeable {
         producer.wireGpuDiagnostics(restored.diagnostics());
         producer.wireStageEnabled(restored.embedding() != null,
             bindings.spladeEncoder() != null, bindings.nerService() != null);
-        producer.wirePolicySnapshotSupplier(() -> inferenceSurface == null
-            ? null : inferenceSurface.policies());
+        producer.wirePolicySnapshotSupplier(() -> restored.owner().surfaceForOwner().policies());
         ServingView restoredView = new ServingView(producer, lexical.searchRuntime,
             lexical.ingestRuntime, lexical.activeGenerationPath);
         restoredView.attachEncoderSet(restored.owner());
@@ -2412,15 +2420,7 @@ public final class KnowledgeServer implements Closeable {
         retiredServingViews.add(lexical);
         servingView = restoredView;
         inPlaceLexicalServices = null;
-        inferenceSurface = restored.owner().surfaceForOwner();
         initialEncoderSet = restored.owner();
-        embeddingService = restored.embedding();
-        nerServiceInstance = bindings.nerService();
-        spladeEncoderInstance = bindings.spladeEncoder();
-        spladeIdfQueryEncoder = restored.spladeIdf();
-        bgeM3EncoderInstance = bindings.bgeM3Encoder();
-        searchRerankerInstance = restored.reranker();
-        citationScorerInstance = restored.citation();
         recordedCandidateInPlace = false;
         servingViewMonitor.notifyAll();
       }
@@ -2451,11 +2451,11 @@ public final class KnowledgeServer implements Closeable {
         contract, modelsDir, () -> !signalBus.isMainGpuActive(), ortSessionEvents, selection);
     var owner = new EncoderSet(surface, identity);
     EmbeddingService embedding = null;
-    io.justsearch.indexerworker.ner.NerService ner = null;
+    io.justsearch.indexerworker.ner.NerService ner;
     io.justsearch.indexerworker.bgem3.BgeM3Encoder bge = null;
     io.justsearch.indexerworker.splade.SpladeEncoder splade = null;
-    io.justsearch.reranker.CrossEncoderReranker reranker = null;
-    io.justsearch.reranker.CitationScorer citation = null;
+    io.justsearch.reranker.CrossEncoderReranker reranker;
+    io.justsearch.reranker.CitationScorer citation;
     try {
       if (surface.embedding().isPresent()) {
         var assembly = surface.embedding().orElseThrow();
@@ -2464,33 +2464,38 @@ public final class KnowledgeServer implements Closeable {
             assembly.sessions(), assembly.shape(), assembly.tokenizer());
         var backend = new io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend(
             encoder, config.gpuEnabled() ? 1 : 0, config.contextLength());
-        embedding = EmbeddingService.createWithBackend(backend, config, embeddingTelemetry,
-            assembly.capabilities().documentPrefix(), assembly.capabilities().queryPrefix());
+        embedding = owner.own(EmbeddingService.createWithBackend(backend, config,
+            embeddingTelemetry, assembly.capabilities().documentPrefix(),
+            assembly.capabilities().queryPrefix()));
         if (!embedding.isAvailable() || embedding.dimension() != identity.vectorDimension()) {
           throw new IOException("Recorded candidate embedding does not match its index dimension");
         }
+        owner.bindEmbedding(embedding);
       }
       ner = surface.ner().isPresent()
-          ? new io.justsearch.indexerworker.ner.NerService(
-              surface.ner().orElseThrow(), encoderConfiguration.ner()) : null;
+          ? owner.own(new io.justsearch.indexerworker.ner.NerService(
+              surface.ner().orElseThrow(), encoderConfiguration.ner())) : null;
+      if (ner != null) owner.bindNer(ner);
       if (surface.bgeM3().isPresent()) {
         var assembly = surface.bgeM3().orElseThrow();
-        bge = new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
+        bge = owner.own(new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
             assembly.sessions(), assembly.shape(), assembly.tokenizer(),
-            encoderConfiguration.bgeM3());
+            encoderConfiguration.bgeM3()));
+        owner.bindBgeM3(bge);
       }
-      io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder idf = null;
       if (surface.splade().isPresent()) {
         var assembly = surface.splade().orElseThrow();
         var config = encoderConfiguration.splade();
-        splade = new io.justsearch.indexerworker.splade.SpladeEncoder(
+        splade = owner.own(new io.justsearch.indexerworker.splade.SpladeEncoder(
             assembly.sessions(), assembly.shape(), assembly.tokenizer(), assembly.vocabulary(),
-            assembly.truncationEvidencePath(), config);
+            assembly.truncationEvidencePath(), config));
+        owner.bindSplade(splade);
         if (config.isIdfQueryMode()) {
           Path table = config.modelPath().resolve("idf.json");
           if (Files.isRegularFile(table)) {
-            idf = new io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder(
+            var idf = new io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder(
                 table, splade.tokenizer(), splade.vocabulary());
+            owner.bindSpladeIdf(idf);
           }
         }
       }
@@ -2505,15 +2510,17 @@ public final class KnowledgeServer implements Closeable {
         throw new IOException("Recorded candidate model could not become READY");
       }
       reranker = surface.reranker().isPresent()
-          ? new io.justsearch.reranker.CrossEncoderReranker(
+          ? owner.own(new io.justsearch.reranker.CrossEncoderReranker(
               surface.reranker().orElseThrow().sessions(),
               surface.reranker().orElseThrow().shape(),
-              surface.reranker().orElseThrow().tokenizer()) : null;
+              surface.reranker().orElseThrow().tokenizer())) : null;
+      if (reranker != null) owner.bindReranker(reranker);
       citation = surface.citation().isPresent()
-          ? new io.justsearch.reranker.CitationScorer(
+          ? owner.own(new io.justsearch.reranker.CitationScorer(
               surface.citation().orElseThrow().sessions(),
               surface.citation().orElseThrow().shape(),
-              surface.citation().orElseThrow().tokenizer()) : null;
+              surface.citation().orElseThrow().tokenizer())) : null;
+      if (citation != null) owner.bindCitation(citation);
       var diagnostics = new GpuDiagnosticSuppliers(
           splade == null ? null : splade::getOrtCudaStatus,
           splade == null ? null : splade::resolvedModelPath,
@@ -2524,13 +2531,10 @@ public final class KnowledgeServer implements Closeable {
           ner == null ? null : ner::getOrtCudaStatus,
           citation == null ? null : citation::getOrtCudaStatus,
           bge == null ? null : bge::getOrtCudaStatus);
-      var bindings = new EncoderBindings.Snapshot(splade, bge, ner, null);
       owner.releaseModelReady();
-      return new CandidateModels(owner, embedding, bindings, idf, reranker, citation, diagnostics);
+      return new CandidateModels(owner, diagnostics);
     } catch (IOException | RuntimeException | Error failure) {
-      try { new CandidateModels(owner, embedding,
-          new EncoderBindings.Snapshot(splade, bge, ner, null), null,
-          reranker, citation, null).close(); }
+      try { new CandidateModels(owner, null).close(); }
       catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
       throw failure;
     }
@@ -2542,7 +2546,7 @@ public final class KnowledgeServer implements Closeable {
    * IndexWriter if applicable. Non-fatal: failures degrade capabilities but don't crash the server.
    */
   @SuppressWarnings("PMD.CognitiveComplexity")
-  private ModelContext initDeferredModels() {
+  private void initDeferredModels() {
     long bgStart = System.nanoTime();
     List<ServingLease> modelWiringLeases = new ArrayList<>();
     if (encoderComponent != null) {
@@ -2605,8 +2609,11 @@ public final class KnowledgeServer implements Closeable {
               () -> !signalBus.isMainGpuActive(),
               ortSessionEvents,
               selection);
-      this.inferenceSurface = surface;
+      this.pendingInitialSurface = surface;
       attachInitialEncoderSet(surface, compositionConfig);
+      this.pendingInitialSurface = null;
+      EncoderSet initialOwner = Objects.requireNonNull(initialEncoderSet,
+          "Initial encoder owner after attachment");
 
       // Embedding — skip when BGE-M3 is active (surface.embedding() is already empty in that case).
       var embeddingConfig = encoderConfiguration.embedding();
@@ -2623,17 +2630,17 @@ public final class KnowledgeServer implements Closeable {
         // Tempdoc 710 Wave 2 Move 1: prefixes come from the capability contract resolved once at
         // composition time — EmbeddingService no longer reads prefix_config.json itself.
         EmbeddingService es =
-            EmbeddingService.createWithBackend(
+            initialOwner.own(EmbeddingService.createWithBackend(
                 backend,
                 embeddingConfig,
                 embeddingTelemetry,
                 embedAssembly.capabilities().documentPrefix(),
-                embedAssembly.capabilities().queryPrefix());
+                embedAssembly.capabilities().queryPrefix()));
         if (es.isAvailable()) {
-          embeddingService = es;
-          validateEmbeddingDimension();
+          initialOwner.bindEmbedding(es);
+          validateEmbeddingDimension(es);
           wireModelServices(modelWiringLeases, svc -> svc.wireEmbeddingProvider(es));
-          // observations.md fix: null `embeddingService` on GPU-handoff unload
+          // observations.md fix: clear the generation's embedding reference on GPU-handoff unload
           // so `GpuDiagnosticSuppliers` lambdas (rebound to re-read the field)
           // stop returning data from the closed instance. The provider becomes
           // NoOpEmbeddingProvider.INSTANCE on unload (IndexingLoop:1581);
@@ -2643,7 +2650,7 @@ public final class KnowledgeServer implements Closeable {
               provider -> {
                 if (provider == null
                     || provider instanceof io.justsearch.indexerworker.embed.NoOpEmbeddingProvider) {
-                  this.embeddingService = null;
+                  initialOwner.clearEmbeddingAfterHandoff(es);
                 }
               }));
           log.info("Embedding service ready (dimension={})", es.dimension());
@@ -2663,9 +2670,9 @@ public final class KnowledgeServer implements Closeable {
       // NER — surface-provided assembly wraps in NerService.
       var nerConfig = encoderConfiguration.ner();
       if (surface.ner().isPresent()) {
-        var nerService = new io.justsearch.indexerworker.ner.NerService(
-            surface.ner().get(), nerConfig);
-        nerServiceInstance = nerService;
+        var nerService = initialOwner.own(new io.justsearch.indexerworker.ner.NerService(
+            surface.ner().get(), nerConfig));
+        initialOwner.bindNer(nerService);
         wireModelServices(modelWiringLeases, svc -> svc.wireNerService(nerService));
         var nerModelPath = nerConfig.modelPath().toString();
         var nerGpuEnabled = nerConfig.gpuEnabled();
@@ -2682,12 +2689,12 @@ public final class KnowledgeServer implements Closeable {
         var bgeAssembly = surface.bgeM3().get();
         var bgeConfig = encoderConfiguration.bgeM3();
         var bgeEncoder =
-            new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
+            initialOwner.own(new io.justsearch.indexerworker.bgem3.BgeM3Encoder(
                 bgeAssembly.sessions(),
                 bgeAssembly.shape(),
                 bgeAssembly.tokenizer(),
-                bgeConfig);
-        bgeM3EncoderInstance = bgeEncoder;
+                bgeConfig));
+        initialOwner.bindBgeM3(bgeEncoder);
         wireModelServices(modelWiringLeases, svc -> svc.wireBgeM3Encoder(bgeEncoder));
         log.info(
             "BGE-M3 encoder ready (replaces SPLADE + EmbeddingService): model={}",
@@ -2699,14 +2706,14 @@ public final class KnowledgeServer implements Closeable {
       if (surface.splade().isPresent()) {
         var spladeAssembly = surface.splade().get();
         var spladeEncoder =
-            new io.justsearch.indexerworker.splade.SpladeEncoder(
+            initialOwner.own(new io.justsearch.indexerworker.splade.SpladeEncoder(
                 spladeAssembly.sessions(),
                 spladeAssembly.shape(),
                 spladeAssembly.tokenizer(),
                 spladeAssembly.vocabulary(),
                 spladeAssembly.truncationEvidencePath(),
-                spladeConfig);
-        spladeEncoderInstance = spladeEncoder;
+                spladeConfig));
+        initialOwner.bindSplade(spladeEncoder);
         wireModelServices(modelWiringLeases, svc -> svc.wireSpladeEncoder(spladeEncoder));
         log.info("SPLADE encoder ready: model={}", spladeConfig.modelPath());
 
@@ -2717,7 +2724,7 @@ public final class KnowledgeServer implements Closeable {
               var idfEncoder =
                   new io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder(
                       idfPath, spladeEncoder.tokenizer(), spladeEncoder.vocabulary());
-              spladeIdfQueryEncoder = idfEncoder;
+              initialOwner.bindSpladeIdf(idfEncoder);
               wireModelServices(modelWiringLeases,
                   svc -> svc.wireSpladeIdfQueryEncoder(idfEncoder));
               log.info("SPLADE IDF query encoder ready: {}", idfPath);
@@ -2746,15 +2753,15 @@ public final class KnowledgeServer implements Closeable {
       var searchRerankConfig = encoderConfiguration.reranker();
       if (surface.reranker().isPresent()) {
         var rerankAssembly = surface.reranker().get();
-        searchRerankerInstance =
-            new io.justsearch.reranker.CrossEncoderReranker(
-                rerankAssembly.sessions(), rerankAssembly.shape(), rerankAssembly.tokenizer());
+        var searchReranker = initialOwner.own(new io.justsearch.reranker.CrossEncoderReranker(
+            rerankAssembly.sessions(), rerankAssembly.shape(), rerankAssembly.tokenizer()));
+        initialOwner.bindReranker(searchReranker);
         wireModelServices(modelWiringLeases,
-            svc -> svc.wireSearchReranker(searchRerankerInstance));
+            svc -> svc.wireSearchReranker(searchReranker));
         // F5: Warm up ORT session at startup instead of paying 5-10s on the first user query.
         try {
           long warmStart = System.nanoTime();
-          searchRerankerInstance.rerank("warmup", List.of("warmup"), 30_000);
+          searchReranker.rerank("warmup", List.of("warmup"), 30_000);
           long warmMs = (System.nanoTime() - warmStart) / 1_000_000;
           log.info("Search reranker ready (gpu={}, warm-up={}ms): model={}",
               searchRerankConfig.gpuEnabled(), warmMs, searchRerankConfig.modelPath());
@@ -2791,13 +2798,14 @@ public final class KnowledgeServer implements Closeable {
       // now a pure consumer with no lazy construction path.
       if (surface.citation().isPresent()) {
         var citationAssembly = surface.citation().get();
-        citationScorerInstance =
-            new io.justsearch.reranker.CitationScorer(
+        var citationScorer =
+            initialOwner.own(new io.justsearch.reranker.CitationScorer(
                 citationAssembly.sessions(),
                 citationAssembly.shape(),
-                citationAssembly.tokenizer());
+                citationAssembly.tokenizer()));
+        initialOwner.bindCitation(citationScorer);
         wireModelServices(modelWiringLeases,
-            svc -> svc.wireCitationScorer(citationScorerInstance));
+            svc -> svc.wireCitationScorer(citationScorer));
       }
 
       // GPU diagnostics suppliers (post-model wiring)
@@ -2807,24 +2815,29 @@ public final class KnowledgeServer implements Closeable {
       // last argument below). The /api/inference/encoders explainer
       // previously dodged the misleading coalesce via policy iteration;
       // the fix makes the diagnostic shape honest.
+      var ownedSplade = initialOwner.splade();
+      var ownedReranker = initialOwner.reranker();
+      var ownedNer = initialOwner.ner();
+      var ownedCitation = initialOwner.citation();
+      var ownedBgeM3 = initialOwner.bgeM3();
       java.util.function.Supplier<io.justsearch.ort.OrtCudaStatus> sparseStatusSupplier =
-          spladeEncoderInstance != null ? spladeEncoderInstance::getOrtCudaStatus : null;
+          ownedSplade != null ? ownedSplade::getOrtCudaStatus : null;
       java.util.function.Supplier<String> sparseModelPathSupplier =
-          spladeEncoderInstance != null ? spladeEncoderInstance::resolvedModelPath : null;
-      // observations.md fix: re-read `this.embeddingService` at supplier-call
+          ownedSplade != null ? ownedSplade::resolvedModelPath : null;
+      // observations.md fix: re-read this exact owner's embedding at supplier-call
       // time so post-unload nulls (set by the addEmbeddingProviderChangeListener
       // above) propagate to /api/status. Method-references like
-      // `embeddingService::getOrtCudaStatus` would have bound the instance at
+      // an embedding method reference would have bound the instance at
       // lambda-creation time and continued returning stale data after close.
       GpuDiagnosticSuppliers diagnostics = new GpuDiagnosticSuppliers(
               sparseStatusSupplier,
               sparseModelPathSupplier,
               () -> {
-                var es = this.embeddingService;
+                var es = initialOwner.embedding();
                 return es != null ? es.getOrtCudaStatus() : null;
               },
               () -> {
-                var es = this.embeddingService;
+                var es = initialOwner.embedding();
                 return es != null ? es.resolvedBackendId() : null;
               },
               () -> {
@@ -2835,21 +2848,21 @@ public final class KnowledgeServer implements Closeable {
                 // SchemaMismatchStatusContractTest 2026-05-09 — fixed
                 // below by returning 0 when no embedding service is
                 // loaded, matching the "no GPU layers" contract).
-                var es = this.embeddingService;
+                var es = initialOwner.embedding();
                 return es != null ? es.gpuLayers() : 0;
               },
-              searchRerankerInstance != null ? searchRerankerInstance::getOrtCudaStatus : null,
-              nerServiceInstance != null ? nerServiceInstance::getOrtCudaStatus : null,
-              citationScorerInstance != null ? citationScorerInstance::getOrtCudaStatus : null,
-              bgeM3EncoderInstance != null ? bgeM3EncoderInstance::getOrtCudaStatus : null);
+              ownedReranker != null ? ownedReranker::getOrtCudaStatus : null,
+              ownedNer != null ? ownedNer::getOrtCudaStatus : null,
+              ownedCitation != null ? ownedCitation::getOrtCudaStatus : null,
+              ownedBgeM3 != null ? ownedBgeM3::getOrtCudaStatus : null);
       wireModelServices(modelWiringLeases, svc -> svc.wireGpuDiagnostics(diagnostics));
 
       // Tempdoc 394 follow-up: publish per-stage enabled state on /api/status.
       // "Enabled" here means the service is usable — config-enabled AND
       // initialization succeeded. A non-null instance satisfies both.
       wireModelServices(modelWiringLeases,
-          svc -> svc.wireStageEnabled(embeddingService != null,
-              spladeEncoderInstance != null, nerServiceInstance != null));
+          svc -> svc.wireStageEnabled(initialOwner.embedding() != null,
+              initialOwner.splade() != null, initialOwner.ner() != null));
 
       publishEncoderComposition();
 
@@ -2860,14 +2873,6 @@ public final class KnowledgeServer implements Closeable {
 
       long bgMs = (System.nanoTime() - bgStart) / 1_000_000;
       log.info("Background model init complete ({}ms)", bgMs);
-      return new ModelContext(
-          embeddingService,
-          embeddingCompatController,
-          nerServiceInstance,
-          spladeEncoderInstance,
-          spladeIdfQueryEncoder,
-          bgeM3EncoderInstance,
-          disambiguationService);
 
     } catch (Exception e) {
       if (encoderComponent != null) {
@@ -2877,14 +2882,6 @@ public final class KnowledgeServer implements Closeable {
       logBackgroundInitFailure(e);
       long bgMs = (System.nanoTime() - bgStart) / 1_000_000;
       log.info("Background model init failed after ({}ms)", bgMs);
-      return new ModelContext(
-          embeddingService,
-          embeddingCompatController,
-          nerServiceInstance,
-          spladeEncoderInstance,
-          spladeIdfQueryEncoder,
-          bgeM3EncoderInstance,
-          disambiguationService);
     } finally {
       // Ensure enumerator is unblocked even if init failed partway through.
       modelReadyLatch.countDown();
@@ -2938,18 +2935,19 @@ public final class KnowledgeServer implements Closeable {
 
   /** Latch release also happens on failure; only the actual composed-and-wired surface certifies readiness. */
   void publishEncoderComposition() {
-    if (encoderComponent == null || inferenceSurface == null) return;
-    var observation = inferenceSurface.componentObservation();
+    EncoderSet owner = initialEncoderSet;
+    if (encoderComponent == null || owner == null) return;
+    var observation = owner.surfaceForOwner().componentObservation();
     var missing = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
     missing.addAll(observation.missingRoles());
     for (var role : observation.requestedRoles()) {
       boolean wired = switch (role) {
-        case EMBEDDING -> embeddingService != null && embeddingService.isAvailable();
-        case BGE_M3 -> bgeM3EncoderInstance != null;
-        case SPLADE -> spladeEncoderInstance != null;
-        case NER -> nerServiceInstance != null;
-        case RERANKER -> searchRerankerInstance != null;
-        case CITATION -> citationScorerInstance != null;
+        case EMBEDDING -> owner.embedding() != null && owner.embedding().isAvailable();
+        case BGE_M3 -> owner.bgeM3() != null;
+        case SPLADE -> owner.splade() != null;
+        case NER -> owner.ner() != null;
+        case RERANKER -> owner.reranker() != null;
+        case CITATION -> owner.citation() != null;
       };
       if (!wired) missing.add(role);
     }
@@ -3359,12 +3357,12 @@ public final class KnowledgeServer implements Closeable {
    *
    * @throws IOException if dimensions don't match (fail-fast)
    */
-  private void validateEmbeddingDimension() throws IOException {
-    if (embeddingService == null || ingestLifecycle == null) {
+  private void validateEmbeddingDimension(EmbeddingService service) throws IOException {
+    if (service == null || ingestLifecycle == null) {
       return;
     }
 
-    int modelDimension = embeddingService.dimension();
+    int modelDimension = service.dimension();
     Integer schemaDimension = ingestLifecycle.schema().ssotVectorDimension();
 
     if (schemaDimension == null) {
@@ -4040,8 +4038,8 @@ public final class KnowledgeServer implements Closeable {
               throw new IOException("Native inference retirement incomplete; server retained for retry",
                   refusal);
             }
-          } else if (inferenceSurface != null) {
-            try { inferenceSurface.close(); }
+          } else if (pendingInitialSurface != null) {
+            try { pendingInitialSurface.close(); }
             catch (RuntimeException refusal) {
               throw new IOException("Native inference retirement incomplete; server retained for retry",
                   refusal);
@@ -4055,9 +4053,10 @@ public final class KnowledgeServer implements Closeable {
           // NDJSON either). Calling LocalTelemetry.flush() here (5s join, SDK fully alive) guarantees
           // the metric lands in metrics-worker.ndjson before any close-time race conditions begin.
           // Counterpart to GPU_HANDOFF emitted from IndexingLoop.unloadEmbeddingService on hybrid-
-          // inference VRAM handoff. The actual embeddingService.close() runs later in the close
-          // sequence — this emit reflects intent regardless of whether close() succeeds.
-          if (embeddingService != null && embeddingTelemetry != null) {
+          // inference VRAM handoff. The generation owner has already closed the wrapper;
+          // this emit reflects shutdown intent regardless of whether close() succeeded.
+          if (initialOwner != null && initialOwner.embedding() != null
+              && embeddingTelemetry != null) {
             embeddingTelemetry.onUnload(
                 io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents.UnloadReason.SHUTDOWN);
             if (telemetry instanceof LocalTelemetry lt) {
@@ -4082,42 +4081,6 @@ public final class KnowledgeServer implements Closeable {
             } catch (Exception e) {
               log.warn("Error closing disambiguation service", e);
             }
-          }
-
-          // Close SPLADE encoder (after indexing loop which uses it)
-          if (spladeEncoderInstance != null) {
-            try {
-              spladeEncoderInstance.close();
-            } catch (Exception e) {
-              log.warn("Error closing SPLADE encoder", e);
-            }
-          }
-
-          // Close BGE-M3 encoder (after indexing loop which uses it)
-          if (bgeM3EncoderInstance != null) {
-            try {
-              bgeM3EncoderInstance.close();
-            } catch (Exception e) {
-              log.warn("Error closing BGE-M3 encoder", e);
-            }
-          }
-
-          // 360: Close search reranker (ORT session + tokenizer)
-          if (searchRerankerInstance != null) {
-            try {
-              searchRerankerInstance.close();
-            } catch (Exception e) {
-              log.warn("Error closing search reranker", e);
-            }
-          }
-
-          if (nerServiceInstance != null) {
-            try { nerServiceInstance.close(); }
-            catch (Exception e) { log.warn("Error closing NER service", e); }
-          }
-          if (citationScorerInstance != null) {
-            try { citationScorerInstance.close(); }
-            catch (Exception e) { log.warn("Error closing citation scorer", e); }
           }
 
           // Phase 3c: OTel callback handles are managed by LocalTelemetry's gaugeHandles list
@@ -4191,17 +4154,6 @@ public final class KnowledgeServer implements Closeable {
           }
         }
         if (runtimeCloseFailure != null) throw runtimeCloseFailure;
-
-        // Close embedding service. unload_total{reason=SHUTDOWN} was emitted earlier (before
-        // telemetry shutdown) so the metric lands in metrics-worker.ndjson regardless of close()'s
-        // outcome.
-        if (embeddingService != null) {
-          try {
-            embeddingService.close();
-          } catch (Exception e) {
-            log.warn("Error closing embedding service", e);
-          }
-        }
 
         // Close auxiliary jobs.db stores before the queue connection.
         if (documentIdentityStore != null) {
@@ -4278,7 +4230,7 @@ public final class KnowledgeServer implements Closeable {
 
   /** Native owner disposition used by the process exit authority after ordered close. */
   public io.justsearch.app.api.NativeQuiescence nativeQuiescence() {
-    CompletableFuture<ModelContext> initialization = deferredModelInit;
+    CompletableFuture<Void> initialization = deferredModelInit;
     if (initialization != null && !initialization.isDone()) {
       return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
     }
@@ -4290,7 +4242,8 @@ public final class KnowledgeServer implements Closeable {
     if (initialOwner != null && !initialOwner.isClosed()) {
       return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
     }
-    InferenceSurface surface = inferenceSurface;
+    if (initialOwner != null) return io.justsearch.app.api.NativeQuiescence.QUIESCED;
+    InferenceSurface surface = pendingInitialSurface;
     // A started initializer with no published surface may have failed after opening a native
     // candidate. No owner can prove its retirement from a null field, so exit conservatively.
     if (surface == null) {
@@ -4800,7 +4753,7 @@ public final class KnowledgeServer implements Closeable {
   /** The application has durably refused B while A is still the pointer. Retire Green first. */
   private void reconcileRefusedRecordedCandidate() {
     if (!recordedCandidatePrecommitRefused() || closeStarted) return;
-    CompletableFuture<ModelContext> composition = deferredModelInit;
+    CompletableFuture<Void> composition = deferredModelInit;
     if (composition != null && !composition.isDone()) return;
     boolean restart = false;
     runtimeSwapLock.lock();
@@ -5137,17 +5090,9 @@ public final class KnowledgeServer implements Closeable {
                       if (recordedCandidate != null) {
                         CandidateModels promotedModels = Objects.requireNonNull(candidateModels,
                             "Promoted candidate model bundle");
-                        inferenceSurface = successorEncoder.surfaceForOwner();
                         initialEncoderSet = promotedModels.owner();
                         embeddingCompatController = candidateEmbeddingCompatController;
                         candidateEmbeddingCompatController = null;
-                        embeddingService = promotedModels.embedding();
-                        nerServiceInstance = promotedModels.bindings().nerService();
-                        spladeEncoderInstance = promotedModels.bindings().spladeEncoder();
-                        spladeIdfQueryEncoder = promotedModels.spladeIdf();
-                        bgeM3EncoderInstance = promotedModels.bindings().bgeM3Encoder();
-                        searchRerankerInstance = promotedModels.reranker();
-                        citationScorerInstance = promotedModels.citation();
                         startupConfiguration = recordedCandidate.configuration();
                         initialModelSelection = GenerationModelSelection.accepted(
                             recordedCandidate.models(), startupConfiguration.ai().sparseModel(),

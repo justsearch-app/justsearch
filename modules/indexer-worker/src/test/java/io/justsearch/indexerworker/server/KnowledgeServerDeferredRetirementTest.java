@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.server;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doNothing;
@@ -12,6 +13,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.adapters.lucene.runtime.DeferredRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
@@ -19,6 +21,7 @@ import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.core.execution.TestEngineExecutors;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
@@ -36,6 +39,108 @@ import org.junit.jupiter.api.io.TempDir;
 /** Regression coverage for deferred serving-owner cleanup and shutdown lock ordering. */
 @Timeout(30)
 final class KnowledgeServerDeferredRetirementTest {
+
+  @Test
+  void retainedServiceKeepsItsOwnPolicyAfterAnotherEncoderPublishes(@TempDir Path tempDir)
+      throws Exception {
+    try (var executors = new TestEngineExecutors()) {
+      var server = new KnowledgeServer(
+          executors, WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+      var aServices = mock(WorkerAppServices.class);
+      var bServices = mock(WorkerAppServices.class);
+      var aSurface = mock(InferenceSurface.class);
+      var bSurface = mock(InferenceSurface.class);
+      var aPolicies = mock(io.justsearch.ort.PolicySnapshot.class);
+      var bPolicies = mock(io.justsearch.ort.PolicySnapshot.class);
+      when(aSurface.policies()).thenReturn(aPolicies);
+      when(bSurface.policies()).thenReturn(bPolicies);
+      var model = IndexFingerprint.ModelFingerprint.present("a");
+      var aOwner = new EncoderSet(aSurface,
+          new EncoderSet.ModelIdentity(model, model, model, false, 768), Duration.ZERO);
+      var bOwner = new EncoderSet(bSurface,
+          new EncoderSet.ModelIdentity(model, model, model, false, 768), Duration.ZERO);
+      try {
+        server.publishServingView(aServices);
+        Field selected = KnowledgeServer.class.getDeclaredField("servingView");
+        selected.setAccessible(true);
+        Object aView = selected.get(server);
+        Method attach = aView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
+        attach.setAccessible(true);
+        attach.invoke(aView, aOwner);
+        var issuedA = server.captureServingView();
+        try {
+          Constructor<?> constructor = aView.getClass().getDeclaredConstructor(
+              WorkerAppServices.class, io.justsearch.adapters.lucene.runtime.LuceneRuntime.class,
+              io.justsearch.adapters.lucene.runtime.LuceneRuntime.class, Path.class);
+          constructor.setAccessible(true);
+          Object bView = constructor.newInstance(bServices, null, null, null);
+          attach.invoke(bView, bOwner);
+          retiredServingViews(server).add(aView);
+          selected.set(server, bView);
+
+          assertSame(aPolicies, invoke(server, "policySnapshotFor",
+              new Class<?>[] {WorkerAppServices.class}, aServices));
+          assertSame(bPolicies, invoke(server, "policySnapshotFor",
+              new Class<?>[] {WorkerAppServices.class}, bServices));
+          assertThrows(IllegalStateException.class, () -> invoke(server, "policySnapshotFor",
+              new Class<?>[] {WorkerAppServices.class}, mock(WorkerAppServices.class)));
+
+          selected.set(server, aView);
+          retiredServingViews(server).clear();
+          Method release = bView.getClass().getDeclaredMethod("releaseEncoderSet");
+          release.setAccessible(true);
+          release.invoke(bView);
+          bOwner.close();
+        } finally {
+          issuedA.close();
+        }
+      } finally {
+        server.close();
+      }
+    }
+  }
+
+  @Test
+  void retiredSourceClosesOnlyItsOwnWrapperAfterTheSourceService(@TempDir Path tempDir)
+      throws Exception {
+    try (var executors = new TestEngineExecutors()) {
+      var server = new KnowledgeServer(
+          executors, WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+      var aServices = mock(WorkerAppServices.class);
+      var aSurface = mock(InferenceSurface.class);
+      var bSurface = mock(InferenceSurface.class);
+      AutoCloseable aWrapper = mock(AutoCloseable.class);
+      AutoCloseable bWrapper = mock(AutoCloseable.class);
+      var model = IndexFingerprint.ModelFingerprint.present("a");
+      var identity = new EncoderSet.ModelIdentity(model, model, model, false, 768);
+      var aOwner = new EncoderSet(aSurface, identity, Duration.ZERO);
+      var bOwner = new EncoderSet(bSurface, identity, Duration.ZERO);
+      aOwner.own(aWrapper);
+      bOwner.own(bWrapper);
+      try {
+        server.publishServingView(aServices);
+        Field selected = KnowledgeServer.class.getDeclaredField("servingView");
+        selected.setAccessible(true);
+        Object aView = selected.get(server);
+        Method attach = aView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
+        attach.setAccessible(true);
+        attach.invoke(aView, aOwner);
+
+        invoke(server, "closeRetiredSource", new Class<?>[] {aView.getClass(), EncoderSet.class},
+            aView, bOwner);
+
+        var order = org.mockito.Mockito.inOrder(aServices, aSurface, aWrapper);
+        order.verify(aServices).close();
+        order.verify(aSurface).close();
+        order.verify(aWrapper).close();
+        verify(bSurface, never()).close();
+        verify(bWrapper, never()).close();
+      } finally {
+        server.close();
+        bOwner.close();
+      }
+    }
+  }
 
   @Test
   void failedDeferredPublicationReleasesPreparedEncoderHold(@TempDir Path tempDir)
@@ -147,7 +252,7 @@ final class KnowledgeServerDeferredRetirementTest {
           executors, WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
       var lockOwner = server.beginDevReplacement();
       var initializerAttempted = new CountDownLatch(1);
-      var initialization = new CompletableFuture<ModelContext>();
+      var initialization = new CompletableFuture<Void>();
       var closeFailure = new AtomicReference<Throwable>();
       var deferred = mock(DeferredRuntime.class);
       setField(server, "ingestLifecycle", deferred);

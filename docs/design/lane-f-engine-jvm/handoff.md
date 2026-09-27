@@ -503,11 +503,40 @@ CUDA B round at `tmp/3942-beside-metadata-pass.txt` again passed exact A
 vector hits before and after settled `BESIDE`, two Green units, B promotion
 and B vector search. It ended `STOP 0`; official health is `ABSENT`.
 The final guard's full worker-services suite passed at `tmp/3943` (5m53s).
-Exact-SHA CI is still due. `node --check` for the strengthened fixture passed.
+Exact-SHA CI on `a29ce2a3007a814e9581414d7485977b0906b024` passed every
+job in run `36295296672`, including Windows-native and system integration.
+`node --check` for the strengthened fixture passed.
 The broad `npm run docs:anchor-audit` at `tmp/3937` remains red on existing
 anchors outside the edited paragraphs, including old `stages/d1.md` links;
 this batch changed no headings or link targets. It is not claimed as a
 passing documentation gate.
+
+**2026-09-27 D1-12 owner cut, local proof.** The selected D1 owner migration
+is implemented in the dirty worktree: `EncoderSet` owns the native-borrowing
+wrappers and typed model roles, retiring wrappers only after its exact lease
+drain and surface retirement. It retries refused wrapper close. The server's
+mutable wrapper/surface aliases, candidate duplicate close loop and
+`ModelContext` are removed. Dev reload captures the current serving owner
+under its replacement lease. The retained A/B policy regression resolves
+each service to its own set and rejects an unretained service. Compile,
+Spotless and PMD passed at `tmp/3956`; focused lifetime tests passed at
+`tmp/3957`; policy test/static passed at `tmp/3958`. The full Worker suite
+at `tmp/3959` passed 851 tests, zero failures, 15 skips. The installed
+distribution rebuilt at `tmp/3960`; fresh seed `tmp/3961` and distinct
+FP32 A / FP16 CUDA B physical `BESIDE` round `tmp/3962` passed exact A
+vector search before/after two B build units, B promotion and B vector
+search. Both supervised rounds ended `STOP 0`; official health returned
+`ABSENT`, with no foreign run or inference orphan. The installed dist's
+build stamp reports the prior Git HEAD because this owner source is not yet
+committed; the Gradle rebuild was performed after the source edit. The
+follow-up interrupted-retirement and promoted-A wrapper-only cleanup
+regressions plus PMD/Spotless passed at `tmp/3964`; repository compile/static
+passed at `tmp/3963`. The final combined test gate at `tmp/3965` passed
+Worker 853 (15 skips), worker-services 1,462 (2 skips), adapters-lucene
+742 and ort-common 184 (including the native stress class), all with zero
+failures. Next: commit and push the checkpoint, then verify hosted CI by
+its exact SHA. Full
+D1-12/D1-13 acceptance and later D1/D2/E/F remain open.
 
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor

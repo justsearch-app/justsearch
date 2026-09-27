@@ -671,11 +671,14 @@ final class KnowledgeServerCloseCompletionTest {
       return null;
     }).when(handle).close();
     org.mockito.Mockito.when(handle.retirementStatus()).thenAnswer(call -> nativeStatus.get());
-    server.inferenceSurface = new InferenceSurface(java.util.Optional.empty(),
+    var pendingSurface = new InferenceSurface(java.util.Optional.empty(),
         java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty(),
         java.util.Optional.empty(), java.util.Optional.empty(),
         new io.justsearch.ort.PolicySnapshot(io.justsearch.ort.RuntimePolicy.defaults(),
             new java.util.TreeMap<>()), java.util.List.of(handle));
+    var pendingSurfaceField = KnowledgeServer.class.getDeclaredField("pendingInitialSurface");
+    pendingSurfaceField.setAccessible(true);
+    pendingSurfaceField.set(server, pendingSurface);
     var services = org.mockito.Mockito.mock(WorkerAppServices.class);
     server.appServices = services;
     var rootLock = org.mockito.Mockito.mock(io.justsearch.indexerworker.util.IndexRootLock.class);

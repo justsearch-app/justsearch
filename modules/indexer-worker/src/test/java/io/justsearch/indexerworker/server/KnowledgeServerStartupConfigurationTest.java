@@ -161,14 +161,14 @@ class KnowledgeServerStartupConfigurationTest {
         server.start();
         invokeDeferredModelInitialization(server);
 
-        var surface = (InferenceSurface) field(server, "inferenceSurface");
+        var surface = ((EncoderSet) field(server, "initialEncoderSet")).surfaceForOwner();
         assertTrue(surface.embedding().isPresent(), "the captured enabled role must compose");
         assertEquals(
             Set.of(EncoderRole.EMBEDDING), surface.componentObservation().requestedRoles());
         assertTrue(surface.componentObservation().missingRoles().isEmpty());
         assertTrue(surface.componentObservation().compositionSatisfied());
 
-        var service = (EmbeddingService) field(server, "embeddingService");
+        var service = ((EncoderSet) field(server, "initialEncoderSet")).embedding();
         assertNotNull(service, "successful composition must reach the production service wiring");
         assertTrue(service.isAvailable());
         assertEquals(capturedModel, service.modelPath());
@@ -425,7 +425,7 @@ class KnowledgeServerStartupConfigurationTest {
                 ((java.util.function.Supplier<?>) field(b.services().searchService(),
                     "modelReadyLatchSupplier")).get(),
                 "the replacement service must await that same generation owner");
-            var selectedProvider = field(server, "embeddingService");
+            var selectedProvider = ((EncoderSet) field(server, "initialEncoderSet")).embedding();
             assertNotNull(selectedProvider);
             assertSame(selectedProvider, field(a.services().searchService(), "embeddingProvider"),
                 "A search service must receive the selected provider before readiness releases");

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -113,6 +114,77 @@ class EncoderSetTest {
 
     assertTrue(set.isClosed());
     verify(surface, times(2)).close();
+  }
+
+  @Test
+  void ownedWrapperClosesAfterTheExactLeaseAndNativeSurface() throws Exception {
+    InferenceSurface surface = mock(InferenceSurface.class);
+    AutoCloseable wrapper = mock(AutoCloseable.class);
+    EncoderSet set = new EncoderSet(surface, IDENTITY_A);
+    set.own(wrapper);
+    EncoderSet.Lease lease = set.acquire();
+
+    Thread closer = Thread.ofVirtual().start(set::close);
+    awaitRetiring(set);
+    verify(surface, never()).close();
+    verify(wrapper, never()).close();
+    lease.close();
+    closer.join(1_000);
+
+    assertFalse(closer.isAlive());
+    assertTrue(set.isClosed());
+    var order = inOrder(surface, wrapper);
+    order.verify(surface).close();
+    order.verify(wrapper).close();
+  }
+
+  @Test
+  void failedWrapperCloseRetainsRetirementAndRetriesOnlyThatWrapper() throws Exception {
+    InferenceSurface surface = mock(InferenceSurface.class);
+    AutoCloseable wrapper = mock(AutoCloseable.class);
+    doThrow(new IllegalStateException("wrapper retained")).doNothing().when(wrapper).close();
+    EncoderSet set = new EncoderSet(surface, IDENTITY_A);
+    set.own(wrapper);
+
+    assertThrows(IllegalStateException.class, set::close);
+    assertTrue(set.isRetiring());
+    assertFalse(set.isClosed());
+    assertThrows(IllegalStateException.class, set::acquire);
+
+    set.close();
+    assertTrue(set.isClosed());
+    verify(wrapper, times(2)).close();
+  }
+
+  @Test
+  void interruptedRetirementKeepsTheWrapperUntilTheIssuedLeaseLeaves() throws Exception {
+    InferenceSurface surface = mock(InferenceSurface.class);
+    AutoCloseable wrapper = mock(AutoCloseable.class);
+    EncoderSet set = new EncoderSet(surface, IDENTITY_A);
+    set.own(wrapper);
+    EncoderSet.Lease issued = set.acquire();
+    java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    Thread closer = Thread.ofVirtual().start(() -> {
+      try { set.close(); }
+      catch (Throwable interrupted) { failure.set(interrupted); }
+    });
+
+    awaitRetiring(set);
+    closer.interrupt();
+    closer.join(1_000);
+    assertFalse(closer.isAlive());
+    assertTrue(failure.get() instanceof IllegalStateException);
+    assertTrue(set.isRetiring());
+    assertFalse(set.isClosed());
+    verify(surface, never()).close();
+    verify(wrapper, never()).close();
+
+    issued.close();
+    set.close();
+    var order = inOrder(surface, wrapper);
+    order.verify(surface).close();
+    order.verify(wrapper).close();
   }
 
   @Test
