@@ -6,6 +6,17 @@ Updated 2026-09-27 after the agent handoff. Start with the
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
 
+**2026-09-27 external handover is now the immediate queue.** Item 01's
+fixture cache-prune code and focused Node proof are recorded in
+[handoff](handoff.md); installed validation waits for disk cleanup. The owner
+approved the exact cache cleanup and chose D1 live migration start plus
+keyword-only search with a visible semantic-pause notice for in-place model
+changes. These choices are recorded in [D1](stages/D1.md) and design §17.7.
+Next implement item 03's memory decision rule before new installed A/B
+proofs, then item 02's outage sampler/live start; resume the WP3 batches
+afterward. Items 04–07 remain in the external handover and Stage F gates
+merge.
+
 **Current 2026-09-27 cut:** Exact-SHA CI on `3d66c74c9` passed every job in
 [run 36299571929](https://github.com/justsearch-app/justsearch/actions/runs/36299571929).
 The pushed `5c721c59a` harness checkpoint measures ordinary forced in-place

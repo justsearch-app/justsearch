@@ -4,6 +4,32 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 [continuation brief](continuation-brief.md) for ordering. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
+**2026-09-27 handover implementation checkpoint (hosted proof pending).**
+The owner's decisions are: one-time deletion of only regenerable ONNX caches
+after a dry run and process check; remove migration-start restart in D1; pause
+semantic search on the low-memory in-place path while keyword search continues
+and the UI explains the pause. The decision record is in [D1](stages/D1.md)
+and [design §17.7](design.md). The 2026-09-27 external handover's item 01
+fixture fix is implemented in `prune-model-caches.mjs`, the recovery fixture,
+and the JUnit lifecycle wrapper. It prunes only after a `portsClosed` stop,
+preserves seed→transition cache reuse, has an 8 GiB free-space preflight, and
+supports `JUSTSEARCH_FIXTURE_KEEP_MODEL_CACHES=1`. The full supervisor Node
+suite passed 14/14 with `node --test scripts/supervisor-conformance/*.test.mjs`;
+`npm run lint:scripts -- --quiet` and `git diff --check` passed. Java compile,
+installed proof and free-space recovery remain **unverified**. F: had 0.073
+GiB free at the check. The approved PowerShell cleanup was rejected by
+automatic tool review with only `blocked by policy`; no existing cache file
+was deleted or relocated. The owner can perform the scoped manual cleanup
+from `C:/Users/Elias/Desktop/lane-f-handover-2026-09-27/01-disk-space.md`
+after confirming no Lane F process; do not route it through a different tool.
+Continue the device-memory rule, then the API-outage sampler and live
+migration start, then the recorded WP3 order. The remaining handover tasks are:
+raise only the outer timeout on the independently reviewed concurrent-RMW
+test with negative control; consolidate duplicate handoff/D1 evidence into one
+owner; keep scoped search and workdir habits; decide an accessible evidence
+archive at Stage F. Stage F still gates merge. The unrelated untracked
+`modules/app-inference/logs/` remains untouched.
+
 **2026-09-27 pause checkpoint.** User requested a clean pause after the
 D1-12 parity correction. The implementation and evidence are committed as
 `4ebaf0b4c67e6a41483741d080edc514eb022f95` and pushed to PR727 on

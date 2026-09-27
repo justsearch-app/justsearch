@@ -17,6 +17,7 @@ import {
 import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
 import { captureFromLive } from '../codegen/gen-api-client.mjs';
 import { exerciseReconfigureRefresh } from './reconfigure-refresh-scenario.mjs';
+import { assertFixtureFreeSpace, pruneRegenerableModelCaches } from './prune-model-caches.mjs';
 
 const repo = process.cwd();
 const scenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO;
@@ -70,6 +71,7 @@ const operationKey = operationFault || bulkFault || bulkGapApproval || installer
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   ? path.resolve(process.env.JUSTSEARCH_WRITER_RECOVERY_WORK)
   : path.join(repo, 'tmp', 'lane-f-takeover', `writer-live-${Date.now()}`);
+assertFixtureFreeSpace(work);
 const state = path.join(work, 'state');
 const data = path.join(work, 'data');
 if (modelLiveAB || bulkGapApproval) {
@@ -611,6 +613,9 @@ try {
   console.log('STOP', stopped.status, stopped.stdout, stopped.stderr);
   if (stopped.status !== 0 || !stopped.stdout.includes('"portsClosed":true')) {
     throw new Error(`identity-checked dev-runner cleanup failed: ${stopped.stdout} ${stopped.stderr}`);
+  }
+  if (modelLiveAB && process.env.JUSTSEARCH_FIXTURE_KEEP_MODEL_CACHES !== '1') {
+    console.log('MODEL_CACHE_PRUNED', JSON.stringify(pruneRegenerableModelCaches(work)));
   }
   }
 } catch (cleanupFailure) {

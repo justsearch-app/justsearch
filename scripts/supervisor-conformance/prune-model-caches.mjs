@@ -1,0 +1,81 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const MINIMUM_FREE_BYTES = 8n * 1024n * 1024n * 1024n;
+const CACHE_SUFFIXES = ['.optimized', '.opt-meta'];
+
+function inside(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`)
+    && !path.isAbsolute(relative));
+}
+
+function checkedDirectory(candidate, root) {
+  const entry = fs.lstatSync(candidate);
+  if (entry.isSymbolicLink() || !entry.isDirectory()) {
+    throw new Error(`model cache tree is not a regular directory: ${candidate}`);
+  }
+  const resolved = fs.realpathSync.native(candidate);
+  if (!inside(root, resolved)) {
+    throw new Error(`model cache tree escapes fixture work directory: ${candidate}`);
+  }
+}
+
+export function assertFixtureFreeSpace(work, minimumBytes = MINIMUM_FREE_BYTES) {
+  fs.mkdirSync(work, { recursive: true });
+  const volume = fs.statfsSync(work, { bigint: true });
+  const freeBytes = volume.bavail * volume.bsize;
+  if (freeBytes < minimumBytes) {
+    throw new Error(`fixture volume has ${(Number(freeBytes) / 2 ** 30).toFixed(2)} GiB free; `
+      + `requires ${(Number(minimumBytes) / 2 ** 30).toFixed(2)} GiB. `
+      + 'Stop the owned run and prune regenerable installer model caches before retrying.');
+  }
+  return freeBytes;
+}
+
+export function pruneRegenerableModelCaches(work) {
+  const absoluteWork = path.resolve(work);
+  checkedDirectory(absoluteWork, fs.realpathSync.native(absoluteWork));
+  const realWork = fs.realpathSync.native(absoluteWork);
+  const candidates = [];
+  for (const name of ['installer-models', 'installer-models-b']) {
+    const root = path.join(absoluteWork, name);
+    if (!fs.existsSync(root)) continue;
+    const pending = [root];
+    while (pending.length > 0) {
+      const directory = pending.pop();
+      checkedDirectory(directory, realWork);
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const candidate = path.join(directory, entry.name);
+        const info = fs.lstatSync(candidate);
+        if (info.isSymbolicLink()) {
+          throw new Error(`model cache tree contains a symbolic link or junction: ${candidate}`);
+        }
+        if (info.isDirectory()) {
+          pending.push(candidate);
+        } else if (info.isFile() && CACHE_SUFFIXES.some(suffix => entry.name.endsWith(suffix))) {
+          const resolved = fs.realpathSync.native(candidate);
+          if (!inside(realWork, resolved)) {
+            throw new Error(`model cache escapes fixture work directory: ${candidate}`);
+          }
+          candidates.push({ path: candidate, bytes: info.size });
+        }
+      }
+    }
+  }
+  for (const candidate of candidates) fs.unlinkSync(candidate.path);
+  return { files: candidates.length, bytes: candidates.reduce((sum, entry) => sum + entry.bytes, 0) };
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const work = process.argv[2];
+  if (!work || process.argv.length !== 3) {
+    throw new Error('usage: node prune-model-caches.mjs <fixture-work-directory>');
+  }
+  if (process.env.JUSTSEARCH_FIXTURE_KEEP_MODEL_CACHES === '1') {
+    console.log('MODEL_CACHE_PRUNED {"files":0,"bytes":0,"kept":true}');
+  } else {
+    console.log('MODEL_CACHE_PRUNED', JSON.stringify(pruneRegenerableModelCaches(work)));
+  }
+}

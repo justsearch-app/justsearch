@@ -29,20 +29,22 @@ final class EngineSupervisedRecoveryE2ETest {
     assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
         "D1-16 AI scenario requires retained CPU A and FP16 CUDA B model bytes");
     Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-semantic-" + UUID.randomUUID());
-    runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
-        "INSTALLER_ACTIVATION_FAULT_PASS");
-    String output = runInstalledModelScenario(repo, work, "model-live-a-b", inPlaceModelEnvironment(),
-        "MODEL_LIVE_AB_PASS");
-    String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_PASS "))
-        .findFirst().orElseThrow();
-    var semantic = MAPPER.readTree(line.substring("MODEL_LIVE_AB_PASS ".length()))
-        .path("semantic");
-    assertTrue(semantic.path("transitionMs").asLong() > 0, line);
-    assertTrue(semantic.path("refusalWindowMs").asLong() > 0, line);
-    assertTrue(semantic.path("refusedFraction").asDouble() > 0, line);
-    assertTrue(semantic.path("recoveredAfterRefusal").asBoolean(), line);
-    assertTrue(output.contains("\"mode\":\"IN_PLACE\""), output);
-    System.out.println("LIFECYCLE_SEMANTIC_AVAILABILITY_PASS §16 " + line);
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      String output = runInstalledModelScenario(repo, work, "model-live-a-b", inPlaceModelEnvironment(),
+          "MODEL_LIVE_AB_PASS");
+      String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_PASS "))
+          .findFirst().orElseThrow();
+      var semantic = MAPPER.readTree(line.substring("MODEL_LIVE_AB_PASS ".length()))
+          .path("semantic");
+      assertTrue(semantic.path("transitionMs").asLong() > 0, line);
+      assertTrue(semantic.path("refusalWindowMs").asLong() > 0, line);
+      assertTrue(semantic.path("refusedFraction").asDouble() > 0, line);
+      assertTrue(semantic.path("recoveredAfterRefusal").asBoolean(), line);
+      assertTrue(output.contains("\"mode\":\"IN_PLACE\""), output);
+      System.out.println("LIFECYCLE_SEMANTIC_AVAILABILITY_PASS §16 " + line);
+    });
   }
 
   static void runSeededInPlaceGapRestoration() throws Exception {
@@ -50,22 +52,24 @@ final class EngineSupervisedRecoveryE2ETest {
     assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
         "D1-16 AI scenario requires retained CPU A and FP16 CUDA B model bytes");
     Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-gap-" + UUID.randomUUID());
-    runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
-        "INSTALLER_ACTIVATION_FAULT_PASS");
-    var environment = new java.util.HashMap<>(inPlaceModelEnvironment());
-    environment.put("JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE", "1");
-    String output = runInstalledModelScenario(repo, work, "model-live-a-b-gap",
-        environment, "MODEL_LIVE_AB_GAP_PASS");
-    String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_GAP_PASS "))
-        .findFirst().orElseThrow();
-    var result = MAPPER.readTree(line.substring("MODEL_LIVE_AB_GAP_PASS ".length()));
-    assertEquals("floor simulated by device-memory cap", result.path("floor").asText(), line);
-    assertEquals("PROMOTED_WITH_GAPS", result.path("terminalReason").asText(), line);
-    assertTrue(result.path("aVectorHits").asInt() > 0, line);
-    assertTrue(result.path("bVectorHits").asInt() > 0, line);
-    assertTrue(result.path("semantic").path("recoveredAfterRefusal").asBoolean(), line);
-    assertTrue(output.contains("MODEL_LIVE_AB_RESTORED_NATIVE_LEASE "), output);
-    System.out.println("LIFECYCLE_IN_PLACE_GAP_RESTORATION_PASS §16 " + line);
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      var environment = new java.util.HashMap<>(inPlaceModelEnvironment());
+      environment.put("JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE", "1");
+      String output = runInstalledModelScenario(repo, work, "model-live-a-b-gap",
+          environment, "MODEL_LIVE_AB_GAP_PASS");
+      String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_GAP_PASS "))
+          .findFirst().orElseThrow();
+      var result = MAPPER.readTree(line.substring("MODEL_LIVE_AB_GAP_PASS ".length()));
+      assertEquals("floor simulated by device-memory cap", result.path("floor").asText(), line);
+      assertEquals("PROMOTED_WITH_GAPS", result.path("terminalReason").asText(), line);
+      assertTrue(result.path("aVectorHits").asInt() > 0, line);
+      assertTrue(result.path("bVectorHits").asInt() > 0, line);
+      assertTrue(result.path("semantic").path("recoveredAfterRefusal").asBoolean(), line);
+      assertTrue(output.contains("MODEL_LIVE_AB_RESTORED_NATIVE_LEASE "), output);
+      System.out.println("LIFECYCLE_IN_PLACE_GAP_RESTORATION_PASS §16 " + line);
+    });
   }
 
   private static Map<String, String> inPlaceModelEnvironment() {
@@ -76,6 +80,60 @@ final class EngineSupervisedRecoveryE2ETest {
         "JUSTSEARCH_SPLADE_GPU_MEM_MB", "2048",
         "JUSTSEARCH_NER_GPU_MEM_MB", "1024",
         "JUSTSEARCH_RERANK_GPU_MEM_MB", "1024");
+  }
+
+  @FunctionalInterface
+  private interface FixtureWork {
+    void run() throws Exception;
+  }
+
+  private static void withModelCacheCleanup(Path repo, Path work, FixtureWork fixture) throws Exception {
+    Throwable primary = null;
+    try {
+      fixture.run();
+    } catch (Exception | AssertionError failure) {
+      primary = failure;
+      throw failure;
+    } finally {
+      try {
+        pruneStoppedModelCaches(repo, work);
+      } catch (Exception cleanupFailure) {
+        if (primary == null) throw cleanupFailure;
+        primary.addSuppressed(cleanupFailure);
+      }
+    }
+  }
+
+  private static void pruneStoppedModelCaches(Path repo, Path work) throws Exception {
+    Path runs = work.resolve("state/runs");
+    if (Files.isDirectory(runs)) {
+      try (var entries = Files.list(runs)) {
+        for (Path run : entries.filter(Files::isDirectory).toList()) {
+          Path report = run.resolve("stop-report.json");
+          if (!Files.isRegularFile(report)
+              || !MAPPER.readTree(Files.readString(report)).path("portsClosed").asBoolean(false)) {
+            throw new IllegalStateException("Cannot prune model caches before owned run has stopped: " + run);
+          }
+        }
+      }
+    }
+    if ("1".equals(System.getenv("JUSTSEARCH_FIXTURE_KEEP_MODEL_CACHES"))) return;
+    Path outputFile = work.resolve("model-cache-prune-output.txt");
+    ProcessBuilder prune = new ProcessBuilder("node",
+        repo.resolve("scripts/supervisor-conformance/prune-model-caches.mjs").toString(),
+        work.toString()).directory(repo.toFile()).redirectErrorStream(true)
+        .redirectOutput(outputFile.toFile());
+    Process process = prune.start();
+    if (!process.waitFor(30, TimeUnit.SECONDS)) {
+      process.destroyForcibly();
+      process.waitFor(10, TimeUnit.SECONDS);
+      throw new IllegalStateException("Model cache prune exceeded 30 seconds");
+    }
+    String output = Files.readString(outputFile, StandardCharsets.UTF_8);
+    if (process.exitValue() != 0 || !output.contains("MODEL_CACHE_PRUNED ")) {
+      throw new IllegalStateException("Model cache prune failed: " + output);
+    }
+    System.out.print(output);
   }
 
   private static String runInstalledModelScenario(Path repo, Path work, String scenario,
@@ -237,6 +295,9 @@ final class EngineSupervisedRecoveryE2ETest {
       }
       try {
         stopOwnedRun(repo, work);
+        if ("writer".equals(scenario) || scenario.startsWith("installer-")) {
+          pruneStoppedModelCaches(repo, work);
+        }
       } catch (Exception cleanupFailure) {
         if (primaryFailure == null) {
           primaryFailure = cleanupFailure;
