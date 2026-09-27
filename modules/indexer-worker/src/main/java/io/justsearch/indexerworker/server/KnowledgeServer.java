@@ -2431,10 +2431,11 @@ public final class KnowledgeServer implements Closeable {
   private void recordFailedSourceRecompose(Exception candidateFailure, Throwable restoreFailure) {
     candidateFailure.addSuppressed(restoreFailure);
     if (encoderComponent != null) {
+      String evidence = "B refused: " + candidateFailure.getMessage() + "; A recompose refused: "
+          + restoreFailure.getMessage();
       encoderComponent.transition(io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
-          "B refused: " + candidateFailure.getMessage() + "; A recompose refused: "
-              + restoreFailure.getMessage());
-      encoderComponent.recordRecoveryAttempt(restoreFailure.getMessage());
+          evidence);
+      encoderComponent.recordRecoveryAttempt(evidence);
     }
     log.error("Active A could not be recomposed after candidate refusal", restoreFailure);
   }

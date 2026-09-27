@@ -331,6 +331,40 @@ fixture, a fresh seed `tmp/3872` and final installed run
 retirement, approval and STOP 0 checks. The final fixture source is this
 strengthened repeat.
 
+**2026-09-27 D1-13/D1-14 native hold and A-recompose failure (local WIP).**
+Exact-SHA hosted run `36287285677` completed SUCCESS on `451531d93edc5618d5086f93ee76741ab979cc8a`, including every job.
+A new real CPU session test holds an issued native lease while in-place B
+composition retires A: lexical captures continue, the old session stays usable,
+new native acquisitions refuse, and composition finishes only after release.
+The focused run at `tmp/3874` had one test, zero skips/failures; the 16-test
+class at `tmp/3876` and PMD/Spotless at `tmp/3875` passed. This is an
+in-process real-native hold, not installed GPU lifetime proof.
+The first installed A-model-removal probe, fresh seed `tmp/3877` and round
+`tmp/3878`, observed repeated real A recompose failures in the Worker log but
+timed out waiting for the required two-reason component evidence. Source
+inspection found `recordFailedSourceRecompose` transitioned to the combined
+evidence and then `recordRecoveryAttempt` overwrote it with only A's failure.
+Passing the combined evidence to both calls is the scoped correction. The
+rebuilt distribution, full compile, Spotless and PMD passed at `tmp/3879`.
+Fresh seed `tmp/3880` and installed round `tmp/3881` then passed: under the
+one-megabyte cap the component exposed `UNAVAILABLE`, `recoveryAttempts=1`,
+`B refused: Candidate awaits gap acceptance; A recompose refused: Recorded
+candidate model could not become READY`, and text service. Restoring A's
+private model file recovered VECTOR; the separately approved cancellation
+retired exact B, retained A, and STOP 0 closed private ports. Focused Java
+regressions cover combined evidence after recovery publication (`tmp/3882`)
+and refusal while an initial native owner remains open (`tmp/3885`); the
+29-test recorded-ingestion class passed without skips at `tmp/3886`, with
+PMD/Spotless at `tmp/3885`. The first static attempt `tmp/3884` found six
+unnecessary `Optional` qualifiers in the new test; those were removed.
+Installed GPU native lifetime, accepted-write backfill in the same in-place
+build, four-mode fake-line cases and D1-12 Flow B remain open.
+The combined source passed the full serial stress-enabled Gradle `test` at
+`tmp/3887-recompose-held-native-integrated.txt` in 16m 20s (196 tasks,
+6 executed). Its affected XMLs show 16 and 29 tests, zero skips/failures.
+Store recoverability, runtime closure, regeneration and JS syntax checks
+also passed before that gate. Hosted proof for this combined source remains due.
+
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor
 `INGEST` row, `superseded_from` linkage and `SUCCESSOR_ROW_MISSING` branch were

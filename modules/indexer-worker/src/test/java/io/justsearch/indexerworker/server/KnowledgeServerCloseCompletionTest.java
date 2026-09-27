@@ -233,6 +233,90 @@ final class KnowledgeServerCloseCompletionTest {
   }
 
   @Test
+  void inPlaceBuildWaitsForIssuedNativeLeaseBeforeComposing(@TempDir Path tempDir)
+      throws Exception {
+    var discovery = io.justsearch.ort.testing.ModelDirTestResolver.discover(
+        "models/onnx/gte-multilingual-base", null, "model.onnx");
+    Assumptions.assumeTrue(discovery.modelDir() != null,
+        "standard embedding model is unavailable for native lifetime proof");
+    io.justsearch.ort.SessionHandle handle = io.justsearch.ort.testing.InferenceCompositionRootTestHelper
+        .cpuSessionFor("in-place-held-native", discovery.modelDir());
+    var surface = new InferenceSurface(java.util.Optional.empty(), java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty(),
+        java.util.Optional.empty(), org.mockito.Mockito.mock(io.justsearch.ort.PolicySnapshot.class),
+        java.util.List.of(handle));
+    var absent = IndexFingerprint.ModelFingerprint.notConfigured();
+    var owner = new EncoderSet(surface, new EncoderSet.ModelIdentity(
+        absent, absent, absent, false, 768));
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var aRuntime = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+    var greenRuntime = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+    var services = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    var lexicalServices = org.mockito.Mockito.mock(WorkerAppServices.class);
+    org.mockito.Mockito.when(services.prepareTextOnlyCandidateView(aRuntime))
+        .thenReturn(lexicalServices);
+    Field searchField = KnowledgeServer.class.getDeclaredField("searchLifecycle");
+    Field ingestField = KnowledgeServer.class.getDeclaredField("ingestLifecycle");
+    Field initialField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+    searchField.setAccessible(true);
+    ingestField.setAccessible(true);
+    initialField.setAccessible(true);
+    searchField.set(server, aRuntime);
+    ingestField.set(server, greenRuntime);
+    server.publishServingView(services);
+    var servingField = KnowledgeServer.class.getDeclaredField("servingView");
+    servingField.setAccessible(true);
+    Object nativeView = servingField.get(server);
+    var attach = nativeView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
+    attach.setAccessible(true);
+    attach.invoke(nativeView, owner);
+    initialField.set(server, owner);
+    var issuedView = server.captureServingView();
+    var nativeRequest = SessionAcquisitionRequest.within(
+        SessionAcquisitionRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(2));
+    io.justsearch.ort.SessionHandle.Lease issuedNative = handle.acquireCpu(nativeRequest);
+    try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      var build = executor.submit(() -> {
+        var begin = KnowledgeServer.class.getDeclaredMethod("beginInPlaceCandidateBuild");
+        begin.setAccessible(true);
+        begin.invoke(server);
+        return null;
+      });
+      long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+      boolean lexicalPublished = false;
+      while (!lexicalPublished && System.nanoTime() < deadline) {
+        try (var lexical = server.captureServingView()) {
+          lexicalPublished = lexical.encoderSet() == null;
+          assertTrue(lexical.searchRuntime() == aRuntime);
+        }
+      }
+      assertTrue(lexicalPublished, "new captures must retain A text during native retirement");
+      issuedView.close();
+      deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+      while (handle.retirementStatus() == io.justsearch.ort.SessionHandle.RetirementStatus.ACTIVE
+          && System.nanoTime() < deadline) Thread.onSpinWait();
+      org.junit.jupiter.api.Assertions.assertEquals(
+          io.justsearch.ort.SessionHandle.RetirementStatus.RETIRING, handle.retirementStatus());
+      assertFalse(build.isDone(), "B composition must wait for the exact native call");
+      assertNotNull(issuedNative.session().getInputNames(),
+          "the issued native session remains usable while retiring");
+      assertThrows(SessionRetiredException.class, () -> handle.acquireCpu(nativeRequest));
+      issuedNative.close();
+      build.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      assertTrue(owner.isClosed());
+      org.junit.jupiter.api.Assertions.assertEquals(
+          io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED, handle.retirementStatus());
+    } finally {
+      issuedNative.close();
+      issuedView.close();
+      server.close();
+    }
+  }
+
+  @Test
   void slowIssuedAQueryRestoresUntouchedNativeViewAfterDrainDeadline(@TempDir Path tempDir)
       throws Exception {
     var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),

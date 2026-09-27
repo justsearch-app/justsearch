@@ -534,6 +534,73 @@ final class KnowledgeServerRecordedIngestionTest {
   }
 
   @Test
+  @DisplayName("failed A recomposition retains both refusal reasons after recording recovery")
+  void failedSourceRecomposeKeepsBothReasonsInRecoveryEvidence(@TempDir Path tempDir)
+      throws Exception {
+    var component = org.mockito.Mockito.mock(io.justsearch.core.component.ComponentHandle.class);
+    var server = new KnowledgeServer(new TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+        org.mockito.Mockito.mock(RecordedIngestionLifecycle.class), null, component);
+    server.appServices = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
+    setField(server, "recordedCandidateInPlace", true);
+    setField(server, "inPlaceSourceHadModels", true);
+    var candidateFailure = new IOException("candidate rejected");
+    try {
+      var recompose = KnowledgeServer.class.getDeclaredMethod(
+          "recomposeSourceAfterCandidateRefusal", Exception.class);
+      recompose.setAccessible(true);
+      recompose.invoke(server, candidateFailure);
+      var evidence = org.mockito.ArgumentCaptor.forClass(String.class);
+      org.mockito.Mockito.verify(component).recordRecoveryAttempt(evidence.capture());
+      assertTrue(evidence.getValue().contains("B refused: candidate rejected"));
+      assertTrue(evidence.getValue().contains("A recompose refused: Active generation model identity"));
+      org.mockito.Mockito.verify(component).transition(
+          io.justsearch.core.component.ComponentState.UNAVAILABLE, null, evidence.getValue());
+      assertEquals(1, candidateFailure.getSuppressed().length);
+    } finally {
+      server.close();
+    }
+  }
+
+  @Test
+  @DisplayName("refusal cannot recompose A while its prior native owner remains open")
+  void sourceRecomposeRetainsIncompleteNativeOwner(@TempDir Path tempDir) throws Exception {
+    var component = org.mockito.Mockito.mock(io.justsearch.core.component.ComponentHandle.class);
+    var server = new KnowledgeServer(new TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+        org.mockito.Mockito.mock(RecordedIngestionLifecycle.class), null, component);
+    var absent = io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.notConfigured();
+    var owner = new EncoderSet(new InferenceSurface(Optional.empty(),
+        Optional.empty(), Optional.empty(), Optional.empty(),
+        Optional.empty(), Optional.empty(),
+        org.mockito.Mockito.mock(io.justsearch.ort.PolicySnapshot.class), List.of()),
+        new EncoderSet.ModelIdentity(absent, absent, absent, false, 768));
+    var held = owner.acquire();
+    setField(server, "initialEncoderSet", owner);
+    setField(server, "recordedCandidateInPlace", true);
+    var candidateFailure = new IOException("candidate rejected");
+    try {
+      var recompose = KnowledgeServer.class.getDeclaredMethod(
+          "recomposeSourceAfterCandidateRefusal", Exception.class);
+      recompose.setAccessible(true);
+      recompose.invoke(server, candidateFailure);
+      var evidence = org.mockito.ArgumentCaptor.forClass(String.class);
+      org.mockito.Mockito.verify(component).recordRecoveryAttempt(evidence.capture());
+      assertTrue(evidence.getValue().contains("B refused: candidate rejected"));
+      assertTrue(evidence.getValue().contains("A recompose refused: A native retirement remains incomplete"));
+      org.mockito.Mockito.verify(component).transition(
+          io.justsearch.core.component.ComponentState.UNAVAILABLE, null, evidence.getValue());
+      assertFalse(owner.isClosed(), "the held native owner must remain available to its issued call");
+    } finally {
+      held.close();
+      owner.close();
+      server.close();
+    }
+  }
+
+  @Test
   @DisplayName("candidate gap approval drains accepted Green work before freezing its witness")
   void gapAcceptanceFenceDrainsBeforeProducerPause(@TempDir Path tempDir) throws Exception {
     KnowledgeServer server = helperServer(preparedLayout(tempDir));

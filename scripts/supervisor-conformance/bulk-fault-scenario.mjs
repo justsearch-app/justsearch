@@ -590,6 +590,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
   operationKey, readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
   watcherDeleteDuringBuild = false, gapApproval = false, gapCancellation = false,
+  gapRecomposeFailure = false,
   extraBuildFiles = 0 }) {
   const runtime = path.join(data, 'runtime');
   const { reachedFile, releaseFile } = barrierFiles(data);
@@ -675,13 +676,14 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     args: input, idempotencyKey: operationKey,
     confirmationToken: prepared.capsule, preparationNonce: prepared.nonce,
   }, sessionHeaders(manifest));
-  if (gapApproval || gapCancellation) {
+  if (gapApproval || gapCancellation || gapRecomposeFailure) {
     requireThat(distinctModelB && inPlaceModelB,
       'installed model gap proof requires a distinct forced in-place candidate');
     await exerciseLiveModelGapDecision({ work, data, indexBase, manifest, apiPort,
       operationKey, sourceGeneration, sourceManifest, marker, file, bRoot, dispatched,
       readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
-      reachedFile, releaseFile, migrationBarrier, operationPath, gapCancellation });
+      reachedFile, releaseFile, migrationBarrier, operationPath, gapCancellation,
+      gapRecomposeFailure });
     return;
   }
   try {
@@ -924,7 +926,10 @@ async function exerciseLiveModelGapDecision(c) {
   const { work, data, indexBase, manifest, apiPort, operationKey, sourceGeneration,
     sourceManifest, marker, file, bRoot, dispatched, readJson, waitFor, request, post,
     requireThat, createOperationKey, matchingHit, reachedFile, releaseFile,
-    migrationBarrier, operationPath, gapCancellation } = c;
+    migrationBarrier, operationPath, gapCancellation, gapRecomposeFailure } = c;
+  const sourceModel = gapRecomposeFailure
+    ? path.resolve(sourceManifest.models.embedding.id) : null;
+  const hiddenSourceModel = sourceModel ? `${sourceModel}.recompose-held` : null;
   const removed = path.join(work, 'installer-root-b', 'installer-1.txt');
   try {
     const reached = await waitFor('installer capture closed before Green build', 180000,
@@ -970,6 +975,12 @@ async function exerciseLiveModelGapDecision(c) {
       `in-place A lost lexical service during B composition: ${text.text}`);
     floorEvidence = { mode: encoder.mode, freeBytes: encoder.freeBytes,
       footprintBytes: encoder.footprintBytes };
+    if (sourceModel) {
+      requireThat(sourceModel.startsWith(path.resolve(work, 'installer-models') + path.sep)
+        && fs.existsSync(sourceModel) && !fs.existsSync(hiddenSourceModel),
+      `A recompose failure would hide a non-private or absent model: ${sourceModel}`);
+      fs.renameSync(sourceModel, hiddenSourceModel);
+    }
   } finally {
     fs.writeFileSync(migrationBarrier.releaseFile, 'release');
   }
@@ -992,6 +1003,28 @@ async function exerciseLiveModelGapDecision(c) {
         && outcome.result?.gaps?.some(gap => gap.unitId && gap.reason)
         ? { row, state, outcome } : null;
     });
+  let failedRecompose;
+  if (sourceModel) {
+    try {
+      failedRecompose = await waitFor('missing A model reports both refusal reasons',
+        120000, async () => {
+          const reply = await request(apiPort, '/api/status', {}, 15000);
+          if (reply.status !== 200) return null;
+          const component = JSON.parse(reply.text)?.readiness?.engineComponents?.encoders;
+          return component?.state === 'UNAVAILABLE'
+            && component.recoveryAttempts > 0
+            && component.evidence?.includes('B refused: Candidate awaits gap acceptance')
+            && component.evidence?.includes('A recompose refused:')
+            ? component : null;
+        });
+      const text = await post(apiPort, '/api/knowledge/search',
+        { query: marker, limit: 10, mode: 'text' }, 30000);
+      requireThat(text.status === 200 && matchingHit(text, file, marker),
+        `failed A recompose also lost lexical service: ${text.text}`);
+    } finally {
+      fs.renameSync(hiddenSourceModel, sourceModel);
+    }
+  }
   const aVector = await waitFor('recomposed A serves VECTOR during installer gap wait',
     120000, async () => {
       try {
@@ -1060,7 +1093,8 @@ async function exerciseLiveModelGapDecision(c) {
       floor: 'floor simulated by device-memory cap', floorEvidence,
       aVectorHitsDuringWait: JSON.parse(aVector.text).results.length,
       aVectorHitsAfterCancel: JSON.parse(resumedA.text).results.length,
-      terminalState: retired.row.state }));
+      terminalState: retired.row.state,
+      ...(failedRecompose ? { failedRecompose } : {}) }));
     return;
   }
   const acceptanceKey = createOperationKey();

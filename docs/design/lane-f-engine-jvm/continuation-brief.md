@@ -72,6 +72,18 @@ switch journal. Accepted-write backfill in that in-place build and the
 remaining A-recompose/native-lease failure paths are still due. The final
 fixture with durable-row and journal assertions passed again at
 `tmp/3872`–`tmp/3873`.
+Exact-SHA hosted CI on `451531d93` passed every job in `36287285677`.
+The next local WIP adds a real CPU native lease across in-place A retirement
+(`tmp/3874`–`tmp/3876`, 16/16 class tests) and fixes the A-recompose failure
+evidence exposed by installed red `tmp/3878`. A fresh installed run
+`tmp/3880`–`tmp/3881` now reports both refusal reasons with
+`recoveryAttempts=1`, restores A VECTOR when its private model file returns,
+and cancels exact B. The 29-test recorded-ingestion class and static gates
+passed at `tmp/3885`–`tmp/3886`. Installed GPU lease, in-place accepted-write
+backfill, fake device-line mode tests and Flow B remain to be proven.
+The combined source's serial stress-enabled Gradle suite passed at `tmp/3887`
+with affected classes 16/16 and 29/29, zero skips. Hosted proof for this
+new combined checkpoint remains due.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

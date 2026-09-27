@@ -30,7 +30,8 @@ const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
 const modelLiveABGap = scenario === 'model-live-a-b-gap';
 const modelLiveABCancel = scenario === 'model-live-a-b-cancel';
-const modelLiveABDecision = modelLiveABGap || modelLiveABCancel;
+const modelLiveABRecomposeFailure = scenario === 'model-live-a-b-recompose-failure';
+const modelLiveABDecision = modelLiveABGap || modelLiveABCancel || modelLiveABRecomposeFailure;
 const modelLiveAB = scenario === 'model-live-a-b' || modelLiveABDecision;
 const acceptedWriteDuringBuild = modelLiveAB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE === '1';
@@ -398,7 +399,9 @@ try {
     await exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort, operationKey,
       readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit, distinctModelB,
       inPlaceModelB, acceptedWriteDuringBuild, watcherDeleteDuringBuild, extraBuildFiles,
-      gapApproval: modelLiveABGap, gapCancellation: modelLiveABCancel });
+      gapApproval: modelLiveABGap,
+      gapCancellation: modelLiveABCancel || modelLiveABRecomposeFailure,
+      gapRecomposeFailure: modelLiveABRecomposeFailure });
   } else if (modelBoot) {
     const initialStatus = await waitFor('model binding boot status', 60000, async () => {
       try {
