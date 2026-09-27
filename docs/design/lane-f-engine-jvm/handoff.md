@@ -534,9 +534,50 @@ regressions plus PMD/Spotless passed at `tmp/3964`; repository compile/static
 passed at `tmp/3963`. The final combined test gate at `tmp/3965` passed
 Worker 853 (15 skips), worker-services 1,462 (2 skips), adapters-lucene
 742 and ort-common 184 (including the native stress class), all with zero
-failures. Next: commit and push the checkpoint, then verify hosted CI by
-its exact SHA. Full
-D1-12/D1-13 acceptance and later D1/D2/E/F remain open.
+failures. Full D1-12/D1-13 acceptance and later D1/D2/E/F remain open.
+
+The owner checkpoint was committed and pushed as
+`e435c76527319ed26399f047ec1cd3e2db2597a6` to PR727. Exact-SHA CI
+run `36297670590` passed every job, including Windows-native and system
+integration. `origin/main`
+had zero commits missing from the branch at this checkpoint. On the pushed
+source, the fresh installed floor run `tmp/3967`–`tmp/3968` chose physical
+`IN_PLACE` under the one-megabyte cap: A served text with encoders
+`RELOADING`, distinct B completed two units, promoted, and returned vector
+hits. A separate fresh seed and cancellation run `tmp/3969`–`tmp/3970`
+recomposed exact A after B's gap refusal: A returned two vector hits during
+the wait and after the durable `CANCELLED` receipt. Both supervised rounds
+ended `STOP 0`; official health after each was `ABSENT` with no foreign
+run or inference orphan. The installed held native call across restored-A
+composition is still unproved; the real CPU held-call integration test at
+`tmp/3916`–`tmp/3917` covers that narrower in-process edge. Continue the
+remaining D1/D2/E/F acceptance after the hosted check.
+
+**2026-09-27 D1-14 floor measurement WIP.** The existing installed
+B-gap fixture now samples actual vector-port outcomes in memory from
+activation dispatch until A's semantic service returns. The first run
+`tmp/3972` failed its zero-unexpected oracle on 30 responses; the
+diagnostic rerun `tmp/3974` identified exact HTTP 503 `worker.starting`
+responses during the fixture's requested Engine restart. They are
+reported separately from encoder `reloading` refusals, not waived.
+Fresh seed `tmp/3975` and corrected round `tmp/3976` passed the durable
+`CANCELLED`/A-vector result with `STOP 0` and official health `ABSENT`.
+The 191 samples over 62,868 ms comprise 106 `reloading` refusals,
+43 available results, 30 startup 503s and 12 transport interruptions;
+the estimated reload refusal window was 28,380 ms (45.14%). Zero
+responses remain unexplained. This is an exploratory refusal-branch
+measurement; a full-generation transition and predeclared product bound
+are still required. The same sampler passed approved-gap promotion in
+fresh `tmp/3977`–`tmp/3978`: 62,207 ms to A restoration, 27,608 ms
+sampled reload window (44.38%), 103 reload refusals, 43 available,
+30 startup 503s, 13 transport interruptions and zero unexplained;
+accepted B then answered a vector query. The deliberate A-recompose
+failure is a distinct `UNAVAILABLE` state and skips the reload sampler.
+Fresh `tmp/3979`–`tmp/3980` passed the both-reason evidence, one recovery
+attempt, later A vector service and durable cancellation. All owned runs
+stopped with ports closed and official health `ABSENT`. The owner-set
+duration/fraction bound has been requested asynchronously; absent that
+answer, these are measured cuts, not full D1-14 acceptance.
 
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor

@@ -161,8 +161,34 @@ passed at `tmp/3964`; repository compile/static passed at `tmp/3963`.
 Final combined module/stress proof at `tmp/3965` passed Worker 853 tests
 (15 skips), worker-services 1,462 (2 skips), adapters-lucene 742, and
 ort-common 184, with zero failures.
-Checkpoint and hosted proof for this dirty owner source are next; full
-D1-12/D1-13 and downstream D1/D2/E/F remain open.
+Full D1-12/D1-13 and downstream D1/D2/E/F remain open.
+The owner cut was pushed as `e435c76527319ed26399f047ec1cd3e2db2597a6`.
+Its exact-SHA CI run `36297670590` passed every job, including Windows-native
+and system integration.
+On that revision, a fresh installed one-megabyte floor round at
+`tmp/3967`–`tmp/3968` selected `IN_PLACE`, served A text with encoders
+`RELOADING`, then promoted distinct B and answered vector search. A separate
+fresh `tmp/3969`–`tmp/3970` B-gap cancellation restored exact A with two
+vector hits during the wait and after durable `CANCELLED`. Both ended
+`STOP 0`, with official health `ABSENT`. The installed held native call
+across A restoration remains unproved.
+An in-memory vector sampler for the installed floor refusal path first
+failed at `tmp/3972`/`tmp/3974`: 30 responses were unclassified until the
+second run showed exact `worker.starting` HTTP 503s during the requested
+restart. The corrected fresh run at `tmp/3975`–`tmp/3976` passed with
+62,868 ms dispatch-to-A-restoration, a sampled 28,380 ms reload refusal
+window (45.14%), 106 reload refusals, 43 available responses, 30 startup
+503s, 12 transport interruptions and zero unexplained responses. This is
+refusal-branch measurement; the full transition and a predeclared product
+bound are still required for D1-14 acceptance.
+The common sampler also passed approved-gap promotion at
+`tmp/3977`–`tmp/3978`: 27,608 ms reload window in 62,207 ms
+(44.38%), zero unexplained responses, and B vector service after
+acceptance. The deliberately failed A recompose is a separate
+`UNAVAILABLE` branch, so it does not run the reload sampler;
+`tmp/3979`–`tmp/3980` passed both refusal reasons, one recovery
+attempt, later A vector service and durable cancellation. The
+owner-set duration/fraction bound has been requested and remains open.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

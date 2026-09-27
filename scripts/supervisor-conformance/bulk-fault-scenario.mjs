@@ -686,11 +686,19 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
   if (gapApproval || gapCancellation || gapRecomposeFailure) {
     requireThat(distinctModelB && inPlaceModelB,
       'installed model gap proof requires a distinct forced in-place candidate');
-    await exerciseLiveModelGapDecision({ work, data, indexBase, manifest, apiPort,
-      operationKey, sourceGeneration, sourceManifest, marker, file, bRoot, dispatched,
-      readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
-      reachedFile, releaseFile, migrationBarrier, operationPath, gapCancellation,
-      gapRecomposeFailure });
+    // The deliberate A-recompose-failure case enters UNAVAILABLE; it is a different
+    // acceptance path from the ordinary RELOADING refusal window.
+    const semanticSampler = gapRecomposeFailure ? null
+      : sampleSemanticAvailability({ apiPort, post, marker, file, matchingHit });
+    try {
+      await exerciseLiveModelGapDecision({ work, data, indexBase, manifest, apiPort,
+        operationKey, sourceGeneration, sourceManifest, marker, file, bRoot, dispatched,
+        readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
+        reachedFile, releaseFile, migrationBarrier, operationPath, gapCancellation,
+        gapRecomposeFailure, semanticSampler });
+    } finally {
+      await semanticSampler?.stop();
+    }
     return;
   }
   let cancellationKey;
@@ -1012,12 +1020,72 @@ async function cancelReindexWithApproval({ apiPort, manifest, reindexKey,
   return cancellationKey;
 }
 
+/** Sample the real vector port from activation admission until A's semantic service returns. */
+function sampleSemanticAvailability({ apiPort, post, marker, file, matchingHit }) {
+  const started = performance.now();
+  const observations = [];
+  const unexpectedSamples = [];
+  let running = true;
+  let result;
+  const task = (async () => {
+    while (running) {
+      const at = performance.now();
+      let outcome = 'transport';
+      try {
+        const reply = await post(apiPort, '/api/knowledge/search',
+          { query: marker, limit: 10, mode: 'vector' }, 10000);
+        if (reply.status === 200 && matchingHit(reply, file, marker)) {
+          outcome = 'available';
+        } else if (reply.status === 400 && reply.text.includes('NO_EMBEDDING_SERVICE')) {
+          outcome = 'reloading';
+        } else if (reply.status === 503 && reply.text.includes('"reason":"worker.starting"')) {
+          outcome = 'worker-starting';
+        } else {
+          outcome = reply.status === 200 ? 'available-unmatched' : `unexpected-${reply.status}`;
+          if (unexpectedSamples.length < 5) unexpectedSamples.push({
+            status: reply.status, body: reply.text.slice(0, 400),
+          });
+        }
+      } catch {
+        // Engine restarts are separate transport outages, never counted as reloading refusals.
+      }
+      observations.push({ at, outcome });
+      if (running) await new Promise(resolve => setTimeout(resolve, 250));
+    }
+  })();
+  return { async stop() {
+    if (result) return result;
+    running = false;
+    await task;
+    const ended = performance.now();
+    const refusals = observations.filter(sample => sample.outcome === 'reloading');
+    const firstRefusal = refusals[0]?.at;
+    const lastRefusal = refusals.at(-1)?.at;
+    const firstRecovery = observations.find(sample => sample.outcome === 'available'
+      && firstRefusal != null && sample.at > lastRefusal)?.at;
+    const transitionMs = Math.round(ended - started);
+    const refusalWindowMs = firstRefusal == null ? 0
+      : Math.round((firstRecovery ?? ended) - firstRefusal);
+    result = { transitionMs, refusalWindowMs,
+      refusedFraction: transitionMs === 0 ? 0 : refusalWindowMs / transitionMs,
+      sampledRequests: observations.length,
+      reloadingRefusals: refusals.length,
+      available: observations.filter(sample => sample.outcome === 'available').length,
+      workerStarting: observations.filter(sample => sample.outcome === 'worker-starting').length,
+      transport: observations.filter(sample => sample.outcome === 'transport').length,
+      unexpected: observations.filter(sample => sample.outcome.startsWith('unexpected-')
+        || sample.outcome === 'available-unmatched').length,
+      unexpectedSamples };
+    return result;
+  } };
+}
+
 /** A captured installer file disappears before B builds; A must regain native service at the wait. */
 async function exerciseLiveModelGapDecision(c) {
   const { work, data, indexBase, manifest, apiPort, operationKey, sourceGeneration,
     sourceManifest, marker, file, bRoot, dispatched, readJson, waitFor, request, post,
     requireThat, createOperationKey, matchingHit, reachedFile, releaseFile,
-    migrationBarrier, operationPath, gapCancellation, gapRecomposeFailure } = c;
+    migrationBarrier, operationPath, gapCancellation, gapRecomposeFailure, semanticSampler } = c;
   const sourceModel = gapRecomposeFailure
     ? path.resolve(sourceManifest.models.embedding.id) : null;
   const hiddenSourceModel = sourceModel ? `${sourceModel}.recompose-held` : null;
@@ -1125,6 +1193,11 @@ async function exerciseLiveModelGapDecision(c) {
           ? reply : null;
       } catch { return null; }
     });
+  const semantic = await semanticSampler?.stop();
+  if (semantic) requireThat(semantic.reloadingRefusals > 0 && semantic.available > 0
+    && semantic.refusalWindowMs > 0 && semantic.refusalWindowMs <= semantic.transitionMs
+    && semantic.unexpected === 0,
+  `floor semantic sampling missed a real refusal and recovery: ${JSON.stringify(semantic)}`);
   if (gapCancellation) {
     const cancellationKey = await cancelReindexWithApproval({ apiPort, manifest,
       reindexKey: operationKey, createOperationKey, request, post, requireThat });
@@ -1158,7 +1231,7 @@ async function exerciseLiveModelGapDecision(c) {
       floor: 'floor simulated by device-memory cap', floorEvidence,
       aVectorHitsDuringWait: JSON.parse(aVector.text).results.length,
       aVectorHitsAfterCancel: JSON.parse(resumedA.text).results.length,
-      terminalState: retired.row.state,
+      terminalState: retired.row.state, ...(semantic ? { semantic } : {}),
       ...(failedRecompose ? { failedRecompose } : {}) }));
     return;
   }
@@ -1212,7 +1285,7 @@ async function exerciseLiveModelGapDecision(c) {
     aVectorHits: JSON.parse(aVector.text).results.length,
     bVectorHits: JSON.parse(bVector.text).results.length,
     gapListHash: waiting.outcome.result.gapListHash,
-    terminalReason: promoted.row.failure_reason }));
+    terminalReason: promoted.row.failure_reason, ...(semantic ? { semantic } : {}) }));
 }
 
 function linkRegularFiles(source, target) {
