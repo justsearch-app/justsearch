@@ -6,6 +6,23 @@ Updated 2026-09-27 after the agent handoff. Start with the
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
 
+**Current 2026-09-27 cut:** Exact-SHA CI on `3d66c74c9` passed every job in
+[run 36299571929](https://github.com/justsearch-app/justsearch/actions/runs/36299571929).
+The pushed `5c721c59a` harness checkpoint measures ordinary forced in-place
+A→B promotion, 14,207 ms of sampled reload refusal in 47,419 ms; exact-SHA
+hosted [run 36300510675](https://github.com/justsearch-app/justsearch/actions/runs/36300510675)
+passed every job. The following pushed `f09413284` checkpoint tightens
+the gate to require a matching vector response after the last refusal;
+fresh installed `tmp/3983`–`tmp/3984` passed, including that recovery,
+B promotion and clean stop. Its exact-SHA CI run `36301513364` is in progress.
+A separate
+local D1-12 adapter test now writes
+two concurrently open, differently bound Lucene runtimes and checks parity
+at `tmp/3988`.
+The owner-set D1-14 wall-clock/fraction bound, installed restored-A held-call,
+full Worker Flow B and remaining D1/D2/E/F acceptance remain open. See
+[handoff](handoff.md) and [D1](stages/D1.md) for exact counts and limits.
+
 **2026-09-26 resumption:** Hosted CI on exact PR head `67890842f` passed all
 13 jobs ([run 36269109655](https://github.com/justsearch-app/justsearch/actions/runs/36269109655)).
 The before-pointer retained-capacity branch passed against installed standard

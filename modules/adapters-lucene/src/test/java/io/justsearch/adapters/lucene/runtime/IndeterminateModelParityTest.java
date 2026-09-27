@@ -10,6 +10,7 @@ import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.runtime.CommitMetadataSource;
@@ -38,6 +39,51 @@ import org.junit.jupiter.api.Test;
  * inputs it names ({@link IndexFingerprint#indeterminateModelInputs()}).
  */
 final class IndeterminateModelParityTest extends LuceneExecutorTestBase {
+
+  @Test
+  void coResidentRuntimesCommitAndCheckTheirOwnModelIdentity() throws Exception {
+    Path blue = Files.createTempDirectory("parity-model-blue");
+    Path green = Files.createTempDirectory("parity-model-green");
+    var config = ResolvedConfig.builder().contributeEnvRegistry().build();
+    var absent = IndexFingerprint.ModelFingerprint.notConfigured();
+    var blueSource = new SsotCommitMetadataSource(config,
+        new SsotCommitMetadataSource.RuntimeFingerprintInputs(768,
+            IndexFingerprint.ModelFingerprint.present("a".repeat(64)), absent, absent));
+    var greenSource = new SsotCommitMetadataSource(config,
+        new SsotCommitMetadataSource.RuntimeFingerprintInputs(768,
+            IndexFingerprint.ModelFingerprint.present("b".repeat(64)), absent, absent));
+
+    try (var blueRuntime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), blueSource,
+            new JsonSchemaCommitMetadataValidator()).atPath(blue)
+            .withExecutorRegistrations(testLuceneExecutors()).open();
+        var greenRuntime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), greenSource,
+            new JsonSchemaCommitMetadataValidator()).atPath(green)
+            .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      blueRuntime.indexingCoordinator().indexSingle(new IndexDocument(
+          Map.of(SchemaFields.DOC_ID, "blue", SchemaFields.DOC_UID, "blue#0")));
+      greenRuntime.indexingCoordinator().indexSingle(new IndexDocument(
+          Map.of(SchemaFields.DOC_ID, "green", SchemaFields.DOC_UID, "green#0")));
+      blueRuntime.commitOps().commitAndTrack();
+      greenRuntime.commitOps().commitAndTrack();
+    }
+    Map<String, String> blueCommit = storedUserData(blue);
+    Map<String, String> greenCommit = storedUserData(green);
+    assertFalse(blueCommit.get(IndexFingerprint.COMMIT_META_KEY)
+        .equals(greenCommit.get(IndexFingerprint.COMMIT_META_KEY)));
+
+    IndexFingerprint.installModelFingerprintProviders(
+        () -> IndexFingerprint.ModelFingerprint.present("c".repeat(64)),
+        IndexFingerprint.ModelFingerprint::notConfigured,
+        IndexFingerprint.ModelFingerprint::notConfigured);
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(blue, blueSource::build).isEmpty());
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(green, greenSource::build).isEmpty());
+    var blueWithGreen = IndexMetadataParityGuard.inspectCommittedParity(blue, greenSource::build);
+    var greenWithBlue = IndexMetadataParityGuard.inspectCommittedParity(green, blueSource::build);
+    assertEquals(1, blueWithGreen.size());
+    assertEquals(1, greenWithBlue.size());
+    assertEquals(IndexFingerprint.COMMIT_META_KEY, blueWithGreen.getFirst().key());
+    assertEquals(IndexFingerprint.COMMIT_META_KEY, greenWithBlue.getFirst().key());
+  }
 
   @AfterEach
   void resetProcessWideProviders() {

@@ -17,13 +17,14 @@ observed 53 `reloading` refusals, 43 matching available responses, 29
 refusal in a 47,419 ms transition (29.96%), then B promoted and answered two
 VECTOR hits. The process exited zero and the supervised run stopped with no
 orphan. This is local installed evidence for the ordinary promotion branch;
-the sampler addition to that branch awaits hosted proof. The
-owner-set semantic wall-clock/fraction bound remains pending, so these
+the sampler addition passed every hosted job in exact-SHA
+[CI 36300510675](https://github.com/justsearch-app/justsearch/actions/runs/36300510675).
+The owner-set semantic wall-clock/fraction bound remains pending, so these
 measurements do not accept the D1 product floor. Startup 503 and transport
 gaps are reported separately from `reloading` and must not be hidden by the
 fraction. The `3d66c74c9` exact-SHA hosted run is
 [CI 36299571929](https://github.com/justsearch-app/justsearch/actions/runs/36299571929);
-check its terminal result before claiming hosted proof.
+it passed every job, including Windows-native and system integration.
 
 The first sampler gate could pass on A's availability **before** the refusal;
 that did not prove sampled recovery. The corrected gate requires a matching
@@ -33,8 +34,23 @@ pass in `bulk-fault-semantic.test.mjs`; fresh seed
 `tmp/3984-full-transition-recovery-gate.txt` passed with
 `recoveredAfterRefusal=true`, 53 reload refusals, 43 available responses,
 14,207/47,469 ms (29.93%), B VECTOR two hits and `STOP 0`. Official health
-returned `ABSENT` with no inference orphan. The correction is locally
-checkpointed; hosted checks on its exact SHA remain pending.
+returned `ABSENT` with no inference orphan. The correction was pushed as
+`f09413284`; its exact-SHA
+[CI 36301513364](https://github.com/justsearch-app/justsearch/actions/runs/36301513364)
+is in progress. The separate CLA workflow `36301511335` passed but is not CI.
+
+**2026-09-27 D1-12 per-runtime parity substrate.** A new adapter test writes
+two Lucene runtimes with distinct embedding identities in one JVM, then
+changes the process-wide provider. Each runtime's parity guard accepts its
+own committed identity and rejects the other's with exactly one model
+fingerprint mismatch. Both runtimes were open at once. The focused class
+passed eight tests, zero skips/failures/errors, plus Spotless/PMD at
+`tmp/3988-per-runtime-co-resident.txt`. This is local
+metadata/parity proof, not the full Worker model-generation/latch acceptance.
+The full adapters-lucene suite passed at
+`tmp/3989-per-runtime-adapters-suite.txt` (742 tests, zero
+failures/errors/skips); its XML is retained under
+`tmp/3989-per-runtime-adapters-xml`.
 
 **Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
 D1-9 streaming correction and its proofs before further implementation. Stage
