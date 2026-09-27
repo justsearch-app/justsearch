@@ -4,7 +4,7 @@ stage: E
 created: 2026-09-09
 base: be47faa40
 status: "runbook, written during stage C planning; instruments and values re-verified at stage start (17.6)"
-updated: 2026-09-24
+updated: 2026-09-27
 ---
 
 # Lane F stage E — gate run: runbook
@@ -276,6 +276,21 @@ hour of sandbox time.
   conclusion: machine, corpus, workload, soak duration and fault scenarios.
   Conditional floor/OS/representative/collector exercises are named when run,
   and claims are bounded when they are not.
+
+### Host decision inputs (WP4)
+
+Record these observations in `evidence/E/host-decision-inputs.md` from the named runs; they
+inform the first post-Lane-F host review without adding another E gate:
+
+| Input | Source row and observation |
+|---|---|
+| Native encoder faults | E4 soak and E5 crash recovery: count supervisor `native crash` exits and retain exact exit evidence. |
+| Encoder reconfigure cost and text-only window | D1 Flow B beside and in-place feature acceptance plus E2 foreground search: wall clock from reconfigure admission to encoder READY, and time in `RELOADING` while lexical search answers. |
+| Encoder share of Engine restart | E5 recovery: difference between API/text readiness and encoder/semantic readiness on the same boot, with the actual component timestamps. |
+| Request-time encoder latency | E2 idle and contended search: query embedding, query sparse encoding, rerank and citation timings where active, with model identity, workload and contention recorded. |
+
+State unavailable measurements as such; a restart interval is a proxy for encoder load only when
+the run's timeline identifies that phase. Apply design §5's trigger/revisit rule in the E decision.
 
 Stage F reads this directory and the D1/D2 stage records.
 

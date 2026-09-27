@@ -24,6 +24,8 @@ import io.justsearch.core.component.DeviceMemoryLine;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.services.CandidateIndexTargetCapture;
+import io.justsearch.ort.SessionAcquisitionRequest;
+import io.justsearch.ort.SessionRetiredException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -34,9 +36,11 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 
@@ -109,6 +113,60 @@ final class KnowledgeServerDeviceMemoryLineTest {
             "the restored A must own a newly composed native set");
       }
       assertTrue(fixture.sourceOwner.isClosed());
+    }
+  }
+
+  @Test
+  void restoredSourceNativeCallDrainsBeforeAnotherInPlaceBuild(@TempDir Path dir)
+      throws Exception {
+    var discovery = io.justsearch.ort.testing.ModelDirTestResolver.discover(
+        "models/onnx/gte-multilingual-base", null, "model.onnx");
+    Assumptions.assumeTrue(discovery.modelDir() != null,
+        "standard embedding model is unavailable for native lifetime proof");
+    var handle = io.justsearch.ort.testing.InferenceCompositionRootTestHelper.cpuSessionFor(
+        "restored-A-held-native", discovery.modelDir());
+    var request = SessionAcquisitionRequest.within(
+        SessionAcquisitionRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(2));
+    try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
+        var composition = mockedComposition()) {
+      composition.when(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
+          any(), any(), any()))
+          .thenThrow(new IllegalStateException("B rejected"))
+          .thenReturn(new InferenceSurface(Optional.empty(), Optional.empty(), Optional.empty(),
+              Optional.empty(), Optional.empty(), Optional.empty(),
+              mock(io.justsearch.ort.PolicySnapshot.class), List.of(handle)));
+      var refusal = assertThrows(InvocationTargetException.class, fixture::composeCandidate)
+          .getCause();
+      fixture.recomposeAfterRefusal((Exception) refusal);
+      try (var restored = fixture.server.captureServingView()) {
+        assertTrue(restored.encoderSet() != fixture.sourceOwner,
+            "A's restored native owner must be a new generation");
+      }
+
+      var issuedNative = handle.acquireCpu(request);
+      try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+        try {
+          var nextBuild = executor.submit(() -> {
+            fixture.beginInPlaceBuild();
+            return null;
+          });
+          long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+          while (handle.retirementStatus() == io.justsearch.ort.SessionHandle.RetirementStatus.ACTIVE
+              && System.nanoTime() < deadline) Thread.onSpinWait();
+          assertEquals(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRING,
+              handle.retirementStatus(), "the next build must retire restored A first");
+          assertTrue(!nextBuild.isDone(), "B cannot compose while restored A's native call runs");
+          assertTrue(!issuedNative.session().getInputNames().isEmpty(),
+              "restored A's issued native session stays readable during retirement");
+          assertThrows(SessionRetiredException.class, () -> handle.acquireCpu(request));
+          issuedNative.close();
+          nextBuild.get(5, TimeUnit.SECONDS);
+          assertEquals(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED,
+              handle.retirementStatus());
+        } finally {
+          issuedNative.close();
+        }
+      }
     }
   }
 
@@ -207,6 +265,12 @@ final class KnowledgeServerDeviceMemoryLineTest {
       Method compose = KnowledgeServer.class.getDeclaredMethod("composeRecordedCandidateModels");
       compose.setAccessible(true);
       candidate = compose.invoke(server);
+    }
+
+    private void beginInPlaceBuild() throws Exception {
+      Method begin = KnowledgeServer.class.getDeclaredMethod("beginInPlaceCandidateBuild");
+      begin.setAccessible(true);
+      begin.invoke(server);
     }
 
     private ComposeEvidence composeEvidence() {

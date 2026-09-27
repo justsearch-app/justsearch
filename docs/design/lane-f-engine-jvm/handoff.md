@@ -450,6 +450,26 @@ PMD/Spotless at `tmp/3912-generation-latch-final-worker.txt` (3m24s).
 The worker-services and adapters-lucene suites at `tmp/3911` remain applicable
 because those modules did not change after that run.
 
+**2026-09-27 D1-13 restored-A native follow-on.** A new
+`KnowledgeServerDeviceMemoryLineTest` case refuses an in-place B composition,
+publishes a newly composed A, acquires its real CPU ORT session, and starts
+another in-place build. It observes restored A's exact session readable in
+`RETIRING`, refuses a new native lease, and requires the build to wait until
+the issued lease exits. The focused class ran five tests with zero skips or
+failures at `tmp/3916-restored-native-round.txt`; the complete Worker suite,
+Spotless and PMD passed at `tmp/3917-restored-native-worker.txt` (3m23s).
+This connects restoration to the native retirement path. Installed proof of
+a held call across the A-restoration sequence remains open.
+
+**2026-09-27 WP4 containment follow-on.** The production dependency inventory
+found native session and `EncoderSet` use inside the encoder packages, with
+two dated exceptions: the backfill BFC-arena classifier and standalone
+benchmark. `NativeInferenceContainmentTest` pins that boundary, proves a
+planted application dependency fails it, and verifies its importer includes
+the production `EncoderSet`. The three focused tests, Spotless and PMD passed
+with exact-class exceptions at `tmp/3922-wp4-exact-exceptions.txt`. Design §0/§5 and E §8 now record the
+in-process decision, revisit triggers and four measurement inputs.
+
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor
 `INGEST` row, `superseded_from` linkage and `SUCCESSOR_ROW_MISSING` branch were

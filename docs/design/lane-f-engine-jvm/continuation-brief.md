@@ -116,6 +116,16 @@ at `tmp/3911`. Full Flow B still needs the wrapper-owner migration and
 beside-mode different-model Green build with live A search.
 The final Worker-side lookup also refuses an unretained stale service after
 publication; its complete module suite and PMD/Spotless passed at `tmp/3912`.
+The next D1-13 Worker regression composes restored A after an in-place B
+refusal, holds a real CPU native session on restored A, and proves another
+in-place build waits for that exact lease. The focused class ran five tests,
+zero skips/failures at `tmp/3916`; full Worker and static checks passed at
+`tmp/3917`. An installed held-call A-restoration round remains open.
+WP4 containment now has a production ArchUnit rule, a planted application
+dependency negative control, and an importer assertion covering `EncoderSet`.
+Three tests plus Spotless/PMD passed with exact-class exceptions at `tmp/3922`.
+Design §0/§5 and E §8
+record the in-process decision and host review measurements.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

@@ -76,3 +76,22 @@ Two things make that deferral cheap and reversible:
 
 **Estimate:** under 0.5 session. Land 4.1 with the next D1-13 or D1-14 checkpoint, so new
 native code is born contained.
+
+**Implementation checkpoint, 2026-09-27.**
+`NativeInferenceContainmentTest` now pins native session, acquisition and
+`EncoderSet` types to encoder implementation packages. The only exact-class
+exceptions in the current production inventory are
+`CombinedEnrichmentBackfillOps`, which calls the existing BFC-arena failure
+classifier without holding a lease, and the standalone diagnostic benchmark.
+The rule selects ownership-bearing native/session types by name: `ort-common`
+also exports neutral `EncoderRole` and GPU probe/diagnostic types consumed by
+app-services and UI, so a blanket `io.justsearch.ort..` ban would reject
+existing non-lifetime contracts. The separate GPU-probe boundary rule still
+governs raw probe access.
+The rule's planted `app-launcher` dependency fails as expected, and a separate
+assertion confirms the production importer actually sees `EncoderSet`.
+The focused ArchUnit class ran three tests without skips/failures and passed
+Spotless/PMD with the exact-class exceptions at `tmp/3922-wp4-exact-exceptions.txt`;
+the prior compile and PMD corrections are at `tmp/3918`–`tmp/3919`. Design §0/§5 records the decision
+and E §8 names the four measured host-decision inputs. Hosted CI on this
+checkpoint remains to run.

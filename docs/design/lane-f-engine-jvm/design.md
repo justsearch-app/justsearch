@@ -3,7 +3,7 @@ title: "Lane F: one Engine JVM, with process boundaries that follow runtime and 
 type: design
 status: "LOCKED with dated amendments; A/B/C1/C2 accepted; D1 in progress, D2/E/F open. Remaining solvable design resolved 2026-09-23; implementation and production proof remain. Draft PR727, merge at F."
 created: 2026-09-06
-updated: 2026-09-25
+updated: 2026-09-27
 lane: F (decision re-examination programme, wave 4)
 model: Sol continuation; Astra design resolution 2026-09-23
 category: engine / process-boundary
@@ -28,6 +28,8 @@ This document is the lane's contract: the design and the considerations that sha
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-27: WP4 keeps the stage-1 in-process encoder owner for Lane F and pins native session/lease dependencies to encoder implementation packages with an ArchUnit negative control. The existing backfill BFC-arena classifier and standalone benchmark are dated exceptions; neither owns a native lease. Stage E records the host-decision measurements from its existing rows. Re-open an out-of-process host when a trigger is evidenced or at the first release after Lane F. [WP4 decision](improvements/WP4-inference-host-decision.md), [E record](stages/E.md#8-the-record-evidencee).
 
 - 2026-09-25: D1-8/D1-9 correct C2's unused successor-ingest-row design under §17.6. The live cutover prepares Green's writer and producer transfer before the pointer; the accepted reindex row, exact recorded generation binding, reopened writable B and settled replay are its recovery witnesses. A separate ingest row would duplicate the accepted reindex owner without another effect boundary. Retire `SUCCESSOR_ROW_MISSING` and `superseded_from` as live contracts; keep the fail-closed writable-B/replay/binding checks and their negative tests. [C2 correction](evidence/C2/operations-store-design.md#17-activation-order-d1), [D1 acceptance](stages/D1.md#d1-9--the-journal-replay-gaps-refusal-and-the-generations-permit), [handoff](handoff.md).
 
@@ -1062,6 +1064,15 @@ named now: model identity and capability set per call, cancellation, partial fai
 binding of a query embedding to the index generation it may search (7.4 keeps model identity as
 generation metadata). Triggers that pull the lane forward: field data showing encoder faults; a
 second GPU runtime or OS; concurrent verification stacks (12); stage 1 reconfigure cost.
+
+**WP4 containment and revisit rule (2026-09-27).** Native session and `EncoderSet` types stay
+inside the encoder implementation packages; application, UI and `core` callers receive results
+and capability observations, never lease tokens. The ArchUnit rule pins this boundary and a
+planted application dependency proves it fires. The backfill BFC-arena classifier and standalone
+diagnostic benchmark are explicit exceptions to the package allowlist, with no lease ownership.
+Stage E measures native encoder faults, reconfigure and text-only duration, encoder share of
+Engine restart, and request-time encoder latency. Revisit the host when one of section 5's
+triggers is observed, or at the first release after Lane F, using these measurements.
 
 ## 6. The wire: what is deleted, what is kept, and what the split really gave
 
