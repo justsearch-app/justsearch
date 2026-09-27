@@ -21,8 +21,9 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
   directories: the raw-evidence inventories hash them through Lane F acceptance.
 - **Next, in order:**
   1. Confirm exact-SHA hosted CI for this checkpoint.
-  2. D1-18, the live migration start. It is specified and not implemented; the one fact to design
-     around is the services swap noted in the spec.
+  2. D1-18, the live migration start. The first attempt was reverted; its evidence and patch are
+     in D1-18. Design the native-producer handoff first, because neither Flow A nor Flow B can
+     reuse the incumbent services.
   3. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
      `index.dense_unavailable`, but the provisional "rebuilding" verdict takes precedence; observe
      before changing UI.

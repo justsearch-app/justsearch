@@ -68,7 +68,10 @@ test('refuses a linked model tree before deleting any candidate', t => {
 test('free-space preflight refuses a threshold above current free space', t => {
   const { work } = fixture(t);
   const volume = fs.statfsSync(work, { bigint: true });
-  const free = volume.bavail * volume.bsize;
-  assert.throws(() => assertFixtureFreeSpace(work, free + 1n), /prune regenerable installer model caches/);
+  // Free space moves while parallel test files write and delete; the volume's whole capacity plus
+  // one byte is a threshold no later free-space read can satisfy (hosted CI raced `free + 1`).
+  const unreachable = volume.blocks * volume.bsize + 1n;
+  assert.throws(() => assertFixtureFreeSpace(work, unreachable),
+    /prune regenerable installer model caches/);
   assert.ok(assertFixtureFreeSpace(work, 0n) >= 0n);
 });
