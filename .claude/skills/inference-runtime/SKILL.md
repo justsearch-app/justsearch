@@ -292,6 +292,18 @@ Settled empirical facts. Each was an open question that got answered.
 - **Scope:** these are generative lifecycle contracts. The full result-bearing component
   compose protocol remains D1 work; this does not establish atomic multi-component reconfigure.
 
+### F-020: local ORT acquisition horizon starts at each batch acquisition
+
+- **Finding (2026-09-27):** `OnnxEmbeddingEncoder` created the five-minute local background
+  request before tokenizing a large document batch, then reused it for later ORT batches.
+  A later acquisition could fail immediately after the horizon elapsed even when the native
+  session was available. The full Worker suite exposed this in the multi-group tokenization
+  test at `tmp/5119-d1-14-full-test-final.txt`.
+- **Correction:** each ORT batch and CPU fallback obtains a fresh local acquisition request
+  when it acquires a session. This changes only the interim local horizon; D2 still owns
+  propagation of an admitted caller's absolute deadline. The affected encoder class and
+  extraction sandbox class passed focused at `tmp/5121-native-failures-focused.txt`.
+
 ## Decisions
 
 Design choices in the current inference runtime, with rationale.

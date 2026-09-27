@@ -314,13 +314,12 @@ public final class OnnxEmbeddingEncoder implements Closeable {
   private static final int MAX_ORT_BATCH_SIZE = 8;
 
   public List<float[]> embedBatch(List<String> texts) throws OrtException {
-    var acquisition = LocalSessionAcquisition.background();
     if (texts.isEmpty()) {
       return List.of();
     }
     if (texts.size() == 1) {
       // Fast path: avoid batch overhead for single text
-      float[] vec = embed(texts.get(0), acquisition).vector();
+      float[] vec = embed(texts.get(0), LocalSessionAcquisition.background()).vector();
       return List.of(vec);
     }
 
@@ -329,16 +328,15 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       List<float[]> allResults = new ArrayList<>(texts.size());
       for (int start = 0; start < texts.size(); start += MAX_ORT_BATCH_SIZE) {
         int end = Math.min(start + MAX_ORT_BATCH_SIZE, texts.size());
-        allResults.addAll(embedBatchInternal(texts.subList(start, end), acquisition));
+        allResults.addAll(embedBatchInternal(texts.subList(start, end)));
       }
       return allResults;
     }
 
-    return embedBatchInternal(texts, acquisition);
+    return embedBatchInternal(texts);
   }
 
-  private List<float[]> embedBatchInternal(
-      List<String> texts, SessionAcquisitionRequest acquisition) throws OrtException {
+  private List<float[]> embedBatchInternal(List<String> texts) throws OrtException {
     int batchSize = texts.size();
     long tTok = System.nanoTime();
     List<long[][]> tokenized = new ArrayList<>(batchSize);
@@ -353,7 +351,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
           });
     }
     profiler.addPhaseNs("tokenize", System.nanoTime() - tTok);
-    return embedPreTokenizedBatch(tokenized, acquisition);
+    return embedPreTokenizedBatch(tokenized, LocalSessionAcquisition::background);
   }
 
   /**
@@ -366,7 +364,8 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * @return one L2-normalized mean-pooled vector per input chunk
    */
   private List<float[]> embedPreTokenizedBatch(
-      List<long[][]> tokenizedChunks, SessionAcquisitionRequest acquisition) throws OrtException {
+      List<long[][]> tokenizedChunks,
+      java.util.function.Supplier<SessionAcquisitionRequest> acquisition) throws OrtException {
     if (tokenizedChunks.isEmpty()) {
       return List.of();
     }
@@ -429,7 +428,9 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       // becomes knowable.
       Span ortSpan = EncoderOrtRunSpans.maybeOrtRun(ORT_TRACER, "embed", batchSize, maxLen);
       try (Scope _ = ortSpan.makeCurrent()) {
-        try (var lease = sessions.acquire(acquisition)) {
+        // The local five-minute horizon bounds this acquisition, not prior tokenization or
+        // earlier ORT batches. D2 may supply the caller's absolute deadline here instead.
+        try (var lease = sessions.acquire(acquisition.get())) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
 
           long tExtract;
@@ -467,7 +468,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
                         runSingleHidden(
                             lease, allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen),
                     i -> {
-                      try (var cpuLease = sessions.acquireCpu(acquisition)) {
+                      try (var cpuLease = sessions.acquireCpu(acquisition.get())) {
                         return runSingleHidden(
                             cpuLease, allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen);
                       }
@@ -608,24 +609,23 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * @throws OrtException if ONNX inference fails
    */
   public List<EmbedResult> embedBatchWithChunking(List<String> texts) throws OrtException {
-    var acquisition = LocalSessionAcquisition.background();
     if (texts.isEmpty()) {
       return List.of();
     }
     if (texts.size() == 1) {
-      return List.of(embed(texts.get(0), acquisition));
+      return List.of(embed(texts.get(0), LocalSessionAcquisition.background()));
     }
 
-    return encodeWindowBatches(texts, true, acquisition);
+    return encodeWindowBatches(texts, true);
   }
 
   /** Parent-vector path: pool windows as they finish without retaining unused chunk vectors. */
   public List<EmbedResult> embedBatchPooled(List<String> texts) throws OrtException {
-    return encodeWindowBatches(texts, false, LocalSessionAcquisition.background());
+    return encodeWindowBatches(texts, false);
   }
 
   private List<EmbedResult> encodeWindowBatches(
-      List<String> texts, boolean retainChunks, SessionAcquisitionRequest acquisition)
+      List<String> texts, boolean retainChunks)
       throws OrtException {
     // Preserve the singleton path's one-window inference grouping and the batch path's
     // global groups of eight, including partial groups across tokenization boundaries.
@@ -633,7 +633,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
         texts.size() == 1
             ? 1
             : MAX_ORT_BATCH_SIZE,
-        windows -> embedPreTokenizedBatch(windows, acquisition));
+        windows -> embedPreTokenizedBatch(windows, LocalSessionAcquisition::background));
     int n = texts.size();
     int groupStart = 0;
     while (groupStart < n) {
@@ -794,7 +794,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     int end = Math.min(fromWindow + maxWindows, windows.size());
     return new WindowSliceResult(
         embedPreTokenizedBatch(
-            windows.subList(fromWindow, end), LocalSessionAcquisition.background()),
+            windows.subList(fromWindow, end), LocalSessionAcquisition::background),
         windows.size());
   }
 
