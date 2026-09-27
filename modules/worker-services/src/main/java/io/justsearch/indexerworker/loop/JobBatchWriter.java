@@ -15,11 +15,14 @@ import io.justsearch.indexerworker.loop.ops.IndexingDocumentOps;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
+import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
+import java.io.IOException;
+import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongConsumer;
 import java.util.function.Supplier;
@@ -149,9 +152,11 @@ public final class JobBatchWriter {
 
       long writeStart = System.currentTimeMillis();
       RunningRuntime lexicalSource = activeLexicalSource.get();
-      if (lexicalSource != null) {
-        // A is a separate generation. The accepted B claim also projects text to the
-        // still-serving A, without placing B's vector or sparse model output in A.
+      if (lexicalSource != null && needsActiveLexicalProjection(lexicalSource, ex, doc)) {
+        // Green enumeration must not replace an unchanged A document with a lexical-only
+        // version: that would erase A's vector while A is still serving queries.
+        // New or changed source bytes, identity, collection or lexical metadata
+        // still project text to A.
         var lexicalMetadata = IndexingDocumentOps.deriveParentMetadata(
             ex.filePath(), ex.artifact().result(), null, log);
         var lexicalDocument = IndexingDocumentOps.buildDocument(
@@ -291,6 +296,30 @@ public final class JobBatchWriter {
   private static boolean isDrainingWriteRejection(Throwable e) {
     return e instanceof IndexRuntimeIOException indexRuntimeIOException
         && indexRuntimeIOException.reason() == IndexRuntimeIOException.Reason.DRAINING;
+  }
+
+  private static boolean needsActiveLexicalProjection(
+      RunningRuntime lexicalSource, ExtractedJob ex, IndexDocument candidate) {
+    try {
+      String docId = PathNormalizer.normalizeKey(ex.filePath());
+      DocumentFieldOps fields = lexicalSource.documentFieldOps();
+      String activeHash = fields.getDocumentFieldOrThrow(docId, SchemaFields.SOURCE_SHA256);
+      if (ex.sourceSha256() == null || !ex.sourceSha256().equals(activeHash)) {
+        return true;
+      }
+      for (String field : new String[] {SchemaFields.DOC_UID, SchemaFields.COLLECTION,
+          SchemaFields.CONTENT_SHA256, SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT}) {
+        Object candidateValue = candidate.fields().get(field);
+        String expected = candidateValue == null ? null : candidateValue.toString();
+        if (!Objects.equals(expected, fields.getDocumentFieldOrThrow(docId, field))) {
+          return true;
+        }
+      }
+      return false;
+    } catch (IOException e) {
+      throw new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DISK_IO,
+          "Cannot read serving document fields before lexical projection: " + ex.filePath(), e);
+    }
   }
 
   private Span maybeSpan(String name) {

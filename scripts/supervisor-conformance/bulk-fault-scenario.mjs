@@ -614,14 +614,19 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     ? path.join(work, 'installer-root-b', `watcher-delete-during-b-${operationKey}.txt`) : null;
   const removedMarker = removedFile
     ? 'watcherremovalcoral' : null;
-  await waitFor('installed A serves a real vector query before B', 120000, async () => {
+  const sourceVector = await waitFor('installed A serves its exact vector document before B',
+    120000, async () => {
     try {
       const response = await post(apiPort, '/api/knowledge/search',
         { query: marker, limit: 10, mode: 'vector' }, 30000);
-      return response.status === 200 && JSON.parse(response.text).results?.length > 0
+      return response.status === 200 && matchingHit(response, file, marker)
         ? response : null;
     } catch { return null; }
   });
+  console.log('MODEL_LIVE_AB_SOURCE_VECTOR', JSON.stringify({
+    sourceGeneration, path: file,
+    hits: JSON.parse(sourceVector.text).results.length,
+  }));
   // Add build load only after A has served a real vector result. These files hold
   // MIGRATING long enough for the native watcher edges and explicit pause.
   for (let i = 0; i < extraBuildFiles; i++) {
@@ -847,8 +852,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
         && JSON.parse(vectorSearch.text).errorCode === 'INVALID_REQUEST'
         && vectorSearch.text.includes('NO_EMBEDDING_SERVICE')
         && status?.components?.encoders?.state === 'RELOADING'
-      : vectorSearch.status === 200
-        && JSON.parse(vectorSearch.text).results?.length > 0;
+      : vectorSearch.status === 200 && matchingHit(vectorSearch, file, marker);
     requireThat(textSearch.status === 200 && matchingHit(textSearch, file, marker)
       && vectorOutcome,
     `serving A violated ${composeMode} mode while B was settled: ${JSON.stringify({

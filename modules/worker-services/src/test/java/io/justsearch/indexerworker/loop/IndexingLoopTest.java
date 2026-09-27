@@ -852,6 +852,87 @@ class IndexingLoopTest {
     }
 
     @Test
+    void unchangedGreenEnumerationPreservesServingAVectorDocument() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-unchanged", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      DocumentFieldOps activeFields = mock(DocumentFieldOps.class);
+      ExtractedJob claim = (ExtractedJob) extractedJob(file, "body");
+      Map<String, String> stored = Map.of(
+          SchemaFields.SOURCE_SHA256, claim.sourceSha256(),
+          SchemaFields.DOC_UID, claim.docUid(),
+          SchemaFields.CONTENT_SHA256,
+          io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex("body"),
+          SchemaFields.SIZE_BYTES, Long.toString(claim.envelope().sizeBytes()),
+          SchemaFields.MODIFIED_AT, Long.toString(claim.envelope().modifiedAtMs()));
+      when(active.documentFieldOps()).thenReturn(activeFields);
+      when(active.commitOps()).thenReturn(mock(CommitOps.class));
+      when(activeFields.getDocumentFieldOrThrow(
+          eq(io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file)), anyString()))
+          .thenAnswer(call -> stored.get(call.getArgument(1)));
+      loop.wireActiveLexicalSource(active);
+
+      invokeWriteExtractedJob(loop, claim);
+
+      verify(active, never()).indexingCoordinator();
+      verify(queue.indexingCoordinator).indexSingle(any());
+      assertNull(queue.lastOutcome, "Green still waits for its commit");
+      invokeFinishIdleCommit(loop);
+      assertTrue(queue.done);
+    }
+
+    @Test
+    void changedCollectionProjectsSameSourceBytesToServingA() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-collection", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      ExtractedJob claim = (ExtractedJob) extractedJob(file, "body");
+      ExtractedJob changedCollection = new ExtractedJob(file, "new-collection", claim.artifact(),
+          claim.startTime(), claim.envelope(), claim.sourceSha256(), claim.docUid());
+      RunningRuntime active = mock(RunningRuntime.class);
+      DocumentFieldOps activeFields = mock(DocumentFieldOps.class);
+      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      when(active.documentFieldOps()).thenReturn(activeFields);
+      when(active.indexingCoordinator()).thenReturn(activeWrites);
+      when(activeFields.getDocumentFieldOrThrow(
+          eq(io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file)), anyString()))
+          .thenAnswer(call -> switch ((String) call.getArgument(1)) {
+            case SchemaFields.SOURCE_SHA256 -> claim.sourceSha256();
+            case SchemaFields.DOC_UID -> claim.docUid();
+            case SchemaFields.COLLECTION -> "old-collection";
+            default -> null;
+          });
+      loop.wireActiveLexicalSource(active);
+
+      invokeWriteExtractedJob(loop, changedCollection);
+
+      verify(activeWrites).indexSingle(any());
+      verify(queue.indexingCoordinator).indexSingle(any());
+    }
+
+    @Test
+    void unreadableServingSourceHashCannotOverwriteOrAcknowledge() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-active-hash-io", ".txt"), "body");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("body"));
+      RunningRuntime active = mock(RunningRuntime.class);
+      DocumentFieldOps activeFields = mock(DocumentFieldOps.class);
+      when(active.documentFieldOps()).thenReturn(activeFields);
+      when(activeFields.getDocumentFieldOrThrow(
+          io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file),
+          SchemaFields.SOURCE_SHA256)).thenThrow(new IOException("hash read failed"));
+      loop.wireActiveLexicalSource(active);
+
+      invokeWriteExtractedJob(loop, extractedJob(file, "body"));
+
+      verify(active, never()).indexingCoordinator();
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+      assertEquals(IngestionOutcomeClass.WRITE_FAILED, queue.lastOutcome.outcomeClass());
+      assertFalse(queue.done);
+    }
+
+    @Test
     void failedActiveLexicalWriteCannotAcknowledgeGreenClaim() throws Exception {
       Path file = Files.writeString(Files.createTempFile("js-active-fail", ".txt"), "body");
       RecordingQueue queue = new RecordingQueue();
@@ -859,6 +940,7 @@ class IndexingLoopTest {
       RunningRuntime active = mock(RunningRuntime.class);
       IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
       when(active.indexingCoordinator()).thenReturn(activeWrites);
+      when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
       doThrow(new RuntimeException("A write failed")).when(activeWrites).indexSingle(any());
       loop.wireActiveLexicalSource(active);
 

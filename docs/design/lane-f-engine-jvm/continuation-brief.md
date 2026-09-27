@@ -126,6 +126,27 @@ dependency negative control, and an importer assertion covering `EncoderSet`.
 Three tests plus Spotless/PMD passed with exact-class exceptions at `tmp/3922`.
 Design §0/§5 and E §8
 record the in-process decision and host review measurements.
+Exact-SHA hosted runs `36292043158` (`1e02b583b`) and `36292950357`
+(`5472314bd`) subsequently passed every job. An installed distinct-model
+`BESIDE` round at `tmp/3926`–`tmp/3927` confirmed A's exact vector document
+before B, then exposed its loss after Green enumeration. The lexical-only
+A rewrite in `JobBatchWriter` was the cause. A stored source-SHA guard now
+skips unchanged A rewrites while projecting new/changed bytes; hash read I/O
+fails closed. The regression reddened at `tmp/3928`; focused tests and
+PMD/Spotless passed at `tmp/3932`. A fresh installed seed and distinct
+FP32 A/FP16 CUDA B pass at `tmp/3934`–`tmp/3935` showed A's exact vector
+document both before and after two Green build units in physical `BESIDE`,
+then B promotion and B vector search; `STOP 0`, official stack `ABSENT`.
+The six server wrapper aliases and full D1-12 acceptance remain next.
+The full worker-services suite passed at `tmp/3936` before a same-byte
+collection-change test reddened the hash-only guard (`tmp/3938`). The final
+guard also checks document UID, collection, content revision, size and
+modified time; five focused tests plus PMD/Spotless passed at `tmp/3939`.
+Rebuilt installed source seeded A at `tmp/3941` and passed physical
+distinct-model `BESIDE` with exact A vector hits before/after Green, B
+promotion and B vector search at `tmp/3942` (`STOP 0`, health `ABSENT`).
+The full worker-services suite passed at `tmp/3943` (5m53s); exact-SHA
+hosted proof remains due for this revision.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

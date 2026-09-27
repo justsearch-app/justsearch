@@ -470,6 +470,45 @@ the production `EncoderSet`. The three focused tests, Spotless and PMD passed
 with exact-class exceptions at `tmp/3922-wp4-exact-exceptions.txt`. Design §0/§5 and E §8 now record the
 in-process decision, revisit triggers and four measurement inputs.
 
+**2026-09-27 D1-12 physical BESIDE follow-on.** Exact-SHA hosted CI runs
+`36292043158` for `1e02b583b` and `36292950357` for `5472314bd` passed all
+jobs. The latter includes the restored-A native regression and WP4 rule.
+The first installed distinct CUDA round (`tmp/3924`–`tmp/3925`) reached
+physical `BESIDE` but A's vector result vanished after Green settled.
+The fixture had only required a nonempty vector result before B; the
+strengthened exact-document precondition at `tmp/3926`–`tmp/3927` showed
+the same loss with a confirmed pre-B A vector hit. `JobBatchWriter` was
+unconditionally replacing unchanged A documents with lexical-only copies
+while enumerating Green. The new test reddened at `tmp/3928`. The writer
+now checks A's stored source SHA under the existing mutation fence, skips
+unchanged A writes, still projects changed/new source bytes and fails
+closed on hash read I/O. Four focused tests and PMD/Spotless passed at
+`tmp/3932`; the earlier full worker-services run at `tmp/3930` executed
+1,460 tests with only a new test's unused mock setup failure, repaired in
+`tmp/3932`. The rebuilt installed distribution at `tmp/3933` seeded fresh
+A at `tmp/3934`; `tmp/3935-beside-projection.txt` passed exact A vector
+hits before and after B settled, two Green units, physical `BESIDE` mode,
+B promotion and B vector search with distinct FP32/FP16 model bytes.
+The private run ended `STOP 0`; subsequent official health was `ABSENT`.
+This closes the demonstrated A-vector regression, while the six server
+wrapper aliases, full D1-12 acceptance and later D1/D2/E/F remain open.
+The corrected full worker-services suite passed at `tmp/3936`. A further
+red regression at `tmp/3938` showed that equal source bytes with a changed
+collection would leave A's metadata stale. The guard now compares A's
+stored document UID, collection, content revision, size and modified time
+after the source SHA matches. Five focused cases plus PMD/Spotless passed
+at `tmp/3939`. The final source was rebuilt into the installed distribution
+at `tmp/3940`; fresh A seeded at `tmp/3941` and the distinct FP32 A/FP16
+CUDA B round at `tmp/3942-beside-metadata-pass.txt` again passed exact A
+vector hits before and after settled `BESIDE`, two Green units, B promotion
+and B vector search. It ended `STOP 0`; official health is `ABSENT`.
+The final guard's full worker-services suite passed at `tmp/3943` (5m53s).
+Exact-SHA CI is still due. `node --check` for the strengthened fixture passed.
+The broad `npm run docs:anchor-audit` at `tmp/3937` remains red on existing
+anchors outside the edited paragraphs, including old `stages/d1.md` links;
+this batch changed no headings or link targets. It is not claimed as a
+passing documentation gate.
+
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor
 `INGEST` row, `superseded_from` linkage and `SUCCESSOR_ROW_MISSING` branch were
