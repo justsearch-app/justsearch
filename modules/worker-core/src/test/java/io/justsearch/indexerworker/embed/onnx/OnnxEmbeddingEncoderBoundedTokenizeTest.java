@@ -12,6 +12,7 @@ import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.model.VariantSelection;
 import io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder.EmbedResult;
+import io.justsearch.indexerworker.inference.BoundedTokenizeGroups;
 import io.justsearch.ort.Composition;
 import io.justsearch.ort.ModelArtifacts;
 import io.justsearch.ort.ModelSessionPolicy;
@@ -22,7 +23,6 @@ import io.justsearch.ort.SessionHandle;
 import io.justsearch.ort.testing.InferenceCompositionRootTestHelper;
 import io.justsearch.ort.testing.ModelDirTestResolver;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
@@ -36,19 +36,14 @@ import org.junit.jupiter.api.Timeout;
  * lane: {@code embedBatchWithChunking}'s Phase 1 used to tokenize every caller text upfront with
  * truncation disabled ({@link #buildFp32CpuSession} loads the same tokenizer config as
  * production, which sets {@code "truncation": "false"}). The fix groups Phase 1 tokenization into
- * {@code TOKENIZE_GROUP_CHAR_BUDGET}-bounded {@code batchEncode} calls (mirroring {@code
- * SpladeEncoder.encodeBatchTokenBudget}'s Phase 1).
+ * character-budgeted {@code batchEncode} calls.
  *
  * <p>Like {@code SpladeEncoderBoundedTokenizeTest}, the memory bound itself is not assertable
  * in-JVM; this test pins the OBSERVABLE contract instead — grouping must not reorder, drop, or
  * cross-wire results relative to embedding each text alone. Unlike SPLADE (which truncates every
- * text to one {@code maxSeqLen}-bounded inference regardless of raw length, so per-text compute
- * is O(1)), embed's chunking makes per-text compute scale with raw length beyond {@code
- * maxSeqLen}. To keep this test's runtime bounded, the batch mixes many short (single-chunk,
- * cheap) filler texts — sized to comfortably exceed the 512k-char group budget in aggregate,
- * forcing multiple tokenize groups — with a few genuinely long (multi-chunk) documents placed at
- * different points in the sequence, and verifies a representative sample of positions (all long
- * docs plus a spread of filler positions) rather than every position.
+ * text to one {@code maxSeqLen}-bounded inference regardless of raw length, embed's chunking
+ * makes per-text compute scale with raw length. A small injected budget exercises multiple
+ * groups while keeping every result cheap enough to compare with singleton inference.
  */
 @DisplayName("710: OnnxEmbeddingEncoder bounded-group tokenization preserves per-text results")
 final class OnnxEmbeddingEncoderBoundedTokenizeTest {
@@ -127,21 +122,6 @@ final class OnnxEmbeddingEncoderBoundedTokenizeTest {
     return dot / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 
-  /** Single-chunk filler text, unique per index (distinct topic rotation) — well under MAX_SEQ_LEN. */
-  private static String fillerText(int index) {
-    String[] topics = {
-      "artificial intelligence research", "quantum computing hardware", "coastal erosion patterns",
-      "distributed systems consistency", "renewable energy storage", "orchestral composition history",
-      "deep sea biodiversity", "trade route archaeology", "central bank policy", "chess endgame theory"
-    };
-    StringBuilder sb = new StringBuilder();
-    sb.append("FILLER-").append(index).append(": ");
-    for (int i = 0; i < 90; i++) {
-      sb.append(topics[(index + i) % topics.length]).append(" section ").append(i).append(". ");
-    }
-    return sb.toString();
-  }
-
   /** Multi-chunk long document, unique per index — just over MAX_SEQ_LEN tokens. */
   private static String longDocText(int index) {
     StringBuilder sb = new StringBuilder();
@@ -172,49 +152,19 @@ final class OnnxEmbeddingEncoderBoundedTokenizeTest {
   }
 
   @Test
-  @Timeout(value = 10, unit = TimeUnit.MINUTES)
-  @DisplayName("multi-group batch: sampled positions == singleton embed(), order preserved")
+  @Timeout(value = 2, unit = TimeUnit.MINUTES)
+  @DisplayName("multi-group batch: every position == singleton embed(), order preserved")
   void groupBoundariesPreserveResults() throws Exception {
-    List<String> batch = new ArrayList<>();
-    // 3 long (multi-chunk) docs interleaved among ~230 short filler docs; filler chars alone
-    // (~230 * ~2300 chars) comfortably exceed TOKENIZE_GROUP_CHAR_BUDGET (512_000), forcing
-    // multiple tokenize groups regardless of exactly where the long docs land.
-    int fillerIdx = 0;
-    for (int segment = 0; segment < 3; segment++) {
-      for (int i = 0; i < 76; i++) {
-        batch.add(fillerText(fillerIdx++));
-      }
-      batch.add(longDocText(segment));
-    }
-
-    long totalChars = batch.stream().mapToLong(String::length).sum();
-    assertTrue(
-        totalChars > 512_000,
-        "test batch must exceed TOKENIZE_GROUP_CHAR_BUDGET to force multiple groups, got "
-            + totalChars);
-
-    List<EmbedResult> batched = encoder.embedBatchWithChunking(batch);
+    List<String> batch = List.of("short introduction", "another topic", longDocText(0),
+        "brief conclusion", "different subject");
+    long budget = 32;
+    assertTrue(BoundedTokenizeGroups.ranges(batch, budget).size() >= 3);
+    List<EmbedResult> batched = encoder.embedBatchWithChunking(batch, budget);
     assertEquals(batch.size(), batched.size());
-
-    // Sanity: the long docs actually exceed maxSeqLen (exercise the multi-chunk path).
-    int longDocPos = 76; // first long doc position (after the first filler segment)
-    int tokenCount = tokenizer.encode(batch.get(longDocPos)).getIds().length;
+    int tokenCount = tokenizer.encode(batch.get(2)).getIds().length;
     assertTrue(tokenCount > MAX_SEQ_LEN, "long doc must exceed maxSeqLen, got " + tokenCount);
-    assertTrue(batched.get(longDocPos).chunkCount() > 1, "long doc must produce multiple chunks");
-
-    // Verify a representative sample: all 3 long docs, plus first/last fillers and a spread of
-    // interior fillers (rather than all ~233 positions — see class doc for the runtime rationale).
-    List<Integer> samplePositions = new ArrayList<>();
-    samplePositions.add(0);
-    samplePositions.add(76); // long doc 0
-    samplePositions.add(153); // long doc 1
-    samplePositions.add(230); // long doc 2
-    samplePositions.add(batch.size() - 1);
-    for (int p = 10; p < batch.size(); p += 37) {
-      samplePositions.add(p);
-    }
-
-    for (int pos : samplePositions) {
+    assertTrue(batched.get(2).chunkCount() > 1, "long doc must produce multiple chunks");
+    for (int pos = 0; pos < batch.size(); pos++) {
       EmbedResult singleton = encoder.embed(batch.get(pos));
       double cos = cosine(batched.get(pos).vector(), singleton.vector());
       assertTrue(

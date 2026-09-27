@@ -6,12 +6,14 @@ Updated 2026-09-27 after the agent handoff. Start with the
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
 
-**Current queue:** use the [handoff current state](handoff.md#current-state-2026-09-27).
+**Current queue:** use the [handoff current state](handoff.md#current-state-2026-09-28).
 The owner-approved cache cleanup and device-memory rule are implemented; D1-18 has
 exact-SHA hosted proof on `5776bd2008b454fb84fa38b3e8da1dcc8f31ab3a`, with acceptance recorded in
 [D1-18](stages/D1.md#d1-18--live-migration-start-added-2026-09-27-owner-decision).
-D1-14's connected live UI check passed locally; its current revision needs integrated and
-hosted gates before the original WP3 batches. D2, E and F remain binding. The dated
+D1-14's connected live UI check and final local gates passed; exact-SHA hosted
+[run 36356190918](https://github.com/justsearch-app/justsearch/actions/runs/36356190918)
+passed every job on `2af145b4899937b728ed047f94286a8642b67a80`.
+Continue original WP3 batches 4/5. D2, E and F remain binding. The dated
 records below are evidence history, not a current action queue.
 
 **Current 2026-09-27 cut:** Exact-SHA CI on `3d66c74c9` passed every job in

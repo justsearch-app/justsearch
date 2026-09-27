@@ -8,6 +8,7 @@ import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.indexerworker.inference.BoundedTokenizeGroups;
 import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
 import io.justsearch.ort.NativeSessionHandle;
@@ -584,19 +585,6 @@ public final class OnnxEmbeddingEncoder implements Closeable {
   }
 
   /**
-   * Upper bound on total input CHARS per native {@code batchEncode} call in {@link
-   * #embedBatchWithChunking}'s Phase 1. Mirrors {@code SpladeEncoder.TOKENIZE_GROUP_CHAR_BUDGET}
-   * (tempdoc 686 crash fix; ported here by tempdoc 710 Move 3): the tokenizer runs with
-   * truncation disabled (see {@link #buildAssembly}'s {@code "truncation": "false"}), so a single
-   * native call over the caller's FULL text list can materialize arbitrarily large encodings
-   * simultaneously — the same landmine SPLADE hit for full-document text with an unbounded
-   * caller list. Grouping by input chars bounds peak per-call native materialization to one
-   * group regardless of caller batch size, while preserving exact tokenization results (batching
-   * granularity only — same tokenizer, same per-text output).
-   */
-  private static final long TOKENIZE_GROUP_CHAR_BUDGET = 512_000;
-
-  /**
    * Batch-embeds texts with chunking support for long documents.
    *
    * <p>Short texts (≤ {@code maxSeqLen} tokens) are embedded directly. Long texts are split into
@@ -616,16 +604,21 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       return List.of(embed(texts.get(0), LocalSessionAcquisition.background()));
     }
 
-    return encodeWindowBatches(texts, true);
+    return embedBatchWithChunking(texts, BoundedTokenizeGroups.DEFAULT_CHAR_BUDGET);
+  }
+
+  List<EmbedResult> embedBatchWithChunking(List<String> texts, long charBudget)
+      throws OrtException {
+    return encodeWindowBatches(texts, true, charBudget);
   }
 
   /** Parent-vector path: pool windows as they finish without retaining unused chunk vectors. */
   public List<EmbedResult> embedBatchPooled(List<String> texts) throws OrtException {
-    return encodeWindowBatches(texts, false);
+    return encodeWindowBatches(texts, false, BoundedTokenizeGroups.DEFAULT_CHAR_BUDGET);
   }
 
   private List<EmbedResult> encodeWindowBatches(
-      List<String> texts, boolean retainChunks)
+      List<String> texts, boolean retainChunks, long charBudget)
       throws OrtException {
     // Preserve the singleton path's one-window inference grouping and the batch path's
     // global groups of eight, including partial groups across tokenization boundaries.
@@ -634,17 +627,9 @@ public final class OnnxEmbeddingEncoder implements Closeable {
             ? 1
             : MAX_ORT_BATCH_SIZE,
         windows -> embedPreTokenizedBatch(windows, LocalSessionAcquisition::background));
-    int n = texts.size();
-    int groupStart = 0;
-    while (groupStart < n) {
-      int groupEnd = groupStart;
-      long groupChars = 0;
-      while (groupEnd < n
-          && (groupEnd == groupStart
-              || groupChars + texts.get(groupEnd).length() <= TOKENIZE_GROUP_CHAR_BUDGET)) {
-        groupChars += texts.get(groupEnd).length();
-        groupEnd++;
-      }
+    for (var group : BoundedTokenizeGroups.ranges(texts, charBudget)) {
+      int groupStart = group.startInclusive();
+      int groupEnd = group.endExclusive();
       long tTok = System.nanoTime();
       Encoding[] groupEncodings = texts.size() == 1
           ? new Encoding[] {tokenizer.encode(texts.get(0))}
@@ -662,7 +647,6 @@ public final class OnnxEmbeddingEncoder implements Closeable {
         batch.addDocument(windows);
         groupEncodings[j] = null;
       }
-      groupStart = groupEnd;
     }
     return batch.finish();
   }

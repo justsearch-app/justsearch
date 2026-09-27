@@ -10,6 +10,7 @@ import ai.onnxruntime.OnnxValue;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.indexerworker.inference.BoundedTokenizeGroups;
 import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
 import io.opentelemetry.api.trace.Span;
@@ -329,26 +330,19 @@ public final class SpladeEncoder implements Closeable {
     return MAX_SPLADE_BATCH_SIZE_CPU;
   }
 
-  /**
-   * Upper bound on total input CHARS per native batchEncode call in {@link
-   * #encodeBatchTokenBudget}. With truncation disabled, materialized Encoding memory scales with
-   * input length (~2 chars/token for OCR-grade text, ~100 bytes/token materialized incl. char
-   * spans and token strings), so 512k chars ≈ ~256k tokens ≈ a few tens of MB peak — bounded
-   * regardless of caller batch size. A single text longer than the budget forms its own group
-   * (~200k chars max via the extraction char cap → ~10-25 MB, safe). Derivation: tempdoc 686
-   * full-corpus crash forensics, 2026-07-10.
-   */
-  private static final long TOKENIZE_GROUP_CHAR_BUDGET = 512_000;
-
   public List<Map<String, Float>> encodeBatch(List<String> texts) throws OrtException {
     if (texts.size() <= 1) {
       return encodeBatchInternal(texts);
     }
-    return encodeBatchTokenBudget(texts);
+    return encodeBatch(texts, BoundedTokenizeGroups.DEFAULT_CHAR_BUDGET);
+  }
+
+  List<Map<String, Float>> encodeBatch(List<String> texts, long charBudget) throws OrtException {
+    return encodeBatchTokenBudget(texts, charBudget);
   }
 
   /**
-   * Token-budget batching: tokenize all texts upfront, sort by token count, partition into
+   * Token-budget batching: tokenize bounded groups, sort by token count, partition into
    * sub-batches where total tokens &le; budget, encode each sub-batch (minimal padding waste), then
    * scatter results back to original order.
    *
@@ -356,7 +350,8 @@ public final class SpladeEncoder implements Closeable {
    * tensor never exceeds current worst-case size. Each sub-batch is also capped at {@code
    * getMaxBatchSize()} documents to bound pinned output tensor dimensions.
    */
-  private List<Map<String, Float>> encodeBatchTokenBudget(List<String> texts) throws OrtException {
+  private List<Map<String, Float>> encodeBatchTokenBudget(List<String> texts, long charBudget)
+      throws OrtException {
     int maxBatch = getMaxBatchSize();
     int tokenBudget = maxBatch * maxSeqLen;
 
@@ -375,16 +370,9 @@ public final class SpladeEncoder implements Closeable {
     long[][] typesByText = new long[n][];
     int[] tokenCounts = new int[n];
     long tTok = System.nanoTime();
-    int groupStart = 0;
-    while (groupStart < n) {
-      int groupEnd = groupStart;
-      long groupChars = 0;
-      while (groupEnd < n
-          && (groupEnd == groupStart
-              || groupChars + texts.get(groupEnd).length() <= TOKENIZE_GROUP_CHAR_BUDGET)) {
-        groupChars += texts.get(groupEnd).length();
-        groupEnd++;
-      }
+    for (var group : BoundedTokenizeGroups.ranges(texts, charBudget)) {
+      int groupStart = group.startInclusive();
+      int groupEnd = group.endExclusive();
       Encoding[] groupEncodings = tokenizer.batchEncode(texts.subList(groupStart, groupEnd));
       for (int i = 0; i < groupEncodings.length; i++) {
         int idx = groupStart + i;
@@ -396,7 +384,6 @@ public final class SpladeEncoder implements Closeable {
         maskByText[idx] = truncate(enc.getAttentionMask(), seqLen);
         typesByText[idx] = truncate(enc.getTypeIds(), seqLen);
       }
-      groupStart = groupEnd;
     }
     profiler.addPhaseNs("tokenize", System.nanoTime() - tTok);
     truncationEvidence.flushIfNeeded(truncationEvidencePath, config.modelPath());

@@ -449,8 +449,17 @@ final class BoundedHandoffTest {
   }
 
   @Test
-  @DisplayName("drainAndClose is capped, so a mistaken caller cannot park a shutdown")
-  void drainIsCapped() throws Exception {
+  @DisplayName("drain budget clamps negative, ordinary, and unbounded requests")
+  void drainBudgetIsCapped() {
+    assertEquals(0L, BoundedHandoff.drainBudgetMs(-1));
+    assertEquals(200L, BoundedHandoff.drainBudgetMs(200));
+    assertEquals(BoundedHandoff.MAX_DRAIN_WAIT_MS,
+        BoundedHandoff.drainBudgetMs(Long.MAX_VALUE));
+  }
+
+  @Test
+  @DisplayName("drainAndClose returns false promptly when the consumer stalls")
+  void stalledConsumerDoesNotDrain() throws Exception {
     CountDownLatch stalled = new CountDownLatch(1);
     BoundedHandoff<Integer> flow =
         new BoundedHandoff<>(
@@ -471,12 +480,11 @@ final class BoundedHandoffTest {
     assertTrue(flow.publish(2));
 
     long startNs = System.nanoTime();
-    assertFalse(flow.drainAndClose(Long.MAX_VALUE), "the tail is undeliverable");
+    assertFalse(flow.drainAndClose(200L), "the tail is undeliverable");
     long elapsedMs = (System.nanoTime() - startNs) / 1_000_000L;
     assertTrue(
-        elapsedMs <= BoundedHandoff.MAX_DRAIN_WAIT_MS + 5_000L,
-        "Long.MAX_VALUE must be capped at " + BoundedHandoff.MAX_DRAIN_WAIT_MS + "ms, waited "
-            + elapsedMs + "ms");
+        elapsedMs < 5_000L,
+        "a 200ms stalled drain must return promptly, waited " + elapsedMs + "ms");
     stalled.countDown();
   }
 

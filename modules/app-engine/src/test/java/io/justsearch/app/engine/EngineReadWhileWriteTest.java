@@ -65,6 +65,8 @@ import org.junit.jupiter.api.io.TempDir;
  * two assertions the wire test could not make: every search moved {@code ForegroundLoad}, and the
  * gauge came back to exactly zero. An unbalanced gate leaves indexing permanently throttled and
  * nothing else in the suite would notice.
+ * The 400-document overlap runs at an explicit 80% foreground duty to bound suite time while
+ * exercising the paced path; {@link EngineForegroundPacingTest} proves the pacing schedule.
  *
  * <p><b>Dropped as process properties:</b> {@code processManager.spawnWorker()},
  * {@code awaitPortWithRetries}, the heartbeat-keeper thread and every {@code mmfHarness.keepAlive()}
@@ -277,7 +279,8 @@ final class EngineReadWhileWriteTest {
             // Publish counts promptly enough that writer progress is observable inside this
             // test's window. Observation granularity, not behaviour.
             "justsearch.backfill.commit_interval_ms", "1000",
-            "justsearch.backfill.max_docs_before_commit", "50"));
+            "justsearch.backfill.max_docs_before_commit", "50",
+            "justsearch.indexing.foreground_duty_pct", "80"));
     KnowledgeServer[] built = new KnowledgeServer[1];
     root =
         new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),

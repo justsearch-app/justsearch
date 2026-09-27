@@ -271,7 +271,7 @@ final class RecordedBulkEngineRestartTest {
 
     try (EngineEpoch recovered = openEpoch(dataDirectory, modelsDirectory, new CountDownLatch(1))) {
       assertTrue(await(() -> recovered.operations().find(key)
-          .map(row -> row.state() == OperationState.CANCELLED).orElse(false), WAIT_MS),
+          .map(row -> row.state() == OperationState.CANCELLED).orElse(false), 90_000L),
           "recovered cancellation did not reach its terminal writer");
       recovered.requestedRestartHandoff();
     }

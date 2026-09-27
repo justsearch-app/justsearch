@@ -908,6 +908,89 @@ final class KnowledgeServerRecordedIngestionTest {
   }
 
   @Test
+  void deferredInitCompletionReconcilesRefusedCandidateBeforeReaperTick(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = preparedLayout(tempDir);
+    KnowledgeServer seed = withoutDeferredModels(helperServer(layout));
+    String fingerprint;
+    try {
+      seed.start();
+      var method = KnowledgeServer.class.getDeclaredMethod("expectedIndexFingerprintOrNull");
+      method.setAccessible(true);
+      fingerprint = (String) method.invoke(seed);
+    } finally {
+      seed.close();
+    }
+
+    String operation = "01994180-0000-7000-8000-000000000198";
+    IndexGenerationManager manager = layout.genManager();
+    String active = manager.readStateBestEffort().active_generation();
+    String building = manager.startRecordedMigration(operation, "recorded-test", fingerprint,
+        active, List.of()).building_generation();
+    var refused = new AtomicBoolean();
+    var lifecycle = new RecordedIngestionLifecycle() {
+      @Override public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) {
+        return new IndexGenerationManager.BootOwnership.Recorded(operation, active,
+            "recorded-test", fingerprint, true, false, List.of());
+      }
+      @Override public boolean recordedPrecommitRefused(String key) {
+        return operation.equals(key) && refused.get();
+      }
+      @Override public JobQueue.RecordedClaimDecision recordedClaimDecision(String key) {
+        return JobQueue.RecordedClaimDecision.DENY;
+      }
+      @Override public Attachment attach(JobQueue queue, CheckedServingGeneration generation,
+          java.util.function.BooleanSupplier online) { return () -> {}; }
+    };
+    KnowledgeServer server = withoutDeferredModels(new KnowledgeServer(
+        new TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()), null,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle));
+    var restarted = new AtomicBoolean();
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    setField(server, "migrationRestartAction", (Runnable) () -> restarted.set(true));
+    try {
+      server.start();
+      org.mockito.Mockito.doCallRealMethod().when(server)
+          .startDeferredModelInitialization(org.mockito.ArgumentMatchers.any());
+      server.startDeferredModelInitialization(() -> {
+        entered.countDown();
+        try {
+          release.await();
+        } catch (InterruptedException interruption) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException(interruption);
+        }
+      });
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      refused.set(true);
+      var startMonitor = KnowledgeServer.class.getDeclaredMethod("startMigrationCutoverMonitorBestEffort");
+      startMonitor.setAccessible(true);
+      startMonitor.invoke(server);
+      var monitorField = KnowledgeServer.class.getDeclaredField("migrationCutoverThread");
+      monitorField.setAccessible(true);
+      Thread monitor = (Thread) monitorField.get(server);
+      assertNotNull(monitor);
+      monitor.join(5_000);
+      assertFalse(monitor.isAlive(), "the cutover monitor must exit before model init completes");
+      var reconcile = KnowledgeServer.class.getDeclaredMethod("reconcileRefusedRecordedCandidate");
+      reconcile.setAccessible(true);
+      reconcile.invoke(server); // The cutover monitor's attempt sees init still in flight.
+      assertTrue(Files.exists(layout.indexBase().resolve("indices").resolve(building)));
+      release.countDown();
+      server.deferredModelInit.get(5, TimeUnit.SECONDS);
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+      while (!restarted.get() && System.nanoTime() < deadline) Thread.sleep(50);
+      assertTrue(restarted.get(), "init completion must reconcile before the 120s reaper tick");
+      assertFalse(Files.exists(layout.indexBase().resolve("indices").resolve(building)));
+      assertEquals(active, manager.readStateBestEffort().active_generation());
+    } finally {
+      release.countDown();
+      server.close();
+    }
+  }
+
+  @Test
   @DisplayName("migration, deferred runtime, and rebuild brake all fence recorded serving")
   void migrationDeferredAndBrakeFenceRecordedServing(@TempDir Path tempDir) throws Exception {
     WorkerBootFixture.Layout layout = preparedLayout(tempDir);

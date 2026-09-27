@@ -4,15 +4,16 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 [continuation brief](continuation-brief.md) for ordering. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
-## Current state (2026-09-27)
+## Current state (2026-09-28)
 
-Branch `codex/lane-f-pr1` in this dedicated worktree is at the pushed D1-18 checkpoint
-`5776bd2008b454fb84fa38b3e8da1dcc8f31ab3a`; exact-SHA hosted
-[run 36340854808](https://github.com/justsearch-app/justsearch/actions/runs/36340854808)
-passed every job. D1-18 migration-start no-restart proof is complete. PR727 remains open;
-do not merge before Stage F acceptance.
+Branch `codex/lane-f-pr1` in this dedicated worktree is at the pushed D1-14 semantic-notice
+checkpoint `2af145b4899937b728ed047f94286a8642b67a80`; exact-SHA hosted
+[run 36356190918](https://github.com/justsearch-app/justsearch/actions/runs/36356190918)
+passed all 13 jobs. The preceding D1-18 checkpoint `5776bd2008b454fb84fa38b3e8da1dcc8f31ab3a`
+passed [run 36340854808](https://github.com/justsearch-app/justsearch/actions/runs/36340854808).
+PR727 remains open; do not merge before Stage F acceptance.
 
-D1-14's semantic-pause notice is implemented in the current uncommitted work. The installed
+D1-14's semantic-pause notice is implemented in the pushed checkpoint. The installed
 BESIDE/IN_PLACE pair passed at `tmp/5106`. The connected Lit Search capture during an
 installed IN_PLACE held cut passed at `tmp/5111-d1-14-connected-ui.txt`, with raw held status,
 screenshot and measure under `tmp/lane-f-takeover/lifecycle-accepted-write-49884f51-fbd6-4913-b6b0-eef81691fbf8/`.
@@ -21,8 +22,7 @@ over 35.6 s, hybrid 224/224 available, vector recovery, no API outage or Engine 
 and owned stop. Its registered UI helper was reaped by the session sweep. The D1-14 section
 holds the implementation and evidence details.
 
-**Next, in order:** complete D1-14 checkpoint gates;
-checkpoint and push, then verify every hosted job by exact SHA. Continue the original
+**Next, in order:** continue the original
 [WP3 batches 4/5](improvements/WP3-remaining-work-plan.md), then D2, E and F.
 The independent review's registry race is corrected locally with one settings-plus-encoder
 precommit batch; focused tests and static checks pass at `tmp/5128` and `tmp/5129`.
@@ -31,8 +31,8 @@ operation runner's projection wrapper omitted the new component-observation call
 delegation is fixed and the same pair passes at `tmp/5135`, including connected Search UI
 evidence. The prior full stress suite passed at `tmp/5131`, before that final wrapper fix;
 the revision-current serial full suite passed at `tmp/5136`, static gate at `tmp/5137`,
-and `build -x test` at `tmp/5138`. Hosted proof remains before
-the D1-14 semantic-notice checkpoint.
+and `build -x test` at `tmp/5138`. The final source passed all 13 hosted jobs in
+run `36356190918`. This closes the semantic-notice slice, not the rest of D1-14.
 Leave the unrelated untracked `modules/app-inference/logs/` directory alone. Root owns the
 single shared Gradle build and dev-stack lease.
 

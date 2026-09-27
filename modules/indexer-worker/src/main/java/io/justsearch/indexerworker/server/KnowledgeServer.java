@@ -1593,10 +1593,7 @@ public final class KnowledgeServer implements Closeable {
       }
       retryRetiredServingViews();
       retryCommittedGenerationRetirement();
-      try { reconcileRefusedRecordedCandidate(); }
-      catch (RuntimeException failure) {
-        log.error("Refused candidate maintenance will retry", failure);
-      }
+      reconcileRefusedCandidateSafely();
     }, REAP_INTERVAL_MS, REAP_INTERVAL_MS, TimeUnit.MILLISECONDS);
   }
 
@@ -1623,6 +1620,23 @@ public final class KnowledgeServer implements Closeable {
       initializer.run();
       return null;
     }, deferredModelExecutor);
+    deferredModelInit.whenComplete((ignored, failure) -> {
+      var reaper = stuckJobReaper;
+      if (closeStarted || reaper == null) return;
+      try {
+        reaper.execute(this::reconcileRefusedCandidateSafely);
+      } catch (java.util.concurrent.RejectedExecutionException closing) {
+        if (!closeStarted) log.warn("Refused candidate completion maintenance could not start", closing);
+      }
+    });
+  }
+
+  private void reconcileRefusedCandidateSafely() {
+    try {
+      reconcileRefusedRecordedCandidate();
+    } catch (RuntimeException failure) {
+      log.error("Refused candidate maintenance will retry", failure);
+    }
   }
 
   /**

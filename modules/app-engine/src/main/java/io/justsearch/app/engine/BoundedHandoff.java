@@ -304,7 +304,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
    *     caller has lost frames and must say so rather than reporting a clean finish
    */
   boolean drainAndClose(long timeoutMs) {
-    long budgetMs = Math.max(0L, Math.min(timeoutMs, MAX_DRAIN_WAIT_MS));
+    long budgetMs = drainBudgetMs(timeoutMs);
     long deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs);
     boolean drained = false;
     while (true) {
@@ -333,6 +333,10 @@ final class BoundedHandoff<T> implements AutoCloseable {
     }
     close();
     return drained;
+  }
+
+  static long drainBudgetMs(long requestedMs) {
+    return Math.max(0L, Math.min(requestedMs, MAX_DRAIN_WAIT_MS));
   }
 
   /**
