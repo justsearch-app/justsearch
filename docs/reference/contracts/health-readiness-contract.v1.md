@@ -60,7 +60,12 @@ This sample shows a **reachable index**, which is why every diagnostic component
 `reasonCode`, wall-clock state epoch `stateSince`, applied and desired
 configuration digests, last compose `mode`, start `deadlineMs`,
 `recoveryAttempts`, and optional diagnostic `evidence`. Nullable fields are
-omitted by the JSON serializer.
+omitted by the JSON serializer. For a generation-bound encoder change, `mode` is
+`BESIDE` (the candidate fits free device memory beside the serving set),
+`IN_PLACE` (the serving set's native models retire first because releasing them
+makes the candidate fit; keyword search keeps answering), or `REFUSED` (neither
+fits, so the serving set is left untouched and the change fails). `reason`,
+`freeBytes`, and `footprintBytes` carry the evidence.
 
 The top-level lifecycle subset on both `/api/health` and `/api/status` is a
 smaller projection of that same snapshot. It uses snake-case wire fields

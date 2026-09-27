@@ -226,7 +226,7 @@ export interface StatusResponse {
       evidence?: string;
       footprintBytes?: number;
       freeBytes?: number;
-      mode?: "BESIDE" | "IN_PLACE";
+      mode?: "BESIDE" | "IN_PLACE" | "REFUSED";
       reason?: string;
       reasonCode?: string;
       recoveryAttempts?: number;
@@ -589,7 +589,7 @@ export const statusResponseSchema = z.strictObject({
       "evidence": z.string().optional(),
       "footprintBytes": z.number().int().optional(),
       "freeBytes": z.number().int().optional(),
-      "mode": z.enum(["BESIDE", "IN_PLACE"]).optional(),
+      "mode": z.enum(["BESIDE", "IN_PLACE", "REFUSED"]).optional(),
       "reason": z.string().optional(),
       "reasonCode": z.string().optional(),
       "recoveryAttempts": z.number().int().optional(),

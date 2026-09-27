@@ -571,7 +571,7 @@
               },
               "mode" : {
                 "type" : "string",
-                "enum" : [ "BESIDE", "IN_PLACE" ]
+                "enum" : [ "BESIDE", "IN_PLACE", "REFUSED" ]
               },
               "reason" : {
                 "type" : "string"

@@ -689,7 +689,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     // The deliberate A-recompose-failure case enters UNAVAILABLE; it is a different
     // acceptance path from the ordinary RELOADING refusal window.
     const semanticSampler = gapRecomposeFailure ? null
-      : sampleSemanticAvailability({ apiPort, post, marker, file, matchingHit });
+      : sampleSemanticAvailability({ apiPort, post, request, marker, file, matchingHit });
     try {
       await exerciseLiveModelGapDecision({ work, data, indexBase, manifest, apiPort,
         operationKey, sourceGeneration, sourceManifest, marker, file, bRoot, dispatched,
@@ -705,7 +705,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     return;
   }
   const transitionSampler = inPlaceModelB
-    ? sampleSemanticAvailability({ apiPort, post, marker, file, matchingHit }) : null;
+    ? sampleSemanticAvailability({ apiPort, post, request, marker, file, matchingHit }) : null;
   // The promotion and cancellation paths both leave through this scope.
   try {
   let cancellationKey;
@@ -989,11 +989,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     `promoted B resurrected a watcher deletion: ${removedText.text}`);
   }
   const semantic = await transitionSampler?.stop();
-  if (semantic) requireThat(semantic.reloadingRefusals > 0
-    && semantic.recoveredAfterRefusal
-    && semantic.refusalWindowMs > 0 && semantic.refusalWindowMs <= semantic.transitionMs
-    && semantic.unexpected === 0,
-  `floor transition sampling missed a real refusal and recovery: ${JSON.stringify(semantic)}`);
+  if (semantic) requireThat(inPlaceSemanticViolations(semantic).length === 0,
+  `floor transition sampling violated D1-14: ${JSON.stringify({
+    violations: inPlaceSemanticViolations(semantic), semantic })}`);
   console.log('MODEL_LIVE_AB_PASS', JSON.stringify({ operationKey,
     sourceGeneration, activeGeneration: completed.active.active_generation,
     settingsRevision: completed.settings.witness.acceptedRevision,
@@ -1038,35 +1036,48 @@ async function cancelReindexWithApproval({ apiPort, manifest, reindexKey,
 }
 
 /** Sample the real vector port through refusal and subsequent A restoration or B promotion. */
-function sampleSemanticAvailability({ apiPort, post, marker, file, matchingHit }) {
+function sampleSemanticAvailability({ apiPort, post, request, marker, file, matchingHit }) {
   const started = performance.now();
   const observations = [];
   const unexpectedSamples = [];
   let running = true;
   let result;
+  const classify = (reply, vector) => {
+    if (reply.status === 200 && matchingHit(reply, file, marker)) return 'available';
+    if (vector && reply.status === 400 && reply.text.includes('NO_EMBEDDING_SERVICE')) {
+      return 'reloading';
+    }
+    if (reply.status === 503 && reply.text.includes('"reason":"worker.starting"')) {
+      return 'worker-starting';
+    }
+    if (unexpectedSamples.length < 5) unexpectedSamples.push({
+      mode: vector ? 'vector' : 'hybrid', status: reply.status, body: reply.text.slice(0, 400),
+    });
+    return reply.status === 200 ? 'available-unmatched' : `unexpected-${reply.status}`;
+  };
+  const search = async (mode) => {
+    try {
+      return classify(await post(apiPort, '/api/knowledge/search',
+        mode ? { query: marker, limit: 10, mode } : { query: marker, limit: 10 }, 10000), !!mode);
+    } catch {
+      // Engine restarts are transport outages, never counted as reloading refusals.
+      return 'transport';
+    }
+  };
   const task = (async () => {
     while (running) {
       const at = performance.now();
-      let outcome = 'transport';
+      const outcome = await search('vector');
+      // Default (hybrid) search must keep answering from its keyword legs while vectors refuse.
+      const hybrid = await search(null);
+      let encoders = null;
       try {
-        const reply = await post(apiPort, '/api/knowledge/search',
-          { query: marker, limit: 10, mode: 'vector' }, 10000);
-        if (reply.status === 200 && matchingHit(reply, file, marker)) {
-          outcome = 'available';
-        } else if (reply.status === 400 && reply.text.includes('NO_EMBEDDING_SERVICE')) {
-          outcome = 'reloading';
-        } else if (reply.status === 503 && reply.text.includes('"reason":"worker.starting"')) {
-          outcome = 'worker-starting';
-        } else {
-          outcome = reply.status === 200 ? 'available-unmatched' : `unexpected-${reply.status}`;
-          if (unexpectedSamples.length < 5) unexpectedSamples.push({
-            status: reply.status, body: reply.text.slice(0, 400),
-          });
-        }
+        const health = await request(apiPort, '/api/health', {}, 10000);
+        if (health.status === 200) encoders = JSON.parse(health.text)?.components?.encoders?.state ?? null;
       } catch {
-        // Engine restarts are separate transport outages, never counted as reloading refusals.
+        encoders = null;
       }
-      observations.push({ at, outcome });
+      observations.push({ at, outcome, hybrid, encoders });
       if (running) await new Promise(resolve => setTimeout(resolve, 250));
     }
   })();
@@ -1090,6 +1101,26 @@ export function summarizeSemanticAvailability(observations, started, ended, unex
   const transitionMs = Math.round(ended - started);
   const refusalWindowMs = firstRefusal == null ? 0
     : Math.round((firstRecovery ?? ended) - firstRefusal);
+  // Whole-API outage (restart): every route answers 503 worker.starting or not at all.
+  const outage = observations.filter(sample => sample.outcome === 'worker-starting'
+    || sample.outcome === 'transport');
+  const apiOutageWindowMs = outage.length === 0 ? 0
+    : Math.round(outage.at(-1).at - outage[0].at);
+  // D1-14 structural window: a vector refusal is legitimate only while `encoders` reports
+  // RELOADING (one neighbouring sample of slack for the health read racing the transition).
+  const encodersAt = index => observations[index]?.encoders;
+  const refusalOutsideReloading = observations.filter((sample, index) =>
+    sample.outcome === 'reloading' && ![index - 1, index, index + 1]
+      .some(neighbour => encodersAt(neighbour) === 'RELOADING')).length;
+  const inWindow = sample => firstRefusal != null && sample.at >= firstRefusal
+    && sample.at <= (firstRecovery ?? ended);
+  const hybridSampled = observations.filter(sample => sample.hybrid !== undefined);
+  const hybridBreaksInRefusalWindow = hybridSampled.filter(sample => inWindow(sample)
+    && sample.hybrid !== 'available').length;
+  const reloadingStart = observations.find(sample => sample.encoders === 'RELOADING')?.at;
+  const reloadingEnd = reloadingStart == null ? undefined
+    : observations.find(sample => sample.at > reloadingStart && sample.encoders
+      && sample.encoders !== 'RELOADING')?.at;
   return { transitionMs, refusalWindowMs,
     refusedFraction: transitionMs === 0 ? 0 : refusalWindowMs / transitionMs,
     sampledRequests: observations.length,
@@ -1100,7 +1131,36 @@ export function summarizeSemanticAvailability(observations, started, ended, unex
     transport: observations.filter(sample => sample.outcome === 'transport').length,
     unexpected: observations.filter(sample => sample.outcome.startsWith('unexpected-')
       || sample.outcome === 'available-unmatched').length,
+    apiOutageWindowMs,
+    apiOutageSamples: outage.length,
+    refusalOutsideReloading,
+    reloadingIntervalMs: reloadingStart == null ? 0
+      : Math.round((reloadingEnd ?? ended) - reloadingStart),
+    hybridSampled: hybridSampled.length,
+    hybridAvailable: hybridSampled.filter(sample => sample.hybrid === 'available').length,
+    hybridBreaksInRefusalWindow,
     unexpectedSamples };
+}
+
+/**
+ * D1-14 acceptance over one sampled in-place transition (owner decision 2026-09-27): vectors refuse
+ * only inside `encoders` RELOADING and recover after it; hybrid keeps answering from keyword legs
+ * throughout the refusal window. The whole-API outage is reported, never folded into the window.
+ */
+export function inPlaceSemanticViolations(semantic) {
+  const violations = [];
+  if (!(semantic.reloadingRefusals > 0)) violations.push('no reloading refusal observed');
+  if (!semantic.recoveredAfterRefusal) violations.push('no vector recovery after the last refusal');
+  if (!(semantic.refusalWindowMs > 0 && semantic.refusalWindowMs <= semantic.transitionMs)) {
+    violations.push('refusal window outside the sampled transition');
+  }
+  if (semantic.unexpected !== 0) violations.push('unexplained vector responses');
+  if (semantic.refusalOutsideReloading !== 0) violations.push('vector refused outside RELOADING');
+  if (!(semantic.hybridSampled > 0)) violations.push('hybrid search was not sampled');
+  if (semantic.hybridBreaksInRefusalWindow !== 0) {
+    violations.push('hybrid search failed inside the refusal window');
+  }
+  return violations;
 }
 
 /** A captured installer file disappears before B builds; A must regain native service at the wait. */
@@ -1145,7 +1205,8 @@ async function exerciseLiveModelGapDecision(c) {
       && state?.active_generation === sourceGeneration
       && state?.migration_state === 'SWITCHING'
       && encoder?.mode === 'IN_PLACE'
-      && encoder?.reason === 'candidate_exceeds_free_device_memory'
+      // D1-14 owner decision 2026-09-27: in place only when releasing A covers the shortfall.
+      && encoder?.reason === 'candidate_fits_after_source_release'
       && encoder?.freeBytes <= 1024 * 1024
       && encoder?.footprintBytes > encoder?.freeBytes
       && status?.components?.encoders?.state === 'RELOADING',
@@ -1224,11 +1285,9 @@ async function exerciseLiveModelGapDecision(c) {
       `restored A native lease probe did not hold a readable session: ${JSON.stringify(reached)}`);
   }
   const semantic = await semanticSampler?.stop();
-  if (semantic) requireThat(semantic.reloadingRefusals > 0
-    && semantic.recoveredAfterRefusal
-    && semantic.refusalWindowMs > 0 && semantic.refusalWindowMs <= semantic.transitionMs
-    && semantic.unexpected === 0,
-  `floor semantic sampling missed a real refusal and recovery: ${JSON.stringify(semantic)}`);
+  if (semantic) requireThat(inPlaceSemanticViolations(semantic).length === 0,
+  `floor semantic sampling violated D1-14: ${JSON.stringify({
+    violations: inPlaceSemanticViolations(semantic), semantic })}`);
   if (gapCancellation) {
     const cancellationKey = await cancelReindexWithApproval({ apiPort, manifest,
       reindexKey: operationKey, createOperationKey, request, post, requireThat });

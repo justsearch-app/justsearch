@@ -32,4 +32,36 @@ final class DeviceMemoryLineTest {
     assertThrows(IllegalArgumentException.class,
         () -> new DeviceMemoryLine(1L, 1L).withCeilingMb(-1L));
   }
+
+  @Test
+  void retiresTheSourceOnlyWhenItsReleaseCanMakeTheCandidateFit() {
+    var line = new DeviceMemoryLine(8_000L, 1_000L);
+    // Fits beside regardless of what the source holds.
+    assertEquals(ComposeEvidence.Mode.BESIDE, line.decision(900L, 0L).mode());
+    // Shortfall 3_000 is covered by the source's release.
+    var inPlace = line.decision(4_000L, 3_000L);
+    assertEquals(ComposeEvidence.Mode.IN_PLACE, inPlace.mode());
+    assertEquals("candidate_fits_after_source_release", inPlace.reason());
+    // Shortfall 3_000 exceeds what the source can release: never pause A for nothing.
+    var refused = line.decision(4_000L, 2_999L);
+    assertEquals(ComposeEvidence.Mode.REFUSED, refused.mode());
+    assertEquals("candidate_exceeds_releasable_device_memory", refused.reason());
+    assertEquals(4_000L, refused.footprintBytes());
+    assertEquals(1_000L, refused.freeBytes());
+    // A CPU-only source releases nothing.
+    assertEquals(ComposeEvidence.Mode.REFUSED, line.decision(4_000L, 0L).mode());
+  }
+
+  @Test
+  void unknownFreeMemoryNeverRetiresASourceThatHoldsNoDeviceMemory() {
+    var unknown = new DeviceMemoryLine(null, null);
+    var beside = unknown.decision(4_000L, 0L);
+    assertEquals(ComposeEvidence.Mode.BESIDE, beside.mode());
+    assertEquals("source_holds_no_device_memory", beside.reason());
+    assertEquals(ComposeEvidence.Mode.IN_PLACE, unknown.decision(4_000L, 1L).mode());
+    // Unknown source release keeps the pre-2026-09-27 unconditional fallback.
+    assertEquals(ComposeEvidence.Mode.IN_PLACE,
+        new DeviceMemoryLine(8_000L, 1_000L).decision(4_000L, null).mode());
+    assertThrows(IllegalArgumentException.class, () -> unknown.decision(1L, -1L));
+  }
 }

@@ -6,8 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -90,6 +92,49 @@ final class KnowledgeServerDeviceMemoryLineTest {
       fixture.composeCandidate();
       assertTrue(sawLexicalA.get(), "text-only A must be published before B native compose");
       assertEquals(ComposeEvidence.Mode.IN_PLACE, fixture.composeEvidence().mode());
+      assertTrue(fixture.sourceOwner.isClosed(), "native A must retire before B composition");
+    }
+  }
+
+  @Test
+  void sourceReleaseTooSmallRefusesBeforeRetiringA(@TempDir Path dir) throws Exception {
+    try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
+        var composition = mockStatic(InferenceCompositionRoot.class)) {
+      fixture.selectSourceGeneration();
+      // B needs 1024 with 512 free; A's own footprint (256) cannot cover the 512 shortfall.
+      composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
+          any(), any(), any(), any(), any())).thenReturn(FOOTPRINT, 256L);
+      var refusal = assertThrows(InvocationTargetException.class, fixture::composeCandidate)
+          .getCause();
+      assertTrue(refusal instanceof java.io.IOException, String.valueOf(refusal));
+      assertTrue(refusal.getMessage().contains("candidate_exceeds_releasable_device_memory"),
+          refusal.getMessage());
+      assertEquals(ComposeEvidence.Mode.REFUSED, fixture.composeEvidence().mode());
+      composition.verify(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
+          any(), any(), any()), never());
+      verify(fixture.component, never())
+          .transition(eq(ComponentState.RELOADING), any(), any());
+      assertTrue(!fixture.sourceOwner.isClosed(), "a refused candidate must never retire A");
+      try (var serving = fixture.server.captureServingView()) {
+        assertSame(fixture.producer, serving.services());
+        assertSame(fixture.sourceOwner, serving.encoderSet());
+      }
+    }
+  }
+
+  @Test
+  void sourceReleaseCoveringTheShortfallStillBuildsInPlace(@TempDir Path dir) throws Exception {
+    try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
+        var composition = mockStatic(InferenceCompositionRoot.class)) {
+      fixture.selectSourceGeneration();
+      composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
+          any(), any(), any(), any(), any())).thenReturn(FOOTPRINT, 512L);
+      composition.when(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
+          any(), any(), any())).thenReturn(emptySurface());
+      fixture.composeCandidate();
+      var evidence = fixture.composeEvidence();
+      assertEquals(ComposeEvidence.Mode.IN_PLACE, evidence.mode());
+      assertEquals("candidate_fits_after_source_release", evidence.reason());
       assertTrue(fixture.sourceOwner.isClosed(), "native A must retire before B composition");
     }
   }
@@ -221,9 +266,11 @@ final class KnowledgeServerDeviceMemoryLineTest {
     private final WorkerAppServices lexical = mock(WorkerAppServices.class);
     private final EncoderSet sourceOwner;
     private final KnowledgeServer server;
+    private final Path dir;
     private Object candidate;
 
     private Fixture(Path dir, DeviceMemoryLine line) throws Exception {
+      this.dir = dir;
       ResolvedConfig configuration = ResolvedConfig.builder().contributeEnvRegistry().build();
       server = new KnowledgeServer(executors, WorkerBootFixture.workerConfig(dir.resolve("data")),
           null, ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null,
@@ -259,6 +306,14 @@ final class KnowledgeServerDeviceMemoryLineTest {
           configuration, target, models));
       set(server, "recordedCandidateFingerprint",
           new CandidateIndexTargetCapture.CaptureResult(target, inputs, models));
+    }
+
+    /** Gives A a known generation selection, so its releasable device footprint is estimated. */
+    private void selectSourceGeneration() throws Exception {
+      var model = new IndexGenerationManager.ModelArtifact(
+          dir.resolve("source.onnx").toAbsolutePath().normalize().toString(), "b".repeat(64));
+      set(server, "initialModelSelection", GenerationModelSelection.accepted(
+          Map.of("source", model), "splade", 768));
     }
 
     private void composeCandidate() throws Exception {

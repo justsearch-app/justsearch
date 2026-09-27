@@ -2156,8 +2156,13 @@ public final class KnowledgeServer implements Closeable {
     var memory = Objects.requireNonNull(deviceMemoryLine.get(), "Device memory line")
         .withCeilingMb(startupConfiguration == null ? null
             : startupConfiguration.ai().deviceMemoryCeilingMb());
-    var composition = memory.decision(footprint);
+    var composition = memory.decision(footprint,
+        sourceReleasableDeviceBytes(hardware, contract, modelsDir));
     if (encoderComponent != null) encoderComponent.setLastCompose(composition);
+    if (composition.mode() == io.justsearch.core.component.ComposeEvidence.Mode.REFUSED) {
+      throw new IOException("Candidate refused before retiring A: " + composition.reason()
+          + " (footprint=" + composition.footprintBytes() + ", free=" + composition.freeBytes() + ")");
+    }
     if (composition.mode() == io.justsearch.core.component.ComposeEvidence.Mode.IN_PLACE) {
       beginInPlaceCandidateBuild();
     }
@@ -2165,6 +2170,23 @@ public final class KnowledgeServer implements Closeable {
         inputs.nerModel(), "bge-m3".equalsIgnoreCase(configuration.ai().sparseModel()), dimension);
     return composeSelectedModels(selection, identity, hardware, contract, modelsDir,
         encoderConfiguration);
+  }
+
+  /**
+   * A's own device footprint under the estimator that sizes B, so retirement is chosen only when it
+   * can release what B needs. Zero when A has no native set; {@code null} when A's generation
+   * selection is unknown (legacy boot), which keeps the unconditional in-place fallback.
+   */
+  private Long sourceReleasableDeviceBytes(HardwareProfile hardware, InstallContract contract,
+      Path modelsDir) {
+    EncoderSet source = initialEncoderSet;
+    if (source == null || source.isClosed()) return 0L;
+    GenerationModelSelection selection = initialModelSelection;
+    ResolvedConfig configuration = startupConfiguration;
+    if (selection == null || configuration == null) return null;
+    return InferenceCompositionRoot.estimateCandidateFootprintBytes(
+        EncoderConfigurationProjection.from(configuration, selection), hardware, contract, modelsDir,
+        selection);
   }
 
   /** Publishes lexical A before retiring its exact native owner, then leaves Green's writer alive. */

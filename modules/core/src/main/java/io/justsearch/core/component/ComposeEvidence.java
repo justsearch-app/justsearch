@@ -23,6 +23,8 @@ public record ComposeEvidence(
 
   public enum Mode {
     BESIDE,
-    IN_PLACE
+    IN_PLACE,
+    /** Neither mode can fit the candidate; the serving set stays untouched. */
+    REFUSED
   }
 }
