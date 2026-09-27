@@ -4,6 +4,27 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 [continuation brief](continuation-brief.md) for ordering. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
+**2026-09-27 D1-14 full transition sampler.** The harness at `3d66c74c9`
+already sampled the refusal and accepted gap branches: fresh forced in-place
+rounds `tmp/3975`–`tmp/3976` (cancel) and `tmp/3977`–`tmp/3978` (accepted
+gap) measured 28,380/62,868 ms (45.14%) and 27,608/62,207 ms (44.38%),
+respectively, with no unexplained semantic responses. A distinct full A→B
+promotion round used fresh seed `tmp/3981-full-transition-seed.txt` and
+`tmp/3982-full-transition-sampled.txt`: installed CPU A and CUDA B had distinct
+model digests; the forced one-megabyte cap selected `IN_PLACE`; the harness
+observed 53 `reloading` refusals, 43 matching available responses, 29
+`worker.starting` responses and 15 transport gaps. It measured 14,207 ms of
+refusal in a 47,419 ms transition (29.96%), then B promoted and answered two
+VECTOR hits. The process exited zero and the supervised run stopped with no
+orphan. This is local installed evidence for the ordinary promotion branch;
+the sampler addition to that branch awaits hosted proof. The
+owner-set semantic wall-clock/fraction bound remains pending, so these
+measurements do not accept the D1 product floor. Startup 503 and transport
+gaps are reported separately from `reloading` and must not be hidden by the
+fraction. The `3d66c74c9` exact-SHA hosted run is
+[CI 36299571929](https://github.com/justsearch-app/justsearch/actions/runs/36299571929);
+check its terminal result before claiming hosted proof.
+
 **Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
 D1-9 streaming correction and its proofs before further implementation. Stage
 E now pairs only seven groups against `main`: quality plus workflow fixture;

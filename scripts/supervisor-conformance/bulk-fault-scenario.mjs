@@ -701,6 +701,10 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     }
     return;
   }
+  const transitionSampler = inPlaceModelB
+    ? sampleSemanticAvailability({ apiPort, post, marker, file, matchingHit }) : null;
+  // The promotion and cancellation paths both leave through this scope.
+  try {
   let cancellationKey;
   try {
     const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
@@ -981,10 +985,19 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       && !matchingHit(removedText, removedFile, removedMarker),
     `promoted B resurrected a watcher deletion: ${removedText.text}`);
   }
+  const semantic = await transitionSampler?.stop();
+  if (semantic) requireThat(semantic.reloadingRefusals > 0 && semantic.available > 0
+    && semantic.refusalWindowMs > 0 && semantic.refusalWindowMs <= semantic.transitionMs
+    && semantic.unexpected === 0,
+  `floor transition sampling missed a real refusal and recovery: ${JSON.stringify(semantic)}`);
   console.log('MODEL_LIVE_AB_PASS', JSON.stringify({ operationKey,
     sourceGeneration, activeGeneration: completed.active.active_generation,
     settingsRevision: completed.settings.witness.acceptedRevision,
-    bVectorHits: JSON.parse(bVector.text).results.length }));
+    bVectorHits: JSON.parse(bVector.text).results.length,
+    ...(semantic ? { semantic } : {}) }));
+  } finally {
+    await transitionSampler?.stop();
+  }
 }
 
 /** The webview's HIGH-risk cancellation uses its own prepared operation and approval. */
@@ -1020,7 +1033,7 @@ async function cancelReindexWithApproval({ apiPort, manifest, reindexKey,
   return cancellationKey;
 }
 
-/** Sample the real vector port from activation admission until A's semantic service returns. */
+/** Sample the real vector port through refusal and subsequent A restoration or B promotion. */
 function sampleSemanticAvailability({ apiPort, post, marker, file, matchingHit }) {
   const started = performance.now();
   const observations = [];
