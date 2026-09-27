@@ -84,6 +84,15 @@ backfill, fake device-line mode tests and Flow B remain to be proven.
 The combined source's serial stress-enabled Gradle suite passed at `tmp/3887`
 with affected classes 16/16 and 29/29, zero skips. Hosted proof for this
 new combined checkpoint remains due.
+Fresh private installed accepted-write activation passed at `tmp/3888`–
+`tmp/3889`: A served the new file during migration, the one-megabyte cap
+forced distinct CUDA B `IN_PLACE`, and B served that file plus VECTOR after
+promotion. A fresh seed and cancellation variant at `tmp/3890`–`tmp/3891`
+passed with the same accepted write before pointer publication: original bulk
+`CANCELLED`, exact A IDLE with text and VECTOR, B physically absent, and no
+switch-buffer rows. The fixture source is local WIP. Four-mode fake device-line
+tests, installed GPU held lease and full Flow B remain next; hosted run
+`36289267749` on `32bc8c810` is still in progress and excludes this fixture.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

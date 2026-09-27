@@ -365,6 +365,30 @@ The combined source passed the full serial stress-enabled Gradle `test` at
 Store recoverability, runtime closure, regeneration and JS syntax checks
 also passed before that gate. Hosted proof for this combined source remains due.
 
+**2026-09-27 D1-14 accepted-write in-place backfill (local WIP).** Fresh
+private installed seed `tmp/3888-inplace-accepted-seed.txt` and activation
+`tmp/3889-inplace-accepted-installed.txt` passed with a recorded write accepted
+and completed while distinct CUDA B built. The write was text-searchable on A
+before the cut and on B after promotion. A's CPU model SHA was
+`5b9f03fdc40350a78fa064b4cfb6bf9a229a7c40aa87736f537e3ebd00aa2b86`;
+B's FP16 SHA was
+`f1d0f4ec988a6c17387d3b256e631deea506a891aed3a6ded4f9bf09386cc38e`.
+The one-megabyte cap selected `IN_PLACE`; Green settled 82 units with zero
+failures, A text answered during `RELOADING`, and B returned ten VECTOR hits
+after activation. A separate fresh seed `tmp/3890-accepted-cancel-seed.txt`
+and installed cancellation `tmp/3891-accepted-cancel-installed.txt` passed
+the same accepted-write and forced in-place cut, then used a distinct prepared,
+approved HIGH-risk webview cancellation before pointer publication. The
+fixture checks the original bulk row `CANCELLED` with durable
+`refusalCode=cancelled`, exact A IDLE, no B directory or switch-buffer rows,
+the accepted file still text-searchable on A, and eight A VECTOR hits with
+the original CPU embedding SHA. Both private runs ended `STOP 0`. These
+results close the local accepted-write activation/cancellation backfill;
+four-mode fake device-line tests, installed GPU held lease and full D1-12
+Flow B acceptance remain open. Exact-SHA hosted run `36289267749` for
+`32bc8c810192d61e329fbd10edb5e026f04dcaf4` is still running; it does
+not include the new fixture changes.
+
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor
 `INGEST` row, `superseded_from` linkage and `SUCCESSOR_ROW_MISSING` branch were

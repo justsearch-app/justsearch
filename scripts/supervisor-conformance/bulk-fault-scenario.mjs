@@ -590,7 +590,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
   operationKey, readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
   watcherDeleteDuringBuild = false, gapApproval = false, gapCancellation = false,
-  gapRecomposeFailure = false,
+  gapRecomposeFailure = false, cancelBeforePointer = false,
   extraBuildFiles = 0 }) {
   const runtime = path.join(data, 'runtime');
   const { reachedFile, releaseFile } = barrierFiles(data);
@@ -606,6 +606,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
   'side-by-side model fixture requires a private installed serving A');
   requireThat(operationRows(operationPath, operationKey).length === 0,
     'side-by-side activation key is already present');
+  if (cancelBeforePointer) requireThat(acceptedWriteDuringBuild && distinctModelB && inPlaceModelB,
+    'accepted-write cancellation requires a distinct forced in-place candidate');
   const file = path.join(work, 'installer-root-a', 'installer-0.txt');
   const marker = fs.readFileSync(file, 'utf8').split(/\s+/)[0];
   const removedFile = watcherDeleteDuringBuild
@@ -686,6 +688,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       gapRecomposeFailure });
     return;
   }
+  let cancellationKey;
   try {
     const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
     const acceptedMarker = 'lexicalbridgecobalt';
@@ -857,11 +860,62 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
       unitsFailed: inFlight.units_failed, mode: composeMode,
       encoderState: status?.components?.encoders?.state,
       vectorHits: actualInPlace ? 0 : JSON.parse(vectorSearch.text).results.length }));
+    if (cancelBeforePointer) {
+      cancellationKey = await cancelReindexWithApproval({ apiPort, manifest,
+        reindexKey: operationKey, createOperationKey, request, post, requireThat });
+    }
   } finally {
     if (acceptedWriteDuringBuild) fs.writeFileSync(migrationBarrier.releaseFile, 'release');
     fs.writeFileSync(releaseFile, 'release');
   }
   await dispatched.settled;
+  if (cancelBeforePointer) {
+    const retired = await waitFor('accepted-write B cancelled and physically retired',
+      180000, () => {
+        const row = operationRows(operationPath, operationKey)[0];
+        const state = readJson(path.join(indexBase, 'state.json'));
+        if (row?.state !== 'CANCELLED' || row.failure_reason !== 'cancelled'
+          || state?.active_generation !== sourceGeneration
+          || state?.migration_state !== 'IDLE'
+          || state?.building_generation != null
+          || fs.existsSync(path.join(indexBase, 'indices', `g-${operationKey}`))) return null;
+        const durable = row.processing_history_counts_json
+          ? JSON.parse(row.processing_history_counts_json) : null;
+        const switchRows = readRows(jobsPath,
+          'SELECT key FROM switch_buffer WHERE generation = ?', `g-${operationKey}`);
+        return durable?.refusalCode === 'cancelled' && switchRows.length === 0
+          ? { row, state } : null;
+      });
+    const acceptedFile = path.join(work, 'installer-root-a',
+      `accepted-during-b-${operationKey}.txt`);
+    const recoveredA = await waitFor('cancelled in-place A retains accepted write and VECTOR',
+      120000, async () => {
+        try {
+          const live = readJson(path.join(runtime, 'manifest.json'));
+          if (!live?.head?.apiPort) return null;
+          const reply = await request(live.head.apiPort, '/api/status', {}, 15000);
+          if (reply.status !== 200) return null;
+          const status = JSON.parse(reply.text);
+          if (status.worker?.compatibility?.embeddingFingerprintCurrent
+              !== sourceManifest.models.embedding.sha256
+            || status.components?.encoders?.state !== 'READY') return null;
+          const text = await post(live.head.apiPort, '/api/knowledge/search',
+            { query: 'lexicalbridgecobalt', limit: 10, mode: 'text' }, 30000);
+          if (text.status !== 200
+            || !matchingHit(text, acceptedFile, 'lexicalbridgecobalt')) return null;
+          const vector = await post(live.head.apiPort, '/api/knowledge/search',
+            { query: marker, limit: 10, mode: 'vector' }, 30000);
+          return vector.status === 200 && JSON.parse(vector.text).results?.length > 0
+            ? { status, text, vector } : null;
+        } catch { return null; }
+      });
+    console.log('MODEL_LIVE_AB_ACCEPTED_CANCEL_PASS', JSON.stringify({ operationKey,
+      cancellationKey, sourceGeneration, activeGeneration: retired.state.active_generation,
+      acceptedFile, aVectorHits: JSON.parse(recoveredA.vector.text).results.length,
+      aEmbeddingSha: recoveredA.status.worker.compatibility.embeddingFingerprintCurrent,
+      terminalState: retired.row.state }));
+    return;
+  }
   const completed = await waitFor('side-by-side activation terminal promotion', 180000, () => {
     const row = operationRows(operationPath, operationKey)[0];
     if (row?.state === 'FAILED' || row?.state === 'CANCELLED') {
@@ -919,6 +973,39 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     sourceGeneration, activeGeneration: completed.active.active_generation,
     settingsRevision: completed.settings.witness.acceptedRevision,
     bVectorHits: JSON.parse(bVector.text).results.length }));
+}
+
+/** The webview's HIGH-risk cancellation uses its own prepared operation and approval. */
+async function cancelReindexWithApproval({ apiPort, manifest, reindexKey,
+  createOperationKey, request, post, requireThat }) {
+  const cancellationKey = createOperationKey();
+  const cancellationInput = { args: { reindexKey }, idempotencyKey: cancellationKey };
+  const initial = await request(apiPort, CANCEL_REINDEX_ROUTE, {
+    method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify(cancellationInput),
+  }, 30000);
+  const pending = parseJson(initial, 'installer cancellation preparation');
+  requireThat(initial.status === 428 && pending.operationKey === cancellationKey
+    && typeof pending.pendingId === 'string',
+  `installer cancellation lacked a distinct prepared decision: ${initial.text}`);
+  const approved = await post(apiPort, '/api/authorizations/approve',
+    { pendingId: pending.pendingId }, 30000);
+  const approval = parseJson(approved, 'installer cancellation approval');
+  requireThat(approved.status === 200 && typeof approval.capsule === 'string'
+    && approval.operationKey === cancellationKey
+    && (approval.preparationNonce === undefined
+      || typeof approval.preparationNonce === 'string'),
+  `installer cancellation approval failed: ${approved.text}`);
+  const cancelled = await request(apiPort, CANCEL_REINDEX_ROUTE, {
+    method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify({
+      ...cancellationInput, confirmationToken: approval.capsule,
+      ...(approval.preparationNonce
+        ? { preparationNonce: approval.preparationNonce } : {}),
+    }),
+  }, 30000);
+  requireThat(cancelled.status === 200
+    && parseJson(cancelled, 'installer cancellation').success,
+  `installer cancellation failed: ${cancelled.text}`);
+  return cancellationKey;
 }
 
 /** A captured installer file disappears before B builds; A must regain native service at the wait. */
@@ -1035,34 +1122,8 @@ async function exerciseLiveModelGapDecision(c) {
       } catch { return null; }
     });
   if (gapCancellation) {
-    const cancellationKey = createOperationKey();
-    const cancellationInput = { args: { reindexKey: operationKey },
-      idempotencyKey: cancellationKey };
-    const initial = await request(apiPort, CANCEL_REINDEX_ROUTE, {
-      method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify(cancellationInput),
-    }, 30000);
-    const pending = parseJson(initial, 'installer gap cancellation preparation');
-    requireThat(initial.status === 428 && pending.operationKey === cancellationKey
-      && typeof pending.pendingId === 'string',
-    `installer gap cancellation lacked a distinct prepared decision: ${initial.text}`);
-    const approved = await post(apiPort, '/api/authorizations/approve',
-      { pendingId: pending.pendingId }, 30000);
-    const approval = parseJson(approved, 'installer gap cancellation approval');
-    requireThat(approved.status === 200 && typeof approval.capsule === 'string'
-      && approval.operationKey === cancellationKey
-      && (approval.preparationNonce === undefined
-        || typeof approval.preparationNonce === 'string'),
-      `installer gap cancellation approval failed: ${approved.text}`);
-    const cancelled = await request(apiPort, CANCEL_REINDEX_ROUTE, {
-      method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify({
-        ...cancellationInput, confirmationToken: approval.capsule,
-        ...(approval.preparationNonce
-          ? { preparationNonce: approval.preparationNonce } : {}),
-      }),
-    }, 30000);
-    requireThat(cancelled.status === 200
-      && parseJson(cancelled, 'installer gap cancellation').success,
-    `installer gap cancellation failed: ${cancelled.text}`);
+    const cancellationKey = await cancelReindexWithApproval({ apiPort, manifest,
+      reindexKey: operationKey, createOperationKey, request, post, requireThat });
     const retired = await waitFor('cancelled installer B retired with A serving', 180000,
       () => {
         const row = operationRows(operationPath, operationKey)[0];

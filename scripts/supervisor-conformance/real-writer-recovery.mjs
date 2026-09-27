@@ -31,18 +31,20 @@ const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x
 const modelLiveABGap = scenario === 'model-live-a-b-gap';
 const modelLiveABCancel = scenario === 'model-live-a-b-cancel';
 const modelLiveABRecomposeFailure = scenario === 'model-live-a-b-recompose-failure';
+const modelLiveABAcceptedCancel = scenario === 'model-live-a-b-accepted-cancel';
 const modelLiveABDecision = modelLiveABGap || modelLiveABCancel || modelLiveABRecomposeFailure;
-const modelLiveAB = scenario === 'model-live-a-b' || modelLiveABDecision;
-const acceptedWriteDuringBuild = modelLiveAB
-  && process.env.JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE === '1';
+const modelLiveAB = scenario === 'model-live-a-b' || modelLiveABDecision
+  || modelLiveABAcceptedCancel;
+const acceptedWriteDuringBuild = modelLiveABAcceptedCancel || (modelLiveAB
+  && process.env.JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE === '1');
 const watcherDeleteDuringBuild = acceptedWriteDuringBuild
   && process.env.JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE === '1';
 // Create the finite MIGRATING load after A's vector readiness check. The named
 // before-SWITCHING barrier holds the monitor while the watcher probe runs.
 const extraBuildFiles = watcherDeleteDuringBuild ? 300 : acceptedWriteDuringBuild ? 80 : 0;
-const distinctModelB = modelLiveABDecision || (modelLiveAB
+const distinctModelB = modelLiveABDecision || modelLiveABAcceptedCancel || (modelLiveAB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B === '1');
-const inPlaceModelB = modelLiveABDecision || (distinctModelB
+const inPlaceModelB = modelLiveABDecision || modelLiveABAcceptedCancel || (distinctModelB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE === '1');
 const mixedChatInstaller = installerFault
   && process.env.JUSTSEARCH_WRITER_RECOVERY_MIXED_CHAT === '1';
@@ -401,7 +403,8 @@ try {
       inPlaceModelB, acceptedWriteDuringBuild, watcherDeleteDuringBuild, extraBuildFiles,
       gapApproval: modelLiveABGap,
       gapCancellation: modelLiveABCancel || modelLiveABRecomposeFailure,
-      gapRecomposeFailure: modelLiveABRecomposeFailure });
+      gapRecomposeFailure: modelLiveABRecomposeFailure,
+      cancelBeforePointer: modelLiveABAcceptedCancel });
   } else if (modelBoot) {
     const initialStatus = await waitFor('model binding boot status', 60000, async () => {
       try {
