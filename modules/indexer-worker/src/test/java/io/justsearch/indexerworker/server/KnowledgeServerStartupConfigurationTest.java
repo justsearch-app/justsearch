@@ -415,6 +415,16 @@ class KnowledgeServerStartupConfigurationTest {
 
           try (var b = server.captureServingView()) {
             assertNotSame(a.services(), b.services(), "deferred publication must install B services");
+            assertSame(a.encoderSet(), b.encoderSet(),
+                "deferred service replacement must retain the exact pending model owner");
+            assertSame(a.encoderSet().modelReadyLatch(),
+                ((java.util.function.Supplier<?>) field(a.services().searchService(),
+                    "modelReadyLatchSupplier")).get(),
+                "an issued A service must await its captured encoder set");
+            assertSame(b.encoderSet().modelReadyLatch(),
+                ((java.util.function.Supplier<?>) field(b.services().searchService(),
+                    "modelReadyLatchSupplier")).get(),
+                "the replacement service must await that same generation owner");
             var selectedProvider = field(server, "embeddingService");
             assertNotNull(selectedProvider);
             assertSame(selectedProvider, field(a.services().searchService(), "embeddingProvider"),

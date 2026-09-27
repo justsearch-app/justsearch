@@ -104,6 +104,18 @@ An isolated installed-library GPU probe compiled at `tmp/3903` and passed at
 new leases refused, and its release completed native retirement. The Worker
 test and installed model/search runs provide the adjacent owner evidence.
 Held native use during restored-A composition and full D1-12 Flow B remain.
+Exact-SHA hosted CI on the device-line/GPU checkpoint `efc101d18` passed
+every job in run `36290764337`.
+The next D1-12 local correction binds an issued search service to its
+captured `EncoderSet` readiness after first attachment. A red deferred-view
+test at `tmp/3906` exposed the process boot latch alias; targeted green and
+static checks passed at `tmp/3908`–`tmp/3909`. A service test at `tmp/3910`
+verified pending B still blocks after A has become ready. The complete
+`indexer-worker`, `worker-services` and `adapters-lucene` module suites passed
+at `tmp/3911`. Full Flow B still needs the wrapper-owner migration and
+beside-mode different-model Green build with live A search.
+The final Worker-side lookup also refuses an unretained stale service after
+publication; its complete module suite and PMD/Spotless passed at `tmp/3912`.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay

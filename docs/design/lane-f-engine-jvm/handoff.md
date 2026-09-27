@@ -419,6 +419,36 @@ exited 0 with `INSTALLED_GPU_LEASE_PASS`. This proves real installed CUDA
 per-handle lifetime, alongside the in-process CPU Worker recompose test.
 An installed held call through the restored A composition, and the wider
 D1-12 Flow B consumer/latch contract, remain open.
+The exact `efc101d183673226de56e5a23f7360e03b1fddd5` checkpoint passed
+every hosted CI job in run `36290764337`, including Windows-native and
+system integration. The subsequent readiness correction is documented below.
+
+**2026-09-27 D1-12 readiness ownership follow-on.** Source review
+found that `wireAppServicesPostConstruction` still sent every initial or
+retained query service to the process-wide boot latch even after its serving
+view had acquired an `EncoderSet`. The existing deferred-publication
+integration test was extended to assert the exact latch used by both an
+issued A service and its replacement. It failed on the A identity at
+`tmp/3906-generation-latch-red.txt`. `readinessLatchFor` now resolves the
+current or retained serving view for that exact service and returns its
+encoder set's latch; only a not-yet-attached boot view uses the pre-owner
+enumerator gate. An initial compile attempt `tmp/3907` exposed that
+`ServingView` is static; passing the boot latch into its helper fixed the
+scope. The targeted test passed at `tmp/3908`, and the full startup and
+device-line classes with Worker PMD/Spotless passed at `tmp/3909`. A
+WorkerSearchService test changes its supplier from released A to pending B
+and verifies B blocks until its own latch releases; it and static checks
+passed at `tmp/3910`. All three D1-12 affected module suites
+(`indexer-worker`, `worker-services`, `adapters-lucene`) passed serially at
+`tmp/3911-flow-b-modules.txt` in 10m46s. Full Flow B acceptance is still
+open: the six server wrapper aliases remain, and a physical beside-mode
+different-model Green build with A serving has not been shown.
+The lookup was then tightened to refuse a service absent from current and
+retained views after publication, while allowing an issued retired-view
+query to finish. The final source passed the entire Worker suite plus
+PMD/Spotless at `tmp/3912-generation-latch-final-worker.txt` (3m24s).
+The worker-services and adapters-lucene suites at `tmp/3911` remain applicable
+because those modules did not change after that run.
 
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor

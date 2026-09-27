@@ -203,6 +203,10 @@ public final class KnowledgeServer implements Closeable {
       encoderSet = owner;
     }
 
+    private CountDownLatch readinessLatch(CountDownLatch bootLatch) {
+      return encoderSet == null ? bootLatch : encoderSet.modelReadyLatch();
+    }
+
     private void releaseEncoderSet() {
       if (encoderLease != null) encoderLease.close();
     }
@@ -400,30 +404,12 @@ public final class KnowledgeServer implements Closeable {
   private volatile MigrationProgressSnapshot persistedMigrationProgressSnapshot;
 
   /**
-   * Gate released by {@link #initDeferredModels()} after all models are wired
-   * (embedding + ECC + SPLADE + BGE-M3 + NER + reranker + citation scorer). The
-   * {@code finally} block ensures the latch releases even if init fails partway through.
-   *
-   * <p><strong>Shared by two independent consumers</strong> — changes to the release
-   * sequence must consider both:
-   *
-   * <ul>
-   *   <li><b>Migration enumerator</b> (tempdoc 332) — the background thread at
-   *       {@code migrationEnumeratorThread} awaits this latch before enqueuing files so
-   *       the {@code IndexingLoop} does not process docs before SPLADE/embedding exist
-   *       (would produce text-only docs needing slow RMW backfill post-cutover).</li>
-   *   <li><b>Query handlers</b> (tempdoc 397 §14.28 U3) — wired via
-   *       {@link io.justsearch.indexerworker.server.WorkerAppServices#wireModelReadyLatch}
-   *       in {@link #initDeferredModels()}, consumed by
-   *       {@code WorkerSearchService.awaitModelsReady(...)} on entry of
-   *       {@code search}/{@code retrieveContext}/{@code rerank}/{@code matchCitations}.
-   *       Closes a boot-race regression where queries arriving before init completed
-   *       silently missed reranker + citation wiring.</li>
-   * </ul>
-   *
-   * <p>Both consumers fall through to a degraded path on timeout (120 s). Splitting the
-   * latch is possible but not currently warranted — the release point (all models wired)
-   * is identical for both.
+   * Initial boot gate before an {@link EncoderSet} can be attached to a serving view.
+   * The migration enumerator waits here before queueing documents. A query service
+   * prepared before its first view also waits here; once its view has an encoder
+   * owner, {@link #readinessLatchFor(WorkerAppServices)} resolves that owner's
+   * independent latch. Both the boot gate and initial set release after all
+   * deferred models are wired, including on a degraded initialization failure.
    */
   private final CountDownLatch modelReadyLatch = new CountDownLatch(1);
 
@@ -1836,6 +1822,22 @@ public final class KnowledgeServer implements Closeable {
         foregroundLoad, pacing.foregroundDutyPct(), pacing.foregroundCooldownMs());
   }
 
+  /** Resolve the latch from the exact service view retained by an issued query. */
+  private CountDownLatch readinessLatchFor(WorkerAppServices service) {
+    synchronized (servingViewMonitor) {
+      if (servingView != null && servingView.services == service) {
+        return servingView.readinessLatch(modelReadyLatch);
+      }
+      for (ServingView retired : retiredServingViews) {
+        if (retired.services == service) return retired.readinessLatch(modelReadyLatch);
+      }
+      if (closeStarted) throw new IllegalStateException("Index serving owner is closing");
+      // Before first publication, a prepared boot service may legitimately wait here.
+      if (servingView == null) return modelReadyLatch;
+    }
+    throw new IllegalStateException("Search service has no retained serving generation");
+  }
+
   /**
    * Apply post-construction wiring to {@code appServices}. Called after the initial
    * boot-time construction and again after any reconstruction (e.g., when
@@ -1850,9 +1852,9 @@ public final class KnowledgeServer implements Closeable {
 
     // 516 P3 FINAL CUT: wireMigrationActiveSupplier removed — pre-wired via DWAS 2-arg ctor.
 
-    // Tempdoc 397 §14.28 U3: wire the modelReadyLatch so WorkerSearchService's query handlers
-    // can await encoder wiring before first use.
-    svc.wireModelReadyLatch(() -> modelReadyLatch);
+    // An issued service waits on its own serving generation after its encoder set is attached.
+    // Before the first set exists, the boot gate still protects deferred service wiring.
+    svc.wireModelReadyLatch(() -> readinessLatchFor(svc));
 
     // Tempdoc 397 §14.28 U4: wire the PolicySnapshot supplier so the getSessionPolicies
     // port can return the index half's authoritative snapshot.
@@ -2851,13 +2853,9 @@ public final class KnowledgeServer implements Closeable {
 
       publishEncoderComposition();
 
-      // 332 + 397 §14.28 U3: release the shared modelReadyLatch after ALL models are
-      // wired (embedding + ECC + SPLADE + BGE-M3 + disambiguation + NER + reranker +
-      // citation). This closes both (a) the SPLADE timing gap from 312 — migration
-      // enumerator now waits until sparse vectors are available — and (b) the query-
-      // handler boot-race — WorkerSearchService.awaitModelsReady unblocks here. See the
-      // modelReadyLatch field Javadoc for the full consumer list before changing the
-      // release point.
+      // Release the pre-owner boot/enumerator gate only after all model services are
+      // wired. Queries whose view has acquired an EncoderSet wait for that set's
+      // independent latch, released in finally after this publication completes.
       modelReadyLatch.countDown();
 
       long bgMs = (System.nanoTime() - bgStart) / 1_000_000;

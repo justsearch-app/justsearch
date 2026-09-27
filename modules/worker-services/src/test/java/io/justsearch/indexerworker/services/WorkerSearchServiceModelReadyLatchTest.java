@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -77,5 +79,34 @@ class WorkerSearchServiceModelReadyLatchTest {
     latch.countDown();
     waiter.join(5_000);
     assertTrue(!waiter.isAlive(), "waiter should have returned after latch.countDown()");
+  }
+
+  @Test
+  void newServingSetWaitsOnItsOwnLatchAfterPreviousSetWasReady() throws InterruptedException {
+    WorkerSearchService service = buildService();
+    CountDownLatch a = new CountDownLatch(0);
+    CountDownLatch b = new CountDownLatch(1);
+    AtomicReference<CountDownLatch> serving = new AtomicReference<>(a);
+    CountDownLatch capturedB = new CountDownLatch(1);
+    service.setModelReadyLatchSupplier(() -> {
+      CountDownLatch selected = serving.get();
+      if (selected == b) capturedB.countDown();
+      return selected;
+    });
+    service.awaitModelsReady("A ready");
+    serving.set(b);
+    Thread waiter = new Thread(() -> service.awaitModelsReady("B loading"),
+        "new-serving-set-waiter");
+    waiter.start();
+    try {
+      assertTrue(capturedB.await(5, TimeUnit.SECONDS), "the query must select B's latch");
+      assertTrue(waiter.isAlive(), "A's released latch cannot authorize B before model wiring");
+      b.countDown();
+      waiter.join(5_000);
+      assertTrue(!waiter.isAlive(), "B's readiness must release its waiting query");
+    } finally {
+      b.countDown();
+      waiter.join(5_000);
+    }
   }
 }
