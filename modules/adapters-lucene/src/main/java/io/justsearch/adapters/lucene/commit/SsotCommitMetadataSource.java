@@ -103,6 +103,14 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
     }
   }
 
+  @Override
+  public List<String> indeterminateFingerprintInputs() {
+    RuntimeFingerprintInputs inputs = runtimeFingerprintInputs;
+    if (inputs == null) return IndexFingerprint.indeterminateModelInputs();
+    return IndexFingerprint.indeterminateModelInputs(
+        inputs.embeddingModel(), inputs.spladeModel(), inputs.nerModel());
+  }
+
   private static File resolveRepoRoot() {
     java.nio.file.Path root = JustSearchConfigurationLoader.repoRootStatic();
     if (root == null) {

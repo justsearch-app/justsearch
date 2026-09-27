@@ -561,6 +561,12 @@ public final class IndexFingerprint {
     return namedIndeterminate(List.of(embeddingModel(), spladeModel(), nerModel()));
   }
 
+  /** Names unresolved model inputs captured for one runtime, independent of global providers. */
+  public static List<String> indeterminateModelInputs(
+      ModelFingerprint embedding, ModelFingerprint splade, ModelFingerprint ner) {
+    return namedIndeterminate(List.of(embedding, splade, ner));
+  }
+
   /** The {@link #MODEL_INPUT_KEYS} whose positionally-aligned fingerprint is INDETERMINATE. */
   private static List<String> namedIndeterminate(List<ModelFingerprint> orderedModels) {
     List<String> out = new ArrayList<>();

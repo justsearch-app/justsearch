@@ -458,8 +458,8 @@ final class RuntimeSession implements AutoCloseable {
     this.indexOpenGuard =
         builder.indexOpenGuardOverride() != null
             ? builder.indexOpenGuardOverride()
-            : new IndexMetadataParityGuard(
-                this::resolvedIndexPathForGuards, commitOps::buildMetadataSnapshot);
+            : IndexMetadataParityGuard.forMetadataSource(
+                this::resolvedIndexPathForGuards, metadataSourceSupplier);
     this.prebuiltComponents = builder.prebuiltComponentsForTests();
 
     // 3. Open Lucene components, with corruption / schema-mismatch recovery.

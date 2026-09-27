@@ -122,13 +122,21 @@ public final class ParityDiagnostics {
 
   public static List<Diff> diff(
       Map<String, String> stored, Map<String, Object> expected, long docCount) {
+    return diff(stored, expected, docCount,
+        io.justsearch.adapters.lucene.commit.IndexFingerprint.indeterminateModelInputs());
+  }
+
+  /** The unresolved inputs belong to the expected runtime, never another open generation. */
+  public static List<Diff> diff(Map<String, String> stored, Map<String, Object> expected,
+      long docCount, List<String> indeterminateInputs) {
+    Objects.requireNonNull(indeterminateInputs, "indeterminateInputs");
     List<Diff> diffs = new ArrayList<>();
     // Runs when EITHER digest is missing and both sides recorded the inputs. It is the answer for
     // that case, so the loop below must not also file the absent digest as its own finding.
     boolean inputsCompared =
         determinateInputComparisonAvailable(stored, expected) && !holdsNothingToMigrate(docCount);
     if (inputsCompared) {
-      diffs.addAll(determinateInputDiff(stored, expected));
+      diffs.addAll(determinateInputDiff(stored, expected, indeterminateInputs));
     }
     for (String key : PARITY_KEYS) {
       String storedRaw = asString(stored == null ? null : stored.get(key));
@@ -258,10 +266,10 @@ public final class ParityDiagnostics {
    * <p>Caller checks availability and doc count; this assumes both.
    */
   private static List<Diff> determinateInputDiff(
-      Map<String, String> stored, Map<String, Object> expected) {
+      Map<String, String> stored, Map<String, Object> expected,
+      List<String> indeterminateInputs) {
     Set<String> ignored =
-        new java.util.TreeSet<>(
-            io.justsearch.adapters.lucene.commit.IndexFingerprint.indeterminateModelInputs());
+        new java.util.TreeSet<>(indeterminateInputs);
     String storedInputs = storedInputsJson(stored);
     if (isBlank(storedFingerprint(stored))) {
       ignored.addAll(

@@ -4,6 +4,54 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 [continuation brief](continuation-brief.md) for ordering. This handoff owns
 current evidence; the brief does not narrow the remaining lane scope.
 
+**2026-09-27 exact-SHA governance correction.** Checkpoint
+`bbc385386065295e45a3ebb62077e2f2eeccd796` passed every hosted job in
+[CI 36306882028](https://github.com/justsearch-app/justsearch/actions/runs/36306882028),
+including Public claims, platform contracts, Windows-native and system
+integration. This closes the two hosted gate failures on `e43908445`; it does
+not close the remaining D1-13 or D1/D2/E/F acceptance.
+
+**2026-09-27 D1-12 indeterminate parity correction (local).** A co-resident
+runtime with unresolved embedding had allowed the process-wide provider from a
+different runtime to hide a determinate SPLADE change. The runtime's commit
+metadata source now supplies its own unresolved input names to pre-open and
+open-time parity. The open-time guard captures metadata and unresolved inputs
+from one source invocation. The regression seeds a real Lucene commit and
+requires the SPLADE change to yield one `index_fingerprint` mismatch despite a
+contradictory process-wide provider. Focused tests, Worker compile, adapter and
+Worker PMD/Spotless passed at `tmp/4012-runtime-parity-focused.txt`. The first
+parallel three-module run `tmp/4013-runtime-parity-modules.txt` passed Worker
+853 tests (15 skips) and worker-services 1,463 (2 skips), but one unrelated
+adapter concurrent-write test reached its 60-second timeout under three
+simultaneous suites. All XML is retained at `tmp/4013-runtime-parity-xml`.
+The concurrent-write class passed serially at `tmp/4014-rmw-serial.txt`; its
+formerly timed-out case took 22.148 seconds. The full adapters-lucene suite
+then passed serially at `tmp/4015-adapters-serial-full.txt`: 743 tests, zero
+failures/errors/skips, XML at `tmp/4015-adapters-serial-xml`. Installed
+real-model proof then passed at `tmp/4016-runtime-parity-installed-ai.txt` on
+this changed source: one `ai`-tagged JUnit test, zero failures/errors/skips,
+XML at `tmp/4016-runtime-parity-installed-ai-xml`. The forced one-megabyte cap
+selected `IN_PLACE` against a 5,905,580,032-byte B footprint. Restored A
+returned two VECTOR hits during gap approval, B returned one after promotion,
+and the sampler recovered after its last refusal (30,350/73,091 ms; 41.52%).
+Official health was `ABSENT` with no inference orphan. The owner-set D1-14
+product bound is still pending, so this measurement is not its acceptance.
+The repository `build -x test -PskipWebBuild=true` compile/static gate passed
+at `tmp/4017-runtime-parity-build.txt` (330 tasks); `regen-all --check` and
+`docs-validate` passed at `tmp/4018`–`tmp/4019`.
+Hosted proof for this source remains pending. The broader
+D1-12 Flow B and D1-17 legacy-provider retirement remain open.
+
+F: ReFS capacity fell below 0.4 GB while installing/running this case. Only
+generated `.optimized` model byproducts from two completed Lane F fixtures
+(`lifecycle-gap-8704be5e-37f5-41b0-b73c-0aecd49d3c2f` and
+`lifecycle-gap-5711499e-186f-40ba-b8ef-5185669d7eb0`) were moved, with
+their relative paths, under
+`C:/Users/Elias/AppData/Local/Temp/justsearch-lane-f-fixture-overflow/`.
+Source model bytes, logs, proof markers, the active fixture and unrelated
+`modules/app-inference/logs/` were left alone. F: had over 4.1 GB free after
+the installed run; this C: Temp location is not the retained test ledger.
+
 **2026-09-27 D1-14 full transition sampler.** The harness at `3d66c74c9`
 already sampled the refusal and accepted gap branches: fresh forced in-place
 rounds `tmp/3975`–`tmp/3976` (cancel) and `tmp/3977`–`tmp/3978` (accepted

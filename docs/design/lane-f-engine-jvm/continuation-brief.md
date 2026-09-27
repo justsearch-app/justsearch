@@ -42,12 +42,22 @@ after an F: disk-capacity and PMD interruption at `tmp/4005`. See the handoff
 for limits and counts.
 The native-hold proof `e43908445` reached hosted Public claims, which found
 an unclassified harness data-dir write. A READY ephemeral marker row now
-passes the local store-recoverability gate; its hosted correction remains to
-be pushed after the current system integration job finishes. The same run's
+passes the local store-recoverability gate. The same run's
 platform-contracts lane found direct probe environment reads; the exact
 system-access audit and Worker static checks pass locally after routing them
 through `SystemAccess.rawEnvVar` at `tmp/4007`. Installed AI rerun `tmp/4008`
 passed with exact A native retirement evidence and clean stack stop.
+The correction was pushed as `bbc385386`; exact-SHA CI run
+[36306882028](https://github.com/justsearch-app/justsearch/actions/runs/36306882028)
+passed every job. A new D1-12 parity correction captures unresolved model
+inputs from each runtime's own metadata source. Focused/static tests passed at
+`tmp/4012`; Worker and worker-services suites passed in `tmp/4013`. The
+parallel adapter run had one unrelated 60-second concurrent-write timeout;
+that class passed serially at `tmp/4014` and the full 743-test adapter suite
+passed at `tmp/4015`. A fresh installed real-model gap/approval
+round passed at `tmp/4016` (A and B VECTOR hits, recovered semantic
+service, one JUnit test with zero failures/skips, clean owned-stack stop).
+Hosted proof remains pending; the handoff has exact counts and retained XML.
 The owner-set D1-14 wall-clock/fraction bound,
 full Worker Flow B and remaining D1/D2/E/F acceptance remain open. See
 [handoff](handoff.md) and [D1](stages/D1.md) for exact counts and limits.

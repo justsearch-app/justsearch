@@ -996,9 +996,11 @@ public final class KnowledgeServer implements Closeable {
       // identically at both sites, by construction rather than by agreement.
       boolean preOpenMismatch = false;
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE && !inProgress) {
+        var preOpenSource = expectedCommitMetadataSource(fpSupplier);
         var preOpenDiffs =
             IndexMetadataParityGuard.inspectCommittedParity(
-                activeIndexPath, () -> expectedCommitMetadata(fpSupplier));
+                activeIndexPath, preOpenSource::build,
+                preOpenSource::indeterminateFingerprintInputs);
         preOpenMismatch = ParityDiagnostics.requiresRebuild(preOpenDiffs);
         if (preOpenMismatch) {
           for (var diff : preOpenDiffs) {
@@ -3279,11 +3281,7 @@ public final class KnowledgeServer implements Closeable {
     return new SsotCommitMetadataSource(config, inputs).build();
   }
 
-  /**
-   * The metadata this runtime would commit — the "expected" side of every parity comparison. One
-   * builder, so the pre-open check, the open-time guard and the commit itself cannot disagree.
-   */
-  private Map<String, Object> expectedCommitMetadata(
+  private io.justsearch.indexing.runtime.CommitMetadataSource expectedCommitMetadataSource(
       java.util.function.Supplier<java.util.Optional<String>> fingerprintSupplier) {
     var selection = initialModelSelection;
     if (selection != null) {
@@ -3291,14 +3289,13 @@ public final class KnowledgeServer implements Closeable {
       return new EmbeddingMetadataOverlay(
           new SsotCommitMetadataSource(startupConfiguration, inputs),
           () -> java.util.Optional.ofNullable(inputs.embeddingModel().sha()),
-          () -> java.util.Optional.ofNullable(inputs.spladeModel().sha())).build();
+          () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()));
     }
     var inputs = configuredRuntimeFingerprintInputs(startupConfiguration);
     return new EmbeddingMetadataOverlay(
             new SsotCommitMetadataSource(startupConfiguration, inputs),
             fingerprintSupplier,
-            () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()))
-        .build();
+            () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()));
   }
 
   private Map<String, Object> servingExpectedCommitMetadata() {

@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -83,6 +84,42 @@ final class IndeterminateModelParityTest extends LuceneExecutorTestBase {
     assertEquals(1, greenWithBlue.size());
     assertEquals(IndexFingerprint.COMMIT_META_KEY, blueWithGreen.getFirst().key());
     assertEquals(IndexFingerprint.COMMIT_META_KEY, greenWithBlue.getFirst().key());
+  }
+
+  @Test
+  void unresolvedEmbeddingDoesNotHideAnotherRuntimesSpladeChange() throws Exception {
+    Path index = Files.createTempDirectory("parity-runtime-unresolved");
+    var config = ResolvedConfig.builder().contributeEnvRegistry().build();
+    var unresolved = IndexFingerprint.ModelFingerprint.indeterminate();
+    var absent = IndexFingerprint.ModelFingerprint.notConfigured();
+    var storedSource = new SsotCommitMetadataSource(config,
+        new SsotCommitMetadataSource.RuntimeFingerprintInputs(768, unresolved,
+            IndexFingerprint.ModelFingerprint.present("a".repeat(64)), absent));
+    var expectedSource = new SsotCommitMetadataSource(config,
+        new SsotCommitMetadataSource.RuntimeFingerprintInputs(768, unresolved,
+            IndexFingerprint.ModelFingerprint.present("b".repeat(64)), absent));
+    seed(index, storedSource);
+
+    // A different co-resident runtime cannot decide which input this runtime must ignore.
+    IndexFingerprint.installModelFingerprintProviders(
+        IndexFingerprint.ModelFingerprint::notConfigured,
+        IndexFingerprint.ModelFingerprint::indeterminate,
+        IndexFingerprint.ModelFingerprint::notConfigured);
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(index, storedSource::build,
+        storedSource::indeterminateFingerprintInputs).isEmpty());
+    var differences = IndexMetadataParityGuard.inspectCommittedParity(index,
+        expectedSource::build, expectedSource::indeterminateFingerprintInputs);
+    assertEquals(1, differences.size());
+    assertEquals(IndexFingerprint.COMMIT_META_KEY, differences.getFirst().key());
+
+    var sourceCalls = new AtomicInteger();
+    var openGuard = IndexMetadataParityGuard.forMetadataSource(() -> index, () -> {
+      sourceCalls.incrementAndGet();
+      return expectedSource;
+    });
+    var mismatch = assertThrows(IndexRuntimeIOException.class, openGuard::checkOnOpen);
+    assertEquals(IndexRuntimeIOException.Reason.SCHEMA_MISMATCH, mismatch.reason());
+    assertEquals(1, sourceCalls.get(), "one source supplies metadata and unresolved inputs");
   }
 
   @AfterEach
