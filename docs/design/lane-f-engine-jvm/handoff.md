@@ -307,6 +307,30 @@ the original bulk `FAILED/settled` with `PROMOTED_WITH_GAPS`. This is local
 installed D1-14 gap/A-recompose proof; cancel/refusal failure and held native
 lease cases remain open.
 
+The exact `573b4373e6850727e0bec4d4eb83eca891729c7d` checkpoint passed the
+serial stress-enabled Gradle suite at `tmp/3865-inplace-gap-integrated-stress.txt`
+(196 tasks, 6 executed) and every hosted CI job in run `36285829735`, including
+Windows-native and system integration. The next uncommitted D1-14 variant
+exercises the same forced in-place installer gap but chooses webview
+`core.cancel-reindex` with a distinct approved operation key. Two fixture
+probes at `tmp/3867` and `tmp/3869` stopped before dispatch because the generic
+passthrough operation has no preparation nonce; the UI's approval flow accepts
+that absence. The corrected fresh seed `tmp/3870` and installed round
+`tmp/3871-installer-cancel-installed.txt` passed: A served VECTOR both during
+the gap wait and after cancellation, B's 14,173,392,077-byte footprint was
+forced in place by the one-megabyte cap, the original bulk terminalized
+`CANCELLED`, and STOP 0 closed the private ports. Independent state and SQLite
+reads found exact A IDLE with no previous pointer, B's generation directory
+absent, the bulk row's durable `refusalCode=cancelled`, a COMPLETE distinct
+cancellation row, and zero switch-buffer rows. This proves the installed
+in-place gap cancellation path; accepted writes during this particular B build,
+both A-recompose failure regressions and held native leases remain open.
+After making the durable refusal code and empty journal part of the repeatable
+fixture, a fresh seed `tmp/3872` and final installed run
+`tmp/3873-installer-cancel-final.txt` passed the same A/B VECTOR, exact-A
+retirement, approval and STOP 0 checks. The final fixture source is this
+strengthened repeat.
+
 **D1-8/D1-9 successor witness correction, 2026-09-25 (local WIP).** An
 independent source review confirmed that C2's specified activation successor
 `INGEST` row, `superseded_from` linkage and `SUCCESSOR_ROW_MISSING` branch were

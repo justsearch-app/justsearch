@@ -54,6 +54,7 @@ const OPERATION_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 const SESSION_HEADER = 'X-JustSearch-Session';
 const START_ROUTE = '/api/indexing/migration/start';
 const ACCEPT_GAPS_ROUTE = '/api/indexing/migration/accept-gaps';
+const CANCEL_REINDEX_ROUTE = '/api/operations/core.cancel-reindex/invoke';
 const ACTIVATION_ROUTE = '/api/operations/core.activate-installed-models/invoke';
 
 /** Installed standard-model proof that an unsuperseded gap waits on A for a distinct user decision. */
@@ -588,7 +589,7 @@ export async function exerciseInstallerActivationFault(c) {
 export async function exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort,
   operationKey, readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
-  watcherDeleteDuringBuild = false, gapApproval = false,
+  watcherDeleteDuringBuild = false, gapApproval = false, gapCancellation = false,
   extraBuildFiles = 0 }) {
   const runtime = path.join(data, 'runtime');
   const { reachedFile, releaseFile } = barrierFiles(data);
@@ -674,13 +675,13 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     args: input, idempotencyKey: operationKey,
     confirmationToken: prepared.capsule, preparationNonce: prepared.nonce,
   }, sessionHeaders(manifest));
-  if (gapApproval) {
+  if (gapApproval || gapCancellation) {
     requireThat(distinctModelB && inPlaceModelB,
       'installed model gap proof requires a distinct forced in-place candidate');
-    await exerciseLiveModelGapApproval({ work, data, indexBase, manifest, apiPort,
+    await exerciseLiveModelGapDecision({ work, data, indexBase, manifest, apiPort,
       operationKey, sourceGeneration, sourceManifest, marker, file, bRoot, dispatched,
       readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
-      reachedFile, releaseFile, migrationBarrier, operationPath });
+      reachedFile, releaseFile, migrationBarrier, operationPath, gapCancellation });
     return;
   }
   try {
@@ -919,11 +920,11 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
 }
 
 /** A captured installer file disappears before B builds; A must regain native service at the wait. */
-async function exerciseLiveModelGapApproval(c) {
+async function exerciseLiveModelGapDecision(c) {
   const { work, data, indexBase, manifest, apiPort, operationKey, sourceGeneration,
     sourceManifest, marker, file, bRoot, dispatched, readJson, waitFor, request, post,
     requireThat, createOperationKey, matchingHit, reachedFile, releaseFile,
-    migrationBarrier, operationPath } = c;
+    migrationBarrier, operationPath, gapCancellation } = c;
   const removed = path.join(work, 'installer-root-b', 'installer-1.txt');
   try {
     const reached = await waitFor('installer capture closed before Green build', 180000,
@@ -1000,6 +1001,68 @@ async function exerciseLiveModelGapApproval(c) {
           ? reply : null;
       } catch { return null; }
     });
+  if (gapCancellation) {
+    const cancellationKey = createOperationKey();
+    const cancellationInput = { args: { reindexKey: operationKey },
+      idempotencyKey: cancellationKey };
+    const initial = await request(apiPort, CANCEL_REINDEX_ROUTE, {
+      method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify(cancellationInput),
+    }, 30000);
+    const pending = parseJson(initial, 'installer gap cancellation preparation');
+    requireThat(initial.status === 428 && pending.operationKey === cancellationKey
+      && typeof pending.pendingId === 'string',
+    `installer gap cancellation lacked a distinct prepared decision: ${initial.text}`);
+    const approved = await post(apiPort, '/api/authorizations/approve',
+      { pendingId: pending.pendingId }, 30000);
+    const approval = parseJson(approved, 'installer gap cancellation approval');
+    requireThat(approved.status === 200 && typeof approval.capsule === 'string'
+      && approval.operationKey === cancellationKey
+      && (approval.preparationNonce === undefined
+        || typeof approval.preparationNonce === 'string'),
+      `installer gap cancellation approval failed: ${approved.text}`);
+    const cancelled = await request(apiPort, CANCEL_REINDEX_ROUTE, {
+      method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify({
+        ...cancellationInput, confirmationToken: approval.capsule,
+        ...(approval.preparationNonce
+          ? { preparationNonce: approval.preparationNonce } : {}),
+      }),
+    }, 30000);
+    requireThat(cancelled.status === 200
+      && parseJson(cancelled, 'installer gap cancellation').success,
+    `installer gap cancellation failed: ${cancelled.text}`);
+    const retired = await waitFor('cancelled installer B retired with A serving', 180000,
+      () => {
+        const row = operationRows(operationPath, operationKey)[0];
+        const state = readJson(path.join(indexBase, 'state.json'));
+        if (row?.state !== 'CANCELLED' || row.failure_reason !== 'cancelled'
+          || state?.active_generation !== sourceGeneration
+          || state?.migration_state !== 'IDLE'
+          || state?.building_generation != null
+          || fs.existsSync(path.join(indexBase, 'indices', `g-${operationKey}`))) return null;
+        const durable = row?.processing_history_counts_json
+          ? JSON.parse(row.processing_history_counts_json) : null;
+        const switchRows = readRows(path.join(data, 'jobs.db'),
+          'SELECT key FROM switch_buffer WHERE generation = ?', `g-${operationKey}`);
+        return durable?.refusalCode === 'cancelled' && switchRows.length === 0
+          ? { row, state } : null;
+      });
+    const resumedA = await waitFor('A serves VECTOR after installer gap cancellation',
+      120000, async () => {
+        try {
+          const reply = await post(apiPort, '/api/knowledge/search',
+            { query: marker, limit: 10, mode: 'vector' }, 30000);
+          return reply.status === 200 && JSON.parse(reply.text).results?.length > 0
+            ? reply : null;
+        } catch { return null; }
+      });
+    console.log('MODEL_LIVE_AB_CANCEL_PASS', JSON.stringify({ operationKey,
+      cancellationKey, sourceGeneration, activeGeneration: retired.state.active_generation,
+      floor: 'floor simulated by device-memory cap', floorEvidence,
+      aVectorHitsDuringWait: JSON.parse(aVector.text).results.length,
+      aVectorHitsAfterCancel: JSON.parse(resumedA.text).results.length,
+      terminalState: retired.row.state }));
+    return;
+  }
   const acceptanceKey = createOperationKey();
   const acceptanceInput = { reindexKey: operationKey,
     gapListHash: waiting.outcome.result.gapListHash, idempotencyKey: acceptanceKey };

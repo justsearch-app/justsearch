@@ -63,7 +63,15 @@ replacement installer activation gap round passed twice, finally at
 `tmp/3860`–`tmp/3861`: `IN_PLACE` under the one-megabyte cap, text on A at
 Green drain, A VECTOR during the gap wait, B VECTOR after approval, exact B
 pointer and terminal approved-gap row. Cancel/refusal failure and held native
-lease acceptance remain next.
+lease acceptance remain next. The exact `573b4373e` source passed the full
+stress-enabled Gradle suite at `tmp/3865` and all hosted CI jobs in
+`36285829735`. A separate local in-place gap cancellation round passed at
+`tmp/3870`–`tmp/3871`: the approved `core.cancel-reindex` retired exact B,
+reopened A with VECTOR, and left a durable cancelled bulk row and empty
+switch journal. Accepted-write backfill in that in-place build and the
+remaining A-recompose/native-lease failure paths are still due. The final
+fixture with durable-row and journal assertions passed again at
+`tmp/3872`–`tmp/3873`.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay
