@@ -14,6 +14,7 @@ import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -80,6 +81,19 @@ final class EngineMigrationRestartDispatchTest {
       var client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
       assertFalse(client.requestCutover(false, TestEngineContexts.FOREGROUND).restartRequired(), "no building generation exists");
       assertEquals(0, restarts.get(), "an idle cutover cannot restart the Engine");
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+      boolean composed = false;
+      while (System.nanoTime() < deadline) {
+        var encoder = root.components().snapshot().components().stream()
+            .filter(component -> "encoders".equals(component.spec().name()))
+            .findFirst().orElseThrow();
+        composed = encoder.state() != io.justsearch.core.component.ComponentState.STARTING
+            && (encoder.appliedVersion() != null || encoder.evidence() != null
+                || encoder.reasonCode() != null);
+        if (composed) break;
+        Thread.sleep(10);
+      }
+      assertTrue(composed, "live-start proof requires completed deferred model composition");
       var start = client.startMigration("manual", TestEngineContexts.FOREGROUND);
       assertTrue(start.accepted());
       assertFalse(start.restartRequired());

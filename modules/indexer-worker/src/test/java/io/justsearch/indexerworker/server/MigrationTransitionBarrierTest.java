@@ -66,6 +66,24 @@ final class MigrationTransitionBarrierTest {
   }
 
   @Test
+  void harnessLiveStartRefusalOccursOnlyAfterThePreOpenHandshake() throws Exception {
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-after-live-green-open",
+            "JUSTSEARCH_MIGRATION_BARRIER_REFUSE", "1")::get));
+    var hook = MigrationTransitionBarrier.fromEnvironment(data,
+        Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-before-live-green-open",
+            "JUSTSEARCH_MIGRATION_BARRIER_REFUSE", "1")::get);
+    Path release = data.resolve("runtime/migration-barrier-release");
+    Files.createDirectories(release.getParent());
+    Files.writeString(release, "release");
+    assertThrows(java.io.IOException.class, () -> hook.await(
+        new MigrationTransitionBarrier.Transition("migration-before-live-green-open", "a", "b")));
+    assertTrue(Files.exists(data.resolve("runtime/migration-barrier-reached.json")));
+  }
+
+  @Test
   void inProcessBarrierReleasesOrCancelsAtTheExactPoint() throws Exception {
     var release = new MigrationTransitionBarrier.Controlled("migration-before-pointer-commit");
     var first = new AtomicReference<Throwable>();

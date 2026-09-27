@@ -124,6 +124,7 @@ delete env.JUSTSEARCH_OPERATION_FAULT_POINT;
 delete env.JUSTSEARCH_OPERATION_FAULT_SELF_EXIT;
 delete env.JUSTSEARCH_MIGRATION_BARRIER_POINT;
 delete env.JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT;
+delete env.JUSTSEARCH_MIGRATION_BARRIER_REFUSE;
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
 if (['writer', 'processing', 'operation'].includes(scenario) || scenario === undefined
     || operationFault || lockScenario) {
@@ -148,10 +149,15 @@ if (operationFault) {
       : scenario === 'settings-mid-compose' ? 'settings-mid-compose' : 'after-accept';
 }
 if (bulkFault || bulkGapApproval) {
-  env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
-  env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
-  env.JUSTSEARCH_OPERATION_FAULT_POINT = bulkGapApproval
-    ? 'bulk-before-building-checkpoint' : BULK_FAULT_CASES[scenario].phase;
+  if (BULK_FAULT_CASES[scenario]?.liveStart) {
+    env.JUSTSEARCH_MIGRATION_BARRIER_POINT = BULK_FAULT_CASES[scenario].phase;
+    if (BULK_FAULT_CASES[scenario].liveRefusal) env.JUSTSEARCH_MIGRATION_BARRIER_REFUSE = '1';
+  } else {
+    env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
+    env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
+    env.JUSTSEARCH_OPERATION_FAULT_POINT = bulkGapApproval
+      ? 'bulk-before-building-checkpoint' : BULK_FAULT_CASES[scenario].phase;
+  }
   const roots = ['bulk-root-a', 'bulk-root-b'].map(name => ({ path: path.join(work, name) }));
   for (const root of roots) fs.mkdirSync(root.path, { recursive: true });
   fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({ schemaVersion: 1, roots }));

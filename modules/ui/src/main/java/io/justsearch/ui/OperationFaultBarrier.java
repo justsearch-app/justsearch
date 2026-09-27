@@ -28,7 +28,10 @@ final class OperationFaultBarrier {
     // a watcher revision that is legitimately superseded by the later recorded admission.
     if (!"1".equals(env.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))) return true;
     String scenario = env.apply("JUSTSEARCH_REAL_RECOVERY_SCENARIO");
-    return !"processing".equals(scenario) && !"operation".equals(scenario);
+    return !"processing".equals(scenario) && !"operation".equals(scenario)
+        && !"bulk-live-before-green-open".equals(scenario)
+        && !"bulk-live-after-green-open".equals(scenario)
+        && !"bulk-live-refused-before-green-open".equals(scenario);
   }
 
   static Consumer<OperationAttemptRunnerImpl.FaultBoundary> fromEnvironment(Path data, Function<String, String> env) {

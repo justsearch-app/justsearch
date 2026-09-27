@@ -34,6 +34,21 @@ final class EngineLifecycleE2ETest {
     System.out.println("LIFECYCLE_HARNESS_BASELINE_PASS §16 live generation transition");
   }
 
+  @Test
+  void recordedLiveStartRecoversAfterBuildingCheckpointBeforeGreenOpen() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runScenario("bulk-live-before-green-open");
+  }
+
+  @Test
+  void recordedLiveStartRecoversAfterGreenOpenBeforePublication() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runScenario("bulk-live-after-green-open");
+  }
+
+  @Test
+  void refusedRecordedLiveStartUsesOneFreeRestartAndSettles() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runScenario("bulk-live-refused-before-green-open");
+  }
+
   @Tag("ai")
   @Test
   void semanticAvailabilitySamplesAnInstalledBesideGenerationTransition() throws Exception {
@@ -44,6 +59,12 @@ final class EngineLifecycleE2ETest {
   @Test
   void semanticAvailabilitySamplesAnInstalledInPlaceGenerationTransition() throws Exception {
     EngineSupervisedRecoveryE2ETest.runSeededInPlaceSemanticTransition();
+  }
+
+  @Tag("ai")
+  @Test
+  void acceptedWriteDuringInPlaceBuildKeepsTheSameEngine() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededInPlaceAcceptedWriteDuringBuild();
   }
 
   @Tag("ai")

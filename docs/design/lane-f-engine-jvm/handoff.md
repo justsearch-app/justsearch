@@ -33,7 +33,10 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
      [run 36331292874](https://github.com/justsearch-app/justsearch/actions/runs/36331292874)
      passed the build and unit lanes but the advisory system-integration job failed its
      `bulk-partial-capture` restart fixture. GitHub marked the workflow successful despite that
-     red job. The corrected fixture and installed BESIDE proof need a new exact-SHA run.
+     red job. Checkpoint `865c33a0d` corrected that fixture and proved installed BESIDE;
+     exact-SHA [run 36334076303](https://github.com/justsearch-app/justsearch/actions/runs/36334076303)
+     passed all jobs. Three new live-start boundary scenarios pass installed at `tmp/5083`;
+     complete their remaining D1-18 gates and push for a new exact-SHA hosted run.
   2. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
      `index.dense_unavailable`, but the provisional "rebuilding" verdict takes precedence; observe
      before changing UI.
@@ -53,10 +56,17 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
   restart fallback (three incarnations and three operation attempts). The corrected fixture passed
   installed at `tmp/5069` with exact queue ACK and `STOP 0`. Installed BESIDE A→B passed at
   `tmp/5072`: unchanged Engine identity/restart count, 151/151 vector and hybrid samples available,
-  zero refusal/transport/outage, B promotion, and owned `STOP 0`. No full-suite, hosted,
-  kill-cut, or independent-review claim applies to these local changes.
-- **D1-18 next:** add both checkpoint/open kill cuts and one forced live refusal with exactly one fallback
-  restart; invert remaining fault-fixture expectations; then full verification and exact-SHA CI.
+  zero refusal/transport/outage, B promotion, and owned `STOP 0`. The two live-start kill cuts
+  and forced-refusal fallback pass installed together at `tmp/5083`, including exact resumed-
+  BUILDING boot evidence, queue ACK, promoted search and `STOP 0`. The accepted-write fixture's
+  stale restart assumption has been inverted and its installed in-place variant passes at
+  `tmp/5089` with an A-visible accepted write, B promotion and zero restarts. Old app-engine
+  restart-fixture waits were inverted and its class passes at `tmp/5086`; the full app-engine
+  suite exposed one early-model-readiness assertion, corrected and focused green at `tmp/5088`.
+  The earlier checkpoint has full hosted proof;
+  these new local changes have neither full-suite nor hosted nor independent-review proof yet.
+- **D1-18 next:** run the full affected suites and integrated checks at the corrected revision,
+  review, checkpoint/push, then check every hosted job by exact SHA.
 
 ## Selected design and remaining implementation/proof
 

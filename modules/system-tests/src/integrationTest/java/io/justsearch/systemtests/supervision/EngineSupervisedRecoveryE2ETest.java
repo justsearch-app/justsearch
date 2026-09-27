@@ -76,6 +76,28 @@ final class EngineSupervisedRecoveryE2ETest {
     });
   }
 
+  static void runSeededInPlaceAcceptedWriteDuringBuild() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-18 accepted-write scenario requires retained CPU A and FP16 CUDA B model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-accepted-write-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      var environment = new java.util.HashMap<>(inPlaceModelEnvironment());
+      environment.put("JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE", "1");
+      String output = runInstalledModelScenario(repo, work, "model-live-a-b", environment,
+          "MODEL_LIVE_AB_PASS");
+      String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_PASS "))
+          .findFirst().orElseThrow();
+      var result = MAPPER.readTree(line.substring("MODEL_LIVE_AB_PASS ".length()));
+      assertTrue(output.contains("MODEL_LIVE_AB_ACCEPTED_WRITE "), output);
+      assertTrue(output.contains("\"mode\":\"IN_PLACE\""), output);
+      assertEquals(0, result.path("restartCount").asInt(), line);
+      System.out.println("LIFECYCLE_ACCEPTED_WRITE_PASS §18 " + line);
+    });
+  }
+
   static void runSeededInPlaceGapRestoration() throws Exception {
     Path repo = repositoryRoot();
     assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
@@ -364,6 +386,17 @@ final class EngineSupervisedRecoveryE2ETest {
       assertTrue(Files.isRegularFile(work.resolve("bulk-cut.json")), "Missing crash-cut evidence");
       assertTrue(Files.isRegularFile(work.resolve("bulk-final.json")), "Missing successor evidence");
       assertTrue(Files.isRegularFile(work.resolve("bulk-after-retry.json")), "Missing retry evidence");
+      if (scenario.startsWith("bulk-live-")) {
+        var cut = MAPPER.readTree(Files.readString(work.resolve("bulk-cut.json")));
+        String expected = "Resuming durable BUILDING generation g-"
+            + cut.path("operationKey").asText() + " from active "
+            + cut.path("cut").path("state").path("active_generation").asText();
+        Path log = work.resolve("state/runs")
+            .resolve(cut.path("cooldown").path("runId").asText())
+            .resolve("logs/engine.log");
+        assertTrue(Files.readString(log).contains(expected),
+            "Successor did not enter the exact durable BUILDING boot branch: " + expected);
+      }
     } else if (operationFault) {
       assertTrue(output.contains("\"scenario\":\"" + scenario + "\""), output);
       if ("ingest-client-disconnect".equals(scenario)) {

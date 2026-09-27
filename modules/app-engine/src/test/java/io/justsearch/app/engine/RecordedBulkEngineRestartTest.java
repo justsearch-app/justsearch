@@ -130,8 +130,7 @@ final class RecordedBulkEngineRestartTest {
           capturedPlan.scope().roots().stream().map(root -> root.path()).toList());
       assertEquals(expectedTarget, capturedPlan.target());
 
-      assertTrue(firstRestart.await(WAIT_MS, TimeUnit.MILLISECONDS),
-          "captured bulk never requested its first Engine restart");
+      awaitBuildingCheckpoint(first, operationKey, firstRestart);
       var running = first.operations().find(operationKey).orElseThrow();
       assertEquals(OperationState.RUNNING, running.state());
       BulkReindexProgress building = first.operations().bulkReindexProgress(running.id()).orElseThrow();
@@ -254,8 +253,7 @@ final class RecordedBulkEngineRestartTest {
       try (var owner = first.root().admission().admit(origin, false)) {
         assertTrue(executor.dispatch(operation, arguments, provenance, Optional.of(approval),
             owner.context(), key, prepared.preparationNonce()).success());
-        assertTrue(restart.await(WAIT_MS, TimeUnit.MILLISECONDS),
-            "accepted bulk did not create a candidate before cancellation");
+        awaitBuildingCheckpoint(first, key, restart);
         var beforeCancel = new IndexGenerationManager(dataDirectory.resolve("index"))
             .readStateBestEffort();
         assertEquals("g-" + key, beforeCancel.building_generation());
@@ -345,7 +343,7 @@ final class RecordedBulkEngineRestartTest {
           SourceTier.valueOf(origin.sourceTier()), operationKey, prepared.preparationNonce());
       assertTrue(executor.dispatch(operation, arguments, provenance, Optional.of(approval),
           origin, operationKey, prepared.preparationNonce()).success());
-      assertTrue(requestedRestart.await(WAIT_MS, TimeUnit.MILLISECONDS));
+      awaitBuildingCheckpoint(first, operationKey, requestedRestart);
       var row = first.operations().find(operationKey).orElseThrow();
       var plan = new RecordedBulkPlanResolver().resolve(row,
           first.operations().acceptedPreparation(row.id()).orElseThrow());
@@ -439,7 +437,7 @@ final class RecordedBulkEngineRestartTest {
           SourceTier.valueOf(origin.sourceTier()), operationKey, prepared.preparationNonce());
       assertTrue(executor.dispatch(operation, arguments, provenance, Optional.of(approval),
           origin, operationKey, prepared.preparationNonce()).success());
-      assertTrue(requestedRestart.await(WAIT_MS, TimeUnit.MILLISECONDS));
+      awaitBuildingCheckpoint(first, operationKey, requestedRestart);
       first.requestedRestartHandoff();
     }
 
@@ -673,6 +671,17 @@ final class RecordedBulkEngineRestartTest {
       Thread.sleep(100);
     }
     return condition.getAsBoolean();
+  }
+
+  private static void awaitBuildingCheckpoint(EngineEpoch epoch, String operationKey,
+      CountDownLatch unexpectedRestart) throws InterruptedException {
+    assertTrue(await(() -> epoch.operations().find(operationKey)
+        .flatMap(row -> epoch.operations().bulkReindexProgress(row.id()))
+        .map(progress -> progress.phase() == BulkReindexProgress.Phase.BUILDING)
+        .orElse(false), WAIT_MS),
+        "accepted bulk did not checkpoint its durable BUILDING candidate");
+    assertEquals(1L, unexpectedRestart.getCount(),
+        "migration start unexpectedly requested an Engine restart");
   }
 
   private static boolean awaitSearchable(KnowledgeClient client, String marker,

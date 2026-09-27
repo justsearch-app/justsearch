@@ -6,6 +6,21 @@ import identity from '../dev/lib/process-identity.cjs';
 import { barrierFiles } from './barrier-files.mjs';
 
 export const BULK_FAULT_CASES = Object.freeze({
+  'bulk-live-before-green-open': Object.freeze({
+    phase: 'migration-before-live-green-open', liveStart: true,
+    finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
+  }),
+  'bulk-live-after-green-open': Object.freeze({
+    phase: 'migration-after-live-green-open', liveStart: true,
+    finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
+  }),
+  'bulk-live-refused-before-green-open': Object.freeze({
+    phase: 'migration-before-live-green-open', liveStart: true, liveRefusal: true,
+    finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 1, finalAttempts: 2,
+  }),
   'bulk-partial-capture': Object.freeze({
     // Recovery boots FENCED before the captured walk can finish. That physical attachment
     // cannot hand off a NATIVE producer live, so the durable BUILDING start uses one free
@@ -210,7 +225,8 @@ export async function exerciseBulkFault(c) {
   const waitFor = (label, budget, probe) =>
     c.waitFor(label, Math.max(1, Math.min(budget, deadline - Date.now())), probe);
   const runtime = path.join(data, 'runtime');
-  const { reachedFile, releaseFile } = barrierFiles(data);
+  const { reachedFile, releaseFile } = barrierFiles(data, selected.liveStart
+    ? 'migration-barrier' : 'operation-fault');
   requireThat(!fs.existsSync(reachedFile) && !fs.existsSync(releaseFile),
     'bulk fault fixture must start without a reached or release marker');
 
@@ -237,6 +253,18 @@ export async function exerciseBulkFault(c) {
   requireThat(operationRows(operationPath, operationKey).length === 0,
     'caller-selected bulk key must be unknown before dispatch');
 
+  if (selected.liveStart) {
+    // HTTP readiness precedes deferred model composition. Start only after A can serve a
+    // real semantic request, otherwise the legitimate early-start fallback masks this cut.
+    await waitFor('live-start source model ready before dispatch', 120000, async () => {
+      try {
+        const response = await post(apiPort, '/api/knowledge/search',
+          { query: markers[0], limit: 10, mode: 'vector' }, 30000);
+        return response.status === 200 ? response : null;
+      } catch { return null; }
+    });
+  }
+
   const headers = sessionHeaders(manifest);
   const input = { reason: 'manual', idempotencyKey: operationKey };
   const prepared = await prepareApprovedDispatch({ apiPort, input, post, requireThat });
@@ -246,10 +274,17 @@ export async function exerciseBulkFault(c) {
 
   const reached = await waitFor(`bulk fault marker ${scenario}`, 170000,
     () => readJson(reachedFile) ?? null);
-  requireThat(reached.phase === selected.phase && reached.parentKind === 'reindex'
-    && reached.parentKey === operationKey && reached.operationKey === operationKey
-    && Number.isSafeInteger(reached.operationRecordId) && reached.operationRecordId > 0,
-  `bulk hook reached the wrong boundary: ${JSON.stringify(reached)}`);
+  if (selected.liveStart) {
+    requireThat(reached.point === selected.phase
+      && reached.sourceGeneration === sourceGeneration
+      && reached.buildingGeneration === `g-${operationKey}`,
+    `live Green hook reached the wrong generation boundary: ${JSON.stringify(reached)}`);
+  } else {
+    requireThat(reached.phase === selected.phase && reached.parentKind === 'reindex'
+      && reached.parentKey === operationKey && reached.operationKey === operationKey
+      && Number.isSafeInteger(reached.operationRecordId) && reached.operationRecordId > 0,
+    `bulk hook reached the wrong boundary: ${JSON.stringify(reached)}`);
+  }
 
   const faulted = await waitFor('admitted Engine that emitted the bulk marker', 10000, () => {
     const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
@@ -261,12 +296,24 @@ export async function exerciseBulkFault(c) {
       && currentManifest.instanceId === supervisor.instanceId
       ? { supervisor, manifest: currentManifest } : null;
   });
-  const cooldown = await killOwnedEngineAndObserveCooldown({
-    engine: faulted.supervisor, data, readJson, waitFor, requireThat,
-  });
+  let cut;
+  let cooldown;
+  if (selected.liveRefusal) {
+    cut = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+    fs.writeFileSync(releaseFile, 'release');
+    cooldown = await waitFor('live refusal requests one free restart', 20000, () => {
+      const state = readJson(path.join(runtime, 'supervisor.v1.json'));
+      return state?.runId === first.runId && state.state === 'running'
+        && state.incarnation === 2 && state.restartCount === 0
+        && state.lastExit?.code === 4 && state.lastExit?.counted === false ? state : null;
+    });
+  } else {
+    cooldown = await killOwnedEngineAndObserveCooldown({
+      engine: faulted.supervisor, data, readJson, waitFor, requireThat,
+    });
+    cut = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+  }
   await dispatched.settled;
-
-  const cut = snapshot({ operationPath, jobsPath, indexBase, operationKey });
   fs.writeFileSync(path.join(work, 'bulk-cut.json'), JSON.stringify({
     scenario, operationKey, reached, cooldown, cut,
   }, null, 2));
@@ -290,15 +337,15 @@ export async function exerciseBulkFault(c) {
       && currentManifest.instanceId === supervisor.instanceId
       ? { supervisor, manifest: currentManifest } : null;
   });
-  requireThat(recovered.supervisor.restartCount === 1,
-    `bulk crash must spend exactly one supervisor restart: ${JSON.stringify(recovered.supervisor)}`);
+  requireThat(recovered.supervisor.restartCount === (selected.liveRefusal ? 0 : 1),
+    `bulk boundary spent the wrong supervisor restart count: ${JSON.stringify(recovered.supervisor)}`);
   if (selected.requestedRestartIncarnations.at(-1) === expectedIncarnation - 1) {
     requireThat(recovered.supervisor.lastExit?.code === 4
       && recovered.supervisor.lastExit?.counted === false,
     `last boundary must be a free requested restart: ${JSON.stringify(recovered.supervisor)}`);
   } else {
     requireThat(recovered.supervisor.lastExit?.counted === true,
-      `promotion crash must remain the last counted exit: ${JSON.stringify(recovered.supervisor)}`);
+      `bulk crash must remain the last counted exit: ${JSON.stringify(recovered.supervisor)}`);
   }
   for (const incarnation of selected.requestedRestartIncarnations) {
     requireThat(c.output().includes(`Engine incarnation ${incarnation} exited 4 (requested_restart`),
@@ -360,7 +407,7 @@ export async function exerciseBulkFault(c) {
   requireThat(servingAfterResult?.state === 'running'
     && servingAfterResult.incarnation === expectedIncarnation
     && servingAfterResult.instanceId === recovered.supervisor.instanceId
-    && servingAfterResult.restartCount === 1
+    && servingAfterResult.restartCount === (selected.liveRefusal ? 0 : 1)
     && !c.output().includes(`Engine incarnation ${expectedIncarnation} exited 4 (requested_restart`),
   `Flow A promoted Green through the live process without a promotion restart: ${JSON.stringify(servingAfterResult)}`);
 
@@ -729,14 +776,17 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       console.log('MODEL_LIVE_AB_TRANSITION_HELD', JSON.stringify(held));
     }
     if (acceptedWriteDuringBuild) {
-      await waitFor('MIGRATING B with a live A producer after restart', 120000, async () => {
+      await waitFor('MIGRATING B with a live A producer in the same Engine', 120000, async () => {
         const state = readJson(path.join(indexBase, 'state.json'));
         const row = operationRows(operationPath, operationKey)[0];
         const successor = readJson(path.join(runtime, 'manifest.json'));
+        const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
         if (state?.migration_state !== 'MIGRATING'
           || state?.building_generation !== `g-${operationKey}`
           || row?.phase === 'settled'
-          || !successor?.instanceId || successor.instanceId === manifest.instanceId) return null;
+          || successor?.instanceId !== manifest.instanceId
+          || supervisor?.instanceId !== manifest.instanceId
+          || supervisor.restartCount !== 0) return null;
         try {
           const health = await request(apiPort, '/api/health', {}, 10000);
           return health.status === 200 ? state : null;
@@ -1531,7 +1581,8 @@ function assertCommonCut({ cut, reached, prepared, operationKey, selected, roots
   requireThat(cut.operations.length === 1 && cut.reindexOperations.length === 1,
     `fault cut must retain exactly one reindex row: ${JSON.stringify(cut.reindexOperations)}`);
   const row = cut.operation;
-  requireThat(row.id === reached.operationRecordId && row.operation_key === operationKey
+  requireThat((selected.liveStart || row.id === reached.operationRecordId)
+    && row.operation_key === operationKey
     && row.kind === 'reindex' && row.operation_ref === 'core.rebuild-index'
     && row.state === 'RUNNING' && row.attempts === selected.cutAttempts
     && row.preparation_nonce === prepared.nonce && row.preparation_sealed === 0,
@@ -1549,6 +1600,23 @@ function assertCommonCut({ cut, reached, prepared, operationKey, selected, roots
 function assertSelectedCut({ selected, cut, files, hashes, operationKey, requireThat }) {
   const target = `g-${operationKey}`;
   const row = cut.operation;
+  if (selected.liveStart) {
+    requireThat(row.phase === 'building' && row.building_generation_id === target
+      && cut.walk?.captured_plan === 1 && cut.walk.enumeration_outcome === 'COMPLETE'
+      && cut.walk.enumeration_closed_at != null && cut.walk.manifest_sha256
+      && cut.walk.planned_units === 2 && cut.walk.sealed_at == null,
+    `live Green cut must retain its complete BUILDING plan: ${JSON.stringify(cut)}`);
+    requireExactMembers(cut.jobs, files, hashes, false, requireThat);
+    requireThat(cut.state.active_generation !== target
+      && cut.state.building_generation === target && cut.state.migration_state === 'MIGRATING',
+    `live Green cut must retain the exact MIGRATING target: ${JSON.stringify(cut.state)}`);
+    const generation = cut.generationManifest;
+    requireThat(generation?.generation_id === target
+      && generation.source === preparationPlan(row.preparation_payload).source
+      && generation.target_index_fingerprint === preparationPlan(row.preparation_payload).target.fingerprint,
+    `live Green metadata is not operation-derived: ${JSON.stringify(generation)}`);
+    return;
+  }
   if (selected.phase === 'bulk-partial-capture') {
     requireThat(row.phase === 'capturing' && cut.walk?.captured_plan === 1
       && cut.walk.enumeration_closed_at == null && cut.walk.enumeration_outcome == null

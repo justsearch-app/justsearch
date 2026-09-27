@@ -27,6 +27,7 @@ public final class MigrationTransitionBarrier {
   public static final Hook NO_HOOK = transition -> {};
 
   private static final Set<String> POINTS = Set.of(
+      "migration-before-live-green-open", "migration-after-live-green-open",
       "migration-green-drained", "migration-before-switching", "migration-switching-entered",
       "migration-before-pointer-commit", "migration-after-pointer-commit",
       "migration-before-live-activation", "migration-after-live-activation",
@@ -36,14 +37,20 @@ public final class MigrationTransitionBarrier {
   public static Hook fromEnvironment(Path dataDir, Function<String, String> env) {
     String point = env.apply("JUSTSEARCH_MIGRATION_BARRIER_POINT");
     String selfExitText = env.apply("JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT");
-    if (point == null && selfExitText == null) return NO_HOOK;
+    String refuseText = env.apply("JUSTSEARCH_MIGRATION_BARRIER_REFUSE");
+    if (point == null && selfExitText == null && refuseText == null) return NO_HOOK;
     if (!"1".equals(env.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
       throw new IllegalArgumentException("Migration barrier selection requires supervisor harness mode");
     }
-    if (!POINTS.contains(point) || (selfExitText != null && !Set.of("0", "1").contains(selfExitText))) {
+    if (!POINTS.contains(point) || (selfExitText != null && !Set.of("0", "1").contains(selfExitText))
+        || (refuseText != null && !Set.of("0", "1").contains(refuseText))) {
       throw new IllegalArgumentException("Invalid migration barrier selection");
     }
     boolean selfExit = "1".equals(selfExitText);
+    boolean refuse = "1".equals(refuseText);
+    if (refuse && (selfExit || !"migration-before-live-green-open".equals(point))) {
+      throw new IllegalArgumentException("Live start refusal requires its pre-open barrier");
+    }
     if (REPLAY_HALT_POINT.equals(point) && !selfExit) {
       throw new IllegalArgumentException("Projection replay barrier requires a harness self-exit");
     }
@@ -59,6 +66,7 @@ public final class MigrationTransitionBarrier {
           "pid", ProcessHandle.current().pid());
       HarnessBarrierProtocol.await(dataDir, "migration-barrier",
           JsonMapper.builder().build().writeValueAsString(marker), selfExit);
+      if (refuse) throw new IOException("Harness refused live Green start before open");
     };
   }
 

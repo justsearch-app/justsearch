@@ -1023,6 +1023,8 @@ public final class KnowledgeServer implements Closeable {
           this.searchLifecycle = this.ingestLifecycle;
         } else {
           if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
+            log.info("Resuming durable BUILDING generation {} from active {}",
+                buildingGenId, state.active_generation());
             // A remains the lexical serving generation while Green owns the queue producer.
             // The directories are distinct; the producer projects accepted text to A.
             this.searchLifecycle = buildIndexRuntime(activeIndexPath)
@@ -4833,6 +4835,8 @@ public final class KnowledgeServer implements Closeable {
   private void beginBuildingLiveAsync(String buildingGeneration, String operationKey,
       Runnable restartFallback) {
     Objects.requireNonNull(restartFallback, "restartFallback");
+    log.info("Live Green start dispatched: generation={}, recorded={}",
+        buildingGeneration, operationKey != null);
     Thread starter = new Thread(() -> {
       boolean live;
       try {
@@ -4868,6 +4872,14 @@ public final class KnowledgeServer implements Closeable {
           || !(searchLifecycle instanceof RunningRuntime active) || !active.isAcceptingWrites()
           || !(appServices instanceof DefaultWorkerAppServices incumbent)
           || (deferredModelInit != null && !deferredModelInit.isDone())) {
+        log.warn("Live Green start precondition refused: running={}, disposition={}, "
+                + "bootOwnership={}, buildingPath={}, sameRuntime={}, searchRuntime={}, "
+                + "appServices={}, deferredDone={}",
+            running, generationBootDisposition, generationBootOwnership,
+            buildingIndexPath, ingestLifecycle == searchLifecycle,
+            searchLifecycle == null ? null : searchLifecycle.getClass().getSimpleName(),
+            appServices == null ? null : appServices.getClass().getSimpleName(),
+            deferredModelInit == null || deferredModelInit.isDone());
         return false;
       }
       source = incumbent;
@@ -4877,7 +4889,11 @@ public final class KnowledgeServer implements Closeable {
               ? candidate : null;
       if (operationKey == null) {
         if (!(ownership instanceof IndexGenerationManager.BootOwnership.Native)) return false;
-      } else if (recorded == null || !operationKey.equals(recorded.operationKey())) return false;
+      } else if (recorded == null || !operationKey.equals(recorded.operationKey())) {
+        log.warn("Live Green start ownership refused: operation={}, ownership={}",
+            operationKey, ownership);
+        return false;
+      }
       var accepted = operationKey == null
           ? java.util.Optional.<RecordedIngestionLifecycle.RecordedCandidate>empty()
           : recordedIngestionLifecycle.recordedCandidate(operationKey);
@@ -4898,7 +4914,12 @@ public final class KnowledgeServer implements Closeable {
           : IndexGenerationManager.BootDisposition.BUILDING;
       if (boot.disposition() != expectedDisposition
           || !boot.layout().activeGenerationPath().equals(activeIndexPath)
-          || !buildingGeneration.equals(boot.layout().state().building_generation())) return false;
+          || !buildingGeneration.equals(boot.layout().state().building_generation())) {
+        log.warn("Live Green start boot witness refused: expectedGeneration={}, "
+                + "expectedDisposition={}, boot={}",
+            buildingGeneration, expectedDisposition, boot);
+        return false;
+      }
       if (accepted.isPresent()) {
         var exact = accepted.orElseThrow();
         String sparseMode = exact.configuration().ai().sparseModel();
@@ -4915,12 +4936,14 @@ public final class KnowledgeServer implements Closeable {
       WorkerServiceConfiguration candidateConfiguration = accepted.isEmpty() ? null
           : WorkerServiceConfiguration.capture(accepted.orElseThrow().configuration(),
               workerExecutors.pdfOcr().spec().threadCount());
+      migrationTransitionForPublication("migration-before-live-green-open");
       try (var fence = incumbent.mutationAdmission().beginFinalFence(
           incumbent.mutationOwnerToken(), 10_000)) {
         if (fence == null || !incumbent.quiesceNativeProducerForHandoff(10_000)) return false;
         quiesced = true;
         green = buildIndexRuntime(greenPath).withoutRecovery()
             .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open();
+        migrationTransitionForPublication("migration-after-live-green-open");
         bindTerminalWriterFaultSource(green);
         prepared = prepareNativeGreenServices(incumbent, active, green,
             candidateConfiguration);
