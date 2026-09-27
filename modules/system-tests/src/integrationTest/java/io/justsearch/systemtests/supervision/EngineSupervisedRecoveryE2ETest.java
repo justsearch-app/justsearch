@@ -10,8 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Timeout;
@@ -20,6 +22,86 @@ import org.junit.jupiter.api.Test;
 /** Installed Engine proofs for durable recovery, migration and hostile filesystem survival. */
 @Timeout(7 * 60)
 final class EngineSupervisedRecoveryE2ETest {
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  static void runSeededInPlaceSemanticTransition() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-16 AI scenario requires retained CPU A and FP16 CUDA B model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-semantic-" + UUID.randomUUID());
+    runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+        "INSTALLER_ACTIVATION_FAULT_PASS");
+    String output = runInstalledModelScenario(repo, work, "model-live-a-b", Map.of(
+        "JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B", "1",
+        "JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE", "1",
+        "JUSTSEARCH_EMBED_GPU_MEM_MB", "2048",
+        "JUSTSEARCH_SPLADE_GPU_MEM_MB", "2048",
+        "JUSTSEARCH_NER_GPU_MEM_MB", "1024",
+        "JUSTSEARCH_RERANK_GPU_MEM_MB", "1024"), "MODEL_LIVE_AB_PASS");
+    String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_PASS "))
+        .findFirst().orElseThrow();
+    var semantic = MAPPER.readTree(line.substring("MODEL_LIVE_AB_PASS ".length()))
+        .path("semantic");
+    assertTrue(semantic.path("transitionMs").asLong() > 0, line);
+    assertTrue(semantic.path("refusalWindowMs").asLong() > 0, line);
+    assertTrue(semantic.path("refusedFraction").asDouble() > 0, line);
+    assertTrue(semantic.path("recoveredAfterRefusal").asBoolean(), line);
+    assertTrue(output.contains("\"mode\":\"IN_PLACE\""), output);
+    System.out.println("LIFECYCLE_SEMANTIC_AVAILABILITY_PASS §16 " + line);
+  }
+
+  private static String runInstalledModelScenario(Path repo, Path work, String scenario,
+      Map<String, String> extraEnvironment, String marker) throws Exception {
+    Files.createDirectories(work);
+    Path outputFile = work.resolve(scenario + "-fixture-output.txt");
+    ProcessBuilder builder = new ProcessBuilder("node",
+        repo.resolve("scripts/supervisor-conformance/real-writer-recovery.mjs").toString())
+        .directory(repo.toFile()).redirectErrorStream(true)
+        .redirectOutput(outputFile.toFile());
+    builder.environment().put("JUSTSEARCH_WRITER_RECOVERY_WORK", work.toString());
+    builder.environment().put("JUSTSEARCH_REAL_RECOVERY_SCENARIO", scenario);
+    builder.environment().putAll(extraEnvironment);
+    Process process = builder.start();
+    Throwable primary = null;
+    try {
+      assertTrue(process.waitFor(330, TimeUnit.SECONDS),
+          "D1-16 installed " + scenario + " exceeded 330 seconds: " + outputFile);
+      String output = Files.readString(outputFile, StandardCharsets.UTF_8);
+      assertEquals(0, process.exitValue(), output);
+      assertTrue(output.contains(marker), output);
+      assertTrue(output.contains("STOP 0") && output.contains("\"portsClosed\":true"), output);
+      return output;
+    } catch (Exception | AssertionError failure) {
+      primary = failure;
+      throw failure;
+    } finally {
+      if (process.isAlive()) {
+        process.destroyForcibly();
+        process.waitFor(10, TimeUnit.SECONDS);
+      }
+      try {
+        if (Files.isRegularFile(outputFile)) {
+          for (String line : Files.readAllLines(outputFile, StandardCharsets.UTF_8)) {
+            if (line.startsWith("{\"ok\":true,\"runId\":")) {
+              stopOwnedRun(repo, work, MAPPER.readTree(line).path("runId").asText());
+              break;
+            }
+          }
+        }
+      } catch (Exception cleanupFailure) {
+        if (primary == null) throw cleanupFailure;
+        primary.addSuppressed(cleanupFailure);
+      }
+    }
+  }
+
+  private static boolean hasRetainedAlternateEmbedding(Path repo) {
+    for (Path ancestor = repo; ancestor != null; ancestor = ancestor.getParent()) {
+      if (Files.isRegularFile(ancestor.resolve(
+          "models/onnx/gte-multilingual-base/model_fp16.onnx"))) return true;
+    }
+    return false;
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"writer", "migration", "lock-ingest", "processing"})
@@ -219,11 +301,15 @@ final class EngineSupervisedRecoveryE2ETest {
     if (runIds.size() != 1) {
       throw new IllegalStateException("ambiguous owned run identities under " + runs + ": " + runIds);
     }
-    String runId = runIds.getFirst();
+    stopOwnedRun(repo, work, runIds.getFirst());
+  }
+
+  private static void stopOwnedRun(Path repo, Path work, String runId) throws Exception {
+    Path runs = work.resolve("state/runs");
     Path stopReport = runs.resolve(runId).resolve("stop-report.json");
     if (Files.isRegularFile(stopReport)) {
       try {
-        var report = new tools.jackson.databind.ObjectMapper().readTree(Files.readString(stopReport));
+        var report = MAPPER.readTree(Files.readString(stopReport));
         if (report != null && report.path("portsClosed").asBoolean(false)) {
           return;
         }

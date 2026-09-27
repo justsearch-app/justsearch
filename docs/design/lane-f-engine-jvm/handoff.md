@@ -37,7 +37,8 @@ pass in `bulk-fault-semantic.test.mjs`; fresh seed
 returned `ABSENT` with no inference orphan. The correction was pushed as
 `f09413284`; its exact-SHA
 [CI 36301513364](https://github.com/justsearch-app/justsearch/actions/runs/36301513364)
-is in progress. The separate CLA workflow `36301511335` passed but is not CI.
+passed every job, including Windows-native and system integration. The
+separate CLA workflow `36301511335` passed but is not CI.
 
 **2026-09-27 D1-12 per-runtime parity substrate.** A new adapter test writes
 two Lucene runtimes with distinct embedding identities in one JVM, then
@@ -51,6 +52,26 @@ The full adapters-lucene suite passed at
 `tmp/3989-per-runtime-adapters-suite.txt` (742 tests, zero
 failures/errors/skips); its XML is retained under
 `tmp/3989-per-runtime-adapters-xml`.
+This adapter checkpoint was pushed as `19acc7a5b`; exact-SHA
+[CI 36302591438](https://github.com/justsearch-app/justsearch/actions/runs/36302591438)
+is in progress.
+
+**2026-09-27 D1-16 semantic lifecycle scenario (local WIP).** The
+`ai`-tagged lifecycle JUnit test now seeds installed A and runs forced
+in-place distinct-model B in one isolated work directory. Its first run
+reached `MODEL_LIVE_AB_PASS` and `STOP 0` but the wrapper cleanup failed on
+the expected two run IDs; red XML is retained at
+`tmp/3992-lifecycle-semantic-red-xml`. The corrected exact-run cleanup
+passed the fresh installed test at
+`tmp/3994-lifecycle-semantic-ai-exact-cleanup.txt`: `LIFECYCLE_SEMANTIC_AVAILABILITY_PASS §16`,
+14,493/47,218 ms (30.69%), recovery after refusal, B VECTOR two hits,
+one JUnit test and zero skips/failures. Its XML is at
+`tmp/3994-lifecycle-semantic-ai-xml`; official health returned `ABSENT`
+without an inference orphan. The default lifecycle task passed at
+`tmp/3995-lifecycle-default-five-pending.txt` (two tests, zero skips or
+failures; XML `tmp/3995-lifecycle-default-xml`). Five feature rows remain
+pending. The owner-set product bound is still needed to judge this
+measurement; D1-16 as a whole remains open.
 
 **Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
 D1-9 streaming correction and its proofs before further implementation. Stage

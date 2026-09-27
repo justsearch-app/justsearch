@@ -178,6 +178,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   // the repository's single-build ownership rule and could deadlock on Gradle's own locks.
   dependsOn(":modules:ui:installDist")
   inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/bulk-fault-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/hostile-lock-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/processing-replay-scenario.mjs"))

@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Timeout;
 
 /** D1-16 installed lifecycle scenarios; pending clauses are data, never disabled tests. */
@@ -25,14 +26,18 @@ final class EngineLifecycleE2ETest {
       new PendingScenario("reconfigure-beside-in-place", "D1-4/D1-12/D1-14", true,
           "beside and in-place reconfigure under the device ceiling"),
       new PendingScenario("low-memory-combined-maintenance", "D1-9/D1-14", true,
-          "changing inputs, interruption and roll-forward under the device ceiling"),
-      new PendingScenario("semantic-availability", "D1-14", true,
-          "availability window and refused fraction with standard encoders"));
+          "changing inputs, interruption and roll-forward under the device ceiling"));
 
   @Test
   void migrationRestartBaselineExercisesTheInstalledHarness() throws Exception {
     EngineSupervisedRecoveryE2ETest.runScenario("migration");
     System.out.println("LIFECYCLE_HARNESS_BASELINE_PASS §16 generation transition restart");
+  }
+
+  @Tag("ai")
+  @Test
+  void semanticAvailabilitySamplesAnInstalledInPlaceGenerationTransition() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededInPlaceSemanticTransition();
   }
 
   @Test
@@ -47,6 +52,6 @@ final class EngineLifecycleE2ETest {
           + " ai=" + scenario.requiresAi() + " proof=" + scenario.proof());
     }
     // Reduce this count only when an actual exercise*(c) scenario replaces a pending entry.
-    assertEquals(6, names.size());
+    assertEquals(5, names.size());
   }
 }

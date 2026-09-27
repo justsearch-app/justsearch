@@ -14,11 +14,17 @@ hosted [run 36300510675](https://github.com/justsearch-app/justsearch/actions/ru
 passed every job. The following pushed `f09413284` checkpoint tightens
 the gate to require a matching vector response after the last refusal;
 fresh installed `tmp/3983`–`tmp/3984` passed, including that recovery,
-B promotion and clean stop. Its exact-SHA CI run `36301513364` is in progress.
+B promotion and clean stop. Its exact-SHA CI run `36301513364` passed every job.
 A separate
 local D1-12 adapter test now writes
 two concurrently open, differently bound Lucene runtimes and checks parity
 at `tmp/3988`.
+The adapter parity checkpoint `19acc7a5b` is pushed; exact-SHA CI run
+`36302591438` is in progress.
+The D1-16 semantic lifecycle scenario is now active and `ai`-tagged, with a
+fresh installed pass at `tmp/3994` and default untagged harness pass at
+`tmp/3995`; five named feature rows remain pending. These are local checks
+checkpointed for a later hosted run.
 The owner-set D1-14 wall-clock/fraction bound, installed restored-A held-call,
 full Worker Flow B and remaining D1/D2/E/F acceptance remain open. See
 [handoff](handoff.md) and [D1](stages/D1.md) for exact counts and limits.
