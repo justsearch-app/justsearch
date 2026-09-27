@@ -26,7 +26,10 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
      passed all 13 jobs. The live-start checkpoint `f93af69f8` was pushed to PR727; its
      [run 36329542381](https://github.com/justsearch-app/justsearch/actions/runs/36329542381)
      exposed a dead three-argument `bindBulkProducer` overload in the app-ui architecture gate.
-     That overload is removed in the following correction; verify its new exact-SHA hosted run.
+     The correction `830c143dc` removed it. Its exact-SHA
+     [run 36330537827](https://github.com/justsearch-app/justsearch/actions/runs/36330537827)
+     exposed an obsolete recorded-start `restartWorker=true` assertion in app-services. The
+     assertion is inverted in the next correction; verify that correction's exact-SHA hosted run.
   2. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
      `index.dense_unavailable`, but the provisional "rebuilding" verdict takes precedence; observe
      before changing UI.
@@ -38,7 +41,8 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
   document test without a migration-start restart. `tmp/5054` passed the unrecorded migration
   lifecycle class, Worker restart-response contract, PMD, and Spotless; `tmp/5056` passed integrated
   `build -x test`. The dead-overload correction passes `RecordedBulkIngestionCoordinatorTest` and
-  `UnreferencedCodeTest` together at `tmp/5060`. The first in-place attempts
+  `UnreferencedCodeTest` together at `tmp/5060`. The app-services projection correction passes
+  `MigrationOutcomeProjectionTest` and Spotless at `tmp/5064`. The first in-place attempts
   failed due an obsolete indexing-jobs serving lease; `tmp/5044` traced its origin, and D1-18
   records the deferred-upgrade retirement notification fix. No full-suite, hosted, beside-mode,
   kill-cut, or independent-review claim applies to these local changes.

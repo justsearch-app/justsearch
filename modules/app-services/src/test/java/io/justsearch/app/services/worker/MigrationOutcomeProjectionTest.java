@@ -3,7 +3,6 @@ package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
@@ -71,7 +70,7 @@ final class MigrationOutcomeProjectionTest {
       assertEquals(TARGET_FINGERPRINT, request.getValue().getTargetIndexFingerprint());
       assertEquals(SOURCE_GENERATION, request.getValue().getExpectedSourceGeneration());
       assertEquals("bulk_reindex", request.getValue().getReason());
-      assertTrue(request.getValue().getRestartWorker());
+      assertFalse(request.getValue().getRestartWorker());
     }
   }
 
