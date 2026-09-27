@@ -25,7 +25,7 @@ final class EngineMigrationRestartDispatchTest {
   private static final String TARGET_FINGERPRINT = "a".repeat(64);
 
   @Test
-  void recordedStartReturnsRestartRequirementWithoutDispatchingIt(@TempDir Path dataDir)
+  void recordedStartReturnsBuildingWitnessWithoutDispatchingRestart(@TempDir Path dataDir)
       throws Exception {
     Path indexBase = dataDir.resolve("index");
     EngineTestHarness.publishConfig(dataDir, indexBase, Map.of());
@@ -55,22 +55,21 @@ final class EngineMigrationRestartDispatchTest {
               TestEngineContexts.FOREGROUND);
 
       assertTrue(outcome.accepted());
-      assertTrue(
-          outcome.restartRequired(), "the operation owner receives the required restart witness");
+      assertFalse(outcome.restartRequired(), "live start carries no restart requirement");
       assertEquals("g-" + OPERATION_KEY, outcome.buildingGenerationId());
       assertEquals(before.active_generation(), outcome.activeGenerationId());
       assertEquals("MIGRATING", outcome.migrationState());
       assertEquals(
           0,
           restarts.get(),
-          "recorded start must let its durable owner bind the witness before restarting the Engine");
+          "recorded start leaves the durable owner to open Green live");
       var persisted = new IndexGenerationManager(indexBase).readStateBestEffort();
       assertEquals(outcome.buildingGenerationId(), persisted.building_generation());
     }
   }
 
   @Test
-  void realClientDispatchesStartAndRefusesDirectoryRollback(@TempDir Path dataDir)
+  void realClientStartsMigrationWithoutDispatchingRestart(@TempDir Path dataDir)
       throws Exception {
     EngineTestHarness.publishConfig(dataDir, dataDir.resolve("index"), Map.of());
     var restarts = new AtomicInteger();
@@ -83,17 +82,10 @@ final class EngineMigrationRestartDispatchTest {
       assertEquals(0, restarts.get(), "an idle cutover cannot restart the Engine");
       var start = client.startMigration("manual", TestEngineContexts.FOREGROUND);
       assertTrue(start.accepted());
-      assertTrue(start.restartRequired());
-      assertEquals(1, restarts.get(), "the production client consumes the requirement");
+      assertFalse(start.restartRequired());
+      assertEquals(0, restarts.get(), "the production client opens Green in this Engine");
       assertTrue(client.requestCutover(true, TestEngineContexts.FOREGROUND).restartRequired());
-      assertEquals(1, restarts.get(), "requesting cutover is not promotion");
-      // This fixture observes dispatch without terminating its JVM. Seed a real predecessor so
-      // the refusal proves that pointer-only rollback is retired even when A still exists.
-      new IndexGenerationManager(dataDir.resolve("index")).promoteBuildingGenerationToActive();
-      var rollback = client.rollbackMigration(TestEngineContexts.FOREGROUND);
-      assertFalse(rollback.accepted());
-      assertFalse(rollback.restartRequired());
-      assertEquals(1, restarts.get());
+      assertEquals(0, restarts.get(), "requesting cutover is not promotion");
     }
   }
 }

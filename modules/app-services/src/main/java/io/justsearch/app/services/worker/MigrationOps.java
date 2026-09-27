@@ -37,7 +37,7 @@ final class MigrationOps {
         return startMigration(
                     MigrationStartRequest.newBuilder()
                             .setReason(reason == null ? "" : reason)
-                            .setRestartWorker(true)
+                            .setRestartWorker(false)
                             .addAllProjectionSourceIds(projectionSourceIds)
                             .setProjectionSourceIdsPresent(true)
                             .build(), engineContext);
@@ -59,7 +59,7 @@ final class MigrationOps {
         }
         var request = MigrationStartRequest.newBuilder()
                 .setReason(reason == null ? "" : reason)
-                .setRestartWorker(true)
+                .setRestartWorker(false)
                 .setRecordedOperationKey(operationKey)
                 .setTargetIndexFingerprint(targetIndexFingerprint)
                 .setExpectedSourceGeneration(expectedSourceGeneration);

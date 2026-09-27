@@ -84,6 +84,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private final java.util.function.Supplier<WorkerAppServices> services;
   private final ForegroundLoadGate foregroundLoad;
   private final Runnable requestedRestartAction;
+  private volatile Consumer<String> liveMigrationStarter;
   private final EngineExecutorRegistry.Registration deadlineRegistration;
   private final EngineExecutorRegistry.Registration foregroundCallRegistration;
   private final EngineExecutorRegistry.Registration backgroundCallRegistration;
@@ -294,8 +295,17 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   @Override
   public io.justsearch.app.api.IndexingService.MigrationOutcome startMigration(String reason, EngineContext engineContext) {
     var outcome = super.startMigration(reason, engineContext);
-    if (outcome.accepted() && outcome.restartRequired()) requestedRestartAction.run();
+    if (outcome.accepted()) {
+      var starter = liveMigrationStarter;
+      if (starter != null) starter.accept(outcome.buildingGenerationId());
+      else if (outcome.restartRequired()) requestedRestartAction.run();
+    }
     return outcome;
+  }
+
+  void bindLiveMigrationStarter(Consumer<String> starter) {
+    if (liveMigrationStarter != null) throw new IllegalStateException("Migration starter already bound");
+    liveMigrationStarter = Objects.requireNonNull(starter, "starter");
   }
 
   @Override

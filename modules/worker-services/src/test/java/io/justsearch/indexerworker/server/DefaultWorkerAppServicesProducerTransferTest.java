@@ -312,6 +312,44 @@ final class DefaultWorkerAppServicesProducerTransferTest {
     assertEquals(1, released.get());
   }
 
+  @Test
+  void nativeToGreenHandoffReplacesLoopButKeepsWatcherAndAQueryModels(@TempDir Path tempDir)
+      throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices source = fixture.newIncumbent();
+      var nerA = mock(io.justsearch.indexerworker.ner.NerService.class);
+      source.wireNerService(nerA);
+      var releasedA = new AtomicInteger();
+      source.replaceProducerModelLease(releasedA::incrementAndGet);
+      DefaultWorkerAppServices green = DefaultWorkerAppServices.prepareNativeGreen(
+          fixture.executors, fixture.nativeGreenContext(), () -> true, null,
+          source.indexingPacing(), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+          fixture.configuration, fixture.candidateConfiguration, source);
+      source.validateNativeProducerSuccessor(green);
+      assertNotSame(field(source, "indexingLoop"), field(green, "indexingLoop"));
+      assertSame(field(source, "workerWatcher"), field(green, "workerWatcher"));
+      assertSame(field(source, "rootWatcherRegistry"), field(green, "rootWatcherRegistry"));
+      assertSame(nerA, queryBindings(green).nerService());
+
+      try (var fence = source.mutationAdmission().beginFinalFence(
+          source.mutationOwnerToken(), 1_000)) {
+        assertNotNull(fence);
+        source.closeNativeLoopRetainingModels();
+        verify(nerA, never()).close();
+        source.installNativeWatcherHandoffTo(green);
+        fence.install(green.mutationOwnerToken());
+        fence.certifySuccessor();
+      }
+      source.close();
+      assertEquals(1, releasedA.get(), "A's old producer lease leaves with its retired view");
+      verify(nerA, never()).close();
+      assertFalse(fixture.watcherExecutor.isShutdown(), "Green now owns the same watcher");
+      green.close();
+      assertTrue(fixture.watcherExecutor.isShutdown());
+      verify(nerA, never()).close();
+    }
+  }
+
   private static EncoderBindings queryBindings(DefaultWorkerAppServices services)
       throws ReflectiveOperationException {
     Object searchService = field(services, "searchService");
@@ -358,6 +396,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
         Executors.newSingleThreadScheduledExecutor();
     private final WorkerExecutorRegistrations executors = mock(WorkerExecutorRegistrations.class);
     private final RunningRuntime runtime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
+    private final RunningRuntime greenRuntime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
     private final JobQueue jobQueue = mock(JobQueue.class);
     private final WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
     private final ResolvedConfig snapshot =
@@ -436,6 +475,15 @@ final class DefaultWorkerAppServicesProducerTransferTest {
 
     private InfraContext greenContext() {
       return context;
+    }
+
+    private InfraContext nativeGreenContext() {
+      when(greenRuntime.resolvedConfig()).thenReturn(snapshot);
+      when(greenRuntime.latestCommitUserDataBestEffort()).thenReturn(Map.of());
+      return new InfraContext(
+          context.config(), jobQueue, () -> runtime, () -> greenRuntime, signalBus,
+          null, metricRegistry, context.indexBasePath(), context.activeIndexPath(),
+          () -> null, 5_000L);
     }
 
     @Override

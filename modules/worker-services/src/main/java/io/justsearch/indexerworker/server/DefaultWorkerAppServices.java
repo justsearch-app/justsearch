@@ -86,6 +86,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   // Tempdoc 418 Phase B — Worker-side filesystem watcher. Owned by appServices so its lifecycle
   // matches the service set's; closed during {@link #close()}.
   private final io.justsearch.indexerworker.services.WorkerMethvinWatcher workerWatcher;
+  private final io.justsearch.indexerworker.services.RootWatcherRegistry rootWatcherRegistry;
   /**
    * The Blue/Green successor borrows the incumbent's producer until durable promotion commits.
    * Access is serialized by KnowledgeServer's runtime-swap owner lock.
@@ -109,52 +110,81 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   /** Exact close owner for the loop/extractor/watcher bundle shared during Green preparation. */
   static final class SharedProducerOwnership {
-    private boolean owned;
+    private boolean ownsLoop;
+    private boolean ownsWatcher;
     private boolean closed;
     private Runnable modelLeaseRelease;
+    private boolean retainNerOnLoopClose;
 
     SharedProducerOwnership(boolean owned) {
-      this.owned = owned;
+      this(owned, owned);
+    }
+
+    SharedProducerOwnership(boolean ownsLoop, boolean ownsWatcher) {
+      this.ownsLoop = ownsLoop;
+      this.ownsWatcher = ownsWatcher;
     }
 
     boolean ownsProducer() {
-      return owned && !closed;
+      return ownsLoop && ownsWatcher && !closed;
     }
 
     boolean closed() { return closed; }
 
     synchronized void replaceModelLease(Runnable release) {
-      if (!owned || closed) throw new IllegalStateException("No live producer owns the model lease");
+      if (!ownsLoop || closed) throw new IllegalStateException("No live producer owns the model lease");
       Runnable previous = modelLeaseRelease;
       modelLeaseRelease = java.util.Objects.requireNonNull(release, "release");
       if (previous != null) previous.run();
     }
 
     synchronized void clearModelLease() {
-      if (!owned || closed) throw new IllegalStateException("No live producer owns the model lease");
+      if (!ownsLoop || closed) throw new IllegalStateException("No live producer owns the model lease");
       Runnable previous = modelLeaseRelease;
       modelLeaseRelease = null;
       if (previous != null) previous.run();
     }
 
     synchronized void transferTo(SharedProducerOwnership successor) {
-      if (!owned || closed || successor.closed || successor.owned
+      if (!ownsProducer() || successor.closed || successor.ownsLoop || successor.ownsWatcher
           || successor.modelLeaseRelease != null) {
         throw new IllegalStateException("Producer model lease cannot be transferred");
       }
       successor.modelLeaseRelease = modelLeaseRelease;
       modelLeaseRelease = null;
-      owned = false;
-      successor.owned = true;
+      ownsLoop = false;
+      ownsWatcher = false;
+      successor.ownsLoop = true;
+      successor.ownsWatcher = true;
+    }
+
+    synchronized void closeLoopRetainingNer(IndexingLoop loop) throws IOException {
+      if (!ownsLoop || closed || loop == null) {
+        throw new IllegalStateException("No live native loop can be handed off");
+      }
+      // The generation's EncoderSet still owns the NER model while A serves issued queries.
+      retainNerOnLoopClose = true;
+      loop.closeRetainingNer();
+      ownsLoop = false;
+    }
+
+    synchronized void transferWatcherTo(SharedProducerOwnership successor) {
+      if (!ownsWatcher || closed || successor.closed || !successor.ownsLoop
+          || successor.ownsWatcher) {
+        throw new IllegalStateException("Native watcher ownership cannot be transferred");
+      }
+      ownsWatcher = false;
+      successor.ownsWatcher = true;
     }
 
     synchronized void close(
         io.justsearch.indexerworker.services.WorkerMethvinWatcher watcher,
         IndexingLoop loop) throws IOException {
       if (closed) return;
-      if (owned) {
-        if (watcher != null) watcher.close();
-        if (loop != null) loop.close();
+      if (ownsWatcher && watcher != null) watcher.close();
+      if (ownsLoop && loop != null) {
+        if (retainNerOnLoopClose) loop.closeRetainingNer();
+        else loop.close();
       }
       if (modelLeaseRelease != null) {
         modelLeaseRelease.run();
@@ -323,6 +353,40 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       WorkerServiceConfiguration configuration,
       WorkerServiceConfiguration candidateConfiguration) {
+    this(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
+        childRegistry, configuration, candidateConfiguration, null);
+  }
+
+  /** Constructs a fresh Green loop while retaining the incumbent's physical watcher. */
+  public static DefaultWorkerAppServices prepareNativeGreen(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      WorkerServiceConfiguration configuration,
+      WorkerServiceConfiguration candidateConfiguration,
+      DefaultWorkerAppServices nativeSource) {
+    java.util.Objects.requireNonNull(nativeSource, "nativeSource");
+    if (!nativeSource.producerOwnership.ownsProducer() || nativeSource.producerRuntime == null) {
+      throw new IllegalStateException("Native source does not own a running producer");
+    }
+    return new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
+        embeddingTelemetryEvents, indexingPacing, childRegistry, configuration,
+        candidateConfiguration, nativeSource);
+  }
+
+  private DefaultWorkerAppServices(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      WorkerServiceConfiguration configuration,
+      WorkerServiceConfiguration candidateConfiguration,
+      DefaultWorkerAppServices nativeSource) {
     java.util.Objects.requireNonNull(executors, "executors");
     java.util.Objects.requireNonNull(childRegistry, "childRegistry");
     this.resolvedConfig = configuration.snapshot();
@@ -356,9 +420,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     RunningRuntime ingestRunning =
         ingestLifecycle instanceof RunningRuntime r ? r : null;
     this.producerRuntime = ingestRunning;
-    this.borrowedFrom = null;
+    this.borrowedFrom = nativeSource;
     this.mutationOwnerToken = new Object();
-    this.mutationAdmission = new WorkerMutationAdmission(mutationOwnerToken);
+    this.mutationAdmission = nativeSource == null
+        ? new WorkerMutationAdmission(mutationOwnerToken) : nativeSource.mutationAdmission;
 
     // Tempdoc 516 P3 / Slice 5 (W7.2): single shared EncoderBindings registry held by both
     // IndexingLoop and SearchOrchestrator. wire* methods below bind once on it instead of
@@ -367,7 +432,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.producerEncoderBindings = candidateConfiguration == null
         ? encoderBindings : new EncoderBindings();
     // Even a deferred bundle owns its watcher; ordinary close semantics remain unchanged.
-    this.producerOwnership = new SharedProducerOwnership(true);
+    this.producerOwnership = new SharedProducerOwnership(true, nativeSource == null);
 
     if (ingestRunning != null) {
       // Extraction owns an executor, a shutdown hook and (after first routed file) child-process
@@ -529,18 +594,54 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             ctx.documentIdentityStore());
     this.preparedWatcherTarget =
         new WatcherCallbacks.Target(ingestRunning, ingestService, watcherDeletionMarker);
-    this.watcherCallbacks = new WatcherCallbacks(preparedWatcherTarget);
-    var workerWatcherCatalog =
-        new io.justsearch.indexerworker.services.WorkerWatcherMetricCatalog(ctx.metricRegistry());
+    this.watcherCallbacks = nativeSource == null
+        ? new WatcherCallbacks(preparedWatcherTarget) : nativeSource.watcherCallbacks;
     // Tempdoc 626 §Axis-A — OVERFLOW/burst recovery is now Worker-owned (in-process reconcile),
     // so the redundant Head watcher can be retired without dropping these safety nets.
-    this.workerWatcher = new io.justsearch.indexerworker.services.WorkerMethvinWatcher(
-        executors.watcherReconcile(), ctx.jobQueue(), workerWatcherCatalog,
-        watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
-        ignored -> mutationAdmission.markReplayUncertain());
-    this.ingestService.setRootWatcherRegistry(
-        new io.justsearch.indexerworker.services.RootWatcherRegistry(this.workerWatcher));
+    if (nativeSource == null) {
+      var workerWatcherCatalog =
+          new io.justsearch.indexerworker.services.WorkerWatcherMetricCatalog(ctx.metricRegistry());
+      this.workerWatcher = new io.justsearch.indexerworker.services.WorkerMethvinWatcher(
+          executors.watcherReconcile(), ctx.jobQueue(), workerWatcherCatalog,
+          watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
+          ignored -> mutationAdmission.markReplayUncertain());
+      this.rootWatcherRegistry =
+          new io.justsearch.indexerworker.services.RootWatcherRegistry(workerWatcher);
+    } else {
+      this.workerWatcher = nativeSource.workerWatcher;
+      this.rootWatcherRegistry = nativeSource.rootWatcherRegistry;
+    }
+    this.ingestService.setRootWatcherRegistry(rootWatcherRegistry);
     this.embeddingProviderTarget = new EmbeddingProviderTarget(this);
+    if (nativeSource != null) copyNativeSourceQueryBindings(nativeSource);
+  }
+
+  /** A remains the query generation while this newly constructed loop writes Green. */
+  private void copyNativeSourceQueryBindings(DefaultWorkerAppServices source) {
+    var bindings = source.encoderBindings.snapshot();
+    encoderBindings.publish(bindings);
+    healthService.setBgeM3Encoder(bindings.bgeM3Encoder());
+    var disambiguation = bindings.disambiguationService();
+    searchService.setClusterSnapshotSupplier(
+        disambiguation == null ? null : disambiguation::snapshot);
+    var provider = source.indexingLoop.getEmbeddingLifecycle().embeddingProvider();
+    wireEmbeddingProvider(provider);
+    if (source.spladeIdfQueryEncoder != null) {
+      wireSpladeIdfQueryEncoder(source.spladeIdfQueryEncoder);
+    }
+    if (source.searchReranker != null) wireSearchReranker(source.searchReranker);
+    if (source.citationScorer != null) wireCitationScorer(source.citationScorer);
+    if (source.gpuDiagnostics != null) wireGpuDiagnostics(source.gpuDiagnostics);
+    if (source.stageAvailability != null) {
+      wireStageEnabled(source.stageAvailability.embedding(),
+          source.stageAvailability.splade(), source.stageAvailability.ner());
+    }
+    if (source.modelReadyLatchSupplier != null) {
+      wireModelReadyLatch(source.modelReadyLatchSupplier);
+    }
+    if (source.policySnapshotSupplier != null) {
+      wirePolicySnapshotSupplier(source.policySnapshotSupplier);
+    }
   }
 
   /**
@@ -591,6 +692,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.encoderBindings = incumbent.producerEncoderBindings;
     this.producerEncoderBindings = incumbent.producerEncoderBindings;
     this.workerWatcher = incumbent.workerWatcher;
+    this.rootWatcherRegistry = incumbent.rootWatcherRegistry;
     this.watcherCallbacks = incumbent.watcherCallbacks;
     this.producerOwnership = new SharedProducerOwnership(false);
 
@@ -638,8 +740,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       return status != null && status.available();
     });
     healthService.setModelActiveSupplier("citation-scorer", searchService::isCitationScorerActive);
-    ingestService.setRootWatcherRegistry(
-        new io.justsearch.indexerworker.services.RootWatcherRegistry(workerWatcher));
+    ingestService.setRootWatcherRegistry(rootWatcherRegistry);
 
     var lifecycle = indexingLoop.getEmbeddingLifecycle();
     var ecc = lifecycle.embeddingCompatController();
@@ -709,6 +810,54 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       embeddingProviderTarget.lock.unlock();
       throw failure;
     }
+  }
+
+  /** Validate the native-to-Green replacement before the incumbent loop is stopped. */
+  public void validateNativeProducerSuccessor(DefaultWorkerAppServices successor) {
+    java.util.Objects.requireNonNull(successor, "successor");
+    if (!producerOwnership.ownsProducer() || successor.borrowedFrom != this
+        || successor.producerRuntime == null || successor.producerRuntime == producerRuntime
+        || successor.indexingLoop == null || successor.indexingLoop == indexingLoop
+        || successor.workerWatcher != workerWatcher
+        || successor.rootWatcherRegistry != rootWatcherRegistry
+        || successor.watcherCallbacks != watcherCallbacks
+        || successor.mutationAdmission != mutationAdmission
+        || successor.producerOwnership.ownsProducer()) {
+      throw new IllegalArgumentException("Successor is not this native producer's prepared Green");
+    }
+  }
+
+  /** Park NATIVE intake at a completed batch without destroying the source loop. */
+  public boolean quiesceNativeProducerForHandoff(long timeoutMs) {
+    if (!producerOwnership.ownsProducer() || indexingLoop == null) {
+      throw new IllegalStateException("Native producer is unavailable for handoff");
+    }
+    return indexingLoop.quiesceForUpgrade(timeoutMs);
+  }
+
+  /** Undo a refused preparation while the source loop still owns its extractor. */
+  public void resumeNativeProducerAfterRefusal() {
+    if (producerOwnership.ownsProducer() && indexingLoop != null) {
+      indexingLoop.resumeAfterUpgradePreparation();
+    }
+  }
+
+  /** Irreversibly closes only A's runtime-bound loop; A's model set remains query-owned. */
+  public void closeNativeLoopRetainingModels() throws IOException {
+    producerOwnership.closeLoopRetainingNer(indexingLoop);
+  }
+
+  /** Moves the unchanged watcher and registrations after A's loop closes, inside the final fence. */
+  public void installNativeWatcherHandoffTo(DefaultWorkerAppServices successor) {
+    if (successor == null || successor.borrowedFrom != this
+        || successor.workerWatcher != workerWatcher
+        || successor.rootWatcherRegistry != rootWatcherRegistry
+        || successor.watcherCallbacks != watcherCallbacks
+        || successor.mutationAdmission != mutationAdmission) {
+      throw new IllegalArgumentException("Native watcher successor changed");
+    }
+    producerOwnership.transferWatcherTo(successor.producerOwnership);
+    watcherCallbacks.target = successor.preparedWatcherTarget;
   }
 
   public WorkerMutationAdmission mutationAdmission() { return mutationAdmission; }

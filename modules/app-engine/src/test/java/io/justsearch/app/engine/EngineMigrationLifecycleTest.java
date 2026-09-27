@@ -82,13 +82,24 @@ final class EngineMigrationLifecycleTest {
     String activeBefore = engine.status().getMigration().getActiveGenerationId();
     assertFalse(activeBefore.isBlank(), "active_generation_id must be set before migration");
 
-    assertTrue(engine.client().startMigration("system_test", TestEngineContexts.FOREGROUND).accepted(), "startMigration must be accepted");
-
-    // An explicit restart, not a simulation of one: startMigration re-cuts the layout and the
-    // Engine has no in-place reopen (see below).
-    engine.restart();
-
+    var started = engine.client().startMigration("system_test", TestEngineContexts.FOREGROUND);
+    assertTrue(started.accepted(), "startMigration must be accepted");
+    assertFalse(started.restartRequired(), "the live start must not require an Engine restart");
     Path bluePath = engine.indexBase().resolve("indices").resolve(activeBefore);
+    Path greenPath = engine.indexBase().resolve("indices")
+        .resolve(started.buildingGenerationId());
+    long openDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
+    boolean liveGreen = false;
+    while (System.nanoTime() < openDeadline) {
+      try (var view = engine.captureServingView()) {
+        liveGreen = bluePath.equals(view.searchRuntime().openedIndexPath())
+            && greenPath.equals(view.ingestRuntime().openedIndexPath());
+      }
+      if (liveGreen) break;
+      Thread.sleep(50);
+    }
+    assertTrue(liveGreen, "the current Engine must serve A while its new Green writer runs");
+
     try (var heldBlue = engine.captureServingView()) {
       assertEquals(bluePath, heldBlue.activeGenerationPath(), "the lease must hold the actual Blue view");
       assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(),

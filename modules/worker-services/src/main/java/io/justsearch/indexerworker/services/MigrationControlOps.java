@@ -36,7 +36,6 @@ final class MigrationControlOps {
 
   MigrationStartResponse startMigration(MigrationStartRequest request) {
     String reason = request.getReason();
-    boolean restart = request.getRestartWorker();
     try {
       if (indexGenerationManager == null) {
         return MigrationStartResponse.newBuilder()
@@ -76,7 +75,7 @@ final class MigrationControlOps {
               .setMigrationState(ms)
               .setActiveGenerationId(active)
               .setBuildingGenerationId(building)
-              .setRestartRequired(restart && (!recorded || !building.isEmpty()))
+              .setRestartRequired(false)
               .build();
 
       return response;

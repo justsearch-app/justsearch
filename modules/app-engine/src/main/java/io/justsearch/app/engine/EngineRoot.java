@@ -431,10 +431,16 @@ public final class EngineRoot implements WorkerHost {
     built.bindProjectionSourceIds(projectionSeedSources.stream()
         .map(io.justsearch.app.api.indexing.ProjectionSeedSource::sourceId)
         .sorted().toList());
+    built.bindLiveMigrationStarter(buildingGeneration ->
+        started.beginUnrecordedBuildingLiveAsync(buildingGeneration,
+            () -> requestRestart(started)));
     this.client = built;
     try {
       recordedIngestion.bindProducer(built::enumerateRecordedRoot);
-      recordedIngestion.bindBulkProducer(built::enumerateCapturedRoots, built, () -> requestRestart(started));
+      recordedIngestion.bindBulkProducer(built::enumerateCapturedRoots, built,
+          () -> requestRestart(started),
+          operationKey -> started.beginRecordedBuildingLiveAsync(
+              operationKey, () -> requestRestart(started)));
       clientReady = true;
     } catch (RuntimeException | Error failure) {
       try { close(); }

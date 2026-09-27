@@ -178,7 +178,8 @@ public final class EncoderSet implements AutoCloseable {
         long remainingNanos = deadline - System.nanoTime();
         if (remainingNanos <= 0) {
           throw new IllegalStateException(
-              "Encoder-set retirement exceeded its close deadline; owner retained");
+              "Encoder-set retirement exceeded its close deadline; owner retained"
+                  + " (holders=" + holders + ", closeRunning=" + closeRunning + ")");
         }
         try {
           TimeUnit.NANOSECONDS.timedWait(lifecycleMonitor, remainingNanos);

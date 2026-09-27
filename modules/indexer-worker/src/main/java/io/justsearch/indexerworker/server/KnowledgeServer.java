@@ -1728,6 +1728,31 @@ public final class KnowledgeServer implements Closeable {
         base.documentIdentityStore());
   }
 
+  /** A search remains capturable while a new, independently bound loop prepares Green. */
+  private DefaultWorkerAppServices prepareNativeGreenServices(DefaultWorkerAppServices source,
+      RunningRuntime active, RunningRuntime green,
+      WorkerServiceConfiguration selectedCandidateConfiguration) {
+    InfraContext base = Objects.requireNonNull(infraCtx, "infraCtx");
+    InfraContext greenContext = new InfraContext(base.config(), base.jobQueue(),
+        () -> active, () -> green, base.signalBus(), base.telemetry(), base.metricRegistry(),
+        base.indexBasePath(), activeIndexPath, base.migrationProgressSupplier(),
+        base.migrationSwitchingMaxDurationMs(), base.pathResolutionStore(),
+        base.documentIdentityStore());
+    DefaultWorkerAppServices candidate = DefaultWorkerAppServices.prepareNativeGreen(
+        workerExecutors, greenContext,
+        () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
+        embeddingTelemetry, indexingPacing, childRegistry, serviceConfiguration,
+        selectedCandidateConfiguration, source);
+    try {
+      wireAppServicesPostConstruction(candidate);
+      return candidate;
+    } catch (RuntimeException | Error failure) {
+      try { candidate.close(); }
+      catch (IOException | RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
+  }
+
   /** Prepares the already-running Green producer's serving services before pointer commitment. */
   DefaultWorkerAppServices prepareServingSuccessor(RunningRuntime greenRuntime) {
     if (!(appServices instanceof DefaultWorkerAppServices incumbent)) {
@@ -2000,7 +2025,10 @@ public final class KnowledgeServer implements Closeable {
       }
     } finally {
       runtimeSwapLock.unlock();
-      if (retired != null) cleanRetiredServingView(retired);
+      if (retired != null) {
+        notifyServingViewRetirement(retired);
+        cleanRetiredServingView(retired);
+      }
     }
     notifyRecordedServicesPublished();
   }
@@ -2239,6 +2267,14 @@ public final class KnowledgeServer implements Closeable {
     notifyServingViewRetirement(nativeView);
     try {
       awaitRetiredNativeView(nativeView);
+      // A live native-to-Green start may have left an older issued A view draining. It owns an
+      // independent lease on the same EncoderSet and must leave before in-place B can retire A.
+      List<ServingView> olderAViews;
+      synchronized (servingViewMonitor) {
+        olderAViews = retiredServingViews.stream()
+            .filter(view -> view != nativeView && view.encoderSet == incumbent).toList();
+      }
+      for (ServingView older : olderAViews) awaitRetiredNativeView(older);
     } catch (IOException refusal) {
       restoreUnretiredNativeView(nativeView);
       throw refusal;
@@ -4364,11 +4400,16 @@ public final class KnowledgeServer implements Closeable {
 
   /** Read the durable pre-pointer source set; a legacy manifest is safe only with no sources. */
   private List<String> expectedProjectionSourceIds() throws IOException {
-    if (indexGenerationManager == null || buildingIndexPath == null) {
+    return expectedProjectionSourceIds(buildingIndexPath, generationBootOwnership);
+  }
+
+  private List<String> expectedProjectionSourceIds(Path building,
+      IndexGenerationManager.BootOwnership ownership) throws IOException {
+    if (indexGenerationManager == null || building == null) {
       throw new IOException("Projection candidate manifest is unavailable");
     }
-    var manifest = indexGenerationManager.manifestForOwnedPath(buildingIndexPath);
-    if (generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+    var manifest = indexGenerationManager.manifestForOwnedPath(building);
+    if (ownership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
         && !Objects.equals(recorded.projectionSourceIds(), manifest.projection_source_ids())) {
       throw new IOException("Recorded candidate source set differs from accepted preparation");
     }
@@ -4771,6 +4812,212 @@ public final class KnowledgeServer implements Closeable {
     } finally {
       runtimeSwapLock.unlock();
     }
+  }
+
+  /**
+   * Opens the durable recorded BUILDING generation in this Engine. The coordinator invokes this
+   * off its own lock: quiescing the NATIVE loop may wait for a claim to return through that lock.
+   */
+  public void beginRecordedBuildingLiveAsync(String operationKey, Runnable restartFallback) {
+    Objects.requireNonNull(operationKey, "operationKey");
+    beginBuildingLiveAsync("g-" + operationKey,
+        operationKey, restartFallback);
+  }
+
+  public void beginUnrecordedBuildingLiveAsync(String buildingGeneration,
+      Runnable restartFallback) {
+    beginBuildingLiveAsync(Objects.requireNonNull(buildingGeneration, "buildingGeneration"),
+        null, restartFallback);
+  }
+
+  private void beginBuildingLiveAsync(String buildingGeneration, String operationKey,
+      Runnable restartFallback) {
+    Objects.requireNonNull(restartFallback, "restartFallback");
+    Thread starter = new Thread(() -> {
+      boolean live;
+      try {
+        live = beginBuildingLive(buildingGeneration, operationKey);
+      } catch (IOException | RuntimeException failure) {
+        log.warn("Live migration start refused; requesting ordered boot recovery", failure);
+        live = false;
+      }
+      if (live) log.info("Green opened live; no Engine restart");
+      else restartFallback.run();
+    }, "engine-migration-live-start");
+    starter.setDaemon(true);
+    starter.start();
+  }
+
+  private boolean beginBuildingLive(String buildingGeneration, String operationKey)
+      throws IOException {
+    ServingView retired;
+    DefaultWorkerAppServices prepared = null;
+    RunningRuntime green = null;
+    ServingView successor = null;
+    DefaultWorkerAppServices source = null;
+    boolean quiesced = false;
+    boolean irreversible = false;
+    boolean published = false;
+    boolean enumerateSources;
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted || !running || rebuildBrakeExhausted || indexGenerationManager == null
+          || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native)
+          || generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE
+          || buildingIndexPath != null || ingestLifecycle != searchLifecycle
+          || !(searchLifecycle instanceof RunningRuntime active) || !active.isAcceptingWrites()
+          || !(appServices instanceof DefaultWorkerAppServices incumbent)
+          || (deferredModelInit != null && !deferredModelInit.isDone())) {
+        return false;
+      }
+      source = incumbent;
+      var ownership = recordedIngestionLifecycle.bootOwnership(jobQueue);
+      IndexGenerationManager.BootOwnership.Recorded recorded =
+          ownership instanceof IndexGenerationManager.BootOwnership.Recorded candidate
+              ? candidate : null;
+      if (operationKey == null) {
+        if (!(ownership instanceof IndexGenerationManager.BootOwnership.Native)) return false;
+      } else if (recorded == null || !operationKey.equals(recorded.operationKey())) return false;
+      var accepted = operationKey == null
+          ? java.util.Optional.<RecordedIngestionLifecycle.RecordedCandidate>empty()
+          : recordedIngestionLifecycle.recordedCandidate(operationKey);
+      io.justsearch.indexerworker.services.CandidateIndexTargetCapture.CaptureResult captured = null;
+      if (accepted.isPresent()) {
+        var exact = accepted.orElseThrow();
+        captured = io.justsearch.indexerworker.services.CandidateIndexTargetCapture
+            .captureWithRuntimeInputs(exact.configuration());
+        if (!exact.target().equals(captured.target())
+            || !exact.target().fingerprint().equals(recorded.targetFingerprint())
+            || !exact.configuration().paths().indexBasePath().equals(indexBasePath)) return false;
+      }
+      String fingerprint = accepted.map(value -> value.target().fingerprint())
+          .orElseGet(this::expectedIndexFingerprintOrNull);
+      var boot = indexGenerationManager.initializeForBoot(ownership, fingerprint);
+      var expectedDisposition = operationKey == null
+          ? IndexGenerationManager.BootDisposition.NATIVE
+          : IndexGenerationManager.BootDisposition.BUILDING;
+      if (boot.disposition() != expectedDisposition
+          || !boot.layout().activeGenerationPath().equals(activeIndexPath)
+          || !buildingGeneration.equals(boot.layout().state().building_generation())) return false;
+      if (accepted.isPresent()) {
+        var exact = accepted.orElseThrow();
+        String sparseMode = exact.configuration().ai().sparseModel();
+        int dimension = "bge-m3".equalsIgnoreCase(sparseMode) ? 1024
+            : new io.justsearch.configuration.JustSearchConfigurationLoader()
+                .loadFieldCatalog().vectorDimension();
+        indexGenerationManager.bindRecordedModels(operationKey, recorded.source(),
+            recorded.targetFingerprint(), exact.models(), sparseMode, dimension);
+      }
+      Path greenPath = indexGenerationManager.resolveGenerationPathStrict(
+          boot.layout().state().building_generation());
+      enumerateSources = operationKey == null
+          || !expectedProjectionSourceIds(greenPath, ownership).isEmpty();
+      WorkerServiceConfiguration candidateConfiguration = accepted.isEmpty() ? null
+          : WorkerServiceConfiguration.capture(accepted.orElseThrow().configuration(),
+              workerExecutors.pdfOcr().spec().threadCount());
+      try (var fence = incumbent.mutationAdmission().beginFinalFence(
+          incumbent.mutationOwnerToken(), 10_000)) {
+        if (fence == null || !incumbent.quiesceNativeProducerForHandoff(10_000)) return false;
+        quiesced = true;
+        green = buildIndexRuntime(greenPath).withoutRecovery()
+            .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open();
+        bindTerminalWriterFaultSource(green);
+        prepared = prepareNativeGreenServices(incumbent, active, green,
+            candidateConfiguration);
+        retainPendingAppServices(prepared);
+        prepared.prepareIndexingLoop();
+        incumbent.validateNativeProducerSuccessor(prepared);
+        synchronized (servingViewMonitor) {
+          ServingView old = servingView;
+          if (old == null || old.retiring || old.services != incumbent
+              || old.searchRuntime != active || old.ingestRuntime != active) return false;
+          successor = new ServingView(prepared, active, green, activeIndexPath);
+          if (old.encoderSet != null) successor.attachEncoderSet(old.encoderSet);
+          retired = old;
+        }
+        // All reversible preparation is complete. The old loop no longer owns a running batch;
+        // its extractor can leave without closing the A model set still used by search leases.
+        irreversible = true;
+        incumbent.closeNativeLoopRetainingModels();
+        publicationLock.writeLock().lock();
+        try {
+          synchronized (servingViewMonitor) {
+            if (closeStarted || servingView != retired || retired.retiring
+                || appServices != incumbent || ingestLifecycle != active) {
+              throw new IOException("Native serving view changed before live Green publication");
+            }
+            retiredServingViews.add(retired);
+            fence.install(prepared.mutationOwnerToken());
+            incumbent.installNativeWatcherHandoffTo(prepared);
+            ServingView old = retired;
+            old.retiring = true;
+            old.retireCleanup = () -> {
+              try { old.services.close(); }
+              catch (IOException failure) {
+                throw new IllegalStateException("Retired native services still own resources", failure);
+              }
+              old.releaseEncoderSet();
+            };
+            generationBootOwnership = ownership;
+            generationBootDisposition = IndexGenerationManager.BootDisposition.BUILDING;
+            recordedCandidate = accepted.orElse(null);
+            recordedCandidateFingerprint = captured;
+            candidateServiceConfiguration = candidateConfiguration;
+            buildingIndexPath = greenPath;
+            migrationEnumeratorDone = !enumerateSources;
+            migrationEnumeratorFailure = null;
+            ingestLifecycle = green;
+            appServices = prepared;
+            servingView = successor;
+            servingViewMonitor.notifyAll();
+            fence.certifySuccessor();
+            published = true;
+            releasePendingAppServices(prepared);
+          }
+        } finally {
+          publicationLock.writeLock().unlock();
+        }
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        return false;
+      }
+    } finally {
+      runtimeSwapLock.unlock();
+      if (!published) {
+        if (successor != null) successor.releaseEncoderSet();
+        if (prepared != null) {
+          try {
+            if (pendingAppServices == prepared) closePendingAppServices();
+            else prepared.close();
+          } catch (IOException | RuntimeException cleanup) {
+            log.warn("Unpublished Green service cleanup refused", cleanup);
+          }
+        }
+        if (green != null) {
+          try { green.close(); }
+          catch (RuntimeException cleanup) { log.warn("Unpublished Green close refused", cleanup); }
+        }
+        if (quiesced && !irreversible && source != null) {
+          source.resumeNativeProducerAfterRefusal();
+        }
+      }
+    }
+    notifyServingViewRetirement(retired);
+    cleanRetiredServingView(retired);
+    initEmbeddingCompatibilityController();
+    notifyRecordedServicesPublished();
+    if (recordedCandidate == null) {
+      if (initialEncoderSet != null) retainProducerModels(prepared, initialEncoderSet);
+      prepared.activatePreparedIndexingLoop();
+    } else {
+      CandidateModels selected = composeRecordedCandidateModels();
+      candidateModels = selected;
+      wireRecordedCandidateProducer(selected);
+    }
+    if (enumerateSources) startMigrationEnumeratorBestEffort(startupConfiguration,
+        operationKey == null);
+    startMigrationCutoverMonitorBestEffort();
+    return true;
   }
 
   /** The application has durably refused B while A is still the pointer. Retire Green first. */

@@ -7,16 +7,16 @@ import { barrierFiles } from './barrier-files.mjs';
 
 export const BULK_FAULT_CASES = Object.freeze({
   'bulk-partial-capture': Object.freeze({
-    phase: 'bulk-partial-capture', finalIncarnation: 3, faultIncarnation: 1,
-    requestedRestartIncarnations: Object.freeze([2]), cutAttempts: 1, finalAttempts: 3,
+    phase: 'bulk-partial-capture', finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
   }),
   'bulk-state-before-binding': Object.freeze({
     phase: 'bulk-before-building-checkpoint', finalIncarnation: 2, faultIncarnation: 1,
     requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
   }),
   'bulk-promotion-before-terminal': Object.freeze({
-    phase: 'bulk-after-promotion', finalIncarnation: 3, faultIncarnation: 2,
-    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 2,
+    phase: 'bulk-after-promotion', finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 1,
   }),
 });
 
@@ -25,28 +25,28 @@ export const BULK_FAULT_CASES = Object.freeze({
 // the legacy bulk migration cases remain unchanged above.
 export const INSTALLER_FAULT_CASES = Object.freeze({
   'installer-before-marker': Object.freeze({
-    phase: 'installer-before-marker', finalIncarnation: 3, faultIncarnation: 2,
-    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 3,
+    phase: 'installer-before-marker', finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
   }),
   'installer-before-arm': Object.freeze({
-    phase: 'installer-before-arm', finalIncarnation: 3, faultIncarnation: 2,
-    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 3,
+    phase: 'installer-before-arm', finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
   }),
   'installer-before-pointer': Object.freeze({
-    phase: 'installer-before-pointer', finalIncarnation: 3, faultIncarnation: 2,
-    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 3,
+    phase: 'installer-before-pointer', finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
   }),
   'installer-pointer-before-settings': Object.freeze({
-    phase: 'installer-pointer-before-settings', finalIncarnation: 3, faultIncarnation: 2,
-    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 2,
+    phase: 'installer-pointer-before-settings', finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 1,
   }),
   'installer-settings-before-publication': Object.freeze({
-    phase: 'installer-settings-before-publication', finalIncarnation: 3, faultIncarnation: 2,
-    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 2,
+    phase: 'installer-settings-before-publication', finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 1,
   }),
   'installer-before-receipt': Object.freeze({
-    phase: 'installer-before-receipt', finalIncarnation: 3, faultIncarnation: 2,
-    requestedRestartIncarnations: Object.freeze([1]), cutAttempts: 2, finalAttempts: 2,
+    phase: 'installer-before-receipt', finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 1,
   }),
 });
 

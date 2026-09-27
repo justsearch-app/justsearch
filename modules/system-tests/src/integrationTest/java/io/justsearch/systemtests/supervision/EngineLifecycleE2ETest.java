@@ -29,9 +29,9 @@ final class EngineLifecycleE2ETest {
           "changing inputs, interruption and roll-forward under the device ceiling"));
 
   @Test
-  void migrationRestartBaselineExercisesTheInstalledHarness() throws Exception {
+  void migrationStartsLiveInTheInstalledEngine() throws Exception {
     EngineSupervisedRecoveryE2ETest.runScenario("migration");
-    System.out.println("LIFECYCLE_HARNESS_BASELINE_PASS §16 generation transition restart");
+    System.out.println("LIFECYCLE_HARNESS_BASELINE_PASS §16 live generation transition");
   }
 
   @Tag("ai")

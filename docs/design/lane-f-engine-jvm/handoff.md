@@ -20,16 +20,27 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
   about 233 GB), and fixtures now prune their own caches after an owned stop. Do not prune whole run
   directories: the raw-evidence inventories hash them through Lane F acceptance.
 - **Next, in order:**
-  1. Confirm exact-SHA hosted CI for this checkpoint.
-  2. D1-18, the live migration start. The first attempt was reverted; its evidence and patch are
-     in D1-18. Design the native-producer handoff first, because neither Flow A nor Flow B can
-     reuse the incumbent services.
-  3. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
+  1. Continue D1-18 from its revised design and partial live implementation. The prior exact-SHA
+     `2020039e8fc5c689f5dbe16734d3c44a97857576` hosted
+     [run 36315852135](https://github.com/justsearch-app/justsearch/actions/runs/36315852135)
+     passed all 13 jobs. The current working revision still needs a new checkpoint and hosted run.
+  2. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
      `index.dense_unavailable`, but the provisional "rebuilding" verdict takes precedence; observe
      before changing UI.
-  4. The original WP3 batch 4/5 queue, followed by D2, E and F.
-- `continuation-brief.md` still carries ordering history. Fold it into this section at the next
-  docs checkpoint.
+  3. The original WP3 batch 4/5 queue, followed by D2, E and F.
+- **D1-18 partial local evidence:** `tmp/5040` installed recorded Flow A opened and promoted Green
+  with 67 API samples and zero outage. `tmp/5045` installed distinct-model in-place A→B passed
+  143 semantic samples with zero Worker-starting/transport/outage, B vector recovery, and `STOP 0`.
+  `tmp/5053` passed the unrecorded `core.reindex` physical A-search/Green-ingest and post-promotion
+  document test without a migration-start restart. `tmp/5054` passed the unrecorded migration
+  lifecycle class, Worker restart-response contract, PMD, and Spotless; `tmp/5056` passed integrated
+  `build -x test`. The first in-place attempts
+  failed due an obsolete indexing-jobs serving lease; `tmp/5044` traced its origin, and D1-18
+  records the deferred-upgrade retirement notification fix. No full-suite, hosted, beside-mode,
+  kill-cut, or independent-review claim applies to these local changes.
+- **D1-18 next:** install and assert beside A→B with unchanged Engine identity/count and zero
+  outage; add both checkpoint/open kill cuts and one forced live refusal with exactly one fallback
+  restart; invert remaining fault-fixture expectations; then full verification and exact-SHA CI.
 
 ## Selected design and remaining implementation/proof
 

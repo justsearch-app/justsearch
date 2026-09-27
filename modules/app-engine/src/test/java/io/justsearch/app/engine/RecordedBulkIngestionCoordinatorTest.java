@@ -587,6 +587,39 @@ final class RecordedBulkIngestionCoordinatorTest {
   }
 
   @Test
+  void liveBuildingWitnessAdoptsTheAcceptedStartWithoutReplacement() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("live-start-adoption"))) {
+      int dispatches = harness.restartCalls.get();
+      assertEquals(1, dispatches);
+      assertEquals(JobQueue.RecordedClaimDecision.DENY,
+          harness.coordinator.recordedClaimDecision(harness.key));
+      harness.runtime.set(buildingRuntime(harness.key));
+      harness.coordinator.maintain();
+      assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE,
+          harness.coordinator.recordedClaimDecision(harness.key));
+      assertEquals(dispatches, harness.restartCalls.get(), "adoption does not dispatch twice");
+      assertEquals(1, harness.migrationStarts.get());
+      JobQueue.IndexJob claim = harness.queue.pollPending(1).getFirst();
+      assertEquals(harness.sourceHash, claim.plannedSourceSha256());
+      harness.queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(
+          claim, null, harness.sourceHash)),
+          IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS", IngestionRetryPolicy.NONE));
+    }
+  }
+
+  @Test
+  void liveStartDoesNotAdoptAnotherOperationsGreen() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("live-start-foreign"))) {
+      harness.runtime.set(buildingRuntime("01994180-0000-7000-8000-00000000ffff"));
+      harness.coordinator.maintain();
+      assertEquals(JobQueue.RecordedClaimDecision.DENY,
+          harness.coordinator.recordedClaimDecision(harness.key));
+      assertEquals(1, harness.restartCalls.get());
+      assertNull(harness.progress().refusalCode());
+    }
+  }
+
+  @Test
   void acknowledgementRepairCrossesFullPageOfRetainedContradictionsToLaterValidTerminalRow() throws Exception {
     try (var harness = new BulkHarness(temp.resolve("ack-inventory-pages"))) {
       harness.replacePhysical(buildingRuntime(harness.key));

@@ -78,29 +78,41 @@ export async function exerciseMigrationRestart(c) {
   // Only A belongs to the accepted watched roots. B remains a real Blue-only document;
   // distinct generations therefore prove reader replacement without racing filesystem deletion.
   const rebuildKey = createOperationKey();
-  const startResponse = await approvedPost('/api/indexing/migration/start', {
-    reason: 'manual', idempotencyKey: rebuildKey,
-  }, 'recorded migration');
-  if (startResponse.status !== undefined) {
-    const rebuildReceipt = requireOperationSuccess(startResponse, 'recorded migration', 202);
-    requireThat(rebuildReceipt.operationKey === rebuildKey, 'rebuild changed its accepted operation key');
+  const availability = sampleLiveApiAvailability({ apiPort, post });
+  let startResponse;
+  let promoted;
+  try {
+    startResponse = await approvedPost('/api/indexing/migration/start', {
+      reason: 'manual', idempotencyKey: rebuildKey,
+    }, 'recorded migration');
+    if (startResponse.status !== undefined) {
+      const rebuildReceipt = requireOperationSuccess(startResponse, 'recorded migration', 202);
+      requireThat(rebuildReceipt.operationKey === rebuildKey, 'rebuild changed its accepted operation key');
+    }
+    console.log('MIGRATION_START_RESPONSE', JSON.stringify(startResponse));
+    const supervisorFile = path.join(data, 'runtime', 'supervisor.v1.json');
+    const manifestFile = path.join(data, 'runtime', 'manifest.json');
+    promoted = await waitFor('live promotion without a start restart', 180000, async () => {
+      const s = readJson(supervisorFile);
+      const m = readJson(manifestFile);
+      const g = readJson(generationFile);
+      return s?.state === 'running' && s.incarnation === first.incarnation
+        && m?.instanceId === s.instanceId && m?.pid === s.pid
+        && g?.active_generation !== blue && g?.migration_state === 'IDLE'
+        ? { supervisor: s, manifest: m, generation: g } : null;
+    });
+  } finally {
+    const sampled = await availability.stop();
+    console.log('MIGRATION_LIVE_API_AVAILABILITY', JSON.stringify(sampled));
+    requireThat(sampled.samples >= 10 && sampled.workerStarting === 0
+      && sampled.transport === 0 && sampled.apiOutageWindowMs === 0,
+    `live migration had an API outage: ${JSON.stringify(sampled)}`);
   }
-  console.log('MIGRATION_START_RESPONSE', JSON.stringify(startResponse));
   const supervisorFile = path.join(data, 'runtime', 'supervisor.v1.json');
-  const manifestFile = path.join(data, 'runtime', 'manifest.json');
-  const promoted = await waitFor('live promotion after the start restart', 180000, async () => {
-    const s = readJson(supervisorFile);
-    const m = readJson(manifestFile);
-    const g = readJson(generationFile);
-    return s?.state === 'running' && s.incarnation === first.incarnation + 1
-      && m?.instanceId === s.instanceId && m?.pid === s.pid
-      && g?.active_generation !== blue && g?.migration_state === 'IDLE'
-      ? { supervisor: s, manifest: m, generation: g } : null;
-  });
-  requireThat(promoted.supervisor.restartCount === 0, 'voluntary restarts consumed crash budget');
-  requireThat(promoted.supervisor.lastExit?.code === 4
-    && promoted.supervisor.lastExit?.counted === false, 'start did not use clean requested restart');
-  requireThat(promoted.manifest.instanceId !== manifest.instanceId, 'start did not replace the Engine');
+  requireThat(promoted.supervisor.restartCount === first.restartCount,
+    'live migration changed the supervisor restart count');
+  requireThat(promoted.manifest.instanceId === manifest.instanceId,
+    'recorded start replaced the Engine instance');
   await waitFor('promoted generation is actually served', 60000, async () => {
     try {
       const kept = await search(promoted.manifest.head.apiPort, 'migrationretainedmarker');
@@ -166,10 +178,42 @@ export async function exerciseMigrationRestart(c) {
         && !matchingHit(removed, b, 'migrationblueonlymarker');
     } catch { return false; }
   });
-  for (const incarnation of [first.incarnation]) {
-    requireThat(c.output().includes(`Engine incarnation ${incarnation} exited 4 (requested_restart`),
-      `incarnation ${incarnation} did not record its own clean requested restart`);
-  }
+  requireThat(!c.output().includes(`Engine incarnation ${first.incarnation} exited`),
+    'the recorded rebuild exited its serving Engine');
   console.log('MIGRATION_PASS', JSON.stringify({ blue, rebuildKey, settlement, retired,
     promoted, rollbackResponse, afterRefusal, work }));
+}
+
+function sampleLiveApiAvailability({ apiPort, post }) {
+  const observations = [];
+  let running = true;
+  const task = (async () => {
+    while (running) {
+      const at = performance.now();
+      try {
+        const reply = await post(apiPort, '/api/knowledge/search', {
+          query: 'migrationretainedmarker', limit: 5, mode: 'text',
+        }, 10000);
+        observations.push({ at, outcome: reply.status === 503
+          && reply.text.includes('"reason":"worker.starting"') ? 'worker-starting'
+          : `http-${reply.status}` });
+      } catch {
+        observations.push({ at, outcome: 'transport' });
+      }
+      if (running) await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  })();
+  return { async stop() {
+    running = false;
+    await task;
+    const outages = observations.filter(item => item.outcome === 'worker-starting'
+      || item.outcome === 'transport');
+    return { samples: observations.length,
+      workerStarting: outages.filter(item => item.outcome === 'worker-starting').length,
+      transport: outages.filter(item => item.outcome === 'transport').length,
+      apiOutageWindowMs: outages.length === 0 ? 0
+        : Math.round(outages.at(-1).at - outages[0].at),
+      unexpected: observations.filter(item => item.outcome !== 'http-200'
+        && item.outcome !== 'worker-starting' && item.outcome !== 'transport').length };
+  } };
 }

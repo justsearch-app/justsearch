@@ -1253,6 +1253,15 @@ public class IndexingLoop implements Closeable {
 
   @Override
   public void close() throws IOException {
+    closeOwnedResources(true);
+  }
+
+  /** Stops a retired writer while its generation-owned NER remains live for A queries. */
+  public void closeRetainingNer() throws IOException {
+    closeOwnedResources(false);
+  }
+
+  private void closeOwnedResources(boolean closeNer) throws IOException {
     log.info("Stopping IndexingLoop...");
     synchronized (probePublicationMonitor) {
       running.set(false);
@@ -1285,11 +1294,10 @@ public class IndexingLoop implements Closeable {
       catch (RuntimeException failure) { throw new IOException("Content extractor still owns resources", failure); }
     }
 
-    // Close NER service — IndexingLoop is the sole closer (KnowledgeServer does not
-    // retain a reference). Other borrowed services (embeddingService, spladeEncoder,
-    // disambiguationService) are closed by KnowledgeServer after this method returns.
+    // Ordinary loop close also closes NER. A live native-to-Green handoff retains NER for
+    // issued A queries; the generation's EncoderSet retires it after those leases leave.
     var ner = encoderBindings.nerService();
-    if (ner != null) {
+    if (closeNer && ner != null) {
       try {
         ner.close();
       } catch (Exception e) {

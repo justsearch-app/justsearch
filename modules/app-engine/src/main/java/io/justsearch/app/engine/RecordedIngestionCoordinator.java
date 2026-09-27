@@ -453,12 +453,19 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   void bindBulkProducer(Producer producer, IndexingService indexing, Runnable restart) {
+    bindBulkProducer(producer, indexing, restart, ignored -> restart.run());
+  }
+
+  /** Dispatches the durable BUILDING checkpoint to the live Worker when available. */
+  void bindBulkProducer(Producer producer, IndexingService indexing, Runnable restart,
+      java.util.function.Consumer<String> start) {
     synchronized (lock) {
       Attached physical = Objects.requireNonNull(attached, "No recorded ingestion attachment");
       if (physical.stopping || physical.bulkProducer != null) throw new IllegalStateException("Bulk producer cannot bind");
       physical.bulkProducer = Objects.requireNonNull(producer, "producer");
       physical.bulkIndexing = Objects.requireNonNull(indexing, "indexing");
       physical.bulkRestart = Objects.requireNonNull(restart, "restart");
+      physical.bulkStart = Objects.requireNonNull(start, "start");
       maintain();
     }
   }
@@ -1681,7 +1688,11 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       // An accepted local start is waiting for a different physical attachment. This process's
       // CAPTURING boot witness cannot authorize the Green it just created, so re-observing that
       // witness would turn our own asynchronous restart into a durable generation refusal.
-      if (bulk.started) return;
+      if (bulk.started) {
+        if (!liveBuildingStarted(bulk, progress, runtime)) return;
+        bulk.started = false;
+        bulk.restartRequested = false;
+      }
       if (progress.phase() == BulkReindexProgress.Phase.SETTLED && runtime.isPresent()
           && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.PROMOTED
           && progress.generationId().equals(runtime.orElseThrow().activeGeneration())
@@ -1728,6 +1739,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         finish(bulk.completion, new OperationReceipt(RecordedIngestionSettlement.UNAVAILABLE, null));
       }
     }
+  }
+
+  private static boolean liveBuildingStarted(Bulk bulk, BulkReindexProgress progress,
+      Optional<RecordedIngestionLifecycle.BulkRuntime> runtime) {
+    return bulk.restartRequested
+        && progress.phase() == BulkReindexProgress.Phase.BUILDING
+        && runtime.isPresent()
+        && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.BUILDING
+        && progress.generationId().equals(runtime.orElseThrow().writableGeneration());
   }
 
   private void captureBulk(Bulk bulk, Attached physical) {
@@ -1812,12 +1832,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   private void restartAfterBulkStart(Attached physical) {
-    if (physical.stopping || physical.bulkRestart == null) return;
+    if (physical.stopping || physical.bulkStart == null) return;
     for (Bulk bulk : List.copyOf(bulks.values())) {
       if (bulk.physical != physical || !bulk.started || bulk.restartRequested
           || bulk.completion.isDone() || bulk.refusalCode != null || bulkRefusalReason(bulk) != null) continue;
       bulk.restartRequested = true;
-      try { physical.bulkRestart.run(); }
+      try { physical.bulkStart.accept(bulk.row.key()); }
       catch (RuntimeException unavailable) {
         bulk.restartRequested = false;
         // BUILDING is durable. Retry dispatch on the next maintenance call without repeating
@@ -2108,6 +2128,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     Producer bulkProducer;
     IndexingService bulkIndexing;
     Runnable bulkRestart;
+    java.util.function.Consumer<String> bulkStart;
     String bulkAckCursor;
     final Set<String> bulkRefusalRestartKeys = new HashSet<>();
     boolean bulkRefusalRestartRequested;
