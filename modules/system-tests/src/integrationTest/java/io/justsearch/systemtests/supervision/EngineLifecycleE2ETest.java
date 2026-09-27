@@ -40,6 +40,12 @@ final class EngineLifecycleE2ETest {
     EngineSupervisedRecoveryE2ETest.runSeededInPlaceSemanticTransition();
   }
 
+  @Tag("ai")
+  @Test
+  void refusedInPlaceGapRestoresAThenApprovesAndPromotesB() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededInPlaceGapRestoration();
+  }
+
   @Test
   void pendingFeatureScenariosAreNamedAndReported() {
     var names = new HashSet<String>();

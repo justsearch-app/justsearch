@@ -72,8 +72,20 @@ without an inference orphan. The default lifecycle task passed at
 failures; XML `tmp/3995-lifecycle-default-xml`). Five feature rows remain
 pending. This was pushed as `4f9d57d43`; exact-SHA CI
 [36303327732](https://github.com/justsearch-app/justsearch/actions/runs/36303327732)
-is running. The owner-set product bound is still needed to judge this
+passed every job. The owner-set product bound is still needed to judge this
 measurement; D1-16 as a whole remains open.
+
+The next `ai`-tagged lifecycle test runs the installed in-place gap/approval
+branch from a fresh A seed. `tmp/4002-lifecycle-inplace-gap-ai.txt` passed one
+JUnit test without skips or failures: the device cap was one megabyte against
+a 5,905,580,032-byte B footprint, restored A returned two VECTOR hits during
+the approval wait, B returned one VECTOR hit after promotion, and the semantic
+sampler recovered after its last refusal (28,112/62,668 ms, 44.86%). Both
+private runs ended `STOP 0`; official health was `ABSENT`. The untagged task
+still passed two tests at `tmp/4003-lifecycle-default-gap-registered.txt`,
+with XML copied to `tmp/4003-lifecycle-default-xml`. Five broader pending
+scenarios remain. This is installed A-restoration and gap-decision proof,
+not the D1-13 held native call or the D1-14 owner-set bound.
 
 **2026-09-27 D1-12 Worker metadata owner cut (local).** `KnowledgeServer`
 no longer installs process-wide model and vector-dimension providers at boot.
@@ -96,6 +108,9 @@ inference orphan. The repository `build -x test -PskipWebBuild=true` compile
 and static gate passed at `tmp/4001-runtime-identity-build.txt` (330 tasks).
 This proves the production metadata cut and real model
 query, not the remaining D1-12/13 Flow B acceptance.
+The cut was pushed as `240284976`; its exact-SHA CI
+[36304369183](https://github.com/justsearch-app/justsearch/actions/runs/36304369183)
+is running.
 
 **Owner decision, 2026-09-24:** D1/D2 feature scope is unchanged. Finish the
 D1-9 streaming correction and its proofs before further implementation. Stage

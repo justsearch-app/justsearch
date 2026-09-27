@@ -24,12 +24,16 @@ The adapter parity checkpoint `19acc7a5b` is pushed; exact-SHA CI run
 The D1-16 semantic lifecycle scenario is now active and `ai`-tagged, with a
 fresh installed pass at `tmp/3994` and default untagged harness pass at
 `tmp/3995`; five named feature rows remain pending. This is pushed as
-`4f9d57d43`; exact-SHA CI run `36303327732` is in progress.
+`4f9d57d43`; exact-SHA CI run `36303327732` passed every job.
 The next local D1-12 cut removes the Worker's boot-time global fingerprint
 provider installation, binds native runtime metadata explicitly, and routes
 physical index-target capture through the Worker owner. Three affected module
 suites and static checks passed at `tmp/3999`; rebuilt installed A/B with real
-vector queries passed at `tmp/4000`. See the handoff for limits and counts.
+vector queries passed at `tmp/4000`. It was pushed as `240284976`; exact-SHA
+CI run `36304369183` is in progress. A second installed `ai` lifecycle
+scenario at `tmp/4002` proved forced in-place gap refusal, A semantic
+restoration during approval, and B promotion after approval. The default
+untagged task remains green at `tmp/4003`. See the handoff for limits and counts.
 The owner-set D1-14 wall-clock/fraction bound, installed restored-A held-call,
 full Worker Flow B and remaining D1/D2/E/F acceptance remain open. See
 [handoff](handoff.md) and [D1](stages/D1.md) for exact counts and limits.

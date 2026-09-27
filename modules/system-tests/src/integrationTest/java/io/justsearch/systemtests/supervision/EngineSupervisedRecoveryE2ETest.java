@@ -31,13 +31,8 @@ final class EngineSupervisedRecoveryE2ETest {
     Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-semantic-" + UUID.randomUUID());
     runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
         "INSTALLER_ACTIVATION_FAULT_PASS");
-    String output = runInstalledModelScenario(repo, work, "model-live-a-b", Map.of(
-        "JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B", "1",
-        "JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE", "1",
-        "JUSTSEARCH_EMBED_GPU_MEM_MB", "2048",
-        "JUSTSEARCH_SPLADE_GPU_MEM_MB", "2048",
-        "JUSTSEARCH_NER_GPU_MEM_MB", "1024",
-        "JUSTSEARCH_RERANK_GPU_MEM_MB", "1024"), "MODEL_LIVE_AB_PASS");
+    String output = runInstalledModelScenario(repo, work, "model-live-a-b", inPlaceModelEnvironment(),
+        "MODEL_LIVE_AB_PASS");
     String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_PASS "))
         .findFirst().orElseThrow();
     var semantic = MAPPER.readTree(line.substring("MODEL_LIVE_AB_PASS ".length()))
@@ -48,6 +43,36 @@ final class EngineSupervisedRecoveryE2ETest {
     assertTrue(semantic.path("recoveredAfterRefusal").asBoolean(), line);
     assertTrue(output.contains("\"mode\":\"IN_PLACE\""), output);
     System.out.println("LIFECYCLE_SEMANTIC_AVAILABILITY_PASS §16 " + line);
+  }
+
+  static void runSeededInPlaceGapRestoration() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-16 AI scenario requires retained CPU A and FP16 CUDA B model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-gap-" + UUID.randomUUID());
+    runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+        "INSTALLER_ACTIVATION_FAULT_PASS");
+    String output = runInstalledModelScenario(repo, work, "model-live-a-b-gap",
+        inPlaceModelEnvironment(), "MODEL_LIVE_AB_GAP_PASS");
+    String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_GAP_PASS "))
+        .findFirst().orElseThrow();
+    var result = MAPPER.readTree(line.substring("MODEL_LIVE_AB_GAP_PASS ".length()));
+    assertEquals("floor simulated by device-memory cap", result.path("floor").asText(), line);
+    assertEquals("PROMOTED_WITH_GAPS", result.path("terminalReason").asText(), line);
+    assertTrue(result.path("aVectorHits").asInt() > 0, line);
+    assertTrue(result.path("bVectorHits").asInt() > 0, line);
+    assertTrue(result.path("semantic").path("recoveredAfterRefusal").asBoolean(), line);
+    System.out.println("LIFECYCLE_IN_PLACE_GAP_RESTORATION_PASS §16 " + line);
+  }
+
+  private static Map<String, String> inPlaceModelEnvironment() {
+    return Map.of(
+        "JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B", "1",
+        "JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE", "1",
+        "JUSTSEARCH_EMBED_GPU_MEM_MB", "2048",
+        "JUSTSEARCH_SPLADE_GPU_MEM_MB", "2048",
+        "JUSTSEARCH_NER_GPU_MEM_MB", "1024",
+        "JUSTSEARCH_RERANK_GPU_MEM_MB", "1024");
   }
 
   private static String runInstalledModelScenario(Path repo, Path work, String scenario,
