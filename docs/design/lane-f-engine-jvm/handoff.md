@@ -29,7 +29,11 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
      The correction `830c143dc` removed it. Its exact-SHA
      [run 36330537827](https://github.com/justsearch-app/justsearch/actions/runs/36330537827)
      exposed an obsolete recorded-start `restartWorker=true` assertion in app-services. The
-     assertion is inverted in the next correction; verify that correction's exact-SHA hosted run.
+     assertion is inverted in `9cf8e3b12`. Its exact-SHA
+     [run 36331292874](https://github.com/justsearch-app/justsearch/actions/runs/36331292874)
+     passed the build and unit lanes but the advisory system-integration job failed its
+     `bulk-partial-capture` restart fixture. GitHub marked the workflow successful despite that
+     red job. The corrected fixture and installed BESIDE proof need a new exact-SHA run.
   2. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
      `index.dense_unavailable`, but the provisional "rebuilding" verdict takes precedence; observe
      before changing UI.
@@ -44,10 +48,14 @@ resumption queue. Owner decisions for handover items 01–03 are recorded in D1-
   `UnreferencedCodeTest` together at `tmp/5060`. The app-services projection correction passes
   `MigrationOutcomeProjectionTest` and Spotless at `tmp/5064`. The first in-place attempts
   failed due an obsolete indexing-jobs serving lease; `tmp/5044` traced its origin, and D1-18
-  records the deferred-upgrade retirement notification fix. No full-suite, hosted, beside-mode,
+  records the deferred-upgrade retirement notification fix. The hosted integration artifact for
+  `36331292874` showed that partial-capture recovery booted FENCED, then used the designed free
+  restart fallback (three incarnations and three operation attempts). The corrected fixture passed
+  installed at `tmp/5069` with exact queue ACK and `STOP 0`. Installed BESIDE A→B passed at
+  `tmp/5072`: unchanged Engine identity/restart count, 151/151 vector and hybrid samples available,
+  zero refusal/transport/outage, B promotion, and owned `STOP 0`. No full-suite, hosted,
   kill-cut, or independent-review claim applies to these local changes.
-- **D1-18 next:** install and assert beside A→B with unchanged Engine identity/count and zero
-  outage; add both checkpoint/open kill cuts and one forced live refusal with exactly one fallback
+- **D1-18 next:** add both checkpoint/open kill cuts and one forced live refusal with exactly one fallback
   restart; invert remaining fault-fixture expectations; then full verification and exact-SHA CI.
 
 ## Selected design and remaining implementation/proof

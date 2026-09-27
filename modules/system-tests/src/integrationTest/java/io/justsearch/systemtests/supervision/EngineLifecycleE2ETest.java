@@ -36,6 +36,12 @@ final class EngineLifecycleE2ETest {
 
   @Tag("ai")
   @Test
+  void semanticAvailabilitySamplesAnInstalledBesideGenerationTransition() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededBesideSemanticTransition();
+  }
+
+  @Tag("ai")
+  @Test
   void semanticAvailabilitySamplesAnInstalledInPlaceGenerationTransition() throws Exception {
     EngineSupervisedRecoveryE2ETest.runSeededInPlaceSemanticTransition();
   }

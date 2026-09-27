@@ -7,8 +7,11 @@ import { barrierFiles } from './barrier-files.mjs';
 
 export const BULK_FAULT_CASES = Object.freeze({
   'bulk-partial-capture': Object.freeze({
-    phase: 'bulk-partial-capture', finalIncarnation: 2, faultIncarnation: 1,
-    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
+    // Recovery boots FENCED before the captured walk can finish. That physical attachment
+    // cannot hand off a NATIVE producer live, so the durable BUILDING start uses one free
+    // requested restart to reopen Green; the original crash remains the only counted exit.
+    phase: 'bulk-partial-capture', finalIncarnation: 3, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([2]), cutAttempts: 1, finalAttempts: 3,
   }),
   'bulk-state-before-binding': Object.freeze({
     phase: 'bulk-before-building-checkpoint', finalIncarnation: 2, faultIncarnation: 1,
@@ -586,7 +589,7 @@ export async function exerciseInstallerActivationFault(c) {
 }
 
 /** Keep the installed A root intact while activating a second, separately owned model root. */
-export async function exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort,
+export async function exerciseLiveModelAB({ work, data, indexBase, first, manifest, apiPort,
   operationKey, readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
   watcherDeleteDuringBuild = false, gapApproval = false, gapCancellation = false,
@@ -704,7 +707,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     }
     return;
   }
-  const transitionSampler = inPlaceModelB
+  const transitionSampler = distinctModelB
     ? sampleSemanticAvailability({ apiPort, post, request, marker, file, matchingHit }) : null;
   // The promotion and cancellation paths both leave through this scope.
   try {
@@ -857,7 +860,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     const status = statusReply.status === 200 ? JSON.parse(statusReply.text) : null;
     const composeMode = status?.readiness?.engineComponents?.encoders?.mode;
     requireThat(['IN_PLACE', 'BESIDE'].includes(composeMode)
-      && (!inPlaceModelB || composeMode === 'IN_PLACE'),
+      && (inPlaceModelB ? composeMode === 'IN_PLACE'
+        : !distinctModelB || composeMode === 'BESIDE'),
     `candidate composition mode is unavailable or violated the forced floor: ${JSON.stringify({
       composeMode, encoder: status?.readiness?.engineComponents?.encoders,
     })}`);
@@ -989,13 +993,29 @@ export async function exerciseLiveModelAB({ work, data, indexBase, manifest, api
     `promoted B resurrected a watcher deletion: ${removedText.text}`);
   }
   const semantic = await transitionSampler?.stop();
-  if (semantic) requireThat(inPlaceSemanticViolations(semantic).length === 0,
-  `floor transition sampling violated D1-14: ${JSON.stringify({
-    violations: inPlaceSemanticViolations(semantic), semantic })}`);
+  if (semantic) {
+    const violations = inPlaceModelB ? inPlaceSemanticViolations(semantic)
+      : besideSemanticViolations(semantic);
+    requireThat(semantic.workerStarting === 0 && semantic.transport === 0
+      && semantic.apiOutageWindowMs === 0 && violations.length === 0,
+    `live model transition violated D1-18: ${JSON.stringify({ violations, semantic })}`);
+  }
+  const promotedSupervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+  const promotedManifest = readJson(path.join(runtime, 'manifest.json'));
+  requireThat(promotedSupervisor?.runId === first.runId
+    && promotedSupervisor.incarnation === first.incarnation
+    && promotedSupervisor.restartCount === first.restartCount
+    && promotedSupervisor.instanceId === first.instanceId
+    && promotedManifest?.instanceId === manifest.instanceId
+    && promotedManifest.pid === manifest.pid,
+  `live model migration changed Engine identity: ${JSON.stringify({
+    first, promotedSupervisor, manifest, promotedManifest })}`);
   console.log('MODEL_LIVE_AB_PASS', JSON.stringify({ operationKey,
     sourceGeneration, activeGeneration: completed.active.active_generation,
     settingsRevision: completed.settings.witness.acceptedRevision,
     bVectorHits: JSON.parse(bVector.text).results.length,
+    instanceId: promotedManifest.instanceId,
+    restartCount: promotedSupervisor.restartCount,
     ...(semantic ? { semantic } : {}) }));
   } finally {
     await transitionSampler?.stop();
@@ -1160,6 +1180,19 @@ export function inPlaceSemanticViolations(semantic) {
   if (semantic.hybridBreaksInRefusalWindow !== 0) {
     violations.push('hybrid search failed inside the refusal window');
   }
+  return violations;
+}
+
+function besideSemanticViolations(semantic) {
+  const violations = [];
+  if (!(semantic.sampledRequests > 0)) violations.push('vector search was not sampled');
+  if (semantic.reloadingRefusals !== 0 || semantic.available !== semantic.sampledRequests) {
+    violations.push('vector search was unavailable during BESIDE composition');
+  }
+  if (!(semantic.hybridSampled > 0) || semantic.hybridAvailable !== semantic.hybridSampled) {
+    violations.push('hybrid search was unavailable during BESIDE composition');
+  }
+  if (semantic.unexpected !== 0) violations.push('unexplained search responses');
   return violations;
 }
 

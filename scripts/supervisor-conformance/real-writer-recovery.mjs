@@ -400,7 +400,7 @@ try {
       readJson, waitFor, request, post, requireThat, requireOperationSuccess, matchingHit,
       scenario, operationKey, output: () => output });
   } else if (modelLiveAB) {
-    await exerciseLiveModelAB({ work, data, indexBase, manifest, apiPort, operationKey,
+    await exerciseLiveModelAB({ work, data, indexBase, first, manifest, apiPort, operationKey,
       readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit, distinctModelB,
       inPlaceModelB, acceptedWriteDuringBuild, watcherDeleteDuringBuild, extraBuildFiles,
       gapApproval: modelLiveABGap,

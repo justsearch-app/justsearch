@@ -2,6 +2,7 @@
 package io.justsearch.systemtests.supervision;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -23,6 +24,34 @@ import org.junit.jupiter.api.Test;
 @Timeout(7 * 60)
 final class EngineSupervisedRecoveryE2ETest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  static void runSeededBesideSemanticTransition() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-18 BESIDE scenario requires retained CPU A and FP16 CUDA B model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-beside-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      String output = runInstalledModelScenario(repo, work, "model-live-a-b",
+          besideModelEnvironment(), "MODEL_LIVE_AB_PASS");
+      String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_PASS "))
+          .findFirst().orElseThrow();
+      var result = MAPPER.readTree(line.substring("MODEL_LIVE_AB_PASS ".length()));
+      var semantic = result.path("semantic");
+      assertTrue(output.contains("\"mode\":\"BESIDE\""), output);
+      assertTrue(semantic.path("sampledRequests").asInt() > 0, line);
+      assertEquals(semantic.path("sampledRequests").asInt(), semantic.path("available").asInt(), line);
+      assertEquals(semantic.path("hybridSampled").asInt(), semantic.path("hybridAvailable").asInt(), line);
+      assertEquals(0, semantic.path("reloadingRefusals").asInt(), line);
+      assertEquals(0, semantic.path("workerStarting").asInt(), line);
+      assertEquals(0, semantic.path("transport").asInt(), line);
+      assertEquals(0, semantic.path("apiOutageWindowMs").asInt(), line);
+      assertEquals(0, result.path("restartCount").asInt(), line);
+      assertFalse(result.path("instanceId").asText().isBlank(), line);
+      System.out.println("LIFECYCLE_BESIDE_AVAILABILITY_PASS §16 " + line);
+    });
+  }
 
   static void runSeededInPlaceSemanticTransition() throws Exception {
     Path repo = repositoryRoot();
@@ -73,9 +102,14 @@ final class EngineSupervisedRecoveryE2ETest {
   }
 
   private static Map<String, String> inPlaceModelEnvironment() {
+    var environment = new java.util.HashMap<>(besideModelEnvironment());
+    environment.put("JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE", "1");
+    return Map.copyOf(environment);
+  }
+
+  private static Map<String, String> besideModelEnvironment() {
     return Map.of(
         "JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B", "1",
-        "JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE", "1",
         "JUSTSEARCH_EMBED_GPU_MEM_MB", "2048",
         "JUSTSEARCH_SPLADE_GPU_MEM_MB", "2048",
         "JUSTSEARCH_NER_GPU_MEM_MB", "1024",
