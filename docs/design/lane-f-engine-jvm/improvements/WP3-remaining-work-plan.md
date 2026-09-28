@@ -95,5 +95,6 @@ The red preflight at `tmp/5248` was a missing harness barrier-file family,
 corrected before the physical rerun. Repository static, default-parallel
 stress suite, build, regeneration and documentation gates pass at
 `tmp/5250`–`tmp/5254`; exact harness-only runtime marker carve-outs pass the
-closure gate, with an unsanctioned-name mutation control. Checkpoint and
-hosted proof remain before Batch 5.
+closure gate, with an unsanctioned-name mutation control. Checkpoint
+`93ad053a401968b3fe6070031557ba793bd3e2e1` passed exact-SHA hosted
+run `36422520680` (all 13 jobs). Batch 5 is now active.

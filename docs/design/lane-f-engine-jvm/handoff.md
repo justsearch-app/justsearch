@@ -7,13 +7,15 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-28)
 
-This correction checkpoint follows pushed Batch D commit
-`66a28be6f21954fc64208ef4b172f40c3722f8ef`, whose source tree is
-`9161227bd9e518e61af0e966fe3b441830a0d115`. PR727 remains open and the
-worktree lifecycle hold has a 2026-10-04 review-by date. Exact-SHA hosted CI
-[run 36365023188](https://github.com/justsearch-app/justsearch/actions/runs/36365023188)
-passed all 13 jobs on that commit, including the advisory system-integration
-job and wall-clock attribution. The prior Batch C source tree
+Current pushed head is `93ad053a401968b3fe6070031557ba793bd3e2e1`
+(source tree `91351561828cc87985465b17d1158b44668caf99`). PR727 remains open
+at this SHA, and the worktree lifecycle hold has a 2026-10-04 review-by date.
+Exact-SHA hosted [run 36422520680](https://github.com/justsearch-app/justsearch/actions/runs/36422520680)
+passed all 13 jobs, including system integration and wall-clock attribution.
+The earlier Batch D source tree `9161227bd9e518e61af0e966fe3b441830a0d115`
+at `66a28be6f21954fc64208ef4b172f40c3722f8ef` passed hosted
+[run 36365023188](https://github.com/justsearch-app/justsearch/actions/runs/36365023188).
+The prior Batch C source tree
 `e1aaefc5e133632d4c0a1bf1651996b139cbf21d` at
 `8fdc9da57c64238c810e5a9a3f0f377ede1e4d73` passed exact-SHA hosted
 [run 36363228657](https://github.com/justsearch-app/justsearch/actions/runs/36363228657).
@@ -149,8 +151,11 @@ store recoverability, runtime matrix, llms.txt, and canonical links pass.
 The runtime-manifest closure check initially flagged two older Batch 4
 private harness markers; exact harness-only carve-outs now pass at `tmp/5251`.
 An unsanctioned marker mutation made the gate fail on the intended
-`sibling-file` rule at `tmp/5253`, and the restored tree passes. Checkpoint
-commit/push and exact-SHA hosted proof remain for this cut.
+`sibling-file` rule at `tmp/5253`, and the restored tree passes. The cut was
+committed and pushed as `93ad053a401968b3fe6070031557ba793bd3e2e1`;
+exact-SHA hosted [run 36422520680](https://github.com/justsearch-app/justsearch/actions/runs/36422520680)
+passed all 13 jobs, including system integration and wall-clock attribution.
+The CLA check passed, and PR727 remains open at that SHA.
 
 Independent review also traced a separate D1-4/12 Batch 5 blocker: a valid
 reranker-only or citation-only installer candidate takes ordinary settings
@@ -161,13 +166,32 @@ install regression, including publication with the registry observation and
 A retirement after leases. Do not mark installer model-path ownership complete
 on Batch 4 evidence alone.
 
+Batch 5's first owner audit found two coupled constraints at exact head
+`93ad053a4`: ordinary services share query/producer `EncoderBindings`, and
+boot's active generation manifest overrides desired reranker/citation paths.
+A full replacement set would either rebind an issued A query and the producer
+or retain old query sessions; an in-memory query-only swap would revert on
+restart. The [D1 decision](stages/D1.md)
+selects an independently leased reranker/citation query set inside a new
+serving view, with the existing producer and index-model set retained. The
+settings envelope's committed witness must carry exact query file and
+supporting-asset identity; the installer contract alone can advance before
+the settings commit and does not hash every supporting asset. This narrows
+D1-12's all-role manifest authority only for query roles. The refute-first
+review was read-only at `93ad053a4`; no Batch 5 code or physical proof has
+landed. Source inspection found independent reranker/citation `SessionHandle`
+and tokenizer construction; live retirement still needs proof. Next
+implementation step is to add the durable identity to the existing settings
+transaction, then connect the
+boot-registered physical owner and installed regression. Root kept this
+coupled lifecycle/ownership design rather than delegating its writes.
+
 The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
 `codex/lane-f-workflow-order` from `origin/main`, in its separate managed
 worktree. Pushing and opening that separate PR await the owner's explicit
 per-action authorization; this does not block Lane F.
 
-**Next, in order:** finish the D1-12 checkpoint and exact-SHA hosted proof,
-then continue [WP3 Batch 5](improvements/WP3-remaining-work-plan.md), D1
+**Next, in order:** continue [WP3 Batch 5](improvements/WP3-remaining-work-plan.md), D1
 closure, D2, E, and F.
 Root owns the single Gradle build and dev-stack lease. Full-suite gates run with
 default parallelism; use `--max-workers=1` only for a diagnosed contention rerun.
