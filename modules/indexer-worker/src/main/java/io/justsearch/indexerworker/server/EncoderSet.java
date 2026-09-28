@@ -7,8 +7,6 @@ import io.justsearch.indexerworker.embed.EmbeddingService;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder;
-import io.justsearch.reranker.CitationScorer;
-import io.justsearch.reranker.CrossEncoderReranker;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,8 +37,6 @@ public final class EncoderSet implements AutoCloseable {
   private volatile SpladeEncoder splade;
   private volatile SpladeIdfQueryEncoder spladeIdf;
   private volatile BgeM3Encoder bgeM3;
-  private volatile CrossEncoderReranker reranker;
-  private volatile CitationScorer citation;
 
   private int holders;
   private boolean retiring;
@@ -53,6 +49,9 @@ public final class EncoderSet implements AutoCloseable {
 
   EncoderSet(InferenceSurface surface, ModelIdentity modelIdentity, Duration closeTimeout) {
     this.surface = Objects.requireNonNull(surface, "surface");
+    if (surface.reranker().isPresent() || surface.citation().isPresent()) {
+      throw new IllegalArgumentException("Index owner cannot retain query-role assemblies");
+    }
     this.modelIdentity = Objects.requireNonNull(modelIdentity, "modelIdentity");
     Objects.requireNonNull(closeTimeout, "closeTimeout");
     if (closeTimeout.isNegative()) {
@@ -103,8 +102,6 @@ public final class EncoderSet implements AutoCloseable {
   SpladeEncoder splade() { return splade; }
   SpladeIdfQueryEncoder spladeIdf() { return spladeIdf; }
   BgeM3Encoder bgeM3() { return bgeM3; }
-  CrossEncoderReranker reranker() { return reranker; }
-  CitationScorer citation() { return citation; }
 
   void bindEmbedding(EmbeddingService wrapper) { embedding = requireOwned(wrapper); }
   void bindNer(NerService wrapper) { ner = requireOwned(wrapper); }
@@ -118,8 +115,6 @@ public final class EncoderSet implements AutoCloseable {
     }
   }
   void bindBgeM3(BgeM3Encoder wrapper) { bgeM3 = requireOwned(wrapper); }
-  void bindReranker(CrossEncoderReranker wrapper) { reranker = requireOwned(wrapper); }
-  void bindCitation(CitationScorer wrapper) { citation = requireOwned(wrapper); }
 
   void clearEmbeddingAfterHandoff(EmbeddingService expected) {
     if (embedding == expected) embedding = null;

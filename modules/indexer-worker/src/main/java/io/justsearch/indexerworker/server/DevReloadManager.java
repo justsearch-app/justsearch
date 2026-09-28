@@ -74,7 +74,8 @@ final class DevReloadManager {
           // The incumbent may have stopped its watcher while its indexing owner drains. Retain
           // this request in the sentinel so a refused close retries without another compile.
           WorkerAppServices oldServices = server.appServices;
-          EncoderSet modelOwner = server.captureDevReplacementEncoderSet(oldServices);
+          KnowledgeServer.DevModelOwners modelOwners =
+              server.captureDevReplacementModelOwners(oldServices);
           if (oldServices != null) {
             log.info("Closing old application services...");
             closeRetryPending = true;
@@ -87,7 +88,7 @@ final class DevReloadManager {
           server.closeFailedPendingAppServices();
           WorkerAppServices newServices = server.newAppServices();
           server.retainPendingAppServices(newServices);
-          rewireModels(newServices, modelOwner);
+          rewireModels(newServices, modelOwners);
           newServices.startIndexingLoop();
           server.publishServingView(newServices);
           server.releasePendingAppServices(newServices);
@@ -150,7 +151,7 @@ final class DevReloadManager {
     }
   }
 
-  private void rewireModels(WorkerAppServices newServices, EncoderSet owner) {
+  private void rewireModels(WorkerAppServices newServices, KnowledgeServer.DevModelOwners owners) {
     // Process-scoped helpers survive a service replacement independently of the model set.
     if (server.embeddingCompatController != null) {
       newServices.wireEmbeddingCompatController(server.embeddingCompatController);
@@ -158,15 +159,17 @@ final class DevReloadManager {
     if (server.disambiguationService != null) {
       newServices.wireDisambiguationService(server.disambiguationService);
     }
-    if (owner == null) return;
+    if (owners == null) return;
+    EncoderSet owner = owners.index();
+    QueryRoleSet queryOwner = owners.query();
 
     var embedding = owner.embedding();
     var ner = owner.ner();
     var splade = owner.splade();
     var idf = owner.spladeIdf();
     var bge = owner.bgeM3();
-    var reranker = owner.reranker();
-    var citation = owner.citation();
+    var reranker = queryOwner == null ? null : queryOwner.reranker();
+    var citation = queryOwner == null ? null : queryOwner.citation();
     if (embedding != null) newServices.wireEmbeddingProvider(embedding);
     if (ner != null) newServices.wireNerService(ner);
     if (splade != null) newServices.wireSpladeEncoder(splade);
@@ -174,7 +177,8 @@ final class DevReloadManager {
     if (bge != null) newServices.wireBgeM3Encoder(bge);
     if (reranker != null) newServices.wireSearchReranker(reranker);
     if (citation != null) newServices.wireCitationScorer(citation);
-    newServices.wirePolicySnapshotSupplier(() -> owner.surfaceForOwner().policies());
+    newServices.wirePolicySnapshotSupplier(
+        () -> KnowledgeServer.combinedPolicies(owner, queryOwner));
     newServices.wireStageEnabled(embedding != null, splade != null, ner != null);
 
     // Diagnostics retain this exact generation; only the embedding slot can change on GPU handoff.

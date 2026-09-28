@@ -374,6 +374,11 @@ final class KnowledgeServerDeviceMemoryLineTest {
       attach.setAccessible(true);
       attach.invoke(view, sourceOwner);
       set(server, "initialEncoderSet", sourceOwner);
+      var queryOwner = new QueryRoleSet(emptySurface());
+      Method attachQuery = view.getClass().getDeclaredMethod("attachQueryRoleSet", QueryRoleSet.class);
+      attachQuery.setAccessible(true);
+      attachQuery.invoke(view, queryOwner);
+      set(server, "initialQueryRoleSet", queryOwner);
 
       var model = new IndexGenerationManager.ModelArtifact(
           dir.resolve("unused.onnx").toAbsolutePath().normalize().toString(), "a".repeat(64));

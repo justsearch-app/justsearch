@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
 
 /**
  * The encoder owner's typed applied-configuration projection.
@@ -83,6 +84,24 @@ final class EncoderConfigurationProjection {
           key(EnvRegistry.ORT_PROFILING_DIR),
           key(EnvRegistry.ORT_VERBOSE_LOGGING),
           key(EnvRegistry.ORT_INTRA_OP_THREADS));
+
+  private static final Set<String> QUERY_ONLY_DEPENDENCIES = Set.of(
+      key(EnvRegistry.RERANK_ENABLED), key(EnvRegistry.RERANK_MODEL_PATH),
+      key(EnvRegistry.RERANK_GPU_ENABLED), key(EnvRegistry.RERANK_GPU_DEVICE_ID),
+      key(EnvRegistry.RERANK_GPU_MEM_MB), key(EnvRegistry.RERANK_TOP_K),
+      key(EnvRegistry.RERANK_DEADLINE_MS), key(EnvRegistry.RERANK_MIN_HITS),
+      key(EnvRegistry.RERANK_MAX_SEQ_LEN), key(EnvRegistry.RERANK_MAX_AVG_DOC_LENGTH_CHARS),
+      key(EnvRegistry.RERANK_JUDGE_BLEND_ENABLED), key(EnvRegistry.RERANK_JUDGE_BLEND_ALPHA),
+      key(EnvRegistry.RERANK_JUDGE_ARBITRATION_ENABLED),
+      key(EnvRegistry.RERANK_JUDGE_ARBITRATION_ALPHA_DIVERGE),
+      key(EnvRegistry.RERANK_JUDGE_ARBITRATION_SKIP_ENABLED),
+      key(EnvRegistry.CITATION_SCORER_ENABLED), key(EnvRegistry.CITATION_SCORER_MODEL_PATH),
+      key(EnvRegistry.CITATION_SCORER_THRESHOLD), key(EnvRegistry.CITATION_SCORER_MAX_SEQ_LEN),
+      key(EnvRegistry.CITATION_SCORER_DEADLINE_MS));
+  private static final Set<String> SHARED_DEPENDENCIES = Set.of(
+      key(EnvRegistry.GPU_ENABLED), key(EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED),
+      key(EnvRegistry.CAPABILITY_CONTRACT_STRICT), key(EnvRegistry.ORT_PROFILING_DIR),
+      key(EnvRegistry.ORT_VERBOSE_LOGGING), key(EnvRegistry.ORT_INTRA_OP_THREADS));
 
   private final ResolvedConfig cfg;
   private final String sparseModel;
@@ -195,7 +214,28 @@ final class EncoderConfigurationProjection {
     return citation;
   }
 
+  EncoderConfigurationProjection withQueryFrom(EncoderConfigurationProjection query) {
+    return new EncoderConfigurationProjection(cfg, sparseModel, embedding, splade, ner, bgeM3,
+        query.reranker, query.citation);
+  }
+
   String digest() {
+    return AppliedConfigurationVersion.digest(DEPENDENCIES, values());
+  }
+
+  String indexDigest() {
+    Set<String> keys = new HashSet<>(DEPENDENCIES);
+    keys.removeAll(QUERY_ONLY_DEPENDENCIES);
+    return AppliedConfigurationVersion.digest(keys, values());
+  }
+
+  String queryDigest() {
+    Set<String> keys = new HashSet<>(QUERY_ONLY_DEPENDENCIES);
+    keys.addAll(SHARED_DEPENDENCIES);
+    return AppliedConfigurationVersion.digest(keys, values());
+  }
+
+  private Map<String, Object> values() {
     Map<String, Object> values = new LinkedHashMap<>();
 
     put(values, EnvRegistry.AI_EMBED_ENABLED, embedding.enabled());
@@ -287,7 +327,7 @@ final class EncoderConfigurationProjection {
         EnvRegistry.ORT_INTRA_OP_THREADS,
         profiling != null ? profiling.intraOpThreads() : null);
 
-    return AppliedConfigurationVersion.digest(DEPENDENCIES, values);
+    return values;
   }
 
   private static String key(EnvRegistry key) {

@@ -68,6 +68,7 @@ final class KnowledgeServerCloseCompletionTest {
     var attach = view.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
     attach.setAccessible(true);
     attach.invoke(view, owner);
+    attachQueryOwner(server, view);
     Field initialOwnerField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
     initialOwnerField.setAccessible(true);
     initialOwnerField.set(server, owner);
@@ -185,6 +186,7 @@ final class KnowledgeServerCloseCompletionTest {
     var attach = nativeView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
     attach.setAccessible(true);
     attach.invoke(nativeView, owner);
+    attachQueryOwner(server, nativeView);
     initialField.set(server, owner);
 
     var held = server.captureServingView();
@@ -273,6 +275,7 @@ final class KnowledgeServerCloseCompletionTest {
     var attach = nativeView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
     attach.setAccessible(true);
     attach.invoke(nativeView, owner);
+    attachQueryOwner(server, nativeView);
     initialField.set(server, owner);
     var issuedView = server.captureServingView();
     var nativeRequest = SessionAcquisitionRequest.within(
@@ -349,6 +352,7 @@ final class KnowledgeServerCloseCompletionTest {
     var attach = nativeView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
     attach.setAccessible(true);
     attach.invoke(nativeView, owner);
+    attachQueryOwner(server, nativeView);
     initialField.set(server, owner);
 
     var held = server.captureServingView();
@@ -702,5 +706,19 @@ final class KnowledgeServerCloseCompletionTest {
     org.mockito.Mockito.verify(rootLock).close();
     org.junit.jupiter.api.Assertions.assertEquals(
         io.justsearch.app.api.NativeQuiescence.QUIESCED, server.nativeQuiescence());
+  }
+  private static void attachQueryOwner(KnowledgeServer server, Object view) throws Exception {
+    var surface = new InferenceSurface(java.util.Optional.empty(), java.util.Optional.empty(),
+        java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty(),
+        java.util.Optional.empty(),
+        new io.justsearch.ort.PolicySnapshot(io.justsearch.ort.RuntimePolicy.defaults(),
+            new java.util.TreeMap<>()), java.util.List.of());
+    var owner = new QueryRoleSet(surface);
+    var attach = view.getClass().getDeclaredMethod("attachQueryRoleSet", QueryRoleSet.class);
+    attach.setAccessible(true);
+    attach.invoke(view, owner);
+    var field = KnowledgeServer.class.getDeclaredField("initialQueryRoleSet");
+    field.setAccessible(true);
+    field.set(server, owner);
   }
 }

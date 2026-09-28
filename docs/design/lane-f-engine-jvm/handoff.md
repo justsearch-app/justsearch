@@ -203,7 +203,39 @@ Exact-SHA hosted run `36438217262` exposed a shell-crate compatibility test
 that still expected ui-settings v4; the register correctly reports v5. The
 test now checks v5 reading legacy v1 without changing strategy identity;
 the focused Rust test passed at `tmp/5274` and all 90 shell library tests
-passed at `tmp/5275`. The corrective push and hosted result are pending.
+passed at `tmp/5275`.
+The correction was pushed as `414cd4e4a87d733c3ff315065976bc96600442a8`;
+exact-SHA hosted [run 36439236379](https://github.com/justsearch-app/justsearch/actions/runs/36439236379)
+passed all 13 jobs, including shell Rust, Windows-native, system integration,
+and wall-clock attribution. This is protocol checkpoint proof; Batch 5 still
+requires the physical owner and installed acceptance.
+The next local Worker cut partitions reranker/citation handles out of both
+initial and recorded index compositions, gives them a separate retryable
+`QueryRoleSet`, and pairs its lease with `EncoderSet` in immutable serving
+views. Green's producer keeps its index-only lease. In-place restore,
+promotion, dev reload, shutdown, quiescence, policy and component evidence
+were updated together. The first Worker suite at `tmp/5282` was red on eight
+old one-owner fixtures and one scan-admission file lock (XML saved in
+`tmp/5282-worker-red-xml/`); the repaired fixtures and scan test passed at
+`tmp/5283`, then the complete Worker suite passed at `tmp/5284` (2m36s).
+Global Spotless/PMD passed at `tmp/5285` and `build -x test` at `tmp/5286`.
+Independent review found a false combined applied-version claim from the index
+digest alone and missing real-handle transition coverage. Index and query
+projections now carry independent digests; publication requires both matching
+owners and synthesizes the full version from their exact combination. Unknown
+and mismatched query observations, an A-index/B-query version, and native query
+handle retirement through a serving view pass at `tmp/5290`–`tmp/5291`.
+The first full repository run at `tmp/5287` exposed three unused split methods
+(XML in `tmp/5287-full-red-xml/`); they were removed and the app-launcher gate
+passes. `tmp/5294` exposed one stale startup fixture asserting the former full
+digest on an index-only surface (XML in `tmp/5294-full-red-xml/`); it now checks
+both domain digests and the combined version. The repaired fixture and
+app-launcher gate passed at `tmp/5295`; the repository suite passed at
+`tmp/5296` (196 tasks, one executed, one from cache, 194 up-to-date), and
+global Spotless/PMD plus `build -x test` passed at `tmp/5297`. Hosted proof
+is pending.
+This cut has no ordinary fixed owner, boot witness binding, or installed
+query-only proof yet. Continue with those before Batch 5 acceptance.
 
 The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
 `codex/lane-f-workflow-order` from `origin/main`, in its separate managed

@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.GpuArbiter;
@@ -15,6 +17,7 @@ import io.justsearch.ort.RuntimePolicy;
 import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import io.justsearch.ort.SessionHandle.Lease;
+import io.justsearch.reranker.RerankerAssembly;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -113,6 +116,14 @@ class InferenceSurfaceTest {
 
   private static PolicySnapshot emptySnapshot() {
     return new PolicySnapshot(RuntimePolicy.defaults(), new TreeMap<>());
+  }
+
+  private static EncoderConfigurationProjection projection() {
+    var projection = mock(EncoderConfigurationProjection.class);
+    when(projection.digest()).thenReturn("digest");
+    when(projection.indexDigest()).thenReturn("index-digest");
+    when(projection.queryDigest()).thenReturn("query-digest");
+    return projection;
   }
 
   @Test
@@ -333,5 +344,44 @@ class InferenceSurfaceTest {
 
     assertEquals(Set.of(EncoderRole.BGE_M3), observation.missingRoles());
     assertFalse(observation.compositionSatisfied());
+  }
+
+  @Test
+  void partitionKeepsQueryHandleIndependentOfIndexRetirement() {
+    CountingHandle index = new CountingHandle();
+    CountingHandle query = new CountingHandle();
+    var observation = InferenceSurface.ComponentObservation.composed("digest",
+        Set.of(EncoderRole.EMBEDDING, EncoderRole.RERANKER),
+        Set.of(EncoderRole.EMBEDDING, EncoderRole.RERANKER));
+    var composed = new InferenceSurface(Optional.empty(), Optional.empty(),
+        Optional.of(new RerankerAssembly(query, null, null)), Optional.empty(),
+        Optional.empty(), Optional.empty(), emptySnapshot(), List.of(index, query), observation);
+
+    var owners = composed.partitionQueryRoles(projection());
+    assertEquals(List.of(index), owners.index().handles());
+    assertEquals(List.of(query), owners.query().handles());
+    assertEquals(Set.of(EncoderRole.EMBEDDING),
+        owners.index().componentObservation().requestedRoles());
+    assertEquals(Set.of(EncoderRole.RERANKER),
+        owners.query().componentObservation().requestedRoles());
+    assertEquals(Optional.of("index-digest"),
+        owners.index().componentObservation().configurationDigest());
+    assertEquals(Optional.of("query-digest"),
+        owners.query().componentObservation().configurationDigest());
+
+    owners.index().close();
+    assertEquals(1, index.closeCount.get());
+    assertEquals(0, query.closeCount.get());
+    owners.query().close();
+    assertEquals(1, query.closeCount.get());
+  }
+
+  @Test
+  void partitionRefusesUnregisteredQueryHandle() {
+    CountingHandle missing = new CountingHandle();
+    var composed = new InferenceSurface(Optional.empty(), Optional.empty(),
+        Optional.of(new RerankerAssembly(missing, null, null)), Optional.empty(),
+        Optional.empty(), Optional.empty(), emptySnapshot(), List.of());
+    assertThrows(IllegalStateException.class, () -> composed.partitionQueryRoles(projection()));
   }
 }

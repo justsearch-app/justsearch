@@ -11,10 +11,12 @@ import io.justsearch.ort.SessionHandle;
 import io.justsearch.reranker.RerankerAssembly;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Typed bundle returned by {@link InferenceCompositionRoot#compose} — the §7.6 single-entry-point
@@ -82,6 +84,64 @@ public record InferenceSurface(
     handles = List.copyOf(handles);
     Objects.requireNonNull(componentObservation, "componentObservation");
   }
+
+  /** Transfers the two independently replaceable query roles away from index-role lifetime. */
+  Partition partitionQueryRoles(EncoderConfigurationProjection projection) {
+    Objects.requireNonNull(projection, "projection");
+    if (componentObservation.configurationDigest().isPresent()
+        && !componentObservation.configurationDigest().orElseThrow().equals(projection.digest())) {
+      throw new IllegalStateException("Composed surface and owner projection disagree");
+    }
+    List<SessionHandle> namedQueryHandles = new ArrayList<>();
+    reranker.ifPresent(assembly -> namedQueryHandles.add(assembly.sessions()));
+    citation.ifPresent(assembly -> namedQueryHandles.add(assembly.sessions()));
+    for (SessionHandle named : namedQueryHandles) {
+      if (namedQueryHandles.stream().filter(candidate -> candidate == named).count() != 1
+          || handles.stream().filter(candidate -> candidate == named).count() != 1) {
+        throw new IllegalStateException("Query assembly must own exactly one distinct surface handle");
+      }
+    }
+    List<SessionHandle> indexHandles = new ArrayList<>();
+    List<SessionHandle> queryHandles = new ArrayList<>();
+    for (SessionHandle handle : handles) {
+      if (namedQueryHandles.stream().anyMatch(candidate -> candidate == handle)) {
+        queryHandles.add(handle);
+      } else {
+        indexHandles.add(handle);
+      }
+    }
+    Set<EncoderRole> queryRoles = EnumSet.of(EncoderRole.RERANKER, EncoderRole.CITATION);
+    Set<EncoderRole> indexRoles = EnumSet.allOf(EncoderRole.class);
+    indexRoles.removeAll(queryRoles);
+    return new Partition(
+        new InferenceSurface(embedding, ner, Optional.empty(), Optional.empty(), splade, bgeM3,
+            policyFor(indexRoles), indexHandles,
+            observationFor(indexRoles, projection.indexDigest())),
+        new InferenceSurface(Optional.empty(), Optional.empty(), reranker, citation,
+            Optional.empty(), Optional.empty(), policyFor(queryRoles), queryHandles,
+            observationFor(queryRoles, projection.queryDigest())));
+  }
+
+  private PolicySnapshot policyFor(Set<EncoderRole> roles) {
+    var selected = new TreeMap<EncoderRole, io.justsearch.ort.ModelSessionPolicy>();
+    policies.models().forEach((role, policy) -> {
+      if (roles.contains(role)) selected.put(role, policy);
+    });
+    return new PolicySnapshot(policies.runtime(), selected);
+  }
+
+  private ComponentObservation observationFor(Set<EncoderRole> roles, String domainDigest) {
+    Set<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
+    Set<EncoderRole> missing = EnumSet.noneOf(EncoderRole.class);
+    requested.addAll(componentObservation.requestedRoles());
+    missing.addAll(componentObservation.missingRoles());
+    requested.retainAll(roles);
+    missing.retainAll(roles);
+    return new ComponentObservation(componentObservation.configurationDigest().map(ignored -> domainDigest),
+        requested, missing);
+  }
+
+  record Partition(InferenceSurface index, InferenceSurface query) {}
 
   /** Immutable evidence used by the physical owner after it completes service wiring. */
   public record ComponentObservation(

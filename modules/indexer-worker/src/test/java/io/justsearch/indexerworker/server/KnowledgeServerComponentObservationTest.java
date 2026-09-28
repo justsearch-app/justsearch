@@ -8,8 +8,10 @@ import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.execution.TestEngineExecutors;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.indexerworker.embed.EmbeddingService;
 import io.justsearch.ort.EncoderRole;
+import io.justsearch.reranker.CrossEncoderReranker;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -50,9 +52,75 @@ class KnowledgeServerComponentObservationTest {
         ComponentState.UNAVAILABLE, "encoder_observation_unknown", false);
   }
 
+  @Test
+  void unknownQueryOwnerCannotCertifyIndexOwnerVersion() throws Exception {
+    observe(Set.of(EncoderRole.EMBEDDING), Set.of(), true, true, Optional.empty(),
+        ComponentState.UNAVAILABLE, "encoder_observation_unknown", false);
+  }
+
+  @Test
+  void mismatchedQueryOwnerCannotCertifyIndexOwnerVersion() throws Exception {
+    observe(Set.of(EncoderRole.EMBEDDING), Set.of(), true, true, Optional.of("other"),
+        ComponentState.UNAVAILABLE, "encoder_owner_digest_mismatch", false);
+  }
+
+  @Test
+  void queryOnlyChangeCombinesRetainedIndexAndNewQueryVersion() throws Exception {
+    var a = new ResolvedConfigBuilder().putSettings("justsearch.rerank.top_k", "20").build();
+    var b = new ResolvedConfigBuilder().putSettings("justsearch.rerank.top_k", "21").build();
+    var aProjection = EncoderConfigurationProjection.from(a);
+    var bProjection = EncoderConfigurationProjection.from(b);
+    org.junit.jupiter.api.Assertions.assertEquals(aProjection.indexDigest(), bProjection.indexDigest());
+    org.junit.jupiter.api.Assertions.assertNotEquals(aProjection.queryDigest(), bProjection.queryDigest());
+    var component = mock(ComponentHandle.class);
+    var config = mock(io.justsearch.indexerworker.WorkerConfig.class);
+    when(config.dataDir()).thenReturn(dir);
+    try (var executors = new TestEngineExecutors()) {
+      var server = new KnowledgeServer(executors, config, null,
+          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, component);
+      var configField = KnowledgeServer.class.getDeclaredField("startupConfiguration");
+      configField.setAccessible(true);
+      configField.set(server, b);
+      var indexSurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
+          new InferenceSurface.ComponentObservation(Optional.of(aProjection.indexDigest()),
+              Set.of(EncoderRole.EMBEDDING), Set.of()));
+      var fingerprint = IndexFingerprint.ModelFingerprint.present("test-model");
+      var index = new EncoderSet(indexSurface,
+          new EncoderSet.ModelIdentity(fingerprint, fingerprint, fingerprint, false, 768));
+      var embedding = index.own(mock(EmbeddingService.class));
+      index.bindEmbedding(embedding);
+      when(embedding.isAvailable()).thenReturn(true);
+      var querySurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
+          new InferenceSurface.ComponentObservation(Optional.of(bProjection.queryDigest()),
+              Set.of(EncoderRole.RERANKER), Set.of()));
+      var query = new QueryRoleSet(querySurface);
+      query.bindReranker(query.own(mock(CrossEncoderReranker.class)));
+      var indexField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+      indexField.setAccessible(true);
+      indexField.set(server, index);
+      var queryField = KnowledgeServer.class.getDeclaredField("initialQueryRoleSet");
+      queryField.setAccessible(true);
+      queryField.set(server, query);
+      server.publishEncoderComposition();
+      verify(component).setDesiredVersion(bProjection.digest());
+      verify(component).setAppliedVersion(bProjection.digest());
+      verify(component).transition(ComponentState.READY, null, null);
+      server.close();
+    }
+  }
+
   private void observe(Set<EncoderRole> requested, Set<EncoderRole> missing,
       boolean serviceAvailable, boolean known, ComponentState expected, String evidence,
       boolean applied) throws Exception {
+    observe(requested, missing, serviceAvailable, known,
+        known ? Optional.of("digest") : Optional.empty(), expected, evidence, applied);
+  }
+
+  private void observe(Set<EncoderRole> requested, Set<EncoderRole> missing,
+      boolean serviceAvailable, boolean known, Optional<String> queryDigest,
+      ComponentState expected, String evidence, boolean applied) throws Exception {
     var component = mock(ComponentHandle.class);
     var config = mock(io.justsearch.indexerworker.WorkerConfig.class);
     when(config.dataDir()).thenReturn(dir);
@@ -72,6 +140,12 @@ class KnowledgeServerComponentObservationTest {
       var ownerField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
       ownerField.setAccessible(true);
       ownerField.set(server, owner);
+      var querySurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
+          new InferenceSurface.ComponentObservation(queryDigest, Set.of(), Set.of()));
+      var queryField = KnowledgeServer.class.getDeclaredField("initialQueryRoleSet");
+      queryField.setAccessible(true);
+      queryField.set(server, new QueryRoleSet(querySurface));
       server.publishEncoderComposition();
       verify(component).transition(expected, null, evidence);
       verify(component, known ? times(1) : never()).setDesiredVersion("digest");

@@ -171,8 +171,10 @@ public final class KnowledgeServer implements Closeable {
     return new DevReplacementLease();
   }
 
-  /** Captures the one model owner for a dev replacement under its runtime-swap lease. */
-  EncoderSet captureDevReplacementEncoderSet(WorkerAppServices expectedServices) {
+  record DevModelOwners(EncoderSet index, QueryRoleSet query) {}
+
+  /** Captures both model owners for a dev replacement under its runtime-swap lease. */
+  DevModelOwners captureDevReplacementModelOwners(WorkerAppServices expectedServices) {
     if (!runtimeSwapLock.isHeldByCurrentThread()) {
       throw new IllegalStateException("Dev replacement owner lock is not held");
     }
@@ -180,15 +182,16 @@ public final class KnowledgeServer implements Closeable {
     try {
       synchronized (servingViewMonitor) {
         if (servingView == null) {
-          if (initialEncoderSet != null) {
-            throw new IllegalStateException("Encoder owner has no serving view");
+          if (initialEncoderSet != null || initialQueryRoleSet != null) {
+            throw new IllegalStateException("Model owner has no serving view");
           }
           return null;
         }
         if (servingView.services != expectedServices) {
           throw new IllegalStateException("Dev reload lost its serving view");
         }
-        return servingView.encoderSet;
+        return servingView.encoderSet == null ? null
+            : new DevModelOwners(servingView.encoderSet, servingView.queryRoleSet);
       }
     } finally {
       publicationLock.readLock().unlock();
@@ -206,6 +209,8 @@ public final class KnowledgeServer implements Closeable {
     private final Path activeGenerationPath;
     private volatile EncoderSet encoderSet;
     private EncoderSet.Lease encoderLease;
+    private volatile QueryRoleSet queryRoleSet;
+    private QueryRoleSet.Lease queryLease;
     private int holders;
     private final List<Runnable> retirementListeners = new ArrayList<>();
     private boolean retiring;
@@ -227,11 +232,18 @@ public final class KnowledgeServer implements Closeable {
       encoderSet = owner;
     }
 
+    private void attachQueryRoleSet(QueryRoleSet owner) {
+      if (queryRoleSet != null) throw new IllegalStateException("Serving query set already installed");
+      queryLease = Objects.requireNonNull(owner, "owner").acquire();
+      queryRoleSet = owner;
+    }
+
     private CountDownLatch readinessLatch(CountDownLatch bootLatch) {
       return encoderSet == null ? bootLatch : encoderSet.modelReadyLatch();
     }
 
-    private void releaseEncoderSet() {
+    private void releaseModelSets() {
+      if (queryLease != null) queryLease.close();
       if (encoderLease != null) encoderLease.close();
     }
   }
@@ -336,7 +348,9 @@ public final class KnowledgeServer implements Closeable {
   io.justsearch.indexerworker.disambiguation.DisambiguationService disambiguationService;
   // Only the not-yet-attached boot surface lives here; once attached EncoderSet owns it.
   private volatile InferenceSurface pendingInitialSurface;
+  private volatile InferenceSurface pendingInitialQuerySurface;
   private volatile EncoderSet initialEncoderSet;
+  private volatile QueryRoleSet initialQueryRoleSet;
   private volatile GenerationModelSelection initialModelSelection;
   // Phase 3c: WorkerOpsMetricCatalog replaces all worker.* gauge / observable-counter fields.
   // Catalog instance is retained for lifetime; OTel async callbacks fire at flush time.
@@ -491,6 +505,7 @@ public final class KnowledgeServer implements Closeable {
   /** B's native/model view, independent of the model wrappers serving A during its build. */
   private record CandidateModels(
       EncoderSet owner,
+      QueryRoleSet queryOwner,
       GpuDiagnosticSuppliers diagnostics) {
     EmbeddingService embedding() { return owner.embedding(); }
     EncoderBindings.Snapshot bindings() {
@@ -499,10 +514,19 @@ public final class KnowledgeServer implements Closeable {
     io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder spladeIdf() {
       return owner.spladeIdf();
     }
-    io.justsearch.reranker.CrossEncoderReranker reranker() { return owner.reranker(); }
-    io.justsearch.reranker.CitationScorer citation() { return owner.citation(); }
+    io.justsearch.reranker.CrossEncoderReranker reranker() { return queryOwner.reranker(); }
+    io.justsearch.reranker.CitationScorer citation() { return queryOwner.citation(); }
     void close() {
-      owner.close();
+      Throwable failure = null;
+      try { queryOwner.close(); }
+      catch (RuntimeException | Error refused) { failure = refused; }
+      try { owner.close(); }
+      catch (RuntimeException | Error refused) {
+        if (failure == null) failure = refused;
+        else failure.addSuppressed(refused);
+      }
+      if (failure instanceof Error fatal) throw fatal;
+      if (failure instanceof RuntimeException refused) throw refused;
     }
   }
 
@@ -1799,11 +1823,8 @@ public final class KnowledgeServer implements Closeable {
         successor.wireStageEnabled(selected.embedding() != null,
             selected.bindings().spladeEncoder() != null,
             selected.bindings().nerService() != null);
-        successor.wirePolicySnapshotSupplier(() -> {
-          try (var lease = selected.owner().acquire()) {
-            return lease.surface().policies();
-          }
-        });
+        successor.wirePolicySnapshotSupplier(
+            () -> combinedPolicies(selected.owner(), selected.queryOwner()));
       }
       return successor;
     } catch (RuntimeException | Error failure) {
@@ -1869,18 +1890,27 @@ public final class KnowledgeServer implements Closeable {
     synchronized (servingViewMonitor) {
       if (servingView != null && servingView.services == service) {
         EncoderSet owner = servingView.encoderSet;
-        return owner == null ? null : owner.surfaceForOwner().policies();
+        return owner == null ? null : combinedPolicies(owner, servingView.queryRoleSet);
       }
       for (ServingView retired : retiredServingViews) {
         if (retired.services == service) {
           EncoderSet owner = retired.encoderSet;
-          return owner == null ? null : owner.surfaceForOwner().policies();
+          return owner == null ? null : combinedPolicies(owner, retired.queryRoleSet);
         }
       }
       if (closeStarted) throw new IllegalStateException("Index serving owner is closing");
       if (servingView == null) return null;
     }
     throw new IllegalStateException("Policy service has no retained serving generation");
+  }
+
+  static io.justsearch.ort.PolicySnapshot combinedPolicies(EncoderSet index,
+      QueryRoleSet query) {
+    var indexPolicies = index.surfaceForOwner().policies();
+    if (query == null) return indexPolicies;
+    var models = new java.util.TreeMap<>(indexPolicies.models());
+    models.putAll(query.surfaceForOwner().policies().models());
+    return new io.justsearch.ort.PolicySnapshot(indexPolicies.runtime(), models);
   }
 
   /**
@@ -2124,7 +2154,8 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /** Assign the deferred A surface to every still-issued A view before model wiring is released. */
-  private void attachInitialEncoderSet(InferenceSurface surface, ResolvedConfig configuration) {
+  private void attachInitialEncoderSet(InferenceSurface indexSurface,
+      InferenceSurface querySurface, ResolvedConfig configuration) {
     var selection = initialModelSelection;
     String sparseMode = selection == null ? configuration.ai().sparseModel()
         : selection.sparseModel().orElseThrow();
@@ -2132,7 +2163,7 @@ public final class KnowledgeServer implements Closeable {
         : "bge-m3".equalsIgnoreCase(sparseMode)
         ? 1024 : new io.justsearch.configuration.JustSearchConfigurationLoader()
             .loadFieldCatalog().vectorDimension();
-    var owner = new EncoderSet(surface, new EncoderSet.ModelIdentity(
+    var owner = new EncoderSet(indexSurface, new EncoderSet.ModelIdentity(
         selection != null ? selection.fingerprint("embedding") : IndexFingerprint.ModelFingerprint.of(
             EmbeddingFingerprint.modelPath().isPresent(), EmbeddingFingerprint.get()),
         selection != null ? selection.fingerprint("splade") : IndexFingerprint.ModelFingerprint.of(
@@ -2141,20 +2172,25 @@ public final class KnowledgeServer implements Closeable {
             io.justsearch.indexerworker.ner.NerFingerprint.modelPath().isPresent(),
             io.justsearch.indexerworker.ner.NerFingerprint.get()),
         "bge-m3".equalsIgnoreCase(sparseMode), dimension));
+    var queryOwner = new QueryRoleSet(querySurface);
     publicationLock.writeLock().lock();
     try {
       synchronized (servingViewMonitor) {
-        if (initialEncoderSet != null || servingView == null || servingView.retiring) {
+        if (initialEncoderSet != null || initialQueryRoleSet != null
+            || servingView == null || servingView.retiring) {
           throw new IllegalStateException("Initial encoder owner lost its serving view");
         }
         initialEncoderSet = owner;
+        initialQueryRoleSet = queryOwner;
         servingView.attachEncoderSet(owner);
+        servingView.attachQueryRoleSet(queryOwner);
         if (appServices instanceof DefaultWorkerAppServices producer) {
           retainProducerModels(producer, owner);
         }
         for (ServingView old : retiredServingViews) {
           if (old.holders > 0 && !old.cleanupRunning && old.encoderSet == null) {
             old.attachEncoderSet(owner);
+            old.attachQueryRoleSet(queryOwner);
           }
         }
       }
@@ -2257,6 +2293,7 @@ public final class KnowledgeServer implements Closeable {
     ServingView nativeView;
     DefaultWorkerAppServices producer;
     EncoderSet incumbent;
+    QueryRoleSet incumbentQuery;
     io.justsearch.core.component.EngineComponentRegistry.PreparedBatch encoderPublication = null;
     runtimeSwapLock.lock();
     try {
@@ -2265,7 +2302,9 @@ public final class KnowledgeServer implements Closeable {
         synchronized (servingViewMonitor) {
           nativeView = servingView;
           incumbent = initialEncoderSet;
+          incumbentQuery = initialQueryRoleSet;
           if (closeStarted || recordedCandidateInPlace || incumbent == null
+              || incumbentQuery == null
               || nativeView == null || nativeView.retiring
               || nativeView.encoderSet != incumbent
               || !(nativeView.services instanceof DefaultWorkerAppServices current)
@@ -2277,6 +2316,9 @@ public final class KnowledgeServer implements Closeable {
           var sourceObservation = incumbent.surfaceForOwner().componentObservation();
           inPlaceSourceHadModels = sourceObservation.requestedRoles().stream()
               .anyMatch(role -> !sourceObservation.missingRoles().contains(role));
+          var queryObservation = incumbentQuery.surfaceForOwner().componentObservation();
+          inPlaceSourceHadModels |= queryObservation.requestedRoles().stream()
+              .anyMatch(role -> !queryObservation.missingRoles().contains(role));
           // The old service remains immutable for its issued calls. New captures see a separate
           // lexical search service over A while this producer continues writing Green.
           WorkerAppServices lexicalServices = current.prepareTextOnlyCandidateView(
@@ -2294,7 +2336,7 @@ public final class KnowledgeServer implements Closeable {
             encoderPublication = prepared;
           }
           nativeView.retiring = true;
-          nativeView.retireCleanup = nativeView::releaseEncoderSet;
+          nativeView.retireCleanup = nativeView::releaseModelSets;
           retiredServingViews.add(nativeView);
           servingView = lexicalView;
           inPlaceLexicalServices = lexicalServices;
@@ -2327,6 +2369,7 @@ public final class KnowledgeServer implements Closeable {
     producer.clearCandidateSourceStatusDiagnostics();
     try {
       incumbent.close();
+      incumbentQuery.close();
     } catch (RuntimeException refusal) {
       if (encoderComponent != null) encoderComponent.transition(
           io.justsearch.core.component.ComponentState.UNAVAILABLE, null,
@@ -2334,6 +2377,7 @@ public final class KnowledgeServer implements Closeable {
       throw new IOException("A native retirement refused; B composition is excluded", refusal);
     }
     initialEncoderSet = null;
+    initialQueryRoleSet = null;
   }
 
   /** A slow issued call never forces native retirement; restore the untouched A view. */
@@ -2396,7 +2440,8 @@ public final class KnowledgeServer implements Closeable {
   /** A committed pointer is never undone; this repairs only a refused precommit B build. */
   private void recomposeSourceAfterCandidateRefusal(Exception candidateFailure) {
     if (!recordedCandidateInPlace) return;
-    if (initialEncoderSet != null && !initialEncoderSet.isClosed()) {
+    if ((initialEncoderSet != null && !initialEncoderSet.isClosed())
+        || (initialQueryRoleSet != null && !initialQueryRoleSet.isClosed())) {
       recordFailedSourceRecompose(candidateFailure,
           new IOException("A native retirement remains incomplete"));
       return;
@@ -2497,10 +2542,12 @@ public final class KnowledgeServer implements Closeable {
         producer.wireGpuDiagnostics(restored.diagnostics());
         producer.wireStageEnabled(restored.embedding() != null,
             bindings.spladeEncoder() != null, bindings.nerService() != null);
-        producer.wirePolicySnapshotSupplier(() -> restored.owner().surfaceForOwner().policies());
+        producer.wirePolicySnapshotSupplier(
+            () -> combinedPolicies(restored.owner(), restored.queryOwner()));
         ServingView restoredView = new ServingView(producer, lexical.searchRuntime,
             lexical.ingestRuntime, lexical.activeGenerationPath);
         restoredView.attachEncoderSet(restored.owner());
+        restoredView.attachQueryRoleSet(restored.queryOwner());
         lexical.retiring = true;
         retiredLexical = lexical;
         lexical.retireCleanup = () -> {};
@@ -2508,6 +2555,7 @@ public final class KnowledgeServer implements Closeable {
         servingView = restoredView;
         inPlaceLexicalServices = null;
         initialEncoderSet = restored.owner();
+        initialQueryRoleSet = restored.queryOwner();
         recordedCandidateInPlace = false;
         servingViewMonitor.notifyAll();
       }
@@ -2536,7 +2584,9 @@ public final class KnowledgeServer implements Closeable {
       EncoderConfigurationProjection encoderConfiguration) throws IOException {
     InferenceSurface surface = InferenceCompositionRoot.compose(encoderConfiguration, hardware,
         contract, modelsDir, () -> !signalBus.isMainGpuActive(), ortSessionEvents, selection);
-    var owner = new EncoderSet(surface, identity);
+    var partition = surface.partitionQueryRoles(encoderConfiguration);
+    var owner = new EncoderSet(partition.index(), identity);
+    var queryOwner = new QueryRoleSet(partition.query());
     EmbeddingService embedding = null;
     io.justsearch.indexerworker.ner.NerService ner;
     io.justsearch.indexerworker.bgem3.BgeM3Encoder bge = null;
@@ -2597,17 +2647,17 @@ public final class KnowledgeServer implements Closeable {
         throw new IOException("Recorded candidate model could not become READY");
       }
       reranker = surface.reranker().isPresent()
-          ? owner.own(new io.justsearch.reranker.CrossEncoderReranker(
+          ? queryOwner.own(new io.justsearch.reranker.CrossEncoderReranker(
               surface.reranker().orElseThrow().sessions(),
               surface.reranker().orElseThrow().shape(),
               surface.reranker().orElseThrow().tokenizer())) : null;
-      if (reranker != null) owner.bindReranker(reranker);
+      if (reranker != null) queryOwner.bindReranker(reranker);
       citation = surface.citation().isPresent()
-          ? owner.own(new io.justsearch.reranker.CitationScorer(
+          ? queryOwner.own(new io.justsearch.reranker.CitationScorer(
               surface.citation().orElseThrow().sessions(),
               surface.citation().orElseThrow().shape(),
               surface.citation().orElseThrow().tokenizer())) : null;
-      if (citation != null) owner.bindCitation(citation);
+      if (citation != null) queryOwner.bindCitation(citation);
       var diagnostics = new GpuDiagnosticSuppliers(
           splade == null ? null : splade::getOrtCudaStatus,
           splade == null ? null : splade::resolvedModelPath,
@@ -2619,9 +2669,9 @@ public final class KnowledgeServer implements Closeable {
           citation == null ? null : citation::getOrtCudaStatus,
           bge == null ? null : bge::getOrtCudaStatus);
       owner.releaseModelReady();
-      return new CandidateModels(owner, diagnostics);
+      return new CandidateModels(owner, queryOwner, diagnostics);
     } catch (IOException | RuntimeException | Error failure) {
-      try { new CandidateModels(owner, null).close(); }
+      try { new CandidateModels(owner, queryOwner, null).close(); }
       catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
       throw failure;
     }
@@ -2696,11 +2746,16 @@ public final class KnowledgeServer implements Closeable {
               () -> !signalBus.isMainGpuActive(),
               ortSessionEvents,
               selection);
-      this.pendingInitialSurface = surface;
-      attachInitialEncoderSet(surface, compositionConfig);
+      var partition = surface.partitionQueryRoles(encoderConfiguration);
+      this.pendingInitialSurface = partition.index();
+      this.pendingInitialQuerySurface = partition.query();
+      attachInitialEncoderSet(partition.index(), partition.query(), compositionConfig);
       this.pendingInitialSurface = null;
+      this.pendingInitialQuerySurface = null;
       EncoderSet initialOwner = Objects.requireNonNull(initialEncoderSet,
           "Initial encoder owner after attachment");
+      QueryRoleSet initialQueryOwner = Objects.requireNonNull(initialQueryRoleSet,
+          "Initial query owner after attachment");
 
       // Embedding — skip when BGE-M3 is active (surface.embedding() is already empty in that case).
       var embeddingConfig = encoderConfiguration.embedding();
@@ -2840,9 +2895,9 @@ public final class KnowledgeServer implements Closeable {
       var searchRerankConfig = encoderConfiguration.reranker();
       if (surface.reranker().isPresent()) {
         var rerankAssembly = surface.reranker().get();
-        var searchReranker = initialOwner.own(new io.justsearch.reranker.CrossEncoderReranker(
+        var searchReranker = initialQueryOwner.own(new io.justsearch.reranker.CrossEncoderReranker(
             rerankAssembly.sessions(), rerankAssembly.shape(), rerankAssembly.tokenizer()));
-        initialOwner.bindReranker(searchReranker);
+        initialQueryOwner.bindReranker(searchReranker);
         wireModelServices(modelWiringLeases,
             svc -> svc.wireSearchReranker(searchReranker));
         // F5: Warm up ORT session at startup instead of paying 5-10s on the first user query.
@@ -2886,11 +2941,11 @@ public final class KnowledgeServer implements Closeable {
       if (surface.citation().isPresent()) {
         var citationAssembly = surface.citation().get();
         var citationScorer =
-            initialOwner.own(new io.justsearch.reranker.CitationScorer(
+            initialQueryOwner.own(new io.justsearch.reranker.CitationScorer(
                 citationAssembly.sessions(),
                 citationAssembly.shape(),
                 citationAssembly.tokenizer()));
-        initialOwner.bindCitation(citationScorer);
+        initialQueryOwner.bindCitation(citationScorer);
         wireModelServices(modelWiringLeases,
             svc -> svc.wireCitationScorer(citationScorer));
       }
@@ -2903,9 +2958,9 @@ public final class KnowledgeServer implements Closeable {
       // previously dodged the misleading coalesce via policy iteration;
       // the fix makes the diagnostic shape honest.
       var ownedSplade = initialOwner.splade();
-      var ownedReranker = initialOwner.reranker();
+      var ownedReranker = initialQueryOwner.reranker();
       var ownedNer = initialOwner.ner();
-      var ownedCitation = initialOwner.citation();
+      var ownedCitation = initialQueryOwner.citation();
       var ownedBgeM3 = initialOwner.bgeM3();
       java.util.function.Supplier<io.justsearch.ort.OrtCudaStatus> sparseStatusSupplier =
           ownedSplade != null ? ownedSplade::getOrtCudaStatus : null;
@@ -3023,8 +3078,10 @@ public final class KnowledgeServer implements Closeable {
   /** Latch release also happens on failure; only the actual composed-and-wired surface certifies readiness. */
   void publishEncoderComposition() {
     EncoderSet owner = initialEncoderSet;
-    if (encoderComponent == null || owner == null) return;
-    var publication = encoderPublication(owner, startupConfiguration, initialModelSelection);
+    QueryRoleSet queryOwner = initialQueryRoleSet;
+    if (encoderComponent == null || owner == null || queryOwner == null) return;
+    var publication = encoderPublication(owner, queryOwner, startupConfiguration,
+        initialModelSelection);
     if (publication.desiredVersion() != null) {
       encoderComponent.setDesiredVersion(publication.desiredVersion());
     }
@@ -3038,42 +3095,61 @@ public final class KnowledgeServer implements Closeable {
       String desiredVersion, String appliedVersion, String evidence) {}
 
   private io.justsearch.core.component.EngineComponentSnapshot.Component encoderCompositionObservation(
-      EncoderSet owner, ResolvedConfig configuration, GenerationModelSelection selection) {
-    var publication = encoderPublication(owner, configuration, selection);
+      EncoderSet owner, QueryRoleSet queryOwner, ResolvedConfig configuration,
+      GenerationModelSelection selection) {
+    var publication = encoderPublication(owner, queryOwner, configuration, selection);
     return encoderObservation(publication.state(), publication.desiredVersion(),
         publication.appliedVersion(), publication.evidence());
   }
 
-  private EncoderPublication encoderPublication(EncoderSet owner, ResolvedConfig configuration,
-      GenerationModelSelection selection) {
-    var observation = owner.surfaceForOwner().componentObservation();
+  private EncoderPublication encoderPublication(EncoderSet owner, QueryRoleSet queryOwner,
+      ResolvedConfig configuration, GenerationModelSelection selection) {
+    var indexObservation = owner.surfaceForOwner().componentObservation();
+    var queryObservation = queryOwner.surfaceForOwner().componentObservation();
+    var requested = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
+    requested.addAll(indexObservation.requestedRoles());
+    requested.addAll(queryObservation.requestedRoles());
     var missing = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
-    missing.addAll(observation.missingRoles());
-    for (var role : observation.requestedRoles()) {
+    missing.addAll(indexObservation.missingRoles());
+    missing.addAll(queryObservation.missingRoles());
+    for (var role : requested) {
       boolean wired = switch (role) {
         case EMBEDDING -> owner.embedding() != null && owner.embedding().isAvailable();
         case BGE_M3 -> owner.bgeM3() != null;
         case SPLADE -> owner.splade() != null;
         case NER -> owner.ner() != null;
-        case RERANKER -> owner.reranker() != null;
-        case CITATION -> owner.citation() != null;
+        case RERANKER -> queryOwner.reranker() != null;
+        case CITATION -> queryOwner.citation() != null;
       };
       if (!wired) missing.add(role);
     }
-    String desiredVersion = configuration == null
-        ? observation.configurationDigest().orElse(null)
-        : EncoderConfigurationProjection.from(configuration).digest();
-    String appliedVersion = observation.configurationDigest().isPresent() && missing.isEmpty()
-        ? observation.configurationDigest().orElseThrow() : null;
-    boolean ready = observation.configurationDigest().isPresent()
-        && observation.hasRequestedRoles() && missing.isEmpty();
-    boolean intentionallyAbsent = observation.configurationDigest().isPresent()
-        && !observation.hasRequestedRoles();
+    EncoderConfigurationProjection desiredProjection = configuration == null ? null
+        : EncoderConfigurationProjection.from(configuration);
+    EncoderConfigurationProjection selectedProjection = desiredProjection == null || selection == null
+        ? desiredProjection : EncoderConfigurationProjection.from(configuration, selection);
+    String indexDigest = indexObservation.configurationDigest().orElse(null);
+    String queryDigest = queryObservation.configurationDigest().orElse(null);
+    boolean observationsKnown = indexDigest != null && queryDigest != null;
+    boolean indexMatches = observationsKnown && (selectedProjection == null
+        ? indexDigest.equals(queryDigest) : indexDigest.equals(selectedProjection.indexDigest()));
+    EncoderConfigurationProjection appliedQuery = null;
+    if (observationsKnown && selectedProjection != null) {
+      if (queryDigest.equals(desiredProjection.queryDigest())) appliedQuery = desiredProjection;
+      else if (queryDigest.equals(selectedProjection.queryDigest())) appliedQuery = selectedProjection;
+    }
+    boolean coherent = indexMatches && (selectedProjection == null || appliedQuery != null);
+    String desiredVersion = desiredProjection == null ? indexDigest : desiredProjection.digest();
+    String appliedVersion = !coherent || !missing.isEmpty() ? null
+        : selectedProjection == null ? indexDigest
+        : selectedProjection.withQueryFrom(appliedQuery).digest();
+    boolean ready = coherent && !requested.isEmpty() && missing.isEmpty();
+    boolean intentionallyAbsent = coherent && requested.isEmpty();
     String evidence = selection != null && selection.hasUnavailableModel()
         ? "INDEX_MODEL_NOT_INSTALLED"
-        : observation.configurationDigest().isEmpty() ? "encoder_observation_unknown"
+        : !observationsKnown ? "encoder_observation_unknown"
+        : !coherent ? "encoder_owner_digest_mismatch"
         : missing.isEmpty()
-        ? (observation.hasRequestedRoles() ? null : "no_encoder_roles_requested")
+        ? (!requested.isEmpty() ? null : "no_encoder_roles_requested")
         : "missing_roles=" + missing.stream()
             .map(Enum::name).sorted().collect(java.util.stream.Collectors.joining(","));
     return new EncoderPublication(ready ? io.justsearch.core.component.ComponentState.READY
@@ -3748,9 +3824,12 @@ public final class KnowledgeServer implements Closeable {
         if (previous != null && previous.encoderSet != null) {
           successor.attachEncoderSet(previous.encoderSet);
         }
+        if (previous != null && previous.queryRoleSet != null) {
+          successor.attachQueryRoleSet(previous.queryRoleSet);
+        }
         appServices = preparedServices;
         servingView = successor;
-        if (previous != null) previous.releaseEncoderSet();
+        if (previous != null) previous.releaseModelSets();
       }
     } finally {
       publicationLock.writeLock().unlock();
@@ -3777,16 +3856,17 @@ public final class KnowledgeServer implements Closeable {
             throw new IllegalStateException("Old application services still own resources", failure);
           }
           preparation.retireReader();
-          old.releaseEncoderSet();
+          old.releaseModelSets();
         };
         try {
           if (old.encoderSet != null) successor.attachEncoderSet(old.encoderSet);
+          if (old.queryRoleSet != null) successor.attachQueryRoleSet(old.queryRoleSet);
           // Reserve the fallible retirement slot before the upgrade becomes published.
           retiredServingViews.add(old);
           preparation.markPublished();
         } catch (RuntimeException | Error failure) {
           retiredServingViews.remove(old);
-          successor.releaseEncoderSet();
+          successor.releaseModelSets();
           throw failure;
         }
         old.retiring = true;
@@ -4137,7 +4217,7 @@ public final class KnowledgeServer implements Closeable {
           // The active view is no longer issuing work. Its model hold must leave before the
           // exact owner can enforce the bounded native retirement deadline below.
           synchronized (servingViewMonitor) {
-            if (servingView != null) servingView.releaseEncoderSet();
+            if (servingView != null) servingView.releaseModelSets();
           }
 
           // Native retirement follows producer exit and precedes tokenizer/resource teardown. A
@@ -4166,6 +4246,20 @@ public final class KnowledgeServer implements Closeable {
             try { pendingInitialSurface.close(); }
             catch (RuntimeException refusal) {
               throw new IOException("Native inference retirement incomplete; server retained for retry",
+                  refusal);
+            }
+          }
+          QueryRoleSet initialQuery = initialQueryRoleSet;
+          if (initialQuery != null) {
+            try { initialQuery.close(); }
+            catch (RuntimeException refusal) {
+              throw new IOException("Query inference retirement incomplete; server retained for retry",
+                  refusal);
+            }
+          } else if (pendingInitialQuerySurface != null) {
+            try { pendingInitialQuerySurface.close(); }
+            catch (RuntimeException refusal) {
+              throw new IOException("Query inference retirement incomplete; server retained for retry",
                   refusal);
             }
           }
@@ -4359,23 +4453,33 @@ public final class KnowledgeServer implements Closeable {
       return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
     }
     CandidateModels selectedCandidate = candidateModels;
-    if (selectedCandidate != null && !selectedCandidate.owner().isClosed()) {
+    if (selectedCandidate != null && (!selectedCandidate.owner().isClosed()
+        || !selectedCandidate.queryOwner().isClosed())) {
       return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
     }
     EncoderSet initialOwner = initialEncoderSet;
     if (initialOwner != null && !initialOwner.isClosed()) {
       return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
     }
-    if (initialOwner != null) return io.justsearch.app.api.NativeQuiescence.QUIESCED;
+    QueryRoleSet initialQuery = initialQueryRoleSet;
+    if (initialQuery != null && !initialQuery.isClosed()) {
+      return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
+    }
+    if (initialOwner != null || initialQuery != null) {
+      return io.justsearch.app.api.NativeQuiescence.QUIESCED;
+    }
     InferenceSurface surface = pendingInitialSurface;
+    InferenceSurface querySurface = pendingInitialQuerySurface;
     // A started initializer with no published surface may have failed after opening a native
     // candidate. No owner can prove its retirement from a null field, so exit conservatively.
-    if (surface == null) {
+    if (surface == null && querySurface == null) {
       return initialization == null ? io.justsearch.app.api.NativeQuiescence.QUIESCED
           : io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
     }
-    if (surface.retirementStatus()
-        == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED) {
+    if ((surface == null || surface.retirementStatus()
+            == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED)
+        && (querySurface == null || querySurface.retirementStatus()
+            == io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED)) {
       return io.justsearch.app.api.NativeQuiescence.QUIESCED;
     }
     return io.justsearch.app.api.NativeQuiescence.UNQUIESCED;
@@ -5032,6 +5136,7 @@ public final class KnowledgeServer implements Closeable {
               || old.searchRuntime != active || old.ingestRuntime != active) return false;
           successor = new ServingView(prepared, active, green, activeIndexPath);
           if (old.encoderSet != null) successor.attachEncoderSet(old.encoderSet);
+          if (old.queryRoleSet != null) successor.attachQueryRoleSet(old.queryRoleSet);
           retired = old;
         }
         // All reversible preparation is complete. The old loop no longer owns a running batch;
@@ -5055,7 +5160,7 @@ public final class KnowledgeServer implements Closeable {
               catch (IOException failure) {
                 throw new IllegalStateException("Retired native services still own resources", failure);
               }
-              old.releaseEncoderSet();
+              old.releaseModelSets();
             };
             generationBootOwnership = ownership;
             generationBootDisposition = IndexGenerationManager.BootDisposition.BUILDING;
@@ -5083,7 +5188,7 @@ public final class KnowledgeServer implements Closeable {
     } finally {
       runtimeSwapLock.unlock();
       if (!published) {
-        if (successor != null) successor.releaseEncoderSet();
+        if (successor != null) successor.releaseModelSets();
         if (prepared != null) {
           try {
             if (pendingAppServices == prepared) closePendingAppServices();
@@ -5366,7 +5471,8 @@ public final class KnowledgeServer implements Closeable {
           if (recordedCandidate != null && encoderComponent != null) {
             Objects.requireNonNull(callbacks, "Recorded candidate settings projection")
                 .includeComponentObservation(encoderCompositionObservation(
-                    candidateModels.owner(), recordedCandidate.configuration(), promotedSelection));
+                    candidateModels.owner(), candidateModels.queryOwner(),
+                    recordedCandidate.configuration(), promotedSelection));
           }
           DefaultWorkerAppServices nextServices = successor;
           RecordedIngestionLifecycle.CheckedPromotion publish = () -> {
@@ -5414,9 +5520,12 @@ public final class KnowledgeServer implements Closeable {
                     ServingView next = new ServingView(preparedServices, green, green, successorPath);
                     EncoderSet successorEncoder = recordedCandidate == null ? old.encoderSet
                         : Objects.requireNonNull(candidateModels, "Recorded B encoder owner").owner();
+                    QueryRoleSet successorQuery = recordedCandidate == null ? old.queryRoleSet
+                        : Objects.requireNonNull(candidateModels, "Recorded B query owner").queryOwner();
                     if (successorEncoder != null) next.attachEncoderSet(successorEncoder);
+                    if (successorQuery != null) next.attachQueryRoleSet(successorQuery);
                     preparedView.set(next);
-                    Runnable cleanup = () -> closeRetiredSource(old, successorEncoder);
+                    Runnable cleanup = () -> closeRetiredSource(old, successorEncoder, successorQuery);
                     IndexGenerationManager.State promoted;
                     try {
                       if (projection != null) projection.admitBeforePointer();
@@ -5471,6 +5580,7 @@ public final class KnowledgeServer implements Closeable {
                         CandidateModels promotedModels = Objects.requireNonNull(candidateModels,
                             "Promoted candidate model bundle");
                         initialEncoderSet = promotedModels.owner();
+                        initialQueryRoleSet = promotedModels.queryOwner();
                         embeddingCompatController = candidateEmbeddingCompatController;
                         candidateEmbeddingCompatController = null;
                         startupConfiguration = recordedCandidate.configuration();
@@ -5542,7 +5652,7 @@ public final class KnowledgeServer implements Closeable {
             requestRecovery = true;
           }
         }
-        if (!published.get() && preparedView.get() != null) preparedView.get().releaseEncoderSet();
+        if (!published.get() && preparedView.get() != null) preparedView.get().releaseModelSets();
       } finally {
         runtimeSwapLock.unlock();
       }
@@ -5571,11 +5681,13 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  private void closeRetiredSource(ServingView old, EncoderSet successorEncoder) {
+  private void closeRetiredSource(ServingView old, EncoderSet successorEncoder,
+      QueryRoleSet successorQuery) {
     try {
       old.services.close();
-      old.releaseEncoderSet();
+      old.releaseModelSets();
       if (old.encoderSet != null && old.encoderSet != successorEncoder) old.encoderSet.close();
+      if (old.queryRoleSet != null && old.queryRoleSet != successorQuery) old.queryRoleSet.close();
       if (old.searchRuntime != null && old.searchRuntime != ingestLifecycle) old.searchRuntime.close();
     } catch (IOException failure) {
       throw new IllegalStateException("Retired generation still owns resources", failure);

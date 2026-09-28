@@ -27,6 +27,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -87,7 +88,7 @@ final class KnowledgeServerDeferredRetirementTest {
 
           selected.set(server, aView);
           retiredServingViews(server).clear();
-          Method release = bView.getClass().getDeclaredMethod("releaseEncoderSet");
+          Method release = bView.getClass().getDeclaredMethod("releaseModelSets");
           release.setAccessible(true);
           release.invoke(bView);
           bOwner.close();
@@ -109,14 +110,26 @@ final class KnowledgeServerDeferredRetirementTest {
       var aServices = mock(WorkerAppServices.class);
       var aSurface = mock(InferenceSurface.class);
       var bSurface = mock(InferenceSurface.class);
+      var aQueryHandle = mock(io.justsearch.ort.SessionHandle.class);
+      var bQueryHandle = mock(io.justsearch.ort.SessionHandle.class);
+      when(aQueryHandle.retirementStatus()).thenReturn(
+          io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
+      when(bQueryHandle.retirementStatus()).thenReturn(
+          io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
       AutoCloseable aWrapper = mock(AutoCloseable.class);
       AutoCloseable bWrapper = mock(AutoCloseable.class);
+      AutoCloseable aQueryWrapper = mock(AutoCloseable.class);
+      AutoCloseable bQueryWrapper = mock(AutoCloseable.class);
       var model = IndexFingerprint.ModelFingerprint.present("a");
       var identity = new EncoderSet.ModelIdentity(model, model, model, false, 768);
       var aOwner = new EncoderSet(aSurface, identity, Duration.ZERO);
       var bOwner = new EncoderSet(bSurface, identity, Duration.ZERO);
       aOwner.own(aWrapper);
       bOwner.own(bWrapper);
+      var aQuery = new QueryRoleSet(querySurface(aQueryHandle));
+      var bQuery = new QueryRoleSet(querySurface(bQueryHandle));
+      aQuery.own(aQueryWrapper);
+      bQuery.own(bQueryWrapper);
       try {
         server.publishServingView(aServices);
         Field selected = KnowledgeServer.class.getDeclaredField("servingView");
@@ -125,21 +138,37 @@ final class KnowledgeServerDeferredRetirementTest {
         Method attach = aView.getClass().getDeclaredMethod("attachEncoderSet", EncoderSet.class);
         attach.setAccessible(true);
         attach.invoke(aView, aOwner);
+        Method attachQuery = aView.getClass().getDeclaredMethod("attachQueryRoleSet",
+            QueryRoleSet.class);
+        attachQuery.setAccessible(true);
+        attachQuery.invoke(aView, aQuery);
 
-        invoke(server, "closeRetiredSource", new Class<?>[] {aView.getClass(), EncoderSet.class},
-            aView, bOwner);
+        invoke(server, "closeRetiredSource",
+            new Class<?>[] {aView.getClass(), EncoderSet.class, QueryRoleSet.class},
+            aView, bOwner, bQuery);
 
-        var order = org.mockito.Mockito.inOrder(aServices, aSurface, aWrapper);
+        var order = org.mockito.Mockito.inOrder(aServices, aSurface, aWrapper,
+            aQueryHandle, aQueryWrapper);
         order.verify(aServices).close();
         order.verify(aSurface).close();
         order.verify(aWrapper).close();
+        order.verify(aQueryHandle).close();
+        order.verify(aQueryWrapper).close();
         verify(bSurface, never()).close();
         verify(bWrapper, never()).close();
+        verify(bQueryHandle, never()).close();
+        verify(bQueryWrapper, never()).close();
       } finally {
         server.close();
         bOwner.close();
+        bQuery.close();
       }
     }
+  }
+
+  private static InferenceSurface querySurface(io.justsearch.ort.SessionHandle handle) {
+    return new InferenceSurface(Optional.empty(), Optional.empty(), Optional.empty(),
+        Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(handle));
   }
 
   @Test
@@ -177,7 +206,7 @@ final class KnowledgeServerDeferredRetirementTest {
             successorServices, oldServices, successorRuntime, preparation));
         assertTrue(retiredServingViews(server).isEmpty(),
             "a rejected publication must not register a retired predecessor");
-        Method release = oldView.getClass().getDeclaredMethod("releaseEncoderSet");
+        Method release = oldView.getClass().getDeclaredMethod("releaseModelSets");
         release.setAccessible(true);
         release.invoke(oldView);
         encoder.close();
@@ -208,6 +237,18 @@ final class KnowledgeServerDeferredRetirementTest {
         setField(server, "searchLifecycle", oldRuntime);
         setField(server, "ingestLifecycle", oldRuntime);
         server.publishServingView(oldServices);
+        var queryHandle = mock(io.justsearch.ort.SessionHandle.class);
+        when(queryHandle.retirementStatus()).thenReturn(
+            io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
+        var queryOwner = new QueryRoleSet(querySurface(queryHandle));
+        setField(server, "initialQueryRoleSet", queryOwner);
+        Field selected = KnowledgeServer.class.getDeclaredField("servingView");
+        selected.setAccessible(true);
+        Object oldView = selected.get(server);
+        Method attachQuery = oldView.getClass().getDeclaredMethod("attachQueryRoleSet",
+            QueryRoleSet.class);
+        attachQuery.setAccessible(true);
+        attachQuery.invoke(oldView, queryOwner);
         var issuedA = server.captureServingView();
 
         invoke(
@@ -231,13 +272,17 @@ final class KnowledgeServerDeferredRetirementTest {
         verify(preparation, never()).retireReader();
         assertEquals(1, retiredServingViews(server).size(),
             "a refused retired owner must remain registered for retry");
+        verify(queryHandle, never()).close();
 
         invoke(server, "retryRetiredServingViews", new Class<?>[0]);
 
         verify(oldServices, times(2)).close();
         verify(preparation).retireReader();
+        verify(queryHandle, never()).close();
         assertTrue(retiredServingViews(server).isEmpty(),
             "successful retry must remove the retired owner");
+        server.close();
+        verify(queryHandle).close();
       } finally {
         server.close();
       }

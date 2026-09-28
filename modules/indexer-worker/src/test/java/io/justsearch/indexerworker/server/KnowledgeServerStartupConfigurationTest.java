@@ -188,12 +188,16 @@ class KnowledgeServerStartupConfigurationTest {
         assertEquals(1536, service.embeddingConfig().contextLength());
         assertEquals(4096, service.embeddingConfig().lateChunkingContextLength());
 
-        String digest = surface.componentObservation().configurationDigest().orElseThrow();
-        assertEquals(EncoderConfigurationProjection.from(captured).digest(), digest);
-        assertNotEquals(EncoderConfigurationProjection.from(replacement).digest(), digest);
+        var projection = EncoderConfigurationProjection.from(captured);
+        String indexDigest = surface.componentObservation().configurationDigest().orElseThrow();
+        String queryDigest = ((QueryRoleSet) field(server, "initialQueryRoleSet"))
+            .surfaceForOwner().componentObservation().configurationDigest().orElseThrow();
+        assertEquals(projection.indexDigest(), indexDigest);
+        assertEquals(projection.queryDigest(), queryDigest);
+        assertNotEquals(EncoderConfigurationProjection.from(replacement).indexDigest(), indexDigest);
         verify(encoderComponent).transition(ComponentState.STARTING, null, null);
-        verify(encoderComponent).setDesiredVersion(digest);
-        verify(encoderComponent).setAppliedVersion(digest);
+        verify(encoderComponent).setDesiredVersion(projection.digest());
+        verify(encoderComponent).setAppliedVersion(projection.digest());
         verify(encoderComponent).transition(ComponentState.READY, null, null);
         embeddingAssembly.verify(
             () ->
