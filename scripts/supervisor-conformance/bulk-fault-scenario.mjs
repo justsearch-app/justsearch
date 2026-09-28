@@ -642,10 +642,11 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
   watcherDeleteDuringBuild = false, gapApproval = false, gapCancellation = false,
   gapRecomposeFailure = false, cancelBeforePointer = false,
-  extraBuildFiles = 0, engineLogWindow = null }) {
+  issuedSearch = false, extraBuildFiles = 0, engineLogWindow = null }) {
   const runtime = path.join(data, 'runtime');
   const { reachedFile, releaseFile } = barrierFiles(data);
   const migrationBarrier = barrierFiles(data, 'migration-barrier');
+  const issuedBarrier = barrierFiles(data, 'issued-a-search');
   const operationPath = path.join(data, 'operations.db');
   const jobsPath = path.join(data, 'jobs.db');
   const sourceGeneration = readJson(path.join(indexBase, 'state.json'))?.active_generation;
@@ -776,6 +777,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   // The promotion and cancellation paths both leave through this scope.
   try {
   let cancellationKey;
+  let issuedARequest;
+  let issuedAReached;
   try {
     const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
     const acceptedMarker = 'lexicalbridgecobalt';
@@ -1021,6 +1024,23 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       retrievalReasons: retrieval?.reasonCodes,
       heldQueryTrace,
       vectorHits: actualInPlace ? 0 : JSON.parse(vectorSearch.text).results.length }));
+    if (issuedSearch) {
+      requireThat(composeMode === 'BESIDE' && distinctModelB,
+        'issued A search requires a physical distinct-model BESIDE candidate');
+      const query = `${marker} ${marker}`;
+      const pending = { settled: false };
+      pending.outcome = post(apiPort, '/api/knowledge/search',
+        { query, limit: 10, mode: 'vector' }, 180000)
+        .then(value => ({ value }), error => ({ error }))
+        .then(outcome => { pending.settled = true; return outcome; });
+      issuedARequest = pending;
+      issuedAReached = await waitFor('A search captured before B publication', 30000,
+        () => readJson(issuedBarrier.reachedFile));
+      requireThat(issuedAReached.query === query
+        && issuedAReached.activeGeneration === sourceGeneration
+        && issuedAReached.pid === manifest.pid && !pending.settled,
+      `issued search did not retain captured A: ${JSON.stringify(issuedAReached)}`);
+    }
     if (cancelBeforePointer) {
       cancellationKey = await cancelReindexWithApproval({ apiPort, manifest,
         reindexKey: operationKey, createOperationKey, request, post, requireThat });
@@ -1028,6 +1048,51 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   } finally {
     if (acceptedWriteDuringBuild) fs.writeFileSync(migrationBarrier.releaseFile, 'release');
     fs.writeFileSync(releaseFile, 'release');
+  }
+  if (issuedSearch) {
+    const published = await waitFor('B serving view published while issued A search waits',
+      120000, () => readJson(migrationBarrier.reachedFile));
+    const state = readJson(path.join(indexBase, 'state.json'));
+    requireThat(published.point === 'migration-after-live-activation'
+      && published.sourceGeneration === `g-${operationKey}`
+      && state?.active_generation === `g-${operationKey}`
+      && !issuedARequest.settled,
+    `B did not publish while A search was issued: ${JSON.stringify({ published, state })}`);
+    fs.writeFileSync(migrationBarrier.releaseFile, 'release');
+    const bFingerprint = readJson(path.join(indexBase, 'indices', `g-${operationKey}`,
+      '.justsearch-index-generation.json'))?.models?.embedding?.sha256;
+    requireThat(/^[0-9a-f]{64}$/i.test(bFingerprint ?? ''),
+      'issued A search candidate lacks a full B embedding fingerprint');
+    const issuedB = await waitFor('B serves VECTOR while issued A search remains held',
+      120000, async () => {
+        if (issuedARequest.settled) {
+          throw new Error('A search completed before B served a new request');
+        }
+        const statusReply = await request(apiPort, '/api/status', {}, 15000);
+        if (statusReply.status !== 200) return null;
+        const status = JSON.parse(statusReply.text);
+        if (status.worker?.migration?.activeGenerationId !== `g-${operationKey}`
+          || status.worker?.compatibility?.embeddingFingerprintCurrent !== bFingerprint
+          || status.components?.encoders?.state !== 'READY') return null;
+        const reply = await post(apiPort, '/api/knowledge/search',
+          { query: marker, limit: 10, mode: 'vector' }, 30000);
+        return reply.status === 200 && JSON.parse(reply.text).results?.length > 0
+          ? reply : null;
+      });
+    requireThat(!issuedARequest.settled,
+      'A search completed before its capture barrier was released');
+    fs.writeFileSync(issuedBarrier.releaseFile, 'release');
+    const aOutcome = await issuedARequest.outcome;
+    requireThat(!aOutcome.error && aOutcome.value.status === 200
+      && matchingHit(aOutcome.value, file, marker),
+    `issued A search failed after B served: ${aOutcome.error?.message ?? aOutcome.value?.text}`);
+    console.log('MODEL_LIVE_AB_ISSUED_SEARCH_PASS', JSON.stringify({
+      sourceGeneration, promotedGeneration: `g-${operationKey}`,
+      capturedGeneration: issuedAReached.activeGeneration,
+      aVectorHits: JSON.parse(aOutcome.value.text).results.length,
+      bVectorHitsWhileAHeld: JSON.parse(issuedB.text).results.length,
+      aSearchCompletedAfterB: true,
+    }));
   }
   await dispatched.settled;
   if (cancelBeforePointer) {
@@ -1163,6 +1228,10 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     restartCount: promotedSupervisor.restartCount,
     ...(semantic ? { semantic } : {}) }));
   } finally {
+    if (issuedSearch) {
+      fs.writeFileSync(issuedBarrier.releaseFile, 'release');
+      fs.writeFileSync(migrationBarrier.releaseFile, 'release');
+    }
     await transitionSampler?.stop();
   }
 }

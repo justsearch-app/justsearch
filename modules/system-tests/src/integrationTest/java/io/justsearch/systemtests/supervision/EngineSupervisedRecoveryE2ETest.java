@@ -77,6 +77,36 @@ final class EngineSupervisedRecoveryE2ETest {
     });
   }
 
+  static void runSeededBesideIssuedSearch() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-12 issued-search scenario requires retained CPU A and FP16 CUDA B model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-issued-search-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      String output = runInstalledModelScenario(repo, work, "model-live-a-b-issued-search",
+          besideModelEnvironment(), "MODEL_LIVE_AB_ISSUED_SEARCH_PASS");
+      var issued = markerPayload(output, "MODEL_LIVE_AB_ISSUED_SEARCH_PASS");
+      var cut = markerPayload(output, "MODEL_LIVE_AB_CUT");
+      var terminal = markerPayload(output, "MODEL_LIVE_AB_PASS");
+      assertEquals(issued.path("sourceGeneration").asText(),
+          issued.path("capturedGeneration").asText(), output);
+      assertEquals(issued.path("promotedGeneration").asText(),
+          terminal.path("activeGeneration").asText(), output);
+      assertFalse(issued.path("sourceGeneration").asText().equals(
+          issued.path("promotedGeneration").asText()), output);
+      assertTrue(issued.path("aVectorHits").asInt() > 0, output);
+      assertTrue(issued.path("bVectorHitsWhileAHeld").asInt() > 0, output);
+      assertBooleanTrue(issued.path("aSearchCompletedAfterB"), output);
+      assertEquals("BESIDE", cut.path("mode").asText(), output);
+      assertFalse(cut.path("aModel").path("sha256").asText().equals(
+          cut.path("bModel").path("sha256").asText()), output);
+      assertEquals(0, terminal.path("restartCount").asInt(), output);
+      System.out.println("LIFECYCLE_ISSUED_A_SEARCH_PASS §12 " + issued);
+    });
+  }
+
   static void runSeededInPlaceAcceptedWriteDuringBuild() throws Exception {
     Path repo = repositoryRoot();
     assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),

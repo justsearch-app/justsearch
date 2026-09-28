@@ -1,8 +1,8 @@
 import path from 'node:path';
 
-/** File names shared by the operation and migration transition supervisor proofs. */
+/** File names shared by the operation, migration, and issued-search supervisor proofs. */
 export function barrierFiles(data, family = 'operation-fault') {
-  if (!['operation-fault', 'migration-barrier'].includes(family)) {
+  if (!['operation-fault', 'migration-barrier', 'issued-a-search'].includes(family)) {
     throw new Error(`unknown supervisor barrier family: ${family}`);
   }
   const runtime = path.join(data, 'runtime');

@@ -33,9 +33,10 @@ const modelLiveABGap = scenario === 'model-live-a-b-gap';
 const modelLiveABCancel = scenario === 'model-live-a-b-cancel';
 const modelLiveABRecomposeFailure = scenario === 'model-live-a-b-recompose-failure';
 const modelLiveABAcceptedCancel = scenario === 'model-live-a-b-accepted-cancel';
+const modelLiveABIssuedSearch = scenario === 'model-live-a-b-issued-search';
 const modelLiveABDecision = modelLiveABGap || modelLiveABCancel || modelLiveABRecomposeFailure;
 const modelLiveAB = scenario === 'model-live-a-b' || modelLiveABDecision
-  || modelLiveABAcceptedCancel;
+  || modelLiveABAcceptedCancel || modelLiveABIssuedSearch;
 const acceptedWriteDuringBuild = modelLiveABAcceptedCancel || (modelLiveAB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE === '1');
 const watcherDeleteDuringBuild = acceptedWriteDuringBuild
@@ -43,7 +44,8 @@ const watcherDeleteDuringBuild = acceptedWriteDuringBuild
 // Create the finite MIGRATING load after A's vector readiness check. The named
 // before-SWITCHING barrier holds the monitor while the watcher probe runs.
 const extraBuildFiles = watcherDeleteDuringBuild ? 300 : acceptedWriteDuringBuild ? 80 : 0;
-const distinctModelB = modelLiveABDecision || modelLiveABAcceptedCancel || (modelLiveAB
+const distinctModelB = modelLiveABDecision || modelLiveABAcceptedCancel
+  || modelLiveABIssuedSearch || (modelLiveAB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B === '1');
 const inPlaceModelB = modelLiveABDecision || modelLiveABAcceptedCancel || (distinctModelB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE === '1');
@@ -77,7 +79,8 @@ const data = path.join(work, 'data');
 if (modelLiveAB || bulkGapApproval) {
   // This owned installed fixture previously exercised a different crash cut.
   for (const marker of ['operation-fault-reached.json', 'operation-fault-release',
-    'migration-barrier-reached.json', 'migration-barrier-release']) {
+    'migration-barrier-reached.json', 'migration-barrier-release',
+    'issued-a-search-reached.json', 'issued-a-search-release']) {
     fs.rmSync(path.join(data, 'runtime', marker), { force: true });
   }
 }
@@ -125,6 +128,7 @@ delete env.JUSTSEARCH_OPERATION_FAULT_SELF_EXIT;
 delete env.JUSTSEARCH_MIGRATION_BARRIER_POINT;
 delete env.JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT;
 delete env.JUSTSEARCH_MIGRATION_BARRIER_REFUSE;
+delete env.JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY;
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
 if (['writer', 'processing', 'operation'].includes(scenario) || scenario === undefined
     || operationFault || lockScenario) {
@@ -191,7 +195,14 @@ if (modelLiveAB) {
   env.JUSTSEARCH_OPERATION_FAULT_POINT = modelLiveABDecision
     ? 'bulk-before-building-checkpoint' : 'installer-before-marker';
   if (modelLiveABDecision) env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-green-drained';
-  else if (acceptedWriteDuringBuild) {
+  else if (modelLiveABIssuedSearch) {
+    env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-after-live-activation';
+    const source = path.join(work, 'installer-root-a', 'installer-0.txt');
+    requireThat(fs.existsSync(source), 'issued A search requires the installed private source');
+    const marker = fs.readFileSync(source, 'utf8').split(/\s+/)[0];
+    env.JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY = `${marker} ${marker}`;
+    env.JUSTSEARCH_WORKER_DEADLINE_MS = '180000';
+  } else if (acceptedWriteDuringBuild) {
     env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-before-switching';
   }
   if (distinctModelB) {
@@ -433,7 +444,8 @@ try {
       gapApproval: modelLiveABGap,
       gapCancellation: modelLiveABCancel || modelLiveABRecomposeFailure,
       gapRecomposeFailure: modelLiveABRecomposeFailure,
-      cancelBeforePointer: modelLiveABAcceptedCancel, engineLogWindow });
+      cancelBeforePointer: modelLiveABAcceptedCancel, engineLogWindow,
+      issuedSearch: modelLiveABIssuedSearch });
   } else if (modelBoot) {
     const initialStatus = await waitFor('model binding boot status', 60000, async () => {
       try {

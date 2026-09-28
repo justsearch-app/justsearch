@@ -86,6 +86,14 @@ installed gap/cancel pair passed at `tmp/5242` with two AI tests, zero skips or
 failures; the approved-gap fixture now checks active CPU citation at initial
 A, restored A, and promoted B as well as its exact A→B→A→B log identities.
 The exact-source repository static, default-parallel native stress suite,
-and build gates passed at `tmp/5243`–`tmp/5245`. Checkpoint commit/push and
-hosted exact-SHA proof remain before the physical issued-A search across B
-publication and Batch 5.
+and build gates passed at `tmp/5243`–`tmp/5245`. Checkpoint
+`00a6cfe1f328435a0e7fb0b8ae3cb14c34afdcc6` passed exact-SHA hosted
+run `36416027903` (all 13 jobs). The physical issued-A search across B
+publication passed at `tmp/5249`: A's captured generation remained issued
+while distinct B published and answered a vector query, then A completed.
+The red preflight at `tmp/5248` was a missing harness barrier-file family,
+corrected before the physical rerun. Repository static, default-parallel
+stress suite, build, regeneration and documentation gates pass at
+`tmp/5250`–`tmp/5254`; exact harness-only runtime marker carve-outs pass the
+closure gate, with an unsanctioned-name mutation control. Checkpoint and
+hosted proof remain before Batch 5.

@@ -124,9 +124,33 @@ The exact corrected source passed repository static checks at `tmp/5243`
 tasks, 1,874 preserved JUnit XML files; the native concurrent stress test has
 one run and zero skips/failures), and `build -x test` at `tmp/5245` (333
 tasks). Regeneration, runtime matrix, canonical links, and store
-recoverability checks passed. Batch 4 checkpoint commit, push, and hosted
-exact-SHA proof remain due; the physical issued-A search across B publication
-then precedes Batch 5.
+recoverability checks passed. Batch 4 was committed and pushed as
+`00a6cfe1f328435a0e7fb0b8ae3cb14c34afdcc6`; exact-SHA hosted
+[run 36416027903](https://github.com/justsearch-app/justsearch/actions/runs/36416027903)
+passed all 13 jobs, including system integration and wall-clock attribution.
+The physical D1-12 issued-A search proof passed at `tmp/5249` (one AI test,
+zero skips/failures; preserved XML SHA-256
+`4FEDD6E120D09FAE9E8818236D1500E0B854628FE2C435B7D4994A60974E3D9C`).
+The first `tmp/5248` run failed before A/B checks because the supervisor
+barrier-file helper omitted the new issued-search family; its red XML is
+preserved. The corrected private fixture
+`tmp/lane-f-takeover/lifecycle-issued-search-83c5281c-e213-4a75-8e8a-742b620964cb/`
+held a query after capture on A, published a distinct FP16 B, answered a B
+vector query while A remained held, then completed A with two vector hits.
+The source and captured generation match, B's generation and embedding SHA
+differ, restart count is zero, and owned ports closed. `quick_health` reports
+the shared stack absent. The exact source passed repository Spotless/PMD at
+`tmp/5250` (321 tasks), the default-parallel stress-enabled suite at
+`tmp/5252` (196 tasks, 7 executed and 189 up to date; 1,874 XML files in
+`tmp/5252-d1-12-issued-suite-xml-structured/`), and `build -x test` at
+`tmp/5254` (333 tasks). The native concurrent stress XML is one test, zero
+skips/failures, reused from the preceding unchanged native source. Regen,
+store recoverability, runtime matrix, llms.txt, and canonical links pass.
+The runtime-manifest closure check initially flagged two older Batch 4
+private harness markers; exact harness-only carve-outs now pass at `tmp/5251`.
+An unsanctioned marker mutation made the gate fail on the intended
+`sibling-file` rule at `tmp/5253`, and the restored tree passes. Checkpoint
+commit/push and exact-SHA hosted proof remain for this cut.
 
 Independent review also traced a separate D1-4/12 Batch 5 blocker: a valid
 reranker-only or citation-only installer candidate takes ordinary settings
@@ -142,8 +166,9 @@ The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
 worktree. Pushing and opening that separate PR await the owner's explicit
 per-action authorization; this does not block Lane F.
 
-**Next, in order:** continue
-[WP3 batches 4/5](improvements/WP3-remaining-work-plan.md), then D2, E, and F.
+**Next, in order:** finish the D1-12 checkpoint and exact-SHA hosted proof,
+then continue [WP3 Batch 5](improvements/WP3-remaining-work-plan.md), D1
+closure, D2, E, and F.
 Root owns the single Gradle build and dev-stack lease. Full-suite gates run with
 default parallelism; use `--max-workers=1` only for a diagnosed contention rerun.
 Leave the unrelated untracked `modules/app-inference/logs/` directory alone.

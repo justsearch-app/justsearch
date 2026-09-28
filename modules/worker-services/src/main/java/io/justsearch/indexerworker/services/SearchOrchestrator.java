@@ -2,6 +2,9 @@
 package io.justsearch.indexerworker.services;
 
 import io.justsearch.adapters.lucene.runtime.LuceneRuntime;
+import io.justsearch.configuration.PlatformPaths;
+import io.justsearch.configuration.SystemAccess;
+import io.justsearch.core.harness.HarnessBarrierProtocol;
 import io.justsearch.indexerworker.disambiguation.EntityClusterSnapshot;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.server.EncoderBindings;
@@ -14,7 +17,12 @@ import io.justsearch.indexerworker.services.respond.SearchResponseBuilder;
 import io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
+import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Search orchestration facade (tempdoc 517 + tempdoc 516 P3 cut).
@@ -32,7 +40,9 @@ import java.util.function.Supplier;
  * spladeIdfQueryEncoder) follow distinct async-load paths that aren't part of the
  * EncoderBindings symmetry.
  *
- * <p>The facade's {@code execute(...)} body is four lines.
+ * <p>The facade's {@code execute(...)} body keeps capture, plan, execute and
+ * response construction as explicit cancellation seams. The installed harness
+ * can hold a captured search at the first seam to verify generation lifetime.
  */
 public final class SearchOrchestrator {
 
@@ -48,6 +58,7 @@ public final class SearchOrchestrator {
   private final SearchPlanner planner;
   private final SearchExecutor executor;
   private final SearchResponseBuilder responseBuilder;
+  private final Consumer<SearchInputs> afterCapture;
   // Tempdoc 687 R3d: retained only for the boot-time warmUp() empty-index guard below.
   private final io.justsearch.adapters.lucene.runtime.IndexCountOps indexCountOps;
 
@@ -97,7 +108,34 @@ public final class SearchOrchestrator {
             lifecycle.facetingEngine(),
             lifecycle::indexAnalyzerOrNull,
             lifecycle::resolvedConfig);
+    this.afterCapture = issuedSearchBarrierFromEnvironment();
     this.indexCountOps = lifecycle.indexCountOps();
+  }
+
+  /** One installed-harness hold after a real request captures A, before retrieval starts. */
+  private static Consumer<SearchInputs> issuedSearchBarrierFromEnvironment() {
+    String query = SystemAccess.rawEnvVar("JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY");
+    if (query == null) return ignored -> {};
+    if (query.isBlank() || !"1".equals(SystemAccess.rawEnvVar("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
+      throw new IllegalArgumentException("Issued search barrier requires a harness query");
+    }
+    var claimed = new AtomicBoolean();
+    var dataDir = PlatformPaths.resolveDataDir();
+    return inputs -> {
+      if (!query.equals(inputs.request().getQuery()) || !claimed.compareAndSet(false, true)) return;
+      try {
+        HarnessBarrierProtocol.await(dataDir, "issued-a-search",
+            JsonMapper.builder().build().writeValueAsString(Map.of(
+                "query", query,
+                "activeGeneration", inputs.activeGeneration() == null ? "" : inputs.activeGeneration(),
+                "pid", ProcessHandle.current().pid())), false);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw WorkerServiceException.cancelled("issued search barrier interrupted");
+      } catch (IOException failure) {
+        throw new IllegalStateException("Issued search barrier failed", failure);
+      }
+    };
   }
 
   /** Captures the encoder pair from one owner publication for this request. */
@@ -132,7 +170,7 @@ public final class SearchOrchestrator {
   }
 
   /**
-   * The 4-line facade body, with a cancellation poll on each seam between the phases (review B3).
+   * Four search phases with a cancellation poll on each seam between them (review B3).
    *
    * <p>The four phases are the natural boundaries: each is a bounded piece of work that hands a
    * value to the next, so a cancel observed between them costs nothing and abandons everything
@@ -151,6 +189,7 @@ public final class SearchOrchestrator {
       CallContext ctx) {
     CallContext call = ctx == null ? CallContext.none() : ctx;
     SearchInputs inputs = capture.capture(request, allowQueryEmbeddings, compatReasonCode);
+    afterCapture.accept(inputs);
     abortIfCancelled(call, "capture");
     SearchDecision decision = planner.plan(inputs);
     abortIfCancelled(call, "plan");

@@ -68,6 +68,13 @@ const ALLOWED_RUNTIME_ARTIFACTS = new Map([
   // manifest's directory has this one too.
   ['supervisor.v1.json', 'lane F stage B item B8 (design 7.1) — the supervisor state a dead Engine cannot report'],
   ['supervisor.v1.json.tmp', 'lane F stage B item B8 — atomic-rename staging file for supervisor.v1.json'],
+  // tempdoc-ref: Lane F D1-12/D1-13 installed acceptance. These exact names are private
+  // supervisor-harness handshakes, enabled only with JUSTSEARCH_SUPERVISOR_HARNESS=1 and
+  // confined to an owned fixture data directory. They carry a reached/proof event to the
+  // test runner, never product discovery or configuration. Release files have no data payload.
+  ['issued-a-search-reached.json', 'lane F D1-12 — held issued-A search observation'],
+  ['restored-a-native-lease-reached.json', 'lane F D1-13 — held native lease observation'],
+  ['restored-a-native-lease-proof.json', 'lane F D1-13 — native lease retirement proof'],
   ['dev-reload.request', 'lane F stage A review S2 — dev-only hot-reload trigger, written by the dev MCP reload tool and deleted by the Engine on consumption. Not a discovery surface: existence is the whole payload, and the file is absent except for the instant between a bytecode push and the service reconstruction it asks for.'],
 ]);
 
