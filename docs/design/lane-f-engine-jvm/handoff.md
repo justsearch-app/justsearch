@@ -7,9 +7,10 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-28)
 
-Current pushed head is `93ad053a401968b3fe6070031557ba793bd3e2e1`
-(source tree `91351561828cc87985465b17d1158b44668caf99`). PR727 remains open
-at this SHA, and the worktree lifecycle hold has a 2026-10-04 review-by date.
+The latest runtime checkpoint with physical and hosted proof is
+`93ad053a401968b3fe6070031557ba793bd3e2e1`
+(source tree `91351561828cc87985465b17d1158b44668caf99`). PR727 remains open,
+and the worktree lifecycle hold has a 2026-10-04 review-by date.
 Exact-SHA hosted [run 36422520680](https://github.com/justsearch-app/justsearch/actions/runs/36422520680)
 passed all 13 jobs, including system integration and wall-clock attribution.
 The earlier Batch D source tree `9161227bd9e518e61af0e966fe3b441830a0d115`
@@ -155,7 +156,7 @@ An unsanctioned marker mutation made the gate fail on the intended
 committed and pushed as `93ad053a401968b3fe6070031557ba793bd3e2e1`;
 exact-SHA hosted [run 36422520680](https://github.com/justsearch-app/justsearch/actions/runs/36422520680)
 passed all 13 jobs, including system integration and wall-clock attribution.
-The CLA check passed, and PR727 remains open at that SHA.
+The CLA check passed. This proof applies to the runtime source at that SHA.
 
 Independent review also traced a separate D1-4/12 Batch 5 blocker: a valid
 reranker-only or citation-only installer candidate takes ordinary settings
