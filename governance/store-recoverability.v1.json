@@ -45,13 +45,14 @@
       ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
-      "format": "JSON envelope v4 around UiSettings object",
-      "currentVersion": 4,
+      "format": "JSON envelope v5 around UiSettings object and optional committed query-role selection",
+      "currentVersion": 5,
       "readableLegacyVersions": [
         0,
         1,
         2,
-        3
+        3,
+        4
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
       "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
@@ -61,7 +62,7 @@
       "corruptionPolicy": "PRESERVE_AND_RECOVER_DEFAULTS",
       "corruptionNote": "Unparseable file is moved to settings.json.corrupt-<timestamp>, defaults are loaded, and LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT is raised as a WARN condition (ADR-0008, tempdoc 882 item 24). A future schemaVersion still fails loud (futureVersionRefusalTest). Test methods: readWrite_malformedStateIsQuarantinedAndDefaulted and readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback in the tests file below; the refusal is readWrite_futureVersionIsRefusedWithoutOverwrite.",
       "reconciliation": "READ_V0_OR_V1_AND_WRITE_V1",
-      "reconciliationNote": "Frozen updater compatibility-strategy identifier from the v1 register: it names read-in-place legacy upcast and atomic rewrite, not the current schema number. UiSettingsStore now writes v4 and reads v0-v3; currentVersion, readableLegacyVersions and versionSource carry those actual versions. Renaming this token would make installed v0.2.0/v0.3.0 updaters reject the successor release before checking readable versions.",
+      "reconciliationNote": "Frozen updater compatibility-strategy identifier from the v1 register: it names read-in-place legacy upcast and atomic rewrite, not the current schema number. UiSettingsStore now writes v5 and reads v0-v4; currentVersion, readableLegacyVersions and versionSource carry those actual versions. Renaming this token would make installed v0.2.0/v0.3.0 updaters reject the successor release before checking readable versions.",
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",

@@ -3,6 +3,7 @@ package io.justsearch.app.services.settings;
 
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.SettingsWitness;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
@@ -13,6 +14,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -59,7 +61,7 @@ public final class UiSettingsStore {
 
   private static final Logger log = LoggerFactory.getLogger(UiSettingsStore.class);
 
-  static final int CURRENT_SCHEMA_VERSION = 4;
+  static final int CURRENT_SCHEMA_VERSION = 5;
 
   /**
    * Versions this build can still read and migrate forward. {@code 0} is the unversioned legacy
@@ -67,7 +69,7 @@ public final class UiSettingsStore {
    * fatal by {@link StoreFormatVersions#requireReadable}, so every schema bump must extend this
    * list or every existing install fails to start.
    */
-  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1, 2, 3};
+  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1, 2, 3, 4};
 
   /**
    * The pre-883 shipped default for {@code contextLength}. Tempdoc 883 made the context window a
@@ -108,17 +110,22 @@ public final class UiSettingsStore {
   }
 
   public UiSettings load() {
+    return loadSnapshot().settings();
+  }
+
+  /** Loads the preferences and their committed query-role selection from the same file. */
+  public Snapshot loadSnapshot() {
     if (mode == PersistenceMode.IN_MEMORY) {
-      return new UiSettings();
+      return new Snapshot(new UiSettings(), new SettingsWitness(0, null), null);
     }
     if (!Files.exists(settingsFile)) {
-      return new UiSettings();
+      return new Snapshot(new UiSettings(), new SettingsWitness(0, null), null);
     }
     try {
-      return parseOrThrow().settings();
+      return parseOrThrow();
     } catch (CorruptDurableStoreException e) {
       lastRecovery = quarantineCorruptFile(e);
-      return new UiSettings();
+      return new Snapshot(new UiSettings(), new SettingsWitness(0, null), null);
     }
   }
 
@@ -135,12 +142,17 @@ public final class UiSettingsStore {
     this.onRecoveryCleared = r;
   }
 
-  public record Snapshot(UiSettings settings, SettingsWitness witness) {}
+  public record Snapshot(UiSettings settings, SettingsWitness witness,
+      QueryRoleSelection queryRoles) {
+    public Snapshot(UiSettings settings, SettingsWitness witness) {
+      this(settings, witness, null);
+    }
+  }
 
   /** Reads without quarantine/default recovery, for commitment classification by the apply owner. */
   public Snapshot inspect() {
     if (mode == PersistenceMode.IN_MEMORY) {
-      return new Snapshot(new UiSettings(), new SettingsWitness(0, null));
+      return new Snapshot(new UiSettings(), new SettingsWitness(0, null), null);
     }
     if (!Files.notExists(settingsFile)) {
       // Unknown accessibility is not absence. Parsing fails closed if the file cannot be read.
@@ -162,7 +174,7 @@ public final class UiSettingsStore {
         throw new UncheckedIOException("Cannot inspect settings quarantine evidence", failure);
       }
     }
-    return new Snapshot(new UiSettings(), new SettingsWitness(0, null));
+    return new Snapshot(new UiSettings(), new SettingsWitness(0, null), null);
   }
 
   /**
@@ -274,7 +286,18 @@ public final class UiSettingsStore {
         }
         witness = new SettingsWitness(revision.longValue(), key.isNull() ? null : key.asText());
       }
-      return new Snapshot(migrate(settings, resolvedVersion), witness);
+      QueryRoleSelection queryRoles = null;
+      JsonNode queryNode = root.get("queryRoles");
+      if (queryNode != null) {
+        if (resolvedVersion < 5 || queryNode.isNull()) {
+          throw new CorruptDurableStoreException("ui-settings", "invalid query role selection");
+        }
+        queryRoles = MAPPER.treeToValue(queryNode, QueryRoleSelection.class);
+        if (queryRoles == null) {
+          throw new CorruptDurableStoreException("ui-settings", "invalid query role selection");
+        }
+      }
+      return new Snapshot(migrate(settings, resolvedVersion), witness, queryRoles);
     } catch (CorruptDurableStoreException
         | io.justsearch.configuration.persistence.UnsupportedStoreVersionException e) {
       throw e;
@@ -347,38 +370,61 @@ public final class UiSettingsStore {
     private final UiSettingsStore owner;
     private final UiSettings settings;
     private final SettingsWitness witness;
+    private final QueryRoleSelection queryRoles;
     private final byte[] bytes;
 
-    private PreparedSettings(UiSettingsStore owner, UiSettings settings, SettingsWitness witness, byte[] bytes) {
+    private PreparedSettings(UiSettingsStore owner, UiSettings settings, SettingsWitness witness,
+        QueryRoleSelection queryRoles, byte[] bytes) {
       this.owner = owner;
       this.settings = settings;
       this.witness = witness;
+      this.queryRoles = queryRoles;
       this.bytes = bytes;
     }
 
     public UiSettings settings() { return copy(settings); }
     public SettingsWitness witness() { return witness; }
+    public QueryRoleSelection queryRoles() { return queryRoles; }
   }
 
   public PreparedSettings prepare(UiSettings settings, SettingsWitness witness) {
-    return prepareInternal(settings, witness, true);
+    return prepareInternal(settings, witness, null, true);
+  }
+
+  public PreparedSettings prepare(UiSettings settings, SettingsWitness witness,
+      QueryRoleSelection queryRoles) {
+    return prepareInternal(settings, witness, queryRoles, true);
+  }
+
+  /** Stamps a detached candidate without serializing settings before physical owner preparation. */
+  public UiSettings prepareCandidate(UiSettings settings) {
+    if (!mode.isWritable()) throw new IllegalStateException("Settings store is read-only");
+    UiSettings candidate = copy(Objects.requireNonNull(settings, "settings"));
+    candidate.getWindow().stampLastShown();
+    return candidate;
   }
 
   /** Preserves every accepted candidate field for a generation-bound roll-forward projection. */
   public PreparedSettings prepareExact(UiSettings settings, SettingsWitness witness) {
-    return prepareInternal(settings, witness, false);
+    return prepareInternal(settings, witness, null, false);
+  }
+
+  public PreparedSettings prepareExact(UiSettings settings, SettingsWitness witness,
+      QueryRoleSelection queryRoles) {
+    return prepareInternal(settings, witness, queryRoles, false);
   }
 
   private PreparedSettings prepareInternal(UiSettings settings, SettingsWitness witness,
+      QueryRoleSelection queryRoles,
       boolean stampLastShown) {
     if (!mode.isWritable()) throw new IllegalStateException("Settings store is read-only");
-    UiSettings candidate = copy(Objects.requireNonNull(settings, "settings"));
+    UiSettings candidate = stampLastShown ? prepareCandidate(settings)
+        : copy(Objects.requireNonNull(settings, "settings"));
     Objects.requireNonNull(witness, "witness");
-    if (stampLastShown) candidate.getWindow().stampLastShown();
     byte[] bytes = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(
         new PersistedSettings(CURRENT_SCHEMA_VERSION, candidate,
-            witness.acceptedRevision(), witness.lastCommittedOperationKey()));
-    return new PreparedSettings(this, candidate, witness, bytes);
+            witness.acceptedRevision(), witness.lastCommittedOperationKey(), queryRoles));
+    return new PreparedSettings(this, candidate, witness, queryRoles, bytes);
   }
 
   /** Performs only strict replacement; the owner resolves ambiguous errors using inspect(). */
@@ -403,7 +449,9 @@ public final class UiSettingsStore {
   }
 
   private record PersistedSettings(
-      int schemaVersion, UiSettings settings, long acceptedRevision, String lastCommittedOperationKey) {}
+      int schemaVersion, UiSettings settings, long acceptedRevision,
+      String lastCommittedOperationKey,
+      @JsonInclude(JsonInclude.Include.NON_NULL) QueryRoleSelection queryRoles) {}
 
   private static Path resolveSettingsFile() {
     // Tempdoc 519 §9 Block B3.0.d: moved from io.justsearch.ui.settings to app-services.

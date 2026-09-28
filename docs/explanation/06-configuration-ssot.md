@@ -84,8 +84,13 @@ Path llmModel = Path.of(EnvRegistry.LLM_MODEL_PATH.getString("Qwen_Qwen3.5-9B-Q4
 
 ## Settings preparation and storage
 
-`UiSettingsStore` writes a schema-v4 envelope containing settings, `acceptedRevision`, and
-`lastCommittedOperationKey`. Legacy raw settings and v1/v2/v3 envelopes remain readable;
+`UiSettingsStore` writes a schema-v5 envelope containing settings, `acceptedRevision`,
+`lastCommittedOperationKey`, and an optional query-role selection. An absent selection
+retains the active generation manifest's legacy authority; a present selection
+distinguishes each explicitly disabled query role from an exact selected model and
+tokenizer file identity. The query-role owner and boot path are still being connected
+in Lane F D1, so this field is not yet a serving-runtime claim. Legacy raw settings
+and v1/v2/v3/v4 envelopes remain readable;
 versions before v3 cannot carry revision fields. A witness is either revision zero with no
 key or a positive revision with a canonical UUIDv7 key. Future versions are refused.
 

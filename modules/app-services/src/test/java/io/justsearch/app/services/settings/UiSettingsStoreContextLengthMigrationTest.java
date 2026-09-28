@@ -109,7 +109,7 @@ final class UiSettingsStoreContextLengthMigrationTest {
     store.replacePrepared(store.prepare(store.load(), new SettingsWitness(0, null)));
 
     String persisted = Files.readString(file);
-    assertTrue(persisted.contains("\"schemaVersion\" : 4"), persisted);
+    assertTrue(persisted.contains("\"schemaVersion\" : 5"), persisted);
     assertEquals(0, new UiSettingsStore(READ_WRITE, file).load().getContextLength());
   }
 

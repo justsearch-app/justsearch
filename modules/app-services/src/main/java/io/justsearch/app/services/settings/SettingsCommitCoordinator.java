@@ -12,6 +12,7 @@ import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsWitness;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.registry.executor.RecordedInstallerGenerationPlanResolver;
@@ -46,7 +47,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(successor, "successor");
     Objects.requireNonNull(plan, "plan");
-    var prepared = store.prepareExact(candidate, successor);
+    var prepared = store.prepareExact(candidate, successor,
+        InstallerQueryRoleSelection.fromPlan(plan).orElse(null));
     try { store.replacePrepared(prepared); }
     catch (IOException | RuntimeException moveFailure) {
       try {
@@ -54,7 +56,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         if (!successor.equals(after.witness())) {
           throw new IOException("Committed installer generation settings roll-forward failed", moveFailure);
         }
-        requireAcceptedInstallerSettings(plan, after.settings());
+        requireAcceptedInstallerProjection(plan, after);
       } catch (RuntimeException unreadable) {
         throw new IOException("Committed installer generation settings roll-forward is uncertain", unreadable);
       }
@@ -63,7 +65,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     if (!successor.equals(after.witness())) {
       throw new IOException("Committed installer generation settings roll-forward lost its witness");
     }
-    requireAcceptedInstallerSettings(plan, after.settings());
+    requireAcceptedInstallerProjection(plan, after);
     return after.settings();
   }
 
@@ -81,6 +83,20 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     }
   }
 
+  /** A committed pointer and settings witness must name the same accepted query bytes. */
+  public static void requireAcceptedInstallerProjection(RecordedInstallerGenerationPlan plan,
+      UiSettingsStore.Snapshot snapshot) throws IOException {
+    requireAcceptedInstallerSettings(plan, snapshot.settings());
+    try {
+      if (!Objects.equals(InstallerQueryRoleSelection.fromPlan(plan).orElse(null),
+          snapshot.queryRoles())) {
+        throw new IOException("Installer generation query selection differs from accepted plan");
+      }
+    } catch (RuntimeException invalid) {
+      throw new IOException("Installer generation query selection is invalid", invalid);
+    }
+  }
+
   @FunctionalInterface
   interface Replacement {
     void replace(UiSettingsStore.PreparedSettings prepared) throws IOException;
@@ -93,6 +109,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     private final String key;
     private final SettingsWitness prior;
     private final UiSettings priorSettings;
+    private final QueryRoleSelection priorQueryRoles;
     private Phase phase = Phase.PREPARING;
     private boolean preparationStarted;
     private boolean restartRequired;
@@ -101,13 +118,12 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     @Override public long expectedRevision() { return prior.acceptedRevision(); }
     private boolean recoveryReset() { return quarantineFingerprint != null; }
 
-    private SettingsCommitFence(long id, String key, SettingsWitness prior) {
-      this(id, key, prior, null, null, false);
-    }
     private SettingsCommitFence(long id, String key, SettingsWitness prior,
-        UiSettings priorSettings, String fingerprint, boolean reset) {
+        UiSettings priorSettings, QueryRoleSelection priorQueryRoles,
+        String fingerprint, boolean reset) {
       this.id = id; this.key = key; this.prior = prior;
       this.priorSettings = priorSettings;
+      this.priorQueryRoles = priorQueryRoles;
       this.quarantineFingerprint = fingerprint; this.reset = reset;
     }
   }
@@ -253,7 +269,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
     }
-    var reserved = new SettingsCommitFence(id, key, prior, snapshot.settings(), null, reset);
+    var reserved = new SettingsCommitFence(id, key, prior, snapshot.settings(),
+        snapshot.queryRoles(), null, reset);
     fence = reserved;
     return reserved;
   }
@@ -282,7 +299,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, row.id()));
       fence = new SettingsCommitFence(row.id(), row.key(), new SettingsWitness(0, null),
-          null, intent.quarantineFingerprint(), true);
+          null, null, intent.quarantineFingerprint(), true);
       return fence;
     } finally { mutex.unlock(); publishIssue(); }
   }
@@ -344,7 +361,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       var successor = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
       // Exact bytes matter: the accepted generation plan already froze this detached settings
       // candidate, including ordinary settings that accompanied the model paths.
-      var preparedSettings = store.prepareExact(candidate, successor);
+      var preparedSettings = store.prepareExact(candidate, successor,
+          InstallerQueryRoleSelection.fromPlan(plan).orElse(null));
       ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(preparedSettings.settings()),
           "Prepared installer configuration");
       requireSelectedInstallerEncoderPaths(desired, plan);
@@ -440,7 +458,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       var actual = RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
           tools.jackson.databind.json.JsonMapper.builder().build()
               .writeValueAsString(snapshot.settings()));
-      return plan.candidateSettings().equals(actual);
+      return plan.candidateSettings().equals(actual)
+          && Objects.equals(InstallerQueryRoleSelection.fromPlan(plan).orElse(null),
+              snapshot.queryRoles());
     } catch (RuntimeException unavailable) {
       return false;
     }
@@ -657,12 +677,12 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         }
       }
       var next = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
-      var prepared = store.prepare(candidate, next);
+      UiSettings preparedCandidate = store.prepareCandidate(candidate);
       // A recovery reset starts from quarantined bytes with no readable prior settings.
       // Its committed defaults are applied by the already-required successor boot.
       boolean chatComponentChanged = !active.recoveryReset() && !Objects.equals(
-          active.priorSettings.getChatEnabled(), prepared.settings().getChatEnabled());
-      ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(prepared.settings()), "Prepared config");
+          active.priorSettings.getChatEnabled(), preparedCandidate.getChatEnabled());
+      ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(preparedCandidate), "Prepared config");
       ResolvedConfig serving = config.get();
       var changedKeys = active.recoveryReset()
           ? new ConfigApplyScopes.ChangedKeys(Set.of(), Map.of(),
@@ -673,6 +693,16 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
             "Generation-bound settings require a separate reindex operation",
             Map.of("keys", List.copyOf(changedKeys.generationBound()),
                 "operation", "core.bulk-reindex"));
+      }
+      boolean queryPathChanged = !active.recoveryReset() && (
+          !Objects.equals(active.priorSettings.getRerankerModelPath(),
+              preparedCandidate.getRerankerModelPath())
+          || !Objects.equals(active.priorSettings.getCitationScorerModelPath(),
+              preparedCandidate.getCitationScorerModelPath()));
+      if (queryPathChanged && !changedKeys.component().containsKey("encoders")) {
+        throw refused("QUERY_ROLE_PATH_OVERRIDDEN",
+            "Query model path change is masked by an operator source",
+            Map.of("component", "encoders"));
       }
       boolean restartRequired = !changedKeys.restartRequired().isEmpty();
       // API_PORT is the only restart-required value this settings candidate can write. If an
@@ -709,12 +739,22 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           });
         }
         preparedComponents = Objects.requireNonNull(
-            components.prepare(prepared.settings(), resolved, Map.copyOf(affected), candidateContext,
+            components.prepare(preparedCandidate, resolved, Map.copyOf(affected), candidateContext,
                 component -> faultHook.accept(new OperationAttemptRunnerImpl.FaultBoundary(
                     "settings-mid-compose", OperationKind.RECONFIGURE, active.key, active.key,
                     active.id, component, 0, 0))),
             "Prepared component transaction");
       }
+      QueryRoleSelection queryRoles = reset ? null : active.priorQueryRoles;
+      if (changedKeys.component().containsKey("encoders")) {
+        if (preparedComponents == null || preparedComponents.queryRoleSelection().isEmpty()) {
+          throw refused("ENCODER_SELECTION_REQUIRED",
+              "Encoder owner did not prepare a query-role selection", Map.of());
+        }
+        queryRoles = preparedComponents.queryRoleSelection().orElseThrow();
+      }
+      // The physical candidate and its exact file identities exist before final serialization.
+      var prepared = store.prepareExact(preparedCandidate, next, queryRoles);
       OperationResult preparedResponse = prepareResponse.apply(prepared.settings());
       if (restartRequired) preparedResponse = withRestartScheduled(preparedResponse);
       var receipt = new Receipt(active.key, next.acceptedRevision(), preparedResponse);
@@ -929,14 +969,18 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         block(new RecoveryIssue(RecoveryReason.PERSISTENCE_DISABLED, row.id()));
         return;
       }
+      final UiSettingsStore.Snapshot snapshot;
       final SettingsWitness witness;
-      try { witness = store.inspect().witness(); }
+      try {
+        snapshot = store.inspect();
+        witness = snapshot.witness();
+      }
       catch (RuntimeException failure) {
         var reset = recoveryIntent(armed.getFirst());
         if (reset != null && matchesQuarantine(reset.quarantineFingerprint())) {
           recoveredDecision = precommitFailure(row);
           fence = new SettingsCommitFence(row.id(), row.key(), new SettingsWitness(0, null),
-              null, reset.quarantineFingerprint(), true);
+              null, null, reset.quarantineFingerprint(), true);
         }
         block(new RecoveryIssue(RecoveryReason.UNREADABLE_WITNESS, row.id()));
         return;
@@ -955,7 +999,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         // after that pointer moved, or may already be B before runtime publication. Neither
         // witness alone decides its terminal outcome; the recorded-ingestion owner must inspect
         // the accepted candidate, pointer, settings projection and reconstructed runtime.
-        fence = new SettingsCommitFence(row.id(), row.key(), witness);
+        fence = new SettingsCommitFence(row.id(), row.key(), witness, snapshot.settings(),
+            snapshot.queryRoles(), null, false);
         return;
       }
       if (row.key().equals(witness.lastCommittedOperationKey()) && witness.acceptedRevision() == expected + 1) {
@@ -996,7 +1041,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         return;
       }
       // Keep the bounded witness reserved until the runner persists the recovery result.
-      fence = new SettingsCommitFence(row.id(), row.key(), witness);
+      fence = new SettingsCommitFence(row.id(), row.key(), witness, snapshot.settings(),
+          snapshot.queryRoles(), null, false);
       if (row.key().equals(witness.lastCommittedOperationKey())) fence.phase = Phase.COMMITTED;
     } finally {
       mutex.unlock();

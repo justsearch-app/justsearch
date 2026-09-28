@@ -2,6 +2,7 @@
 package io.justsearch.app.services.settings;
 
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +31,10 @@ public interface SettingsComponentComposer {
   }
 
   interface Prepared {
+    /** Present only when a physical encoder owner prepared both query roles. */
+    default java.util.Optional<QueryRoleSelection> queryRoleSelection() {
+      return java.util.Optional.empty();
+    }
     /** Add a generation-owned observation before the final shared registry batch is built. */
     void includeObservation(io.justsearch.core.component.EngineComponentSnapshot.Component observation);
     /** Holds physical owner lifecycle locks before entering the publication write section. */

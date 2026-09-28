@@ -179,13 +179,25 @@ settings envelope's committed witness must carry exact query file and
 supporting-asset identity; the installer contract alone can advance before
 the settings commit and does not hash every supporting asset. This narrows
 D1-12's all-role manifest authority only for query roles. The refute-first
-review was read-only at `93ad053a4`; no Batch 5 code or physical proof has
-landed. Source inspection found independent reranker/citation `SessionHandle`
-and tokenizer construction; live retirement still needs proof. Next
-implementation step is to add the durable identity to the existing settings
-transaction, then connect the
-boot-registered physical owner and installed regression. Root kept this
-coupled lifecycle/ownership design rather than delegating its writes.
+review was read-only at `93ad053a4`. Source inspection found independent
+reranker/citation `SessionHandle` and tokenizer construction; live retirement
+still needs proof. A later protocol checkpoint on top of `60df8a86a` adds a
+v5 query-role selection to the settings witness, preserves it on unrelated
+writes, projects complete accepted plans, finalizes settings bytes after
+component preparation, refuses masked query paths, and adds an exact-model
+assembly overload. The first full suite at `tmp/5266` exposed two store
+self-calls to guarded publication methods; the corrected focused architecture
+gate passed at `tmp/5267` and the full suite at `tmp/5268` (9m16s, 196 tasks,
+8 executed, 188 up to date). Static, regen, store-recoverability and runtime
+manifest checks passed at `tmp/5265` and in the terminal. The fixed physical
+owner is still absent, so query-only apply still refuses before commitment;
+boot still does not consume the selection and installed behavior is unproved.
+The next owner cut must partition query sessions at initial and recorded
+composition, pair independently leased query and index sets in each immutable
+serving view, preserve the running Green producer, then connect the fixed
+owner and boot path before installed/crash-cut acceptance. The read-only owner
+audit traced initial/deferred, candidate, in-place, promotion, close and
+quiescence paths; D1 records that scope. Root owns the coupled lifecycle writes.
 
 The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
 `codex/lane-f-workflow-order` from `origin/main`, in its separate managed

@@ -86,6 +86,14 @@ public final class CitationScorer implements Closeable {
     return CrossEncoderReranker.buildAssembly(sessions, tokenizerPath, maxSequenceLength);
   }
 
+  /** Query-role witnesses bypass directory discovery for the model-name probe. */
+  public static RerankerAssembly buildAssembly(
+      SessionHandle sessions, Path tokenizerPath, Path modelPath, int maxSequenceLength)
+      throws OrtException {
+    return CrossEncoderReranker.buildAssembly(sessions, tokenizerPath, modelPath,
+        maxSequenceLength);
+  }
+
   /** Returns true if the scorer is ready for inference. */
   public boolean isAvailable() {
     return !closed;

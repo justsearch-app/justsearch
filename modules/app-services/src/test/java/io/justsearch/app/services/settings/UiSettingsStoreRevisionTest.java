@@ -6,6 +6,8 @@ import static io.justsearch.app.services.settings.UiSettingsStore.PersistenceMod
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.StoreFormatVersions;
@@ -68,7 +70,7 @@ class UiSettingsStoreRevisionTest {
     assertEquals(new SettingsWitness(0, null), store.inspect().witness());
     assertEquals(4096, store.load().getContextLength());
     store.replacePrepared(store.prepare(store.load(), new SettingsWitness(1, KEY)));
-    assertTrue(Files.readString(path).contains("\"schemaVersion\" : 4"));
+    assertTrue(Files.readString(path).contains("\"schemaVersion\" : 5"));
     assertThrows(UnsupportedStoreVersionException.class,
         () -> StoreFormatVersions.requireReadable("ui-settings", 3, 2, 0, 0, 1));
   }
@@ -103,6 +105,43 @@ class UiSettingsStoreRevisionTest {
       assertTrue(restarted.lastRecovery().isEmpty(), "The restarted instance did not perform the quarantine");
       assertEquals(raw, Files.readString(store.lastRecovery().orElseThrow().backupPath()));
     }
+  }
+
+  @Test
+  void queryRoleSelectionDistinguishesLegacyFromDisabledAndSurvivesReboot() throws Exception {
+    Path path = directory.resolve("settings.json");
+    UiSettingsStore store = new UiSettingsStore(READ_WRITE, path);
+    Files.writeString(path, "{\"schemaVersion\":4,\"settings\":{},"
+        + "\"acceptedRevision\":0,\"lastCommittedOperationKey\":null}");
+    assertNull(store.inspect().queryRoles(), "v4 retains manifest authority");
+
+    var selected = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
+        QueryRoleSelection.Role.selected("cpu", new ModelFile(
+            directory.resolve("citation/model.onnx"), "a".repeat(64), 10),
+            new ModelFile(directory.resolve("citation/tokenizer.json"), "b".repeat(64), 20)));
+    store.replacePrepared(store.prepareExact(new UiSettings(),
+        new SettingsWitness(1, KEY), selected));
+    assertEquals(selected, new UiSettingsStore(READ_WRITE, path).loadSnapshot().queryRoles());
+    assertTrue(Files.readString(path).contains("\"queryRoles\""));
+    assertEquals(QueryRoleSelection.State.DISABLED, store.inspect().queryRoles().reranker().state());
+  }
+
+  @Test
+  void queryRoleSelectionRejectsMixedModelAndTokenizerDirectories() {
+    var model = new ModelFile(directory.resolve("a/model.onnx"), "a".repeat(64), 10);
+    var tokenizer = new ModelFile(directory.resolve("b/tokenizer.json"), "b".repeat(64), 20);
+    assertThrows(IllegalArgumentException.class,
+        () -> QueryRoleSelection.Role.selected("cpu", model, tokenizer));
+  }
+
+  @Test
+  void explicitNullQuerySelectionIsNotLegacyFallback() throws Exception {
+    Path path = directory.resolve("settings.json");
+    Files.writeString(path, "{\"schemaVersion\":5,\"settings\":{},"
+        + "\"acceptedRevision\":0,\"lastCommittedOperationKey\":null,"
+        + "\"queryRoles\":null}");
+    assertThrows(CorruptDurableStoreException.class,
+        () -> new UiSettingsStore(READ_WRITE, path).inspect());
   }
 
   @Test

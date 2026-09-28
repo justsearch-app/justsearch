@@ -4,6 +4,7 @@ package io.justsearch.app.services.settings;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.core.component.EngineComponentSnapshot;
@@ -35,6 +36,11 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
   public interface PreparedOwner extends SettingsComponentComposer.Prepared {
     /** Prebuilt observation of the physical candidate, installed with the other owners. */
     EngineComponentSnapshot.Component observation();
+  }
+
+  /** The encoder owner alone can supply the exact selection persisted by the settings owner. */
+  public interface QueryRolePreparedOwner extends PreparedOwner {
+    QueryRoleSelection selection();
   }
 
   private final EngineComponentRegistry registry;
@@ -105,6 +111,7 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
     var prepared = new ArrayList<PreparedOwner>();
     try {
       Map<String, EngineComponentSnapshot.Component> observations = new LinkedHashMap<>();
+      QueryRoleSelection queryRoles = null;
       for (var entry : selected.entrySet()) {
         PreparedOwner owner = Objects.requireNonNull(
             entry.getValue().prepare(candidate, desired, affected.get(entry.getKey()),
@@ -112,11 +119,17 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
                     : io.justsearch.app.api.settings.SettingsCandidateContext.NONE),
             "Prepared owner: " + entry.getKey());
         prepared.add(owner);
+        if ("encoders".equals(entry.getKey())) {
+          if (!(owner instanceof QueryRolePreparedOwner queryOwner)) {
+            throw new IllegalStateException("Encoder owner has no prepared query-role selection");
+          }
+          queryRoles = Objects.requireNonNull(queryOwner.selection(), "Query-role selection");
+        }
         observations.put(entry.getKey(), Objects.requireNonNull(owner.observation(),
             "Prepared observation: " + entry.getKey()));
         afterOwnerPrepared.accept(entry.getKey());
       }
-      return new Composite(List.copyOf(prepared), observations, registry, lease);
+      return new Composite(List.copyOf(prepared), observations, queryRoles, registry, lease);
     } catch (RuntimeException | Error failure) {
       int priorSuppressed = failure.getSuppressed().length;
       abortAll(prepared, failure);
@@ -146,17 +159,23 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
   private static final class Composite implements Prepared {
     private final List<PreparedOwner> owners;
     private final Map<String, EngineComponentSnapshot.Component> observations;
+    private final QueryRoleSelection queryRoles;
     private final EngineComponentRegistry registry;
     private final EngineComponentRegistry.ApplyLease lease;
     private EngineComponentRegistry.PreparedBatch batch;
 
     private Composite(List<PreparedOwner> owners,
         Map<String, EngineComponentSnapshot.Component> observations,
+        QueryRoleSelection queryRoles,
         EngineComponentRegistry registry, EngineComponentRegistry.ApplyLease lease) {
       this.owners = owners;
       this.observations = new LinkedHashMap<>(observations);
+      this.queryRoles = queryRoles;
       this.registry = registry;
       this.lease = lease;
+    }
+    @Override public java.util.Optional<QueryRoleSelection> queryRoleSelection() {
+      return java.util.Optional.ofNullable(queryRoles);
     }
     @Override public void withOwnerLocks(Runnable publication) {
       underOwnerLocks(0, publication);

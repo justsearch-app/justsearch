@@ -17,6 +17,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
@@ -51,6 +52,46 @@ final class FixedSettingsComponentComposerTest {
     assertEquals("COMPONENT_PREPARATION_REQUIRED", refusal.response().errorCode().orElseThrow());
     assertEquals("encoders", refusal.response().errorDetails().get("component"));
     verify(registry, never()).tryApply();
+  }
+
+  @Test
+  void encoderOwnerMustSupplyASelectionBeforeItsObservationCanCommit() {
+    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
+    when(registry.tryApply()).thenReturn(new Acquired(lease));
+    FixedSettingsComponentComposer composer = new FixedSettingsComponentComposer(registry);
+    RecordingOwner incomplete = new RecordingOwner("encoders");
+    composer.register("encoders", incomplete);
+    composer.seal();
+
+    assertThrows(IllegalStateException.class,
+        () -> composer.prepare(CANDIDATE, DESIRED, Map.of("encoders", Set.of("model"))));
+    assertEquals(1, incomplete.prepared.abortCount);
+    verify(lease).close();
+    verify(registry, never()).prepareBatch(anyMap());
+  }
+
+  @Test
+  void encoderOwnerSelectionIsExposedByThePreparedComposite() {
+    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
+    when(registry.tryApply()).thenReturn(new Acquired(lease));
+    var selection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
+        QueryRoleSelection.Role.disabled());
+    FixedSettingsComponentComposer.QueryRolePreparedOwner prepared =
+        mock(FixedSettingsComponentComposer.QueryRolePreparedOwner.class);
+    when(prepared.selection()).thenReturn(selection);
+    when(prepared.observation()).thenReturn(
+        new RecordingPrepared("encoders", null, new ArrayList<>()).observation());
+    FixedSettingsComponentComposer composer = new FixedSettingsComponentComposer(registry);
+    composer.register("encoders", (candidate, desired, keys) -> prepared);
+    composer.seal();
+
+    var composite = composer.prepare(CANDIDATE, DESIRED,
+        Map.of("encoders", Set.of("model")));
+    assertEquals(selection, composite.queryRoleSelection().orElseThrow());
+    composite.abort();
+    verify(lease).close();
   }
 
   @Test

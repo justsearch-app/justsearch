@@ -15,9 +15,11 @@ import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
 import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.api.operations.OperationState;
+import io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.settings.SettingsWitness;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.app.observability.operations.OperationAttemptRunnerImpl;
 import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
@@ -86,6 +88,123 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void unrelatedSettingsCommitRetainsCommittedQueryRoleSelection() throws Exception {
+    Path settingsPath = temp.resolve("query-selection-settings.json");
+    try (var operations = operations("query-selection")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var selection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
+          QueryRoleSelection.Role.disabled());
+      settings.replacePrepared(settings.prepare(new UiSettings(), new SettingsWitness(0, null),
+          selection));
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(settings.load()));
+      var runner = runner(operations, coordinator(settings, config));
+      UiSettings candidate = settings.load();
+      candidate.setTheme("dark");
+      var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertEquals(selection, new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+          settingsPath).inspect().queryRoles());
+    }
+  }
+
+  @Test
+  void queryOwnerSelectionIsSerializedOnlyAfterPhysicalPreparation() throws Exception {
+    Path settingsPath = temp.resolve("query-owner-settings.json");
+    Path modelDir = temp.resolve("citation-model");
+    var selection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
+        QueryRoleSelection.Role.selected("model.onnx",
+            new ModelFile(modelDir.resolve("model.onnx"), "0".repeat(64), 1),
+            new ModelFile(modelDir.resolve("tokenizer.json"), "1".repeat(64), 1)));
+    AtomicBoolean preparedOwner = new AtomicBoolean();
+    SettingsComponentComposer components = (candidate, desired, affected) -> {
+      assertEquals(Set.of("encoders"), affected.keySet());
+      assertFalse(Files.exists(settingsPath));
+      preparedOwner.set(true);
+      return new SettingsComponentComposer.Prepared() {
+        @Override public Optional<QueryRoleSelection> queryRoleSelection() {
+          return Optional.of(selection);
+        }
+        @Override public void includeObservation(
+            io.justsearch.core.component.EngineComponentSnapshot.Component observation) {}
+        @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
+        @Override public void validate() {}
+        @Override public void install() {}
+        @Override public void notifyObservers() {}
+        @Override public void retire() {}
+        @Override public void abort() {}
+      };
+    };
+    try (var operations = operations("query-owner")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          candidate -> OperationResult.success("prepared"), () -> false, components);
+      var runner = runner(operations, owner);
+      UiSettings candidate = new UiSettings();
+      candidate.setCitationScorerModelPath(modelDir.toString());
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertTrue(preparedOwner.get());
+      assertEquals(selection, settings.inspect().queryRoles());
+    }
+  }
+
+  @Test
+  void installerRollForwardPersistsOnlyCompletePlanQueryIdentities() throws Exception {
+    String key = OperationKeys.generate(CLOCK);
+    Path modelDir = temp.resolve("plan-citation");
+    Path rerankerDir = temp.resolve("plan-reranker");
+    UiSettings candidate = new UiSettings();
+    candidate.setCitationScorerModelPath(modelDir.toString());
+    var incomplete = installerPlan(key, candidate, Map.of("citation-scorer", modelDir));
+    assertTrue(InstallerQueryRoleSelection.fromPlan(incomplete).isEmpty());
+    var legacyStore = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        temp.resolve("plan-legacy-query-settings.json"));
+    SettingsCommitCoordinator.rollForwardInstallerBoot(legacyStore, candidate,
+        new SettingsWitness(1, key), incomplete);
+    assertNull(legacyStore.inspect().queryRoles());
+    candidate.setRerankerModelPath(rerankerDir.toString());
+    var bothWithoutTokenizers = installerPlan(key, candidate,
+        Map.of("reranker", rerankerDir, "citation-scorer", modelDir));
+    var assets = new java.util.ArrayList<>(bothWithoutTokenizers.assets());
+    assets.add(new RecordedInstallerGenerationPlan.AssetIdentity(
+        "citation-scorer/tokenizer.json", modelDir.resolve("tokenizer.json"),
+        "1".repeat(64), 1, bothWithoutTokenizers.acquisition()));
+    assets.add(new RecordedInstallerGenerationPlan.AssetIdentity(
+        "reranker/tokenizer.json", rerankerDir.resolve("tokenizer.json"),
+        "2".repeat(64), 1, bothWithoutTokenizers.acquisition()));
+    var complete = new RecordedInstallerGenerationPlan(bothWithoutTokenizers.operationId(),
+        bothWithoutTokenizers.profile(), bothWithoutTokenizers.source(),
+        bothWithoutTokenizers.operationKey(), bothWithoutTokenizers.sourceGeneration(),
+        bothWithoutTokenizers.scope(), bothWithoutTokenizers.target(),
+        bothWithoutTokenizers.settingsWitness(), bothWithoutTokenizers.candidateSettings(),
+        bothWithoutTokenizers.models(), assets, bothWithoutTokenizers.chatSelection(),
+        bothWithoutTokenizers.acquisition(), bothWithoutTokenizers.projectionSourceIds());
+    var expected = InstallerQueryRoleSelection.fromPlan(complete).orElseThrow();
+    assertEquals(QueryRoleSelection.State.SELECTED, expected.reranker().state());
+    assertEquals(modelDir.resolve("tokenizer.json"), expected.citation().tokenizer().path());
+
+    var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        temp.resolve("plan-query-settings.json"));
+    var successor = new SettingsWitness(1, key);
+    SettingsCommitCoordinator.rollForwardInstallerBoot(store, candidate, successor, complete);
+    assertEquals(expected, store.inspect().queryRoles());
+    SettingsCommitCoordinator.requireAcceptedInstallerProjection(complete, store.inspect());
+    store.replacePrepared(store.prepareExact(candidate, successor));
+    assertThrows(IOException.class,
+        () -> SettingsCommitCoordinator.requireAcceptedInstallerProjection(complete,
+            store.inspect()));
+  }
+
+  @Test
   void generationBoundChangeRefusesWithReindexPointerBeforeFileOrConfigPublication()
       throws Exception {
     Path settingsPath = temp.resolve("generation-bound-settings.json");
@@ -137,6 +256,35 @@ final class SettingsCommitCoordinatorTest {
         assertEquals(OperationState.COMPLETE, result.record().state());
         assertEquals(desired, settings.inspect().settings().getEmbedOnnxModelPath());
         assertEquals(new SettingsWitness(1, attempt.accepted().key()), settings.inspect().witness());
+      }
+    } finally {
+      if (prior == null) System.clearProperty(key); else System.setProperty(key, prior);
+    }
+  }
+
+  @Test
+  void operatorMaskedQueryPathCannotCommitAnUnpreparedWitness() throws Exception {
+    String key = "justsearch.citation.scorer.model_path";
+    String prior = System.getProperty(key);
+    System.setProperty(key, temp.resolve("operator-citation").toString());
+    try {
+      Path settingsPath = temp.resolve("masked-citation-settings.json");
+      try (var operations = operations("masked-citation")) {
+        var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+            settingsPath);
+        var config = new ConfigStore(ConfigStoreRebuilder.prepare(settings.load()));
+        var runner = runner(operations, coordinator(settings, config));
+        UiSettings candidate = settings.load();
+        candidate.setCitationScorerModelPath(temp.resolve("desired-citation").toString());
+        var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+        var result = runner.start(attempt, handle -> OperationExecution.finished(
+            runner.applySettings(handle, currentWitness(settings), candidate)));
+
+        assertEquals(OperationState.FAILED, result.record().state());
+        assertEquals("QUERY_ROLE_PATH_OVERRIDDEN", result.response().errorCode().orElseThrow());
+        assertFalse(Files.exists(settingsPath));
+        assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
       }
     } finally {
       if (prior == null) System.clearProperty(key); else System.setProperty(key, prior);

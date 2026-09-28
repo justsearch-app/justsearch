@@ -91,7 +91,6 @@ public final class CrossEncoderReranker implements Closeable {
    */
   public static RerankerAssembly buildAssembly(
       SessionHandle sessions, Path tokenizerPath, int maxSequenceLength) throws OrtException {
-    RerankerTokenizer tokenizer = new RerankerTokenizer(tokenizerPath, maxSequenceLength);
     // Tempdoc 397 §14.24 FD-ProbeDeletion: probe input names via the assembler helper.
     // Tempdoc 374 sandbox round 4 issue H: resolve via ModelManifest so the probe
     // hits whichever variant Install AI placed on disk (FP32 model.onnx vs FP16
@@ -99,6 +98,14 @@ public final class CrossEncoderReranker implements Closeable {
     Path modelDir = tokenizerPath.getParent();
     Path modelPath =
         io.justsearch.ort.ModelManifest.loadOrDefault(modelDir).resolveExistingModelFile(modelDir);
+    return buildAssembly(sessions, tokenizerPath, modelPath, maxSequenceLength);
+  }
+
+  /** Uses the exact witnessed model for both the session and its input-name probe. */
+  public static RerankerAssembly buildAssembly(
+      SessionHandle sessions, Path tokenizerPath, Path modelPath, int maxSequenceLength)
+      throws OrtException {
+    RerankerTokenizer tokenizer = new RerankerTokenizer(tokenizerPath, maxSequenceLength);
     io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
         io.justsearch.ort.OrtSessionAssembler.probeModelNames(sessions.environment(), modelPath);
     boolean needsTokenTypeIds = probed.inputs().contains("token_type_ids");

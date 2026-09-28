@@ -151,7 +151,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
     if (snapshot.witness().equals(successor)) {
       io.justsearch.app.services.settings.SettingsCommitCoordinator
-          .requireAcceptedInstallerSettings(plan, snapshot.settings());
+          .requireAcceptedInstallerProjection(plan, snapshot);
       return snapshot.settings();
     }
     return io.justsearch.app.services.settings.SettingsCommitCoordinator
