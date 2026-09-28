@@ -15,19 +15,23 @@ final class DeviceMemoryLineTest {
     var capped = measured.withCeilingMb(1024L);
     assertEquals(1024L * 1024L * 1024L, capped.totalBytes());
     assertEquals(1024L * 1024L * 1024L, capped.freeBytes());
-    assertEquals(ComposeEvidence.Mode.IN_PLACE, capped.decision(7_000_000_000L).mode());
+    assertEquals(ComposeEvidence.Mode.REFUSED, capped.decision(7_000_000_000L).mode());
+    assertEquals("source_releasable_device_memory_unknown",
+        capped.decision(7_000_000_000L).reason());
     assertEquals(7_000_000_000L, capped.decision(7_000_000_000L).footprintBytes());
     assertEquals(measured, measured.withCeilingMb(Long.MAX_VALUE));
   }
 
   @Test
   void unknownOrZeroFreeMemoryDoesNotAuthorizeCoResidentComposition() {
-    assertEquals("free_device_memory_unknown",
-        new DeviceMemoryLine(null, null).decision(1).reason());
+    var unknown = new DeviceMemoryLine(null, null).decision(1);
+    assertEquals(ComposeEvidence.Mode.REFUSED, unknown.mode());
+    assertEquals("free_device_memory_unknown", unknown.reason());
     assertEquals(ComposeEvidence.Mode.BESIDE,
         new DeviceMemoryLine(null, null).decision(0).mode());
-    assertEquals(ComposeEvidence.Mode.IN_PLACE,
-        new DeviceMemoryLine(8_000_000_000L, 0L).decision(1).mode());
+    var zeroFree = new DeviceMemoryLine(8_000_000_000L, 0L).decision(1);
+    assertEquals(ComposeEvidence.Mode.REFUSED, zeroFree.mode());
+    assertEquals("source_releasable_device_memory_unknown", zeroFree.reason());
     assertThrows(IllegalArgumentException.class, () -> new DeviceMemoryLine(-1L, 0L));
     assertThrows(IllegalArgumentException.class,
         () -> new DeviceMemoryLine(1L, 1L).withCeilingMb(-1L));
@@ -53,15 +57,19 @@ final class DeviceMemoryLineTest {
   }
 
   @Test
-  void unknownFreeMemoryNeverRetiresASourceThatHoldsNoDeviceMemory() {
+  void unknownMemoryEvidenceNeverAuthorizesSourceRetirement() {
     var unknown = new DeviceMemoryLine(null, null);
     var beside = unknown.decision(4_000L, 0L);
     assertEquals(ComposeEvidence.Mode.BESIDE, beside.mode());
     assertEquals("source_holds_no_device_memory", beside.reason());
-    assertEquals(ComposeEvidence.Mode.IN_PLACE, unknown.decision(4_000L, 1L).mode());
-    // Unknown source release keeps the pre-2026-09-27 unconditional fallback.
-    assertEquals(ComposeEvidence.Mode.IN_PLACE,
-        new DeviceMemoryLine(8_000L, 1_000L).decision(4_000L, null).mode());
+
+    var unknownFree = unknown.decision(4_000L, 1L);
+    assertEquals(ComposeEvidence.Mode.REFUSED, unknownFree.mode());
+    assertEquals("free_device_memory_unknown", unknownFree.reason());
+
+    var unknownSource = new DeviceMemoryLine(8_000L, 1_000L).decision(4_000L, null);
+    assertEquals(ComposeEvidence.Mode.REFUSED, unknownSource.mode());
+    assertEquals("source_releasable_device_memory_unknown", unknownSource.reason());
     assertThrows(IllegalArgumentException.class, () -> unknown.decision(1L, -1L));
   }
 }

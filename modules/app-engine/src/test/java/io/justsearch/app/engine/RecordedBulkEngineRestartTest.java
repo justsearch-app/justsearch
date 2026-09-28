@@ -559,6 +559,8 @@ final class RecordedBulkEngineRestartTest {
           "the distinct webview decision has its own completed operation row");
       assertEquals("g-" + operationKey, new IndexGenerationManager(dataDirectory.resolve("index"))
           .readStateBestEffort().active_generation());
+      assertTrue(await(() -> third.root().admission().activeWorkCount() == 0, WAIT_MS),
+          "the promoted bulk must release its admitted Engine work before owner close");
     } finally {
       source.releaseEnumeration();
     }

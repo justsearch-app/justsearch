@@ -20,15 +20,15 @@ public record DeviceMemoryLine(Long totalBytes, Long freeBytes) {
     return new DeviceMemoryLine(clamp(totalBytes, ceilingBytes), clamp(freeBytes, ceilingBytes));
   }
 
-  /** Unknown free memory cannot certify that a second encoder set fits. */
+  /** Without a measured source release, only measured free memory can admit the candidate. */
   public ComposeEvidence decision(long footprintBytes) {
     return decision(footprintBytes, null);
   }
 
   /**
-   * Retire the serving set only when that can make the candidate fit (D1-14, 2026-09-27 owner
-   * decision). {@code releasableSourceBytes} is the serving set's own device footprint; {@code null}
-   * means it is unknown and keeps the unconditional in-place fallback.
+   * Retire the serving set only when measured free memory plus its releasable footprint can hold the
+   * candidate (D1-14, 2026-09-27 owner decision). {@code null} means the source release is unknown;
+   * neither that nor unknown free memory authorizes retiring a serving source.
    */
   public ComposeEvidence decision(long footprintBytes, Long releasableSourceBytes) {
     if (footprintBytes < 0) throw new IllegalArgumentException("footprint must be non-negative");
@@ -38,11 +38,7 @@ public record DeviceMemoryLine(Long totalBytes, Long freeBytes) {
     if (footprintBytes == 0 || freeBytes != null && footprintBytes <= freeBytes) {
       return evidence(ComposeEvidence.Mode.BESIDE, "candidate_fits_free_device_memory", footprintBytes);
     }
-    if (releasableSourceBytes == null) {
-      return evidence(ComposeEvidence.Mode.IN_PLACE, freeBytes == null
-          ? "free_device_memory_unknown" : "candidate_exceeds_free_device_memory", footprintBytes);
-    }
-    if (releasableSourceBytes == 0) {
+    if (releasableSourceBytes != null && releasableSourceBytes == 0) {
       // Retiring a source that holds no device memory frees nothing: never pause it for B.
       return freeBytes == null
           ? evidence(ComposeEvidence.Mode.BESIDE, "source_holds_no_device_memory", footprintBytes)
@@ -50,7 +46,11 @@ public record DeviceMemoryLine(Long totalBytes, Long freeBytes) {
               footprintBytes);
     }
     if (freeBytes == null) {
-      return evidence(ComposeEvidence.Mode.IN_PLACE, "free_device_memory_unknown", footprintBytes);
+      return evidence(ComposeEvidence.Mode.REFUSED, "free_device_memory_unknown", footprintBytes);
+    }
+    if (releasableSourceBytes == null) {
+      return evidence(ComposeEvidence.Mode.REFUSED,
+          "source_releasable_device_memory_unknown", footprintBytes);
     }
     return footprintBytes - freeBytes <= releasableSourceBytes
         ? evidence(ComposeEvidence.Mode.IN_PLACE, "candidate_fits_after_source_release",

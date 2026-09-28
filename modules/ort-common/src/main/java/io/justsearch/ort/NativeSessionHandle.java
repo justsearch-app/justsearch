@@ -15,6 +15,7 @@ import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -638,13 +639,19 @@ public final class NativeSessionHandle implements SessionHandle {
   // ---------------------------------------------------------------------------
 
   /**
-   * Closes both CPU and GPU sessions, GPU RunOptions, and releases all resources. Safe to call
-   * multiple times (idempotent).
+   * Closes both CPU and GPU sessions, GPU RunOptions, and releases all resources. A refused
+   * retirement retains ownership and can be retried after the outstanding work releases.
    */
   @Override
   public void close() {
+    retire(Duration.ofNanos(RETIRE_TIMEOUT_NANOS));
+  }
+
+  /** Package-private deadline seam for deterministic retirement-timeout tests. */
+  void retire(Duration timeout) {
+    if (timeout.isNegative()) throw new IllegalArgumentException("retirement timeout must be non-negative");
     synchronized (closeLock) {
-      long deadline = System.nanoTime() + RETIRE_TIMEOUT_NANOS;
+      long deadline = System.nanoTime() + timeout.toNanos();
       synchronized (lifecycleLock) {
         retired = true;
         retirementStatus = RetirementStatus.RETIRING;
@@ -656,8 +663,11 @@ public final class NativeSessionHandle implements SessionHandle {
         }
         if (!allLeasesReleased() || nativeActionsInProgress != 0) {
           retirementStatus = RetirementStatus.REFUSED;
-          log.warn("{}: native session retirement timed out; resources retained for retry", consumerName);
-          return;
+          int outstandingLeases = sessionInstances.values().stream()
+              .mapToInt(instance -> instance.leases).sum();
+          throw new IllegalStateException(consumerName + ": native session retirement timed out; "
+              + outstandingLeases + " outstanding leases and " + nativeActionsInProgress
+              + " native actions; resources retained for retry");
         }
       }
 

@@ -140,7 +140,6 @@ final class KnowledgeServerDeviceMemoryLineTest {
   void sourceReleaseTooSmallRefusesBeforeRetiringA(@TempDir Path dir) throws Exception {
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
         var composition = mockStatic(InferenceCompositionRoot.class)) {
-      fixture.selectSourceGeneration();
       // B needs 1024 with 512 free; A's own footprint (256) cannot cover the 512 shortfall.
       composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
           any(), any(), any(), any(), any())).thenReturn(FOOTPRINT, 256L);
@@ -152,13 +151,43 @@ final class KnowledgeServerDeviceMemoryLineTest {
       assertEquals(ComposeEvidence.Mode.REFUSED, fixture.composeEvidence().mode());
       composition.verify(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
           any(), any(), any()), never());
-      verify(fixture.component, never())
-          .transition(eq(ComponentState.RELOADING), any(), any());
-      assertTrue(!fixture.sourceOwner.isClosed(), "a refused candidate must never retire A");
-      try (var serving = fixture.server.captureServingView()) {
-        assertSame(fixture.producer, serving.services());
-        assertSame(fixture.sourceOwner, serving.encoderSet());
-      }
+      fixture.assertInPlaceBuildNeverBeganAndSourceStillServes();
+    }
+  }
+
+  @Test
+  void unknownFreeMemoryRefusesBeforeRetiringA(@TempDir Path dir) throws Exception {
+    try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, null));
+        var composition = mockedComposition()) {
+      var refusal = assertThrows(InvocationTargetException.class, fixture::composeCandidate)
+          .getCause();
+      assertTrue(refusal instanceof java.io.IOException, String.valueOf(refusal));
+      assertTrue(refusal.getMessage().contains("free_device_memory_unknown"),
+          refusal.getMessage());
+      var evidence = fixture.composeEvidence();
+      assertEquals(ComposeEvidence.Mode.REFUSED, evidence.mode());
+      assertEquals("free_device_memory_unknown", evidence.reason());
+      composition.verify(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
+          any(), any(), any()), never());
+      fixture.assertInPlaceBuildNeverBeganAndSourceStillServes();
+    }
+  }
+
+  @Test
+  void unknownSourceReleaseRefusesBeforeRetiringA(@TempDir Path dir) throws Exception {
+    try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L), false);
+        var composition = mockedComposition()) {
+      var refusal = assertThrows(InvocationTargetException.class, fixture::composeCandidate)
+          .getCause();
+      assertTrue(refusal instanceof java.io.IOException, String.valueOf(refusal));
+      assertTrue(refusal.getMessage().contains("source_releasable_device_memory_unknown"),
+          refusal.getMessage());
+      var evidence = fixture.composeEvidence();
+      assertEquals(ComposeEvidence.Mode.REFUSED, evidence.mode());
+      assertEquals("source_releasable_device_memory_unknown", evidence.reason());
+      composition.verify(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
+          any(), any(), any()), never());
+      fixture.assertInPlaceBuildNeverBeganAndSourceStillServes();
     }
   }
 
@@ -166,7 +195,6 @@ final class KnowledgeServerDeviceMemoryLineTest {
   void sourceReleaseCoveringTheShortfallStillBuildsInPlace(@TempDir Path dir) throws Exception {
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
         var composition = mockStatic(InferenceCompositionRoot.class)) {
-      fixture.selectSourceGeneration();
       composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
           any(), any(), any(), any(), any())).thenReturn(FOOTPRINT, 512L);
       composition.when(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
@@ -313,6 +341,10 @@ final class KnowledgeServerDeviceMemoryLineTest {
     private Object candidate;
 
     private Fixture(Path dir, DeviceMemoryLine line) throws Exception {
+      this(dir, line, true);
+    }
+
+    private Fixture(Path dir, DeviceMemoryLine line, boolean sourceSelectionKnown) throws Exception {
       this.dir = dir;
       var spec = new ComponentSpec("encoders", false, Set.of(),
           ComponentSpec.ComposeCapability.CHOOSES_PER_APPLY, Duration.ofMinutes(2), 2);
@@ -355,6 +387,7 @@ final class KnowledgeServerDeviceMemoryLineTest {
           configuration, target, models));
       set(server, "recordedCandidateFingerprint",
           new CandidateIndexTargetCapture.CaptureResult(target, inputs, models));
+      if (sourceSelectionKnown) selectSourceGeneration();
     }
 
     /** Gives A a known generation selection, so its releasable device footprint is estimated. */
@@ -382,6 +415,16 @@ final class KnowledgeServerDeviceMemoryLineTest {
       verify(component).setLastCompose(captured.capture());
       assertEquals(FOOTPRINT, captured.getValue().footprintBytes());
       return captured.getValue();
+    }
+
+    private void assertInPlaceBuildNeverBeganAndSourceStillServes() throws Exception {
+      verify(component, never()).prepareReplacement(any());
+      verify(component, never()).transition(eq(ComponentState.RELOADING), any(), any());
+      assertTrue(!sourceOwner.isClosed(), "a refused candidate must never retire A");
+      try (var serving = server.captureServingView()) {
+        assertSame(producer, serving.services());
+        assertSame(sourceOwner, serving.encoderSet());
+      }
     }
 
     private void recomposeAfterRefusal(Exception refusal) throws Exception {

@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -18,6 +20,9 @@ import io.justsearch.ort.GpuArbiter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 
 /**
  * Unit tests for {@link InferenceCompositionRoot#compose} (tempdoc 397 §14.28 U6). Focuses
@@ -235,6 +241,66 @@ class InferenceCompositionRootComposeTest {
   }
 
   @Test
+  @DisplayName("citation identity log uses the generation-selected file and fingerprint")
+  void citationIdentityLogUsesGenerationSelection(@TempDir Path temp) throws IOException {
+    Path selectedFile = temp.resolve("generation-X/model.onnx").toAbsolutePath().normalize();
+    Path desiredFile = temp.resolve("desired-Y/model.onnx").toAbsolutePath().normalize();
+    Files.createDirectories(selectedFile.getParent());
+    Files.createDirectories(desiredFile.getParent());
+    Files.writeString(selectedFile, "generation-selected-citation-model");
+    Files.writeString(desiredFile, "conflicting-desired-citation-model");
+    String selectedSha = sha256(selectedFile);
+    String desiredSha = sha256(desiredFile);
+
+    var cfg =
+        TestResolvedConfigHelper.fromEntries(
+            Map.of(
+                EnvRegistry.AI_EMBED_ENABLED.configKey(), "false",
+                EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+                EnvRegistry.NER_ENABLED.configKey(), "false",
+                EnvRegistry.RERANK_ENABLED.configKey(), "false",
+                EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "true",
+                EnvRegistry.CITATION_SCORER_MODEL_PATH.configKey(),
+                    desiredFile.getParent().toString()));
+    var selection =
+        GenerationModelSelection.accepted(
+            Map.of("citation-scorer", new ModelArtifact(selectedFile.toString(), selectedSha)),
+            "splade",
+            768);
+    var projection = EncoderConfigurationProjection.from(cfg, selection);
+    ch.qos.logback.classic.Logger logger =
+        (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(InferenceCompositionRoot.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+
+    try {
+      InferenceCompositionRoot.compose(
+          projection,
+          HardwareProfile.cpuOnly(),
+          null,
+          null,
+          NO_GPU,
+          io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP,
+          selection);
+
+      var messages = appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+      assertTrue(
+          messages.contains(
+              "Citation scorer generation selected: model="
+                  + selectedFile
+                  + ", sha256="
+                  + selectedSha),
+          () -> "missing generation-selected citation identity in " + messages);
+      assertTrue(messages.stream().noneMatch(message -> message.contains(desiredFile.toString())));
+      assertTrue(messages.stream().noneMatch(message -> message.contains(desiredSha)));
+    } finally {
+      logger.detachAppender(appender);
+      appender.stop();
+    }
+  }
+
+  @Test
   @DisplayName("BGE selection remains requested when its SPLADE fallback is attempted")
   void selectedBgeFailureRemainsMissingAcrossFallback() {
     var cfg =
@@ -399,6 +465,15 @@ class InferenceCompositionRootComposeTest {
     Files.createDirectories(dir);
     for (String file : files) {
       Files.writeString(dir.resolve(file), "stub");
+    }
+  }
+
+  private static String sha256(Path file) throws IOException {
+    try {
+      return HexFormat.of()
+          .formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+    } catch (NoSuchAlgorithmException impossible) {
+      throw new IllegalStateException("SHA-256 is unavailable", impossible);
     }
   }
 }

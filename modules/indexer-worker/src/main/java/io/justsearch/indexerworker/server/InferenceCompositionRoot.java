@@ -780,6 +780,11 @@ public final class InferenceCompositionRoot {
       return Optional.empty();
     }
     try {
+      if (selection != null) {
+        log.info("Citation scorer generation selected: model={}, sha256={}",
+            variant.modelFile().toAbsolutePath().normalize(),
+            selection.fingerprint("citation-scorer").sha());
+      }
       ModelSessionPolicy policy =
           ModelSessionPolicyResolver.resolve(EncoderRole.CITATION, cfg, hardware, variant);
       assertCitationIsCpuOnly(variant, policy);

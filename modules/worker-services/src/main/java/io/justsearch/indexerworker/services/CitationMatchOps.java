@@ -12,14 +12,7 @@ import io.justsearch.ipc.CitationMatchEntry;
 import io.justsearch.ipc.MatchCitationsResponse;
 import io.justsearch.reranker.CitationScorer;
 import io.justsearch.reranker.CitationScorerConfig;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -111,30 +104,6 @@ final class CitationMatchOps {
   void setCitationScorer(CitationScorer scorer) {
     this.citationScorer = scorer;
     setCrossEncoderProducer(scorer == null ? null : scorer::scoreAll);
-    if (scorer != null && citationScorerConfig != null) {
-      var config = citationScorerConfig;
-      if (config.modelPath() == null) {
-        // The scorer can be composed from an installed model even when this consumer's
-        // optional path setting is absent. Fingerprint reporting must not abort readiness.
-        log.info("Citation scorer wired (consumer model path unavailable)");
-        return;
-      }
-      // Tempdoc 374 sandbox round 4 issue H: resolve via ModelManifest so the
-      // fingerprint identifies whichever variant Install AI placed on disk.
-      Path modelOnnx =
-          io.justsearch.ort.ModelManifest.loadOrDefault(config.modelPath())
-              .resolveExistingModelFile(config.modelPath());
-      String fingerprint = computeModelSha256(modelOnnx);
-      if (fingerprint != null) {
-        log.info(
-            "Citation scorer wired: model={}, sha256={}",
-            modelOnnx.getFileName(),
-            fingerprint.substring(0, 16) + "...");
-      } else {
-        log.info(
-            "Citation scorer wired: model={} (fingerprint unavailable)", config.modelPath());
-      }
-    }
   }
 
   void setCitationScorerConfig(CitationScorerConfig config) {
@@ -494,29 +463,6 @@ final class CitationMatchOps {
    *
    * @return chunk content text, or null if not found
    */
-  /** Computes SHA-256 of a model file for fingerprint comparison. */
-  private static String computeModelSha256(Path modelFile) {
-    if (modelFile == null || !Files.exists(modelFile)) {
-      return null;
-    }
-    try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      byte[] buffer = new byte[8 * 1024 * 1024]; // 8 MB
-      try (InputStream in = Files.newInputStream(modelFile)) {
-        int read;
-        while ((read = in.read(buffer)) != -1) {
-          digest.update(buffer, 0, read);
-        }
-      }
-      return HexFormat.of().formatHex(digest.digest());
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError("SHA-256 not available", e);
-    } catch (IOException e) {
-      log.warn("Failed to compute SHA-256 for {}", modelFile.getFileName(), e);
-      return null;
-    }
-  }
-
   private String lookupChunkContent(String parentDocId, int chunkIndex) {
     try {
       // Query by parent_doc_id only (term-indexed keyword), fetch enough to find the right chunk

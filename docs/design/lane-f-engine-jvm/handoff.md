@@ -7,14 +7,17 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-28)
 
-Branch `codex/lane-f-pr1` is at pushed Batch C commit
-`8fdc9da57c64238c810e5a9a3f0f377ede1e4d73`, whose source tree is
-`e1aaefc5e133632d4c0a1bf1651996b139cbf21d`. PR727 remains open and the
+This correction checkpoint follows pushed Batch D commit
+`66a28be6f21954fc64208ef4b172f40c3722f8ef`, whose source tree is
+`9161227bd9e518e61af0e966fe3b441830a0d115`. PR727 remains open and the
 worktree lifecycle hold has a 2026-10-04 review-by date. Exact-SHA hosted CI
-[run 36363228657](https://github.com/justsearch-app/justsearch/actions/runs/36363228657)
+[run 36365023188](https://github.com/justsearch-app/justsearch/actions/runs/36365023188)
 passed all 13 jobs on that commit, including the advisory system-integration
-job's integration tier, attribution, and artifact-upload steps. Do not merge
-before Stage F acceptance.
+job and wall-clock attribution. The prior Batch C source tree
+`e1aaefc5e133632d4c0a1bf1651996b139cbf21d` at
+`8fdc9da57c64238c810e5a9a3f0f377ede1e4d73` passed exact-SHA hosted
+[run 36363228657](https://github.com/justsearch-app/justsearch/actions/runs/36363228657).
+Do not merge before Stage F acceptance.
 
 Batch C's exact local proof is recorded in
 [D1-14](stages/D1.md#d1-14--beside-or-in-place-the-device-line-the-floor-override-and-a-recomposed-on-refusal):
@@ -24,6 +27,41 @@ stress-enabled suite `tmp/5173`; the final all-up-to-date suite confirmation
 BESIDE/IN_PLACE status, trace, and connected UI proof at `tmp/5181`.
 The raw held-cut trace and screenshot are under
 `tmp/lane-f-takeover/lifecycle-accepted-write-c5b7dc8d-a614-4fcd-8f45-512f75968556/`.
+
+This D1-13/14 correction slice refuses source retirement
+when device free bytes or A's releasable footprint are unknown, makes native
+retirement timeout throw with outstanding counts, and logs citation identity from
+the verified generation selection. Focused proof: `tmp/5185`, `tmp/5186`,
+`tmp/5189`, `tmp/5191`; full Spotless/PMD preflight `tmp/5193` and docs checks
+passed. Independent refute-first review found no product finding on frozen diff
+SHA-256 `C18D33519797944775BD04B5ADB2C74AB0834275CA03C6EF93EC317643EA51C3`.
+The default-parallel full suite at `tmp/5195` was red after 16m54s: one of 419
+app-engine tests observed a terminal receipt before process-local bulk admission
+released, then its fixture closed the live index owner. Red XML is preserved at
+`tmp/5195-recorded-bulk-engine-restart-red.xml`; all suite XML is in
+`tmp/5195-suite-xml/`. The test now awaits the exact active-work count before
+fixture close, without weakening `EngineRoot.close`; the focused regression at
+`tmp/5196` passed. The complete app-engine module test, Spotless, and PMD rerun
+passed at `tmp/5197` in 9m23s. A separate refute-first reviewer found the
+assertion observes the real admission-handle map before fixture teardown.
+`tmp/5199` is an all-up-to-date ordinary full-suite confirmation (196 tasks)
+after the source-valid app-engine module rerun at `tmp/5197`; it is not a fresh
+test execution. The exact corrected tree passed the default-parallel
+stress-enabled suite at `tmp/5200` (19m28s; 23 executed, 11 cached, 166 up to
+date), and `build -x test` at `tmp/5202`. The native concurrent stress XML at
+`modules/ort-common/build/test-results/test/` reports one test, zero skips or
+failures; the suite XML snapshot is retained at `tmp/5200-suite-xml/`.
+Exact-SHA hosted CI and current-head installed proof remain pending at this
+checkpoint. The installed
+preflight found that the floor fixture must assert realized CUDA A, carry
+CPU-only citation selection into B for log-to-manifest
+correlation, and register the cancellation/recompose-failure scenario with the
+lifecycle test task before those rows can be accepted.
+
+The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
+`codex/lane-f-workflow-order` from `origin/main`, in its separate managed
+worktree. Pushing and opening that separate PR await the owner's explicit
+per-action authorization; this does not block Lane F.
 
 **Next, in order:** continue
 [WP3 batches 4/5](improvements/WP3-remaining-work-plan.md), then D2, E, and F.
@@ -40,6 +78,17 @@ systemic friction item. Batch V's default-parallel full suite took 8m57s at
 next WP3 batch 4/5 integrated boundary, root should keep the one-build rule,
 run the full suite with default parallelism, preserve its XML and wall time, and
 reserve a serial rerun for diagnosed contention.
+Batch 4's app-engine module suite took 9m23s at `tmp/5197`; the parallel
+stress-enabled repository suite took 19m28s at `tmp/5200`. A thread dump at
+`tmp/5197-app-engine-worker-thread-dump.txt` captured a normal bounded
+cutover-pause handshake, not a deadlock. The app-engine fixture repeatedly
+boots Engine owners and initializes extraction tools; its test XML contains
+missing-tool debug traces for ffmpeg, exiftool, and sox. The app-engine test
+fixture owner should time boot and extraction setup separately and compare
+local test parallelism 1 versus 3 before changing the measured default.
+The `gradle.properties` comment still says 2 local test JVMs, while
+`JvmBaseConventionsPlugin` actually defaults to 3; align that comment in a
+later build-doc touch. No timing-sensitive run was restarted to free CPU.
 
 **2026-09-28 owner briefing override:** for concurrency, lifecycle, or ownership
 changes, start the independent refute-first review of the frozen slice alongside

@@ -2219,7 +2219,7 @@ public final class KnowledgeServer implements Closeable {
   /**
    * A's own device footprint under the estimator that sizes B, so retirement is chosen only when it
    * can release what B needs. Zero when A has no native set; {@code null} when A's generation
-   * selection is unknown (legacy boot), which keeps the unconditional in-place fallback.
+   * selection is unknown (legacy boot), which refuses retirement if B cannot fit beside A.
    */
   private Long sourceReleasableDeviceBytes(HardwareProfile hardware, InstallContract contract,
       Path modelsDir) {
