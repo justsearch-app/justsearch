@@ -36,6 +36,7 @@ final class HeadlessAppHealthMonitorStartupTest {
       assertSame(cleanup, failure.getSuppressed()[0]);
       verify(construction.constructed().getFirst()).close();
       verify(api, never()).bindWorkerRecovery(any());
+      verify(api, never()).bindComponentRecovery(any());
     }
   }
 
@@ -49,6 +50,7 @@ final class HeadlessAppHealthMonitorStartupTest {
       var order = inOrder(monitor, api);
       order.verify(monitor).start();
       order.verify(api).bindWorkerRecovery(monitor);
+      order.verify(api).bindComponentRecovery(monitor);
       verify(monitor, never()).close();
     }
   }
@@ -60,8 +62,11 @@ final class HeadlessAppHealthMonitorStartupTest {
     org.mockito.Mockito.when(bootstrap.substrate()).thenReturn(substrate);
     org.mockito.Mockito.when(substrate.health()).thenReturn(health);
     var method = HeadlessApp.class.getDeclaredMethod("startHealthMonitor",
-        HeadAssembly.class, LocalApiServer.class, KnowledgeServerBootstrap.class);
+        HeadAssembly.class, LocalApiServer.class, KnowledgeServerBootstrap.class,
+        io.justsearch.core.component.EngineComponentRegistry.class,
+        java.util.concurrent.CompletableFuture.class);
     method.setAccessible(true);
-    return method.invoke(null, bootstrap, api, mock(KnowledgeServerBootstrap.class));
+    return method.invoke(null, bootstrap, api, mock(KnowledgeServerBootstrap.class),
+        mock(io.justsearch.core.component.EngineComponentRegistry.class), null);
   }
 }

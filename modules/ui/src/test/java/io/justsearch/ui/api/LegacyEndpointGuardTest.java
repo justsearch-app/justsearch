@@ -217,7 +217,7 @@ class LegacyEndpointGuardTest {
         mock(AiRuntimeController.class),
         mock(AiModelsController.class),
         chatControllerMock);
-    InferenceRoutes.register(app, noop, noop, noop, noop, noop, noop, noop, noop);
+    InferenceRoutes.register(app, noop, noop, noop, noop, noop, noop, noop, noop, noop);
     KnowledgeRoutes.register(
         app, mock(KnowledgeSearchController.class), LoggerFactory.getLogger("test"));
     AgentRoutes.register(

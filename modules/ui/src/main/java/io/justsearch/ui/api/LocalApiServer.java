@@ -659,6 +659,7 @@ public class LocalApiServer {
         inferenceHandlers::handleSetInferenceMode,
         inferenceHandlers::handleDetachExternalInferenceServer,
         inferenceHandlers::handleRestartWorker,
+        inferenceHandlers::handleRecoverComponent,
         core.encoderRuntimeController()::handle,
         inferenceHandlers::handleInferenceFailures,
         inferenceHandlers::handleInferenceTransitions);
@@ -859,6 +860,12 @@ public class LocalApiServer {
   public void bindWorkerRecovery(
       io.justsearch.app.services.worker.WorkerRecoveryAuthority workerRecovery) {
     core.inferenceHandlers().setWorkerRecovery(workerRecovery);
+  }
+
+  /** Binds the monitor that owns the component recovery slot. */
+  public void bindComponentRecovery(
+      io.justsearch.app.services.worker.ComponentRecoveryAuthority componentRecovery) {
+    core.inferenceHandlers().setComponentRecovery(componentRecovery);
   }
 
   /**

@@ -115,7 +115,7 @@ class RouteManifestControllerTest {
     Javalin app = Javalin.create(cfg -> cfg.showJavalinBanner = false);
     io.javalin.http.Handler noOp = ctx -> {};
     io.justsearch.ui.api.routes.InferenceRoutes.register(app, noOp, noOp, noOp, noOp,
-        noOp, noOp, noOp, noOp);
+        noOp, noOp, noOp, noOp, noOp);
     io.justsearch.ui.api.routes.DebugRoutes.register(app,
         org.mockito.Mockito.mock(DebugStateController.class),
         org.mockito.Mockito.mock(EffectiveConfigController.class),
@@ -125,6 +125,10 @@ class RouteManifestControllerTest {
         org.mockito.Mockito.mock(SessionPoliciesController.class), noOp, noOp);
 
     List<RouteEntry> routes = RouteManifestController.build(app, List.of());
+
+    assertTrue(routes.stream().anyMatch(route ->
+        route.method().equals("POST")
+            && route.path().equals("/api/engine/components/{name}/recover")));
 
     assertFalse(routes.stream().anyMatch(route ->
         route.path().equals("/api/inference/reload")

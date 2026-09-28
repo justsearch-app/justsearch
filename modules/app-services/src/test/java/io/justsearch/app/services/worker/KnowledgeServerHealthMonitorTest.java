@@ -2,7 +2,9 @@ package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -11,7 +13,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.core.component.ComponentSpec;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.core.execution.TestEngineExecutors;
+import java.time.Duration;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +36,87 @@ import org.junit.jupiter.api.Test;
 final class KnowledgeServerHealthMonitorTest {
 
   private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @Test
+  void failedBoundIndexReopensThroughItsPhysicalOwnerAndUsesOneSlot() throws Exception {
+    try (var components = new TestEngineComponents()) {
+      var index = components.register(new ComponentSpec("index", true, Set.of(),
+          ComponentSpec.ComposeCapability.BESIDE, Duration.ofSeconds(60), 2));
+      index.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+          "index owner lost");
+      var bootstrap = mock(KnowledgeServerBootstrap.class);
+      when(bootstrap.indexComponent()).thenReturn(index);
+      when(bootstrap.hasClient()).thenReturn(true);
+      var enteredClose = new CountDownLatch(1);
+      var releaseClose = new CountDownLatch(1);
+      when(bootstrap.closeForUpgrade()).thenAnswer(ignored -> {
+        enteredClose.countDown();
+        assertTrue(releaseClose.await(5, TimeUnit.SECONDS));
+        return ShutdownOutcome.GRACEFUL;
+      });
+      when(bootstrap.startForRecovery()).thenAnswer(ignored -> {
+        index.transition(ComponentState.READY, null, "same configuration serving");
+        return true;
+      });
+      var handedOver = new CountDownLatch(1);
+      try (var monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap)) {
+        monitor.componentRegistry(components);
+        monitor.onRecoveryConnected(ignored -> handedOver.countDown());
+        assertEquals(ComponentRecoveryAuthority.Outcome.ACCEPTED,
+            monitor.requestComponentRecovery("index"));
+        assertTrue(enteredClose.await(5, TimeUnit.SECONDS));
+        assertEquals(ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING,
+            monitor.requestComponentRecovery("index"));
+        releaseClose.countDown();
+        assertTrue(handedOver.await(5, TimeUnit.SECONDS));
+        assertEquals(ComponentState.READY, index.snapshot().state());
+        assertEquals(1, index.snapshot().recoveryAttempts());
+        verify(bootstrap, times(1)).closeForUpgrade();
+        verify(bootstrap, times(1)).startForRecovery();
+      } finally {
+        releaseClose.countDown();
+      }
+    }
+  }
+
+  @Test
+  void overdueInitialIndexOpenFailsWithItsAwaitedResourceWhileApiStaysReady()
+      throws Exception {
+    try (var components = new TestEngineComponents()) {
+      var api = components.register(new ComponentSpec("api", true, Set.of(),
+          ComponentSpec.ComposeCapability.IN_PLACE, Duration.ZERO, 2));
+      var index = components.register(new ComponentSpec("index", true, Set.of(),
+          ComponentSpec.ComposeCapability.BESIDE, Duration.ofMillis(1), 2));
+      api.transition(ComponentState.READY, null, "loopback bound");
+      index.transition(ComponentState.STARTING, LifecycleReasonCode.WORKER_STARTING.code(),
+          "index root lock at test-index");
+      var bootstrap = mock(KnowledgeServerBootstrap.class);
+      when(bootstrap.indexComponent()).thenReturn(index);
+      var unfinishedStart = new CompletableFuture<Void>();
+      try (var monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap)) {
+        monitor.observeInitialStartup(unfinishedStart);
+        var handovers = new java.util.concurrent.atomic.AtomicInteger();
+        var reconciles = new java.util.concurrent.atomic.AtomicInteger();
+        monitor.onTick(reconciles::incrementAndGet);
+        monitor.onRecoveryConnected(ignored -> handovers.incrementAndGet());
+        Thread.sleep(5);
+        monitor.tick();
+        assertEquals(ComponentState.FAILED, index.snapshot().state());
+        assertTrue(index.snapshot().evidence().contains("index root lock at test-index"));
+        assertEquals(ComponentState.READY, api.snapshot().state());
+        assertFalse(unfinishedStart.isDone());
+        assertEquals(1, reconciles.get(), "the pending owner must not skip readiness reconciliation");
+        verify(bootstrap, never()).checkHealth();
+
+        unfinishedStart.complete(null);
+        when(bootstrap.hasClient()).thenReturn(true);
+        when(bootstrap.checkHealth()).thenReturn(true);
+        monitor.tick();
+        monitor.tick();
+        assertEquals(1, handovers.get(), "late initial success has one handover");
+      }
+    }
+  }
 
   @AfterEach
   void closeProcessExecutors() {

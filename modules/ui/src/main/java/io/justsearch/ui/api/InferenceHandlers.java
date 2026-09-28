@@ -18,6 +18,7 @@ import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.status.InferenceGpuView;
 import io.justsearch.app.api.status.InferenceStatusResponseBuilder;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.ComponentRecoveryAuthority;
 import io.justsearch.app.services.worker.RestartRequiredException;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
@@ -43,6 +44,7 @@ final class InferenceHandlers {
   private volatile KnowledgeServerBootstrap knowledgeServer;
   // Tempdoc 825: the recovery authority behind POST /api/worker/restart when no worker is bound.
   private volatile io.justsearch.app.services.worker.WorkerRecoveryAuthority workerRecovery;
+  private volatile ComponentRecoveryAuthority componentRecovery;
   // Tempdoc 374 alpha.27: VramDetector dependency removed; nvidia-smi availability
   // is read from gpuCapabilitiesService.snapshot().nvidiaSmi().available().
   private final GpuCapabilitiesService gpuCapabilitiesService;
@@ -93,6 +95,42 @@ final class InferenceHandlers {
   void setWorkerRecovery(
       io.justsearch.app.services.worker.WorkerRecoveryAuthority workerRecovery) {
     this.workerRecovery = workerRecovery;
+  }
+
+  void setComponentRecovery(ComponentRecoveryAuthority componentRecovery) {
+    this.componentRecovery = componentRecovery;
+  }
+
+  /** Schedules one same-configuration component recovery through the registered owner. */
+  void handleRecoverComponent(Context ctx) {
+    ComponentRecoveryAuthority authority = componentRecovery;
+    if (authority == null) {
+      ctx.status(503).json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE,
+          "Component recovery is still initializing", telemetry, ApiErrorHandler.routeOf(ctx)));
+      return;
+    }
+    String name = ctx.pathParam("name");
+    ComponentRecoveryAuthority.Outcome verdict = authority.requestComponentRecovery(name);
+    switch (verdict) {
+      case ACCEPTED -> ctx.status(202).json(Map.of("success", true, "component", name,
+          "recovery", verdict.name()));
+      case ALREADY_RUNNING -> ctx.status(429).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.ADMISSION_ENGINE_LIMIT, "A component recovery is already running",
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+      case EXHAUSTED -> ctx.status(503).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.WORKER_RECOVERY_EXHAUSTED,
+          "Component recovery budget is spent; restart the application to retry",
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+      case NOT_APPLICABLE -> ctx.status(409).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.INVALID_STATE, "Component does not need recovery",
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+      case UNKNOWN_COMPONENT -> ctx.status(404).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.NOT_FOUND, "Unknown Engine component: " + name,
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+      case OWNER_UNAVAILABLE -> ctx.status(503).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.SERVICE_UNAVAILABLE, "Component has no available local recovery owner",
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+    }
   }
 
   /**

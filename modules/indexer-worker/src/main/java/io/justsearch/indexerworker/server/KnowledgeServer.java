@@ -932,6 +932,12 @@ public final class KnowledgeServer implements Closeable {
 
       Path effectiveIndexBasePath = rc.paths().indexBasePath();
 
+      if (indexComponent != null) {
+        indexComponent.transition(io.justsearch.core.component.ComponentState.STARTING,
+            io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_STARTING.code(),
+            "index root lock at " + effectiveIndexBasePath);
+      }
+
       // Acquire a lock for the effective index root to prevent two Workers from mutating the same
       // indexBasePath (important when justsearch.index.base_path is overridden).
       this.indexRootLock = new IndexRootLock(effectiveIndexBasePath);
@@ -977,6 +983,11 @@ public final class KnowledgeServer implements Closeable {
       this.indexGenerationManager = genManager;
       this.indexBasePath = layout.basePath();
       this.activeIndexPath = layout.activeGenerationPath();
+      if (indexComponent != null) {
+        indexComponent.transition(io.justsearch.core.component.ComponentState.STARTING,
+            io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_STARTING.code(),
+            "Lucene generation at " + activeIndexPath);
+      }
       this.initialModelSelection = GenerationModelSelection.from(
           genManager.manifestForOwnedPath(activeIndexPath)).orElse(null);
       this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);

@@ -8,10 +8,13 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 ## Current state (2026-09-28)
 
 The latest hosted-proven checkpoint is
-`ea6cc176ef85486ae949b1cfb93ac414439227d6`. PR727 remains open,
+`00c7a51786740c35edc025975dd7a6c1bba879f6`. PR727 remains open,
 and the worktree lifecycle hold has a 2026-10-04 review-by date.
-Exact-SHA hosted [run 36472269250](https://github.com/justsearch-app/justsearch/actions/runs/36472269250)
-passed all 13 jobs, including system integration and wall-clock attribution.
+Exact-SHA hosted [run 36476388179](https://github.com/justsearch-app/justsearch/actions/runs/36476388179)
+passed for the D1-7 exit-contract checkpoint. The preceding
+`ea6cc176ef85486ae949b1cfb93ac414439227d6` passed all 13 jobs in
+[run 36472269250](https://github.com/justsearch-app/justsearch/actions/runs/36472269250),
+including system integration and wall-clock attribution.
 The earlier Batch D source tree `9161227bd9e518e61af0e966fe3b441830a0d115`
 at `66a28be6f21954fc64208ef4b172f40c3722f8ef` passed hosted
 [run 36365023188](https://github.com/justsearch-app/justsearch/actions/runs/36365023188).
@@ -334,8 +337,35 @@ entry point. Exact-source Java exit/sequence/register tests passed at `tmp/5368`
 global Spotless/PMD at `tmp/5369`, and both supervisor adapters passed 18/18
 at `tmp/5364` and `tmp/5367`. The first Tauri attempt at `tmp/5365` used a
 stale embedded-register binary and failed on `unknown(5)`; rebuilding it at
-`tmp/5366` made the exact case pass. The component monitor, route, physical
-retry, and installed stuck-index acceptance are still open.
+`tmp/5366` made the exact case pass. Full component recovery and installed
+stuck-index acceptance are still open.
+
+**Pause handoff after the D1-7 source checkpoint.** The initial index wait
+is now bounded by the declared deadline; the constructed bootstrap is
+published before its start, and the same monitor observes a late completion
+without opening a second owner. The monitor records the awaited index resource,
+keeps readiness reconciliation running while startup is pending, and has one
+registered `head.component-recovery` worker for a bound index local close/open.
+`POST /api/engine/components/{name}/recover` reaches that monitor and inherits
+the POST mutation token. Focused startup, monitor, route, token, and capacity
+checks passed at `tmp/5382` (capacity at `tmp/5381`); the local close/open and
+busy-slot test passed at `tmp/5382`. Repository Spotless/PMD passed at
+`tmp/5383` after the one PMD
+test-qualifier correction found in `tmp/5379`. These are source tests only;
+the new source checkpoint still needs exact-SHA hosted CI.
+
+**Resume D1-7 here:** The general component recovery design is not yet
+accepted. The shipped boot policy still allows four attempts; D1 requires two.
+The monitor does not yet invoke the ordered code-5 escalation after index
+exhaustion or immediate fatal reasons. Encoder/generative physical owners are
+not bound to same-config retry actions, and deadline scanning presently covers
+index only. The new route is not yet in the live route/OpenAPI snapshot or
+Health operation catalog. The held-open initial owner and bound-index paths
+need independent refute-first review, especially shutdown while an initial
+open is still running, followed by installed FileIntruder release/exhaustion
+and optional non-escalation proof. Then run integrated and hosted gates. Do not
+start D1-6 retirement or D1-15 renames until D1-7 route and escalation pass.
+
 Root owns the single Gradle build and dev-stack lease. Full-suite gates run with
 default parallelism; use `--max-workers=1` only for a diagnosed contention rerun.
 Leave the unrelated untracked `modules/app-inference/logs/` directory alone.

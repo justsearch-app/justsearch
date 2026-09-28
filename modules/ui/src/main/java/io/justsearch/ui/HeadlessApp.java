@@ -577,17 +577,31 @@ public class HeadlessApp {
   private static WorkerConnectionResult connectWorker(
       ApiPhaseResult apiPhase,
       java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> workerFuture,
-      io.justsearch.core.component.ComponentHandle indexComponent) {
-    KnowledgeServerStartResult ksStart = workerFuture.join();
-    KnowledgeServerBootstrap knowledgeServer = ksStart.bootstrap();
-    String knowledgeServerStartError = ksStart.startError();
+      java.util.concurrent.CompletableFuture<KnowledgeServerBootstrap> constructedWorker,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.EngineComponentRegistry componentRegistry) {
+    KnowledgeServerStartResult ksStart = awaitInitialIndexStart(workerFuture, indexComponent);
+    if (ksStart == null && workerFuture.isDone()) {
+      // Completion may race the timed wait. Bind a completed owner immediately instead of
+      // reporting a pending start until the monitor's next tick.
+      ksStart = workerFuture.join();
+    }
+    boolean initialStartPending = ksStart == null;
+    KnowledgeServerBootstrap knowledgeServer = initialStartPending
+        ? constructedWorker.getNow(null) : ksStart.bootstrap();
+    if (initialStartPending && knowledgeServer == null) {
+      throw new IllegalStateException("Index bootstrap was not constructed by its start deadline");
+    }
+    String knowledgeServerStartError = initialStartPending
+        ? "Index startup is still in progress" : ksStart.startError();
     HeadAssembly bootstrap = apiPhase.bootstrap();
     LocalApiServer apiServer = apiPhase.apiServer();
     KnowledgeServerHealthMonitor healthMonitor = null;
 
-    if (knowledgeServer != null && knowledgeServer.hasClient()) {
+    if (!initialStartPending && knowledgeServer != null && knowledgeServer.hasClient()) {
       connectAndBind(bootstrap, apiServer, knowledgeServer, knowledgeServerStartError);
-      healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer);
+      healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer,
+          componentRegistry, null);
       if (bootstrap.capabilities().worker().available()) {
         log.info("Knowledge Server connected â€” search and indexing now available");
       } else {
@@ -612,11 +626,15 @@ public class HeadlessApp {
       // SUPPRESSED start attempts that each consumed the one-shot marker â€” without it this branch
       // logged, and /api/health served, the generic spawn failure for a deliberate refusal.
       // Re-stamping the generic code here would destroy that specific cause all over again.
-      healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer);
-      log.warn(
-          "Knowledge Server failed to start: {} (worker reason: {}) â€” boot recovery armed",
-          knowledgeServerStartError,
-          bootstrap.capabilities().worker().pendingReason());
+      healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer,
+          componentRegistry, initialStartPending ? workerFuture : null);
+      if (initialStartPending) {
+        log.warn("Index startup exceeded its wait while the API remains available; monitoring its"
+            + " physical owner until it completes");
+      } else {
+        log.warn("Knowledge Server failed to start: {} (worker reason: {}) — boot recovery armed",
+            knowledgeServerStartError, bootstrap.capabilities().worker().pendingReason());
+      }
     } else if (knowledgeServerStartError != null) {
       // No bootstrap instance at all: the failure was fatal before/at construction (or the data
       // directory is locked), so there is nothing to re-attempt.
@@ -636,6 +654,26 @@ public class HeadlessApp {
     }
 
     return new WorkerConnectionResult(knowledgeServer, knowledgeServerStartError, healthMonitor);
+  }
+
+  /** A timed-out initial open remains owned by its future; this wait never cancels it. */
+  static <T> T awaitInitialIndexStart(java.util.concurrent.CompletableFuture<T> start,
+      io.justsearch.core.component.ComponentHandle indexComponent) {
+    var observed = indexComponent.snapshot();
+    long deadlineNanos = observed.spec().startDeadline().toNanos();
+    long elapsedNanos = observed.state() == io.justsearch.core.component.ComponentState.STARTING
+        ? Math.max(0L, System.nanoTime() - observed.stateSinceMonotonicNanos()) : 0L;
+    long remainingNanos = Math.max(0L, deadlineNanos - elapsedNanos);
+    try {
+      return start.get(remainingNanos, java.util.concurrent.TimeUnit.NANOSECONDS);
+    } catch (java.util.concurrent.TimeoutException timeout) {
+      return null;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted waiting for initial index start", interrupted);
+    } catch (java.util.concurrent.ExecutionException failure) {
+      return start.join(); // preserve the existing CompletionException contract
+    }
   }
 
   /**
@@ -663,9 +701,13 @@ public class HeadlessApp {
    * manual path and the automatic loop share one budget and one set of vetoes.
    */
   private static KnowledgeServerHealthMonitor startHealthMonitor(
-      HeadAssembly bootstrap, LocalApiServer apiServer, KnowledgeServerBootstrap knowledgeServer) {
+      HeadAssembly bootstrap, LocalApiServer apiServer, KnowledgeServerBootstrap knowledgeServer,
+      io.justsearch.core.component.EngineComponentRegistry componentRegistry,
+      java.util.concurrent.CompletableFuture<?> initialStartup) {
     KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap.executors(), knowledgeServer);
+    monitor.componentRegistry(componentRegistry);
     monitor.onRecoveryConnected(recovered -> connectAndBind(bootstrap, apiServer, recovered, null));
+    if (initialStartup != null) monitor.observeInitialStartup(initialStartup);
     var health = bootstrap.substrate().health();
     monitor.onRecoveryOccurrence(occurrence ->
         io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridge.emitRecoveryOccurrence(
@@ -690,6 +732,7 @@ public class HeadlessApp {
     try {
       monitor.start();
       apiServer.bindWorkerRecovery(monitor);
+      apiServer.bindComponentRecovery(monitor);
       return monitor;
     } catch (RuntimeException | Error failure) {
       try {
@@ -1156,7 +1199,8 @@ public class HeadlessApp {
               1, bootstrapLimits.maxQueue(), 1));
       var bootstrapExecutor = bootstrapOwner.open(
           Thread.ofPlatform().daemon().name("engine-bootstrap-", 0).factory());
-      java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> workerFuture =
+      var constructedWorker = new java.util.concurrent.CompletableFuture<KnowledgeServerBootstrap>();
+      java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> workerTask =
           startChildCapableAsyncAfterOwnershipReconciliation(
               bootstrapExecutor,
               manifestPublisher,
@@ -1170,12 +1214,17 @@ public class HeadlessApp {
                   settingsReconciled.join();
                   return tryStartKnowledgeServer(
                       ksConfig, engineRoot,
-                      OperationFaultBarrier.automaticRootProducersEnabled(SystemAccess::rawEnvVar, operationFaultHook));
+                      OperationFaultBarrier.automaticRootProducersEnabled(SystemAccess::rawEnvVar,
+                          operationFaultHook), constructedWorker::complete);
               });
       // Graceful retirement from the completing task cannot interrupt its own completion path.
       // The process registry continues accounting the concrete instance until it actually exits.
+      java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> workerFuture =
+          workerTask.whenComplete((result, failure) -> {
+            constructedWorker.complete(result == null ? null : result.bootstrap());
+            bootstrapExecutor.shutdown();
+          });
       pendingIndexStartup = workerFuture;
-      workerFuture.whenComplete((result, failure) -> bootstrapExecutor.shutdown());
 
       // Phase 2: Build API server (degraded mode â€” no Worker yet)
       ApiPhaseResult apiPhase;
@@ -1250,7 +1299,9 @@ public class HeadlessApp {
       tPrev = tPhase;
 
       // Phase 3: Wait for Worker and connect
-      WorkerConnectionResult workerResult = connectWorker(apiPhase, workerFuture, engineRoot.indexComponent());
+      WorkerConnectionResult workerResult = connectWorker(
+          apiPhase, workerFuture, constructedWorker, engineRoot.indexComponent(),
+          engineRoot.components());
       knowledgeServer = workerResult.knowledgeServer();
       healthMonitor = workerResult.healthMonitor();
 
@@ -1726,7 +1777,8 @@ public class HeadlessApp {
 
   private static KnowledgeServerStartResult tryStartKnowledgeServer(
       io.justsearch.app.services.worker.KnowledgeServerConfig ksConfig,
-      io.justsearch.app.engine.EngineRoot engineRoot, boolean automaticRootProducers) {
+      io.justsearch.app.engine.EngineRoot engineRoot, boolean automaticRootProducers,
+      java.util.function.Consumer<KnowledgeServerBootstrap> onConstructed) {
     // Tempdoc 825: held outside the try so a failed start still RETURNS the instance. The pre-825
     // code manufactured the null that connectWorker then turned into a permanent DEGRADED pin with
     // no monitor â€” the "boot brick" of 821 Â§O.4. The instance is restartable by construction
@@ -1745,6 +1797,7 @@ public class HeadlessApp {
               null,
               engineRoot.components(), engineRoot.indexComponent(),
               engineRoot, automaticRootProducers, engineRoot.publicationLock());
+      onConstructed.accept(bootstrap);
       // Retry transient boot-time timing failures. A single failed start used to be terminal: the
       // catch below returned a null bootstrap, connectWorker() then pinned the worker capability
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.
@@ -1760,6 +1813,7 @@ public class HeadlessApp {
       log.error("Fix: Close the other instance, or launch with a different data dir via -Djustsearch.data.dir=<path>.");
       throw new RuntimeException(e);
     } catch (Exception e) {
+      if (bootstrap == null) onConstructed.accept(null);
       // Elevated to ERROR - this is a critical failure that affects core functionality
       log.error("=== KNOWLEDGE SERVER FAILED TO START ===");
       log.error("Indexing and search features will be UNAVAILABLE.");

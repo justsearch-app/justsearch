@@ -14,6 +14,7 @@ public final class InferenceRoutes {
       Handler setInferenceModeHandler,
       Handler detachExternalInferenceServerHandler,
       Handler restartWorkerHandler,
+      Handler recoverComponentHandler,
       Handler encoderRuntimeHandler,
       Handler inferenceFailuresHandler,
       Handler inferenceTransitionsHandler) {
@@ -22,6 +23,7 @@ public final class InferenceRoutes {
     app.post("/api/inference/mode", setInferenceModeHandler);
     app.post("/api/inference/detach", detachExternalInferenceServerHandler);
     app.post("/api/worker/restart", restartWorkerHandler);
+    app.post("/api/engine/components/{name}/recover", recoverComponentHandler);
     // Tempdoc 422: per-encoder runtime accelerator explainer.
     app.get("/api/inference/encoders", encoderRuntimeHandler);
     // Tempdoc 518 Appendix F W2.1: failure-history ring buffer.

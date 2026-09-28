@@ -4,13 +4,18 @@ package io.justsearch.app.services.worker;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSpec;
 import java.io.Closeable;
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
@@ -58,7 +63,8 @@ import org.slf4j.LoggerFactory;
  * poll or another attempt — the "one restart authority" constraint from the tempdoc-627 review is
  * structural here, not a convention.
  */
-public final class KnowledgeServerHealthMonitor implements Closeable, WorkerRecoveryAuthority {
+public final class KnowledgeServerHealthMonitor implements Closeable, WorkerRecoveryAuthority,
+    ComponentRecoveryAuthority {
   private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
       "engine-health-monitor", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServerHealthMonitor.class);
@@ -89,6 +95,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   private final long pollIntervalMs;
   private final EngineExecutorRegistry.Registration executorRegistration;
   private final ScheduledExecutorService executor;
+  private final EngineExecutorRegistry.Registration recoveryExecutorRegistration;
+  private final ExecutorService recoveryExecutor;
   private final LongSupplier nowMs;
   private final BootRecoveryPolicy recoveryPolicy;
   /** Wall-clock (epoch ms) of the previous tick; {@code -1} until the first tick. */
@@ -102,6 +110,11 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    */
   private volatile Consumer<KnowledgeServerBootstrap> onRecoveryConnected;
 
+  /** The initial index start may outlive the API's bounded wait; it still owns its opening. */
+  private volatile CompletableFuture<?> initialStartup;
+  private volatile boolean initialHandoverPending;
+  private volatile EngineComponentRegistry componentRegistry;
+
   private volatile Runnable onTick = () -> {};
   private volatile Consumer<RecoveryOccurrence> onRecoveryOccurrence = occurrence -> {};
   // Correlates an episode's events only; never gates lifecycle or readiness.
@@ -109,7 +122,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   // --- boot-recovery arm state. Mutated only by the single executor thread (the CAS below admits
   // one attempt at a time), but READ by requestRecoveryNow on the caller's thread, so volatile. ---
-  private volatile int recoveryAttemptsMade;
+  private final AtomicInteger recoveryAttemptsMade = new AtomicInteger();
   private volatile long lastRecoveryAttemptMs = -1;
   private volatile boolean recoveryGaveUp;
 
@@ -184,16 +197,30 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
                 1,
                 background.maxQueue(),
                 1));
+    ScheduledExecutorService timer = null;
+    EngineExecutorRegistry.Registration recoveryRegistration = null;
     try {
-      this.executorRegistration = registration;
-      this.executor =
-          registration.openScheduled(
+      timer = registration.openScheduled(
               r -> {
                 Thread t = new Thread(r, "knowledge-server-health-monitor");
                 t.setDaemon(true);
                 return t;
               });
+      recoveryRegistration = processExecutors.register(new EngineExecutorSpec(
+          "head.component-recovery", EngineExecutorSpec.Kind.BACKGROUND,
+          EngineExecutorSpec.Mode.PLATFORM, 1, background.maxQueue(), 1));
+      ExecutorService recovery = recoveryRegistration.open(
+          Thread.ofPlatform().daemon().name("engine-component-recovery-", 0).factory());
+      this.executorRegistration = registration;
+      this.executor = timer;
+      this.recoveryExecutorRegistration = recoveryRegistration;
+      this.recoveryExecutor = recovery;
     } catch (RuntimeException | Error failure) {
+      if (recoveryRegistration != null) {
+        try { recoveryRegistration.close(); }
+        catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+      }
+      if (timer != null) timer.shutdownNow();
       try {
         registration.close();
       } catch (RuntimeException | Error cleanupFailure) {
@@ -290,16 +317,33 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         eagerlyRevalidateAfterResume(gap);
       }
 
-      // Tempdoc 825: pick the arm. No client ⇒ start() never completed, so there is nothing to poll
-      // for health and everything to recover.
-      if (!bootstrap.hasClient()) {
-        runBootRecoveryArm();
-        return;
-      }
+      failIndexIfStartDeadlineElapsed();
+      CompletableFuture<?> startup = initialStartup;
+      if (startup != null && !startup.isDone()) {
+        // The initial bootstrap still owns its open. Never start a second open over it.
+      } else {
+        if (initialHandoverPending && bootstrap.hasClient()) {
+          handOverRecoveredWorker(0);
+        }
 
-      // The bootstrap owns physical-health initialization. Sampled readiness is an output,
-      // not the trigger for catch-up work (an API restart must not reindex persisted roots).
-      if (bootstrap.checkHealth()) completeRecoveryEpisode();
+        // Tempdoc 825: pick the arm. No client ⇒ start() never completed, so there is nothing to
+        // poll for health and everything to recover.
+        if (!bootstrap.hasClient()) {
+          runBootRecoveryArm();
+        } else if (!recoveryAttemptRunning.get()) {
+          // The bootstrap owns physical-health initialization. Sampled readiness is an output,
+          // not the trigger for catch-up work (an API restart must not reindex persisted roots).
+          boolean healthy = bootstrap.checkHealth();
+          ComponentState indexState = bootstrap.indexComponent().snapshot().state();
+          if (healthy && indexState != ComponentState.FAILED) {
+            completeRecoveryEpisode();
+            recoveryAttemptsMade.set(0);
+            lastRecoveryAttemptMs = -1;
+          } else if (indexState == ComponentState.FAILED) {
+            scheduleBoundIndexRecovery(false);
+          }
+        }
+      }
     } catch (Exception e) {
       log.warn("Knowledge Server health monitor tick failed: {}", e.getMessage(), e);
       // checkHealth owns physical-loss reporting; setup/resume exceptions are not evidence
@@ -357,6 +401,161 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     this.onRecoveryConnected = handover;
   }
 
+  /** Arms a late handover without adding another timer or a second recovery authority. */
+  public void observeInitialStartup(CompletableFuture<?> startup) {
+    this.initialStartup = Objects.requireNonNull(startup, "startup");
+    this.initialHandoverPending = true;
+  }
+
+  /** Binds the already-registered component authority before the monitor becomes visible. */
+  public void componentRegistry(EngineComponentRegistry registry) {
+    this.componentRegistry = Objects.requireNonNull(registry, "registry");
+  }
+
+  @Override
+  public ComponentRecoveryAuthority.Outcome requestComponentRecovery(String name) {
+    EngineComponentRegistry registry = componentRegistry;
+    if (closed || registry == null || name == null) {
+      return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+    }
+    var component = registry.snapshot().components().stream()
+        .filter(row -> name.equals(row.spec().name())).findFirst();
+    if (component.isEmpty()) return ComponentRecoveryAuthority.Outcome.UNKNOWN_COMPONENT;
+    var observed = component.orElseThrow();
+    if (observed.state() == ComponentState.READY || observed.state() == ComponentState.ABSENT) {
+      return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+    }
+    if (!name.equals(bootstrap.indexComponent().spec().name())) {
+      // A physical owner must supply a same-config action before a route may promise an attempt.
+      return ComponentRecoveryAuthority.Outcome.OWNER_UNAVAILABLE;
+    }
+    if (bootstrap.hasClient()) {
+      if (observed.state() != ComponentState.FAILED) {
+        return recoveryAttemptRunning.get() ? ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING
+            : ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+      }
+      return scheduleBoundIndexRecovery(true);
+    }
+    return switch (requestRecoveryNow()) {
+      case ACCEPTED -> ComponentRecoveryAuthority.Outcome.ACCEPTED;
+      case ALREADY_RUNNING -> ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING;
+      case EXHAUSTED -> ComponentRecoveryAuthority.Outcome.EXHAUSTED;
+      case NOT_APPLICABLE -> ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+    };
+  }
+
+  private ComponentRecoveryAuthority.Outcome scheduleBoundIndexRecovery(boolean operatorRequested) {
+    if (closed || !bootstrap.hasClient()) return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+    if (!recoveryAttemptRunning.compareAndSet(false, true)) {
+      return ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING;
+    }
+    boolean handedOff = false;
+    try {
+      BootRecoveryDecision.Decision decision = BootRecoveryDecision.decide(
+          new BootRecoveryDecision.Input(false,
+              !operatorRequested && bootstrap.indexFatalCode() != null,
+              recoveryAttemptsMade.get(), recoveryGaveUp,
+              lastRecoveryAttemptMs < 0 ? Long.MAX_VALUE
+                  : nowMs.getAsLong() - lastRecoveryAttemptMs), recoveryPolicy);
+      if (decision.action() == BootRecoveryDecision.Action.GIVE_UP) {
+        narrateGiveUp(decision.veto());
+        return ComponentRecoveryAuthority.Outcome.EXHAUSTED;
+      }
+      if (decision.action() == BootRecoveryDecision.Action.NONE) {
+        return recoveryGaveUp ? ComponentRecoveryAuthority.Outcome.EXHAUSTED
+            : ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+      }
+      if (decision.action() == BootRecoveryDecision.Action.WAIT && !operatorRequested) {
+        return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+      }
+      recoveryExecutor.execute(() -> attemptBoundIndexRecovery(operatorRequested));
+      handedOff = true;
+      return ComponentRecoveryAuthority.Outcome.ACCEPTED;
+    } catch (io.justsearch.core.execution.EngineExecutorRejectedException refusal) {
+      if (closed || refusal.reason()
+          == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+        return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+      }
+      var failure = new io.justsearch.app.api.EngineAdmissionException(
+          io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
+          refusal.retryAfterSeconds());
+      failure.initCause(refusal);
+      throw failure;
+    } finally {
+      if (!handedOff) recoveryAttemptRunning.set(false);
+    }
+  }
+
+  private void attemptBoundIndexRecovery(boolean operatorRequested) {
+    try {
+      if (closed || !bootstrap.hasClient()) return;
+      ComponentHandle handle = bootstrap.indexComponent();
+      var before = handle.snapshot();
+      if (before.state() != ComponentState.FAILED) return;
+      BootRecoveryDecision.Decision decision = BootRecoveryDecision.decide(
+          new BootRecoveryDecision.Input(false,
+              !operatorRequested && bootstrap.indexFatalCode() != null,
+              recoveryAttemptsMade.get(), recoveryGaveUp,
+              lastRecoveryAttemptMs < 0 ? Long.MAX_VALUE
+                  : nowMs.getAsLong() - lastRecoveryAttemptMs), recoveryPolicy);
+      if (decision.action() == BootRecoveryDecision.Action.GIVE_UP) {
+        narrateGiveUp(decision.veto());
+        return;
+      }
+      if (decision.action() != BootRecoveryDecision.Action.ATTEMPT
+          && !(operatorRequested && decision.action() == BootRecoveryDecision.Action.WAIT)) return;
+      int attemptNo = decision.nextAttempt();
+      if (!handle.transitionIfUnchanged(before, ComponentState.STARTING,
+          LifecycleReasonCode.WORKER_RECOVERING.code(),
+          "Reopening index with the current configuration (attempt " + attemptNo + ")")) return;
+      handle.recordRecoveryAttempt("Index recovery attempt " + attemptNo);
+      recoveryAttemptsMade.set(attemptNo);
+      lastRecoveryAttemptMs = nowMs.getAsLong();
+      try {
+        if (bootstrap.closeForUpgrade() != ShutdownOutcome.GRACEFUL) {
+          throw new IllegalStateException("Index owner refused local close");
+        }
+        if (closed) return;
+        boolean physicallyHealthy = bootstrap.startForRecovery();
+        if (closed) return;
+        if (physicallyHealthy && bootstrap.hasClient()) {
+          handOverRecoveredWorker(attemptNo);
+          completeRecoveryEpisode();
+          recoveryAttemptsMade.set(0);
+          lastRecoveryAttemptMs = -1;
+          return;
+        }
+        handle.transition(ComponentState.FAILED,
+            LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+            "Index did not become healthy after local recovery attempt " + attemptNo);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        if (!closed) handle.transition(ComponentState.FAILED,
+            LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+            "Index local recovery was interrupted");
+      } catch (Exception failure) {
+        if (!closed) handle.transition(ComponentState.FAILED,
+            LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+            "Index local recovery attempt " + attemptNo + " failed: " + failure.getMessage());
+      }
+    } finally {
+      recoveryAttemptRunning.set(false);
+    }
+  }
+
+  private void failIndexIfStartDeadlineElapsed() {
+    ComponentHandle handle = bootstrap.indexComponent();
+    if (handle == null) return; // test-only mock bootstraps may have no registered component
+    var before = handle.snapshot();
+    long deadline = before.spec().startDeadline().toNanos();
+    if (deadline == 0 || before.state() != ComponentState.STARTING
+        || System.nanoTime() - before.stateSinceMonotonicNanos() < deadline) return;
+    String awaited = before.evidence() == null ? "unknown startup resource" : before.evidence();
+    handle.transitionIfUnchanged(before, ComponentState.FAILED,
+        LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+        "Index start deadline exceeded while waiting for " + awaited);
+  }
+
   /**
    * The boot-recovery arm (tempdoc 825 §D2). Reads the observable state, asks the pure
    * {@link BootRecoveryDecision} what to do, and executes that verbatim.
@@ -396,7 +595,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     return new BootRecoveryDecision.Input(
         bootstrap.hasClient(),
         !operatorRequested && bootstrap.indexFatalCode() != null,
-        recoveryAttemptsMade,
+        recoveryAttemptsMade.get(),
         // Withholding the veto is not enough on its own: the give-up it produced has already latched,
         // and a latched give-up short-circuits to NONE before any veto is consulted. So an operator
         // request re-opens exactly the INDEX_FATAL terminal state and no other.
@@ -460,8 +659,10 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
       // silent (narrateGiveUp returns early while the latch is set).
       recoveryGaveUp = false;
       gaveUpVeto = null;
-      recoveryAttemptsMade = recoveryAttemptsMade + 1;
+      recoveryAttemptsMade.incrementAndGet();
       lastRecoveryAttemptMs = nowMs.getAsLong();
+      bootstrap.indexComponent().recordRecoveryAttempt(
+          "Index recovery attempt " + attemptNo + " of " + recoveryPolicy.maxAttempts());
       bootstrap.indexComponent().transition(
           ComponentState.STARTING,
           LifecycleReasonCode.WORKER_RECOVERING.code(),
@@ -503,7 +704,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         // reset the budget: the arc is over, and any LATER fault is supervision's (the spawner now
         // exists) or the health arm's.
         handOverRecoveredWorker(attemptNo);
-        recoveryAttemptsMade = 0;
+        recoveryAttemptsMade.set(0);
         lastRecoveryAttemptMs = -1;
       }
     } finally {
@@ -519,10 +720,12 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         bootstrap.indexComponent().snapshot().state());
     Consumer<KnowledgeServerBootstrap> handover = this.onRecoveryConnected;
     if (handover == null) {
+      initialHandoverPending = false;
       return;
     }
     try {
       handover.accept(bootstrap);
+      initialHandoverPending = false;
     } catch (RuntimeException e) {
       // Never let a surface-binding failure kill the monitor thread: the worker IS up, and the next
       // tick's health arm keeps it observable even if a controller failed to rebind.
@@ -571,14 +774,14 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         log.error(
             "Boot recovery exhausted after {} attempt(s); the knowledge server will not be retried"
                 + " again in this process",
-            recoveryAttemptsMade);
+            recoveryAttemptsMade.get());
         bootstrap
             .indexComponent()
             .transition(
                 ComponentState.FAILED,
                 LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
                 "Knowledge server failed to start and "
-                    + recoveryAttemptsMade
+                    + recoveryAttemptsMade.get()
                     + " recovery attempt(s) did not bring it up");
       }
     }
@@ -610,7 +813,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   /** Boot-recovery attempts spent in this arc. Visible for tests. */
   int recoveryAttemptsMadeForTest() {
-    return recoveryAttemptsMade;
+    return recoveryAttemptsMade.get();
   }
 
   /** Whether an attempt holds the single attempt slot right now. Visible for tests. */
@@ -638,6 +841,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     if (closed || bootstrap.hasClient()) {
       return Verdict.NOT_APPLICABLE;
     }
+    CompletableFuture<?> startup = initialStartup;
+    if (startup != null && !startup.isDone()) return Verdict.ALREADY_RUNNING;
     // Reserve the single attempt slot on the CALLER's thread and hand it to the runnable. Checking a
     // "is one running" flag instead let a burst queue N runnables before the first had started, so
     // N requests were all told ACCEPTED and the later ones were then dropped by the executor-side
@@ -736,6 +941,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   public void close() {
     closed = true;
     executor.shutdownNow();
+    recoveryExecutor.shutdownNow();
     try {
       if (!executor.awaitTermination(CLOSE_AWAIT_MS, TimeUnit.MILLISECONDS)) {
         log.warn(
@@ -743,9 +949,13 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
                 + " still be unwinding",
             CLOSE_AWAIT_MS);
       }
+      if (!recoveryExecutor.awaitTermination(CLOSE_AWAIT_MS, TimeUnit.MILLISECONDS)) {
+        log.warn("Component recovery did not stop within {}ms", CLOSE_AWAIT_MS);
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } finally {
+      recoveryExecutorRegistration.close();
       executorRegistration.close();
     }
   }
