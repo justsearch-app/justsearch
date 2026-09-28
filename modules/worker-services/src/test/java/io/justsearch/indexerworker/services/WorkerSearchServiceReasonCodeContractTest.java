@@ -80,7 +80,7 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
           "SKIPPED_EMPTY_QUERY");
 
   private static final Set<String> RAG_RETRIEVAL_MODE_REASONS =
-      Set.of(
+      union(EMBEDDING_COMPAT_REASON_CODES, Set.of(
           "EMPTY_REQUEST",
           "NO_CHUNKS_FOUND",
           "CHUNKS_BELOW_THRESHOLD",
@@ -90,7 +90,7 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
           "EMBEDDING_UNAVAILABLE",
           "EMBEDDING_EMPTY",
           "EMBEDDING_GENERATION_FAILED",
-          "CHUNK_VECTOR_COVERAGE_INCOMPLETE");
+          "CHUNK_VECTOR_COVERAGE_INCOMPLETE"));
 
   @Test
   void searchResponsesOnlyEmitAllowlistedReasonCodes() throws Exception {

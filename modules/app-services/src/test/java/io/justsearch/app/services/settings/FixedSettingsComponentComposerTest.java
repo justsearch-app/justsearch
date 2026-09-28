@@ -327,6 +327,10 @@ final class FixedSettingsComponentComposerTest {
           "prepared-" + name, "desired-" + name, null, 0, "test");
     }
 
+    @Override public void includeObservation(EngineComponentSnapshot.Component unexpected) {
+      throw new UnsupportedOperationException("Recording owner has no generation projection");
+    }
+
     @Override
     public void validate() {
       validateCount++;

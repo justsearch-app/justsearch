@@ -502,6 +502,11 @@ final class SettingsCommitCoordinatorTest {
           assertEquals(Set.of("chatProfile"), affected.get("generative"));
           seen.set(context);
           return new Prepared() {
+            @Override public void includeObservation(
+                io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+              throw new UnsupportedOperationException("Profile fixture has no generation projection");
+            }
+            @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
             @Override public void validate() {}
             @Override public void install() { installed.set(true); }
             @Override public void notifyObservers() {}
@@ -571,6 +576,11 @@ final class SettingsCommitCoordinatorTest {
       var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
       SettingsComponentComposer components = (candidate, desired, affected) ->
           new SettingsComponentComposer.Prepared() {
+            @Override public void includeObservation(
+                io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+              throw new UnsupportedOperationException("Install-failure fixture has no generation projection");
+            }
+            @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
             @Override public void validate() {}
             @Override public void install() { throw new IllegalStateException("broken prepared install"); }
             @Override public void notifyObservers() {}
@@ -1181,6 +1191,11 @@ final class SettingsCommitCoordinatorTest {
           assertEquals(Set.of("chatProfile"), affected.get("generative"));
           assertEquals(new SettingsWitness(1, key), settings.inspect().witness());
           return new Prepared() {
+            @Override public void includeObservation(
+                io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+              throw new UnsupportedOperationException("Recovery fixture has no generation projection");
+            }
+            @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
             @Override public void validate() {}
             @Override public void install() { installed.incrementAndGet(); }
             @Override public void notifyObservers() {}

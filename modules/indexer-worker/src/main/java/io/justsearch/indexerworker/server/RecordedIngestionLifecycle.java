@@ -82,16 +82,24 @@ public interface RecordedIngestionLifecycle {
   }
 
   /** Prepared settings projection for a typed activation. Physical publication calls it in order. */
-  @FunctionalInterface
   interface CommittedProjection {
-    default void includeComponentObservation(
-        io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
-      throw new UnsupportedOperationException("Generation component observation is unavailable");
-    }
-    default void admitBeforePointer() {}
+    CommittedProjection NONE = new CommittedProjection() {
+      @Override public void includeComponentObservation(
+          io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+        throw new UnsupportedOperationException("No generation component projection");
+      }
+      @Override public void admitBeforePointer() {}
+      @Override public void afterPointerCommitted() {}
+      @Override public void afterRuntimePublished() {}
+      @Override public void abortBeforePointer() {}
+    };
+
+    void includeComponentObservation(
+        io.justsearch.core.component.EngineComponentSnapshot.Component observation);
+    void admitBeforePointer();
     void afterPointerCommitted() throws IOException;
-    default void afterRuntimePublished() {}
-    default void abortBeforePointer() {}
+    void afterRuntimePublished();
+    void abortBeforePointer();
   }
 
   /** Settings owner locks wrap only the short physical pointer/publication cut. */
@@ -105,7 +113,7 @@ public interface RecordedIngestionLifecycle {
   default PreparedCompositeProjection prepareRecordedGenerationProjection(
       String operationKey, JobQueue queue) throws IOException {
     return new PreparedCompositeProjection() {
-      private final CommittedProjection empty = () -> {};
+      private final CommittedProjection empty = CommittedProjection.NONE;
       @Override public IndexGenerationManager.State withOwnerLocks(CheckedPromotion promotion)
           throws IOException { return promotion.promote(); }
       @Override public CommittedProjection callbacks() { return empty; }
@@ -128,7 +136,7 @@ public interface RecordedIngestionLifecycle {
   default IndexGenerationManager.State promoteRecordedGenerationWithProjection(
       String operationKey, JobQueue queue, CheckedCompositePromotion promotion) throws IOException {
     return promoteRecordedGeneration(operationKey, queue,
-        () -> promotion.promote(() -> {}));
+        () -> promotion.promote(CommittedProjection.NONE));
   }
 
   /** Bounded current permission check under the queue lock; never call jobs or operation storage. */

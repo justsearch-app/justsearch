@@ -1175,15 +1175,23 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     else completion.complete(OperationResult.failure("Recorded ingestion could not complete", receipt.code(), Map.of(), false));
   }
 
+  private static String recordedTarget(String operationKey) {
+    try {
+      return IndexGenerationManager.recordedGenerationId(operationKey);
+    } catch (IOException invalid) {
+      throw new JobQueue.RecordedWalkGapException("Recorded bulk operation key is noncanonical", invalid);
+    }
+  }
+
   private static BulkReindexProgress capturing(Bulk bulk) {
-    return new BulkReindexProgress("g-" + bulk.row.key(), bulk.plan.target(),
+    return new BulkReindexProgress(recordedTarget(bulk.row.key()), bulk.plan.target(),
         BulkReindexProgress.Phase.CAPTURING, null, null);
   }
 
   private BulkReindexProgress bulkProgress(Bulk bulk) {
     var progress = operations.bulkReindexProgress(bulk.row.id()).orElseThrow(
         () -> new JobQueue.RecordedWalkGapException("Bulk operation progress disappeared"));
-    if (!progress.generationId().equals("g-" + bulk.row.key()) || !progress.target().equals(bulk.plan.target())) {
+    if (!progress.generationId().equals(recordedTarget(bulk.row.key())) || !progress.target().equals(bulk.plan.target())) {
       throw new JobQueue.RecordedWalkGapException("Bulk target binding changed");
     }
     return progress;
@@ -1229,7 +1237,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     try {
       var runtime = physical.bulkRuntime.current();
       return runtime.isPresent() && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.BUILDING
-          && ("g-" + bulk.row.key()).equals(runtime.orElseThrow().writableGeneration());
+          && IndexGenerationManager.recordedGenerationId(bulk.row.key())
+              .equals(runtime.orElseThrow().writableGeneration());
     } catch (IOException unavailable) { return false; }
   }
 
@@ -1430,41 +1439,24 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       catch (RuntimeException | Error settlementFailure) { failure.addSuppressed(settlementFailure); }
       throw failure;
     }
+    return preparedInstallerProjection(projection, attempts, bulk.handle,
+        () -> refuseInstallerPrecommit(bulk, queue,
+            new IllegalStateException("Installer activation did not commit its pointer")));
+  }
+
+  static PreparedCompositeProjection preparedInstallerProjection(
+      io.justsearch.app.api.settings.SettingsCommitOwner.PreparedGenerationProjection projection,
+      OperationAttemptRunner attempts, OperationRecordHandle handle, Runnable refuseBeforePointer) {
     return new PreparedCompositeProjection() {
       private final java.util.concurrent.atomic.AtomicBoolean aborted =
           new java.util.concurrent.atomic.AtomicBoolean();
       private void abort() {
         if (!aborted.compareAndSet(false, true)) return;
         projection.abortBeforePointer();
-        refuseInstallerPrecommit(bulk, queue,
-            new IllegalStateException("Installer activation did not commit its pointer"));
+        refuseBeforePointer.run();
       }
-      private final CommittedProjection callbacks = new CommittedProjection() {
-        @Override public void includeComponentObservation(
-            io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
-          projection.includeComponentObservation(observation);
-        }
-        @Override public void admitBeforePointer() {
-          attempts.observeBulkBoundary(bulk.handle,
-              OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_ARM);
-          projection.admitBeforePointer();
-          attempts.observeBulkBoundary(bulk.handle,
-              OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_POINTER);
-        }
-        @Override public void afterPointerCommitted() throws IOException {
-          attempts.observeBulkBoundary(bulk.handle,
-              OperationAttemptRunner.BulkBoundary.INSTALLER_POINTER_BEFORE_SETTINGS);
-          projection.afterPointerCommitted();
-          attempts.observeBulkBoundary(bulk.handle,
-              OperationAttemptRunner.BulkBoundary.INSTALLER_SETTINGS_BEFORE_PUBLICATION);
-        }
-        @Override public void afterRuntimePublished() {
-          projection.afterRuntimePublished();
-          attempts.observeBulkBoundary(bulk.handle,
-              OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_RECEIPT);
-        }
-        @Override public void abortBeforePointer() { abort(); }
-      };
+      private final CommittedProjection callbacks =
+          installerCallbacks(projection, attempts, handle, this::abort);
 
       @Override public IndexGenerationManager.State withOwnerLocks(CheckedPromotion promotion)
           throws IOException {
@@ -1480,6 +1472,37 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
       @Override public CommittedProjection callbacks() { return callbacks; }
       @Override public void abortBeforePointer() { abort(); }
+    };
+  }
+
+  static CommittedProjection installerCallbacks(
+      io.justsearch.app.api.settings.SettingsCommitOwner.PreparedGenerationProjection projection,
+      OperationAttemptRunner attempts, OperationRecordHandle handle, Runnable abort) {
+    return new CommittedProjection() {
+      @Override public void includeComponentObservation(
+          io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+        projection.includeComponentObservation(observation);
+      }
+      @Override public void admitBeforePointer() {
+        attempts.observeBulkBoundary(handle,
+            OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_ARM);
+        projection.admitBeforePointer();
+        attempts.observeBulkBoundary(handle,
+            OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_POINTER);
+      }
+      @Override public void afterPointerCommitted() throws IOException {
+        attempts.observeBulkBoundary(handle,
+            OperationAttemptRunner.BulkBoundary.INSTALLER_POINTER_BEFORE_SETTINGS);
+        projection.afterPointerCommitted();
+        attempts.observeBulkBoundary(handle,
+            OperationAttemptRunner.BulkBoundary.INSTALLER_SETTINGS_BEFORE_PUBLICATION);
+      }
+      @Override public void afterRuntimePublished() {
+        projection.afterRuntimePublished();
+        attempts.observeBulkBoundary(handle,
+            OperationAttemptRunner.BulkBoundary.INSTALLER_BEFORE_RECEIPT);
+      }
+      @Override public void abortBeforePointer() { abort.run(); }
     };
   }
 
@@ -1564,7 +1587,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     var observedProgress = operations.bulkReindexProgress(row.id());
     if (observedProgress.isEmpty()) return bulkRefusalDecision(found.isEmpty() ? reason : RecordedIngestionSettlement.UNAVAILABLE);
     var progress = observedProgress.orElseThrow();
-    if (!progress.generationId().equals("g-" + row.key()) || !progress.target().equals(plan.target())) {
+    if (!progress.generationId().equals(recordedTarget(row.key())) || !progress.target().equals(plan.target())) {
       return failed(RecordedIngestionSettlement.UNAVAILABLE);
     }
     if (progress.refusalCode() == null) {
@@ -1814,7 +1837,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     var outcome = physical.bulkIndexing.startRecordedMigration(bulk.row.key(), bulk.plan.source(),
         bulk.plan.target().fingerprint(), bulk.plan.scope().generation(),
         bulk.plan.projectionSourceIds(), bulk.work.context());
-    String target = "g-" + bulk.row.key();
+    String target = recordedTarget(bulk.row.key());
     if (!outcome.accepted() || !target.equals(outcome.buildingGenerationId())
         || !bulk.plan.scope().generation().equals(outcome.activeGenerationId())
         || !("MIGRATING".equals(outcome.migrationState()) || "SWITCHING".equals(outcome.migrationState()))) {
@@ -1885,7 +1908,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     var history = settlement.processingHistory().stream().map(unit -> new BulkReindexProgress.ProcessingEvent(
         unit.pathHash(), unit.unitRevision(), unit.plannedSourceSha256(), unit.contentHash(), unit.coverage(),
         unit.outcomeClass(), unit.reasonCode(), unit.retryPolicy())).toList();
-    return new BulkReindexProgress("g-" + key, plan.target(), BulkReindexProgress.Phase.SETTLED,
+    return new BulkReindexProgress(recordedTarget(key), plan.target(), BulkReindexProgress.Phase.SETTLED,
         new BulkReindexProgress.Capture(settlement.manifestSha256(), settlement.plannedUnits()),
         new BulkReindexProgress.Settlement(settlement.revision(), settlement.sha256(), settlement.failedEvents(),
             settlement.supersededEvents(), gaps, history));
@@ -1904,14 +1927,14 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   private static boolean committedBulkPointer(String key, Optional<BulkRuntime> runtime) {
     return runtime.isPresent()
         && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.PROMOTED
-        && ("g-" + key).equals(runtime.orElseThrow().activeGeneration());
+        && recordedTarget(key).equals(runtime.orElseThrow().activeGeneration());
   }
 
   private static boolean promotedGeneration(String key, Optional<BulkRuntime> runtime) {
     return runtime.isPresent() && runtime.orElseThrow().promotedBoot()
         && runtime.orElseThrow().disposition() == IndexGenerationManager.BootDisposition.PROMOTED
-        && ("g-" + key).equals(runtime.orElseThrow().activeGeneration())
-        && ("g-" + key).equals(runtime.orElseThrow().writableGeneration())
+        && recordedTarget(key).equals(runtime.orElseThrow().activeGeneration())
+        && recordedTarget(key).equals(runtime.orElseThrow().writableGeneration())
         && "IDLE".equals(runtime.orElseThrow().migrationState());
   }
 
@@ -1983,7 +2006,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     if (receipt.isEmpty()) return;
     var progress = operations.bulkReindexProgress(row.id()).orElseThrow(
         () -> new JobQueue.RecordedWalkGapException("Terminal bulk progress disappeared"));
-    if (!progress.generationId().equals("g-" + row.key()) || !progress.target().equals(plan.target())) {
+    if (!progress.generationId().equals(recordedTarget(row.key())) || !progress.target().equals(plan.target())) {
       throw new JobQueue.RecordedWalkGapException("Terminal bulk target changed");
     }
     String code = row.receipt() == null ? null : row.receipt().code();

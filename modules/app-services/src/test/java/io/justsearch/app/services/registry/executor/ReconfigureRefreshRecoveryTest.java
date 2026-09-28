@@ -97,6 +97,11 @@ final class ReconfigureRefreshRecoveryTest {
           assertEquals(Set.of("modelRefresh", "chatProfile"), affected.get("generative"));
           assertEquals(new SettingsWitness(1, key), settings.inspect().witness());
           return new Prepared() {
+            @Override public void includeObservation(
+                io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+              throw new UnsupportedOperationException("Refresh fixture has no generation projection");
+            }
+            @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
             @Override public void validate() {}
             @Override public void install() { installed.incrementAndGet(); }
             @Override public void notifyObservers() {}

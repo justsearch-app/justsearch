@@ -185,6 +185,10 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
 
   private record AbsentPreparedOwner(EngineComponentSnapshot.Component observation)
       implements FixedSettingsComponentComposer.PreparedOwner {
+    @Override public void includeObservation(EngineComponentSnapshot.Component unexpected) {
+      throw new UnsupportedOperationException("Absent generative owner has no component projection");
+    }
+    @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
     @Override public void validate() {}
     @Override public void install() {}
     @Override public void notifyObservers() {}
@@ -202,6 +206,10 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     private ManagedPreparedOwner {
       Objects.requireNonNull(candidate, "candidate");
       Objects.requireNonNull(observation, "observation");
+    }
+
+    @Override public void includeObservation(EngineComponentSnapshot.Component unexpected) {
+      throw new UnsupportedOperationException("Generative owner has no generation projection");
     }
 
     @Override public void withOwnerLocks(Runnable publication) {

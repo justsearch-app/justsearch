@@ -10,6 +10,7 @@ import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController.State;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.SearchMode;
+import io.justsearch.ipc.RetrieveContextRequest;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
 import java.lang.reflect.Field;
@@ -21,6 +22,55 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 final class WorkerSearchServiceDegradationSignalingTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
+
+  @Test
+  void textOnlyCandidateNamesRebuildInHybridTraceAndRagContext() throws Exception {
+    String previous = System.getProperty("justsearch.config");
+    try {
+      RunningRuntime lifecycle = newLifecycleWithOneDoc("Hello world");
+      try {
+        var service = WorkerSearchService.textOnlyCandidateView(lifecycle);
+        SearchResponse hybrid = invokeSearch(service, SearchRequest.newBuilder()
+            .setQuery("Hello").setLimit(10).setMode(SearchMode.SEARCH_MODE_HYBRID).build());
+        assertEquals("REBUILD_IN_PROGRESS",
+            hybrid.getSearchTrace().getDegradation().getVectorBlockedReason());
+        assertTrue(hybrid.getTotalHits() >= 1, "keyword results remain available");
+        var context = service.retrieveContext(RetrieveContextRequest.newBuilder()
+            .setQuestion("Hello").setTopK(5).build(), CallContext.none());
+        assertEquals("REBUILD_IN_PROGRESS", context.getRetrievalModeReason());
+      } finally {
+        lifecycle.close();
+      }
+    } finally {
+      restoreConfig(previous);
+    }
+  }
+
+  @Test
+  void ordinaryRebuildingCompatibilityNamesItsReasonInRagContext() throws Exception {
+    String previous = System.getProperty("justsearch.config");
+    try {
+      RunningRuntime lifecycle = newLifecycleWithOneDoc("Hello world");
+      try {
+        var service = new WorkerSearchService(lifecycle);
+        var controller = new EmbeddingCompatibilityController(Map::of, () -> 1L);
+        forceEmbeddingCompatState(controller, State.REBUILDING, "REBUILD_IN_PROGRESS");
+        service.setEmbeddingCompatController(controller);
+        var context = service.retrieveContext(RetrieveContextRequest.newBuilder()
+            .setQuestion("Hello").setTopK(5).build(), CallContext.none());
+        assertEquals("REBUILD_IN_PROGRESS", context.getRetrievalModeReason());
+      } finally {
+        lifecycle.close();
+      }
+    } finally {
+      restoreConfig(previous);
+    }
+  }
+
+  private static void restoreConfig(String previous) {
+    if (previous == null) System.clearProperty("justsearch.config");
+    else System.setProperty("justsearch.config", previous);
+  }
 
   @Test
   void vectorModeReturnsEmptyWithVectorBlockedAndReasonWhenEmbeddingQueriesDisallowed() throws Exception {

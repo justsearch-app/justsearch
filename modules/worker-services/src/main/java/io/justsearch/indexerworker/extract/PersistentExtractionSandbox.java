@@ -413,14 +413,14 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   private ContentExtractor.ExtractionException discardAndClassify(
       Slot slot, Child child, String reason, Exception cause) {
     child.retirementReason = reason;
-    int exitCode = exitCodeAfterKill(child);
+    KillOutcome kill = exitCodeAfterKill(child);
     // The OOM signature only reaches the tail once the drain thread has seen EOF on the dead
     // child's stderr; reading it before that classifies a heap exhaustion as an ordinary crash.
     child.stderr.awaitDrain(2000L);
     String tail = child.stderr.tail();
     boolean oom = tail.contains("OutOfMemoryError");
     try {
-      finishDiscard(slot, child, oom ? REASON_OOM : reason);
+      finishDiscard(slot, child, oom ? REASON_OOM : reason, kill);
     } catch (RuntimeException | Error cleanup) {
       if (cause != null && cause != cleanup) cleanup.addSuppressed(cause);
       throw cleanup;
@@ -428,22 +428,22 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     if (oom) {
       // Permanent: the file does not fit in the child heap, so a retry exhausts it again.
       return new ContentExtractor.ExtractionException(
-          "Sandbox child exhausted its heap (exit=" + exitCode + "): " + tail, cause);
+          "Sandbox child exhausted its heap (exit=" + kill.exitCode() + "): " + tail, cause);
     }
     return new SandboxExtractionException(
-        "Sandbox child exited with code " + exitCode + ": " + tail, cause);
+        "Sandbox child exited with code " + kill.exitCode() + ": " + tail, cause);
   }
 
   private void discardChild(Slot slot, Child child, String reason) {
     child.retirementReason = reason;
-    exitCodeAfterKill(child);
-    finishDiscard(slot, child, reason);
+    KillOutcome kill = exitCodeAfterKill(child);
+    finishDiscard(slot, child, reason, kill);
   }
 
-  private void finishDiscard(Slot slot, Child child, String reason) {
+  private void finishDiscard(Slot slot, Child child, String reason, KillOutcome kill) {
     if (child.process.isAlive()) {
       throw new IllegalStateException("Extraction child " + child.pid
-          + " survived retirement; retaining its slot for cleanup retry");
+          + " survived retirement; retaining its slot for cleanup retry; " + kill);
     }
     child.close();
     unregister(child);
@@ -457,16 +457,36 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     log.warn("Extraction sandbox child recycled (reason={}, pid={})", reason, child.pid);
   }
 
-  private static int exitCodeAfterKill(Child child) {
-    child.process.destroyForcibly();
+  private static KillOutcome exitCodeAfterKill(Child child) {
+    return killAndConfirm(child.process);
+  }
+
+  private record KillOutcome(boolean exited, int exitCode, long waitedMs, boolean interrupted) {}
+
+  /** Caller interruption cannot turn an in-flight OS teardown into a false survival verdict. */
+  private static KillOutcome killAndConfirm(Process process) {
+    long started = System.nanoTime();
+    long deadline = started + TimeUnit.SECONDS.toNanos(5);
+    boolean interrupted = Thread.interrupted();
     try {
-      if (child.process.waitFor(5, TimeUnit.SECONDS)) {
-        return child.process.exitValue();
+      process.destroyForcibly();
+      while (process.isAlive()) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) break;
+        try {
+          // A normal false return means the bounded wait expired. Retry only on interruption.
+          if (!process.waitFor(remaining, TimeUnit.NANOSECONDS)) break;
+        } catch (InterruptedException e) {
+          interrupted = true;
+        }
       }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      boolean exited = !process.isAlive();
+      return new KillOutcome(
+          exited, exited ? process.exitValue() : -1,
+          TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), interrupted);
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
     }
-    return -1;
   }
 
   private Child acquireChild(Slot slot) throws IOException {
@@ -517,16 +537,16 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   @Override
   public void close() {
     closed = true;
-    boolean stopped = killAll();
+    List<String> survivors = killAll();
     shutdownAndCancelQueued(readers);
     try {
       readers.awaitTermination(5, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    if (!stopped) {
+    if (!survivors.isEmpty()) {
       // Keep the JVM callback and exact handles reachable for the final cleanup attempt.
-      throw new IllegalStateException("Extraction children survived terminal cleanup");
+      throw new IllegalStateException("Extraction children survived terminal cleanup: " + survivors);
     }
     try {
       Runtime.getRuntime().removeShutdownHook(shutdownHook);
@@ -543,14 +563,14 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
   }
 
-  private boolean killAll() {
-    boolean stopped = true;
+  private List<String> killAll() {
+    List<String> survivors = new ArrayList<>();
     for (Slot slot : allSlots) {
       Child child = slot.child;
       if (child != null) {
-        exitCodeAfterKill(child);
-        if (child.process.isAlive()) {
-          stopped = false;
+        KillOutcome kill = exitCodeAfterKill(child);
+        if (!kill.exited()) {
+          survivors.add("pid=" + child.pid + " " + kill);
         } else {
           slot.child = null;
           child.close();
@@ -560,33 +580,29 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
     synchronized (unregisteredChildren) {
       for (Process process : unregisteredChildren) {
-        terminateAndWait(process);
+        KillOutcome kill = terminateAndWait(process);
+        if (!kill.exited()) survivors.add("unregisteredPid=" + process.pid() + " " + kill);
       }
       unregisteredChildren.removeIf(process -> !process.isAlive());
-      return stopped && unregisteredChildren.isEmpty();
+      return survivors;
     }
   }
 
   IOException rollbackFailedRegistration(Process process, Throwable failure) {
-    if (!terminateAndWait(process)) {
+    KillOutcome kill = terminateAndWait(process);
+    if (!kill.exited()) {
       unregisteredChildren.add(process);
       log.error(
-          "Unregistered extraction child PID {} survived registration rollback; retaining handle",
-          process.pid());
+          "Unregistered extraction child PID {} survived registration rollback; retaining handle; {}",
+          process.pid(), kill);
     }
     return failure instanceof IOException io
         ? io
         : new IOException("could not register extraction child", failure);
   }
 
-  private static boolean terminateAndWait(Process process) {
-    process.destroyForcibly();
-    try {
-      return process.waitFor(5, TimeUnit.SECONDS) && !process.isAlive();
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      return false;
-    }
+  private static KillOutcome terminateAndWait(Process process) {
+    return killAndConfirm(process);
   }
 
   private void unregister(Child child) {

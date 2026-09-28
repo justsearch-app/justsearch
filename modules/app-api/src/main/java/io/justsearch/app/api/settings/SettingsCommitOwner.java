@@ -96,12 +96,10 @@ public interface SettingsCommitOwner {
    */
   interface PreparedGenerationProjection {
     /** Join a generation-owned observation to the settings batch before pointer admission. */
-    default void includeComponentObservation(
-        io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
-      throw new UnsupportedOperationException("Generation component observation is unavailable");
-    }
+    void includeComponentObservation(
+        io.justsearch.core.component.EngineComponentSnapshot.Component observation);
     /** Establish prepared component owner locks before the runtime/state/publication lock order. */
-    default void withOwnerLocks(Runnable publication) { publication.run(); }
+    void withOwnerLocks(Runnable publication);
 
     /** Final witness, shutdown and cancellation arbitration while publication excludes captures. */
     void admitBeforePointer();
@@ -110,7 +108,7 @@ public interface SettingsCommitOwner {
     void afterPointerCommitted() throws IOException;
 
     /** Deliver observations and retire superseded components after runtime publication unlocks. */
-    default void afterRuntimePublished() {}
+    void afterRuntimePublished();
 
     /** Dispose only while the exact generation pointer is proven unchanged. */
     void abortBeforePointer();

@@ -235,7 +235,7 @@ final class RagContextOps {
   RetrieveContextResponse executeRetrieval(
       io.justsearch.ipc.RetrieveContextRequest request,
       Set<String> docIds, int topK, int maxContextTokens,
-      boolean allowQueryEmbeddings,
+      boolean allowQueryEmbeddings, String compatibilityReason,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
 
     String question = request.getQuestion();
@@ -276,7 +276,8 @@ final class RagContextOps {
 
     ChunkContextResult chunkContext =
         searchChunksWithMeta(question, effectiveDocIds, topK, maxContextTokens,
-            allowQueryEmbeddings, filters, request.getExcludedChunksList(), urgency, childLifetime);
+            allowQueryEmbeddings, compatibilityReason, filters, request.getExcludedChunksList(),
+            urgency, childLifetime);
     if (chunkContext.context() != null && !chunkContext.context().isBlank()) {
       log.debug(
           "RAG: Found {} chars from chunks (chunksUsed={}, chunksFoundTotal={})",
@@ -293,6 +294,10 @@ final class RagContextOps {
     long chunksFoundInSearch = chunkContext.totalFound();
     String fallbackReason =
         chunksFoundInSearch > 0 ? "CHUNKS_BELOW_THRESHOLD" : "NO_CHUNKS_FOUND";
+    if (!allowQueryEmbeddings && compatibilityReason != null
+        && compatibilityReason.equals(chunkContext.retrievalModeReason())) {
+      fallbackReason = compatibilityReason;
+    }
     log.debug(
         "RAG: Falling back to full document search (chunksFound={}, reason={})",
         chunksFoundInSearch, fallbackReason);
@@ -424,7 +429,7 @@ final class RagContextOps {
       Set<String> docIds,
       int topK,
       int maxContextTokens,
-      boolean allowQueryEmbeddings,
+      boolean allowQueryEmbeddings, String compatibilityReason,
       LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
       List<io.justsearch.ipc.ChunkRef> excludedChunks,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
@@ -462,10 +467,10 @@ final class RagContextOps {
           retrievalModeReason = "EMBEDDING_GENERATION_FAILED";
         }
       } else {
-        retrievalModeReason =
-            embeddingProvider instanceof io.justsearch.indexerworker.embed.NoOpEmbeddingProvider
-                ? "NO_EMBEDDING_SERVICE"
-                : "EMBEDDING_UNAVAILABLE";
+        retrievalModeReason = !allowQueryEmbeddings
+            ? (compatibilityReason != null ? compatibilityReason : "EMBEDDING_UNAVAILABLE")
+            : embeddingProvider instanceof io.justsearch.indexerworker.embed.NoOpEmbeddingProvider
+                ? "NO_EMBEDDING_SERVICE" : "EMBEDDING_UNAVAILABLE";
       }
 
       // If mode is "hybrid" but no embedding, log a warning

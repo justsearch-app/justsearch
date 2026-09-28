@@ -452,8 +452,25 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       if (!store.armInstallerGenerationSettingsRevision(row.id(), expectedRevision)) {
         throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
       }
-      var projection = prepared;
-      return new SettingsCommitOwner.PreparedGenerationProjection() {
+      return installerProjectionWithCancellation(prepared, cancellation);
+    } catch (RuntimeException | Error failure) {
+      cancellation.close();
+      if (prepared != null) {
+        try { prepared.abortBeforePointer(); }
+        catch (RuntimeException | Error cleanupFailure) {
+          control.settingsUncertain = true;
+          failure.addSuppressed(cleanupFailure);
+        }
+      }
+      if (control.settingsUncertain) fatalSettings(control, failure);
+      throw failure;
+    }
+  }
+
+  static SettingsCommitOwner.PreparedGenerationProjection installerProjectionWithCancellation(
+      SettingsCommitOwner.PreparedGenerationProjection projection,
+      io.justsearch.app.api.EngineWorkHandle.Registration cancellation) {
+    return new SettingsCommitOwner.PreparedGenerationProjection() {
         @Override public void includeComponentObservation(
             io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
           projection.includeComponentObservation(observation);
@@ -469,19 +486,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
           try { projection.abortBeforePointer(); }
           finally { cancellation.close(); }
         }
-      };
-    } catch (RuntimeException | Error failure) {
-      cancellation.close();
-      if (prepared != null) {
-        try { prepared.abortBeforePointer(); }
-        catch (RuntimeException | Error cleanupFailure) {
-          control.settingsUncertain = true;
-          failure.addSuppressed(cleanupFailure);
-        }
-      }
-      if (control.settingsUncertain) fatalSettings(control, failure);
-      throw failure;
-    }
+    };
   }
 
   @Override public boolean installerGenerationProjected(

@@ -1068,7 +1068,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     if (candidateConfiguration == null || producerEncoderBindings == encoderBindings) {
       throw new IllegalStateException("No detached candidate producer is available");
     }
-    var lexicalSearch = new WorkerSearchService(
+    var lexicalSearch = WorkerSearchService.textOnlyCandidateView(
         java.util.Objects.requireNonNull(activeRuntime, "activeRuntime"));
     lexicalSearch.setActiveGenerationSupplier(ingestService.activeGenerationSupplier());
     return new TextOnlyCandidateView(this, lexicalSearch, healthService.textOnlyView());

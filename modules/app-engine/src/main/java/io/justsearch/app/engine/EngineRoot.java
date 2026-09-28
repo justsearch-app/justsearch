@@ -7,6 +7,7 @@ import io.justsearch.app.services.worker.WorkerHost;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import java.io.IOException;
 import java.util.Objects;
@@ -453,9 +454,16 @@ public final class EngineRoot implements WorkerHost {
       recordedIngestion.bindProducer(built::enumerateRecordedRoot);
       recordedIngestion.bindBulkProducer(built::enumerateCapturedRoots, built,
           () -> requestRestart(started),
-          operationKey -> liveMigrationStartAttempt = new LiveMigrationStartAttempt(
-              "g-" + operationKey, started.beginRecordedBuildingLiveAsync(
-                  operationKey, () -> requestRestart(started))));
+          operationKey -> {
+            try {
+              liveMigrationStartAttempt = new LiveMigrationStartAttempt(
+                  IndexGenerationManager.recordedGenerationId(operationKey),
+                  started.beginRecordedBuildingLiveAsync(
+                      operationKey, () -> requestRestart(started)));
+            } catch (IOException invalid) {
+              throw new IllegalStateException("Recorded bulk operation key is noncanonical", invalid);
+            }
+          });
       clientReady = true;
     } catch (RuntimeException | Error failure) {
       try { close(); }

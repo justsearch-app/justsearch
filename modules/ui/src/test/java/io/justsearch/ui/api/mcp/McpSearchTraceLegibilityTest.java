@@ -225,6 +225,33 @@ final class McpSearchTraceLegibilityTest {
   }
 
   @Test
+  @DisplayName("rebuild pause appears once in MCP text and structured degradation")
+  void rebuildPauseReasonIsLegibleWithoutDuplication() {
+    SearchTrace.Degradation degradation =
+        new SearchTrace.Degradation(
+            true, "REBUILD_IN_PROGRESS", true, "REBUILD_IN_PROGRESS", false, "paused");
+    SearchTrace trace =
+        new SearchTrace(SearchTrace.SCHEMA_VERSION, "HYBRID", null, null, degradation, List.of());
+    KnowledgeSearchResponse canned =
+        new KnowledgeSearchResponse(
+            0L, 0L, 3L, List.of(), null, null, null, null, null, null, null, trace, null);
+
+    Map<String, Object> result = invokeSearch(canned);
+    String text = textOf(result);
+    assertTrue(
+        text.contains(
+            "Note: semantic ranking degraded (REBUILD_IN_PROGRESS); results may be"
+                + " keyword-ranked only."),
+        text);
+    assertFalse(text.contains("REBUILD_IN_PROGRESS; REBUILD_IN_PROGRESS"), text);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> summary = (Map<String, Object>) structuredOf(result).get("degradation");
+    assertEquals(Boolean.TRUE, summary.get("vectorBlocked"));
+    assertEquals(Boolean.TRUE, summary.get("hybridFallback"));
+    assertEquals(List.of("REBUILD_IN_PROGRESS"), summary.get("reasons"));
+  }
+
+  @Test
   @DisplayName("(c) no degradation note when neither flag is true, even with a present Degradation")
   void noDegradationNoteWhenFlagsFalse() {
     SearchTrace.Degradation degradation = new SearchTrace.Degradation(false, null, false, null, true, null);

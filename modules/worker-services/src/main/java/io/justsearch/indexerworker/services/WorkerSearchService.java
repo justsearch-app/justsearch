@@ -96,6 +96,7 @@ public final class WorkerSearchService {
   private final FolderBrowseEngine folderBrowseEngine;
   private final String documentIdSnapshotEpoch = UUID.randomUUID().toString();
   private volatile EmbeddingCompatibilityController embeddingCompatController;
+  private final EmbeddingCompat fixedCompatibility;
   private final OperationalMetrics metrics = OperationalMetrics.getInstance();
 
   private final SearchOrchestrator searchOrchestrator;
@@ -161,6 +162,15 @@ public final class WorkerSearchService {
       io.justsearch.adapters.lucene.runtime.LuceneRuntime searchLifecycle,
       EmbeddingProvider embeddingProvider,
       io.justsearch.indexerworker.server.EncoderBindings encoderBindings) {
+    this(searchLifecycle, embeddingProvider, encoderBindings, null);
+  }
+
+  private WorkerSearchService(
+      io.justsearch.adapters.lucene.runtime.LuceneRuntime searchLifecycle,
+      EmbeddingProvider embeddingProvider,
+      io.justsearch.indexerworker.server.EncoderBindings encoderBindings,
+      EmbeddingCompat fixedCompatibility) {
+    this.fixedCompatibility = fixedCompatibility;
     EmbeddingProvider provider =
         embeddingProvider != null ? embeddingProvider : NoOpEmbeddingProvider.INSTANCE;
     this.embeddingProvider = provider;
@@ -182,6 +192,13 @@ public final class WorkerSearchService {
         searchLifecycle::resolvedConfig,
         provider,
         searchLifecycle.documentFieldOps());
+  }
+
+  /** The lexical serving view during a candidate model rebuild has a fixed semantic pause gate. */
+  public static WorkerSearchService textOnlyCandidateView(
+      io.justsearch.adapters.lucene.runtime.LuceneRuntime searchLifecycle) {
+    return new WorkerSearchService(searchLifecycle, NoOpEmbeddingProvider.INSTANCE, null,
+        new EmbeddingCompat(false, "REBUILD_IN_PROGRESS"));
   }
 
   /**
@@ -368,6 +385,7 @@ public final class WorkerSearchService {
    * and reason code from the same snapshot to avoid TOCTOU races.
    */
   private EmbeddingCompat embeddingCompat() {
+    if (fixedCompatibility != null) return fixedCompatibility;
     var controller = embeddingCompatController;
     return new EmbeddingCompat(
         controller == null || controller.allowQueryEmbeddings(),
@@ -868,9 +886,10 @@ public final class WorkerSearchService {
 
       try {
         CallContext normalizedCallContext = ctx == null ? CallContext.none() : ctx;
+        var compat = embeddingCompat();
         return ragContextOps.executeRetrieval(
             request, new HashSet<>(docIds), topK, maxContextTokens,
-            embeddingCompat().allowed(), normalizedCallContext.engineContext().urgency(),
+            compat.allowed(), compat.reasonCode(), normalizedCallContext.engineContext().urgency(),
             normalizedCallContext.childLifetime());
       } catch (RuntimeException e) {
         EngineFutures.rethrowExecutorRefusal(e);

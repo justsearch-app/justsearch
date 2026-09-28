@@ -31,13 +31,9 @@ public interface SettingsComponentComposer {
 
   interface Prepared {
     /** Add a generation-owned observation before the final shared registry batch is built. */
-    default void includeObservation(io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
-      throw new UnsupportedOperationException("Generation component observation is unavailable");
-    }
+    void includeObservation(io.justsearch.core.component.EngineComponentSnapshot.Component observation);
     /** Holds physical owner lifecycle locks before entering the publication write section. */
-    default void withOwnerLocks(Runnable publication) {
-      publication.run();
-    }
+    void withOwnerLocks(Runnable publication);
 
     /** Final owner validation under the shared publication write lock, before file replacement. */
     void validate();

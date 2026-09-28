@@ -1450,7 +1450,8 @@ public final class McpToolSurface {
     }
     if (degradation.hybridFallback()
         && degradation.hybridFallbackReason() != null
-        && !degradation.hybridFallbackReason().isBlank()) {
+        && !degradation.hybridFallbackReason().isBlank()
+        && !reasons.contains(degradation.hybridFallbackReason())) {
       reasons.add(degradation.hybridFallbackReason());
     }
     String reasonText = reasons.isEmpty() ? "reason unavailable" : String.join("; ", reasons);

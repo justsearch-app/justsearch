@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -87,6 +88,23 @@ final class RecordedBulkIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   private static final String SERVING_GENERATION = "serving-generation-1";
   private static final String TARGET_INPUTS = "{\"dimension\":768}";
+
+  @Test
+  void recordedGenerationEncoderAndBulkDecoderAgreeOnCanonicalKeys() throws Exception {
+    String key = OperationKeys.generate(CLOCK);
+    String generation = IndexGenerationManager.recordedGenerationId(key);
+    var progress = new BulkReindexProgress(
+        generation, new IndexTargetSnapshot(sha256(TARGET_INPUTS), TARGET_INPUTS),
+        BulkReindexProgress.Phase.CAPTURING, null, null);
+    assertEquals(generation, progress.generationId());
+
+    String noncanonical = key.toUpperCase(java.util.Locale.ROOT);
+    assertThrows(java.io.IOException.class,
+        () -> IndexGenerationManager.recordedGenerationId(noncanonical));
+    assertThrows(IllegalArgumentException.class,
+        () -> new BulkReindexProgress("g-" + noncanonical,
+            progress.target(), BulkReindexProgress.Phase.CAPTURING, null, null));
+  }
 
   @TempDir Path temp;
 

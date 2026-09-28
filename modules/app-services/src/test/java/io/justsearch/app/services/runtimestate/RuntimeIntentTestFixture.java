@@ -110,6 +110,11 @@ public final class RuntimeIntentTestFixture implements AutoCloseable {
    */
   private static SettingsComponentComposer inMemoryComponents() {
     SettingsComponentComposer.Prepared prepared = new SettingsComponentComposer.Prepared() {
+      @Override public void includeObservation(
+          io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+        throw new UnsupportedOperationException("Runtime intent fixture has no generation projection");
+      }
+      @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
       @Override public void validate() { }
 
       @Override public void install() { }

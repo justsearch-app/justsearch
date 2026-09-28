@@ -4886,8 +4886,12 @@ public final class KnowledgeServer implements Closeable {
   public CompletableFuture<Boolean> beginRecordedBuildingLiveAsync(
       String operationKey, Runnable restartFallback) {
     Objects.requireNonNull(operationKey, "operationKey");
-    return beginBuildingLiveAsync("g-" + operationKey,
-        operationKey, restartFallback);
+    try {
+      return beginBuildingLiveAsync(IndexGenerationManager.recordedGenerationId(operationKey),
+          operationKey, restartFallback);
+    } catch (IOException invalid) {
+      return CompletableFuture.failedFuture(invalid);
+    }
   }
 
   public CompletableFuture<Boolean> beginUnrecordedBuildingLiveAsync(String buildingGeneration,
@@ -5140,8 +5144,9 @@ public final class KnowledgeServer implements Closeable {
               cleanupFailure);
         }
       } else {
-        if (!("g-" + recorded.operationKey()).equals(state.building_generation())) return;
         try {
+          if (!IndexGenerationManager.recordedGenerationId(recorded.operationKey())
+              .equals(state.building_generation())) return;
           if (!(searchLifecycle instanceof RunningRuntime source)
               || !indexGenerationManager.resolveGenerationPathStrict(state.active_generation())
                   .equals(activeIndexPath)) {

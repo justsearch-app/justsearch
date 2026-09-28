@@ -82,6 +82,11 @@ final class SettingsControllerSpecNudgeTest {
 
   private static io.justsearch.app.services.settings.SettingsComponentComposer inMemoryComponents() {
     return (candidate, desired, affected) -> new io.justsearch.app.services.settings.SettingsComponentComposer.Prepared() {
+      @Override public void includeObservation(
+          io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+        throw new UnsupportedOperationException("No generation projection in this UI test");
+      }
+      @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
       @Override public void validate() { }
       @Override public void install() { }
       @Override public void notifyObservers() { }

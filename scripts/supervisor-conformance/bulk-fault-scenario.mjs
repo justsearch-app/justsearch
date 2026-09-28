@@ -929,10 +929,13 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
         && retrieval.reasonCodes?.includes('index.embedding_rebuilding')
       : !retrieval?.reasonCodes?.includes('index.embedding_rebuilding'),
     `semantic-pause readiness contradicted ${composeMode}: ${JSON.stringify(retrieval)}`);
+    const vectorBody = vectorSearch.status === 200 ? JSON.parse(vectorSearch.text) : null;
+    const heldQueryTrace = actualInPlace ? vectorBody?.searchTrace?.degradation ?? null : null;
     const vectorOutcome = actualInPlace
-      ? vectorSearch.status === 400
-        && JSON.parse(vectorSearch.text).errorCode === 'INVALID_REQUEST'
-        && vectorSearch.text.includes('NO_EMBEDDING_SERVICE')
+      ? vectorSearch.status === 200
+        && vectorBody?.results?.length === 0
+        && heldQueryTrace?.vectorBlocked === true
+        && heldQueryTrace.vectorBlockedReason === 'REBUILD_IN_PROGRESS'
         && status?.components?.encoders?.state === 'RELOADING'
       : vectorSearch.status === 200 && matchingHit(vectorSearch, file, marker);
     requireThat(textSearch.status === 200 && matchingHit(textSearch, file, marker)
@@ -940,6 +943,17 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     `serving A violated ${composeMode} mode while B was settled: ${JSON.stringify({
       text: textSearch.text, vector: vectorSearch.text, encoders: status?.components?.encoders,
     })}`);
+    if (actualInPlace) {
+      const hybridSearch = await post(apiPort, '/api/knowledge/search',
+        { query: marker, limit: 10 }, 30000);
+      requireThat(hybridSearch.status === 200
+        && matchingHit(hybridSearch, file, marker),
+      `held in-place hybrid query lost keyword search: ${hybridSearch.text}`);
+      console.log('MODEL_LIVE_AB_HELD_QUERY_TRACE', JSON.stringify({
+        operationKey, encoderState: status?.components?.encoders?.state,
+        retrievalReasons: retrieval?.reasonCodes, degradation: heldQueryTrace,
+      }));
+    }
     if (actualInPlace && acceptedWriteDuringBuild) {
       // D1-14's UI acceptance runs against this held installed Engine, not a mocked
       // status response. The installed harness intentionally has a dummy frontend;
@@ -989,6 +1003,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       unitsFailed: inFlight.units_failed, mode: composeMode,
       encoderState: status?.components?.encoders?.state,
       retrievalReasons: retrieval?.reasonCodes,
+      heldQueryTrace,
       vectorHits: actualInPlace ? 0 : JSON.parse(vectorSearch.text).results.length }));
     if (cancelBeforePointer) {
       cancellationKey = await cancelReindexWithApproval({ apiPort, manifest,
@@ -1178,7 +1193,12 @@ function sampleSemanticAvailability({ apiPort, post, request, marker, file, matc
   let result;
   const classify = (reply, vector) => {
     if (reply.status === 200 && matchingHit(reply, file, marker)) return 'available';
-    if (vector && reply.status === 400 && reply.text.includes('NO_EMBEDDING_SERVICE')) {
+    let body = null;
+    if (vector && reply.status === 200) {
+      try { body = JSON.parse(reply.text); } catch { /* classified as an unexpected response below */ }
+    }
+    if (vector && body?.results?.length === 0
+      && body?.searchTrace?.degradation?.vectorBlockedReason === 'REBUILD_IN_PROGRESS') {
       return 'reloading';
     }
     if (reply.status === 503 && reply.text.includes('"reason":"worker.starting"')) {

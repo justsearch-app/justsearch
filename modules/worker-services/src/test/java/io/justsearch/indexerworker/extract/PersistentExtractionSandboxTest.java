@@ -123,7 +123,11 @@ final class PersistentExtractionSandboxTest {
     PersistentExtractionSandbox sandbox = sandbox(List.of("unused-command"), Duration.ofSeconds(1));
     try {
       sandbox.rollbackFailedRegistration(process, new java.io.IOException("disk full"));
-      assertThrows(IllegalStateException.class, sandbox::close);
+      IllegalStateException failure = assertThrows(IllegalStateException.class, sandbox::close);
+      assertTrue(failure.getMessage().contains("KillOutcome[exited=false, exitCode=-1,"),
+          failure.getMessage());
+      assertTrue(failure.getMessage().contains("waitedMs="), failure.getMessage());
+      assertTrue(failure.getMessage().contains("interrupted=false"), failure.getMessage());
       assertTrue(process.isAlive());
       assertEquals(2, process.destroyCalls);
       process.killAfter = 3;
@@ -132,6 +136,26 @@ final class PersistentExtractionSandboxTest {
       assertEquals(3, process.destroyCalls);
     } finally {
       process.killAfter = 0;
+      sandbox.close();
+    }
+  }
+
+  @Test
+  @Timeout(40)
+  void interruptedCallerStillConfirmsRealChildRetirement() throws Exception {
+    PersistentExtractionSandbox sandbox =
+        sandbox(javaCommand(ScriptedChild.class), Duration.ofSeconds(10));
+    try {
+      sandbox.extract(file("ready.txt"));
+      long pid = sandbox.firstChildPid();
+      assertTrue(ProcessHandle.of(pid).orElseThrow().isAlive());
+      Thread.currentThread().interrupt();
+      sandbox.close();
+      assertTrue(Thread.currentThread().isInterrupted(), "caller interrupt flag must be restored");
+      assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
+    } finally {
+      // Avoid carrying this test's intentional interrupt into JUnit or another test.
+      Thread.interrupted();
       sandbox.close();
     }
   }

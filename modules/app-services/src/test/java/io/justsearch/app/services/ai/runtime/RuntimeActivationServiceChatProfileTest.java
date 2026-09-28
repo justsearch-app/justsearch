@@ -632,6 +632,11 @@ final class RuntimeActivationServiceChatProfileTest {
       desiredGpuLayers.add(desired.ai().gpuLayers());
       desiredContexts.add(desired.ai().contextSize());
       return new Prepared() {
+        @Override public void includeObservation(
+            io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+          throw new UnsupportedOperationException("Chat-profile fixture has no generation projection");
+        }
+        @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
         @Override
         public void validate() {
           if (failValidation) throw new IllegalStateException("simulated precommit refusal");

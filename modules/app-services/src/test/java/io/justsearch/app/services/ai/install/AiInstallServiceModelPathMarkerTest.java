@@ -341,6 +341,11 @@ final class AiInstallServiceModelPathMarkerTest {
     private Prepared prepared(SettingsCandidateContext context) {
       preparedContexts.add(context);
       return new Prepared() {
+        @Override public void includeObservation(
+            io.justsearch.core.component.EngineComponentSnapshot.Component observation) {
+          throw new UnsupportedOperationException("Install fixture has no generation projection");
+        }
+        @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
         @Override public void validate() { }
         @Override public void install() { installCount++; }
         @Override public void notifyObservers() { }
