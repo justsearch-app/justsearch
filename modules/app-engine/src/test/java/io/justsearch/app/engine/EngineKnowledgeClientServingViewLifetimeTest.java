@@ -118,6 +118,54 @@ final class EngineKnowledgeClientServingViewLifetimeTest {
   }
 
   @Test
+  void executingSearchKeepsIssuedAViewThroughBPublication() throws Exception {
+    var aEntered = new CountDownLatch(1);
+    var releaseA = new CountDownLatch(1);
+    var aSearch = mock(io.justsearch.indexerworker.services.WorkerSearchService.class);
+    var bSearch = mock(io.justsearch.indexerworker.services.WorkerSearchService.class);
+    var aResponse = SearchResponse.newBuilder().setTookMs(1).build();
+    var bResponse = SearchResponse.newBuilder().setTookMs(2).build();
+    doAnswer(ignored -> {
+      aEntered.countDown();
+      await(releaseA);
+      return aResponse;
+    }).when(aSearch).search(any(), any());
+    when(bSearch.search(any(), any())).thenReturn(bResponse);
+    var aServices = services(aSearch, null);
+    var bServices = services(bSearch, null);
+    var aClosed = new AtomicInteger();
+    var bClosed = new AtomicInteger();
+    var selected = new AtomicReference<KnowledgeServer.ServingLease>(
+        leaseFor(aServices, aClosed));
+
+    try (var registry = registry();
+        var client = client(registry, aServices, selected::get)) {
+      var result = CompletableFuture.supplyAsync(
+          () -> client.search("issued-on-a", 10, TestEngineContexts.FOREGROUND));
+      assertTrue(aEntered.await(3, TimeUnit.SECONDS));
+
+      selected.set(leaseFor(bServices, bClosed));
+      assertEquals(0, aClosed.get(), "executing search must retain its issued A lease");
+      assertEquals(0, bClosed.get(), "published B must remain untouched by the A search");
+      verify(bSearch, never()).search(any(), any());
+
+      releaseA.countDown();
+      assertSame(aResponse, result.get(5, TimeUnit.SECONDS));
+      awaitClosed(aClosed, 1);
+      assertEquals(1, aClosed.get(), "completed A search must release its serving lease");
+
+      assertSame(bResponse,
+          client.search("issued-on-b", 10, TestEngineContexts.FOREGROUND));
+      verify(aSearch).search(any(), any());
+      verify(bSearch).search(any(), any());
+      awaitClosed(bClosed, 1);
+      assertEquals(1, bClosed.get(), "completed B search must release its serving lease");
+    } finally {
+      releaseA.countDown();
+    }
+  }
+
+  @Test
   void queuedRootWalksUseTheViewCapturedBeforeEachQueueEntry() throws Exception {
     var aSearch = mock(io.justsearch.indexerworker.services.WorkerSearchService.class);
     var bSearch = mock(io.justsearch.indexerworker.services.WorkerSearchService.class);

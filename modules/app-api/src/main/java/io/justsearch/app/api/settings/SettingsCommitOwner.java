@@ -116,7 +116,7 @@ public interface SettingsCommitOwner {
 
   /** Build all fallible settings work privately from an already reserved installer candidate. */
   default PreparedGenerationProjection prepareInstallerGenerationProjection(Reservation reservation,
-      UiSettings candidate, AttemptControl control) {
+      UiSettings candidate, AttemptControl control, RecordedInstallerGenerationPlan plan) {
     throw new UnsupportedOperationException("Installer generation settings are unavailable");
   }
 

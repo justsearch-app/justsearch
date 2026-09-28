@@ -205,7 +205,9 @@ class AiInstallOnnxSettingsProducerTest {
     assertEquals(2, candidate.models().size());
     assertEquals(4, candidate.assets().size(), "model bytes and supporting files are both retained");
     assertTrue(candidate.generationBoundKeys().contains("justsearch.embed.onnx.model_path"));
-    assertTrue(candidate.componentKeys().containsKey("index"));
+    assertEquals(Set.of("justsearch.rerank.model_path"), candidate.componentKeys().get("encoders"));
+    assertFalse(candidate.componentKeys().containsKey("index"),
+        "the installed reranker is owned by the shared encoder set");
     assertEquals(0L, store.inspect().witness().acceptedRevision());
     assertTrue(store.load().getEmbedOnnxModelPath().isBlank());
     verifyNoInteractions(settings);
@@ -260,6 +262,10 @@ class AiInstallOnnxSettingsProducerTest {
           "reranker remains a query-only component update");
       assertFalse(candidate.generationBoundKeys().contains("justsearch.citation.scorer.model_path"),
           "citation scorer remains a query-only component update");
+      assertEquals(
+          Set.of("justsearch.rerank.model_path", "justsearch.citation.scorer.model_path"),
+          candidate.componentKeys().get("encoders"),
+          "reranker and citation paths must rebuild their shared encoder owner together");
       String json = candidate.encodedSettings().canonicalJson();
       for (ModelPackage pkg : packages) {
         assertEquals(root.resolve(pkg.targetDir()).toAbsolutePath().normalize().toString(),
@@ -493,7 +499,7 @@ class AiInstallOnnxSettingsProducerTest {
     } finally {
       ConfigStore.restoreGlobal(current, previous);
     }
-    assertTrue(candidate.componentKeys().containsKey("index"));
+    assertEquals(Set.of("justsearch.rerank.model_path"), candidate.componentKeys().get("encoders"));
     assertTrue(candidate.generationBoundKeys().isEmpty());
   }
 

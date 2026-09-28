@@ -63,3 +63,29 @@ Record the preflight result beside the gate id.
 | A flow needs a mechanism placed in a later batch | move it earlier with a note; don't build a workaround |
 | An installed scenario fails for a timing reason after WP1 | the failure is WP1's bug; fix the barrier point, don't widen timeouts |
 | D1 closes and the remaining D2 estimate still exceeds 10 sessions | write a plan delta on D2 ordering for the owner |
+
+**2026-09-28 Batch 4 delta.** The installed D1-14 citation fixture exposed a
+D1-4/D1-12 installer settings ownership seam before the fault marker
+(`tmp/5222`). Its bounded correction moves into Batch 4: accept only model
+paths backed by the recorded generation plan and join the already-composed
+encoder observation to the settings registry batch. Full D1-4 connected
+publication and lifetime work remains in Batch 5. The fixture's 240-second
+marker timeout was downstream of terminal precommit refusal, so the product
+owner was corrected instead of extending the timeout. Focused tests pass at
+`tmp/5226`. The first installed evidence rerun at `tmp/5229` exposed two
+harness assertion mismatches; the corrected pair passed at `tmp/5231`.
+The cleanup-corrected `tmp/5234` pair exposed a restored native lease probe
+race: the probe could inspect the handle before its exact retirement began.
+The bounded probe correction passed the approved-gap installed case at
+`tmp/5236`; the recompose/cancel case passed at `tmp/5234`. The full native
+stress suite and static checks passed at `tmp/5238` and `tmp/5237` on that
+source. Final review then found an effective runtime model-path override gap
+and a citation identity log emitted before successful composition. Both are
+corrected and focused tests pass at `tmp/5239` and `tmp/5240`. The final
+installed gap/cancel pair passed at `tmp/5242` with two AI tests, zero skips or
+failures; the approved-gap fixture now checks active CPU citation at initial
+A, restored A, and promoted B as well as its exact A→B→A→B log identities.
+The exact-source repository static, default-parallel native stress suite,
+and build gates passed at `tmp/5243`–`tmp/5245`. Checkpoint commit/push and
+hosted exact-SHA proof remain before the physical issued-A search across B
+publication and Batch 5.

@@ -83,6 +83,10 @@ final class ConfigApplyRegisterTest {
     assertEquals(
         "restart-required",
         rows.get(EnvRegistry.GPU_DEVICE_MEMORY_CEILING_MB.configKey()));
+    assertEquals("component:encoders", rows.get(EnvRegistry.RERANK_MODEL_PATH.configKey()));
+    assertEquals("component:index", rows.get(EnvRegistry.RERANK_CHUNKS_MODEL_PATH.configKey()));
+    assertEquals(
+        "component:encoders", rows.get(EnvRegistry.CITATION_SCORER_MODEL_PATH.configKey()));
   }
 
   @Test

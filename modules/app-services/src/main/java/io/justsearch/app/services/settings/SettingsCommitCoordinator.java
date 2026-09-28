@@ -21,9 +21,13 @@ import io.justsearch.configuration.resolved.ConfigApplyScopes;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CancellationException;
@@ -320,9 +324,10 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
 
   @Override
   public PreparedGenerationProjection prepareInstallerGenerationProjection(Reservation reservation,
-      UiSettings candidate, AttemptControl control) {
+      UiSettings candidate, AttemptControl control, RecordedInstallerGenerationPlan plan) {
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(control, "control");
+    Objects.requireNonNull(plan, "plan");
     SettingsComponentComposer.Prepared preparedComponents = null;
     mutex.lock();
     try {
@@ -331,24 +336,35 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         throw new IllegalStateException("Installer generation settings preparation already started");
       }
       active.preparationStarted = true;
+      var exactCandidate = RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
+          tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(candidate));
+      if (!plan.candidateSettings().equals(exactCandidate)) {
+        throw new IllegalArgumentException("Installer settings differ from the accepted generation plan");
+      }
       var successor = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
       // Exact bytes matter: the accepted generation plan already froze this detached settings
       // candidate, including ordinary settings that accompanied the model paths.
       var preparedSettings = store.prepareExact(candidate, successor);
       ResolvedConfig desired = Objects.requireNonNull(prepareConfig.apply(preparedSettings.settings()),
           "Prepared installer configuration");
+      requireSelectedInstallerEncoderPaths(desired, plan);
       ResolvedConfig serving = config.get();
       var changed = ConfigApplyScopes.classify(serving, desired);
       if (!changed.restartRequired().isEmpty()
-          && !java.util.Set.of("justsearch.api.port").containsAll(changed.restartRequired())) {
+          && !Set.of("justsearch.api.port").containsAll(changed.restartRequired())) {
         throw refused("RESTART_SOURCE_DRIFT", "A process source changed during model activation",
             Map.of("keys", List.copyOf(changed.restartRequired())));
       }
       boolean restartRequired = !changed.restartRequired().isEmpty();
       ResolvedConfig published = restartRequired ? desired.retainingApiPortFrom(serving) : desired;
-      if (!changed.component().isEmpty()) {
+      // The recorded B owner has already composed its selected Worker models. Its exact
+      // encoder observation joins this batch before pointer admission; a second fixed owner
+      // must not recompose those same native sessions.
+      Map<String, Set<String>> ordinaryComponents = ordinaryInstallerComponents(
+          changed.component(), desired, plan);
+      if (!ordinaryComponents.isEmpty()) {
         preparedComponents = Objects.requireNonNull(components.prepare(preparedSettings.settings(),
-            desired, changed.component()), "Prepared installer components");
+            desired, ordinaryComponents), "Prepared installer components");
       }
       ConfigStore.PreparedSwap preparedConfig = config.prepareSwap(published);
       OperationResult response = prepareResponse.apply(preparedSettings.settings());
@@ -366,6 +382,52 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       throw failure;
     } finally { mutex.unlock(); publishIssue(); }
+  }
+
+  private static void requireSelectedInstallerEncoderPaths(ResolvedConfig desired,
+      RecordedInstallerGenerationPlan plan) {
+    for (var model : plan.models()) {
+      switch (model.packageId()) {
+        case "citation-scorer" -> requireInstallerEncoderPath("encoders", model.packageId(),
+            desired.ai().citationScorer().modelPath(), plan);
+        case "reranker" -> requireInstallerEncoderPath("encoders", model.packageId(),
+            desired.ai().reranker().modelPath(), plan);
+        default -> { }
+      }
+    }
+  }
+
+  private static Map<String, Set<String>> ordinaryInstallerComponents(
+      Map<String, Set<String>> changed, ResolvedConfig desired,
+      RecordedInstallerGenerationPlan plan) {
+    Map<String, Set<String>> ordinary = new LinkedHashMap<>();
+    for (var entry : changed.entrySet()) {
+      Set<String> keys = new LinkedHashSet<>(entry.getValue());
+      if (keys.remove("justsearch.citation.scorer.model_path")) {
+        requireInstallerEncoderPath(entry.getKey(), "citation-scorer",
+            desired.ai().citationScorer().modelPath(), plan);
+      }
+      if (keys.remove("justsearch.rerank.model_path")) {
+        requireInstallerEncoderPath(entry.getKey(), "reranker",
+            desired.ai().reranker().modelPath(), plan);
+      }
+      if (!keys.isEmpty()) ordinary.put(entry.getKey(), Set.copyOf(keys));
+    }
+    return ordinary;
+  }
+
+  private static void requireInstallerEncoderPath(String component, String packageId,
+      Path effectiveDirectory, RecordedInstallerGenerationPlan plan) {
+    if (!"encoders".equals(component) || effectiveDirectory == null) {
+      throw new IllegalArgumentException("Installer model path has no encoder owner: " + packageId);
+    }
+    Path selectedDirectory = effectiveDirectory.toAbsolutePath().normalize();
+    List<RecordedInstallerGenerationPlan.ModelIdentity> selected = plan.models().stream()
+        .filter(model -> packageId.equals(model.packageId())).toList();
+    if (selected.size() != 1 || !selectedDirectory.equals(selected.getFirst().path().getParent())) {
+      throw new IllegalArgumentException("Installer model path is not backed by the accepted plan: "
+          + packageId);
+    }
   }
 
   @Override public boolean installerGenerationProjected(RecordedInstallerGenerationPlan plan) {
@@ -427,6 +489,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (active != fence || admitted || generationObservationIncluded) {
         throw new IllegalStateException("Installer generation observation is no longer preparable");
       }
+      if (!"encoders".equals(Objects.requireNonNull(observation, "observation").spec().name())) {
+        throw new IllegalArgumentException("Installer generation requires its physical encoders observation");
+      }
       if (componentSwap == null) {
         componentSwap = Objects.requireNonNull(components.prepare(settings.settings(), desired,
             Map.of()), "Prepared installer component observation");
@@ -445,6 +510,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       // The logical reservation excludes other official settings commits throughout this cut.
       if (active != fence || active.phase != Phase.PREPARING || admitted || processClosing.getAsBoolean()) {
         throw refused("ENGINE_CLOSING", "Model activation settings can no longer commit", Map.of());
+      }
+      if (!generationObservationIncluded) {
+        throw new IllegalStateException("Installer generation has no physical encoders observation");
       }
       SettingsWitness current = store.inspect().witness();
       if (!active.prior.equals(current)) {
@@ -597,8 +665,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(prepared.settings()), "Prepared config");
       ResolvedConfig serving = config.get();
       var changedKeys = active.recoveryReset()
-          ? new ConfigApplyScopes.ChangedKeys(java.util.Set.of(), Map.of(),
-              java.util.Set.of(), java.util.Set.of())
+          ? new ConfigApplyScopes.ChangedKeys(Set.of(), Map.of(),
+              Set.of(), Set.of())
           : ConfigApplyScopes.classify(serving, resolved);
       if (!changedKeys.generationBound().isEmpty()) {
         throw refused("GENERATION_BOUND_REQUIRES_REINDEX",
@@ -609,7 +677,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       boolean restartRequired = !changedKeys.restartRequired().isEmpty();
       // API_PORT is the only restart-required value this settings candidate can write. If an
       // unrelated process source drifted since boot, refuse before touching a component owner.
-      if (!java.util.Set.of("justsearch.api.port").containsAll(changedKeys.restartRequired())) {
+      if (!Set.of("justsearch.api.port").containsAll(changedKeys.restartRequired())) {
         throw refused("RESTART_SOURCE_DRIFT",
             "A restart-required process source changed; restart before applying settings",
             Map.of("keys", List.copyOf(changedKeys.restartRequired())));
@@ -618,26 +686,26 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           ? resolved.retainingApiPortFrom(serving) : resolved;
       if (!changedKeys.component().isEmpty() || chatComponentChanged
           || candidateContext.hasChatProfile() || candidateContext.forceGenerativeRefresh()) {
-        var affected = new java.util.TreeMap<String, java.util.Set<String>>(changedKeys.component());
+        var affected = new java.util.TreeMap<String, Set<String>>(changedKeys.component());
         if (chatComponentChanged) {
-          affected.merge("generative", java.util.Set.of("ui.chatEnabled"), (left, right) -> {
+          affected.merge("generative", Set.of("ui.chatEnabled"), (left, right) -> {
             var keys = new java.util.TreeSet<>(left);
             keys.addAll(right);
-            return java.util.Set.copyOf(keys);
+            return Set.copyOf(keys);
           });
         }
         if (candidateContext.hasChatProfile()) {
-          affected.merge("generative", java.util.Set.of("chatProfile"), (left, right) -> {
+          affected.merge("generative", Set.of("chatProfile"), (left, right) -> {
             var keys = new java.util.TreeSet<>(left);
             keys.addAll(right);
-            return java.util.Set.copyOf(keys);
+            return Set.copyOf(keys);
           });
         }
         if (candidateContext.forceGenerativeRefresh()) {
-          affected.merge("generative", java.util.Set.of("modelRefresh"), (left, right) -> {
+          affected.merge("generative", Set.of("modelRefresh"), (left, right) -> {
             var keys = new java.util.TreeSet<>(left);
             keys.addAll(right);
-            return java.util.Set.copyOf(keys);
+            return Set.copyOf(keys);
           });
         }
         preparedComponents = Objects.requireNonNull(
@@ -978,7 +1046,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (recoveredContext.forceGenerativeRefresh()) {
         generativeKeys.add("modelRefresh");
       }
-      var affected = Map.<String, java.util.Set<String>>of("generative", java.util.Set.copyOf(generativeKeys));
+      var affected = Map.<String, Set<String>>of("generative", Set.copyOf(generativeKeys));
       prepared = Objects.requireNonNull(components.prepare(snapshot.settings(), desired, affected,
           recoveredContext), "Recovered component transaction");
       SettingsComponentComposer.Prepared chosen = prepared;
@@ -1083,7 +1151,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   }
 
   private static OperationResult withRestartScheduled(OperationResult response) {
-    var data = new java.util.LinkedHashMap<String, Object>(response.structuredData());
+    var data = new LinkedHashMap<String, Object>(response.structuredData());
     data.put("restartScheduled", true);
     return new OperationResult(response.success(), response.message(), response.executionId(), data,
         response.errorCode(), response.errorDetails(), response.retryable());

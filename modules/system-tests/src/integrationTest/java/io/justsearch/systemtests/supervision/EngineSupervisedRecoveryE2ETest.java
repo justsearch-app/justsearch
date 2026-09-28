@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -113,14 +114,92 @@ final class EngineSupervisedRecoveryE2ETest {
       String line = output.lines().filter(value -> value.startsWith("MODEL_LIVE_AB_GAP_PASS "))
           .findFirst().orElseThrow();
       var result = MAPPER.readTree(line.substring("MODEL_LIVE_AB_GAP_PASS ".length()));
+      var citationIdentity = markerPayload(output, "MODEL_LIVE_AB_CITATION_IDENTITY");
+      var cudaA = markerPayload(output, "MODEL_LIVE_AB_CUDA_A");
+      var nativeLease = markerPayload(output, "MODEL_LIVE_AB_RESTORED_NATIVE_LEASE");
       assertEquals("floor simulated by device-memory cap", result.path("floor").asText(), line);
       assertEquals("PROMOTED_WITH_GAPS", result.path("terminalReason").asText(), line);
       assertTrue(result.path("aVectorHits").asInt() > 0, line);
       assertTrue(result.path("bVectorHits").asInt() > 0, line);
-      assertTrue(result.path("semantic").path("recoveredAfterRefusal").asBoolean(), line);
-      assertTrue(output.contains("MODEL_LIVE_AB_RESTORED_NATIVE_LEASE "), output);
+      assertBooleanTrue(result.path("semantic").path("recoveredAfterRefusal"), line);
+      assertCitationIdentity(citationIdentity, output);
+      assertEquals("cuda", cudaA.path("before").asText(), output);
+      assertEquals("cuda", cudaA.path("restored").asText(), output);
+      assertBooleanTrue(cudaA.path("availableBefore"), output);
+      assertBooleanTrue(cudaA.path("availableRestored"), output);
+      assertBooleanTrue(nativeLease.path("ok"), output);
+      assertEquals("RETIRING", nativeLease.path("retirementStatus").asText(), output);
+      assertTrue(nativeLease.path("inputCount").asInt() > 0, output);
       System.out.println("LIFECYCLE_IN_PLACE_GAP_RESTORATION_PASS §16 " + line);
     });
+  }
+
+  static void runSeededInPlaceRecomposeFailureCancellation() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-13/D1-14 recompose failure requires retained CPU A and CUDA B model bytes");
+    Path work = repo.resolve(
+        "tmp/lane-f-takeover/lifecycle-recompose-failure-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      String output = runInstalledModelScenario(repo, work, "model-live-a-b-recompose-failure",
+          inPlaceModelEnvironment(), "MODEL_LIVE_AB_CANCEL_PASS");
+      var result = markerPayload(output, "MODEL_LIVE_AB_CANCEL_PASS");
+      var cudaA = markerPayload(output, "MODEL_LIVE_AB_CUDA_A");
+      var failedRecompose = result.path("failedRecompose");
+      var floor = result.path("floorEvidence");
+      assertEquals("CANCELLED", result.path("terminalState").asText(), output);
+      assertFalse(result.path("sourceGeneration").asText().isBlank(), output);
+      assertEquals(result.path("sourceGeneration").asText(),
+          result.path("activeGeneration").asText(), output);
+      assertEquals("floor simulated by device-memory cap", result.path("floor").asText(), output);
+      assertEquals("IN_PLACE", floor.path("mode").asText(), output);
+      assertEquals("cuda", cudaA.path("before").asText(), output);
+      assertEquals("cuda", cudaA.path("restored").asText(), output);
+      assertBooleanTrue(cudaA.path("availableBefore"), output);
+      assertBooleanTrue(cudaA.path("availableRestored"), output);
+      assertTrue(floor.path("freeBytes").asLong() <= 1024L * 1024L, output);
+      assertTrue(floor.path("footprintBytes").asLong() > floor.path("freeBytes").asLong(), output);
+      assertEquals("UNAVAILABLE", failedRecompose.path("state").asText(), output);
+      assertTrue(failedRecompose.path("recoveryAttempts").asInt() > 0, output);
+      assertTrue(failedRecompose.path("evidence").isTextual(), output);
+      String evidence = failedRecompose.path("evidence").asText();
+      assertTrue(evidence.contains("B refused: Candidate awaits gap acceptance"), output);
+      assertTrue(evidence.contains("A recompose refused:"), output);
+      assertTrue(result.path("aVectorHitsDuringWait").asInt() > 0, output);
+      assertTrue(result.path("aVectorHitsAfterCancel").asInt() > 0, output);
+      System.out.println("LIFECYCLE_RECOMPOSE_FAILURE_CANCEL_PASS §16 " + result);
+    });
+  }
+
+  private static JsonNode markerPayload(String output, String marker) throws Exception {
+    String prefix = marker + " ";
+    String line = output.lines().filter(value -> value.startsWith(prefix))
+        .findFirst().orElseThrow(() -> new AssertionError("Missing " + marker + ": " + output));
+    return MAPPER.readTree(line.substring(prefix.length()));
+  }
+
+  private static void assertCitationIdentity(JsonNode identity, String output) {
+    assertBooleanTrue(identity.path("verified"), output);
+    String aPath = identity.path("aPath").asText();
+    String bPath = identity.path("bPath").asText();
+    String restoredAPath = identity.path("restoredAPath").asText();
+    String aSha256 = identity.path("aSha256").asText();
+    String bSha256 = identity.path("bSha256").asText();
+    String restoredASha256 = identity.path("restoredASha256").asText();
+    assertFalse(aPath.isBlank(), output);
+    assertFalse(bPath.isBlank(), output);
+    assertEquals(aPath, restoredAPath, output);
+    assertFalse(aPath.equals(bPath), output);
+    assertTrue(aSha256.matches("[0-9a-f]{64}"), output);
+    assertEquals(aSha256, bSha256, output);
+    assertEquals(aSha256, restoredASha256, output);
+  }
+
+  private static void assertBooleanTrue(JsonNode value, String output) {
+    assertTrue(value.isBoolean(), output);
+    assertTrue(value.asBoolean(), output);
   }
 
   private static Map<String, String> inPlaceModelEnvironment() {
@@ -221,6 +300,8 @@ final class EngineSupervisedRecoveryE2ETest {
         process.destroyForcibly();
         process.waitFor(10, TimeUnit.SECONDS);
       }
+      Exception cleanupFailure = null;
+      boolean stopped = false;
       try {
         if (Files.isRegularFile(outputFile)) {
           for (String line : Files.readAllLines(outputFile, StandardCharsets.UTF_8)) {
@@ -230,9 +311,38 @@ final class EngineSupervisedRecoveryE2ETest {
             }
           }
         }
-      } catch (Exception cleanupFailure) {
+        stopped = true;
+      } catch (Exception failure) {
+        cleanupFailure = failure;
+      }
+      if (stopped && "model-live-a-b-recompose-failure".equals(scenario)) {
+        try {
+          restorePrivateAAfterForcedExit(work);
+        } catch (Exception failure) {
+          if (cleanupFailure == null) cleanupFailure = failure;
+          else cleanupFailure.addSuppressed(failure);
+        }
+      }
+      if (cleanupFailure != null) {
         if (primary == null) throw cleanupFailure;
         primary.addSuppressed(cleanupFailure);
+      }
+    }
+  }
+
+  private static void restorePrivateAAfterForcedExit(Path work) throws Exception {
+    Path privateRoot = work.resolve("installer-models").toAbsolutePath().normalize();
+    if (!Files.isDirectory(privateRoot)) return;
+    try (var files = Files.walk(privateRoot)) {
+      for (Path hidden : files.filter(Files::isRegularFile)
+          .filter(path -> path.getFileName().toString().endsWith(".recompose-held")).toList()) {
+        String name = hidden.getFileName().toString();
+        Path original = hidden.resolveSibling(
+            name.substring(0, name.length() - ".recompose-held".length())).normalize();
+        if (!original.startsWith(privateRoot) || Files.exists(original)) {
+          throw new IllegalStateException("Private A model cannot be restored: " + hidden);
+        }
+        Files.move(hidden, original);
       }
     }
   }
@@ -428,8 +538,15 @@ final class EngineSupervisedRecoveryE2ETest {
     for (Path ancestor = repo; ancestor != null; ancestor = ancestor.getParent()) {
       Path models = ancestor.resolve("models");
       if (Files.isRegularFile(models.resolve("onnx/gte-multilingual-base/model.onnx"))
+          && Files.isRegularFile(models.resolve("onnx/gte-multilingual-base/tokenizer.json"))
           && Files.isRegularFile(models.resolve("onnx/ner/model.onnx"))
-          && Files.isRegularFile(models.resolve("splade/naver-splade-v3/model.onnx"))) {
+          && Files.isRegularFile(models.resolve("onnx/ner/model_fp16.onnx"))
+          && Files.isRegularFile(models.resolve("onnx/ner/tokenizer.json"))
+          && Files.isRegularFile(models.resolve("splade/naver-splade-v3/model.onnx"))
+          && Files.isRegularFile(models.resolve("splade/naver-splade-v3/model_fp16.onnx"))
+          && Files.isRegularFile(models.resolve("splade/naver-splade-v3/tokenizer.json"))
+          && Files.isRegularFile(models.resolve("onnx/citation-scorer/model.onnx"))
+          && Files.isRegularFile(models.resolve("onnx/citation-scorer/tokenizer.json"))) {
         return true;
       }
     }

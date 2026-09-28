@@ -642,7 +642,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
   watcherDeleteDuringBuild = false, gapApproval = false, gapCancellation = false,
   gapRecomposeFailure = false, cancelBeforePointer = false,
-  extraBuildFiles = 0 }) {
+  extraBuildFiles = 0, engineLogWindow = null }) {
   const runtime = path.join(data, 'runtime');
   const { reachedFile, releaseFile } = barrierFiles(data);
   const migrationBarrier = barrierFiles(data, 'migration-barrier');
@@ -653,8 +653,14 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     '.justsearch-index-generation.json'));
   const oldContract = readJson(path.join(data, 'install-contract.v2.json'));
   requireThat(sourceManifest?.models?.embedding?.id && oldContract?.modelsDir
-    && sourceManifest.models.embedding.id.startsWith(path.resolve(work)),
+    && sourceManifest.models.embedding.id.startsWith(path.resolve(work))
+    && sourceManifest.models['citation-scorer'],
   'side-by-side model fixture requires a private installed serving A');
+  const installedACitation = citationIdentityFromManifest(
+    sourceManifest, 'installed serving A', requireThat);
+  requireThat(installedACitation.modelPath.startsWith(
+    path.resolve(work, 'installer-models') + path.sep),
+  `installed A citation model escaped its private root: ${installedACitation.modelPath}`);
   requireThat(operationRows(operationPath, operationKey).length === 0,
     'side-by-side activation key is already present');
   if (cancelBeforePointer) requireThat(acceptedWriteDuringBuild && distinctModelB && inPlaceModelB,
@@ -678,6 +684,15 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     sourceGeneration, path: file,
     hits: JSON.parse(sourceVector.text).results.length,
   }));
+  if (gapApproval || gapRecomposeFailure) {
+    await waitFor('installed A has an active CPU citation scorer', 30000,
+      () => readActiveCitation(apiPort, request));
+  }
+  if (engineLogWindow) readEngineLogWindow(engineLogWindow, requireThat);
+  const cudaABefore = gapApproval || gapRecomposeFailure
+    ? await waitFor('installed A realizes CUDA before migration', 60000,
+      () => readRealizedCudaEmbedding(apiPort, request))
+    : null;
   // Add build load only after A has served a real vector result. These files hold
   // MIGRATING long enough for the native watcher edges and explicit pause.
   for (let i = 0; i < extraBuildFiles; i++) {
@@ -700,15 +715,16 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     linkRegularFiles(source, target);
     if (distinctModelB) {
       const pkg = shippedRegistry?.packages.find(item => item.id === packageId);
-      const variant = pkg?.variants.find(item => item.targetEP === 'CUDA');
+      const requiredTargetEP = packageId === 'citation-scorer' ? 'CPU' : 'CUDA';
+      const variant = pkg?.variants.find(item => item.targetEP === requiredTargetEP);
       requireThat(variant && retainedRoot,
-        `no retained CUDA variant for installed package ${packageId}`);
+        `no retained ${requiredTargetEP} variant for installed package ${packageId}`);
       const alternate = path.join(retainedRoot, pkg.targetDir, variant.filename);
       const selected = path.join(target, variant.filename);
-      fs.linkSync(alternate, selected);
+      if (!fs.existsSync(selected)) fs.linkSync(alternate, selected);
       requireThat(fs.statSync(selected).size === variant.sizeBytes
         && sha256(fs.readFileSync(selected)) === variant.sha256.toLowerCase(),
-      `retained CUDA bytes differ from shipped registry for ${packageId}`);
+      `retained ${requiredTargetEP} bytes differ from shipped registry for ${packageId}`);
       installed.variantFilename = variant.filename;
       installed.precision = variant.precision;
       installed.targetEP = variant.targetEP;
@@ -746,7 +762,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
         operationKey, sourceGeneration, sourceManifest, marker, file, bRoot, dispatched,
         readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
         reachedFile, releaseFile, migrationBarrier, operationPath, gapCancellation,
-        gapRecomposeFailure, semanticSampler });
+        gapRecomposeFailure, semanticSampler, cudaABefore, engineLogWindow });
     } finally {
       if (process.env.JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE === '1') {
         fs.writeFileSync(path.join(data, 'runtime', 'restored-a-native-lease-release'), 'release');
@@ -1339,7 +1355,8 @@ async function exerciseLiveModelGapDecision(c) {
   const { work, data, indexBase, manifest, apiPort, operationKey, sourceGeneration,
     sourceManifest, marker, file, bRoot, dispatched, readJson, waitFor, request, post,
     requireThat, createOperationKey, matchingHit, reachedFile, releaseFile,
-    migrationBarrier, operationPath, gapCancellation, gapRecomposeFailure, semanticSampler } = c;
+    migrationBarrier, operationPath, gapCancellation, gapRecomposeFailure, semanticSampler,
+    cudaABefore, engineLogWindow } = c;
   const sourceModel = gapRecomposeFailure
     ? path.resolve(sourceManifest.models.embedding.id) : null;
   const hiddenSourceModel = sourceModel ? `${sourceModel}.recompose-held` : null;
@@ -1364,62 +1381,70 @@ async function exerciseLiveModelGapDecision(c) {
   const dispatch = await dispatched.settled;
   requireThat(!dispatch.error, `installer gap dispatch failed: ${dispatch.error?.message}`);
   let floorEvidence;
-  try {
-    const reached = await waitFor('installer Green drained before gap decision', 180000,
-      () => readJson(migrationBarrier.reachedFile));
-    const state = readJson(path.join(indexBase, 'state.json'));
-    const reply = await request(apiPort, '/api/status', {}, 15000);
-    const status = reply.status === 200 ? JSON.parse(reply.text) : null;
-    const encoder = status?.readiness?.engineComponents?.encoders;
-    requireThat(reached.point === 'migration-green-drained'
-      && reached.buildingGeneration === `g-${operationKey}`
-      && state?.active_generation === sourceGeneration
-      && state?.migration_state === 'SWITCHING'
-      && encoder?.mode === 'IN_PLACE'
-      // D1-14 owner decision 2026-09-27: in place only when releasing A covers the shortfall.
-      && encoder?.reason === 'candidate_fits_after_source_release'
-      && encoder?.freeBytes <= 1024 * 1024
-      && encoder?.footprintBytes > encoder?.freeBytes
-      && status?.components?.encoders?.state === 'RELOADING',
-    `installer gap missed the forced device line: ${JSON.stringify({ reached, state, encoder,
-      component: status?.components?.encoders })}`);
-    const text = await post(apiPort, '/api/knowledge/search',
-      { query: marker, limit: 10, mode: 'text' }, 30000);
-    requireThat(text.status === 200 && matchingHit(text, file, marker),
-      `in-place A lost lexical service during B composition: ${text.text}`);
-    floorEvidence = { mode: encoder.mode, freeBytes: encoder.freeBytes,
-      footprintBytes: encoder.footprintBytes };
-    if (sourceModel) {
-      requireThat(sourceModel.startsWith(path.resolve(work, 'installer-models') + path.sep)
-        && fs.existsSync(sourceModel) && !fs.existsSync(hiddenSourceModel),
-      `A recompose failure would hide a non-private or absent model: ${sourceModel}`);
-      fs.renameSync(sourceModel, hiddenSourceModel);
-    }
-  } finally {
-    fs.writeFileSync(migrationBarrier.releaseFile, 'release');
-  }
-  const waiting = await waitFor('installer gap keeps A active and B bound', 180000,
-    async () => {
-      const row = operationRows(operationPath, operationKey)[0];
-      const state = readJson(path.join(indexBase, 'state.json'));
-      if (row?.state === 'FAILED' || row?.state === 'CANCELLED') {
-        throw new Error(`installer gap terminated before approval: ${row.failure_reason}`);
-      }
-      if (row?.state !== 'COMPLETE_WITH_GAPS' || row.phase !== 'settled'
-        || state?.active_generation !== sourceGeneration
-        || state?.building_generation !== `g-${operationKey}`
-        || state?.migration_state !== 'AWAITING_ACCEPTANCE') return null;
-      const reply = await request(apiPort, `/api/operation-history/${operationKey}`, {}, 15000);
-      if (reply.status !== 200) return null;
-      const outcome = parseJson(reply, 'installer gap outcome');
-      return outcome.phase === 'awaiting_acceptance' && outcome.state === 'running'
-        && /^[0-9a-f]{64}$/.test(outcome.result?.gapListHash ?? '')
-        && outcome.result?.gaps?.some(gap => gap.unitId && gap.reason)
-        ? { row, state, outcome } : null;
-    });
+  let waiting;
+  let settledBCitation;
   let failedRecompose;
-  if (sourceModel) {
+  try {
     try {
+      const reached = await waitFor('installer Green drained before gap decision', 180000,
+        () => readJson(migrationBarrier.reachedFile));
+      const state = readJson(path.join(indexBase, 'state.json'));
+      const reply = await request(apiPort, '/api/status', {}, 15000);
+      const status = reply.status === 200 ? JSON.parse(reply.text) : null;
+      const encoder = status?.readiness?.engineComponents?.encoders;
+      requireThat(reached.point === 'migration-green-drained'
+        && reached.buildingGeneration === `g-${operationKey}`
+        && state?.active_generation === sourceGeneration
+        && state?.migration_state === 'SWITCHING'
+        && encoder?.mode === 'IN_PLACE'
+        // D1-14 owner decision 2026-09-27: in place only when releasing A covers the shortfall.
+        && encoder?.reason === 'candidate_fits_after_source_release'
+        && encoder?.freeBytes <= 1024 * 1024
+        && encoder?.footprintBytes > encoder?.freeBytes
+        && status?.components?.encoders?.state === 'RELOADING',
+      `installer gap missed the forced device line: ${JSON.stringify({ reached, state, encoder,
+        component: status?.components?.encoders })}`);
+      const text = await post(apiPort, '/api/knowledge/search',
+        { query: marker, limit: 10, mode: 'text' }, 30000);
+      requireThat(text.status === 200 && matchingHit(text, file, marker),
+        `in-place A lost lexical service during B composition: ${text.text}`);
+      floorEvidence = { mode: encoder.mode, freeBytes: encoder.freeBytes,
+        footprintBytes: encoder.footprintBytes };
+      if (sourceModel) {
+        requireThat(sourceModel.startsWith(path.resolve(work, 'installer-models') + path.sep)
+          && fs.existsSync(sourceModel) && !fs.existsSync(hiddenSourceModel),
+        `A recompose failure would hide a non-private or absent model: ${sourceModel}`);
+        fs.renameSync(sourceModel, hiddenSourceModel);
+      }
+    } finally {
+      fs.writeFileSync(migrationBarrier.releaseFile, 'release');
+    }
+    waiting = await waitFor('installer gap keeps A active and B bound', 180000,
+      async () => {
+        const row = operationRows(operationPath, operationKey)[0];
+        const state = readJson(path.join(indexBase, 'state.json'));
+        if (row?.state === 'FAILED' || row?.state === 'CANCELLED') {
+          throw new Error(`installer gap terminated before approval: ${row.failure_reason}`);
+        }
+        if (row?.state !== 'COMPLETE_WITH_GAPS' || row.phase !== 'settled'
+          || state?.active_generation !== sourceGeneration
+          || state?.building_generation !== `g-${operationKey}`
+          || state?.migration_state !== 'AWAITING_ACCEPTANCE') return null;
+        const reply = await request(apiPort, `/api/operation-history/${operationKey}`, {}, 15000);
+        if (reply.status !== 200) return null;
+        const outcome = parseJson(reply, 'installer gap outcome');
+        return outcome.phase === 'awaiting_acceptance' && outcome.state === 'running'
+          && /^[0-9a-f]{64}$/.test(outcome.result?.gapListHash ?? '')
+          && outcome.result?.gaps?.some(gap => gap.unitId && gap.reason)
+          ? { row, state, outcome } : null;
+      });
+    const settledBManifest = readJson(path.join(indexBase, 'indices', `g-${operationKey}`,
+      '.justsearch-index-generation.json'));
+    settledBCitation = citationIdentityFromManifest(
+      settledBManifest, 'settled B', requireThat);
+    requireThat(settledBCitation.modelPath.startsWith(path.resolve(bRoot) + path.sep),
+      `settled B citation model escaped its private root: ${settledBCitation.modelPath}`);
+    if (sourceModel) {
       failedRecompose = await waitFor('missing A model reports both refusal reasons',
         120000, async () => {
           const reply = await request(apiPort, '/api/status', {}, 15000);
@@ -1435,7 +1460,11 @@ async function exerciseLiveModelGapDecision(c) {
         { query: marker, limit: 10, mode: 'text' }, 30000);
       requireThat(text.status === 200 && matchingHit(text, file, marker),
         `failed A recompose also lost lexical service: ${text.text}`);
-    } finally {
+    }
+  } finally {
+    if (hiddenSourceModel && fs.existsSync(hiddenSourceModel)) {
+      requireThat(!fs.existsSync(sourceModel),
+        `hidden A model cannot be restored over an occupied source path: ${sourceModel}`);
       fs.renameSync(hiddenSourceModel, sourceModel);
     }
   }
@@ -1448,6 +1477,30 @@ async function exerciseLiveModelGapDecision(c) {
           ? reply : null;
       } catch { return null; }
     });
+  await waitFor('restored A has an active CPU citation scorer', 30000,
+    () => readActiveCitation(apiPort, request));
+  const restoredAManifest = readJson(path.join(indexBase, 'indices', sourceGeneration,
+    '.justsearch-index-generation.json'));
+  const sourceCitation = citationIdentityFromManifest(
+    sourceManifest, 'initial A', requireThat);
+  const restoredCitation = citationIdentityFromManifest(
+    restoredAManifest, 'restored A', requireThat);
+  requireThat(sameCitationIdentity(sourceCitation, restoredCitation),
+    `restored A citation identity differs from initial A: ${JSON.stringify({
+      sourceCitation, restoredCitation,
+    })}`);
+  const cudaARestored = cudaABefore
+    ? await waitFor('restored A realizes CUDA after the gap', 60000,
+      () => readRealizedCudaEmbedding(apiPort, request))
+    : null;
+  if (cudaABefore && cudaARestored) {
+    console.log('MODEL_LIVE_AB_CUDA_A', JSON.stringify({
+      before: cudaABefore.currentAccelerator,
+      restored: cudaARestored.currentAccelerator,
+      availableBefore: cudaABefore.available,
+      availableRestored: cudaARestored.available,
+    }));
+  }
   const nativeLeaseProbe = process.env.JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE === '1';
   if (nativeLeaseProbe) {
     const reached = await waitFor('restored A issued a native CPU lease', 30000,
@@ -1555,6 +1608,12 @@ async function exerciseLiveModelGapDecision(c) {
   requireThat(bManifest?.models?.embedding?.id?.startsWith(bRoot)
     && bManifest.models.embedding.sha256 !== sourceManifest.models.embedding.sha256,
   `installed gap promoted the wrong model set: ${JSON.stringify(bManifest?.models)}`);
+  const promotedBCitation = citationIdentityFromManifest(
+    bManifest, 'promoted B', requireThat);
+  requireThat(sameCitationIdentity(settledBCitation, promotedBCitation),
+    `promoted B citation identity differs from settled B: ${JSON.stringify({
+      settledBCitation, promotedBCitation,
+    })}`);
   const bVector = await waitFor('approved installer gap serves B VECTOR', 120000,
     async () => {
       try {
@@ -1564,6 +1623,22 @@ async function exerciseLiveModelGapDecision(c) {
           ? reply : null;
       } catch { return null; }
     });
+  await waitFor('promoted B has an active CPU citation scorer', 30000,
+    () => readActiveCitation(apiPort, request));
+  requireThat(engineLogWindow,
+    'installed gap citation identity proof requires a current-run Engine log window');
+  const citationLog = await waitFor('current-run citation identity log records A then B then A then B',
+    30000, () => verifyCitationIdentityLog({ engineLogWindow, sourceCitation,
+      settledBCitation, restoredCitation, promotedBCitation, requireThat }));
+  console.log('MODEL_LIVE_AB_CITATION_IDENTITY', JSON.stringify({
+    aPath: sourceCitation.modelPath,
+    aSha256: sourceCitation.sha256,
+    bPath: settledBCitation.modelPath,
+    bSha256: settledBCitation.sha256,
+    restoredAPath: restoredCitation.modelPath,
+    restoredASha256: restoredCitation.sha256,
+    verified: citationLog.verified,
+  }));
   console.log('MODEL_LIVE_AB_GAP_PASS', JSON.stringify({ operationKey, acceptanceKey,
     sourceGeneration, promotedGeneration: promoted.state.active_generation,
     floor: 'floor simulated by device-memory cap', floorEvidence,
@@ -1571,6 +1646,130 @@ async function exerciseLiveModelGapDecision(c) {
     bVectorHits: JSON.parse(bVector.text).results.length,
     gapListHash: waiting.outcome.result.gapListHash,
     terminalReason: promoted.row.failure_reason, ...(semantic ? { semantic } : {}) }));
+}
+
+async function readRealizedCudaEmbedding(apiPort, request) {
+  try {
+    const response = await request(apiPort, '/api/inference/encoders', {}, 15000);
+    if (response.status !== 200) return null;
+    const embed = JSON.parse(response.text)?.encoders?.embed;
+    return embed?.currentAccelerator === 'cuda' && embed.available === true
+      ? { currentAccelerator: embed.currentAccelerator, available: embed.available }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readActiveCitation(apiPort, request) {
+  try {
+    const [statusResponse, runtimeResponse] = await Promise.all([
+      request(apiPort, '/api/status', {}, 15000),
+      request(apiPort, '/api/inference/encoders', {}, 15000),
+    ]);
+    if (statusResponse.status !== 200 || runtimeResponse.status !== 200) return null;
+    const status = JSON.parse(statusResponse.text);
+    const runtime = JSON.parse(runtimeResponse.text);
+    const citation = runtime?.encoders?.citation;
+    return status?.components?.encoders?.state === 'READY'
+      && runtime?.snapshotStatus === 'ok'
+      && citation?.available === true
+      && citation?.configuredAccelerator === 'CPU'
+      && citation?.currentAccelerator === 'cpu' ? citation : null;
+  } catch {
+    return null;
+  }
+}
+
+function citationIdentityFromManifest(manifest, label, requireThat) {
+  const artifact = manifest?.models?.['citation-scorer'];
+  requireThat(typeof artifact?.id === 'string' && path.isAbsolute(artifact.id)
+    && /^[0-9a-f]{64}$/i.test(artifact?.sha256 ?? ''),
+  `${label} lacks a full citation model identity: ${JSON.stringify(artifact)}`);
+  return {
+    modelPath: path.normalize(path.resolve(artifact.id)),
+    sha256: artifact.sha256.toLowerCase(),
+  };
+}
+
+function sameCitationIdentity(left, right) {
+  return left.modelPath === right.modelPath && left.sha256 === right.sha256;
+}
+
+function engineLogIdentity(stat) {
+  return { dev: stat.dev, ino: stat.ino, birthtimeMs: stat.birthtimeMs };
+}
+
+function readEngineLogWindow(window, requireThat) {
+  requireThat(fs.existsSync(window.file),
+    `current-run Engine log does not exist: ${window.file}`);
+  const stat = fs.statSync(window.file);
+  const identity = engineLogIdentity(stat);
+  const expectedIdentity = window.initialIdentity ?? window.observedIdentity;
+  requireThat(expectedIdentity == null || sameJson(identity, expectedIdentity),
+    `current-run Engine log rolled after capture: ${JSON.stringify({
+      file: window.file, expectedIdentity, identity,
+    })}`);
+  if (window.observedIdentity == null) window.observedIdentity = identity;
+  requireThat(stat.size >= window.startOffset,
+    `current-run Engine log shrank after capture: ${JSON.stringify({
+      file: window.file, startOffset: window.startOffset, size: stat.size,
+    })}`);
+  const directory = path.dirname(window.file);
+  const rolledFiles = fs.existsSync(directory)
+    ? Object.fromEntries(fs.readdirSync(directory)
+      .filter(name => /^engine\..+\.log\.gz$/.test(name))
+      .sort()
+      .map(name => {
+        const rolled = fs.statSync(path.join(directory, name));
+        return [name, { size: rolled.size, mtimeMs: rolled.mtimeMs }];
+      }))
+    : {};
+  requireThat(sameJson(rolledFiles, window.rolledFiles),
+    `current-run Engine log rolled after capture: ${JSON.stringify({
+      before: window.rolledFiles, after: rolledFiles,
+    })}`);
+  const bytes = fs.readFileSync(window.file);
+  requireThat(bytes.length >= window.startOffset,
+    `current-run Engine log shrank while reading: ${JSON.stringify({
+      file: window.file, startOffset: window.startOffset, size: bytes.length,
+    })}`);
+  return bytes.subarray(window.startOffset).toString('utf8');
+}
+
+function verifyCitationIdentityLog({ engineLogWindow, sourceCitation, settledBCitation,
+  restoredCitation, promotedBCitation, requireThat }) {
+  const contents = readEngineLogWindow(engineLogWindow, requireThat);
+  const messages = contents.split(/\r?\n/).filter(Boolean).flatMap(line => {
+    try {
+      const message = JSON.parse(line)?.message;
+      return typeof message === 'string' ? [message] : [];
+    } catch {
+      requireThat(!line.includes('Citation scorer generation selected:'),
+        `citation identity evidence was not valid Engine log JSON: ${line}`);
+      return [];
+    }
+  });
+  const legacy = messages.filter(message =>
+    /^Citation scorer wired: model=.*sha256=[0-9a-f]{16}\.\.\.$/i.test(message));
+  requireThat(legacy.length === 0,
+    `legacy truncated citation consumer SHA remained in the Engine log: ${JSON.stringify(legacy)}`);
+  const prefix = 'Citation scorer generation selected: model=';
+  const tuples = messages.filter(message => message.startsWith(prefix)).map(message => {
+    const match = /^Citation scorer generation selected: model=(.+), sha256=([0-9a-f]{64})$/i
+      .exec(message);
+    requireThat(match,
+      `citation generation identity was not an exact normalized path plus full SHA: ${message}`);
+    return { modelPath: match[1], sha256: match[2].toLowerCase() };
+  });
+  const expected = [sourceCitation, settledBCitation, restoredCitation, promotedBCitation];
+  if (tuples.length < expected.length) return null;
+  requireThat(tuples.length === expected.length
+    && tuples.every((tuple, index) => sameCitationIdentity(tuple, expected[index])),
+    `current-run citation log differs from exact A→B→A→B composition: ${JSON.stringify({
+      tuples, expected,
+    })}`);
+  return { verified: true };
 }
 
 function linkRegularFiles(source, target) {
@@ -1983,10 +2182,12 @@ export function writeRetainedInstallerCandidate({ data, requireThat,
   const installedModels = {};
   const targetEP = mixedChat ? 'CUDA' : 'CPU';
   const downloadProfile = mixedChat ? 'GPU_FULL' : 'CPU';
-  for (const packageId of ['embedding', 'ner', 'splade']) {
+  for (const packageId of ['embedding', 'ner', 'splade', 'citation-scorer']) {
     const pkg = registry.packages.find(entry => entry.id === packageId);
-    const variant = pkg?.variants.find(entry => entry.targetEP === targetEP);
-    requireThat(pkg && variant, `installer fixture lacks ${targetEP} registry variant for ${packageId}`);
+    const packageTargetEP = packageId === 'citation-scorer' ? 'CPU' : targetEP;
+    const variant = pkg?.variants.find(entry => entry.targetEP === packageTargetEP);
+    requireThat(pkg && variant,
+      `installer fixture lacks ${packageTargetEP} registry variant for ${packageId}`);
     const sourceDir = path.join(modelsRoot, pkg.targetDir);
     const stagedDir = path.join(candidateRoot, pkg.targetDir);
     fs.mkdirSync(stagedDir, { recursive: true });

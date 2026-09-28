@@ -872,7 +872,7 @@
     },
     {
       "key": "justsearch.rerank.model_path",
-      "applyScope": "component:index"
+      "applyScope": "component:encoders"
     },
     {
       "key": "justsearch.rerank.top_k",

@@ -46,6 +46,15 @@ final class RestoredNativeLeaseProbe {
       HarnessBarrierProtocol.await(dataDir, FAMILY,
           JSON.writeValueAsString(Map.of("pid", ProcessHandle.current().pid(),
               "inputCount", inputs.size())), false);
+      // The harness can approve B while its component is RELOADING, before B actually starts
+      // retiring A. Hold the issued lease until this exact native handle enters retirement.
+      long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+      while (handle.retirementStatus() == SessionHandle.RetirementStatus.ACTIVE) {
+        if (System.nanoTime() >= deadline) {
+          throw new IllegalStateException("Restored A native retirement did not begin");
+        }
+        Thread.sleep(10);
+      }
       if (handle.retirementStatus() != SessionHandle.RetirementStatus.RETIRING
           || !inputs.equals(lease.session().getInputNames())) {
         throw new IllegalStateException("Restored A was not held open during B retirement");

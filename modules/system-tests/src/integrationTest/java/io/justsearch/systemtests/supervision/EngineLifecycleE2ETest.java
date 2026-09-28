@@ -73,6 +73,12 @@ final class EngineLifecycleE2ETest {
     EngineSupervisedRecoveryE2ETest.runSeededInPlaceGapRestoration();
   }
 
+  @Tag("ai")
+  @Test
+  void failedInPlaceARecomposeCancelsBAndRestoresA() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededInPlaceRecomposeFailureCancellation();
+  }
+
   @Test
   void pendingFeatureScenariosAreNamedAndReported() {
     var names = new HashSet<String>();

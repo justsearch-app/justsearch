@@ -51,12 +51,91 @@ stress-enabled suite at `tmp/5200` (19m28s; 23 executed, 11 cached, 166 up to
 date), and `build -x test` at `tmp/5202`. The native concurrent stress XML at
 `modules/ort-common/build/test-results/test/` reports one test, zero skips or
 failures; the suite XML snapshot is retained at `tmp/5200-suite-xml/`.
-Exact-SHA hosted CI and current-head installed proof remain pending at this
-checkpoint. The installed
+The correction was pushed as `692097947df722920fd2b3f0acd605d6ffa9a83b`;
+exact-SHA hosted [run 36400618964](https://github.com/justsearch-app/justsearch/actions/runs/36400618964)
+passed all 13 jobs, including system integration and wall-clock attribution.
+Current-head installed proof remained pending at that checkpoint. The installed
 preflight found that the floor fixture must assert realized CUDA A, carry
 CPU-only citation selection into B for log-to-manifest
 correlation, and register the cancellation/recompose-failure scenario with the
 lifecycle test task before those rows can be accepted.
+
+The first corrected Batch 4 installed pair at `tmp/5222` failed before either
+fault marker: citation staging produced a recorded `encoders` model-path change,
+but the fixed settings composer had no physical `encoders` owner. The terminal
+operation was `ACTIVATION_PRECOMMIT_REFUSED`; increasing the marker wait would
+not repair it. The red XML is preserved at `tmp/5222-batch4-installed-gap-cancel-red.xml`.
+The Batch 4 correction now passes the accepted installer generation plan into
+settings preparation, excludes only exact plan-backed citation/reranker paths
+from ordinary component composition, and requires B's already-composed encoder
+observation in the one registry batch before pointer admission. Other component
+keys still require their fixed owner. Reranker model-path scope is corrected
+from `index` to its physical `encoders` owner. Focused configuration and
+app-services tests passed at `tmp/5226`; affected Java formatting/PMD passed at
+`tmp/5228`, and the Node harness checks passed at `tmp/5227`. The installed
+pair at `tmp/5229` reached both product paths but failed new evidence checks:
+the recovery status field is a string, and the complete approved-gap citation
+composition is A→B→A→B (B composes again for final promotion). The red XML is
+preserved at `tmp/5229-batch4-installed-gap-cancel-red.xml`. Exact string and
+four-tuple assertions now match those observed contracts; Java/Node preflight
+passed at `tmp/5230`. The installed pair passed at `tmp/5231` (two AI tests,
+zero skips/failures; XML preserved at `tmp/5231-batch4-installed-gap-cancel-green.xml`).
+The failed-recompose/cancel method retained exact A and vector search after
+cancellation under the forced CUDA floor. The approved-gap method restored A,
+then promoted B, with zero API outage samples and exact current-run citation
+composition A→B→A→B by model path and full SHA. Independent review then closed
+a private fixture cleanup interval: A restoration now covers barrier release,
+and Java restores a hidden private A file if Node is forcibly terminated after
+the owned stack stops. The first exact-source installed pair at `tmp/5234`
+passed the recompose/cancel method but failed the restored-A native lease probe
+in the approved-gap method (two AI tests, one failure, zero skips; red XML at
+`tmp/5234-batch4-installed-gap-cancel-red.xml`). The harness released its
+native lease after broad component `RELOADING`, before the exact A handle
+entered `RETIRING`. The probe now holds the issued CPU lease until that handle
+reaches `RETIRING` and then requires the session input names to remain readable;
+it still refuses if retirement never begins or the handle is `REFUSED`.
+Worker compile, Spotless and PMD pass at `tmp/5235`. The exact corrected
+approved-gap method passed at `tmp/5236` (one AI test, zero skips/failures;
+preserved XML). Its private fixture records `RETIRING` with two readable
+native inputs, exact citation A→B→A→B identities, approved B promotion,
+zero API outage samples, and clean owned ports. The recompose/cancel method
+passed at `tmp/5234` before this probe-only correction; its scenario does not
+enable that probe. The repository static gate passed at `tmp/5237` and the
+default-parallel native stress suite passed at `tmp/5238` on that source (196
+tasks, 23 executed). Final review then found two proof defects: plan-backed
+model-path exemption compared raw settings instead of the effective resolved
+path, and the citation identity log preceded successful scorer assembly. The
+coordinator now compares the effective citation/reranker path with the accepted
+plan even when an operator override was already serving; four override
+regressions pass at `tmp/5239`. The citation log now follows successful
+assembly; a failed-assembly unit regression and affected Java static checks
+pass at `tmp/5240`. The exact corrected installed pair passed at `tmp/5242`
+(two AI tests, zero skips/failures; XML snapshot
+`tmp/5242-batch4-final-installed-pair-green.xml`, SHA-256
+`EEFE6F40C3885E7347F07BC08356F01D5B75A73FD9F457C1A51257C3E7157256`).
+Its private fixture records active CPU citation at initial A, restored A, and
+promoted B, exact current-run A→B→A→B citation paths/full SHA, restored A
+CUDA and an issued native lease readable during `RETIRING`, approved B
+promotion, zero API outage samples, and clean owned ports. An independent
+read-only review found no remaining production high finding on tracked diff
+SHA-256 `a17fbd197a78cf6a98c07af716d493bf31aaf37c05a4dd8b85edf71c249f2578`.
+The exact corrected source passed repository static checks at `tmp/5243`
+(321 tasks), the default-parallel native stress suite at `tmp/5244` (196
+tasks, 1,874 preserved JUnit XML files; the native concurrent stress test has
+one run and zero skips/failures), and `build -x test` at `tmp/5245` (333
+tasks). Regeneration, runtime matrix, canonical links, and store
+recoverability checks passed. Batch 4 checkpoint commit, push, and hosted
+exact-SHA proof remain due; the physical issued-A search across B publication
+then precedes Batch 5.
+
+Independent review also traced a separate D1-4/12 Batch 5 blocker: a valid
+reranker-only or citation-only installer candidate takes ordinary settings
+apply, where `component:encoders` has no registered fixed owner. Batch 4's
+generation-bound plan exception does not serve that path. Batch 5 must give
+ordinary query-only changes a real serving encoder owner and an executable
+install regression, including publication with the registry observation and
+A retirement after leases. Do not mark installer model-path ownership complete
+on Batch 4 evidence alone.
 
 The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
 `codex/lane-f-workflow-order` from `origin/main`, in its separate managed
@@ -78,6 +157,11 @@ systemic friction item. Batch V's default-parallel full suite took 8m57s at
 next WP3 batch 4/5 integrated boundary, root should keep the one-build rule,
 run the full suite with default parallelism, preserve its XML and wall time, and
 reserve a serial rerun for diagnosed contention.
+The Batch 4 installed harness waited 240 seconds for a marker after the
+operation had already settled `FAILED` at `tmp/5222`. A later harness owner
+should make this wait fail promptly on a terminal operation, preserving the
+underlying refusal and fixture logs. This is a process improvement; it does
+not replace the product correction or the current installed rerun.
 Batch 4's app-engine module suite took 9m23s at `tmp/5197`; the parallel
 stress-enabled repository suite took 19m28s at `tmp/5200`. A thread dump at
 `tmp/5197-app-engine-worker-thread-dump.txt` captured a normal bounded

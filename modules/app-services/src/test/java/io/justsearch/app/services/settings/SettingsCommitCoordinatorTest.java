@@ -190,14 +190,16 @@ final class SettingsCommitCoordinatorTest {
         temp.resolve("installer-projection.json"));
     var initial = ConfigStoreRebuilder.prepare(new UiSettings());
     var config = new ConfigStore(initial);
-    var owner = coordinator(settings, config);
+    var owner = projectionCoordinator(settings, config);
     owner.inspectRecovery(List.of());
     String key = OperationKeys.generate(CLOCK);
     UiSettings candidate = new UiSettings();
     candidate.setEmbedOnnxModelPath(temp.resolve("candidate-embedding.onnx").toString());
     var control = new ProjectionControl();
     var reservation = owner.reserve(71, key, currentWitness(settings));
-    var projection = owner.prepareInstallerGenerationProjection(reservation, candidate, control);
+    var projection = owner.prepareInstallerGenerationProjection(reservation, candidate, control,
+        installerPlan(key, candidate));
+    projection.includeComponentObservation(componentObservation("encoders"));
 
     assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
     assertSame(initial, config.get());
@@ -229,18 +231,16 @@ final class SettingsCommitCoordinatorTest {
         candidate -> OperationResult.success("prepared"), () -> false, components);
     owner.inspectRecovery(List.of());
     String key = OperationKeys.generate(CLOCK);
+    UiSettings candidate = new UiSettings();
+    Path reranker = temp.resolve("reranker");
+    Path citation = temp.resolve("citation");
+    candidate.setRerankerModelPath(reranker.toString());
+    candidate.setCitationScorerModelPath(citation.toString());
     var projection = owner.prepareInstallerGenerationProjection(
-        owner.reserve(711, key, currentWitness(settings)), new UiSettings(),
-        new ProjectionControl());
-    var spec = new io.justsearch.core.component.ComponentSpec("encoders", false, Set.of(),
-        io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
-        java.time.Duration.ofSeconds(1), 1);
-    var observation = new io.justsearch.core.component.EngineComponentSnapshot.Component(
-        spec, io.justsearch.core.component.ComponentState.READY, null, Instant.EPOCH, 0,
-        "model-b", "model-b", null, 0, null);
+        owner.reserve(711, key, currentWitness(settings)), candidate,
+        new ProjectionControl(), installerPlan(key, candidate));
+    var observation = componentObservation("encoders");
     projection.includeComponentObservation(observation);
-    assertThrows(IllegalStateException.class,
-        () -> projection.includeComponentObservation(observation));
     assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
     org.mockito.Mockito.verify(components).prepare(org.mockito.ArgumentMatchers.any(),
         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(Map.of()));
@@ -261,16 +261,178 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void installerProjectionRefusesModelPathsMissingOrContradictingAcceptedPlan() {
+    for (boolean missingCitation : List.of(true, false)) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+          temp.resolve("installer-plan-path-" + missingCitation + ".json"));
+      var initial = ConfigStoreRebuilder.prepare(new UiSettings());
+      var config = new ConfigStore(initial);
+      var owner = coordinator(settings, config);
+      owner.inspectRecovery(List.of());
+      String key = OperationKeys.generate(CLOCK);
+      UiSettings candidate = new UiSettings();
+      Path reranker = temp.resolve("planned-reranker-" + missingCitation);
+      Path citation = temp.resolve("planned-citation-" + missingCitation);
+      candidate.setRerankerModelPath(reranker.toString());
+      candidate.setCitationScorerModelPath(citation.toString());
+      Map<String, Path> identities = missingCitation
+          ? Map.of("embedding", temp.resolve("placeholder"), "reranker", reranker)
+          : Map.of("reranker", reranker, "citation-scorer", temp.resolve("other-citation"));
+      var reservation = owner.reserve(712 + (missingCitation ? 0 : 1), key,
+          currentWitness(settings));
+
+      IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+          () -> owner.prepareInstallerGenerationProjection(reservation, candidate,
+              new ProjectionControl(), installerPlan(key, candidate, identities)));
+
+      assertTrue(failure.getMessage().contains("accepted plan"));
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      assertSame(initial, config.get());
+    }
+  }
+
+  @Test
+  void installerProjectionRefusesEffectiveModelPathOverridesEvenWhenAlreadyServing() {
+    for (String packageId : List.of("reranker", "citation-scorer")) {
+      for (boolean alreadyServing : List.of(false, true)) {
+        String property = "reranker".equals(packageId)
+            ? "justsearch.rerank.model_path" : "justsearch.citation.scorer.model_path";
+        String prior = System.getProperty(property);
+        Path override = temp.resolve(packageId + "-override-" + alreadyServing);
+        try {
+          System.clearProperty(property);
+          var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+              temp.resolve(packageId + "-override-" + alreadyServing + ".json"));
+          if (alreadyServing) System.setProperty(property, override.toString());
+          var initial = ConfigStoreRebuilder.prepare(new UiSettings());
+          var config = new ConfigStore(initial);
+          var owner = coordinator(settings, config);
+          owner.inspectRecovery(List.of());
+          String key = OperationKeys.generate(CLOCK);
+          UiSettings candidate = new UiSettings();
+          Path selected = temp.resolve(packageId + "-selected-" + alreadyServing);
+          if ("reranker".equals(packageId)) candidate.setRerankerModelPath(selected.toString());
+          else candidate.setCitationScorerModelPath(selected.toString());
+          if (!alreadyServing) System.setProperty(property, override.toString());
+
+          IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+              () -> owner.prepareInstallerGenerationProjection(
+                  owner.reserve(alreadyServing ? 717 : 716, key, currentWitness(settings)),
+                  candidate, new ProjectionControl(), installerPlan(key, candidate)));
+
+          assertTrue(failure.getMessage().contains("accepted plan"));
+          assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+          assertSame(initial, config.get());
+        } finally {
+          if (prior == null) System.clearProperty(property);
+          else System.setProperty(property, prior);
+        }
+      }
+    }
+  }
+
+  @Test
+  void installerProjectionKeepsNonPathComponentChangesOwnedByFixedComposer() {
+    List<String[]> cases = List.of(
+        new String[] {"justsearch.rerank.top_k", "37", "encoders"},
+        new String[] {"justsearch.rerank.chunks.model_path",
+            temp.resolve("chunk-reranker").toString(), "index"});
+    for (int index = 0; index < cases.size(); index++) {
+      int caseIndex = index;
+      String[] testCase = cases.get(index);
+      String property = testCase[0];
+      String prior = System.getProperty(property);
+      try {
+        System.clearProperty(property);
+        var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+            temp.resolve("installer-ordinary-component-" + index + ".json"));
+        var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+        String changedValue = "justsearch.rerank.top_k".equals(property)
+            ? Integer.toString(config.get().ai().reranker().topK() + 1) : testCase[1];
+        System.setProperty(property, changedValue);
+        var components = new FixedSettingsComponentComposer(org.mockito.Mockito.mock(
+            io.justsearch.core.component.EngineComponentRegistry.class));
+        components.seal();
+        var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+            candidateSettings -> OperationResult.success("prepared"), () -> false, components);
+        owner.inspectRecovery(List.of());
+        String key = OperationKeys.generate(CLOCK);
+        UiSettings candidate = new UiSettings();
+        candidate.setRerankerModelPath(temp.resolve("ordinary-reranker-" + index).toString());
+        candidate.setCitationScorerModelPath(
+            temp.resolve("ordinary-citation-" + index).toString());
+
+        SettingsCommitOwner.Refused failure = assertThrows(SettingsCommitOwner.Refused.class,
+            () -> owner.prepareInstallerGenerationProjection(
+                owner.reserve(714 + caseIndex, key, currentWitness(settings)), candidate,
+                new ProjectionControl(), installerPlan(key, candidate)));
+
+        assertEquals("COMPONENT_PREPARATION_REQUIRED",
+            failure.response().errorCode().orElseThrow());
+        assertEquals(testCase[2], failure.response().errorDetails().get("component"));
+        assertTrue(((Set<?>) failure.response().errorDetails().get("keys")).contains(property));
+        assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      } finally {
+        if (prior == null) System.clearProperty(property);
+        else System.setProperty(property, prior);
+      }
+    }
+  }
+
+  @Test
+  void installerProjectionRequiresExactlyOnePhysicalEncoderObservationBeforePointer() {
+    for (String scenario : List.of("missing", "wrong", "duplicate")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+          temp.resolve("installer-observation-" + scenario + ".json"));
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
+      var components = org.mockito.Mockito.mock(SettingsComponentComposer.class);
+      var prepared = org.mockito.Mockito.mock(SettingsComponentComposer.Prepared.class);
+      org.mockito.Mockito.when(components.prepare(org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyMap()))
+          .thenReturn(prepared);
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          candidate -> OperationResult.success("prepared"), () -> false, components);
+      owner.inspectRecovery(List.of());
+      String key = OperationKeys.generate(CLOCK);
+      UiSettings candidate = new UiSettings();
+      candidate.setRerankerModelPath(temp.resolve("observation-reranker-" + scenario).toString());
+      var projection = owner.prepareInstallerGenerationProjection(
+          owner.reserve(715 + List.of("missing", "wrong", "duplicate").indexOf(scenario), key,
+              currentWitness(settings)), candidate, new ProjectionControl(),
+          installerPlan(key, candidate));
+
+      if ("wrong".equals(scenario)) {
+        assertThrows(IllegalArgumentException.class,
+            () -> projection.includeComponentObservation(componentObservation("generative")));
+      } else if ("duplicate".equals(scenario)) {
+        var observation = componentObservation("encoders");
+        projection.includeComponentObservation(observation);
+        assertThrows(IllegalStateException.class,
+            () -> projection.includeComponentObservation(observation));
+      }
+      if (!"duplicate".equals(scenario)) {
+        config.publicationLock().writeLock().lock();
+        try { assertThrows(IllegalStateException.class, projection::admitBeforePointer); }
+        finally { config.publicationLock().writeLock().unlock(); }
+      }
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      projection.abortBeforePointer();
+    }
+  }
+
+  @Test
   void installerProjectionRefusesFullWitnessConflictBeforePointer() throws Exception {
     var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
         temp.resolve("installer-projection-conflict.json"));
     var config = new ConfigStore(ConfigStoreRebuilder.prepare(new UiSettings()));
-    var owner = coordinator(settings, config);
+    var owner = projectionCoordinator(settings, config);
     owner.inspectRecovery(List.of());
     String key = OperationKeys.generate(CLOCK);
     var reservation = owner.reserve(72, key, currentWitness(settings));
-    var projection = owner.prepareInstallerGenerationProjection(reservation, new UiSettings(),
-        new ProjectionControl());
+    UiSettings candidate = new UiSettings();
+    var projection = owner.prepareInstallerGenerationProjection(reservation, candidate,
+        new ProjectionControl(), installerPlan(key, candidate));
+    projection.includeComponentObservation(componentObservation("encoders"));
     writeWitness(settings, 1, OperationKeys.generate(CLOCK));
 
     config.publicationLock().writeLock().lock();
@@ -291,7 +453,7 @@ final class SettingsCommitCoordinatorTest {
         ConfigStoreRebuilder::prepare, candidate -> OperationResult.success("prepared"), prepared -> {
           settings.replacePrepared(settings.prepareExact(new UiSettings(), prepared.witness()));
           throw new IOException("move reported failure after installing different bytes");
-        });
+        }, () -> false, acceptingComponents());
     owner.inspectRecovery(List.of());
     String key = OperationKeys.generate(CLOCK);
     UiSettings candidate = new UiSettings();
@@ -305,7 +467,9 @@ final class SettingsCommitCoordinatorTest {
       }
       @Override public void uncertain() { uncertain.set(true); }
     };
-    var projection = owner.prepareInstallerGenerationProjection(reservation, candidate, control);
+    var projection = owner.prepareInstallerGenerationProjection(reservation, candidate, control,
+        installerPlan(key, candidate));
+    projection.includeComponentObservation(componentObservation("encoders"));
 
     config.publicationLock().writeLock().lock();
     try {
@@ -1503,6 +1667,81 @@ final class SettingsCommitCoordinatorTest {
   private SettingsCommitCoordinator coordinator(UiSettingsStore settings, ConfigStore config) {
     return new SettingsCommitCoordinator(settings, config, () -> {},
         candidate -> OperationResult.success("prepared"));
+  }
+
+  private SettingsCommitCoordinator projectionCoordinator(
+      UiSettingsStore settings, ConfigStore config) {
+    return new SettingsCommitCoordinator(settings, config, () -> {},
+        candidate -> OperationResult.success("prepared"), () -> false,
+        acceptingComponents());
+  }
+
+  private RecordedInstallerGenerationPlan installerPlan(String operationKey, UiSettings candidate) {
+    var identities = new java.util.LinkedHashMap<String, Path>();
+    identities.put("embedding", temp.resolve("plan-placeholder"));
+    if (!candidate.getRerankerModelPath().isBlank()) {
+      identities.put("reranker", Path.of(candidate.getRerankerModelPath()));
+    }
+    if (!candidate.getCitationScorerModelPath().isBlank()) {
+      identities.put("citation-scorer", Path.of(candidate.getCitationScorerModelPath()));
+    }
+    return installerPlan(operationKey, candidate, identities);
+  }
+
+  private RecordedInstallerGenerationPlan installerPlan(String operationKey, UiSettings candidate,
+      Map<String, Path> identityDirectories) {
+    String hash = "0".repeat(64);
+    var provenance = new RecordedInstallerGenerationPlan.AcquisitionProvenance(
+        RecordedInstallerGenerationPlan.AcquisitionProvenance.Kind.REGISTRY,
+        "settings-test", hash);
+    var models = new java.util.ArrayList<RecordedInstallerGenerationPlan.ModelIdentity>();
+    var assets = new java.util.ArrayList<RecordedInstallerGenerationPlan.AssetIdentity>();
+    identityDirectories.forEach((packageId, directory) -> {
+      Path model = directory.toAbsolutePath().normalize().resolve(packageId + ".onnx");
+      models.add(new RecordedInstallerGenerationPlan.ModelIdentity(
+          packageId, "fixture", model, hash, 1, provenance));
+      assets.add(new RecordedInstallerGenerationPlan.AssetIdentity(
+          packageId + "/model", model, hash, 1, provenance));
+    });
+    String json = tools.jackson.databind.json.JsonMapper.builder().build()
+        .writeValueAsString(candidate);
+    return new RecordedInstallerGenerationPlan(operationKey, "settings-source",
+        new RecordedRootPlan("settings-source", List.of()),
+        new IndexTargetSnapshot(sha256("{}"), "{}"), new SettingsWitness(0, null),
+        RecordedInstallerGenerationPlan.CandidateSettings.fromJson(json), models, assets,
+        RecordedInstallerGenerationPlan.ChatSelection.none(), provenance);
+  }
+
+  private static String sha256(String value) {
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+          .digest(value.getBytes(StandardCharsets.UTF_8)));
+    } catch (java.security.NoSuchAlgorithmException impossible) {
+      throw new AssertionError(impossible);
+    }
+  }
+
+  private static io.justsearch.core.component.EngineComponentSnapshot.Component
+      componentObservation(String name) {
+    var spec = new io.justsearch.core.component.ComponentSpec(name, false, Set.of(),
+        io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
+        java.time.Duration.ofSeconds(1), 1);
+    return new io.justsearch.core.component.EngineComponentSnapshot.Component(
+        spec, io.justsearch.core.component.ComponentState.READY, null, Instant.EPOCH, 0,
+        "model-b", "model-b", null, 0, null);
+  }
+
+  private static SettingsComponentComposer acceptingComponents() {
+    return (candidate, desired, affected) -> new SettingsComponentComposer.Prepared() {
+      @Override public void includeObservation(
+          io.justsearch.core.component.EngineComponentSnapshot.Component observation) {}
+      @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
+      @Override public void validate() {}
+      @Override public void install() {}
+      @Override public void notifyObservers() {}
+      @Override public void retire() {}
+      @Override public void abort() {}
+    };
   }
 
   private static SettingsWitness currentWitness(UiSettingsStore settings) {

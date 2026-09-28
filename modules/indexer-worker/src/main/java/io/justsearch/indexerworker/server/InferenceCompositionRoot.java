@@ -780,11 +780,6 @@ public final class InferenceCompositionRoot {
       return Optional.empty();
     }
     try {
-      if (selection != null) {
-        log.info("Citation scorer generation selected: model={}, sha256={}",
-            variant.modelFile().toAbsolutePath().normalize(),
-            selection.fingerprint("citation-scorer").sha());
-      }
       ModelSessionPolicy policy =
           ModelSessionPolicyResolver.resolve(EncoderRole.CITATION, cfg, hardware, variant);
       assertCitationIsCpuOnly(variant, policy);
@@ -810,6 +805,11 @@ public final class InferenceCompositionRoot {
               sessions,
               citationCfg.modelPath().resolve("tokenizer.json"),
               citationCfg.maxSequenceLength());
+      if (selection != null) {
+        log.info("Citation scorer generation selected: model={}, sha256={}",
+            variant.modelFile().toAbsolutePath().normalize(),
+            selection.fingerprint("citation-scorer").sha());
+      }
       handles.add(assembly.sessions());
       policies.put(EncoderRole.CITATION, policy);
       return Optional.of(assembly);

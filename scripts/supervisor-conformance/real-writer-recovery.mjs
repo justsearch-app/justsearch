@@ -262,6 +262,27 @@ if (modelBoot) {
   }
 }
 const runner = path.join(repo, 'scripts', 'dev', 'dev-runner.cjs');
+const engineLogWindow = modelLiveAB ? (() => {
+  const file = path.join(data, 'logs', 'engine.log');
+  const directory = path.dirname(file);
+  const stat = fs.existsSync(file) ? fs.statSync(file) : null;
+  const rolledFiles = fs.existsSync(directory)
+    ? Object.fromEntries(fs.readdirSync(directory)
+      .filter(name => /^engine\..+\.log\.gz$/.test(name))
+      .sort()
+      .map(name => {
+        const rolled = fs.statSync(path.join(directory, name));
+        return [name, { size: rolled.size, mtimeMs: rolled.mtimeMs }];
+      }))
+    : {};
+  return {
+    file,
+    startOffset: stat?.size ?? 0,
+    initialIdentity: stat == null ? null
+      : { dev: stat.dev, ino: stat.ino, birthtimeMs: stat.birthtimeMs },
+    rolledFiles,
+  };
+})() : null;
 const child = spawn(process.execPath, [
   runner, 'start', '--json', '--skip-build', '--clean', 'none', '--api-port', '0',
   '--ui-port', String(port), '--data-dir', data, '--session-id', 'writer-recovery-live',
@@ -412,7 +433,7 @@ try {
       gapApproval: modelLiveABGap,
       gapCancellation: modelLiveABCancel || modelLiveABRecomposeFailure,
       gapRecomposeFailure: modelLiveABRecomposeFailure,
-      cancelBeforePointer: modelLiveABAcceptedCancel });
+      cancelBeforePointer: modelLiveABAcceptedCancel, engineLogWindow });
   } else if (modelBoot) {
     const initialStatus = await waitFor('model binding boot status', 60000, async () => {
       try {

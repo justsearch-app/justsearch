@@ -241,8 +241,8 @@ class InferenceCompositionRootComposeTest {
   }
 
   @Test
-  @DisplayName("citation identity log uses the generation-selected file and fingerprint")
-  void citationIdentityLogUsesGenerationSelection(@TempDir Path temp) throws IOException {
+  @DisplayName("failed citation assembly never claims a generation-selected identity")
+  void failedCitationAssemblyDoesNotLogGenerationIdentity(@TempDir Path temp) throws IOException {
     Path selectedFile = temp.resolve("generation-X/model.onnx").toAbsolutePath().normalize();
     Path desiredFile = temp.resolve("desired-Y/model.onnx").toAbsolutePath().normalize();
     Files.createDirectories(selectedFile.getParent());
@@ -275,23 +275,22 @@ class InferenceCompositionRootComposeTest {
     logger.addAppender(appender);
 
     try {
-      InferenceCompositionRoot.compose(
+      try (InferenceSurface surface = InferenceCompositionRoot.compose(
           projection,
           HardwareProfile.cpuOnly(),
           null,
           null,
           NO_GPU,
           io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP,
-          selection);
+          selection)) {
+        assertTrue(surface.citation().isEmpty());
+        assertTrue(surface.componentObservation().missingRoles().contains(EncoderRole.CITATION));
+      }
 
       var messages = appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
-      assertTrue(
-          messages.contains(
-              "Citation scorer generation selected: model="
-                  + selectedFile
-                  + ", sha256="
-                  + selectedSha),
-          () -> "missing generation-selected citation identity in " + messages);
+      assertTrue(messages.stream().noneMatch(message -> message.startsWith(
+          "Citation scorer generation selected:")),
+          () -> "failed citation assembly logged a selected identity in " + messages);
       assertTrue(messages.stream().noneMatch(message -> message.contains(desiredFile.toString())));
       assertTrue(messages.stream().noneMatch(message -> message.contains(desiredSha)));
     } finally {

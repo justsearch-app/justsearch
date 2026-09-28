@@ -447,7 +447,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       io.justsearch.app.api.UiSettings candidate = tools.jackson.databind.json.JsonMapper.builder().build()
           .readValue(plan.candidateSettings().canonicalJson(), io.justsearch.app.api.UiSettings.class);
       prepared = settingsOwner.prepareInstallerGenerationProjection(
-          reservation, candidate, control.settingsControl);
+          reservation, candidate, control.settingsControl, plan);
       observeBulkBoundary(handle, BulkBoundary.INSTALLER_BEFORE_MARKER);
       if (!store.armInstallerGenerationSettingsRevision(row.id(), expectedRevision)) {
         throw new OperationStoreException(OperationStoreException.Code.STORAGE_FAILED, null);
