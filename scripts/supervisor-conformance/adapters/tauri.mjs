@@ -54,6 +54,7 @@ const RESTART_CASES = new Set([
   'fileless-clean-local-restart-is-not-counted',
   'crash-1-restarts-under-budget',
   'oom-3-restarts-under-budget',
+  'escalated-restart',
   'hang-soft-recovered-through-the-request-file',
   'hang-hard-recovered-by-forced-kill',
   'requested-restart-is-not-counted',
@@ -199,6 +200,13 @@ export async function runCase({ testCase, policy, io }) {
       }
       if (testCase.id === 'oom-3-restarts-under-budget' && summary.lastExit?.reason !== 'out_of_memory') {
         problems.push(`lastExit.reason ${summary.lastExit?.reason}, expected out_of_memory`);
+      }
+      if (testCase.id === 'escalated-restart'
+          && (summary.lastExit?.code !== 5
+            || summary.lastExit?.reason !== 'escalated_restart'
+            || summary.lastExit?.class !== 'TRANSIENT'
+            || summary.lastExit?.counted !== true)) {
+        problems.push(`escalated restart did not spend the host budget: ${JSON.stringify(summary.lastExit)}`);
       }
       if (testCase.id === 'hang-hard-recovered-by-forced-kill' && summary.forcedKill !== true) {
         problems.push(

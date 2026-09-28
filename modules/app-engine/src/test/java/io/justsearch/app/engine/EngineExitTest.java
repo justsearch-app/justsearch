@@ -29,6 +29,7 @@ final class EngineExitTest {
   void namedCodesClassify() {
     assertEquals(ExitClass.REQUESTED, EngineExit.classify(EngineExit.OK));
     assertEquals(ExitClass.REQUESTED, EngineExit.classify(EngineExit.REQUESTED_RESTART));
+    assertEquals(ExitClass.TRANSIENT, EngineExit.classify(EngineExit.ESCALATED_RESTART));
     assertEquals(
         ExitClass.NON_TRANSIENT,
         EngineExit.classify(EngineExit.DATA_DIR_LOCKED),
@@ -63,6 +64,7 @@ final class EngineExitTest {
     assertEquals("unknown(-1073741819)", EngineExit.describe(-1073741819));
     assertEquals("out_of_memory", EngineExit.describe(EngineExit.OUT_OF_MEMORY));
     assertEquals("data_dir_locked", EngineExit.describe(EngineExit.DATA_DIR_LOCKED));
+    assertEquals("escalated_restart", EngineExit.describe(EngineExit.ESCALATED_RESTART));
   }
 
   /** {@code HeadlessApp.java}, read as text from this module's project directory. */

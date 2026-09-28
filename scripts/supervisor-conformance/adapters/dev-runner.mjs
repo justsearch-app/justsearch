@@ -158,6 +158,7 @@ const RESTART_CASES = new Set([
   'fileless-clean-local-restart-is-not-counted',
   'crash-1-restarts-under-budget',
   'oom-3-restarts-under-budget',
+  'escalated-restart',
   'hang-soft-recovered-through-the-request-file',
   'hang-hard-recovered-by-forced-kill',
   'requested-restart-is-not-counted',
@@ -249,6 +250,13 @@ export async function runCase({ testCase, policy, io }) {
       }
       if (testCase.id === 'oom-3-restarts-under-budget' && restarted.lastExit?.reason !== 'out_of_memory') {
         problems.push(`lastExit.reason ${restarted.lastExit?.reason}, expected out_of_memory`);
+      }
+      if (testCase.id === 'escalated-restart'
+          && (restarted.lastExit?.code !== 5
+            || restarted.lastExit?.reason !== 'escalated_restart'
+            || restarted.lastExit?.class !== 'TRANSIENT'
+            || restarted.lastExit?.counted !== true)) {
+        problems.push(`escalated restart did not spend the host budget: ${JSON.stringify(restarted.lastExit)}`);
       }
       // `FORCED KILL:` and not a looser match: the supervisor also NARRATES the deadline when it
       // writes the request ("...then a forced kill"), and a regex that matched both reported every

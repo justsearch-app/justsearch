@@ -52,6 +52,28 @@ final class EngineShutdownSequenceTest {
   }
 
   @Test
+  void essentialRecoveryEscalationIsOrderedAndCountedOnlyAfterCleanClose(@TempDir Path dataDir) {
+    for (boolean clean : List.of(true, false)) {
+      var code = new AtomicInteger(-1);
+      var seenReason = new ArrayList<Reason>();
+      var sequence = new EngineShutdownSequence(
+          dataDir,
+          List.of(new Step(EngineShutdownSequence.INDEX_HALF_STEP, reason -> {
+            seenReason.add(reason);
+            return "GRACEFUL";
+          })),
+          code::set,
+          preliminary -> {
+            if (!clean) throw new java.io.IOException("handoff publication failed");
+          });
+      sequence.runAndExitEscalated();
+      assertEquals(List.of(Reason.RESTART), seenReason);
+      assertEquals(clean ? EngineExit.ESCALATED_RESTART : EngineExit.FATAL_OR_UNCAUGHT,
+          code.get());
+    }
+  }
+
+  @Test
   @DisplayName("the upgrade path is idempotent and writes a nonce-bound receipt")
   void upgradeShutdownIsIdempotentAndWritesNonceBoundReceipt(@TempDir Path dataDir)
       throws Exception {

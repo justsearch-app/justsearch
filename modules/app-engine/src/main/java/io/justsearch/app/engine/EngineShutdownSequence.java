@@ -229,6 +229,20 @@ public final class EngineShutdownSequence {
   }
 
   /**
+   * Closes in restart order after essential-component recovery is exhausted. A clean close is
+   * charged to the host's transient restart budget; an unclean close retains the fatal code.
+   */
+  public void runAndExitEscalated() {
+    if (!claimExit(false)) {
+      return;
+    }
+    Result shutdown = run(Reason.RESTART);
+    int completedCode = shutdown.clean()
+        ? EngineExit.ESCALATED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
+    terminate(shutdown, selectExitCode(completedCode));
+  }
+
+  /**
    * Runs the ordered close and exits with the transient fatal code for an admitted process fault.
    *
    * <p>The fatal request and final code selection share {@link #exitAuthority} with the cooperative

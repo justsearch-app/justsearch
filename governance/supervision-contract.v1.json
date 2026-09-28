@@ -189,7 +189,8 @@
         { "code": 0, "name": "OK", "class": "REQUESTED" },
         { "code": 1, "name": "FATAL_OR_UNCAUGHT", "class": "TRANSIENT" },
         { "code": 2, "name": "DATA_DIR_LOCKED", "class": "NON_TRANSIENT" },
-        { "code": 3, "name": "OUT_OF_MEMORY", "class": "TRANSIENT" }
+        { "code": 3, "name": "OUT_OF_MEMORY", "class": "TRANSIENT" },
+        { "code": 5, "name": "ESCALATED_RESTART", "class": "TRANSIENT" }
       ],
       "unknownExitClass": "TRANSIENT",
       "exitCodesNote": "A projection of io.justsearch.app.engine.EngineExit (stage B item B1), which is the code that produces these integers. It is duplicated here rather than parsed out of Java by two non-JVM readers, and EngineSupervisionPolicyTest fails the build if the two disagree — including if EngineExit gains a constant this list does not carry. scripts/supervisor-conformance/contract.mjs re-checks the same agreement at harness start, so the harness refuses to run on drift without waiting for Gradle. unknownExitClass is TRANSIENT on purpose: a wrong retry costs one cooldown, a wrong `exhausted` costs the product.",
@@ -260,6 +261,15 @@
         }
       ],
       "conformanceCases": [
+        {
+          "id": "escalated-restart",
+          "faultMode": "clean-exit",
+          "drives": ["decision", "actuator"],
+          "engine": { "mode": "clean-exit", "exitCode": 5, "exitAfterMs": 600 },
+          "observation": { "event": "exit", "exitCode": 5, "requestedReason": null, "restartCount": 0, "state": "running" },
+          "expect": { "action": "restart", "cooldownMs": 1000, "counted": true },
+          "why": "An essential component exhausted its local recovery budget. A clean ordered Engine close still spends one host restart attempt."
+        },
         {
           "id": "fileless-clean-local-restart-is-not-counted",
           "faultMode": "clean-exit",

@@ -80,6 +80,9 @@ public final class EngineExit {
   /** A clean Engine-local restart; the host replaces it without charging the crash budget. */
   public static final int REQUESTED_RESTART = 4;
 
+  /** An essential component exhausted local recovery; the host charges the restart budget. */
+  public static final int ESCALATED_RESTART = 5;
+
   /**
    * Classifies an observed exit code.
    *
@@ -90,7 +93,7 @@ public final class EngineExit {
     return switch (code) {
       case OK, REQUESTED_RESTART -> ExitClass.REQUESTED;
       case DATA_DIR_LOCKED -> ExitClass.NON_TRANSIENT;
-      case FATAL_OR_UNCAUGHT, OUT_OF_MEMORY -> ExitClass.TRANSIENT;
+      case FATAL_OR_UNCAUGHT, OUT_OF_MEMORY, ESCALATED_RESTART -> ExitClass.TRANSIENT;
       default -> ExitClass.TRANSIENT;
     };
   }
@@ -109,6 +112,7 @@ public final class EngineExit {
       case FATAL_OR_UNCAUGHT -> "fatal_or_uncaught";
       case DATA_DIR_LOCKED -> "data_dir_locked";
       case OUT_OF_MEMORY -> "out_of_memory";
+      case ESCALATED_RESTART -> "escalated_restart";
       default -> "unknown(" + code + ")";
     };
   }

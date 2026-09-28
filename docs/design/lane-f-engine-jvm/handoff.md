@@ -7,11 +7,10 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-28)
 
-The latest runtime checkpoint with physical and hosted proof is
-`93ad053a401968b3fe6070031557ba793bd3e2e1`
-(source tree `91351561828cc87985465b17d1158b44668caf99`). PR727 remains open,
+The latest hosted-proven checkpoint is
+`ea6cc176ef85486ae949b1cfb93ac414439227d6`. PR727 remains open,
 and the worktree lifecycle hold has a 2026-10-04 review-by date.
-Exact-SHA hosted [run 36422520680](https://github.com/justsearch-app/justsearch/actions/runs/36422520680)
+Exact-SHA hosted [run 36472269250](https://github.com/justsearch-app/justsearch/actions/runs/36472269250)
 passed all 13 jobs, including system integration and wall-clock attribution.
 The earlier Batch D source tree `9161227bd9e518e61af0e966fe3b441830a0d115`
 at `66a28be6f21954fc64208ef4b172f40c3722f8ef` passed hosted
@@ -310,16 +309,33 @@ The checkpoint source now passes the default-parallel repository suite at
 at `tmp/5361`. Regen, runtime closure, store, docs, and Node syntax checks
 pass. The exact-source installed override sequence passed at `tmp/5362` and
 the ordinary query-only installer commit/reboot passed at `tmp/5363`; both
-AI tests executed and closed owned ports. Next: commit/push this Batch 5 cut
-and confirm hosted CI against its exact SHA before marking Batch 5 accepted.
+AI tests executed and closed owned ports.
+Checkpoint `ea6cc176ef85486ae949b1cfb93ac414439227d6` passed
+[exact-SHA hosted run 36472269250](https://github.com/justsearch-app/justsearch/actions/runs/36472269250)
+with all 13 jobs successful, including system integration and wall-clock
+attribution. WP3 Batch 5 is accepted for its connected query-role scope.
+D1-4 remains open for the restart-required clause and D1 closure feature
+acceptance. Continue with the interleaved D1-7 recovery route before D1-6
+retires the old worker restart route; D1-15's new vocabulary then has real
+deadline, recovery and escalation producers.
 
 The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
 `codex/lane-f-workflow-order` from `origin/main`, in its separate managed
 worktree. Pushing and opening that separate PR await the owner's explicit
 per-action authorization; this does not block Lane F.
 
-**Next, in order:** continue [WP3 Batch 5](improvements/WP3-remaining-work-plan.md), D1
-closure, D2, E, and F.
+**Next, in order:** D1-7's component recovery route and bounded escalation,
+D1-6's restart-required/legacy-route retirement, the D1-15 reason-code re-cut,
+D1-16 feature scenarios, D1-17 residue sweep and D1 closure; then D2, E, and F.
+The [D1-7 ownership decision](stages/D1.md#d1-7--start-deadlines-local-recovery-bounded-escalation)
+keeps one monitor authority and assigns recomposition to physical component
+owners. Its first local cut adds counted exit 5 and the ordered escalation
+entry point. Exact-source Java exit/sequence/register tests passed at `tmp/5368`,
+global Spotless/PMD at `tmp/5369`, and both supervisor adapters passed 18/18
+at `tmp/5364` and `tmp/5367`. The first Tauri attempt at `tmp/5365` used a
+stale embedded-register binary and failed on `unknown(5)`; rebuilding it at
+`tmp/5366` made the exact case pass. The component monitor, route, physical
+retry, and installed stuck-index acceptance are still open.
 Root owns the single Gradle build and dev-stack lease. Full-suite gates run with
 default parallelism; use `--max-workers=1` only for a diagnosed contention rerun.
 Leave the unrelated untracked `modules/app-inference/logs/` directory alone.
