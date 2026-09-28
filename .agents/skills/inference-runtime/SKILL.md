@@ -295,6 +295,26 @@ Settled empirical facts. Each was an open question that got answered.
   propagation of an admitted caller's absolute deadline. The affected encoder class and
   extraction sandbox class passed focused at `tmp/5121-native-failures-focused.txt`.
 
+### F-021: bounded-tokenize grouping is shared and tested without a large inference corpus
+
+- **Finding (2026-09-28):** the former embedding grouping test processed about 234 texts
+  through FP32 CPU embedding to test ordering and took 129 s in the pre-change serial
+  suite. A local gte-multilingual-base probe (4×512-token batch, i7-12700K with 12
+  physical cores) measured 10.3 cores and 938 ms per run with default ORT intra-op;
+  a four-thread cap measured 3.6 cores and 2207 ms per run. The cap lowered CPU use
+  but increased latency and did not materially improve concurrent throughput.
+- **Correction:** `BoundedTokenizeGroups` now owns the common contiguous-range algorithm and
+  character budget used by embedding, SPLADE and NER. Pure grouping tests cover boundaries;
+  small real-model parity tests retain numerical coverage. The default policy was not changed
+  to impose a thread cap. Pre-change serial full-suite JUnit XML summed worker-core class
+  times to 186 s. After Batch V, the embedding class took 20.9 s and worker-core's sum of
+  class times was 82 s in the default-parallel suite at
+  `tmp/5148-batch-v-full-junit-times.txt`. A later stress-enabled suite recorded 20.2 s
+  and 78 s respectively at
+  `tmp/5174-batch-c-full-stress-times.txt`. These are local timings, not a CPU-capacity
+  guarantee across hosts. The Batch V source passed exact-SHA hosted CI on
+  `af19d1e6269d735c1e31b705c25e7cc8bb822a44` in run 36359252711.
+
 ## Decisions
 
 Design choices in the current inference runtime, with rationale.

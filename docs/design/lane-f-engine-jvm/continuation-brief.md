@@ -1,20 +1,23 @@
 # Lane F continuation brief
 
-Updated 2026-09-27 after the agent handoff. Start with the
+Updated 2026-09-28 after Batch C. Start with the
 [2026-09-26 takeover](takeover-2026-09-26.md); this brief owns ordering,
-[handoff](handoff.md) owns the evidence ledger, and
+[handoff](handoff.md) owns the current queue, and
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
 
 **Current queue:** use the [handoff current state](handoff.md#current-state-2026-09-28).
-The owner-approved cache cleanup and device-memory rule are implemented; D1-18 has
-exact-SHA hosted proof on `5776bd2008b454fb84fa38b3e8da1dcc8f31ab3a`, with acceptance recorded in
-[D1-18](stages/D1.md#d1-18--live-migration-start-added-2026-09-27-owner-decision).
-D1-14's connected live UI check and final local gates passed; exact-SHA hosted
-[run 36356190918](https://github.com/justsearch-app/justsearch/actions/runs/36356190918)
-passed every job on `2af145b4899937b728ed047f94286a8642b67a80`.
-Continue original WP3 batches 4/5. D2, E and F remain binding. The dated
-records below are evidence history, not a current action queue.
+Batch C is pushed as commit `8fdc9da57c64238c810e5a9a3f0f377ede1e4d73`
+with tested source tree `e1aaefc5e133632d4c0a1bf1651996b139cbf21d`.
+[D1-14](stages/D1.md#d1-14--beside-or-in-place-the-device-line-the-floor-override-and-a-recomposed-on-refusal)
+owns its exact local proof: mutation checks `tmp/5155`, `tmp/5167`, and
+`tmp/5168`; parallel stress suite `tmp/5173` plus final all-up-to-date
+confirmation `tmp/5179`; builds `tmp/5175` and `tmp/5180`; and installed
+BESIDE/IN_PLACE status, trace, and UI evidence `tmp/5181`. Exact-SHA hosted
+[run 36363228657](https://github.com/justsearch-app/justsearch/actions/runs/36363228657)
+passed all 13 jobs on that commit, including advisory system integration.
+Continue original WP3 batches 4/5; D2, E, and F remain binding.
+The dated records below are evidence history, not a current action queue.
 
 **Current 2026-09-27 cut:** Exact-SHA CI on `3d66c74c9` passed every job in
 [run 36299571929](https://github.com/justsearch-app/justsearch/actions/runs/36299571929).
@@ -67,9 +70,11 @@ that class passed serially at `tmp/4014` and the full 743-test adapter suite
 passed at `tmp/4015`. A fresh installed real-model gap/approval
 round passed at `tmp/4016` (A and B VECTOR hits, recovered semantic
 service, one JUnit test with zero failures/skips, clean owned-stack stop).
-Hosted proof remains pending; the handoff has exact counts and retained XML.
-The owner-set D1-14 wall-clock/fraction bound,
-full Worker Flow B and remaining D1/D2/E/F acceptance remain open. See
+Hosted proof for that source was pending at the checkpoint; the handoff has exact
+counts and retained XML.
+The 2026-09-27 owner decision superseded the earlier numeric D1-14 bound with
+structural endpoint proof plus reported duration/fraction, build units and document
+count; full Worker Flow B and remaining D1/D2/E/F acceptance remain open. See
 [handoff](handoff.md) and [D1](stages/D1.md) for exact counts and limits.
 
 **2026-09-26 resumption:** Hosted CI on exact PR head `67890842f` passed all
@@ -245,8 +250,8 @@ restart. The corrected fresh run at `tmp/3975`–`tmp/3976` passed with
 62,868 ms dispatch-to-A-restoration, a sampled 28,380 ms reload refusal
 window (45.14%), 106 reload refusals, 43 available responses, 30 startup
 503s, 12 transport interruptions and zero unexplained responses. This is
-refusal-branch measurement; the full transition and a predeclared product
-bound are still required for D1-14 acceptance.
+refusal-branch measurement; the full transition and structural endpoint proof
+are still required for D1-14 acceptance.
 The common sampler also passed approved-gap promotion at
 `tmp/3977`–`tmp/3978`: 27,608 ms reload window in 62,207 ms
 (44.38%), zero unexplained responses, and B vector service after
@@ -254,7 +259,8 @@ acceptance. The deliberately failed A recompose is a separate
 `UNAVAILABLE` branch, so it does not run the reload sampler;
 `tmp/3979`–`tmp/3980` passed both refusal reasons, one recovery
 attempt, later A vector service and durable cancellation. The
-owner-set duration/fraction bound has been requested and remains open.
+later 2026-09-27 owner decision superseded the earlier numeric bound; these runs
+report duration and fraction but do not close the structural endpoint proof.
 
 **Current D1-9 source-set checkpoint (2026-09-25):** The affected
 Worker/Engine suites and full compile passed on the preceding no-file replay
@@ -488,13 +494,17 @@ Read AGENTS.md, docs/llms.txt and the relevant canonical owners/skills. Verify
 worktree, branch, status and current HEAD. Run world-state and official
 quick_health before selecting shared resources; the last check was ABSENT with
 no foreign run or inference orphan. That observation must be refreshed.
-The worktree is held through2026-09-29; retain it while the lane remains active.
+The handoff owns the current worktree hold; retain it while the lane remains active.
 Verification run2466 was the next unused number at handoff; check retained tmp
 artifacts before assigning it.
 
 Root owns integration, all Gradle runs, stack lifecycle, settings/publication
 authority, and changes crossing lifecycle owners. Only one build and one shared
-stack may run. Freeze compiled sources during a build. If delegating, assign one
+stack may run. Full-suite gates use default parallelism; `--max-workers=1` is
+reserved for diagnosed contention. The 2026-09-28 owner briefing starts a
+refute-first review of the frozen slice alongside the integrated gate, while
+acceptance still requires matching reviewed and tested source-tree hashes.
+Freeze compiled sources during a build. If delegating, assign one
 writer per file and a stable deliverable with proof; read-only exploration/review
 can proceed independently. Check module access and actual owner identity before
 dispatching an implementation task. Unsettled ownership returns to root.

@@ -2,113 +2,49 @@
 
 Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 [continuation brief](continuation-brief.md) for ordering. This handoff owns
-current evidence; the brief does not narrow the remaining lane scope.
+the current queue, revision, lease, and blocking decisions; D1 owns design and
+acceptance evidence. The brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-28)
 
-Branch `codex/lane-f-pr1` in this dedicated worktree is at the pushed D1-14 semantic-notice
-checkpoint `2af145b4899937b728ed047f94286a8642b67a80`; exact-SHA hosted
-[run 36356190918](https://github.com/justsearch-app/justsearch/actions/runs/36356190918)
-passed all 13 jobs. The preceding D1-18 checkpoint `5776bd2008b454fb84fa38b3e8da1dcc8f31ab3a`
-passed [run 36340854808](https://github.com/justsearch-app/justsearch/actions/runs/36340854808).
-PR727 remains open; do not merge before Stage F acceptance.
+Branch `codex/lane-f-pr1` is at pushed Batch C commit
+`8fdc9da57c64238c810e5a9a3f0f377ede1e4d73`, whose source tree is
+`e1aaefc5e133632d4c0a1bf1651996b139cbf21d`. PR727 remains open and the
+worktree lifecycle hold has a 2026-10-04 review-by date. Exact-SHA hosted CI
+[run 36363228657](https://github.com/justsearch-app/justsearch/actions/runs/36363228657)
+passed all 13 jobs on that commit, including the advisory system-integration
+job's integration tier, attribution, and artifact-upload steps. Do not merge
+before Stage F acceptance.
 
-D1-14's semantic-pause notice is implemented in the pushed checkpoint. The installed
-BESIDE/IN_PLACE pair passed at `tmp/5106`. The connected Lit Search capture during an
-installed IN_PLACE held cut passed at `tmp/5111-d1-14-connected-ui.txt`, with raw held status,
-screenshot and measure under `tmp/lane-f-takeover/lifecycle-accepted-write-49884f51-fbd6-4913-b6b0-eef81691fbf8/`.
-That run showed `index.embedding_rebuilding`, the visible notice, 128 vector refusals
-over 35.6 s, hybrid 224/224 available, vector recovery, no API outage or Engine restart,
-and owned stop. Its registered UI helper was reaped by the session sweep. The D1-14 section
-holds the implementation and evidence details.
+Batch C's exact local proof is recorded in
+[D1-14](stages/D1.md#d1-14--beside-or-in-place-the-device-line-the-floor-override-and-a-recomposed-on-refusal):
+mutation regressions `tmp/5155`, `tmp/5167`, and `tmp/5168`; the parallel
+stress-enabled suite `tmp/5173`; the final all-up-to-date suite confirmation
+`tmp/5179`; builds `tmp/5175` and `tmp/5180`; and the final installed
+BESIDE/IN_PLACE status, trace, and connected UI proof at `tmp/5181`.
+The raw held-cut trace and screenshot are under
+`tmp/lane-f-takeover/lifecycle-accepted-write-c5b7dc8d-a614-4fcd-8f45-512f75968556/`.
 
-**Next, in order:** continue the original
-[WP3 batches 4/5](improvements/WP3-remaining-work-plan.md), then D2, E and F.
-The independent review's registry race is corrected locally with one settings-plus-encoder
-precommit batch; focused tests and static checks pass at `tmp/5128` and `tmp/5129`.
-The first revision-current installed pair at `tmp/5133` failed at the installer seed: the
-operation runner's projection wrapper omitted the new component-observation callback. Its
-delegation is fixed and the same pair passes at `tmp/5135`, including connected Search UI
-evidence. The prior full stress suite passed at `tmp/5131`, before that final wrapper fix;
-the revision-current serial full suite passed at `tmp/5136`, static gate at `tmp/5137`,
-and `build -x test` at `tmp/5138`. The final source passed all 13 hosted jobs in
-run `36356190918`. This closes the semantic-notice slice, not the rest of D1-14.
-Leave the unrelated untracked `modules/app-inference/logs/` directory alone. Root owns the
-single shared Gradle build and dev-stack lease.
+**Next, in order:** continue
+[WP3 batches 4/5](improvements/WP3-remaining-work-plan.md), then D2, E, and F.
+Root owns the single Gradle build and dev-stack lease. Full-suite gates run with
+default parallelism; use `--max-workers=1` only for a diagnosed contention rerun.
+Leave the unrelated untracked `modules/app-inference/logs/` directory alone.
+The WP10 session-start sweep at `tmp/5183-batch-d-agent-spawn-sweep.txt` retained
+both lapsed `ui-shot` registrations (PIDs 31236 and 28528) as owner-unknown
+contention and reported the ownerless `otlp-sink`; no process was reaped.
 
-## Prior resumption state (historical)
+**Process improvement queue:** verification orchestration remains a root-owned
+systemic friction item. Batch V's default-parallel full suite took 8m57s at
+`tmp/5147`, versus 36m29s for the preceding serial suite at `tmp/5136`. At the
+next WP3 batch 4/5 integrated boundary, root should keep the one-build rule,
+run the full suite with default parallelism, preserve its XML and wall time, and
+reserve a serial rerun for diagnosed contention.
 
-History up to this point was moved verbatim to
-[handoff-history-2026-09-22-to-27.md](handoff-history-2026-09-22-to-27.md). This section is the
-resumption queue. Owner decisions for handover items 01–03 are recorded in D1-14 and D1-18.
-
-- **Landed in this checkpoint** (evidence under D1-14):
-  - The D1-14 device rule, with the `REFUSED` mode and the schema, TS and canonical-contract updates.
-  - The structural in-place sampler, with the outage, hybrid and window checks.
-  - The fixture reason assertion updated to the new decision.
-  - The `BatchUpdateIntegrationTest` outer guard raised to 300 s (per-iteration hang bound unchanged).
-  - Both AI lifecycle in-place scenarios pass installed.
-- **Disk:** regenerable ONNX Runtime caches were deleted with owner approval (F: freed from 92 MB to
-  about 233 GB), and fixtures now prune their own caches after an owned stop. Do not prune whole run
-  directories: the raw-evidence inventories hash them through Lane F acceptance.
-- **Next, in order:**
-  1. Continue D1-18 from its revised design and partial live implementation. Exact-SHA
-     `2020039e8fc5c689f5dbe16734d3c44a97857576` hosted
-     [run 36315852135](https://github.com/justsearch-app/justsearch/actions/runs/36315852135)
-     passed all 13 jobs. The live-start checkpoint `f93af69f8` was pushed to PR727; its
-     [run 36329542381](https://github.com/justsearch-app/justsearch/actions/runs/36329542381)
-     exposed a dead three-argument `bindBulkProducer` overload in the app-ui architecture gate.
-     The correction `830c143dc` removed it. Its exact-SHA
-     [run 36330537827](https://github.com/justsearch-app/justsearch/actions/runs/36330537827)
-     exposed an obsolete recorded-start `restartWorker=true` assertion in app-services. The
-     assertion is inverted in `9cf8e3b12`. Its exact-SHA
-     [run 36331292874](https://github.com/justsearch-app/justsearch/actions/runs/36331292874)
-     passed the build and unit lanes but the advisory system-integration job failed its
-     `bulk-partial-capture` restart fixture. GitHub marked the workflow successful despite that
-     red job. Checkpoint `865c33a0d` corrected that fixture and proved installed BESIDE;
-     exact-SHA [run 36334076303](https://github.com/justsearch-app/justsearch/actions/runs/36334076303)
-     passed all jobs. Three new live-start boundary scenarios pass installed at `tmp/5083`.
-     Checkpoint `a0c00e4a3` passed exact-SHA
-     [run 36337610338](https://github.com/justsearch-app/justsearch/actions/runs/36337610338)
-     across every job. Independent review found the app-engine no-restart tests could finish
-     before asynchronous Green preparation and pass for the wrong reason. The repaired tests
-     await physical Green ownership and the live starter's terminal completion; focused
-     `tmp/5096` passed. Complete the corrected revision's remaining gates and push for a new
-     exact-SHA hosted run.
-  2. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
-     `index.dense_unavailable`, but the provisional "rebuilding" verdict takes precedence; observe
-     before changing UI.
-  3. The original WP3 batch 4/5 queue, followed by D2, E and F.
-- **D1-18 partial local evidence:** `tmp/5040` installed recorded Flow A opened and promoted Green
-  with 67 API samples and zero outage. `tmp/5045` installed distinct-model in-place A→B passed
-  143 semantic samples with zero Worker-starting/transport/outage, B vector recovery, and `STOP 0`.
-  `tmp/5053` passed the unrecorded `core.reindex` physical A-search/Green-ingest and post-promotion
-  document test without a migration-start restart. `tmp/5054` passed the unrecorded migration
-  lifecycle class, Worker restart-response contract, PMD, and Spotless; `tmp/5056` passed integrated
-  `build -x test`. The dead-overload correction passes `RecordedBulkIngestionCoordinatorTest` and
-  `UnreferencedCodeTest` together at `tmp/5060`. The app-services projection correction passes
-  `MigrationOutcomeProjectionTest` and Spotless at `tmp/5064`. The first in-place attempts
-  failed due an obsolete indexing-jobs serving lease; `tmp/5044` traced its origin, and D1-18
-  records the deferred-upgrade retirement notification fix. The hosted integration artifact for
-  `36331292874` showed that partial-capture recovery booted FENCED, then used the designed free
-  restart fallback (three incarnations and three operation attempts). The corrected fixture passed
-  installed at `tmp/5069` with exact queue ACK and `STOP 0`. Installed BESIDE A→B passed at
-  `tmp/5072`: unchanged Engine identity/restart count, 151/151 vector and hybrid samples available,
-  zero refusal/transport/outage, B promotion, and owned `STOP 0`. The two live-start kill cuts
-  and forced-refusal fallback pass installed together at `tmp/5083`, including exact resumed-
-  BUILDING boot evidence, queue ACK, promoted search and `STOP 0`. The accepted-write fixture's
-  stale restart assumption has been inverted and its installed in-place variant passes at
-  `tmp/5089` with an A-visible accepted write, B promotion and zero restarts. Old app-engine
-  restart-fixture waits were inverted and its class passes at `tmp/5086`; the full app-engine
-  suite exposed one early-model-readiness assertion, corrected and focused green at `tmp/5088`.
-  Exact-SHA hosted CI for `a0c00e4a3` passed every job. The full affected suites at `tmp/5091`
-  and integrated `build -x test` at `tmp/5094` passed before the completion-future repair.
-  Focused terminal-outcome tests pass at `tmp/5096`, and integrated `build -x test` passes at
-  `tmp/5097`; final-revision full `test` passes at `tmp/5098`. Independent review found no
-  remaining actionable completion-future defect. The final-revision system-tests lifecycle
-  class passes at `tmp/5099`, including both kill cuts and the forced refusal fallback;
-  new exact-SHA hosted proof remains pending.
-- **D1-18 next:** checkpoint/push, then check every hosted job by exact SHA.
+**2026-09-28 owner briefing override:** for concurrency, lifecycle, or ownership
+changes, start the independent refute-first review of the frozen slice alongside
+the integrated gate. Acceptance still requires the reviewed snapshot and tested
+snapshot to have the same source-tree hash; review changes supersede that gate.
 
 ## Selected design and remaining implementation/proof
 
@@ -525,7 +461,10 @@ A/B publication remain open D1 blockers.
 Start with the acceptance path, then reuse actual owners. Delegate bounded files
 and deliverables; consolidate review and reassess after two substantive rounds.
 Root owns shared state, stack and Gradle. Freeze compiled sources before a build.
-Run focused checks while correcting and integrated checks at coherent boundaries;
+Run focused checks while correcting and integrated checks at coherent boundaries.
+Full suites use default parallelism; `--max-workers=1` is a diagnosed-contention
+rerun only. The 2026-09-28 owner briefing allows frozen-slice review to start
+alongside the integrated gate, but reviewed and tested source-tree hashes must match;
 collect independent static failures using `spotlessCheck pmdAll --continue`.
 Workflow correction `b4d01c1cc` already records this in canonical guidance and both
 CI-triage skills; no extra always-loaded policy copy is needed.

@@ -3,6 +3,83 @@
 Moved verbatim from `handoff.md` on 2026-09-27 (handover item 05). This is dated
 background, not a resumption queue; current state lives in [handoff.md](handoff.md).
 
+The following 2026-09-27 resumption block was moved verbatim from `handoff.md`
+on 2026-09-28; its action statements remain historical.
+
+## Prior resumption state (historical)
+
+History up to this point was moved verbatim to
+[handoff-history-2026-09-22-to-27.md](handoff-history-2026-09-22-to-27.md). This section is the
+resumption queue. Owner decisions for handover items 01–03 are recorded in D1-14 and D1-18.
+
+- **Landed in this checkpoint** (evidence under D1-14):
+  - The D1-14 device rule, with the `REFUSED` mode and the schema, TS and canonical-contract updates.
+  - The structural in-place sampler, with the outage, hybrid and window checks.
+  - The fixture reason assertion updated to the new decision.
+  - The `BatchUpdateIntegrationTest` outer guard raised to 300 s (per-iteration hang bound unchanged).
+  - Both AI lifecycle in-place scenarios pass installed.
+- **Disk:** regenerable ONNX Runtime caches were deleted with owner approval (F: freed from 92 MB to
+  about 233 GB), and fixtures now prune their own caches after an owned stop. Do not prune whole run
+  directories: the raw-evidence inventories hash them through Lane F acceptance.
+- **Next, in order:**
+  1. Continue D1-18 from its revised design and partial live implementation. Exact-SHA
+     `2020039e8fc5c689f5dbe16734d3c44a97857576` hosted
+     [run 36315852135](https://github.com/justsearch-app/justsearch/actions/runs/36315852135)
+     passed all 13 jobs. The live-start checkpoint `f93af69f8` was pushed to PR727; its
+     [run 36329542381](https://github.com/justsearch-app/justsearch/actions/runs/36329542381)
+     exposed a dead three-argument `bindBulkProducer` overload in the app-ui architecture gate.
+     The correction `830c143dc` removed it. Its exact-SHA
+     [run 36330537827](https://github.com/justsearch-app/justsearch/actions/runs/36330537827)
+     exposed an obsolete recorded-start `restartWorker=true` assertion in app-services. The
+     assertion is inverted in `9cf8e3b12`. Its exact-SHA
+     [run 36331292874](https://github.com/justsearch-app/justsearch/actions/runs/36331292874)
+     passed the build and unit lanes but the advisory system-integration job failed its
+     `bulk-partial-capture` restart fixture. GitHub marked the workflow successful despite that
+     red job. Checkpoint `865c33a0d` corrected that fixture and proved installed BESIDE;
+     exact-SHA [run 36334076303](https://github.com/justsearch-app/justsearch/actions/runs/36334076303)
+     passed all jobs. Three new live-start boundary scenarios pass installed at `tmp/5083`.
+     Checkpoint `a0c00e4a3` passed exact-SHA
+     [run 36337610338](https://github.com/justsearch-app/justsearch/actions/runs/36337610338)
+     across every job. Independent review found the app-engine no-restart tests could finish
+     before asynchronous Green preparation and pass for the wrong reason. The repaired tests
+     await physical Green ownership and the live starter's terminal completion; focused
+     `tmp/5096` passed. Complete the corrected revision's remaining gates and push for a new
+     exact-SHA hosted run.
+  2. The live UI check of the semantic-paused notice (D1-14). The backend likely emits
+     `index.dense_unavailable`, but the provisional "rebuilding" verdict takes precedence; observe
+     before changing UI.
+  3. The original WP3 batch 4/5 queue, followed by D2, E and F.
+- **D1-18 partial local evidence:** `tmp/5040` installed recorded Flow A opened and promoted Green
+  with 67 API samples and zero outage. `tmp/5045` installed distinct-model in-place A→B passed
+  143 semantic samples with zero Worker-starting/transport/outage, B vector recovery, and `STOP 0`.
+  `tmp/5053` passed the unrecorded `core.reindex` physical A-search/Green-ingest and post-promotion
+  document test without a migration-start restart. `tmp/5054` passed the unrecorded migration
+  lifecycle class, Worker restart-response contract, PMD, and Spotless; `tmp/5056` passed integrated
+  `build -x test`. The dead-overload correction passes `RecordedBulkIngestionCoordinatorTest` and
+  `UnreferencedCodeTest` together at `tmp/5060`. The app-services projection correction passes
+  `MigrationOutcomeProjectionTest` and Spotless at `tmp/5064`. The first in-place attempts
+  failed due an obsolete indexing-jobs serving lease; `tmp/5044` traced its origin, and D1-18
+  records the deferred-upgrade retirement notification fix. The hosted integration artifact for
+  `36331292874` showed that partial-capture recovery booted FENCED, then used the designed free
+  restart fallback (three incarnations and three operation attempts). The corrected fixture passed
+  installed at `tmp/5069` with exact queue ACK and `STOP 0`. Installed BESIDE A→B passed at
+  `tmp/5072`: unchanged Engine identity/restart count, 151/151 vector and hybrid samples available,
+  zero refusal/transport/outage, B promotion, and owned `STOP 0`. The two live-start kill cuts
+  and forced-refusal fallback pass installed together at `tmp/5083`, including exact resumed-
+  BUILDING boot evidence, queue ACK, promoted search and `STOP 0`. The accepted-write fixture's
+  stale restart assumption has been inverted and its installed in-place variant passes at
+  `tmp/5089` with an A-visible accepted write, B promotion and zero restarts. Old app-engine
+  restart-fixture waits were inverted and its class passes at `tmp/5086`; the full app-engine
+  suite exposed one early-model-readiness assertion, corrected and focused green at `tmp/5088`.
+  Exact-SHA hosted CI for `a0c00e4a3` passed every job. The full affected suites at `tmp/5091`
+  and integrated `build -x test` at `tmp/5094` passed before the completion-future repair.
+  Focused terminal-outcome tests pass at `tmp/5096`, and integrated `build -x test` passes at
+  `tmp/5097`; final-revision full `test` passes at `tmp/5098`. Independent review found no
+  remaining actionable completion-future defect. The final-revision system-tests lifecycle
+  class passes at `tmp/5099`, including both kill cuts and the forced refusal fallback;
+  new exact-SHA hosted proof remains pending.
+- **D1-18 next:** checkpoint/push, then check every hosted job by exact SHA.
+
 **2026-09-27 handover implementation checkpoint (hosted proof pending).**
 The owner's decisions are: one-time deletion of only regenerable ONNX caches
 after a dry run and process check; remove migration-start restart in D1; pause
