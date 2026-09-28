@@ -23,6 +23,30 @@ class KnowledgeServerComponentObservationTest {
   @TempDir Path dir;
 
   @Test
+  void startupProgressCannotReviveAnExpiredPhysicalOpen() throws Exception {
+    var config = mock(io.justsearch.indexerworker.WorkerConfig.class);
+    when(config.dataDir()).thenReturn(dir);
+    try (var executors = new TestEngineExecutors();
+        var components = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
+      var index = components.handle("index");
+      var server = new KnowledgeServer(executors, config, null,
+          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), index, null);
+      try {
+        index.transition(ComponentState.STARTING, "worker.starting", "initial open");
+        server.recordIndexStartupWait("index root lock");
+        org.junit.jupiter.api.Assertions.assertEquals("index root lock", index.snapshot().evidence());
+        index.transition(ComponentState.FAILED, "worker.spawn.failed", "deadline: index root lock");
+        var expired = index.snapshot();
+        server.recordIndexStartupWait("Lucene generation");
+        org.junit.jupiter.api.Assertions.assertEquals(expired, index.snapshot(),
+            "an intermediate startup milestone is not proof of restored readiness");
+      } finally {
+        server.close();
+      }
+    }
+  }
+
+  @Test
   void completeCompositionRequiresAvailableWiredService() throws Exception {
     observe(Set.of(EncoderRole.EMBEDDING), Set.of(), true, true,
         ComponentState.READY, null, true);

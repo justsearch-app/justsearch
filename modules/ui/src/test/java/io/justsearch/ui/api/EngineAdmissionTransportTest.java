@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 
 import io.javalin.Javalin;
 import io.justsearch.app.engine.EngineAdmissionController;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.ui.api.mcp.McpProtocolHandler;
 import io.justsearch.ui.api.mcp.McpToolSurface;
 import java.net.URI;
@@ -204,31 +205,51 @@ final class EngineAdmissionTransportTest {
 
   @Test
   void manualRecoveryCapacityReachesInstalledHttpExceptionMapping() throws Exception {
+    var registry = org.mockito.Mockito.spy(new io.justsearch.app.engine.DefaultEngineExecutorRegistry());
+    org.mockito.Mockito.doReturn(new io.justsearch.core.execution.EngineExecutorRegistry.Limits(1, 4))
+        .when(registry).limits(io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+    var bootstrap = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+    org.mockito.Mockito.when(bootstrap.workerCapability())
+        .thenReturn(io.justsearch.app.services.bootstrap.CapabilityGraph.unavailable().worker());
+    var components = TestEngineComponents.fourComponents();
+    org.mockito.Mockito.when(bootstrap.indexComponent()).thenReturn(components.handle("index"));
+    var attempted = new CountDownLatch(1);
+    var attemptFinished = new CountDownLatch(1);
+    org.mockito.Mockito.doAnswer(invocation -> {
+      attempted.countDown();
+      try {
+        return false;
+      } finally {
+        attemptFinished.countDown();
+      }
+    }).when(bootstrap).startForRecovery();
     try (var fixture = new Fixture(2, 8);
-        var registry = org.mockito.Mockito.spy(new io.justsearch.app.engine.DefaultEngineExecutorRegistry())) {
-      var scheduler = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledExecutorService>();
-      org.mockito.Mockito.doAnswer(invocation -> {
-        var owner = (io.justsearch.core.execution.EngineExecutorRegistry.Registration) invocation.callRealMethod();
-        var observed = org.mockito.Mockito.spy(owner);
-        org.mockito.Mockito.doAnswer(open -> {
-          var executor = owner.openScheduled(open.getArgument(0));
-          scheduler.set(executor);
-          return executor;
-        }).when(observed).openScheduled(org.mockito.ArgumentMatchers.any());
-        org.mockito.Mockito.doAnswer(close -> { owner.close(); return null; }).when(observed).close();
-        return observed;
-      }).when(registry).register(org.mockito.ArgumentMatchers.any());
-      var bootstrap = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
-      org.mockito.Mockito.when(bootstrap.workerCapability())
-          .thenReturn(io.justsearch.app.services.bootstrap.CapabilityGraph.unavailable().worker());
-      try (var monitor = new io.justsearch.app.services.worker.KnowledgeServerHealthMonitor(
-          registry, bootstrap, 60_000)) {
-        monitor.start();
-        int capacity = registry.limits(io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND).maxQueue();
-        for (int i = 1; i < capacity; i++) {
-          var _ = scheduler.get().schedule(() -> {}, 1, TimeUnit.DAYS);
+        components;
+        registry;
+        var monitor = new io.justsearch.app.services.worker.KnowledgeServerHealthMonitor(
+            registry, bootstrap, 60_000)) {
+      var field = io.justsearch.app.services.worker.KnowledgeServerHealthMonitor.class
+          .getDeclaredField("recoveryExecutor");
+      field.setAccessible(true);
+      var recovery = (java.util.concurrent.ExecutorService) field.get(monitor);
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      var held = recovery.submit(() -> {
+        entered.countDown();
+        if (!release.await(5, TimeUnit.SECONDS)) {
+          throw new AssertionError("test did not release recovery queue");
         }
-        assertEquals(capacity, registry.snapshot().timerRegistrations());
+        return null;
+      });
+      var queued = new ArrayList<java.util.concurrent.Future<?>>();
+      try {
+        assertTrue(entered.await(2, TimeUnit.SECONDS));
+        int capacity = registry.limits(
+            io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND).maxQueue();
+        for (int i = 0; i < capacity; i++) {
+          queued.add(recovery.submit(() -> {}));
+        }
+        assertEquals(4, capacity);
         var handlers = new InferenceHandlers(mock(io.justsearch.app.api.OnlineAiService.class),
             null, mock(io.justsearch.gpu.GpuCapabilitiesService.class),
             mock(io.justsearch.app.api.EnterprisePolicyService.class),
@@ -240,11 +261,20 @@ final class EngineAdmissionTransportTest {
             .timeout(Duration.ofSeconds(5)).POST(HttpRequest.BodyPublishers.ofString("{}")).build();
         var response = fixture.client.send(request, HttpResponse.BodyHandlers.ofString());
         assertEquals(429, response.statusCode(), response.body());
-        assertEquals(String.valueOf(registry.retryAfterSeconds()), response.headers().firstValue("Retry-After").orElseThrow());
+        assertEquals(String.valueOf(registry.retryAfterSeconds()),
+            response.headers().firstValue("Retry-After").orElseThrow());
         var body = JsonMapper.builder().build().readTree(response.body());
         assertEquals("ADMISSION_ENGINE_LIMIT", body.get("errorCode").asText());
         assertFalse(body.get("retrySafe").asBoolean(), "handler entered before refusal");
+      } finally {
+        release.countDown();
+        held.get(2, TimeUnit.SECONDS);
+        for (var task : queued) task.get(2, TimeUnit.SECONDS);
       }
+      assertEquals(io.justsearch.app.services.worker.WorkerRecoveryAuthority.Verdict.ACCEPTED,
+          monitor.requestRecoveryNow(), "failed handoff must release attempt slot");
+      assertTrue(attempted.await(2, TimeUnit.SECONDS));
+      assertTrue(attemptFinished.await(2, TimeUnit.SECONDS));
     }
   }
 

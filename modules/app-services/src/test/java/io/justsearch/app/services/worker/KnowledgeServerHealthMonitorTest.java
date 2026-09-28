@@ -49,12 +49,9 @@ final class KnowledgeServerHealthMonitorTest {
       when(bootstrap.hasClient()).thenReturn(true);
       var enteredClose = new CountDownLatch(1);
       var releaseClose = new CountDownLatch(1);
-      when(bootstrap.closeForUpgrade()).thenAnswer(ignored -> {
+      when(bootstrap.recomposeForRecovery(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> {
         enteredClose.countDown();
         assertTrue(releaseClose.await(5, TimeUnit.SECONDS));
-        return ShutdownOutcome.GRACEFUL;
-      });
-      when(bootstrap.startForRecovery()).thenAnswer(ignored -> {
         index.transition(ComponentState.READY, null, "same configuration serving");
         return true;
       });
@@ -71,11 +68,48 @@ final class KnowledgeServerHealthMonitorTest {
         assertTrue(handedOver.await(5, TimeUnit.SECONDS));
         assertEquals(ComponentState.READY, index.snapshot().state());
         assertEquals(1, index.snapshot().recoveryAttempts());
-        verify(bootstrap, times(1)).closeForUpgrade();
-        verify(bootstrap, times(1)).startForRecovery();
+        verify(bootstrap, times(1)).recomposeForRecovery(org.mockito.ArgumentMatchers.any());
       } finally {
         releaseClose.countDown();
       }
+    }
+  }
+
+  @Test
+  void boundRecoveryCountPreservesTheRetainedFatalRemedy() throws Exception {
+    try (var components = TestEngineComponents.fourComponents()) {
+      var index = new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(
+          components.handle("index"));
+      String remedy = "index.schema_mismatch.policy requires operator repair";
+      index.transition(ComponentState.FAILED,
+          LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH.code(), remedy);
+      var bootstrap = mock(KnowledgeServerBootstrap.class);
+      when(bootstrap.indexComponent()).thenReturn(index);
+      when(bootstrap.hasClient()).thenReturn(true);
+      when(bootstrap.indexFatalCode()).thenReturn(LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH);
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      when(bootstrap.recomposeForRecovery(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> {
+        entered.countDown();
+        assertTrue(release.await(5, TimeUnit.SECONDS));
+        return false;
+      });
+      try (var monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap)) {
+        monitor.componentRegistry(components);
+        try {
+          assertEquals(ComponentRecoveryAuthority.Outcome.ACCEPTED,
+              monitor.requestComponentRecovery("index"));
+          assertTrue(entered.await(5, TimeUnit.SECONDS));
+          assertEquals(1, index.snapshot().recoveryAttempts());
+          assertEquals(ComponentState.STARTING, index.snapshot().state());
+          assertEquals(LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH.code(),
+              index.snapshot().reasonCode());
+          assertEquals(remedy, index.snapshot().evidence());
+        } finally {
+          release.countDown();
+        }
+      }
+      verify(bootstrap).recomposeForRecovery(org.mockito.ArgumentMatchers.any());
     }
   }
 
@@ -106,15 +140,66 @@ final class KnowledgeServerHealthMonitorTest {
         assertEquals(ComponentState.READY, api.snapshot().state());
         assertFalse(unfinishedStart.isDone());
         assertEquals(1, reconciles.get(), "the pending owner must not skip readiness reconciliation");
-        verify(bootstrap, never()).checkHealth();
+        verify(bootstrap, never()).tryCheckHealth();
 
         unfinishedStart.complete(null);
         when(bootstrap.hasClient()).thenReturn(true);
-        when(bootstrap.checkHealth()).thenReturn(true);
+        when(bootstrap.tryCheckHealth()).thenReturn(java.util.Optional.of(true));
         monitor.tick();
         monitor.tick();
         assertEquals(1, handovers.get(), "late initial success has one handover");
+        monitor.close(); // Drain any incorrectly queued replacement before verifying.
+        verify(bootstrap, never()).recomposeForRecovery(org.mockito.ArgumentMatchers.any());
+        verify(bootstrap, never()).closeForUpgrade();
+        verify(bootstrap, never()).startForRecovery();
       }
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void manualRecoveryCannotReplaceInitialOwnerBeforeItsHandover(boolean startCompleted) throws Exception {
+    try (var components = TestEngineComponents.fourComponents()) {
+      var index = components.handle("index");
+      index.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+          "initial deadline elapsed");
+      var bootstrap = mock(KnowledgeServerBootstrap.class);
+      when(bootstrap.indexComponent()).thenReturn(index);
+      when(bootstrap.hasClient()).thenReturn(true);
+      var initialStart = new CompletableFuture<Void>();
+      if (startCompleted) initialStart.complete(null);
+      try (var monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap)) {
+        monitor.componentRegistry(components);
+        monitor.observeInitialStartup(initialStart);
+        assertEquals(ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING,
+            monitor.requestComponentRecovery("index"));
+      }
+      verify(bootstrap, never()).recomposeForRecovery(org.mockito.ArgumentMatchers.any());
+      verify(bootstrap, never()).closeForUpgrade();
+      verify(bootstrap, never()).startForRecovery();
+    }
+  }
+
+  @Test
+  void busyPhysicalOwnerSkipsHealthDecisionButStillReconciles() throws Exception {
+    try (var components = TestEngineComponents.fourComponents()) {
+      var index = components.handle("index");
+      index.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+          "prior deadline");
+      var bootstrap = mock(KnowledgeServerBootstrap.class);
+      when(bootstrap.indexComponent()).thenReturn(index);
+      when(bootstrap.hasClient()).thenReturn(true);
+      when(bootstrap.tryCheckHealth()).thenReturn(java.util.Optional.empty(), java.util.Optional.of(true));
+      var reconciles = new java.util.concurrent.atomic.AtomicInteger();
+      try (var monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap)) {
+        monitor.onTick(reconciles::incrementAndGet);
+        monitor.tick();
+        monitor.tick();
+        assertEquals(2, reconciles.get());
+      }
+      verify(bootstrap, times(2)).tryCheckHealth();
+      verify(bootstrap, never()).recomposeForRecovery(org.mockito.ArgumentMatchers.any());
+      assertEquals(0, index.snapshot().recoveryAttempts());
     }
   }
 
@@ -128,13 +213,13 @@ final class KnowledgeServerHealthMonitorTest {
   void healthArmDelegatesPhysicalObservationAndInitializationToBootstrap(boolean healthy) {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.checkHealth()).thenReturn(healthy);
+    when(bootstrap.tryCheckHealth()).thenReturn(java.util.Optional.of(healthy));
     KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
     var reconciles = new java.util.concurrent.atomic.AtomicInteger();
     monitor.onTick(reconciles::incrementAndGet);
     monitor.tick();
     monitor.tick();
-    verify(bootstrap, times(2)).checkHealth();
+    verify(bootstrap, times(2)).tryCheckHealth();
     verify(bootstrap, never()).workerCapability();
     assertEquals(2, reconciles.get());
   }
@@ -143,12 +228,12 @@ final class KnowledgeServerHealthMonitorTest {
   void tickSwallowsExceptionsAndStillRequestsReadinessReconciliation() {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    doThrow(new RuntimeException("direct health failure")).when(bootstrap).checkHealth();
+    doThrow(new RuntimeException("direct health failure")).when(bootstrap).tryCheckHealth();
     KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap);
     var reconciles = new java.util.concurrent.atomic.AtomicInteger();
     monitor.onTick(reconciles::incrementAndGet);
     assertDoesNotThrow(monitor::tick);
-    verify(bootstrap).checkHealth();
+    verify(bootstrap).tryCheckHealth();
     verify(bootstrap, never()).workerCapability();
     assertEquals(1, reconciles.get());
   }
@@ -160,7 +245,7 @@ final class KnowledgeServerHealthMonitorTest {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.checkHealth()).thenReturn(true);
+    when(bootstrap.tryCheckHealth()).thenReturn(java.util.Optional.of(true));
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
@@ -176,7 +261,7 @@ final class KnowledgeServerHealthMonitorTest {
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.checkHealth()).thenReturn(true);
+    when(bootstrap.tryCheckHealth()).thenReturn(java.util.Optional.of(true));
 
     long[] clock = {1_000_000L};
     KnowledgeServerHealthMonitor monitor =
@@ -209,7 +294,7 @@ final class KnowledgeServerHealthMonitorTest {
     KnowledgeClient client = mock(KnowledgeClient.class);
     KnowledgeServerBootstrap.ClientLease lease = mock(KnowledgeServerBootstrap.ClientLease.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.checkHealth()).thenReturn(true);
+    when(bootstrap.tryCheckHealth()).thenReturn(java.util.Optional.of(true));
     when(bootstrap.captureClient()).thenReturn(lease);
     when(lease.client()).thenReturn(client);
     when(lease.withClient(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation ->
@@ -237,7 +322,7 @@ final class KnowledgeServerHealthMonitorTest {
     // boot-recovery arm's, tested over a real bootstrap.
     KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
     when(bootstrap.hasClient()).thenReturn(true);
-    when(bootstrap.checkHealth()).thenReturn(true);
+    when(bootstrap.tryCheckHealth()).thenReturn(java.util.Optional.of(true));
     when(bootstrap.captureClient()).thenThrow(new IllegalStateException("Knowledge Server not started"));
 
     long[] clock = {1_000_000L};
@@ -247,7 +332,7 @@ final class KnowledgeServerHealthMonitorTest {
     clock[0] += 3_600_000L;
     assertDoesNotThrow(monitor::tick);
     // checkHealth still ran on both ticks; the resume path did not knock the capability to DEGRADED.
-    verify(bootstrap, times(2)).checkHealth();
+    verify(bootstrap, times(2)).tryCheckHealth();
   }
 
   @Test

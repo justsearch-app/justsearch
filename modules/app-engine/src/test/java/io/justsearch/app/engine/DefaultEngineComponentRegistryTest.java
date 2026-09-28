@@ -336,6 +336,10 @@ final class DefaultEngineComponentRegistryTest {
       assertEquals(Mode.BESIDE, complete.lastCompose().mode());
       assertEquals(1, complete.recoveryAttempts());
       assertEquals("retry after transient failure", complete.evidence());
+      index.recordRecoveryAttempt(null);
+      assertEquals(2, index.snapshot().recoveryAttempts());
+      assertEquals(complete.evidence(), index.snapshot().evidence(),
+          "count-only recovery publication must preserve the physical cause");
     }
   }
 

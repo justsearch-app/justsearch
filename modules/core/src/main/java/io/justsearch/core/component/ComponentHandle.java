@@ -40,5 +40,6 @@ public interface ComponentHandle {
 
   void setLastCompose(ComposeEvidence evidence);
 
+  /** Increments the attempt count; null evidence preserves the current physical cause. */
   void recordRecoveryAttempt(String evidence);
 }

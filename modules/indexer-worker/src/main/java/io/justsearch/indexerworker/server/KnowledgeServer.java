@@ -932,11 +932,7 @@ public final class KnowledgeServer implements Closeable {
 
       Path effectiveIndexBasePath = rc.paths().indexBasePath();
 
-      if (indexComponent != null) {
-        indexComponent.transition(io.justsearch.core.component.ComponentState.STARTING,
-            io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_STARTING.code(),
-            "index root lock at " + effectiveIndexBasePath);
-      }
+      recordIndexStartupWait("index root lock at " + effectiveIndexBasePath);
 
       // Acquire a lock for the effective index root to prevent two Workers from mutating the same
       // indexBasePath (important when justsearch.index.base_path is overridden).
@@ -983,11 +979,7 @@ public final class KnowledgeServer implements Closeable {
       this.indexGenerationManager = genManager;
       this.indexBasePath = layout.basePath();
       this.activeIndexPath = layout.activeGenerationPath();
-      if (indexComponent != null) {
-        indexComponent.transition(io.justsearch.core.component.ComponentState.STARTING,
-            io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_STARTING.code(),
-            "Lucene generation at " + activeIndexPath);
-      }
+      recordIndexStartupWait("Lucene generation at " + activeIndexPath);
       this.initialModelSelection = GenerationModelSelection.from(
           genManager.manifestForOwnedPath(activeIndexPath)).orElse(null);
       this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
@@ -2584,6 +2576,17 @@ public final class KnowledgeServer implements Closeable {
       publicationLock.writeLock().unlock();
     }
     notifyServingViewRetirement(retiredLexical);
+  }
+
+  /** A progress milestone cannot revive an attempt whose declared deadline already failed. */
+  void recordIndexStartupWait(String evidence) {
+    if (indexComponent == null) return;
+    var observed = indexComponent.snapshot();
+    if (observed.state() == io.justsearch.core.component.ComponentState.STARTING) {
+      indexComponent.transitionIfUnchanged(observed,
+          io.justsearch.core.component.ComponentState.STARTING,
+          observed.reasonCode(), evidence);
+    }
   }
 
   private void recordFailedSourceRecompose(Exception candidateFailure, Throwable restoreFailure) {

@@ -24,6 +24,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -119,6 +121,7 @@ final class KnowledgeServerBootRecoveryTest {
     var monitor = newMonitor(bootstrap);
 
     monitor.tick();
+    awaitRecoveryAttempt(monitor, 1);
 
     // The ReasonRetention trap (825 §D2 mechanism 4): worker.recovering is TRANSIENT and the held
     // worker.spawn.failed is a FAULT, so without the recovery-supersedes arm this write is silently
@@ -141,12 +144,16 @@ final class KnowledgeServerBootRecoveryTest {
 
     for (int i = 0; i < NO_WAIT.maxAttempts(); i++) {
       monitor.tick();
+      awaitRecoveryAttempt(monitor, i + 1);
     }
     assertFalse(
         seen.stream().anyMatch(t -> t.contains(RECOVERY_EXHAUSTED)),
         "the terminal code must not land while attempts remain: " + seen);
 
     monitor.tick(); // budget spent
+    awaitCondition(
+        () -> RECOVERY_EXHAUSTED.equals(bootstrap.workerCapability().pendingReason()),
+        "the recovery budget to be narrated");
     assertEquals(
         RECOVERY_EXHAUSTED,
         bootstrap.workerCapability().pendingReason(),
@@ -173,6 +180,13 @@ final class KnowledgeServerBootRecoveryTest {
 
     for (int i = 0; i <= NO_WAIT.maxAttempts(); i++) {
       monitor.tick();
+      if (i < NO_WAIT.maxAttempts()) {
+        awaitRecoveryAttempt(monitor, i + 1);
+      } else {
+        awaitCondition(
+            () -> RECOVERY_EXHAUSTED.equals(bootstrap.workerCapability().pendingReason()),
+            "the recovery budget to be narrated");
+      }
     }
 
     assertFalse(
@@ -209,8 +223,18 @@ final class KnowledgeServerBootRecoveryTest {
     try (var monitor = newMonitor(bootstrap)) {
       List<String> seen = recordTransitions(bootstrap);
       monitor.tick();
+      awaitRecoveryAttempt(monitor, 1);
       assertEquals(RECOVERING, bootstrap.workerCapability().pendingReason());
-      for (int i = 1; i <= NO_WAIT.maxAttempts(); i++) monitor.tick();
+      for (int i = 1; i <= NO_WAIT.maxAttempts(); i++) {
+        monitor.tick();
+        if (i < NO_WAIT.maxAttempts()) {
+          awaitRecoveryAttempt(monitor, i + 1);
+        } else {
+          awaitCondition(
+              () -> RECOVERY_EXHAUSTED.equals(bootstrap.workerCapability().pendingReason()),
+              "the recovery budget to be narrated");
+        }
+      }
       assertEquals(RECOVERY_EXHAUSTED, bootstrap.workerCapability().pendingReason());
       assertEquals(1, seen.stream().filter(t -> t.contains(RECOVERY_EXHAUSTED)).count());
       assertEquals(exhausted, Files.readString(record), "Java does not rewrite host-owned state");
@@ -236,6 +260,7 @@ final class KnowledgeServerBootRecoveryTest {
       assertEquals(SPAWN_FAILED, bootstrap.workerCapability().pendingReason());
       try (var monitor = newMonitor(bootstrap)) {
         monitor.tick();
+        awaitRecoveryAttempt(monitor, 1);
         assertEquals(RECOVERING, bootstrap.workerCapability().pendingReason());
       }
     } finally {
@@ -254,6 +279,7 @@ final class KnowledgeServerBootRecoveryTest {
         WorkerRecoveryAuthority.Verdict.ACCEPTED,
         monitor.requestRecoveryNow(),
         "POST /api/worker/restart in the null-worker state must reach the recovery loop");
+    awaitRecoveryAttempt(monitor, 1);
 
     // Drive the budget to its end through the periodic arm. The manual request runs on the monitor's
     // own executor and HOLDS the single attempt slot while it does (review F5), so a tick landing in
@@ -262,7 +288,11 @@ final class KnowledgeServerBootRecoveryTest {
     while (System.currentTimeMillis() < deadline
         && !RECOVERY_EXHAUSTED.equals(bootstrap.workerCapability().pendingReason())) {
       monitor.tick();
-      Thread.onSpinWait();
+      if (monitor.recoveryAttemptRunningForTest()) {
+        awaitRecoverySettled(monitor);
+      } else {
+        Thread.onSpinWait();
+      }
     }
     assertEquals(
         RECOVERY_EXHAUSTED,
@@ -418,6 +448,7 @@ final class KnowledgeServerBootRecoveryTest {
         verdicts.add(String.valueOf(verdict));
         if (verdict == WorkerRecoveryAuthority.Verdict.ACCEPTED) {
           accepted++;
+          awaitRecoverySettled(monitor);
         }
       }
       while (System.currentTimeMillis() < deadline
@@ -465,12 +496,16 @@ final class KnowledgeServerBootRecoveryTest {
     monitor.onRecoveryOccurrence(occurrences::add);
 
     monitor.tick();
+    awaitCondition(
+        () -> bootstrap.hasClient(), "the recovery attempt to bind its client");
 
     assertTrue(bootstrap.hasClient(), "the host bound even though its health check failed");
     assertEquals(List.of(RecoveryOccurrence.Kind.ATTEMPTED), kinds(occurrences));
 
     healthy.set(true);
     monitor.tick();
+    awaitCondition(
+        () -> occurrences.size() >= 2, "the healthy observation to complete recovery");
 
     assertEquals(
         List.of(RecoveryOccurrence.Kind.ATTEMPTED, RecoveryOccurrence.Kind.RECOVERED),
@@ -495,7 +530,9 @@ final class KnowledgeServerBootRecoveryTest {
     monitor.onRecoveryOccurrence(occurrences::add);
 
     monitor.tick();
+    awaitRecoveryAttempt(monitor, 1);
     monitor.tick();
+    awaitOccurrences(occurrences, 2);
 
     assertEquals(
         List.of(RecoveryOccurrence.Kind.ATTEMPTED, RecoveryOccurrence.Kind.RECOVERED),
@@ -517,11 +554,97 @@ final class KnowledgeServerBootRecoveryTest {
     monitor.onRecoveryOccurrence(ignored -> { throw new IllegalStateException("sink failed"); });
 
     assertDoesNotThrow(monitor::tick);
-    assertEquals(1, monitor.recoveryAttemptsMadeForTest());
+    awaitRecoveryAttempt(monitor, 1);
+  }
+
+  @Test
+  @Timeout(30)
+  @DisplayName("a held recovery leaves tick reconciliation live and rejects manual duplicates")
+  void heldRecoveryDoesNotBlockTickReconciliationOrManualBusyVerdicts(@TempDir Path tempDir)
+      throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var client = mock(KnowledgeClient.class);
+    when(client.isHealthy(any())).thenReturn(true);
+    var host = mock(WorkerHost.class);
+    when(host.start(any(), any())).thenAnswer(ignored -> {
+      entered.countDown();
+      assertTrue(release.await(10, TimeUnit.SECONDS), "test must release the held start");
+      return client;
+    });
+    var bootstrap = newBootstrap(tempDir, host);
+    bootstrap.transitionWorkerDown(
+        LifecycleReasonCode.WORKER_SPAWN_FAILED, "initial composition failed");
+    var monitor = newMonitor(bootstrap);
+    var reconciles = new AtomicInteger();
+    monitor.onTick(reconciles::incrementAndGet);
+
+    try {
+      monitor.tick();
+      assertTrue(entered.await(5, TimeUnit.SECONDS), "the recovery must reach WorkerHost.start");
+      int beforeHeldTick = reconciles.get();
+
+      monitor.tick();
+      assertEquals(
+          beforeHeldTick + 1,
+          reconciles.get(),
+          "tick reconciliation must continue while the recovery executor is blocked");
+      assertEquals(
+          WorkerRecoveryAuthority.Verdict.ALREADY_RUNNING,
+          monitor.requestRecoveryNow(),
+          "manual recovery must share the held retry slot");
+      assertEquals(
+          WorkerRecoveryAuthority.Verdict.ALREADY_RUNNING,
+          monitor.requestRecoveryNow(),
+          "a second manual request must remain busy until the held start releases");
+
+      release.countDown();
+      awaitRecoverySettled(monitor);
+      assertTrue(bootstrap.hasClient(), "the released retry must complete its physical start");
+      assertEquals(
+          WorkerRecoveryAuthority.Verdict.NOT_APPLICABLE,
+          monitor.requestRecoveryNow(),
+          "once the retry binds a client, manual boot recovery no longer applies");
+    } finally {
+      release.countDown();
+    }
   }
 
   private static List<RecoveryOccurrence.Kind> kinds(List<RecoveryOccurrence> occurrences) {
     return occurrences.stream().map(RecoveryOccurrence::kind).toList();
+  }
+
+  private static void awaitRecoveryAttempt(KnowledgeServerHealthMonitor monitor, int expected) {
+    awaitCondition(
+        () -> monitor.recoveryAttemptsMadeForTest() >= expected,
+        "recovery attempt " + expected + " to start");
+    awaitRecoverySettled(monitor);
+  }
+
+  private static void awaitRecoverySettled(KnowledgeServerHealthMonitor monitor) {
+    awaitCondition(
+        () -> !monitor.recoveryAttemptRunningForTest(), "the recovery executor task to settle");
+  }
+
+  private static void awaitOccurrences(
+      List<RecoveryOccurrence> occurrences, int expectedCount) {
+    awaitCondition(
+        () -> occurrences.size() >= expectedCount,
+        "recovery occurrence " + expectedCount + " to be published");
+  }
+
+  private static void awaitCondition(BooleanSupplier condition, String description) {
+    long deadline = System.currentTimeMillis() + 30_000;
+    while (System.currentTimeMillis() < deadline) {
+      if (condition.getAsBoolean()) return;
+      try {
+        Thread.sleep(10);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new AssertionError("Interrupted while waiting for " + description, interrupted);
+      }
+    }
+    throw new AssertionError("Timed out waiting for " + description);
   }
 
   // BootstrapPhysicalInitializationTest proves close/restart initialization through real

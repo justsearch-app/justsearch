@@ -1797,11 +1797,12 @@ public class HeadlessApp {
               null,
               engineRoot.components(), engineRoot.indexComponent(),
               engineRoot, automaticRootProducers, engineRoot.publicationLock());
-      onConstructed.accept(bootstrap);
       // Retry transient boot-time timing failures. A single failed start used to be terminal: the
       // catch below returned a null bootstrap, connectWorker() then pinned the worker capability
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.
-      bootstrap.startWithRetry();
+      // Expose the pending owner only after its startup lock is held. A timed-out API wait can
+      // then safely hand this owner to ordered shutdown, even before its physical open begins.
+      bootstrap.startWithRetry(onConstructed);
       log.info("Knowledge Server physical connection established; component readiness: {}",
           bootstrap.indexComponent().snapshot().state());
       return new KnowledgeServerStartResult(bootstrap, null);

@@ -205,13 +205,34 @@ final class KnowledgeServerHealthMonitorCapacityTest {
     doAnswer(invocation -> { attempted.countDown(); return null; }).when(bootstrap).startForRecovery();
     try (var registry = registry();
         var monitor = new KnowledgeServerHealthMonitor(registry, bootstrap, 10_000)) {
-      var held = otherScheduler(registry).schedule(() -> {}, 1, TimeUnit.DAYS);
-      var refusal = assertThrows(EngineAdmissionException.class, monitor::requestRecoveryNow);
-      assertEquals(EngineAdmissionException.Reason.ENGINE_LIMIT, refusal.reason());
-      assertEquals(1, refusal.retryAfterSeconds());
-      assertEquals(EngineExecutorRejectedException.Reason.TIMER_LIMIT,
-          ((EngineExecutorRejectedException) refusal.getCause()).reason());
-      held.cancel(false);
+      // Physical recovery now has its own worker. Saturate that concrete queue, not the timer
+      // whose continued availability is required while recovery is blocked.
+      var field = KnowledgeServerHealthMonitor.class.getDeclaredField("recoveryExecutor");
+      field.setAccessible(true);
+      var recovery = (java.util.concurrent.ExecutorService) field.get(monitor);
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      var held = recovery.submit(() -> {
+        entered.countDown();
+        if (!release.await(5, TimeUnit.SECONDS)) throw new AssertionError("test did not release recovery queue");
+        return null;
+      });
+      var queued = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+      try {
+        assertTrue(entered.await(2, TimeUnit.SECONDS));
+        for (int i = 0; i < registry.limits(Kind.BACKGROUND).maxQueue(); i++) {
+          queued.add(recovery.submit(() -> {}));
+        }
+        var refusal = assertThrows(EngineAdmissionException.class, monitor::requestRecoveryNow);
+        assertEquals(EngineAdmissionException.Reason.ENGINE_LIMIT, refusal.reason());
+        assertEquals(1, refusal.retryAfterSeconds());
+        assertEquals(EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+            ((EngineExecutorRejectedException) refusal.getCause()).reason());
+      } finally {
+        release.countDown();
+        held.get(2, TimeUnit.SECONDS);
+        for (var task : queued) task.get(2, TimeUnit.SECONDS);
+      }
       assertEquals(Verdict.ACCEPTED, monitor.requestRecoveryNow(), "failed handoff must release attempt slot");
       assertTrue(attempted.await(2, TimeUnit.SECONDS));
     }

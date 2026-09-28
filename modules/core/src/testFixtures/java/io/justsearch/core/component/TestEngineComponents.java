@@ -313,7 +313,7 @@ public final class TestEngineComponents implements EngineComponentRegistry {
           this,
           handle -> {
             handle.recoveryAttempts++;
-            handle.evidence = nextEvidence;
+            if (nextEvidence != null) handle.evidence = nextEvidence;
             return true;
           });
     }

@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.*;
 
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
@@ -11,7 +10,7 @@ import io.justsearch.configuration.ConfigKey;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
-import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.opentelemetry.api.GlobalOpenTelemetry;
@@ -20,7 +19,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -118,19 +116,19 @@ class IndexConfigurationProjectionTest {
     var snapshot = TestResolvedConfigHelper.fromEntries(values);
     var previous = ConfigStore.globalOrNull();
     ConfigStore.setGlobal(new ConfigStore(snapshot));
-    var applied = new AtomicReference<String>();
-    var handle = mock(ComponentHandle.class);
-    doAnswer(call -> { applied.set(call.getArgument(0)); return null; })
-        .when(handle).setAppliedVersion(nullable(String.class));
-    try (var executors = new TestEngineExecutors()) {
+    try (var components = TestEngineComponents.fourComponents();
+        var executors = new TestEngineExecutors()) {
       var server = spy(new KnowledgeServer(executors, WorkerConfig.load(snapshot), null,
-          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), handle, null, snapshot));
+          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(),
+          components.handle("index"), null, snapshot));
       // This test exercises index composition; encoder composition has its own real wiring proof.
       doNothing().when(server).startDeferredModelInitialization(any());
       try {
         server.start();
-        assertNotNull(applied.get(), "the real physical start must publish its owner version");
-        return applied.get();
+        var applied = components.handle("index").snapshot().appliedVersion();
+        assertNotNull(
+            applied, "the real physical start must publish its owner version");
+        return applied;
       } finally {
         server.close();
       }

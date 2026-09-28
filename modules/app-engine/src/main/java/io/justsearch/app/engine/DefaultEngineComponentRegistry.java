@@ -493,7 +493,7 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
       optionalNonBlank(nextEvidence, "evidence");
       mutate(this, handle -> {
         handle.recoveryAttempts++;
-        handle.evidence = nextEvidence;
+        if (nextEvidence != null) handle.evidence = nextEvidence;
         return true;
       });
     }

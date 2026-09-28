@@ -139,6 +139,29 @@ final class HeadlessAppShutdownWiringTest {
   }
 
   @Test
+  void refusedPendingIndexCloseRetainsDependenciesAndSelectsFatalExit(@TempDir Path tempDir)
+      throws Exception {
+    var index = mock(KnowledgeServerBootstrap.class);
+    when(index.closeForUpgrade()).thenReturn(ShutdownOutcome.FAILED);
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    var instanceLock = mock(AppInstanceLock.class);
+    var exitCode = new AtomicInteger(-1);
+    var sequence = new EngineShutdownSequence(tempDir,
+        HeadlessApp.orderedShutdownSteps(null, null, null, index, null, null, null,
+            instanceLock, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
+            resources, () -> null, operations, null, null), exitCode::set);
+
+    sequence.runAndExitEscalated();
+
+    assertEquals(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT, exitCode.get());
+    assertFalse(sequence.run(Reason.RESTART).clean());
+    org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
+    org.mockito.Mockito.verifyNoInteractions(resources, instanceLock);
+    org.mockito.Mockito.verify(index).closeForUpgrade();
+  }
+
+  @Test
   @DisplayName("terminal writer waits for the complete ordered shutdown binding, then exits 1")
   void terminalWriterUsesLateBoundOrderedSequence(@TempDir Path tempDir) throws Exception {
     var binding = new CompletableFuture<EngineShutdownSequence>();

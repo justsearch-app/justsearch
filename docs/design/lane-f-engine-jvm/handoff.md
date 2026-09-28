@@ -5,7 +5,36 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 the current queue, revision, lease, and blocking decisions; D1 owns design and
 acceptance evidence. The brief does not narrow the remaining lane scope.
 
-## Current state (2026-09-28)
+## Current state (2026-09-29)
+
+**Autonomous continuation:** the owner resumed remaining Lane F work in this
+chat, retaining the D1/D2/E/F acceptance and checkpoint publication authority.
+The startup-lifetime correction is locally verified and ready for its checkpoint
+push. Prior pushed head `de6cedf80` failed hosted run `36480997611` because
+recording a recovery count replaced retained fatal-remedy evidence; that defect
+and the independent lifetime findings are corrected with runnable regressions.
+Initial open now owns the bootstrap lock before publication and through retry
+backoff; close refuses a live opening within five seconds. Timer observation
+stays nonblocking while the separate recovery worker performs physical work.
+Late initial success, manual admission, owner-local close/open, and conditional
+startup progress preserve the actual owner's lifetime.
+
+Final stress-enabled suite plus Spotless/PMD passed in 9m11s at
+`tmp/5407-d1-7-final-integrated.txt`, with 1,860 XML reports preserved in
+`tmp/5407-suite-xml/` and source manifest `tmp/5407-d1-7-source-sha256.txt`.
+`build -x test` passed in 21s at `tmp/5410-d1-7-final-build.txt`.
+Regeneration coherence and canonical links passed at `tmp/5408` and `tmp/5409`.
+Independent review found no remaining correction-slice defect. Negative controls
+at `tmp/5385`, `tmp/5401`, and `tmp/5406` fail the intended assertions against
+old close, retry-backoff, remedy-overwrite, and pre-lock publication behavior.
+The earlier full-suite fixture failures are preserved at `tmp/5393-suite-xml/`;
+the version and capacity assertions remain intact with corrected physical fixtures.
+
+This is a prerequisite checkpoint, not D1-7 acceptance. General two-attempt
+policy, all-component deadlines, optional physical owner actions, counted code-5
+escalation, catalog/live snapshots, and installed recovery/model proof remain.
+Continue D1-7 before D1-6 or D1-15. Do not merge before Stage F acceptance.
+The dated checkpoint chronology below is evidence history.
 
 The latest hosted-proven checkpoint is
 `00c7a51786740c35edc025975dd7a6c1bba879f6`. PR727 remains open,

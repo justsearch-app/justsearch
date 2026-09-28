@@ -59,9 +59,8 @@ import org.slf4j.LoggerFactory;
  *       {@code worker.spawn_recovery_exhausted}.
  * </ul>
  *
- * <p>Both arms run on the same single-threaded executor, so an attempt can never overlap a health
- * poll or another attempt — the "one restart authority" constraint from the tempdoc-627 review is
- * structural here, not a convention.
+ * <p>Both arms share one physical-recovery executor and one admission slot. The separate timer
+ * continues deadline and readiness observation while a physical attempt is running.
  */
 public final class KnowledgeServerHealthMonitor implements Closeable, WorkerRecoveryAuthority,
     ComponentRecoveryAuthority {
@@ -321,7 +320,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
       CompletableFuture<?> startup = initialStartup;
       if (startup != null && !startup.isDone()) {
         // The initial bootstrap still owns its open. Never start a second open over it.
-      } else {
+      } else if (!recoveryAttemptRunning.get()) {
         if (initialHandoverPending && bootstrap.hasClient()) {
           handOverRecoveredWorker(0);
         }
@@ -333,15 +332,16 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         } else if (!recoveryAttemptRunning.get()) {
           // The bootstrap owns physical-health initialization. Sampled readiness is an output,
           // not the trigger for catch-up work (an API restart must not reindex persisted roots).
-          boolean healthy = bootstrap.checkHealth();
-          ComponentState indexState = bootstrap.indexComponent().snapshot().state();
-          if (healthy && indexState != ComponentState.FAILED) {
-            completeRecoveryEpisode();
-            recoveryAttemptsMade.set(0);
-            lastRecoveryAttemptMs = -1;
-          } else if (indexState == ComponentState.FAILED) {
-            scheduleBoundIndexRecovery(false);
-          }
+          bootstrap.tryCheckHealth().ifPresent(healthy -> {
+            ComponentState indexState = bootstrap.indexComponent().snapshot().state();
+            if (healthy) {
+              completeRecoveryEpisode();
+              recoveryAttemptsMade.set(0);
+              lastRecoveryAttemptMs = -1;
+            } else if (indexState == ComponentState.FAILED) {
+              scheduleBoundIndexRecovery(false);
+            }
+          });
         }
       }
     } catch (Exception e) {
@@ -422,6 +422,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         .filter(row -> name.equals(row.spec().name())).findFirst();
     if (component.isEmpty()) return ComponentRecoveryAuthority.Outcome.UNKNOWN_COMPONENT;
     var observed = component.orElseThrow();
+    if (initialOwnerPending() || recoveryAttemptRunning.get()) {
+      return ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING;
+    }
     if (observed.state() == ComponentState.READY || observed.state() == ComponentState.ABSENT) {
       return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
     }
@@ -444,8 +447,15 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     };
   }
 
+  private boolean initialOwnerPending() {
+    CompletableFuture<?> startup = initialStartup;
+    return startup != null && (!startup.isDone()
+        || (initialHandoverPending && bootstrap.hasClient()));
+  }
+
   private ComponentRecoveryAuthority.Outcome scheduleBoundIndexRecovery(boolean operatorRequested) {
     if (closed || !bootstrap.hasClient()) return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+    if (initialOwnerPending()) return ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING;
     if (!recoveryAttemptRunning.compareAndSet(false, true)) {
       return ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING;
     }
@@ -488,10 +498,13 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   private void attemptBoundIndexRecovery(boolean operatorRequested) {
     try {
-      if (closed || !bootstrap.hasClient()) return;
+      if (closed || initialOwnerPending() || !bootstrap.hasClient()) return;
       ComponentHandle handle = bootstrap.indexComponent();
       var before = handle.snapshot();
       if (before.state() != ComponentState.FAILED) return;
+      // A deadline observation can lag the physical owner's late successful initialization.
+      // Let readiness reconcile that success instead of tearing down the recovered owner.
+      if (bootstrap.checkHealth()) return;
       BootRecoveryDecision.Decision decision = BootRecoveryDecision.decide(
           new BootRecoveryDecision.Input(false,
               !operatorRequested && bootstrap.indexFatalCode() != null,
@@ -508,15 +521,12 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
       if (!handle.transitionIfUnchanged(before, ComponentState.STARTING,
           LifecycleReasonCode.WORKER_RECOVERING.code(),
           "Reopening index with the current configuration (attempt " + attemptNo + ")")) return;
-      handle.recordRecoveryAttempt("Index recovery attempt " + attemptNo);
+      handle.recordRecoveryAttempt(bootstrap.indexFatalCode() == null
+          ? "Index recovery attempt " + attemptNo : null);
       recoveryAttemptsMade.set(attemptNo);
       lastRecoveryAttemptMs = nowMs.getAsLong();
       try {
-        if (bootstrap.closeForUpgrade() != ShutdownOutcome.GRACEFUL) {
-          throw new IllegalStateException("Index owner refused local close");
-        }
-        if (closed) return;
-        boolean physicallyHealthy = bootstrap.startForRecovery();
+        boolean physicallyHealthy = bootstrap.recomposeForRecovery(() -> !closed);
         if (closed) return;
         if (physicallyHealthy && bootstrap.hasClient()) {
           handOverRecoveredWorker(attemptNo);
@@ -572,8 +582,20 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
               "Boot recovery attempt {} due in {}ms",
               decision.nextAttempt(),
               decision.waitMs());
-      case ATTEMPT -> attemptBootRecovery(false, false);
+      case ATTEMPT -> scheduleBootRecovery();
       case GIVE_UP -> narrateGiveUp(decision.veto());
+    }
+  }
+
+  /** Physical retries never occupy the timer that observes their deadline and readiness. */
+  private void scheduleBootRecovery() {
+    if (closed || !recoveryAttemptRunning.compareAndSet(false, true)) return;
+    boolean submitted = false;
+    try {
+      recoveryExecutor.execute(() -> attemptBootRecovery(false));
+      submitted = true;
+    } finally {
+      if (!submitted) recoveryAttemptRunning.set(false);
     }
   }
 
@@ -611,16 +633,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    * ultimately succeeds narrates ONE {@code worker.restart-attempted} milestone and ONE
    * {@code worker.recovered}, not a flap per cycle.
    */
-  private void attemptBootRecovery(boolean operatorRequested, boolean slotAlreadyHeld) {
-    // Review F4: the closed check is INSIDE the running-slot and re-checked after it, because close()
-    // waits for an in-flight attempt but must not let a new one start. A spawn begun after
-    // performOrderedShutdown has passed the monitor would orphan a worker JVM that nothing closes.
-    if (closed && !slotAlreadyHeld) {
-      return;
-    }
-    if (!slotAlreadyHeld && !recoveryAttemptRunning.compareAndSet(false, true)) {
-      return;
-    }
+  private void attemptBootRecovery(boolean operatorRequested) {
+    // The caller reserved the one slot before dispatch. Recheck shutdown on the physical worker.
     try {
       if (closed) {
         return;
@@ -662,7 +676,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
       recoveryAttemptsMade.incrementAndGet();
       lastRecoveryAttemptMs = nowMs.getAsLong();
       bootstrap.indexComponent().recordRecoveryAttempt(
-          "Index recovery attempt " + attemptNo + " of " + recoveryPolicy.maxAttempts());
+          bootstrap.indexFatalCode() == null
+              ? "Index recovery attempt " + attemptNo + " of " + recoveryPolicy.maxAttempts()
+              : null);
       bootstrap.indexComponent().transition(
           ComponentState.STARTING,
           LifecycleReasonCode.WORKER_RECOVERING.code(),
@@ -868,7 +884,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         // decision is re-run on the executor before anything spawns, so this is a hint, not a
         // licence — a burst of requests still cannot out-spend the budget (review F5).
         case ATTEMPT, WAIT -> {
-          executor.execute(() -> attemptBootRecovery(true, true));
+          recoveryExecutor.execute(() -> attemptBootRecovery(true));
           slotHandedOff = true;
           yield Verdict.ACCEPTED;
         }

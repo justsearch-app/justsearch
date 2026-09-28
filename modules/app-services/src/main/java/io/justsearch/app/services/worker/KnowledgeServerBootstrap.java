@@ -71,6 +71,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private boolean healthyInitializationComplete;
     private final java.util.concurrent.locks.ReentrantLock initLock =
         new java.util.concurrent.locks.ReentrantLock();
+    private static final long CLOSE_START_WAIT_SECONDS = 5;
 
     // Tempdoc 825 review F10: volatile. Written by whichever thread runs start() /
     // closeForUpgrade() — the boot thread, and (since 825) the health monitor's executor — and read
@@ -387,9 +388,33 @@ public final class KnowledgeServerBootstrap implements Closeable {
         startWithRetry(DEFAULT_START_ATTEMPTS, DEFAULT_START_RETRY_BACKOFF_MS);
     }
 
-    /** {@link #startWithRetry()} with an explicit attempt budget; visible for tests. */
+    /** Publishes the initial owner only after it has claimed its complete opening lifetime. */
+    public void startWithRetry(java.util.function.Consumer<KnowledgeServerBootstrap> onOpening)
+            throws IOException, InterruptedException {
+        java.util.Objects.requireNonNull(onOpening, "onOpening");
+        initLock.lockInterruptibly();
+        try {
+            onOpening.accept(this);
+            startWithRetryLocked(DEFAULT_START_ATTEMPTS, DEFAULT_START_RETRY_BACKOFF_MS);
+        } finally {
+            initLock.unlock();
+        }
+    }
+
     /** {@link #startWithRetry()} with an explicit attempt budget; visible for tests. */
     public void startWithRetry(int maxAttempts, long backoffMs)
+            throws IOException, InterruptedException {
+        // The whole initial opening owns its lifetime, including inter-attempt backoff. Otherwise
+        // ordered close could succeed between attempts and a later attempt reopen closed stores.
+        initLock.lockInterruptibly();
+        try {
+            startWithRetryLocked(maxAttempts, backoffMs);
+        } finally {
+            initLock.unlock();
+        }
+    }
+
+    private void startWithRetryLocked(int maxAttempts, long backoffMs)
             throws IOException, InterruptedException {
         Exception last = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -450,6 +475,26 @@ public final class KnowledgeServerBootstrap implements Closeable {
         initLock.lockInterruptibly();
         try {
             bootRecoveryInFlight = true;
+            startWithRetry(1, 0);
+            return physicalHealthy && healthyInitializationComplete;
+        } finally {
+            bootRecoveryInFlight = false;
+            initLock.unlock();
+        }
+    }
+
+    /** The physical owner retains initialization and recovery narration across local replacement. */
+    public boolean recomposeForRecovery(java.util.function.BooleanSupplier stillAdmitted)
+            throws IOException, InterruptedException {
+        java.util.Objects.requireNonNull(stillAdmitted, "stillAdmitted");
+        initLock.lockInterruptibly();
+        try {
+            if (!stillAdmitted.getAsBoolean()) return false;
+            bootRecoveryInFlight = true;
+            if (closeLocked() != ShutdownOutcome.GRACEFUL) {
+                throw new IOException("Index owner refused local close");
+            }
+            if (!stillAdmitted.getAsBoolean()) return false;
             startWithRetry(1, 0);
             return physicalHealthy && healthyInitializationComplete;
         } finally {
@@ -758,6 +803,16 @@ public final class KnowledgeServerBootstrap implements Closeable {
             ComponentState.FAILED, down.code().code(), down.detail());
     }
 
+    /** Empty means an owner is composing or retiring; observation must not wait behind it. */
+    public java.util.Optional<Boolean> tryCheckHealth() {
+        if (!initLock.tryLock()) return java.util.Optional.empty();
+        try {
+            return java.util.Optional.of(checkHealth());
+        } finally {
+            initLock.unlock();
+        }
+    }
+
     public boolean checkHealth() {
         initLock.lock();
         try {
@@ -803,9 +858,24 @@ public final class KnowledgeServerBootstrap implements Closeable {
         closeForUpgrade();
     }
 
-    /** Ordered close that reports whether Worker process termination required force. */
+    /** Ordered close refuses while a physical open still owns initialization past its budget. */
     public ShutdownOutcome closeForUpgrade() {
-        initLock.lock();
+        // An initial open can outlive the API's startup deadline. Never wait indefinitely here:
+        // a refused close retains the owner and its stores for the ordered fatal-exit path.
+        // The immediate acquisition also preserves same-thread startup-failure cleanup when
+        // interruption is already set; the lock is reentrant in that path.
+        if (!initLock.tryLock()) {
+            try {
+                if (!initLock.tryLock(CLOSE_START_WAIT_SECONDS,
+                        java.util.concurrent.TimeUnit.SECONDS)) {
+                    log.warn("Index initialization still owns its open; retaining index owner");
+                    return ShutdownOutcome.FAILED;
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return ShutdownOutcome.FAILED;
+            }
+        }
         try {
             return closeLocked();
         } finally {
