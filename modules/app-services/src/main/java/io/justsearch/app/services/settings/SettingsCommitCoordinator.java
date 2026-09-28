@@ -814,6 +814,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           active.restartRequired = restartRequired;
           control.committed(receipt);
           try {
+            faultHook.accept(new OperationAttemptRunnerImpl.FaultBoundary(
+                "settings-after-file-replace-before-publication", OperationKind.RECONFIGURE,
+                active.key, active.key, active.id, "encoders", 0, 0));
             config.installPrepared(preparedConfig);
             if (preparedForPublish != null) preparedForPublish.install();
           } catch (RuntimeException | Error publicationFailure) {

@@ -85,6 +85,23 @@ public record InferenceSurface(
     Objects.requireNonNull(componentObservation, "componentObservation");
   }
 
+  /** Records a boot selection failure without changing the composed roles or their handles. */
+  InferenceSurface withUnavailableQueryRoles(Set<EncoderRole> unavailable) {
+    if (unavailable.isEmpty()) return this;
+    if (!EnumSet.of(EncoderRole.RERANKER, EncoderRole.CITATION).containsAll(unavailable)) {
+      throw new IllegalArgumentException("Only query roles can be marked unavailable here");
+    }
+    Set<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
+    requested.addAll(componentObservation.requestedRoles());
+    requested.addAll(unavailable);
+    Set<EncoderRole> missing = EnumSet.noneOf(EncoderRole.class);
+    missing.addAll(componentObservation.missingRoles());
+    missing.addAll(unavailable);
+    return new InferenceSurface(embedding, ner, reranker, citation, splade, bgeM3, policies,
+        handles, new ComponentObservation(componentObservation.configurationDigest(),
+            requested, missing));
+  }
+
   /** Transfers the two independently replaceable query roles away from index-role lifetime. */
   Partition partitionQueryRoles(EncoderConfigurationProjection projection) {
     Objects.requireNonNull(projection, "projection");

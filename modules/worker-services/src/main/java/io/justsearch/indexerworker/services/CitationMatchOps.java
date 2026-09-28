@@ -4,6 +4,9 @@ package io.justsearch.indexerworker.services;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
+import io.justsearch.configuration.PlatformPaths;
+import io.justsearch.configuration.SystemAccess;
+import io.justsearch.core.harness.HarnessBarrierProtocol;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.util.ParseUtils;
 import io.justsearch.indexerworker.util.VectorUtils;
@@ -12,10 +15,14 @@ import io.justsearch.ipc.CitationMatchEntry;
 import io.justsearch.ipc.MatchCitationsResponse;
 import io.justsearch.reranker.CitationScorer;
 import io.justsearch.reranker.CitationScorerConfig;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import tools.jackson.databind.json.JsonMapper;
 import org.apache.lucene.search.TermQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,6 +58,32 @@ final class CitationMatchOps {
   private volatile CitationScorerConfig citationScorerConfig;
   private volatile CitationScorer citationScorer;
   private volatile CrossEncoderProducer crossEncoderProducer;
+  private final java.util.function.Consumer<String> issuedCitationBarrier =
+      issuedCitationBarrierFromEnvironment();
+
+  private static java.util.function.Consumer<String> issuedCitationBarrierFromEnvironment() {
+    String heldAnswer = SystemAccess.rawEnvVar("JUSTSEARCH_ISSUED_CITATION_BARRIER_ANSWER");
+    if (heldAnswer == null) return ignored -> {};
+    if (heldAnswer.isBlank()
+        || !"1".equals(SystemAccess.rawEnvVar("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
+      throw new IllegalArgumentException("Issued citation barrier requires a harness answer");
+    }
+    var claimed = new AtomicBoolean();
+    var dataDir = PlatformPaths.resolveDataDir();
+    return answer -> {
+      if (!heldAnswer.equals(answer) || !claimed.compareAndSet(false, true)) return;
+      try {
+        HarnessBarrierProtocol.await(dataDir, "issued-a-citation",
+            JsonMapper.builder().build().writeValueAsString(Map.of(
+                "answer", answer, "pid", ProcessHandle.current().pid())), false);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw WorkerServiceException.cancelled("issued citation barrier interrupted");
+      } catch (IOException failure) {
+        throw new IllegalStateException("Issued citation barrier failed", failure);
+      }
+    };
+  }
 
   /**
    * The cross-encoder producer as a function of its inputs.
@@ -210,6 +243,7 @@ final class CitationMatchOps {
     }
 
     if (crossEncoder != null) {
+      issuedCitationBarrier.accept(answerText);
       try {
         CitationScorer.ScoringResult result =
             crossEncoder.scoreAll(

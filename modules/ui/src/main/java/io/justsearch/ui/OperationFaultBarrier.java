@@ -49,7 +49,8 @@ final class OperationFaultBarrier {
             "installer-pointer-before-settings", "installer-settings-before-publication",
             "installer-before-receipt")
         : "reconfigure".equals(kind)
-            ? Set.of("before-accept", "after-accept", "after-effect", "settings-mid-compose")
+            ? Set.of("before-accept", "after-accept", "after-effect", "settings-mid-compose",
+                "settings-after-file-replace-before-publication")
             : Set.of("before-accept", "after-accept", "after-effect");
     if (phase == null || !phases.contains(phase)
         || key == null || kind == null || !Set.of("ingest", "settings-apply", "reconfigure", "reindex").contains(kind)) {

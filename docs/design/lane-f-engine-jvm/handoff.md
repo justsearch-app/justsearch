@@ -253,12 +253,65 @@ passed at `tmp/5328`; llms.txt, skills sync, canonical links, module graph,
 and runtime configuration matrix checks passed. Direct frontend unit execution
 without its expected localhost:3000 fixture emitted `ECONNREFUSED` and was
 stopped; the frontend typecheck passed at `tmp/5319`. Exact-SHA hosted proof
-and the remaining Batch 5 cuts below are open.
+for this checkpoint then passed all 13 jobs in
+[run 36460387664](https://github.com/justsearch-app/justsearch/actions/runs/36460387664)
+at `1fec9a9885fbdd96271931d7e710ace1d2f3d7eb`. This does not prove the
+later local crash and concurrency cuts.
 
-Batch 5 still needs a contract-B/settings-A crash, a post-settings/pre-view
-kill, an issued A citation query crossing B publication, concurrent registry
-and serving-view observation, and higher-priority boot model-path override
-proof. Do not treat the installed sequence as full D1-4 acceptance.
+The next uncommitted local cut passes an installed environment model-path
+override on a disabled durable witness (`tmp/5331`), a settings-B/pre-view
+Engine kill with witnessed B boot (`tmp/5332`), issued A citation scoring
+across B publication and old query-owner retirement after the last lease
+(`tmp/5334`), registry/view reads held at a between-assignments publication
+barrier (`tmp/5335`), and contract-B/settings-A crash retaining the exact A
+model and witness (`tmp/5336`). The first issued-A run `tmp/5333` timed out
+waiting for a live log flush after both A and B queries succeeded; its log
+contains the retirement event and the corrected assertion reads the flushed
+log after owned shutdown. `tmp/5330` selected no tests because the AI tag
+requires `-PincludeAiTests=true`; `tmp/5331` used that gate. Each passing
+installed run reports clean owned ports. The default-parallel full repository
+suite passed at `tmp/5338` (9m29s; 18 executed, 178 up to date) before the
+following installed fixture addition. A true ordinary query-only acquisition
+then passed at `tmp/5346`: the private CPU, zero-download plan enters
+`/api/ai/install/start`, writes its own contract and v5 model/tokenizer witness,
+serves a real citation scorer, and a separate installed reboot serves the same
+exact witness. The JUnit XML reports one AI test, zero skips/failures, with
+both owned runs' ports closed. Earlier red fixtures at `tmp/5339`, `5340`,
+`5341`, `5342`, `5343`, `5344`, and `5345` remain preserved. They isolated
+host GPU profile, private DJL native-cache and bundled-runtime prerequisites,
+content-addressed installer placement, Windows path length, and the serialized
+file-URI witness shape; `tmp/5343` reached a real unavailable scorer before the
+short-path correction, while `tmp/5344` and `5345` reached successful product
+commit but failed fixture assertions. This is local Batch 5 behavior proof;
+the global Spotless/PMD gate passed at `tmp/5347` (301 tasks), `build -x test`
+at `tmp/5348` (333 tasks), and the final-source ordinary `test` task at
+`tmp/5349` (196 up-to-date tasks reusing the fresh `tmp/5338` executions).
+llms.txt, skills sync, canonical links, runtime matrix, and store
+recoverability checks pass. The runtime-manifest gate first rejected three
+literal harness-only reached markers; narrow D1 Batch 5 allowlist entries
+now pass the 3,747-file scan. Exact-SHA hosted proof remains before Batch 5/
+D1-4 acceptance.
+The Batch 5 refute pass found a post-file fault callback outside the settings
+uncertainty fence and an invalid operator query path that could abort Worker
+boot before role composition. The callback now runs within the fence;
+`tmp/5350` passes the focused coordinator test and `tmp/5351` passes the
+installed Engine kill. Boot resolves query roles independently and records a
+failed override as an unavailable physical role. `tmp/5353` passes the
+installed valid/invalid override sequence: the invalid case keeps the durable
+DISABLED witness unchanged, starts the Worker, reports
+`missing_roles=CITATION`, and serves citation fallback. `tmp/5354` passes
+resolver and observation-partition unit tests. Re-run global gates on this
+new source before checkpointing; hosted proof is still outstanding. A further
+refute check found the non-overridden role could lose active-generation
+authority if its desired path was absent; `tmp/5356` passes the corrected
+generation-selection regression.
+The checkpoint source now passes the default-parallel repository suite at
+`tmp/5359` (8m19s; 196 tasks), Spotless/PMD at `tmp/5360`, and `build -x test`
+at `tmp/5361`. Regen, runtime closure, store, docs, and Node syntax checks
+pass. The exact-source installed override sequence passed at `tmp/5362` and
+the ordinary query-only installer commit/reboot passed at `tmp/5363`; both
+AI tests executed and closed owned ports. Next: commit/push this Batch 5 cut
+and confirm hosted CI against its exact SHA before marking Batch 5 accepted.
 
 The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
 `codex/lane-f-workflow-order` from `origin/main`, in its separate managed

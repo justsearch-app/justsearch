@@ -75,6 +75,11 @@ const ALLOWED_RUNTIME_ARTIFACTS = new Map([
   ['issued-a-search-reached.json', 'lane F D1-12 — held issued-A search observation'],
   ['restored-a-native-lease-reached.json', 'lane F D1-13 — held native lease observation'],
   ['restored-a-native-lease-proof.json', 'lane F D1-13 — native lease retirement proof'],
+  // tempdoc-ref: Lane F D1 Batch 5 installed acceptance. These are harness-only rendezvous
+  // markers under the owned fixture data directory; they are not product runtime discovery.
+  ['issued-a-citation-reached.json', 'lane F D1 Batch 5 — held query-A citation observation'],
+  ['query-publication-reached.json', 'lane F D1 Batch 5 — registry/view publication barrier'],
+  ['operation-fault-reached.json', 'lane F D1 Batch 5 — settings after-file crash barrier'],
   ['dev-reload.request', 'lane F stage A review S2 — dev-only hot-reload trigger, written by the dev MCP reload tool and deleted by the Engine on consumption. Not a discovery surface: existence is the whole payload, and the file is absent except for the instant between a bytecode push and the service reconstruction it asks for.'],
 ]);
 

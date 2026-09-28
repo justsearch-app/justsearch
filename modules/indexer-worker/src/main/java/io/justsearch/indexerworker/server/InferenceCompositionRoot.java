@@ -859,6 +859,11 @@ public final class InferenceCompositionRoot {
               citationCfg.modelPath().resolve("tokenizer.json"), citationCfg.maxSequenceLength())
           : CitationScorer.buildAssembly(sessions, witnessed.tokenizer().path(),
               witnessed.model().path(), citationCfg.maxSequenceLength());
+      if (witnessed != null) {
+        log.info("Citation scorer settings selected: model={}, sha256={}, tokenizerSha256={}",
+            witnessed.model().path(), witnessed.model().sha256(),
+            witnessed.tokenizer().sha256());
+      }
       if (selection != null) {
         log.info("Citation scorer generation selected: model={}, sha256={}",
             variant.modelFile().toAbsolutePath().normalize(),

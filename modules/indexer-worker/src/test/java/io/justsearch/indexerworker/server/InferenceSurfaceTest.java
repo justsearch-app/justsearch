@@ -347,6 +347,26 @@ class InferenceSurfaceTest {
   }
 
   @Test
+  void unavailableBootOverrideSurvivesQueryPartition() {
+    var original = InferenceSurface.ComponentObservation.composed("digest",
+        Set.of(EncoderRole.EMBEDDING), Set.of(EncoderRole.EMBEDDING));
+    var surface = new InferenceSurface(Optional.empty(), Optional.empty(), Optional.empty(),
+        Optional.empty(), Optional.empty(), Optional.empty(), emptySnapshot(), List.of(), original);
+
+    var owners = surface.withUnavailableQueryRoles(Set.of(EncoderRole.CITATION))
+        .partitionQueryRoles(projection());
+
+    assertEquals(Set.of(EncoderRole.EMBEDDING),
+        owners.index().componentObservation().requestedRoles());
+    assertEquals(Set.of(EncoderRole.CITATION),
+        owners.query().componentObservation().requestedRoles());
+    assertEquals(Set.of(EncoderRole.CITATION),
+        owners.query().componentObservation().missingRoles());
+    assertFalse(owners.query().componentObservation().compositionSatisfied());
+    assertEquals(Set.of(EncoderRole.EMBEDDING), original.requestedRoles());
+  }
+
+  @Test
   void partitionKeepsQueryHandleIndependentOfIndexRetirement() {
     CountingHandle index = new CountingHandle();
     CountingHandle query = new CountingHandle();

@@ -31,8 +31,13 @@ const bulkGapApproval = scenario === 'bulk-gap-approval';
 const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
 const queryRoleScenario = scenario === 'query-role-commit' || scenario === 'query-role-boot'
+  || scenario === 'query-role-installer-commit' || scenario === 'query-role-installer-boot'
   || scenario === 'query-role-tampered-boot' || scenario === 'query-role-clear'
-  || scenario === 'query-role-disabled-boot';
+  || scenario === 'query-role-disabled-boot' || scenario === 'query-role-override-boot'
+  || scenario === 'query-role-invalid-override-boot'
+  || scenario === 'query-role-after-file-crash' || scenario === 'query-role-issued-a'
+  || scenario === 'query-role-publication-hold'
+  || scenario === 'query-role-contract-b-settings-a';
 const modelLiveABGap = scenario === 'model-live-a-b-gap';
 const modelLiveABCancel = scenario === 'model-live-a-b-cancel';
 const modelLiveABRecomposeFailure = scenario === 'model-live-a-b-recompose-failure';
@@ -73,6 +78,7 @@ function findRetainedModelsRoot() {
   }
 }
 const operationKey = operationFault || bulkFault || bulkGapApproval || installerFault || modelLiveAB
+  || scenario === 'query-role-after-file-crash'
   ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   ? path.resolve(process.env.JUSTSEARCH_WRITER_RECOVERY_WORK)
@@ -133,6 +139,8 @@ delete env.JUSTSEARCH_MIGRATION_BARRIER_POINT;
 delete env.JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT;
 delete env.JUSTSEARCH_MIGRATION_BARRIER_REFUSE;
 delete env.JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY;
+delete env.JUSTSEARCH_ISSUED_CITATION_BARRIER_ANSWER;
+delete env.JUSTSEARCH_QUERY_PUBLICATION_BARRIER;
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
 if (['writer', 'processing', 'operation'].includes(scenario) || scenario === undefined
     || operationFault || lockScenario) {
@@ -155,6 +163,13 @@ if (operationFault) {
   env.JUSTSEARCH_OPERATION_FAULT_POINT = scenario.endsWith('before-accept') ? 'before-accept'
     : scenario.endsWith('before-checkpoint') ? 'after-effect'
       : scenario === 'settings-mid-compose' ? 'settings-mid-compose' : 'after-accept';
+}
+if (scenario === 'query-role-after-file-crash') {
+  env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
+  env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
+  env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
+  env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reconfigure';
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = 'settings-after-file-replace-before-publication';
 }
 if (bulkFault || bulkGapApproval) {
   if (BULK_FAULT_CASES[scenario]?.liveStart) {
@@ -219,6 +234,36 @@ if (modelLiveAB) {
 }
 const installerCandidate = installerFault
   ? writeRetainedInstallerCandidate({ data, requireThat, mixedChat: mixedChatInstaller }) : null;
+const queryInstallerCandidate = scenario === 'query-role-installer-commit'
+  ? writeRetainedInstallerCandidate({ data, requireThat, mixedChat: false,
+    candidateOwned: true }) : null;
+if (queryInstallerCandidate) {
+  // The acquisition itself must publish the contract. Only the private model bytes are pre-staged.
+  fs.rmSync(queryInstallerCandidate.contractPath);
+  fs.writeFileSync(path.join(work, 'query-installer-targets.json'), JSON.stringify({
+    citationModel: path.join(queryInstallerCandidate.candidateDirs['citation-scorer'], 'model.onnx'),
+    embeddingDir: queryInstallerCandidate.candidateDirs.embedding,
+  }));
+  env.JUSTSEARCH_MODELS_DIR = queryInstallerCandidate.modelsRoot;
+  env.JUSTSEARCH_MODE = 'mcp-lite';
+  env.JUSTSEARCH_GPU_ENABLED = 'false';
+  env.CUDA_VISIBLE_DEVICES = '-1';
+  env.ENGINE_CACHE_DIR = path.join(work, 'djl-cache');
+  const bundledRuntime = path.join(path.dirname(findRetainedModelsRoot()),
+    'modules', 'ui', 'native-bin', 'llama-server', 'variants', 'cuda12');
+  const privateRuntime = path.join(data, 'native-bin', 'llama-server');
+  requireThat(fs.existsSync(path.join(bundledRuntime, 'llama-server.exe'))
+    && fs.statSync(path.join(bundledRuntime, 'llama-server.exe')).isFile(),
+  'query-only installer requires a retained bundled runtime executable');
+  fs.mkdirSync(privateRuntime, { recursive: true });
+  for (const name of fs.readdirSync(bundledRuntime)) {
+    if (!/\.(?:exe|dll)$/i.test(name)) continue;
+    fs.linkSync(path.join(bundledRuntime, name), path.join(privateRuntime, name));
+  }
+  env.JUSTSEARCH_EMBED_ONNX_MODEL_PATH = queryInstallerCandidate.modelDir;
+  env.JUSTSEARCH_NER_MODEL_PATH = path.join(queryInstallerCandidate.modelsRoot, 'onnx', 'ner');
+  env.JUSTSEARCH_SPLADE_MODEL_PATH = path.join(queryInstallerCandidate.modelsRoot, 'onnx', 'splade');
+}
 delete env.JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND;
 if (aiEnabled) {
   delete env.JUSTSEARCH_AI_EMBED_ENABLED;
@@ -279,6 +324,13 @@ if (modelBoot) {
 if (queryRoleScenario) {
   delete env.AI_OFFLINE;
   env.JUSTSEARCH_CITATION_SCORER_ENABLED = 'true';
+  if (scenario === 'query-role-issued-a') {
+    env.JUSTSEARCH_ISSUED_CITATION_BARRIER_ANSWER =
+      'The quokka A request remains issued.';
+  }
+  if (scenario === 'query-role-publication-hold') {
+    env.JUSTSEARCH_QUERY_PUBLICATION_BARRIER = '1';
+  }
 }
 const runner = path.join(repo, 'scripts', 'dev', 'dev-runner.cjs');
 const engineLogWindow = modelLiveAB ? (() => {
@@ -434,8 +486,8 @@ try {
       requireThat, createOperationKey });
   } else if (queryRoleScenario) {
     await exerciseQueryRoleScenario({ scenario, work, data,
-      modelsRoot: findRetainedModelsRoot(), apiPort, manifest, request, post, waitFor,
-      requireThat, createOperationKey });
+      modelsRoot: findRetainedModelsRoot(), apiPort, manifest, first, readJson,
+      request, post, waitFor, requireThat, createOperationKey, operationKey });
   } else if (bulkGapApproval) {
     await exerciseBulkGapApproval({ work, data, indexBase, first, manifest, apiPort,
       readJson, waitFor, request, post, requireThat, matchingHit, createOperationKey,

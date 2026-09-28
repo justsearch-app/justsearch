@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,6 +31,29 @@ final class EngineSupervisedRecoveryE2ETest {
 
   @Test
   @Tag("ai")
+  void ordinaryQueryOnlyInstallerAcquisitionCommitsExactCitationAndSurvivesReboot()
+      throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "query-only installer requires retained registry model bytes");
+    // The installer's content-addressed candidate suffix plus ORT's optimized cache suffix must
+    // stay below the Windows native path limit; this is still a private, unique test directory.
+    Path work = repo.resolve("tmp/qi-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      String committed = runInstalledModelScenario(repo, work, "query-role-installer-commit",
+          Map.of(), "QUERY_ROLE_INSTALLER_COMMIT_PASS");
+      String committedSettings = Files.readString(work.resolve("data/ui/settings.json"));
+      String rebooted = runInstalledModelScenario(repo, work, "query-role-installer-boot",
+          Map.of(), "QUERY_ROLE_INSTALLER_BOOT_PASS");
+      assertEquals(committedSettings, Files.readString(work.resolve("data/ui/settings.json")),
+          "reboot changed the installer-committed query identity or witness");
+      assertTrue(committed.contains("QUERY_ROLE_INSTALLER_COMMIT_PASS "), committed);
+      assertTrue(rebooted.contains("QUERY_ROLE_INSTALLER_BOOT_PASS "), rebooted);
+    });
+  }
+
+  @Test
+  @Tag("ai")
   void queryOnlyCitationCommitSurvivesAnInstalledWorkerReboot() throws Exception {
     Path repo = repositoryRoot();
     assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
@@ -46,11 +71,115 @@ final class EngineSupervisedRecoveryE2ETest {
           "QUERY_ROLE_CLEAR_PASS");
       String disabledBoot = runInstalledModelScenario(repo, work, "query-role-disabled-boot", Map.of(),
           "QUERY_ROLE_DISABLED_BOOT_PASS");
+      Files.copy(repo.resolve("models/onnx/citation-scorer/tokenizer.json"),
+          work.resolve("query-citation-b/tokenizer.json"),
+          java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+      String overrideBoot = runInstalledModelScenario(repo, work, "query-role-override-boot",
+          Map.of("JUSTSEARCH_CITATION_SCORER_MODEL_PATH",
+              work.resolve("query-citation-b").toString()),
+          "QUERY_ROLE_OVERRIDE_BOOT_PASS");
+      String invalidOverrideBoot = runInstalledModelScenario(repo, work,
+          "query-role-invalid-override-boot",
+          Map.of("JUSTSEARCH_CITATION_SCORER_MODEL_PATH",
+              work.resolve("missing-query-model").toString()),
+          "QUERY_ROLE_INVALID_OVERRIDE_BOOT_PASS");
       assertTrue(committed.contains("QUERY_ROLE_COMMIT_PASS "), committed);
       assertTrue(rebooted.contains("QUERY_ROLE_BOOT_PASS "), rebooted);
       assertTrue(tampered.contains("QUERY_ROLE_TAMPERED_BOOT_PASS "), tampered);
       assertTrue(cleared.contains("QUERY_ROLE_CLEAR_PASS "), cleared);
       assertTrue(disabledBoot.contains("QUERY_ROLE_DISABLED_BOOT_PASS "), disabledBoot);
+      assertTrue(overrideBoot.contains("QUERY_ROLE_OVERRIDE_BOOT_PASS "), overrideBoot);
+      assertTrue(invalidOverrideBoot.contains("QUERY_ROLE_INVALID_OVERRIDE_BOOT_PASS "),
+          invalidOverrideBoot);
+    });
+  }
+
+  @Test
+  @Tag("ai")
+  void queryOnlySettingsFileCommitBootsBAfterAPrepublicationEngineKill() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "query-role crash scenario requires retained citation model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/query-role-after-file-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      String output = runInstalledModelScenario(repo, work, "query-role-after-file-crash",
+          Map.of(), "QUERY_ROLE_AFTER_FILE_CRASH_PASS");
+      assertTrue(output.contains("QUERY_ROLE_AFTER_FILE_CRASH_PASS "), output);
+    });
+  }
+
+  @Test
+  @Tag("ai")
+  void issuedACitationFinishesAfterQueryOnlyBPublishesAndThenRetires() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "query-role issued scenario requires retained citation model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/query-role-issued-a-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      String output = runInstalledModelScenario(repo, work, "query-role-issued-a",
+          Map.of(), "QUERY_ROLE_ISSUED_A_PASS");
+      assertTrue(output.contains("QUERY_ROLE_ISSUED_A_PASS "), output);
+      Path runs = work.resolve("state/runs");
+      Path run;
+      try (var entries = Files.list(runs)) {
+        run = entries.filter(Files::isDirectory).findFirst().orElseThrow();
+      }
+      String engineLog = Files.readString(run.resolve("logs/engine.log"));
+      assertTrue(engineLog.contains(
+          "Query settings old query set retired after serving leases drained"),
+          "A's query owner did not retire after its issued lease completed");
+    });
+  }
+
+  @Test
+  @Tag("ai")
+  void queryViewAndRegistryCaptureWaitForTheSamePublication() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "query publication scenario requires retained citation model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/query-role-publication-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      String output = runInstalledModelScenario(repo, work, "query-role-publication-hold",
+          Map.of(), "QUERY_ROLE_PUBLICATION_HOLD_PASS");
+      assertTrue(output.contains("QUERY_ROLE_PUBLICATION_HOLD_PASS "), output);
+    });
+  }
+
+  @Test
+  @Tag("ai")
+  void contractBWithSettingsARebootsTheExactCommittedQueryA() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "query-role contract crash scenario requires retained citation model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/query-role-contract-crash-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "query-role-commit", Map.of(),
+          "QUERY_ROLE_COMMIT_PASS");
+      String output = runInstalledModelScenario(repo, work, "query-role-contract-b-settings-a",
+          Map.of(), "QUERY_ROLE_CONTRACT_B_SETTINGS_A_PASS");
+      String line = output.lines()
+          .filter(value -> value.startsWith("QUERY_ROLE_CONTRACT_B_SETTINGS_A_PASS "))
+          .findFirst().orElseThrow();
+      JsonNode proof = MAPPER.readTree(line.substring(
+          "QUERY_ROLE_CONTRACT_B_SETTINGS_A_PASS ".length()));
+      Instant publishedAt = Instant.ofEpochMilli(proof.path("contractPublishedAtMs").asLong());
+      Path run = work.resolve("state/runs").resolve(proof.path("runId").asText());
+      String selectedA = work.resolve("query-citation-b/model.onnx").toString();
+      String contractB = work.resolve("query-citation-c/model.onnx").toString();
+      boolean selectedAfterCrash = false;
+      for (String logLine : Files.readAllLines(run.resolve("logs/engine.log"))) {
+        JsonNode row = MAPPER.readTree(logLine);
+        if (!row.path("message").asText().startsWith("Citation scorer settings selected:")) {
+          continue;
+        }
+        if (OffsetDateTime.parse(row.path("@timestamp").asText()).toInstant()
+            .isBefore(publishedAt)) continue;
+        String message = row.path("message").asText();
+        assertFalse(message.contains(contractB), "successor selected contract B over settings A");
+        if (message.contains(selectedA)) selectedAfterCrash = true;
+      }
+      assertTrue(selectedAfterCrash,
+          "successor did not log exact settings A selection after contract B publication");
     });
   }
 

@@ -2227,7 +2227,8 @@ function assertInstallerChatSelection({ plan, preparationPayload, cut, final, ca
 }
 
 export function writeRetainedInstallerCandidate({ data, requireThat,
-  mixedChat = process.env.JUSTSEARCH_WRITER_RECOVERY_MIXED_CHAT === '1' }) {
+  mixedChat = process.env.JUSTSEARCH_WRITER_RECOVERY_MIXED_CHAT === '1',
+  candidateOwned = false }) {
   const modelsRoot = findRetainedModelsRoot();
   requireThat(modelsRoot, 'installer activation requires retained real model bytes under a models/ root');
   // Stage one coherent standard-model candidate. The local embedding manifest is generated for
@@ -2249,6 +2250,7 @@ export function writeRetainedInstallerCandidate({ data, requireThat,
     === '9df8c6ed2d15a686eeb15e080971670919966de2812daf440b4469576b33157d',
   'embedded installer fixture manifest differs from the shipped registry');
   const installedModels = {};
+  const candidateDirs = {};
   const targetEP = mixedChat ? 'CUDA' : 'CPU';
   const downloadProfile = mixedChat ? 'GPU_FULL' : 'CPU';
   for (const packageId of ['embedding', 'ner', 'splade', 'citation-scorer']) {
@@ -2278,10 +2280,47 @@ export function writeRetainedInstallerCandidate({ data, requireThat,
     if (packageId !== 'embedding' && fs.existsSync(runtimeManifest)) {
       fs.linkSync(runtimeManifest, path.join(stagedDir, 'model_manifest.json'));
     }
+    if (candidateOwned && (packageId === 'embedding' || packageId === 'citation-scorer')) {
+      // Mirror InstallPlanner.effectiveTargetDir only for fixture placement. Its public plan
+      // preview must still prove every exact registry byte is already present before install.
+      const identity = (key, value) => {
+        const normalized = key.endsWith('sha256') ? value.toUpperCase() : value;
+        return `${key}=${normalized.length}:${normalized}\n`;
+      };
+      let input = identity('package', packageId)
+        + identity('target', pkg.targetDir)
+        + identity('model', variant.filename)
+        + identity('model-sha256', variant.sha256);
+      for (const file of [...pkg.supportingFiles].sort((a, b) =>
+        a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0)) {
+        input += identity('supporting', file.filename)
+          + identity('supporting-sha256', file.sha256);
+      }
+      const targetDir = `${pkg.targetDir}/candidates/${sha256(Buffer.from(input))}`;
+      const candidateDir = path.join(candidateRoot, targetDir);
+      fs.mkdirSync(candidateDir, { recursive: true });
+      for (const file of [{ filename: variant.filename, sha256: variant.sha256,
+        sizeBytes: variant.sizeBytes }, ...pkg.supportingFiles]) {
+        const sourceFile = fs.existsSync(path.join(stagedDir, file.filename))
+          ? path.join(stagedDir, file.filename) : path.join(sourceDir, file.filename);
+        const target = path.join(candidateDir, file.filename);
+        fs.linkSync(sourceFile, target);
+        requireThat(fs.statSync(target).size === file.sizeBytes
+          && sha256File(target) === file.sha256.toLowerCase(),
+        `candidate-owned ${packageId}/${file.filename} differs from the shipped registry`);
+      }
+      candidateDirs[packageId] = path.resolve(candidateDir);
+    }
     installedModels[packageId] = {
       packageId, variantFilename: variant.filename, precision: variant.precision,
-      targetEP: variant.targetEP, targetDir: pkg.targetDir, sha256: variant.sha256,
-      installedFiles: [variant.filename, ...required.map(file => file.filename)],
+      targetEP: variant.targetEP,
+      targetDir: candidateDirs[packageId]
+        ? path.relative(candidateRoot, candidateDirs[packageId]).replaceAll('\\', '/')
+        : pkg.targetDir,
+      sha256: variant.sha256,
+      installedFiles: [variant.filename,
+        ...(candidateDirs[packageId] ? pkg.supportingFiles : required)
+          .map(file => file.filename)],
       skipped: false, skipReason: null, skipCause: null,
     };
   }
@@ -2306,7 +2345,8 @@ export function writeRetainedInstallerCandidate({ data, requireThat,
     }
     return { pkg, variant, identities };
   })() : null;
-  const modelDir = path.join(candidateRoot, 'onnx', 'gte-multilingual-base');
+  const modelDir = candidateOwned ? candidateDirs.embedding
+    : path.join(candidateRoot, 'onnx', 'gte-multilingual-base');
   const modelPath = path.join(modelDir, mixedChat ? 'model_fp16.onnx' : 'model.onnx');
   const installedFiles = installedModels.embedding.installedFiles;
   if (chatIdentity) {
@@ -2337,6 +2377,7 @@ export function writeRetainedInstallerCandidate({ data, requireThat,
   const chatCompanionIdentities = chatIdentity?.companions ?? [];
   return { contractPath, modelsRoot: path.resolve(candidateRoot), modelPath,
     modelDir: path.resolve(modelDir), installedFiles, mixedChat,
+    candidateDirs,
     chatModelPath: chatModelIdentity?.path ?? null,
     chatModelAssetId: chatModelIdentity?.assetId ?? null,
     chatCompanionAssetIds: chatCompanionIdentities.map(identity => identity.assetId),

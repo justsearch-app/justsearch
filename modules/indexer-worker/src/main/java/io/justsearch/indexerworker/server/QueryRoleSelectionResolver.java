@@ -6,10 +6,16 @@ import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.ModelRegistryLoader;
 import io.justsearch.configuration.model.ModelVariant;
+import io.justsearch.configuration.EnvRegistry;
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.ort.DevModeVariantProbe;
 import io.justsearch.ort.ModelManifest;
+import io.justsearch.ort.EncoderRole;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Objects;
 
 /** Captures both query roles before the settings file can select a new serving view. */
@@ -18,6 +24,67 @@ final class QueryRoleSelectionResolver {
       ModelRegistryLoader.loadFromClasspath("ai/model-registry.v2.json");
 
   private QueryRoleSelectionResolver() {}
+
+  record BootResolution(QueryRoleSelection selection, Map<EncoderRole, String> unavailableRoles) {
+    BootResolution {
+      unavailableRoles = Map.copyOf(unavailableRoles);
+    }
+  }
+
+  static BootResolution forBoot(QueryRoleSelection committed, ResolvedConfig resolved,
+      GenerationModelSelection generation) {
+    boolean rerankerOverride = isOperatorOverride(resolved,
+        EnvRegistry.RERANK_MODEL_PATH.configKey());
+    boolean citationOverride = isOperatorOverride(resolved,
+        EnvRegistry.CITATION_SCORER_MODEL_PATH.configKey());
+    if (!rerankerOverride && !citationOverride) {
+      return new BootResolution(enrich(committed), Map.of());
+    }
+    var projection = EncoderConfigurationProjection.from(resolved);
+    var reranker = projection.reranker();
+    var citation = projection.citation();
+    Map<EncoderRole, String> unavailable = new EnumMap<>(EncoderRole.class);
+    QueryRoleSelection.Role selectedReranker = captureForBoot(EncoderRole.RERANKER,
+        unavailable, () -> rerankerOverride
+            ? select("reranker", true, reranker.modelPath(), null, generation, false,
+                reranker.gpuEnabled())
+            : select("reranker", false, reranker.modelPath(),
+                committed == null ? null : committed.reranker(), generation,
+                reranker.isReady(), reranker.gpuEnabled()));
+    QueryRoleSelection.Role selectedCitation = captureForBoot(EncoderRole.CITATION,
+        unavailable, () -> citationOverride
+            ? select("citation-scorer", true, citation == null ? null : citation.modelPath(),
+                null, generation, false,
+                false)
+            : select("citation-scorer", false, citation == null ? null : citation.modelPath(),
+                committed == null ? null : committed.citation(), generation,
+                citation != null && citation.isReady(), false));
+    return new BootResolution(new QueryRoleSelection(selectedReranker, selectedCitation),
+        unavailable);
+  }
+
+  private static QueryRoleSelection.Role captureForBoot(EncoderRole role,
+      Map<EncoderRole, String> unavailable, BootCapture capture) {
+    try {
+      return capture.select();
+    } catch (IOException | IllegalArgumentException failure) {
+      unavailable.put(role, failure.toString());
+      // This placeholder suppresses legacy discovery. BootResolution separately marks the role
+      // unavailable, so a failed override is never mistaken for an intentional disablement.
+      return QueryRoleSelection.Role.disabled();
+    }
+  }
+
+  @FunctionalInterface
+  private interface BootCapture {
+    QueryRoleSelection.Role select() throws IOException;
+  }
+
+  private static boolean isOperatorOverride(ResolvedConfig resolved, String key) {
+    var source = resolved.resolution(key);
+    return source != null && source.isResolved()
+        && source.sourceOrdinal() >= ResolvedConfigBuilder.ORDINAL_ENV_VAR;
+  }
 
   static QueryRoleSelection.Role select(String packageId, boolean pathChanged,
       Path desiredDirectory, QueryRoleSelection.Role prior, GenerationModelSelection generation,
@@ -32,13 +99,13 @@ final class QueryRoleSelectionResolver {
     if (prior != null) {
       return enrich(packageId, prior);
     }
-    if (!currentlyWired) return QueryRoleSelection.Role.disabled();
     if (generation != null && generation.includes(packageId)) {
       Path exact = generation.verify(packageId)
           .orElseThrow(() -> new IOException("Active query model bytes changed: " + packageId))
           .file();
       return capture(packageId, exact, gpuEnabled);
     }
+    if (!currentlyWired) return QueryRoleSelection.Role.disabled();
     if (desiredDirectory == null) {
       throw new IOException("Active legacy query role has no model directory: " + packageId);
     }

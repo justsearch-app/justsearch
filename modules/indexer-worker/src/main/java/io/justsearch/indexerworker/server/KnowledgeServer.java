@@ -13,6 +13,7 @@ import io.justsearch.adapters.lucene.runtime.ReadOnlyRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
+import io.justsearch.core.harness.HarnessBarrierProtocol;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
@@ -2746,7 +2747,16 @@ public final class KnowledgeServer implements Closeable {
       var generationProjection = selection == null
           ? EncoderConfigurationProjection.from(compositionConfig)
           : EncoderConfigurationProjection.from(compositionConfig, selection);
-      var encoderConfiguration = bootQueryRoleSelection == null ? generationProjection
+      var bootQueryResolution = QueryRoleSelectionResolver.forBoot(
+          bootQueryRoleSelection, compositionConfig, selection);
+      var effectiveQuerySelection = bootQueryResolution.selection();
+      if (effectiveQuerySelection != null
+          && !effectiveQuerySelection.equals(bootQueryRoleSelection)) {
+        log.info("Query model path override selected for this Worker incarnation");
+      }
+      bootQueryResolution.unavailableRoles().forEach((role, reason) ->
+          log.warn("Query role {} unavailable during Worker boot selection: {}", role, reason));
+      var encoderConfiguration = effectiveQuerySelection == null ? generationProjection
           : generationProjection.withQueryFrom(
               EncoderConfigurationProjection.from(compositionConfig));
       InferenceSurface surface =
@@ -2758,7 +2768,8 @@ public final class KnowledgeServer implements Closeable {
               () -> !signalBus.isMainGpuActive(),
               ortSessionEvents,
               selection,
-              bootQueryRoleSelection);
+              effectiveQuerySelection)
+              .withUnavailableQueryRoles(bootQueryResolution.unavailableRoles().keySet());
       var partition = surface.partitionQueryRoles(encoderConfiguration);
       this.pendingInitialSurface = partition.index();
       this.pendingInitialQuerySurface = partition.query();
@@ -3341,6 +3352,7 @@ public final class KnowledgeServer implements Closeable {
           }
           old.releaseModelSets();
           old.queryRoleSet.close();
+          log.info("Query settings old query set retired after serving leases drained");
         };
         retiredServingViews.add(old);
         appServices = services;
@@ -3349,6 +3361,25 @@ public final class KnowledgeServer implements Closeable {
         startupConfiguration = configuration;
         installed = true;
         servingViewMonitor.notifyAll();
+      }
+      awaitQueryPublicationBarrier();
+    }
+
+    private void awaitQueryPublicationBarrier() {
+      String selected = SystemAccess.rawEnvVar("JUSTSEARCH_QUERY_PUBLICATION_BARRIER");
+      if (selected == null) return;
+      if (!"1".equals(selected)
+          || !"1".equals(SystemAccess.rawEnvVar("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
+        throw new IllegalArgumentException("Query publication barrier requires supervisor harness");
+      }
+      try {
+        HarnessBarrierProtocol.await(dataDir, "query-publication",
+            "{\"pid\":" + ProcessHandle.current().pid() + "}", false);
+      } catch (IOException failure) {
+        throw new IllegalStateException("Query publication barrier failed", failure);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Query publication barrier interrupted", interrupted);
       }
     }
 
