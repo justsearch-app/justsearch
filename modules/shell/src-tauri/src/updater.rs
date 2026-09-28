@@ -2374,14 +2374,14 @@ mod tests {
     }
 
     #[test]
-    fn ui_settings_v4_successor_reads_legacy_v1_without_changing_strategy_identity() {
+    fn ui_settings_v5_successor_reads_legacy_v1_without_changing_strategy_identity() {
         let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         let old = local
             .durable_stores
             .iter_mut()
             .find(|store| store.id == "ui-settings")
             .unwrap();
-        assert_eq!(old.current_version, 4);
+        assert_eq!(old.current_version, 5);
         assert_eq!(old.reconciliation, "READ_V0_OR_V1_AND_WRITE_V1");
         old.current_version = 1;
 
@@ -2390,8 +2390,8 @@ mod tests {
             .iter_mut()
             .find(|store| store.owner_id == "ui-settings")
             .unwrap();
-        assert_eq!(successor.format_version, 4);
-        successor.readable_source_versions = vec![0, 1, 2, 3, 4];
+        assert_eq!(successor.format_version, 5);
+        successor.readable_source_versions = vec![0, 1, 2, 3, 4, 5];
         let accepted = test_descriptor(compatibility.clone());
         validate_store_compatibility_against(local, &accepted).unwrap();
 
@@ -2401,7 +2401,7 @@ mod tests {
             .iter_mut()
             .find(|store| store.owner_id == "ui-settings")
             .unwrap()
-            .reconciliation_strategy = "READ_V0_TO_V4_AND_WRITE_V4".into();
+            .reconciliation_strategy = "READ_V0_TO_V5_AND_WRITE_V5".into();
         let mut old_local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         old_local
             .durable_stores

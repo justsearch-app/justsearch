@@ -198,6 +198,12 @@ serving view, preserve the running Green producer, then connect the fixed
 owner and boot path before installed/crash-cut acceptance. The read-only owner
 audit traced initial/deferred, candidate, in-place, promotion, close and
 quiescence paths; D1 records that scope. Root owns the coupled lifecycle writes.
+The protocol checkpoint was pushed as `bd7f6f8e55ffeeb12b4d37e856eeccaaee479313`.
+Exact-SHA hosted run `36438217262` exposed a shell-crate compatibility test
+that still expected ui-settings v4; the register correctly reports v5. The
+test now checks v5 reading legacy v1 without changing strategy identity;
+the focused Rust test passed at `tmp/5274` and all 90 shell library tests
+passed at `tmp/5275`. The corrective push and hosted result are pending.
 
 The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
 `codex/lane-f-workflow-order` from `origin/main`, in its separate managed
