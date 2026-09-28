@@ -17,6 +17,7 @@ import {
 import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
 import { captureFromLive } from '../codegen/gen-api-client.mjs';
 import { exerciseReconfigureRefresh } from './reconfigure-refresh-scenario.mjs';
+import { exerciseQueryRoleScenario } from './query-role-scenario.mjs';
 import { assertFixtureFreeSpace, pruneRegenerableModelCaches } from './prune-model-caches.mjs';
 
 const repo = process.cwd();
@@ -29,6 +30,9 @@ const bulkFault = Object.hasOwn(BULK_FAULT_CASES, scenario ?? '');
 const bulkGapApproval = scenario === 'bulk-gap-approval';
 const installerFault = Object.hasOwn(INSTALLER_FAULT_CASES, scenario ?? '');
 const modelBoot = scenario === 'model-x-y-boot' || scenario === 'model-missing-x-boot';
+const queryRoleScenario = scenario === 'query-role-commit' || scenario === 'query-role-boot'
+  || scenario === 'query-role-tampered-boot' || scenario === 'query-role-clear'
+  || scenario === 'query-role-disabled-boot';
 const modelLiveABGap = scenario === 'model-live-a-b-gap';
 const modelLiveABCancel = scenario === 'model-live-a-b-cancel';
 const modelLiveABRecomposeFailure = scenario === 'model-live-a-b-recompose-failure';
@@ -272,6 +276,10 @@ if (modelBoot) {
     if (fs.existsSync(modelX) && !fs.existsSync(missing)) fs.renameSync(modelX, missing);
   }
 }
+if (queryRoleScenario) {
+  delete env.AI_OFFLINE;
+  env.JUSTSEARCH_CITATION_SCORER_ENABLED = 'true';
+}
 const runner = path.join(repo, 'scripts', 'dev', 'dev-runner.cjs');
 const engineLogWindow = modelLiveAB ? (() => {
   const file = path.join(data, 'logs', 'engine.log');
@@ -423,6 +431,10 @@ try {
     console.log('PASS route-capture', JSON.stringify({ routeCount: captured.count, work }));
   } else if (scenario === 'reconfigure-refresh') {
     await exerciseReconfigureRefresh({ apiPort, manifest, request, post, waitFor,
+      requireThat, createOperationKey });
+  } else if (queryRoleScenario) {
+    await exerciseQueryRoleScenario({ scenario, work, data,
+      modelsRoot: findRetainedModelsRoot(), apiPort, manifest, request, post, waitFor,
       requireThat, createOperationKey });
   } else if (bulkGapApproval) {
     await exerciseBulkGapApproval({ work, data, indexBase, first, manifest, apiPort,

@@ -440,7 +440,8 @@ public class HeadlessApp {
       io.justsearch.ui.api.UpgradeShutdownBridge upgradeShutdownBridge,
       io.justsearch.ui.api.LifecycleShutdownBridge lifecycleShutdownBridge,
       io.justsearch.app.engine.EngineRoot engineRoot,
-      io.justsearch.app.services.settings.FixedSettingsComponentComposer settingsComponents)
+      io.justsearch.app.services.settings.FixedSettingsComponentComposer settingsComponents,
+      java.util.concurrent.CompletableFuture<Void> settingsReconciled)
       throws Exception {
     Telemetry telemetry = infraPhase.telemetry();
     ResolvedConfig resolvedConfig = infraPhase.config().resolvedConfig();
@@ -456,9 +457,17 @@ public class HeadlessApp {
       // Register fixed physical owners before the API can admit a settings transaction.
       var generativeSettingsOwner = bootstrap.generativeSettingsOwner();
       settingsComponents.register("generative", generativeSettingsOwner);
+      settingsComponents.register("encoders", engineRoot.queryRoleSettingsOwner(
+          () -> settingsStore.inspect().queryRoles()));
       settingsComponents.seal();
-      if (!engineRoot.operationAttempts().reconcileSettingsAfterComposition()) {
-        generativeSettingsOwner.markRecoveryUnavailable();
+      try {
+        if (!engineRoot.operationAttempts().reconcileSettingsAfterComposition()) {
+          generativeSettingsOwner.markRecoveryUnavailable();
+        }
+        settingsReconciled.complete(null);
+      } catch (RuntimeException | Error failure) {
+        settingsReconciled.completeExceptionally(failure);
+        throw failure;
       }
       log.info("HeadAssembly started (degraded â€” Worker connecting in background).");
 
@@ -1126,6 +1135,7 @@ public class HeadlessApp {
           childRegistry, requestedRestartAction, operationAuthority, configPhase.configStore(),
           runtimeResources);
       processRoot = engineRoot;
+      engineRoot.bindQueryRoleBootSelection(() -> resetSettingsStore.loadSnapshot().queryRoles());
 
       // Phase 1: infrastructure (telemetry, policy)
       InfraPhaseResult infraPhase = setupInfra(configPhase, engineRoot.executors());
@@ -1136,6 +1146,7 @@ public class HeadlessApp {
       tPrev = tPhase;
 
       // Start Knowledge Server asynchronously â€” startup runs in parallel with API construction.
+      var settingsReconciled = new java.util.concurrent.CompletableFuture<Void>();
       var bootstrapLimits = engineRoot.executors().limits(
           io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
       var bootstrapOwner = engineRoot.executors().register(
@@ -1155,24 +1166,32 @@ public class HeadlessApp {
                   reconciler.reconcile();
                 }
               },
-              () ->
-                  tryStartKnowledgeServer(
+              () -> {
+                  settingsReconciled.join();
+                  return tryStartKnowledgeServer(
                       ksConfig, engineRoot,
-                      OperationFaultBarrier.automaticRootProducersEnabled(SystemAccess::rawEnvVar, operationFaultHook)));
+                      OperationFaultBarrier.automaticRootProducersEnabled(SystemAccess::rawEnvVar, operationFaultHook));
+              });
       // Graceful retirement from the completing task cannot interrupt its own completion path.
       // The process registry continues accounting the concrete instance until it actually exits.
       pendingIndexStartup = workerFuture;
       workerFuture.whenComplete((result, failure) -> bootstrapExecutor.shutdown());
 
       // Phase 2: Build API server (degraded mode â€” no Worker yet)
-      ApiPhaseResult apiPhase =
-          buildApi(
+      ApiPhaseResult apiPhase;
+      try {
+        apiPhase = buildApi(
               infraPhase,
               settingsStore,
               manifestPublisher,
               childRegistry,
               upgradeShutdownBridge,
-              lifecycleShutdownBridge, engineRoot, settingsComponents);
+              lifecycleShutdownBridge, engineRoot, settingsComponents,
+              settingsReconciled);
+      } catch (Exception | Error failure) {
+        settingsReconciled.completeExceptionally(failure);
+        throw failure;
+      }
       bootstrap = apiPhase.bootstrap();
       apiServer = apiPhase.apiServer();
 

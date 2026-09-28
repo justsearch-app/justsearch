@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.server;
 
 import ai.onnxruntime.OrtException;
 import io.justsearch.configuration.model.ExecutionProvider;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.InstallContract;
 import io.justsearch.configuration.model.VariantSelection;
@@ -42,6 +43,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -344,6 +346,18 @@ public final class InferenceCompositionRoot {
       GpuArbiter arbiter,
       OrtSessionTelemetryEvents events,
       GenerationModelSelection selection) {
+    return compose(projection, hardware, contract, modelsDir, arbiter, events, selection, null);
+  }
+
+  static InferenceSurface compose(
+      EncoderConfigurationProjection projection,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir,
+      GpuArbiter arbiter,
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection,
+      QueryRoleSelection witnessedQuery) {
     ResolvedConfig cfg = projection.config();
     List<SessionHandle> handles = new ArrayList<>();
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
@@ -430,7 +444,8 @@ public final class InferenceCompositionRoot {
             policies,
             requestedRoles,
             events,
-            selection);
+            selection,
+            witnessedQuery == null ? null : witnessedQuery.reranker());
 
     Optional<RerankerAssembly> citation =
         composeCitationRole(
@@ -443,7 +458,8 @@ public final class InferenceCompositionRoot {
             policies,
             requestedRoles,
             events,
-            selection);
+            selection,
+            witnessedQuery == null ? null : witnessedQuery.citation());
 
     RuntimePolicy runtime = RuntimePolicyResolver.resolve(cfg, hardware);
     PolicySnapshot snapshot = new PolicySnapshot(runtime, policies);
@@ -465,6 +481,32 @@ public final class InferenceCompositionRoot {
         handles,
         InferenceSurface.ComponentObservation.composed(
             projection.digest(), requestedRoles, presentRoles));
+  }
+
+  /** Composes only the independently mutable query roles from one committed byte witness. */
+  static InferenceSurface composeQueryRoles(EncoderConfigurationProjection projection,
+      QueryRoleSelection selection, HardwareProfile hardware, GpuArbiter arbiter,
+      OrtSessionTelemetryEvents events) {
+    Objects.requireNonNull(projection, "projection");
+    Objects.requireNonNull(selection, "selection");
+    ResolvedConfig cfg = projection.config();
+    List<SessionHandle> handles = new ArrayList<>();
+    TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
+    EnumSet<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
+    Optional<RerankerAssembly> reranker = composeRerankerRole(projection.reranker(), cfg,
+        hardware, null, null, arbiter, handles, policies, requested, events, null,
+        selection.reranker());
+    Optional<RerankerAssembly> citation = composeCitationRole(projection.citation(), cfg,
+        hardware, null, null, handles, policies, requested, events, null,
+        selection.citation());
+    EnumSet<EncoderRole> present = EnumSet.noneOf(EncoderRole.class);
+    reranker.ifPresent(ignored -> present.add(EncoderRole.RERANKER));
+    citation.ifPresent(ignored -> present.add(EncoderRole.CITATION));
+    return new InferenceSurface(Optional.empty(), Optional.empty(), reranker, citation,
+        Optional.empty(), Optional.empty(),
+        new PolicySnapshot(RuntimePolicyResolver.resolve(cfg, hardware), policies), handles,
+        InferenceSurface.ComponentObservation.composed(projection.queryDigest(), requested,
+            present));
   }
 
   // -------- Per-role composition helpers (tempdoc 397 §14.26 T2-C1). --------
@@ -692,29 +734,34 @@ public final class InferenceCompositionRoot {
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events,
-      GenerationModelSelection selection) {
-    if (rerankCfg.enabled()) {
-      requestedRoles.add(EncoderRole.RERANKER);
-    }
-    if (!rerankCfg.isReady()) {
+      GenerationModelSelection selection,
+      QueryRoleSelection.Role witnessed) {
+    if (witnessed != null && witnessed.state() == QueryRoleSelection.State.DISABLED) {
       return Optional.empty();
     }
-    VariantSelection variant =
-        resolveVariant(
+    if (witnessed != null || rerankCfg.enabled()) {
+      requestedRoles.add(EncoderRole.RERANKER);
+    }
+    if (witnessed == null && !rerankCfg.isReady()) {
+      return Optional.empty();
+    }
+    VariantSelection variant = witnessed == null
+        ? resolveVariant(
             "reranker",
             contract,
             hardware,
             modelsDir,
             rerankCfg.modelPath(),
             rerankCfg.gpuEnabled(),
-            selection);
+            selection)
+        : witnessedVariant(witnessed, rerankCfg.gpuEnabled());
     if (variant == null) {
       log.info("Search reranker: no variant resolved; reranking disabled.");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
-      SessionHandle sessions =
-          compose(
+      sessions = compose(
               EncoderRole.RERANKER.consumerName(),
               EncoderRole.RERANKER,
               cfg,
@@ -732,17 +779,18 @@ public final class InferenceCompositionRoot {
       io.justsearch.indexerworker.metrics.OperationalMetrics.getInstance()
           .registerEncoder(EncoderRole.RERANKER.consumerName(), rerankerProfiler);
       sessions.setOrtRunRecorder(rerankerProfiler::recordOrtCall);
-      RerankerAssembly assembly =
-          CrossEncoderReranker.buildAssembly(
-              sessions,
-              rerankCfg.modelPath().resolve("tokenizer.json"),
-              rerankCfg.maxSequenceLength());
+      RerankerAssembly assembly = witnessed == null
+          ? CrossEncoderReranker.buildAssembly(sessions,
+              rerankCfg.modelPath().resolve("tokenizer.json"), rerankCfg.maxSequenceLength())
+          : CrossEncoderReranker.buildAssembly(sessions, witnessed.tokenizer().path(),
+              witnessed.model().path(), rerankCfg.maxSequenceLength());
       handles.add(assembly.sessions());
       policies.put(
           EncoderRole.RERANKER,
           ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, hardware, variant));
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedQueryHandle(sessions, e);
       log.warn("Failed to initialize search reranker (non-fatal): {}", e.getMessage());
       log.debug("Failed to initialize search reranker (stack trace)", e);
       return Optional.empty();
@@ -759,32 +807,38 @@ public final class InferenceCompositionRoot {
       java.util.Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events,
-      GenerationModelSelection selection) {
-    if (citationCfg != null && citationCfg.enabled()) {
-      requestedRoles.add(EncoderRole.CITATION);
-    }
-    if (citationCfg == null || !citationCfg.isReady()) {
+      GenerationModelSelection selection,
+      QueryRoleSelection.Role witnessed) {
+    if (witnessed != null && witnessed.state() == QueryRoleSelection.State.DISABLED) {
       return Optional.empty();
     }
-    VariantSelection variant =
-        resolveVariant(
+    if (witnessed != null || citationCfg != null && citationCfg.enabled()) {
+      requestedRoles.add(EncoderRole.CITATION);
+    }
+    if (citationCfg == null || witnessed == null && !citationCfg.isReady()) {
+      return Optional.empty();
+    }
+    VariantSelection variant = witnessed == null
+        ? resolveVariant(
             "citation-scorer",
             contract,
             hardware,
             modelsDir,
             citationCfg.modelPath(),
             /* gpuEnabled= */ false,
-            selection);
+            selection)
+        : witnessed.targetEp() == ExecutionProvider.CPU
+            ? witnessedVariant(witnessed, false) : null;
     if (variant == null) {
       log.info("Citation scorer: no variant resolved; citation scoring disabled.");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
       ModelSessionPolicy policy =
           ModelSessionPolicyResolver.resolve(EncoderRole.CITATION, cfg, hardware, variant);
       assertCitationIsCpuOnly(variant, policy);
-      SessionHandle sessions =
-          buildHandle(
+      sessions = buildHandle(
               EncoderRole.CITATION.consumerName(),
               cfg,
               hardware,
@@ -800,11 +854,11 @@ public final class InferenceCompositionRoot {
       io.justsearch.indexerworker.metrics.OperationalMetrics.getInstance()
           .registerEncoder(EncoderRole.CITATION.consumerName(), citationProfiler);
       sessions.setOrtRunRecorder(citationProfiler::recordOrtCall);
-      RerankerAssembly assembly =
-          CitationScorer.buildAssembly(
-              sessions,
-              citationCfg.modelPath().resolve("tokenizer.json"),
-              citationCfg.maxSequenceLength());
+      RerankerAssembly assembly = witnessed == null
+          ? CitationScorer.buildAssembly(sessions,
+              citationCfg.modelPath().resolve("tokenizer.json"), citationCfg.maxSequenceLength())
+          : CitationScorer.buildAssembly(sessions, witnessed.tokenizer().path(),
+              witnessed.model().path(), citationCfg.maxSequenceLength());
       if (selection != null) {
         log.info("Citation scorer generation selected: model={}, sha256={}",
             variant.modelFile().toAbsolutePath().normalize(),
@@ -814,10 +868,31 @@ public final class InferenceCompositionRoot {
       policies.put(EncoderRole.CITATION, policy);
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedQueryHandle(sessions, e);
       log.warn("Citation scorer init failed (non-fatal): {}", e.getMessage());
       log.debug("Citation scorer init failed (stack trace)", e);
       return Optional.empty();
     }
+  }
+
+  private static void retireFailedQueryHandle(SessionHandle sessions, Exception cause) {
+    if (sessions == null) return;
+    try {
+      sessions.close();
+      if (sessions.retirementStatus() == SessionHandle.RetirementStatus.RETIRED) return;
+    } catch (RuntimeException closeFailure) {
+      cause.addSuppressed(closeFailure);
+    }
+    throw new IllegalStateException("Failed query assembly retained its native session", cause);
+  }
+
+  private static VariantSelection witnessedVariant(QueryRoleSelection.Role role,
+      boolean gpuEnabled) {
+    if (role.state() != QueryRoleSelection.State.SELECTED || role.precision() == null
+        || role.targetEp() == null || !GenerationModelSelection.verifyIdentity(role.model())
+        || !GenerationModelSelection.verifyIdentity(role.tokenizer())) return null;
+    return DevModeVariantProbe.probeExact(role.model().path(), role.precision(),
+        role.targetEp(), gpuEnabled);
   }
 
   /**

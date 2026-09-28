@@ -141,6 +141,23 @@ public final class DevModeVariantProbe {
         gpuEnabled ? ExecutionProvider.CUDA : ExecutionProvider.CPU);
   }
 
+  /** Uses a committed variant descriptor without consulting mutable model-directory metadata. */
+  public static VariantSelection probeExact(Path modelFile, ModelPrecision precision,
+      ExecutionProvider targetEp, boolean gpuEnabled) {
+    if (modelFile == null || precision == null || targetEp == null
+        || !Files.isRegularFile(modelFile, LinkOption.NOFOLLOW_LINKS)) return null;
+    if (!gpuEnabled && precision == ModelPrecision.FP16) {
+      log.warn("Exact witnessed model {} requires FP16 but CUDA is unavailable", modelFile);
+      return null;
+    }
+    if (gpuEnabled && targetEp == ExecutionProvider.CPU) {
+      return VariantSelection.degraded(modelFile, precision, ExecutionProvider.CUDA,
+          "Witnessed CPU variant selected on CUDA");
+    }
+    return VariantSelection.optimal(modelFile, precision,
+        gpuEnabled ? ExecutionProvider.CUDA : ExecutionProvider.CPU);
+  }
+
   /**
    * Tempdoc 710 Wave 2 Move 1 orphan #4: precision comes from the manifest's declared {@code
    * capabilities.cpu_precision}/{@code gpu_precision} field when present; the filename-substring

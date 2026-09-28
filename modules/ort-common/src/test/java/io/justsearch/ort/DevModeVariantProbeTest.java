@@ -107,6 +107,25 @@ class DevModeVariantProbeTest {
   }
 
   @Test
+  void witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile(@TempDir Path modelDir)
+      throws IOException {
+    Path selectedFile = Files.createFile(modelDir.resolve("selected.onnx"));
+    Files.createFile(modelDir.resolve("sibling.onnx"));
+    Files.writeString(modelDir.resolve("model_manifest.json"),
+        "{\"cpu\":\"sibling.onnx\",\"capabilities\":{\"cpu_precision\":\"fp32\"}}");
+
+    assertNull(DevModeVariantProbe.probeExact(selectedFile, false));
+    var selected = DevModeVariantProbe.probeExact(selectedFile, ModelPrecision.INT8,
+        ExecutionProvider.CPU, false);
+    assertNotNull(selected);
+    assertEquals(selectedFile, selected.modelFile());
+    assertEquals(ModelPrecision.INT8, selected.precision());
+    assertEquals(ExecutionProvider.CPU, selected.executionProvider());
+    assertNull(DevModeVariantProbe.probeExact(selectedFile, ModelPrecision.FP16,
+        ExecutionProvider.CUDA, false));
+  }
+
+  @Test
   void optimizedSidecarAcceptedInPlaceOfBareFile(@TempDir Path modelDir) throws IOException {
     // ORT graph-optimisation cache can exist without the original when a build was incremental.
     Files.createFile(modelDir.resolve("model.onnx.optimized"));

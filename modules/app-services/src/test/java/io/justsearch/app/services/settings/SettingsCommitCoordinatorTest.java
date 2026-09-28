@@ -118,7 +118,9 @@ final class SettingsCommitCoordinatorTest {
     var selection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
         QueryRoleSelection.Role.selected("model.onnx",
             new ModelFile(modelDir.resolve("model.onnx"), "0".repeat(64), 1),
-            new ModelFile(modelDir.resolve("tokenizer.json"), "1".repeat(64), 1)));
+            new ModelFile(modelDir.resolve("tokenizer.json"), "1".repeat(64), 1),
+            io.justsearch.configuration.model.ModelPrecision.INT8,
+            io.justsearch.configuration.model.ExecutionProvider.CPU));
     AtomicBoolean preparedOwner = new AtomicBoolean();
     SettingsComponentComposer components = (candidate, desired, affected) -> {
       assertEquals(Set.of("encoders"), affected.keySet());
@@ -181,16 +183,27 @@ final class SettingsCommitCoordinatorTest {
     assets.add(new RecordedInstallerGenerationPlan.AssetIdentity(
         "reranker/tokenizer.json", rerankerDir.resolve("tokenizer.json"),
         "2".repeat(64), 1, bothWithoutTokenizers.acquisition()));
+    var registry = io.justsearch.configuration.model.ModelRegistryLoader
+        .loadFromClasspath("ai/model-registry.v2.json");
+    var registeredModels = bothWithoutTokenizers.models().stream().map(model -> {
+      var variant = registry.findPackage(model.packageId()).variants().getFirst();
+      return new RecordedInstallerGenerationPlan.ModelIdentity(model.packageId(),
+          variant.filename(), model.path().getParent().resolve(variant.filename()),
+          variant.sha256().toLowerCase(java.util.Locale.ROOT), variant.sizeBytes(),
+          model.provenance());
+    }).toList();
     var complete = new RecordedInstallerGenerationPlan(bothWithoutTokenizers.operationId(),
         bothWithoutTokenizers.profile(), bothWithoutTokenizers.source(),
         bothWithoutTokenizers.operationKey(), bothWithoutTokenizers.sourceGeneration(),
         bothWithoutTokenizers.scope(), bothWithoutTokenizers.target(),
         bothWithoutTokenizers.settingsWitness(), bothWithoutTokenizers.candidateSettings(),
-        bothWithoutTokenizers.models(), assets, bothWithoutTokenizers.chatSelection(),
+        registeredModels, assets, bothWithoutTokenizers.chatSelection(),
         bothWithoutTokenizers.acquisition(), bothWithoutTokenizers.projectionSourceIds());
     var expected = InstallerQueryRoleSelection.fromPlan(complete).orElseThrow();
     assertEquals(QueryRoleSelection.State.SELECTED, expected.reranker().state());
     assertEquals(modelDir.resolve("tokenizer.json"), expected.citation().tokenizer().path());
+    assertEquals(io.justsearch.configuration.model.ModelPrecision.INT8,
+        expected.citation().precision());
 
     var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
         temp.resolve("plan-query-settings.json"));
@@ -738,6 +751,54 @@ final class SettingsCommitCoordinatorTest {
       assertEquals("COMPONENT_PREPARATION_REQUIRED", result.response().errorCode().orElseThrow());
       assertEquals("index", result.response().errorDetails().get("component"));
       org.mockito.Mockito.verify(first).abort();
+      org.mockito.Mockito.verify(lease).close();
+      assertArrayEquals(originalBytes, Files.readAllBytes(settingsPath));
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      assertSame(initial, config.get());
+    }
+  }
+
+  @Test
+  void generativeRefusalAfterQueryOwnerPreparationLeavesTheExactSettingsWitnessAtA()
+      throws Exception {
+    Path settingsPath = temp.resolve("query-first-settings.json");
+    try (var operations = operations("query-first")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      settings.replacePrepared(settings.prepareExact(new UiSettings(), new SettingsWitness(0, null)));
+      byte[] originalBytes = Files.readAllBytes(settingsPath);
+      var initial = ConfigStoreRebuilder.prepare(settings.load());
+      var config = new ConfigStore(initial);
+      var registry = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.class);
+      var lease = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.ApplyLease.class);
+      org.mockito.Mockito.when(registry.tryApply()).thenReturn(
+          new io.justsearch.core.component.EngineComponentRegistry.ApplyAttempt.Acquired(lease));
+      var query = org.mockito.Mockito.mock(FixedSettingsComponentComposer.QueryRolePreparedOwner.class);
+      org.mockito.Mockito.when(query.selection()).thenReturn(new QueryRoleSelection(
+          QueryRoleSelection.Role.disabled(), QueryRoleSelection.Role.disabled()));
+      org.mockito.Mockito.when(query.observation()).thenReturn(
+          org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentSnapshot.Component.class));
+      var components = new FixedSettingsComponentComposer(registry);
+      components.register("encoders", (candidate, desired, keys) -> query);
+      components.register("generative", (candidate, desired, keys) -> {
+        throw new SettingsCommitOwner.Refused(OperationResult.failure(
+            "Generative candidate refused", "COMPONENT_PREPARATION_REQUIRED",
+            Map.of("component", "generative"), false));
+      });
+      components.seal();
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+          candidate -> OperationResult.success("prepared"), () -> false, components);
+      var runner = runner(operations, owner);
+      UiSettings candidate = settings.load();
+      candidate.setCitationScorerModelPath(temp.resolve("citation-b").toString());
+      candidate.setContextLength(initial.ai().contextSize() + 1024);
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertEquals(OperationState.FAILED, result.record().state());
+      assertEquals("generative", result.response().errorDetails().get("component"));
+      org.mockito.Mockito.verify(query).abort();
       org.mockito.Mockito.verify(lease).close();
       assertArrayEquals(originalBytes, Files.readAllBytes(settingsPath));
       assertEquals(new SettingsWitness(0, null), settings.inspect().witness());

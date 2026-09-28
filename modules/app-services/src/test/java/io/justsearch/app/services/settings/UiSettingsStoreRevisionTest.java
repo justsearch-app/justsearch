@@ -118,7 +118,9 @@ class UiSettingsStoreRevisionTest {
     var selected = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
         QueryRoleSelection.Role.selected("cpu", new ModelFile(
             directory.resolve("citation/model.onnx"), "a".repeat(64), 10),
-            new ModelFile(directory.resolve("citation/tokenizer.json"), "b".repeat(64), 20)));
+            new ModelFile(directory.resolve("citation/tokenizer.json"), "b".repeat(64), 20),
+            io.justsearch.configuration.model.ModelPrecision.INT8,
+            io.justsearch.configuration.model.ExecutionProvider.CPU));
     store.replacePrepared(store.prepareExact(new UiSettings(),
         new SettingsWitness(1, KEY), selected));
     assertEquals(selected, new UiSettingsStore(READ_WRITE, path).loadSnapshot().queryRoles());
@@ -131,7 +133,23 @@ class UiSettingsStoreRevisionTest {
     var model = new ModelFile(directory.resolve("a/model.onnx"), "a".repeat(64), 10);
     var tokenizer = new ModelFile(directory.resolve("b/tokenizer.json"), "b".repeat(64), 20);
     assertThrows(IllegalArgumentException.class,
-        () -> QueryRoleSelection.Role.selected("cpu", model, tokenizer));
+        () -> QueryRoleSelection.Role.selected("cpu", model, tokenizer,
+            io.justsearch.configuration.model.ModelPrecision.INT8,
+            io.justsearch.configuration.model.ExecutionProvider.CPU));
+  }
+
+  @Test
+  void earlierV5QuerySelectionWithoutRuntimeDescriptorRemainsReadable() throws Exception {
+    Path path = directory.resolve("earlier-v5-settings.json");
+    var model = new ModelFile(directory.resolve("legacy/model.onnx"), "a".repeat(64), 10);
+    var tokenizer = new ModelFile(directory.resolve("legacy/tokenizer.json"), "b".repeat(64), 20);
+    var earlier = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
+        new QueryRoleSelection.Role(QueryRoleSelection.State.SELECTED, "model.onnx",
+            model, tokenizer, null, null));
+    var store = new UiSettingsStore(READ_WRITE, path);
+    store.replacePrepared(store.prepareExact(new UiSettings(), new SettingsWitness(1, KEY), earlier));
+    assertEquals(earlier, new UiSettingsStore(READ_WRITE, path).loadSnapshot().queryRoles());
+    assertNull(earlier.citation().precision());
   }
 
   @Test

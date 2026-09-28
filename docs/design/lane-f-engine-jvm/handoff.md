@@ -232,10 +232,33 @@ digest on an index-only surface (XML in `tmp/5294-full-red-xml/`); it now checks
 both domain digests and the combined version. The repaired fixture and
 app-launcher gate passed at `tmp/5295`; the repository suite passed at
 `tmp/5296` (196 tasks, one executed, one from cache, 194 up-to-date), and
-global Spotless/PMD plus `build -x test` passed at `tmp/5297`. Hosted proof
-is pending.
-This cut has no ordinary fixed owner, boot witness binding, or installed
-query-only proof yet. Continue with those before Batch 5 acceptance.
+global Spotless/PMD plus `build -x test` passed at `tmp/5297`. The split was
+pushed as `95e62734439317dc489f437065e660889947d15d`; exact-SHA hosted
+[run 36447151206](https://github.com/justsearch-app/justsearch/actions/runs/36447151206)
+passed all 13 jobs. This is Worker ownership proof, not Batch 5 acceptance.
+The following uncommitted Batch 5 cut connects the ordinary fixed `encoders`
+owner, boot witness binding, and the public settings v2 query-path fields. It
+passes focused owner lifetime, settings second-component refusal, schema,
+component registry, and frontend type checks (`tmp/5308`, `tmp/5309`,
+`tmp/5312`, `tmp/5315`, `tmp/5318`, `tmp/5319`, `tmp/5326`). The installed
+five-incarnation query-only citation sequence passes at `tmp/5325`: A commits
+an exact model and tokenizer witness, B reboots and scores a real citation,
+tampered tokenizer bytes make only citation unavailable while lexical search
+answers, and explicit disablement persists across another reboot. Its test
+reports one AI test, zero failures/skips and clean owned ports. Red fixture
+outputs at `tmp/5317`, `tmp/5320`, and `tmp/5321` record corrected public
+schema, deferred owner readiness, and witness file format assumptions. This is
+local proof only. Global Spotless/PMD passed at `tmp/5327` and `build -x test`
+passed at `tmp/5328`; llms.txt, skills sync, canonical links, module graph,
+and runtime configuration matrix checks passed. Direct frontend unit execution
+without its expected localhost:3000 fixture emitted `ECONNREFUSED` and was
+stopped; the frontend typecheck passed at `tmp/5319`. Exact-SHA hosted proof
+and the remaining Batch 5 cuts below are open.
+
+Batch 5 still needs a contract-B/settings-A crash, a post-settings/pre-view
+kill, an issued A citation query crossing B publication, concurrent registry
+and serving-view observation, and higher-priority boot model-path override
+proof. Do not treat the installed sequence as full D1-4 acceptance.
 
 The WP9 docs-only workflow-order fix is committed locally as `d9111bf0e` on
 `codex/lane-f-workflow-order` from `origin/main`, in its separate managed

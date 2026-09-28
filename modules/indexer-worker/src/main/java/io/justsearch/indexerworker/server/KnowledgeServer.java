@@ -32,6 +32,8 @@ import io.justsearch.indexerworker.recovery.IndexRecoveryPolicy;
 import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
 import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.app.api.status.MigrationSource;
+import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.indexerworker.liveness.LivenessWindows;
 import io.justsearch.indexerworker.util.IndexRootLock;
@@ -489,6 +491,13 @@ public final class KnowledgeServer implements Closeable {
       deviceMemoryLine;
   private RecordedIngestionLifecycle.Attachment recordedIngestionAttachment;
   private volatile ResolvedConfig startupConfiguration;
+  private QueryRoleSelection bootQueryRoleSelection;
+
+  /** Bound after settings reconciliation and before the first model composition. */
+  public void bindBootQueryRoleSelection(QueryRoleSelection selection) {
+    if (running) throw new IllegalStateException("Query witness must be bound before Worker start");
+    bootQueryRoleSelection = QueryRoleSelectionResolver.enrich(selection);
+  }
   /** Accepted B configuration, independent of the A snapshot while Green is built. */
   private volatile RecordedIngestionLifecycle.RecordedCandidate recordedCandidate;
   private volatile io.justsearch.indexerworker.services.CandidateIndexTargetCapture.CaptureResult
@@ -2734,9 +2743,12 @@ public final class KnowledgeServer implements Closeable {
         throw new IOException("Active generation model mode is unavailable");
       }
       this.initialModelSelection = selection;
-      var encoderConfiguration = selection == null
+      var generationProjection = selection == null
           ? EncoderConfigurationProjection.from(compositionConfig)
           : EncoderConfigurationProjection.from(compositionConfig, selection);
+      var encoderConfiguration = bootQueryRoleSelection == null ? generationProjection
+          : generationProjection.withQueryFrom(
+              EncoderConfigurationProjection.from(compositionConfig));
       InferenceSurface surface =
           InferenceCompositionRoot.compose(
               encoderConfiguration,
@@ -2745,7 +2757,8 @@ public final class KnowledgeServer implements Closeable {
               modelsDir,
               () -> !signalBus.isMainGpuActive(),
               ortSessionEvents,
-              selection);
+              selection,
+              bootQueryRoleSelection);
       var partition = surface.partitionQueryRoles(encoderConfiguration);
       this.pendingInitialSurface = partition.index();
       this.pendingInitialQuerySurface = partition.query();
@@ -3156,6 +3169,219 @@ public final class KnowledgeServer implements Closeable {
         : intentionallyAbsent ? io.justsearch.core.component.ComponentState.ABSENT
         : io.justsearch.core.component.ComponentState.UNAVAILABLE,
         desiredVersion, appliedVersion, evidence);
+  }
+
+  /** Builds a private query successor while retaining the exact currently issued A view. */
+  public PreparedQueryRoleSettings prepareQueryRoleSettings(UiSettings candidate,
+      ResolvedConfig desired, Set<String> changedKeys, QueryRoleSelection prior) {
+    Objects.requireNonNull(candidate, "candidate");
+    Objects.requireNonNull(desired, "desired");
+    Objects.requireNonNull(changedKeys, "changedKeys");
+    ServingLease source = captureServingView();
+    QueryRoleSet preparedQuery = null;
+    DefaultWorkerAppServices preparedServices = null;
+    ServingView preparedView = null;
+    try {
+      ServingView old = source.captured;
+      if (!(old.services instanceof DefaultWorkerAppServices producer)
+          || !(old.searchRuntime instanceof RunningRuntime runtime)
+          || old.ingestRuntime != runtime || old.encoderSet == null || old.queryRoleSet == null) {
+        throw new IllegalStateException("Query settings require a running physical encoder owner");
+      }
+      EncoderConfigurationProjection projection = EncoderConfigurationProjection.from(desired);
+      EncoderConfigurationProjection selected = initialModelSelection == null ? projection
+          : EncoderConfigurationProjection.from(desired, initialModelSelection);
+      if (!old.encoderSet.surfaceForOwner().componentObservation().configurationDigest()
+          .filter(selected.indexDigest()::equals).isPresent()) {
+        throw new IllegalStateException("Query-only settings cannot change index model ownership");
+      }
+      boolean rerankerPathChanged = changedKeys.contains(EnvRegistry.RERANK_MODEL_PATH.configKey());
+      boolean citationPathChanged = changedKeys.contains(
+          EnvRegistry.CITATION_SCORER_MODEL_PATH.configKey());
+      Path rerankerDirectory = rerankerPathChanged && candidate.getRerankerModelPath().isBlank()
+          ? null : projection.reranker().modelPath();
+      Path citationDirectory = citationPathChanged && candidate.getCitationScorerModelPath().isBlank()
+          ? null : projection.citation().modelPath();
+      QueryRoleSelection selection = new QueryRoleSelection(
+          QueryRoleSelectionResolver.select("reranker", rerankerPathChanged, rerankerDirectory,
+              prior == null ? null : prior.reranker(), initialModelSelection,
+              old.queryRoleSet.reranker() != null, projection.reranker().gpuEnabled()),
+          QueryRoleSelectionResolver.select("citation-scorer", citationPathChanged,
+              citationDirectory, prior == null ? null : prior.citation(), initialModelSelection,
+              old.queryRoleSet.citation() != null, false));
+      var aiHome = desired.paths().dataDir();
+      InstallContract contract = aiHome == null ? null : InstallContractIO.read(aiHome);
+      HardwareProfile hardware = contract != null && contract.hardwareProfile() != null
+          ? contract.hardwareProfile()
+          : desired.ai().masterGpuEnabled() ? HardwareProfile.gpuFull(0)
+              : HardwareProfile.cpuOnly();
+      InferenceSurface surface = InferenceCompositionRoot.composeQueryRoles(projection, selection,
+          hardware, () -> !signalBus.isMainGpuActive(), ortSessionEvents);
+      preparedQuery = new QueryRoleSet(surface);
+      if (surface.reranker().isPresent()) {
+        var assembly = surface.reranker().orElseThrow();
+        preparedQuery.bindReranker(preparedQuery.own(new io.justsearch.reranker.CrossEncoderReranker(
+            assembly.sessions(), assembly.shape(), assembly.tokenizer())));
+      }
+      if (surface.citation().isPresent()) {
+        var assembly = surface.citation().orElseThrow();
+        preparedQuery.bindCitation(preparedQuery.own(new io.justsearch.reranker.CitationScorer(
+            assembly.sessions(), assembly.shape(), assembly.tokenizer())));
+      }
+      if (surface.componentObservation().missingRoles().size() != 0) {
+        throw new IllegalStateException("Prepared query model did not become available: "
+            + surface.componentObservation().missingRoles());
+      }
+      preparedServices = producer.prepareQueryServingSuccessor(
+          fixedRuntimeContext(runtime, old.activeGenerationPath),
+          io.justsearch.reranker.RerankerConfig.ChunkRerankerConfig.from(desired),
+          projection.citation());
+      wireAppServicesPostConstruction(preparedServices);
+      preparedServices.wireSearchReranker(preparedQuery.reranker());
+      preparedServices.wireCitationScorer(preparedQuery.citation());
+      preparedServices.wireQueryDiagnostics(preparedQuery.reranker(), preparedQuery.citation());
+      preparedView = new ServingView(preparedServices, old.searchRuntime, old.ingestRuntime,
+          old.activeGenerationPath);
+      preparedView.attachEncoderSet(old.encoderSet);
+      preparedView.attachQueryRoleSet(preparedQuery);
+      var observation = encoderCompositionObservation(old.encoderSet, preparedQuery, desired,
+          initialModelSelection);
+      return new PreparedQueryRoleSettings(source, old, preparedView, preparedServices,
+          preparedQuery, selection, observation, desired);
+    } catch (IOException | RuntimeException | Error failure) {
+      if (preparedView != null) preparedView.releaseModelSets();
+      if (preparedServices != null) {
+        try { preparedServices.close(); }
+        catch (IOException | RuntimeException closeFailure) { failure.addSuppressed(closeFailure); }
+      }
+      if (preparedQuery != null) {
+        try { preparedQuery.close(); }
+        catch (RuntimeException closeFailure) { failure.addSuppressed(closeFailure); }
+      }
+      source.close();
+      if (failure instanceof IOException checked) {
+        throw new IllegalStateException("Query model preparation refused", checked);
+      }
+      if (failure instanceof RuntimeException runtimeFailure) throw runtimeFailure;
+      throw (Error) failure;
+    }
+  }
+
+  /** One settings candidate's physical query owner, installed only after its file witness. */
+  public final class PreparedQueryRoleSettings {
+    private final ServingLease source;
+    private final ServingView old;
+    private final ServingView successor;
+    private final DefaultWorkerAppServices services;
+    private final QueryRoleSet query;
+    private final QueryRoleSelection selection;
+    private final io.justsearch.core.component.EngineComponentSnapshot.Component observation;
+    private final ResolvedConfig configuration;
+    private DefaultWorkerAppServices.ProducerTransfer transfer;
+    private boolean installed;
+
+    private PreparedQueryRoleSettings(ServingLease source, ServingView old,
+        ServingView successor, DefaultWorkerAppServices services, QueryRoleSet query,
+        QueryRoleSelection selection,
+        io.justsearch.core.component.EngineComponentSnapshot.Component observation,
+        ResolvedConfig configuration) {
+      this.source = source;
+      this.old = old;
+      this.successor = successor;
+      this.services = services;
+      this.query = query;
+      this.selection = selection;
+      this.observation = observation;
+      this.configuration = configuration;
+    }
+
+    public QueryRoleSelection selection() { return selection; }
+    public io.justsearch.core.component.EngineComponentSnapshot.Component observation() {
+      return observation;
+    }
+
+    public void withOwnerLocks(Runnable publication) {
+      runtimeSwapLock.lock();
+      try {
+        if (servingView != old || closeStarted || old.retiring) {
+          throw new IllegalStateException("Query owner changed during settings preparation");
+        }
+        transfer = ((DefaultWorkerAppServices) old.services).prepareProducerTransferTo(services);
+        try { publication.run(); }
+        finally { transfer.close(); }
+      } finally {
+        runtimeSwapLock.unlock();
+      }
+    }
+
+    public void validate() {
+      if (servingView != old || closeStarted || old.retiring || query.isClosed()) {
+        throw new IllegalStateException("Prepared query owner lost its physical predecessor");
+      }
+      for (var role : List.of(selection.reranker(), selection.citation())) {
+        if (role.state() == QueryRoleSelection.State.SELECTED
+            && (!GenerationModelSelection.verifyIdentity(role.model())
+                || !GenerationModelSelection.verifyIdentity(role.tokenizer()))) {
+          throw new IllegalStateException("Prepared query model bytes changed before commitment");
+        }
+      }
+    }
+
+    public void install() {
+      if (transfer == null || servingView != old || installed) {
+        throw new IllegalStateException("Query owner publication was not prepared");
+      }
+      transfer.install();
+      synchronized (servingViewMonitor) {
+        old.retiring = true;
+        old.retireCleanup = () -> {
+          try { old.services.close(); }
+          catch (IOException failure) {
+            throw new IllegalStateException("Old query service still owns resources", failure);
+          }
+          old.releaseModelSets();
+          old.queryRoleSet.close();
+        };
+        retiredServingViews.add(old);
+        appServices = services;
+        servingView = successor;
+        initialQueryRoleSet = query;
+        startupConfiguration = configuration;
+        installed = true;
+        servingViewMonitor.notifyAll();
+      }
+    }
+
+    public void notifyObservers() { notifyServingViewRetirement(old); }
+
+    public void retire() {
+      source.close();
+      if (!installed) abort();
+    }
+
+    public void abort() {
+      if (installed) return;
+      RuntimeException failure = null;
+      try { successor.releaseModelSets(); }
+      catch (RuntimeException closeFailure) { failure = closeFailure; }
+      try { services.close(); }
+      catch (IOException | RuntimeException closeFailure) {
+        if (failure == null) failure = new IllegalStateException(
+            "Query successor still owns resources", closeFailure);
+        else failure.addSuppressed(closeFailure);
+      }
+      try { query.close(); }
+      catch (RuntimeException closeFailure) {
+        if (failure == null) failure = closeFailure;
+        else failure.addSuppressed(closeFailure);
+      }
+      try { source.close(); }
+      catch (RuntimeException closeFailure) {
+        if (failure == null) failure = closeFailure;
+        else failure.addSuppressed(closeFailure);
+      }
+      if (failure != null) throw failure;
+    }
   }
 
 

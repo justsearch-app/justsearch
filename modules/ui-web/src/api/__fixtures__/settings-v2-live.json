@@ -29,5 +29,7 @@
   "operationKey" : null,
   "state" : null,
   "apiPort" : null,
-  "restartScheduled" : null
+  "restartScheduled" : null,
+  "rerankerModelPath" : null,
+  "citationScorerModelPath" : null
 }

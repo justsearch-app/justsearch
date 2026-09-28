@@ -240,7 +240,8 @@ final class HeadlessAppComponentRegistryCoverageTest {
             UpgradeShutdownBridge.class,
             LifecycleShutdownBridge.class,
             EngineRoot.class,
-            io.justsearch.app.services.settings.FixedSettingsComponentComposer.class);
+            io.justsearch.app.services.settings.FixedSettingsComponentComposer.class,
+            java.util.concurrent.CompletableFuture.class);
     method.setAccessible(true);
     try {
       return (HeadlessApp.ApiPhaseResult)
@@ -253,7 +254,8 @@ final class HeadlessAppComponentRegistryCoverageTest {
               upgradeShutdown,
               lifecycleShutdown,
               root,
-              settingsComponents);
+              settingsComponents,
+              new java.util.concurrent.CompletableFuture<Void>());
     } catch (InvocationTargetException failure) {
       if (failure.getCause() instanceof Exception cause) throw cause;
       if (failure.getCause() instanceof Error cause) throw cause;

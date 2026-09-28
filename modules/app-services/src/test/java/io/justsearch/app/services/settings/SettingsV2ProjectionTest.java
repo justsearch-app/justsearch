@@ -85,6 +85,33 @@ class SettingsV2ProjectionTest {
   }
 
   @Test
+  void queryModelPathsRoundTripThroughTheWitnessedPatch() {
+    var base = new UiSettings();
+    base.setCitationScorerModelPath("citation-a");
+    var omission = new SettingsV2(null, null, null, null, null, null, null, null);
+    SettingsPatch.merge(base, omission, true);
+    assertEquals("citation-a", base.getCitationScorerModelPath());
+
+    var changed = new SettingsV2(null, null, null, null, null, null, null,
+        null, null, "reranker-b", "citation-b");
+    var normalized = SettingsPatch.normalize(changed);
+    SettingsPatch.merge(base, normalized, true);
+    assertEquals("reranker-b", base.getRerankerModelPath());
+    assertEquals("citation-b", base.getCitationScorerModelPath());
+    var projected = SettingsV2Projection.toSettingsV2(base,
+        UiSettingsStore.PersistenceMode.READ_WRITE);
+    assertEquals("reranker-b", projected.rerankerModelPath());
+    assertEquals("citation-b", projected.citationScorerModelPath());
+
+    var cleared = new SettingsV2(null, null, null, null, null, null, null,
+        null, null, null, "");
+    SettingsPatch.merge(base, cleared, true);
+    assertEquals("", base.getCitationScorerModelPath());
+    assertNull(SettingsV2Projection.toSettingsV2(base,
+        UiSettingsStore.PersistenceMode.READ_WRITE).citationScorerModelPath());
+  }
+
+  @Test
   void patchRejectsOutOfRangePortBeforeMutation() {
     assertThrows(IllegalArgumentException.class,
         () -> new SettingsV2(null, null, null, null, null, null, null, 65536));

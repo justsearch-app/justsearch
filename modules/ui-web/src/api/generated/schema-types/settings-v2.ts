@@ -11,6 +11,7 @@
 import { z } from 'zod';
 
 export interface SettingsV2 {
+  citationScorerModelPath?: string | null;
   apiPort?: number | null;
   indexPaths?: string[] | null;
   llm?: {
@@ -22,6 +23,7 @@ export interface SettingsV2 {
     serverExecutable?: string | null;
   } | null;
   operationKey?: string | null;
+  rerankerModelPath?: string | null;
   restartScheduled?: boolean | null;
   settingsMode?: string | null;
   state?: string | null;
@@ -44,6 +46,7 @@ export interface SettingsV2 {
   } | null;
 }
 export const settingsV2Schema = z.strictObject({
+  "citationScorerModelPath": z.string().nullable().optional(),
   "apiPort": z.number().int().nullable().optional(),
   "indexPaths": z.array(z.string()).nullable().optional(),
   "llm": z.strictObject({
@@ -55,6 +58,7 @@ export const settingsV2Schema = z.strictObject({
     "serverExecutable": z.string().nullable().optional(),
   }).nullable().optional(),
   "operationKey": z.string().nullable().optional(),
+  "rerankerModelPath": z.string().nullable().optional(),
   "restartScheduled": z.boolean().nullable().optional(),
   "settingsMode": z.string().nullable().optional(),
   "state": z.string().nullable().optional(),

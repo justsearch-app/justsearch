@@ -20,11 +20,39 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 
 /** Installed Engine proofs for durable recovery, migration and hostile filesystem survival. */
 @Timeout(7 * 60)
 final class EngineSupervisedRecoveryE2ETest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  @Test
+  @Tag("ai")
+  void queryOnlyCitationCommitSurvivesAnInstalledWorkerReboot() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "query-role installed scenario requires retained citation model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/query-role-commit-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      String committed = runInstalledModelScenario(repo, work, "query-role-commit", Map.of(),
+          "QUERY_ROLE_COMMIT_PASS");
+      String rebooted = runInstalledModelScenario(repo, work, "query-role-boot", Map.of(),
+          "QUERY_ROLE_BOOT_PASS");
+      Files.writeString(work.resolve("query-citation-b/tokenizer.json"), "tampered fixture bytes\n");
+      String tampered = runInstalledModelScenario(repo, work, "query-role-tampered-boot", Map.of(),
+          "QUERY_ROLE_TAMPERED_BOOT_PASS");
+      String cleared = runInstalledModelScenario(repo, work, "query-role-clear", Map.of(),
+          "QUERY_ROLE_CLEAR_PASS");
+      String disabledBoot = runInstalledModelScenario(repo, work, "query-role-disabled-boot", Map.of(),
+          "QUERY_ROLE_DISABLED_BOOT_PASS");
+      assertTrue(committed.contains("QUERY_ROLE_COMMIT_PASS "), committed);
+      assertTrue(rebooted.contains("QUERY_ROLE_BOOT_PASS "), rebooted);
+      assertTrue(tampered.contains("QUERY_ROLE_TAMPERED_BOOT_PASS "), tampered);
+      assertTrue(cleared.contains("QUERY_ROLE_CLEAR_PASS "), cleared);
+      assertTrue(disabledBoot.contains("QUERY_ROLE_DISABLED_BOOT_PASS "), disabledBoot);
+    });
+  }
 
   static void runSeededBesideSemanticTransition() throws Exception {
     Path repo = repositoryRoot();

@@ -12,6 +12,10 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.model.HardwareProfile;
+import io.justsearch.configuration.model.ModelPrecision;
+import io.justsearch.configuration.model.ExecutionProvider;
+import io.justsearch.app.api.settings.QueryRoleSelection;
+import io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.indexerworker.index.IndexGenerationManager.ModelArtifact;
@@ -62,6 +66,29 @@ class InferenceCompositionRootComposeTest {
   }
 
   private static final GpuArbiter NO_GPU = () -> false;
+
+  @Test
+  void changedWitnessedTokenizerDisablesOnlyThatQueryRole(@TempDir Path modelDir)
+      throws IOException {
+    Path model = Files.writeString(modelDir.resolve("model.onnx"), "model");
+    Path tokenizer = Files.writeString(modelDir.resolve("tokenizer.json"), "changed");
+    var selection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
+        QueryRoleSelection.Role.selected("model.onnx",
+            new ModelFile(model, sha256(model), Files.size(model)),
+            new ModelFile(tokenizer, "0".repeat(64), Files.size(tokenizer)),
+            ModelPrecision.INT8, ExecutionProvider.CPU));
+    var projection = EncoderConfigurationProjection.from(ConfigStore.global().get());
+    var surface = InferenceCompositionRoot.composeQueryRoles(projection, selection,
+        HardwareProfile.cpuOnly(), NO_GPU,
+        io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP);
+    assertTrue(surface.handles().isEmpty());
+    assertEquals(Set.of(EncoderRole.CITATION),
+        surface.componentObservation().missingRoles());
+    assertEquals(Set.of(EncoderRole.CITATION),
+        surface.componentObservation().requestedRoles());
+    assertEquals(projection.queryDigest(),
+        surface.componentObservation().configurationDigest().orElseThrow());
+  }
 
   @Test
   @DisplayName("component dependencies are stable config keys and immutable")

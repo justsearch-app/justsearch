@@ -222,7 +222,7 @@ In the current app:
 * Request-time budgets (e.g., `maxTokens` for summarize/Q&A/chat) are read from persisted settings and passed as `max_tokens` per request (so changes take effect without a full restart).
 
 ### UI settings v2 (UX-facing fields)
-The canonical contract for user preferences is `GET/POST /api/settings/v2` with `ui` and `llm` sections.
+The canonical contract for user preferences is `GET/POST /api/settings/v2` with `ui` and `llm` sections, plus top-level desired query model paths for reranker and citation scorer.
 
 POST requires the full witness observed with the edited base and one canonical
 UUIDv7 operationKey per logical attempt. The service looks up that key before

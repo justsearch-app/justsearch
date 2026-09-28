@@ -6,6 +6,7 @@ import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.indexerworker.index.IndexGenerationManager.GenerationManifest;
 import io.justsearch.indexerworker.index.IndexGenerationManager.ModelArtifact;
 import io.justsearch.configuration.model.VariantSelection;
+import io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile;
 import io.justsearch.ort.DevModeVariantProbe;
 import java.io.IOException;
 import java.io.InputStream;
@@ -111,6 +112,31 @@ final class GenerationModelSelection {
     } catch (IOException unreadable) {
       return Optional.empty();
     }
+  }
+
+  /** Exact selected-file proof shared with the independently committed query-role witness. */
+  static boolean verifyIdentity(ModelFile identity) {
+    if (identity == null || !Files.isRegularFile(identity.path(), LinkOption.NOFOLLOW_LINKS)) {
+      return false;
+    }
+    try {
+      return Files.size(identity.path()) == identity.sizeBytes()
+          && identity.sha256().equals(sha256(identity.path()));
+    } catch (IOException unreadable) {
+      return false;
+    }
+  }
+
+  static ModelFile captureIdentity(Path file) throws IOException {
+    Path exact = Objects.requireNonNull(file, "file").toAbsolutePath().normalize();
+    if (!Files.isRegularFile(exact, LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Selected model asset is not a regular file: " + exact);
+    }
+    ModelFile identity = new ModelFile(exact, sha256(exact), Files.size(exact));
+    if (!verifyIdentity(identity)) {
+      throw new IOException("Selected model asset changed during identity capture: " + exact);
+    }
+    return identity;
   }
 
   /** Exact generation variant for the current execution policy; never consults install state. */

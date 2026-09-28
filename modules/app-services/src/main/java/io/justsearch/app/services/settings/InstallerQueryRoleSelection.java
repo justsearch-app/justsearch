@@ -5,12 +5,15 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile;
 import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
 import io.justsearch.app.api.settings.QueryRoleSelection;
+import io.justsearch.configuration.model.ModelRegistryLoader;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 
 /** Projects complete query identities from an accepted generation plan into settings v5. */
 final class InstallerQueryRoleSelection {
+  private static final io.justsearch.configuration.model.ModelRegistry REGISTRY =
+      ModelRegistryLoader.loadFromClasspath("ai/model-registry.v2.json");
   private InstallerQueryRoleSelection() {}
 
   static Optional<QueryRoleSelection> fromPlan(RecordedInstallerGenerationPlan plan) {
@@ -37,6 +40,15 @@ final class InstallerQueryRoleSelection {
         .filter(model -> packageId.equals(model.packageId())).findFirst();
     if (selected.isEmpty()) return Optional.empty();
     var model = selected.orElseThrow();
+    var packageDescriptor = REGISTRY.findPackage(packageId);
+    if (packageDescriptor == null) return Optional.empty();
+    var variant = packageDescriptor.variants().stream()
+        .filter(item -> item.filename().equals(model.variantId())
+            && item.filename().equals(model.path().getFileName().toString())
+            && item.sha256().equalsIgnoreCase(model.sha256())
+            && item.sizeBytes() == model.sizeBytes())
+        .findFirst();
+    if (variant.isEmpty()) return Optional.empty();
     Path directory = model.path().getParent();
     if (desiredPath == null || desiredPath.isBlank()
         || !Path.of(desiredPath).toAbsolutePath().normalize().equals(directory)) {
@@ -55,6 +67,7 @@ final class InstallerQueryRoleSelection {
     }
     return Optional.of(QueryRoleSelection.Role.selected(model.variantId(),
         new ModelFile(model.path(), model.sha256(), model.sizeBytes()),
-        new ModelFile(asset.path(), asset.sha256(), asset.sizeBytes())));
+        new ModelFile(asset.path(), asset.sha256(), asset.sizeBytes()),
+        variant.orElseThrow().precision(), variant.orElseThrow().targetEP()));
   }
 }

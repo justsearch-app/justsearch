@@ -47,7 +47,9 @@ final class SettingsPatch {
     List<String> paths = input.indexPaths();
     paths = paths == null || paths.isEmpty() ? null : List.of(normalized.getIndexBasePath());
     return new SettingsV2(ui, llm, paths, null, input.witness(), null, null,
-        input.apiPort() == null ? null : normalized.configuredApiPort());
+        input.apiPort() == null ? null : normalized.configuredApiPort(), null,
+        input.rerankerModelPath() == null ? null : normalized.getRerankerModelPath(),
+        input.citationScorerModelPath() == null ? null : normalized.getCitationScorerModelPath());
   }
 
   /** Merges an incoming {@link SettingsV2} into the existing {@link UiSettings}. */
@@ -58,6 +60,12 @@ final class SettingsPatch {
 
     if (incoming.apiPort() != null) {
       base.setApiPort(incoming.apiPort());
+    }
+    if (incoming.rerankerModelPath() != null) {
+      base.setRerankerModelPath(incoming.rerankerModelPath());
+    }
+    if (incoming.citationScorerModelPath() != null) {
+      base.setCitationScorerModelPath(incoming.citationScorerModelPath());
     }
 
     UiSettingsV2 ui = incoming.ui();

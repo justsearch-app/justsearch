@@ -161,6 +161,51 @@ public final class EngineRoot implements WorkerHost {
   private boolean terminalWriterExitAccepted;
 
   private volatile KnowledgeServer server;
+  private volatile java.util.function.Supplier<io.justsearch.app.api.settings.QueryRoleSelection>
+      queryRoleBootSelection = () -> null;
+
+  public void bindQueryRoleBootSelection(
+      java.util.function.Supplier<io.justsearch.app.api.settings.QueryRoleSelection> selection) {
+    if (server != null) throw new IllegalStateException("Query witness binding followed Worker start");
+    queryRoleBootSelection = Objects.requireNonNull(selection, "selection");
+  }
+
+  /** Fixed settings owner that resolves the current physical Worker only at preparation time. */
+  public io.justsearch.app.services.settings.FixedSettingsComponentComposer.Owner
+      queryRoleSettingsOwner(
+          java.util.function.Supplier<io.justsearch.app.api.settings.QueryRoleSelection> prior) {
+    Objects.requireNonNull(prior, "prior");
+    return (candidate, desired, changedKeys) -> {
+      KnowledgeServer current = server;
+      if (current == null) {
+        throw new IllegalStateException("Physical encoder owner is unavailable");
+      }
+      var prepared = current.prepareQueryRoleSettings(candidate, desired, changedKeys, prior.get());
+      return new io.justsearch.app.services.settings.FixedSettingsComponentComposer.QueryRolePreparedOwner() {
+        @Override public io.justsearch.app.api.settings.QueryRoleSelection selection() {
+          return prepared.selection();
+        }
+        @Override public io.justsearch.core.component.EngineComponentSnapshot.Component observation() {
+          return prepared.observation();
+        }
+        @Override public void includeObservation(
+            io.justsearch.core.component.EngineComponentSnapshot.Component unexpected) {
+          throw new UnsupportedOperationException("Query owner has no generation projection");
+        }
+        @Override public void withOwnerLocks(Runnable publication) {
+          prepared.withOwnerLocks(publication);
+        }
+        @Override public void validate() {
+          if (server != current) throw new IllegalStateException("Physical encoder owner changed");
+          prepared.validate();
+        }
+        @Override public void install() { prepared.install(); }
+        @Override public void notifyObservers() { prepared.notifyObservers(); }
+        @Override public void retire() { prepared.retire(); }
+        @Override public void abort() { prepared.abort(); }
+      };
+    };
+  }
   private volatile EngineKnowledgeClient client;
   private volatile LiveMigrationStartAttempt liveMigrationStartAttempt;
   private record LiveMigrationStartAttempt(
@@ -415,6 +460,7 @@ public final class EngineRoot implements WorkerHost {
     started.onMigrationRestart(() -> requestRestart(started));
     try {
       started.installProjectionSeedSources(projectionSeedSources);
+      started.bindBootQueryRoleSelection(queryRoleBootSelection.get());
       started.start();
     } catch (IOException | RuntimeException | Error failure) {
       // A failed start may also have failed cleanup. Retain that physical owner until its

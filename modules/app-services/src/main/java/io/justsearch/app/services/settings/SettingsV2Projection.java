@@ -31,7 +31,9 @@ public final class SettingsV2Projection {
     String basePath = settings.getIndexBasePath();
     List<String> indexPaths = basePath == null || basePath.isBlank() ? List.of() : List.of(basePath);
     return new SettingsV2(ui, llm, indexPaths, persistenceMode.name().toLowerCase(Locale.ROOT),
-        witness, null, null, settings.configuredApiPort());
+        witness, null, null, settings.configuredApiPort(), null,
+        blankToNull(settings.getRerankerModelPath()),
+        blankToNull(settings.getCitationScorerModelPath()));
   }
 
   private static String blankToNull(String value) {

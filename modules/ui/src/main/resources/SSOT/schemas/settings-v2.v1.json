@@ -2,6 +2,9 @@
   "$schema" : "https://json-schema.org/draft/2020-12/schema",
   "type" : "object",
   "properties" : {
+    "citationScorerModelPath" : {
+      "type" : [ "string", "null" ]
+    },
     "apiPort" : {
       "type" : [ "integer", "null" ]
     },
@@ -35,6 +38,9 @@
       }
     },
     "operationKey" : {
+      "type" : [ "string", "null" ]
+    },
+    "rerankerModelPath" : {
       "type" : [ "string", "null" ]
     },
     "restartScheduled" : {

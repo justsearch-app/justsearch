@@ -667,22 +667,53 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       throw new IllegalArgumentException(
           "Successor context must bind search and ingest to the incumbent Green runtime");
     }
-    return new DefaultWorkerAppServices(this, greenContext, producerRuntime);
+    return new DefaultWorkerAppServices(this, greenContext, producerRuntime, null, null);
+  }
+
+  /** Fresh query service bindings over this exact producer and read runtime. */
+  public DefaultWorkerAppServices prepareQueryServingSuccessor(InfraContext context,
+      RerankerConfig.ChunkRerankerConfig queryChunkConfig,
+      CitationScorerConfig queryCitationConfig) {
+    java.util.Objects.requireNonNull(queryChunkConfig, "queryChunkConfig");
+    java.util.Objects.requireNonNull(queryCitationConfig, "queryCitationConfig");
+    if (producerRuntime == null || !producerOwnership.ownsProducer()
+        || context.searchLifecycleSupplier().get() != producerRuntime
+        || context.ingestLifecycleSupplier().get() != producerRuntime) {
+      throw new IllegalStateException("Query successor requires the live read/write producer");
+    }
+    return new DefaultWorkerAppServices(this, context, producerRuntime, queryChunkConfig,
+        queryCitationConfig);
+  }
+
+  /** Replaces only query-role accelerator evidence on a fresh serving successor. */
+  public void wireQueryDiagnostics(CrossEncoderReranker reranker,
+      io.justsearch.reranker.CitationScorer citation) {
+    GpuDiagnosticSuppliers old = gpuDiagnostics;
+    if (old == null) return;
+    wireGpuDiagnostics(new GpuDiagnosticSuppliers(old.spladeOrtCudaStatus(),
+        old.spladeModelPath(), old.embedOrtCudaStatus(), old.embedBackend(),
+        old.embedGpuLayers(), reranker == null ? null : reranker::getOrtCudaStatus,
+        old.nerOrtCudaStatus(), citation == null ? null : citation::getOrtCudaStatus,
+        old.bgeM3OrtCudaStatus()));
   }
 
   /** Builds only the runtime-bound service view; all producer resources remain borrowed. */
   private DefaultWorkerAppServices(
-      DefaultWorkerAppServices incumbent, InfraContext greenContext, RunningRuntime greenRuntime) {
+      DefaultWorkerAppServices incumbent, InfraContext greenContext, RunningRuntime greenRuntime,
+      RerankerConfig.ChunkRerankerConfig queryChunkConfig,
+      CitationScorerConfig queryCitationConfig) {
     this.candidateConfiguration = incumbent.candidateConfiguration;
     this.resolvedConfig = candidateConfiguration == null
         ? incumbent.resolvedConfig : candidateConfiguration.snapshot();
     this.extractionConfiguration = candidateConfiguration == null
         ? incumbent.extractionConfiguration : candidateConfiguration.extraction();
     this.detailedTracing = !"none".equalsIgnoreCase(resolvedConfig.index().tracingLevel());
-    this.chunkRerankerConfig = candidateConfiguration == null
+    this.chunkRerankerConfig = queryChunkConfig != null ? queryChunkConfig
+        : candidateConfiguration == null
         ? incumbent.chunkRerankerConfig : candidateConfiguration.chunkReranker();
-    this.citationScorerConfig = candidateConfiguration == null
-        ? incumbent.citationScorerConfig : candidateConfiguration.citationScorer();
+    this.citationScorerConfig = queryCitationConfig != null ? queryCitationConfig
+        : candidateConfiguration == null
+            ? incumbent.citationScorerConfig : candidateConfiguration.citationScorer();
     this.indexingPacing = incumbent.indexingPacing;
     this.indexingLoop = incumbent.indexingLoop;
     this.producerRuntime = greenRuntime;

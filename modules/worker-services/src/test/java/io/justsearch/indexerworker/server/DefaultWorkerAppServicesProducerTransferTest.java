@@ -79,6 +79,48 @@ final class DefaultWorkerAppServicesProducerTransferTest {
   }
 
   @Test
+  void queryOnlySuccessorRetainsRunningProducerAcrossSearchViewRetirement(
+      @TempDir Path tempDir) throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices incumbent = fixture.newIncumbent();
+      incumbent.startIndexingLoop();
+      assertTrue(incumbent.recordedWriterReady());
+
+      DefaultWorkerAppServices aborted = incumbent.prepareQueryServingSuccessor(
+          fixture.greenContext(), fixture.configuration.chunkReranker(),
+          fixture.configuration.citationScorer());
+      assertNotSame(incumbent.searchService(), aborted.searchService());
+      aborted.close();
+      assertTrue(incumbent.recordedWriterReady());
+      assertFalse(fixture.watcherExecutor.isShutdown());
+
+      var querySnapshot = new ResolvedConfigBuilder()
+          .putSettings("justsearch.rerank.chunks.top_k", "13")
+          .putSettings("justsearch.citation.scorer.threshold", "0.7")
+          .build();
+      var queryChunk = RerankerConfig.ChunkRerankerConfig.from(querySnapshot);
+      var queryCitation = CitationScorerConfig.from(querySnapshot);
+      DefaultWorkerAppServices successor = incumbent.prepareQueryServingSuccessor(
+          fixture.greenContext(), queryChunk, queryCitation);
+      assertSame(producerBindings(incumbent), producerBindings(successor));
+      assertEquals(13, successor.chunkRerankerConfig().topK());
+      assertEquals(10, incumbent.chunkRerankerConfig().topK());
+      assertSame(queryCitation, field(successor, "citationScorerConfig"));
+      try (DefaultWorkerAppServices.ProducerTransfer transfer =
+          incumbent.prepareProducerTransferTo(successor)) {
+        transfer.install();
+      }
+
+      incumbent.close();
+      assertTrue(successor.recordedWriterReady());
+      assertFalse(fixture.watcherExecutor.isShutdown());
+      successor.close();
+      assertFalse(successor.recordedWriterReady());
+      assertTrue(fixture.watcherExecutor.isShutdown());
+    }
+  }
+
+  @Test
   void transferRejectsWrongThreadAndInstallationAfterRelease(@TempDir Path tempDir)
       throws Exception {
     try (Fixture fixture = new Fixture(tempDir)) {
