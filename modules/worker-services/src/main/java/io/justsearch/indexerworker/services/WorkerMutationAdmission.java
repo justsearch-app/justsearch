@@ -2,7 +2,6 @@
 package io.justsearch.indexerworker.services;
 
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -18,8 +17,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public final class WorkerMutationAdmission {
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
-  private final AtomicBoolean replayUncertain = new AtomicBoolean();
+  private final Object replayCertificateMonitor = new Object();
   private final Object fencedOwner = new Object();
+  private boolean replayUncertain;
   private Object owner;
 
   public WorkerMutationAdmission(Object initialOwner) {
@@ -27,9 +27,17 @@ public final class WorkerMutationAdmission {
   }
 
   /** A lost watcher routing effect cannot be certified by the switch-buffer replay. */
-  public void markReplayUncertain() { replayUncertain.set(true); }
+  public void markReplayUncertain() {
+    synchronized (replayCertificateMonitor) {
+      replayUncertain = true;
+    }
+  }
 
-  public boolean replayCertain() { return !replayUncertain.get(); }
+  public boolean replayCertain() {
+    synchronized (replayCertificateMonitor) {
+      return !replayUncertain;
+    }
+  }
 
   public Lease enter(Object expectedOwner) {
     Objects.requireNonNull(expectedOwner, "expectedOwner");
@@ -75,6 +83,7 @@ public final class WorkerMutationAdmission {
     private final Thread holder = Thread.currentThread();
     private boolean installed;
     private boolean certified;
+    private boolean replayCertificateArmed;
     private boolean closed;
 
     private FinalFence(Object prior) { this.prior = prior; }
@@ -89,11 +98,57 @@ public final class WorkerMutationAdmission {
       installed = true;
     }
 
+    /**
+     * Arms the replay certificate before durable pointer publication.
+     *
+     * <p>Once armed, any replay uncertainty marked before this fence closes prevents successor
+     * admission. A false result is a pre-pointer refusal: the caller must not publish or install the
+     * successor.
+     */
+    public boolean armReplayCertificate() {
+      requireOpen();
+      if (installed) {
+        throw new IllegalStateException("Replay certificate must arm before successor installation");
+      }
+      if (replayCertificateArmed) {
+        throw new IllegalStateException("Replay certificate already armed");
+      }
+      synchronized (replayCertificateMonitor) {
+        if (replayUncertain) return false;
+        replayCertificateArmed = true;
+        return true;
+      }
+    }
+
     /** Only exact replay cleanup and publication may release B to new mutation producers. */
     public void certifySuccessor() {
       requireOpen();
       if (!installed) throw new IllegalStateException("Successor has not been installed");
+      if (replayCertificateArmed) {
+        throw new IllegalStateException("Armed replay certificate requires conditional certification");
+      }
       certified = true;
+    }
+
+    /**
+     * Certifies an installed successor only while the armed replay witness remains certain.
+     *
+     * <p>The fence rechecks the witness when it closes, so a concurrent failure that follows this
+     * check but linearizes before admission release still leaves the installed successor fenced. A
+     * failure after admission release belongs to the successor's live fault-recovery path; it does
+     * not retroactively fail this cutover.
+     */
+    public boolean certifySuccessorIfReplayCertain() {
+      requireOpen();
+      if (!installed) throw new IllegalStateException("Successor has not been installed");
+      if (!replayCertificateArmed) {
+        throw new IllegalStateException("Replay certificate has not been armed");
+      }
+      synchronized (replayCertificateMonitor) {
+        if (replayUncertain) return false;
+        certified = true;
+        return true;
+      }
     }
 
     private void requireOpen() {
@@ -105,8 +160,15 @@ public final class WorkerMutationAdmission {
     @Override public void close() {
       requireOpen();
       closed = true;
-      if (installed && !certified) owner = fencedOwner;
-      lock.writeLock().unlock();
+      synchronized (replayCertificateMonitor) {
+        if (installed && (!certified || (replayCertificateArmed && replayUncertain))) {
+          owner = fencedOwner;
+        }
+        // Release admission inside the certificate decision's critical section. A watcher failure
+        // can therefore linearize either before release (and fence B) or after release (as a live-B
+        // fault), never between the final certainty check and producer admission.
+        lock.writeLock().unlock();
+      }
     }
   }
 }
