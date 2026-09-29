@@ -7,21 +7,22 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-29)
 
-**Paused at the user's request.** The user requested a clean stop and written handoff on
-2026-09-29. Resume only on their next instruction. This checkpoint preserves incomplete
-D1-6 work; it is not D1 completion. D1-15 has only a read-only implementation map.
+**Active after the user's resume instruction.** D1-6 remains in verification; it is not
+D1 completion. D1-15 has only a read-only implementation map. Continue the lane without
+another user checkpoint unless the user pauses it or an external dependency prevents progress.
 
 **Authorization and scope.** Continue D1/D2/E/F autonomously in this chat, including
 checkpoint publication to existing draft [PR727](https://github.com/justsearch-app/justsearch/pull/727).
 Do not merge before Stage F acceptance. The worktree hold has review-by date 2026-10-04.
 
-**Revision.** Recovery checkpoint `ac22fff8e10661087a1d77ef59cd076328a614e9` is pushed to
-`codex/lane-f-pr1`. Exact-SHA [CI run 36526921771](https://github.com/justsearch-app/justsearch/actions/runs/36526921771)
-has a Public claims failure: ESLint rejects throws inside the Sandbox fixture's `finally`.
-The local correction preserves cleanup ordering and moves error propagation after `finally`;
-focused ESLint and both host-only Sandbox regressions pass. Hosted integration remains in progress.
-D1-6 API/operation migration is saved in the pause checkpoint described below;
-its remaining verification prevents stage completion.
+**Revision.** The verified code checkpoint is
+`8c0ba0607c8d39831f496559e814356f8cd53648` on `codex/lane-f-pr1`, following the pushed
+`fee7e907372a867e877a58a665ea8a49226adef2`. Exact-SHA
+[CI run 36529193291](https://github.com/justsearch-app/justsearch/actions/runs/36529193291)
+at the earlier checkpoint passed all jobs except app-ui and integration. App-ui exposed the
+undeclared schema route and SDK snapshot drift; integration exposed a boot-fault recovery wiring
+defect and obsolete test budget. Those causes are corrected and locally verified in `8c0ba0607`.
+Its exact-SHA hosted run remains required. No stage completion is claimed.
 
 **Pause checkpoint contents.** The commit containing this handoff adds `core.recover-component`
 with strict `{name}` arguments, one invocation-time `BootstrapLateBindings` authority, Health's
@@ -41,24 +42,39 @@ comparison at 5567. The latter only compares committed snapshot sources; it does
 those sources match the new live route surface. Diff/new-source secret scans pass at 5565.
 Two host-only Sandbox regressions and focused fixture ESLint also pass after the CI fix.
 
+**Current D1-6 proof.** An owned fresh backend reached `ready_worker`; live route capture
+found 245 routes, including the new recovery route. Capturing at `ready_http` had missed nine
+late-bound knowledge routes and was discarded. The new operation, HTTP recovery, and old 410
+were exercised through the live trust boundary. The consent-capsule integration suite passed
+all seven cases. The OpenAPI renderer now projects declared per-status response schemas;
+`api-error-response.v1.json` declares the live `retrySafe` 429 field; the schema controller
+serves declared v2 files. Generated UI and runtime-client projections match those contracts.
+Focused Java, frontend typecheck, codegen checks, docs checks, and runtime-client tests pass.
+The full integrated run 5578 failed for two PMD findings and the runtime-client snapshot;
+those three causes are corrected and their focused reruns pass. Its suite XML was preserved
+before targeted reruns at `tmp/5578-suite-xml/`. Final integrated run 5581 passes in 10m02s:
+1,861 suites, 12,211 tests, zero failures/errors, 33 skips, and PMD/Spotless green. Its XML
+and counts are retained at `tmp/5581-suite-xml/` and `tmp/5581-test-counts.json`. The focused
+boot integration passes 1/1, and standard-profile real-chat recovery passes 1/1 at 5582 (33s).
+`build -x test` passes again on the final CSS tree at 5588 (45s). The corrected light fixture found and then fixed
+Health's light success/unknown-chip contrast defects. Fresh 5585 Health dark/light captures
+have zero axe findings, zero console errors and no overflow; the measured a11y gate passes at
+5586 after retiring the stale dark debt and adding zero-debt light coverage. Frontend typecheck,
+contrast matrix, and all 6,613 unit tests pass at 5587.
+
 **Exact next steps.**
-1. Read D1-6's current acceptance block. Start the owned worktree's current backend under the
-   normal lease, capture `node scripts/codegen/gen-api-client.mjs --from-live=http://127.0.0.1:<port>`,
-   and regenerate/check derived clients. Existing route snapshots are deliberately still stale.
-2. Verify new operation/HTTP recovery and old410 through the real trust boundary; run the
-   changed `ConsentCapsuleRecoveryE2ETest` and relevant standard-model recovery query. Compile
-   proof is not live proof. Check the next checkpoint's hosted CI and refresh the PR review record.
-3. Classify the serious color-contrast finding in dark/light health captures at
-   `tmp/5562-health-ui/`; completion/recovery captures have zero axe findings. All four have
-   zero console errors and no overflow. Do not call this a clean a11y pass.
-4. Continue D1-15 atomically across reason producers, retention, lifecycle projections and UI;
+1. Push the code checkpoint and this handoff update to draft PR727. Inspect exact-SHA hosted
+   CI and refresh the PR review record. Do not merge before F.
+2. Continue D1-15 atomically across reason producers, retention, lifecycle projections and UI;
    its contract is in D1's owning section. Preserve sticky fatal causes and lost-contact
    precedence; remove aliases rather than adding compatibility spellings. Then D1-16/17,
    D2, all seven paired Stage E groups, and Stage F remain binding.
-5. D1-4 needs the signed Sandbox candidate and a current signing-provider allocation. Do not
+3. D1-4 needs the signed Sandbox candidate and a current signing-provider allocation. Do not
    rerun the unsafe host-profile fixture, bypass Application Control, or invent signing capacity.
 
-**Paused resources.** No dev stack or Sandbox is running. Sweep5563 confirmed cleanup of this
+**Resources.** No dev stack or Sandbox is running. Sweep5589 reaped this chat's owned
+`ui-shot` Vite helper (PID2936/5177) with verified identity; foreign helpers were left alone.
+Sweep5563 confirmed cleanup of this
 chat's two UI-shot processes (24208/5177 and32588/5178), after repairing their missing session
 attribution using verified creation identity and this chat's launch evidence. Three foreign or
 unattributed UI helpers and the ownerless OTLP sink were left alone. Pass
@@ -124,8 +140,7 @@ gone. Successful D1-4 execution requires a signed candidate. The signing workflo
 the provider's current remaining-signature allocation; none has been supplied for this run.
 Keep this item open for the signed-candidate round rather than bypassing application control.
 
-**Next on resume.** Finish D1-6 verification and generated route capture, then continue D1-15 and the remaining lane.
-Standard generative recovery passes at 5541 (40s), now requiring
+**Earlier recovery evidence.** Standard generative recovery passes at 5541 (40s), now requiring
 COMPLETED, the requested exact word, and positive token usage. CUDA replay 5542 passes in
 4m23s, including restored vector queries and 9.49 GB private-cache cleanup. Optional
 generative exhaustion passes at 5543 (29s), with no Engine escalation. Fixture compile,
