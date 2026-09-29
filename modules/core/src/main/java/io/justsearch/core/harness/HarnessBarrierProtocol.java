@@ -17,6 +17,15 @@ public final class HarnessBarrierProtocol {
 
   public static void await(Path dataDir, String family, String markerJson, boolean selfExit)
       throws IOException, InterruptedException {
+    await(dataDir, family, markerJson, selfExit, 180);
+  }
+
+  /** Harness-only bounded override for installed scenarios that span multiple periodic ticks. */
+  public static void await(Path dataDir, String family, String markerJson, boolean selfExit,
+      long timeoutSeconds) throws IOException, InterruptedException {
+    if (timeoutSeconds < 180 || timeoutSeconds > 600) {
+      throw new IllegalArgumentException("Harness barrier timeout must be 180..600 seconds");
+    }
     Path runtime = dataDir.resolve("runtime");
     Path reached = reached(dataDir, family);
     Path release = runtime.resolve(family + "-release");
@@ -25,7 +34,7 @@ public final class HarnessBarrierProtocol {
     Files.writeString(pending, markerJson);
     Files.move(pending, reached, StandardCopyOption.ATOMIC_MOVE);
     if (selfExit) haltHarnessEngine();
-    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(180);
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds);
     while (!Files.exists(release)) {
       if (System.nanoTime() >= deadline) {
         throw new IllegalStateException("Harness barrier was not released: " + family);

@@ -714,6 +714,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   const operationPath = path.join(data, 'operations.db');
   const jobsPath = path.join(data, 'jobs.db');
   const sourceGeneration = readJson(path.join(indexBase, 'state.json'))?.active_generation;
+  const bGeneration = `g-${operationKey}`;
   const sourceManifest = readJson(path.join(indexBase, 'indices', sourceGeneration,
     '.justsearch-index-generation.json'));
   const oldContract = readJson(path.join(data, 'install-contract.v2.json'));
@@ -846,6 +847,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   let cancellationKey;
   let issuedARequest;
   let issuedAReached;
+  let watcherPassEvidence;
+  let acceptedWriteEvidence;
+  let watcherSemanticEvidence;
   try {
     const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
     const acceptedMarker = 'lexicalbridgecobalt';
@@ -914,7 +918,10 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       }
       if (watcherDeleteDuringBuild) {
         fs.writeFileSync(removedFile, `${removedMarker} accepted by watcher during B\n`);
-        await waitFor('MIGRATING watcher addition visible in serving A', 240000, async () => {
+        // The installed migration barrier expires at 180s. Fail on the missing A
+        // observation while it is still held, so the fixture cannot drift into
+        // SWITCHING and mistake barrier timeout for watcher replay evidence.
+        const additionInA = await waitFor('MIGRATING watcher addition visible in serving A', 120000, async () => {
           const state = readJson(path.join(indexBase, 'state.json'));
           if (state?.migration_state !== 'MIGRATING') return null;
           try {
@@ -927,7 +934,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
         const journalKey = `path:${removedFile.toLowerCase()}`;
         const journalSql = `SELECT generation, op FROM switch_buffer
           WHERE generation = 'g-${operationKey}' AND key = ?`;
-        requireThat(readRows(jobsPath, journalSql, journalKey).some(row => row.op === 'UPSERT'),
+        const upsertRows = readRows(jobsPath, journalSql, journalKey);
+        const upsertWitness = upsertRows.find(row => row.op === 'UPSERT');
+        requireThat(upsertWitness,
           'watcher addition reached A without a candidate-scoped replay obligation');
         const atDelete = readJson(path.join(indexBase, 'state.json'));
         requireThat(atDelete?.migration_state === 'MIGRATING'
@@ -938,7 +947,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
           sourceGeneration, buildingGeneration: `g-${operationKey}`,
           submittedAt: Date.now(), stateUpdatedAt: atDelete.updated_at_ms, path: removedFile,
         }));
-        await waitFor('MIGRATING watcher deletion absent from serving A', 90000, async () => {
+        const deletionAbsentInA = await waitFor('MIGRATING watcher deletion absent from serving A', 120000, async () => {
           const state = readJson(path.join(indexBase, 'state.json'));
           if (state?.active_generation !== sourceGeneration
             || !['MIGRATING', 'SWITCHING'].includes(state?.migration_state)) return null;
@@ -952,8 +961,22 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
         console.log('MODEL_LIVE_AB_WATCHER_DELETE_A', JSON.stringify({
           sourceGeneration, buildingGeneration: `g-${operationKey}`, path: removedFile,
         }));
-        requireThat(readRows(jobsPath, journalSql, journalKey).some(row => row.op === 'DELETE'),
+        const deleteRows = readRows(jobsPath, journalSql, journalKey);
+        const deleteWitness = deleteRows.find(row => row.op === 'DELETE');
+        requireThat(deleteWitness,
           'watcher deletion reached A without a candidate-scoped delete obligation');
+        watcherPassEvidence = {
+          path: removedFile,
+          marker: removedMarker,
+          additionVisibleInA: true,
+          additionHitsInA: JSON.parse(additionInA.text).results?.length ?? 0,
+          scopedUpsert: { generation: upsertWitness.generation, key: journalKey,
+            op: upsertWitness.op },
+          deletionAbsentInA: true,
+          deletionHitsInA: JSON.parse(deletionAbsentInA.text).results?.length ?? 0,
+          scopedDelete: { generation: deleteWitness.generation, key: journalKey,
+            op: deleteWitness.op },
+        };
       }
       fs.writeFileSync(acceptedFile, `${acceptedMarker} capybara\n`);
       const ingestKey = createOperationKey();
@@ -999,6 +1022,79 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
         buildingGeneration: `g-${operationKey}`, path: acceptedFile,
         aTextHits: JSON.parse(visibleInA.text).results?.length ?? 0,
       }));
+      acceptedWriteEvidence = {
+        operationKey: ingestKey, acceptedAt: acceptedRow.accepted_at,
+        completedAt: acceptedRow.completed_at, sourceGeneration,
+        buildingGeneration: `g-${operationKey}`, path: acceptedFile,
+        marker: acceptedMarker,
+        duringBuild: true,
+        visibleInA: true,
+        aTextHits: JSON.parse(visibleInA.text).results?.length ?? 0,
+      };
+    }
+    if (watcherDeleteDuringBuild) {
+      // The watcher probe can spend long enough exercising add/delete reconciliation that B
+      // reaches SWITCHING immediately after this barrier is released. Prove the semantic pause
+      // against the barrier's exact MIGRATING phase instead of attributing a later transition
+      // phase's readiness to MIGRATING.
+      const held = readJson(migrationBarrier.reachedFile);
+      const heldState = readJson(path.join(indexBase, 'state.json'));
+      const live = readJson(path.join(runtime, 'manifest.json'));
+      const statusReply = await request(apiPort, '/api/status', {}, 15000);
+      const heldStatus = statusReply.status === 200 ? JSON.parse(statusReply.text) : null;
+      const retrieval = heldStatus?.readiness?.composites?.retrieval;
+      const composeMode = heldStatus?.readiness?.engineComponents?.encoders?.mode;
+      requireThat(held?.point === 'migration-before-switching'
+          && held.sourceGeneration === sourceGeneration
+          && held.buildingGeneration === `g-${operationKey}`
+          && held.pid === live?.pid
+          && heldState?.migration_state === 'MIGRATING'
+          && heldStatus?.worker?.migration?.migrationState === 'MIGRATING'
+          && composeMode === 'IN_PLACE'
+          && heldStatus?.components?.encoders?.state === 'RELOADING'
+          && retrieval?.state === 'DEGRADED'
+          && retrieval.reasonCodes?.includes('encoders.reloading'),
+        `watcher semantic pause was absent at the held MIGRATING phase: ${JSON.stringify({
+          held, heldState, live, migration: heldStatus?.worker?.migration,
+          compatibility: heldStatus?.worker?.compatibility, composeMode,
+          encoders: heldStatus?.components?.encoders, retrieval,
+        })}`);
+      const vectorSearch = await post(apiPort, '/api/knowledge/search',
+        { query: marker, limit: 10, mode: 'vector' }, 30000);
+      const hybridSearch = await post(apiPort, '/api/knowledge/search',
+        // AUTO may legitimately choose sparse-only for this query. Request the HYBRID preset
+        // to exercise its dense-leg refusal and sparse fallback at this held phase.
+        { query: marker, limit: 10, mode: 'hybrid' }, 30000);
+      const vectorBody = vectorSearch.status === 200 ? JSON.parse(vectorSearch.text) : null;
+      const hybridBody = hybridSearch.status === 200 ? JSON.parse(hybridSearch.text) : null;
+      const vectorTrace = vectorBody?.searchTrace?.degradation ?? null;
+      const hybridTrace = hybridBody?.searchTrace?.degradation ?? null;
+      const afterQueriesState = readJson(path.join(indexBase, 'state.json'));
+      const afterQueriesLive = readJson(path.join(runtime, 'manifest.json'));
+      requireThat(vectorSearch.status === 200
+          && vectorBody?.results?.length === 0
+          && vectorTrace?.vectorBlocked === true
+          && vectorTrace.vectorBlockedReason === 'REBUILD_IN_PROGRESS'
+          && hybridSearch.status === 200
+          && matchingHit(hybridSearch, file, marker)
+          && hybridTrace?.vectorBlocked === true
+          && hybridTrace.vectorBlockedReason === 'REBUILD_IN_PROGRESS'
+          && afterQueriesState?.migration_state === 'MIGRATING'
+          && afterQueriesLive?.pid === held.pid,
+        `watcher semantic pause lacked its held vector/hybrid trace: ${JSON.stringify({
+          vector: vectorSearch.text, hybrid: hybridSearch.text,
+          afterQueriesState, afterQueriesLive,
+        })}`);
+      watcherSemanticEvidence = {
+        point: held.point, pid: held.pid, migration: heldState.migration_state,
+        compatibility: heldStatus?.worker?.compatibility?.embeddingCompatState ?? null,
+        composeMode, encoderState: heldStatus.components.encoders.state,
+        retrievalReasons: retrieval.reasonCodes,
+        vector: { hits: vectorBody.results.length, degradation: vectorTrace },
+        hybrid: { hits: hybridBody.results?.length ?? 0, degradation: hybridTrace },
+      };
+      console.log('MODEL_LIVE_AB_WATCHER_SEMANTIC_PAUSE',
+        JSON.stringify(watcherSemanticEvidence));
     }
     if (crashBoundary) {
       // The later pointer fault hook may hold publication while /api/status waits for that
@@ -1062,7 +1158,6 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       return;
     }
     const aState = readJson(path.join(indexBase, 'state.json'));
-    const bGeneration = `g-${operationKey}`;
     const bManifest = readJson(path.join(indexBase, 'indices', bGeneration,
       '.justsearch-index-generation.json'));
     const inFlight = operationRows(operationPath, operationKey)[0];
@@ -1082,12 +1177,14 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       { query: marker, limit: 10, mode: 'vector' }, 30000);
     const statusReply = await request(apiPort, '/api/status', {}, 15000);
     const status = statusReply.status === 200 ? JSON.parse(statusReply.text) : null;
-    console.log('MODEL_LIVE_AB_HELD_READINESS', JSON.stringify({
-      migration: status?.worker?.migration?.migrationState,
-      compat: status?.worker?.compatibility?.embeddingCompatState,
-      encoders: status?.components?.encoders?.state,
-      retrieval: status?.readiness?.composites?.retrieval,
-    }));
+    if (!watcherDeleteDuringBuild) {
+      console.log('MODEL_LIVE_AB_HELD_READINESS', JSON.stringify({
+        migration: status?.worker?.migration?.migrationState,
+        compat: status?.worker?.compatibility?.embeddingCompatState,
+        encoders: status?.components?.encoders?.state,
+        retrieval: status?.readiness?.composites?.retrieval,
+      }));
+    }
     const composeMode = status?.readiness?.engineComponents?.encoders?.mode;
     requireThat(['IN_PLACE', 'BESIDE'].includes(composeMode)
       && (inPlaceModelB ? composeMode === 'IN_PLACE'
@@ -1097,26 +1194,30 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     })}`);
     const actualInPlace = composeMode === 'IN_PLACE';
     const retrieval = status?.readiness?.composites?.retrieval;
-    requireThat(actualInPlace
-      ? retrieval?.state === 'DEGRADED'
-        && retrieval.reasonCodes?.includes('index.embedding_rebuilding')
-      : !retrieval?.reasonCodes?.includes('index.embedding_rebuilding'),
-    `semantic-pause readiness contradicted ${composeMode}: ${JSON.stringify(retrieval)}`);
     const vectorBody = vectorSearch.status === 200 ? JSON.parse(vectorSearch.text) : null;
-    const heldQueryTrace = actualInPlace ? vectorBody?.searchTrace?.degradation ?? null : null;
-    const vectorOutcome = actualInPlace
-      ? vectorSearch.status === 200
-        && vectorBody?.results?.length === 0
-        && heldQueryTrace?.vectorBlocked === true
-        && heldQueryTrace.vectorBlockedReason === 'REBUILD_IN_PROGRESS'
-        && status?.components?.encoders?.state === 'RELOADING'
-      : vectorSearch.status === 200 && matchingHit(vectorSearch, file, marker);
-    requireThat(textSearch.status === 200 && matchingHit(textSearch, file, marker)
-      && vectorOutcome,
-    `serving A violated ${composeMode} mode while B was settled: ${JSON.stringify({
-      text: textSearch.text, vector: vectorSearch.text, encoders: status?.components?.encoders,
-    })}`);
-    if (actualInPlace) {
+    const heldQueryTrace = watcherDeleteDuringBuild
+      ? watcherSemanticEvidence?.vector?.degradation ?? null
+      : actualInPlace ? vectorBody?.searchTrace?.degradation ?? null : null;
+    if (!watcherDeleteDuringBuild) {
+      requireThat(actualInPlace
+        ? retrieval?.state === 'DEGRADED'
+          && retrieval.reasonCodes?.includes('index.embedding_rebuilding')
+        : !retrieval?.reasonCodes?.includes('index.embedding_rebuilding'),
+      `semantic-pause readiness contradicted ${composeMode}: ${JSON.stringify(retrieval)}`);
+      const vectorOutcome = actualInPlace
+        ? vectorSearch.status === 200
+          && vectorBody?.results?.length === 0
+          && heldQueryTrace?.vectorBlocked === true
+          && heldQueryTrace.vectorBlockedReason === 'REBUILD_IN_PROGRESS'
+          && status?.components?.encoders?.state === 'RELOADING'
+        : vectorSearch.status === 200 && matchingHit(vectorSearch, file, marker);
+      requireThat(textSearch.status === 200 && matchingHit(textSearch, file, marker)
+        && vectorOutcome,
+      `serving A violated ${composeMode} mode while B was settled: ${JSON.stringify({
+        text: textSearch.text, vector: vectorSearch.text, encoders: status?.components?.encoders,
+      })}`);
+    }
+    if (actualInPlace && !watcherDeleteDuringBuild) {
       const hybridSearch = await post(apiPort, '/api/knowledge/search',
         { query: marker, limit: 10 }, 30000);
       requireThat(hybridSearch.status === 200
@@ -1127,7 +1228,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
         retrievalReasons: retrieval?.reasonCodes, degradation: heldQueryTrace,
       }));
     }
-    if (actualInPlace && acceptedWriteDuringBuild) {
+    if (actualInPlace && acceptedWriteDuringBuild && !watcherDeleteDuringBuild) {
       // D1-14's UI acceptance runs against this held installed Engine, not a mocked
       // status response. The installed harness intentionally has a dummy frontend;
       // jseval auto-serves this worktree's Lit UI with its proxy pinned to the
@@ -1175,9 +1276,11 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       bModel: bManifest.models.embedding, unitsCompleted: inFlight.units_completed,
       unitsFailed: inFlight.units_failed, mode: composeMode,
       encoderState: status?.components?.encoders?.state,
-      retrievalReasons: retrieval?.reasonCodes,
+      retrievalReasons: watcherDeleteDuringBuild
+        ? watcherSemanticEvidence?.retrievalReasons : retrieval?.reasonCodes,
       heldQueryTrace,
-      vectorHits: actualInPlace ? 0 : JSON.parse(vectorSearch.text).results.length }));
+      vectorHits: watcherDeleteDuringBuild ? watcherSemanticEvidence?.vector?.hits
+        : actualInPlace ? 0 : JSON.parse(vectorSearch.text).results.length }));
     if (issuedSearch) {
       requireThat(composeMode === 'BESIDE' && distinctModelB,
         'issued A search requires a physical distinct-model BESIDE candidate');
@@ -1347,7 +1450,11 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       { query: removedMarker, limit: 10, mode: 'text' }, 30000);
     requireThat(removedText.status === 200
       && !matchingHit(removedText, removedFile, removedMarker),
-    `promoted B resurrected a watcher deletion: ${removedText.text}`);
+      `promoted B resurrected a watcher deletion: ${removedText.text}`);
+    watcherPassEvidence.bAbsence = {
+      absentInB: true,
+      hitsInB: JSON.parse(removedText.text).results?.length ?? 0,
+    };
   }
   // The terminal B query above proves recovery at the API, but the independent sampler may be
   // between its vector and hybrid requests at that instant. Let it witness one post-refusal
@@ -1374,6 +1481,34 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     && promotedManifest.pid === manifest.pid,
   `live model migration changed Engine identity: ${JSON.stringify({
     first, promotedSupervisor, manifest, promotedManifest })}`);
+  if (watcherDeleteDuringBuild) {
+    requireThat(watcherPassEvidence?.additionVisibleInA
+      && watcherPassEvidence?.scopedUpsert?.generation === bGeneration
+      && watcherPassEvidence?.scopedDelete?.generation === bGeneration
+      && watcherPassEvidence?.deletionAbsentInA === true
+      && watcherPassEvidence?.bAbsence?.absentInB === true
+      && acceptedWriteEvidence?.visibleInA === true
+      && watcherSemanticEvidence?.migration === 'MIGRATING'
+      && JSON.parse(bVector.text).results.length > 0
+      && promotedSupervisor.restartCount === first.restartCount,
+    `watcher deletion replay evidence was incomplete: ${JSON.stringify({
+      watcherPassEvidence, acceptedWriteEvidence, watcherSemanticEvidence,
+      bVectorHits: JSON.parse(bVector.text).results.length,
+      first, promotedSupervisor,
+    })}`);
+    console.log('MODEL_LIVE_AB_WATCHER_DELETE_PASS', JSON.stringify({
+      scenario: 'model-live-a-b', mode: watcherSemanticEvidence.composeMode, sourceGeneration,
+      buildingGeneration: bGeneration, watcher: watcherPassEvidence,
+      acceptedWrite: acceptedWriteEvidence,
+      semanticPause: watcherSemanticEvidence,
+      bVector: { visible: true, hits: JSON.parse(bVector.text).results.length },
+      engine: { instanceId: promotedManifest.instanceId, pid: promotedManifest.pid,
+        restartCount: promotedSupervisor.restartCount,
+        processRestarted: promotedManifest.instanceId !== manifest.instanceId
+          || promotedManifest.pid !== manifest.pid
+          || promotedSupervisor.restartCount !== first.restartCount },
+    }));
+  }
   console.log('MODEL_LIVE_AB_PASS', JSON.stringify({ operationKey,
     sourceGeneration, activeGeneration: completed.active.active_generation,
     settingsRevision: completed.settings.witness.acceptedRevision,

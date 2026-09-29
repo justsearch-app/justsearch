@@ -114,9 +114,8 @@ public final class WorkerMutationAdmission {
         throw new IllegalStateException("Replay certificate already armed");
       }
       synchronized (replayCertificateMonitor) {
-        if (replayUncertain) return false;
         replayCertificateArmed = true;
-        return true;
+        return !replayUncertain;
       }
     }
 
@@ -151,6 +150,47 @@ public final class WorkerMutationAdmission {
       }
     }
 
+    /**
+     * Atomically releases an armed, certified successor and reports whether admission reached it.
+     *
+     * <p>This is the armed fence's final operation. It closes the interval in which replay
+     * uncertainty can invalidate an earlier conditional certification, makes the final owner
+     * decision, and releases mutation admission without dropping the certificate monitor between
+     * those actions. A false result means the installed successor was replaced by the fenced owner.
+     */
+    public boolean releaseCertifiedSuccessor() {
+      requireOpen();
+      if (!installed) throw new IllegalStateException("Successor has not been installed");
+      if (!replayCertificateArmed) {
+        throw new IllegalStateException("Replay certificate has not been armed");
+      }
+      closed = true;
+      synchronized (replayCertificateMonitor) {
+        boolean released = certified && !replayUncertain;
+        if (!released) owner = fencedOwner;
+        lock.writeLock().unlock();
+        return released;
+      }
+    }
+
+    /**
+     * Boot reconciliation keeps the same owner. Its final filesystem check and admission release
+     * must still decide replay certainty under the same monitor used by watcher failure reports.
+     */
+    public boolean releaseCurrentOwnerIfReplayCertain() {
+      requireOpen();
+      if (installed || !replayCertificateArmed) {
+        throw new IllegalStateException("Boot release requires an armed unchanged owner");
+      }
+      closed = true;
+      synchronized (replayCertificateMonitor) {
+        boolean released = !replayUncertain;
+        if (!released) owner = fencedOwner;
+        lock.writeLock().unlock();
+        return released;
+      }
+    }
+
     private void requireOpen() {
       if (closed || Thread.currentThread() != holder) {
         throw new IllegalStateException("Final fence belongs to its preparing thread");
@@ -158,15 +198,17 @@ public final class WorkerMutationAdmission {
     }
 
     @Override public void close() {
-      requireOpen();
+      if (Thread.currentThread() != holder) {
+        throw new IllegalStateException("Final fence belongs to its preparing thread");
+      }
+      if (closed) return;
       closed = true;
       synchronized (replayCertificateMonitor) {
-        if (installed && (!certified || (replayCertificateArmed && replayUncertain))) {
+        // An armed fence must report its actual release through releaseCertifiedSuccessor().
+        // Falling out of try-with-resources without that call fails closed.
+        if (installed && (!certified || replayCertificateArmed)) {
           owner = fencedOwner;
         }
-        // Release admission inside the certificate decision's critical section. A watcher failure
-        // can therefore linearize either before release (and fence B) or after release (as a live-B
-        // fault), never between the final certainty check and producer admission.
         lock.writeLock().unlock();
       }
     }

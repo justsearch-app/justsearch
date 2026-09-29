@@ -58,6 +58,30 @@ import org.mockito.MockedConstruction;
 final class KnowledgeServerRecoveryCloseTest {
 
   @Test
+  void replaySettlementFromAnEarlierGenerationCannotCertifyItsSuccessor(@TempDir Path tempDir)
+      throws Exception {
+    var values = new HashMap<String, String>();
+    values.put(EnvRegistry.DATA_DIR.configKey(), tempDir.resolve("data").toString());
+    values.put(EnvRegistry.INDEX_BASE_PATH.configKey(), tempDir.resolve("index").toString());
+    values.put(EnvRegistry.EXTRACTION_SANDBOX_MODE.configKey(), "in_process");
+    var config = TestResolvedConfigHelper.fromEntries(values);
+    try (var executors = new TestEngineExecutors()) {
+      var server = new KnowledgeServer(executors, WorkerConfig.load(config), null);
+      Field witness = KnowledgeServer.class.getDeclaredField("replaySettledGeneration");
+      witness.setAccessible(true);
+      Method settled = KnowledgeServer.class.getDeclaredMethod(
+          "nativePredecessorReplaySettled", String.class);
+      settled.setAccessible(true);
+
+      witness.set(server, "g-source");
+      assertFalse((boolean) settled.invoke(server, "g-successor"),
+          "a settled prior generation cannot authorize successor predecessor retirement");
+      witness.set(server, "g-successor");
+      assertTrue((boolean) settled.invoke(server, "g-successor"));
+    }
+  }
+
+  @Test
   void capturedRecoveryHelperPartitionsIndexAWithCurrentQueryB(@TempDir Path tempDir)
       throws Exception {
     var base = new HashMap<String, String>();

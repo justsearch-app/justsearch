@@ -38,13 +38,29 @@ public final class MigrationTransitionBarrier {
     String point = env.apply("JUSTSEARCH_MIGRATION_BARRIER_POINT");
     String selfExitText = env.apply("JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT");
     String refuseText = env.apply("JUSTSEARCH_MIGRATION_BARRIER_REFUSE");
-    if (point == null && selfExitText == null && refuseText == null) return NO_HOOK;
+    String timeoutText = env.apply("JUSTSEARCH_MIGRATION_BARRIER_TIMEOUT_SECONDS");
+    if (point == null && selfExitText == null && refuseText == null && timeoutText == null) {
+      return NO_HOOK;
+    }
     if (!"1".equals(env.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
       throw new IllegalArgumentException("Migration barrier selection requires supervisor harness mode");
     }
     if (!POINTS.contains(point) || (selfExitText != null && !Set.of("0", "1").contains(selfExitText))
         || (refuseText != null && !Set.of("0", "1").contains(refuseText))) {
       throw new IllegalArgumentException("Invalid migration barrier selection");
+    }
+    final long timeoutSeconds;
+    if (timeoutText != null) {
+      try {
+        timeoutSeconds = Long.parseLong(timeoutText);
+      } catch (NumberFormatException invalid) {
+        throw new IllegalArgumentException("Invalid migration barrier timeout", invalid);
+      }
+      if (timeoutSeconds < 180 || timeoutSeconds > 600) {
+        throw new IllegalArgumentException("Migration barrier timeout must be 180..600 seconds");
+      }
+    } else {
+      timeoutSeconds = 180;
     }
     boolean selfExit = "1".equals(selfExitText);
     boolean refuse = "1".equals(refuseText);
@@ -65,7 +81,7 @@ public final class MigrationTransitionBarrier {
           "buildingGeneration", transition.buildingGeneration() == null ? "" : transition.buildingGeneration(),
           "pid", ProcessHandle.current().pid());
       HarnessBarrierProtocol.await(dataDir, "migration-barrier",
-          JsonMapper.builder().build().writeValueAsString(marker), selfExit);
+          JsonMapper.builder().build().writeValueAsString(marker), selfExit, timeoutSeconds);
       if (refuse) throw new IOException("Harness refused live Green start before open");
     };
   }

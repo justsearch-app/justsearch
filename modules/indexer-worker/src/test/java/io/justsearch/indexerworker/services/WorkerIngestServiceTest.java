@@ -151,7 +151,7 @@ final class WorkerIngestServiceTest {
   }
 
   @Test
-  void unsupportedMaintenanceMutationsRefuseBeforeChangingTheCandidate() throws Exception {
+  void candidateSyncWithoutWritableServingProjectionAndOtherMaintenanceRefuse() throws Exception {
     Path base = tempDir.resolve("maintenance-candidate-index");
     Path building = base.resolve("indices").resolve("g-green");
     Files.createDirectories(building);
@@ -161,6 +161,8 @@ final class WorkerIngestServiceTest {
          "migration_state":"MIGRATING","migration_paused":false,
          "updated_at_ms":%d}
         """.formatted(System.currentTimeMillis()));
+    // This deferred fixture has no serving A writer. Candidate-scoped reconciliation therefore
+    // still refuses; the distinct A/B route is covered by WorkerIngestServiceCandidateReconciliationTest.
     WorkerIngestService candidate = new WorkerIngestService(jobQueue,
         stubIndexingLoop(), new StubWorkerSignalBus(), IndexingPacing.unthrottled(),
         base, building, null, null, null, 0L);

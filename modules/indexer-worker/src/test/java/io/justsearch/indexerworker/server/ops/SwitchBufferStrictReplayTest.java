@@ -475,9 +475,52 @@ final class SwitchBufferStrictReplayTest {
   }
 
   @Test
-  void committedNativePointerRetainsUnknownEffectForRecovery() {
+  void committedNativePointerReplaysExactDeleteAndClearsOnlyItsReceipt() throws Exception {
     var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
         "green", "path:deleted", "DELETE", "deleted", 1, "v1");
+    var foreign = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "other", "path:foreign", "DELETE", "foreign", 2, "v2");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected, foreign), List.of(foreign));
+    when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
+    var indexing = mock(IndexingCoordinator.class);
+    when(runtime.indexingCoordinator()).thenReturn(indexing);
+    var commits = mock(CommitOps.class);
+    when(runtime.commitOps()).thenReturn(commits);
+    when(runtime.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+
+    assertTrue(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
+        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+    verify(indexing).deleteByIdAndChunks("deleted");
+    verify(queue).deleteByExactPath("deleted");
+    verify(commits).commitAndTrack(any());
+    verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
+    verify(indexing, never()).deleteByIdAndChunks("foreign");
+  }
+
+  @Test
+  void committedNativePointerPreflightsLaterUpsertBeforeAnyDelete() throws Exception {
+    String path = tempDir.resolve("later.txt").toAbsolutePath().toString();
+    var deletion = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:deleted", "DELETE", "deleted", 1, "v1");
+    var pending = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + path, "UPSERT",
+        new SwitchBufferUpsert(path, null, null, "pending-revision", "b".repeat(64)).encode(),
+        2, "v2");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(deletion, pending));
+    var indexing = mock(IndexingCoordinator.class);
+    when(runtime.indexingCoordinator()).thenReturn(indexing);
+
+    assertFalse(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
+        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+    verify(indexing, never()).deleteByIdAndChunks("deleted");
+    verify(queue, never()).deleteByExactPath("deleted");
+    verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
+  }
+
+  @Test
+  void committedNativePointerRetainsUnknownEffectForRecovery() {
+    var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "prefix:deleted", "DELETE_PREFIX", "deleted", 1, "v1");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected));
 
     assertFalse(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(

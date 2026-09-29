@@ -88,6 +88,13 @@ final class EngineLifecycleE2ETest {
 
   @Tag("ai")
   @Test
+  @Timeout(14 * 60)
+  void watcherAddDeleteReplayDuringInPlaceBuildKeepsAAndPromotesB() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededInPlaceWatcherDeleteReplay();
+  }
+
+  @Tag("ai")
+  @Test
   void refusedInPlaceGapRestoresAThenApprovesAndPromotesB() throws Exception {
     EngineSupervisedRecoveryE2ETest.runSeededInPlaceGapRestoration();
   }
@@ -113,6 +120,12 @@ final class EngineLifecycleE2ETest {
   void lowMemoryInPlaceChangingInputRecoversAfterPointerBeforeSettings() throws Exception {
     EngineSupervisedRecoveryE2ETest.runSeededInPlaceCombinedMaintenance(
         "model-live-a-b-low-memory-pointer-before-settings", "installer-pointer-before-settings");
+  }
+
+  @Tag("ai")
+  @Test
+  void generativeSecondOwnerFailureAbortsQueryCandidateAndKeepsA() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runQueryAndGenerativeActualOwnerRollback();
   }
 
   @Test

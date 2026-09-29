@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import io.justsearch.adapters.lucene.runtime.DeferredRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
@@ -27,7 +28,10 @@ import io.justsearch.reranker.CitationScorerConfig;
 import io.justsearch.reranker.RerankerConfig;
 import io.justsearch.telemetry.catalog.MetricDefinition;
 import io.justsearch.telemetry.catalog.NoopMetricRegistry;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +46,164 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 final class DefaultWorkerAppServicesProducerTransferTest {
+
+  @Test
+  void watcherTargetChangeAfterEffectFailureDoesNotRetryTheEffect() throws Exception {
+    Object owner = new Object();
+    var admission = new io.justsearch.indexerworker.services.WorkerMutationAdmission(owner);
+    var oldIngest = mock(io.justsearch.indexerworker.services.WorkerIngestService.class);
+    var successorIngest = mock(io.justsearch.indexerworker.services.WorkerIngestService.class);
+    var marker = mock(io.justsearch.indexerworker.services.ConfirmedDeletionMarker.class);
+    var runtime = mock(RunningRuntime.class);
+    var witness = mock(
+        io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription.class);
+
+    Class<?> targetType = Class.forName(
+        "io.justsearch.indexerworker.server.DefaultWorkerAppServices$WatcherCallbacks$Target");
+    Constructor<?> targetConstructor = targetType.getDeclaredConstructor(
+        RunningRuntime.class,
+        io.justsearch.indexerworker.services.WorkerIngestService.class,
+        io.justsearch.indexerworker.services.ConfirmedDeletionMarker.class,
+        io.justsearch.indexerworker.services.WorkerMutationAdmission.class,
+        Object.class);
+    targetConstructor.setAccessible(true);
+    Object oldTarget = targetConstructor.newInstance(
+        runtime, oldIngest, marker, admission, owner);
+    Object successorTarget = targetConstructor.newInstance(
+        runtime, successorIngest, marker, admission, owner);
+    Class<?> callbacksType = Class.forName(
+        "io.justsearch.indexerworker.server.DefaultWorkerAppServices$WatcherCallbacks");
+    Constructor<?> callbacksConstructor = callbacksType.getDeclaredConstructor(targetType);
+    callbacksConstructor.setAccessible(true);
+    Object callbacks = callbacksConstructor.newInstance(oldTarget);
+    Field selectedTarget = callbacksType.getDeclaredField("target");
+    selectedTarget.setAccessible(true);
+    var effects = new AtomicInteger();
+    doAnswer(invocation -> {
+      ((Runnable) invocation.getArgument(1)).run();
+      selectedTarget.set(callbacks, successorTarget);
+      throw new IllegalStateException("queue effect failed after it started");
+    }).when(oldIngest).acceptWatcherEvent(eq(witness), any(Runnable.class));
+    Method route = callbacksType.getDeclaredMethod(
+        "route",
+        io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription.class,
+        Runnable.class);
+    route.setAccessible(true);
+
+    var failure = assertThrows(java.lang.reflect.InvocationTargetException.class,
+        () -> route.invoke(callbacks, witness, (Runnable) effects::incrementAndGet));
+
+    assertInstanceOf(IllegalStateException.class, failure.getCause());
+    assertEquals(1, effects.get());
+    verify(successorIngest, never()).acceptWatcherEvent(any(), any());
+  }
+
+  @Test
+  void abandonedDeferredWriterUpgradeLeavesWatcherOwnershipWithIncumbent(
+      @TempDir Path tempDir) throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices deferred = fixture.newDeferredIncumbent();
+      DefaultWorkerAppServices candidate = DefaultWorkerAppServices.prepareDeferredWriterUpgrade(
+          fixture.executors, fixture.greenContext(), () -> false, null,
+          IndexingPacing.unthrottled(),
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), fixture.configuration,
+          deferred);
+
+      try (DefaultWorkerAppServices.WatcherHandoff ignored =
+          deferred.prepareDeferredWatcherHandoffTo(candidate)) {
+        // Simulates DeferredRuntime.PreparedUpgrade.markPublished() refusing publication.
+      }
+      candidate.close();
+      assertFalse(fixture.watcherExecutor.isShutdown(),
+          "an abandoned candidate owns only its newly-created loop");
+
+      deferred.close();
+      assertTrue(fixture.watcherExecutor.isShutdown(),
+          "the incumbent remains the exact physical watcher closer after refusal");
+    }
+  }
+
+  @Test
+  void deferredWriterUpgradeKeepsRegisteredPhysicalWatcherAndRoutesBlockedEventToSuccessor(
+      @TempDir Path tempDir) throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      Path root = Files.createDirectory(tempDir.resolve("watched"));
+      Path created = Files.writeString(root.resolve("created.txt"), "content");
+      DefaultWorkerAppServices deferred = fixture.newDeferredIncumbent();
+      EmbeddingProvider deferredProvider = mock(EmbeddingProvider.class);
+      io.justsearch.indexerworker.splade.SpladeEncoder deferredSplade =
+          mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+      deferred.wireEmbeddingProvider(deferredProvider);
+      deferred.wireSpladeEncoder(deferredSplade);
+      var watched = deferred.ingestService().watchRoot(
+          io.justsearch.ipc.WatchRootRequest.newBuilder()
+              .setRootPath(root.toString())
+              .setCollection("docs")
+              .build(),
+          io.justsearch.indexerworker.services.CallContext.none());
+      assertTrue(watched.getWatching(), watched.getErrorMessage());
+
+      Object registry = field(deferred, "rootWatcherRegistry");
+      Object watcher = field(deferred, "workerWatcher");
+      Object subscription =
+          invokeDeclared(registry, "subscription", new Class<?>[] {Path.class}, root);
+      assertNotNull(subscription);
+
+      DefaultWorkerAppServices successor = DefaultWorkerAppServices.prepareDeferredWriterUpgrade(
+          fixture.executors, fixture.greenContext(), () -> false, null,
+          IndexingPacing.unthrottled(),
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), fixture.configuration,
+          deferred);
+      assertSame(registry, field(successor, "rootWatcherRegistry"));
+      assertSame(watcher, field(successor, "workerWatcher"));
+      assertSame(deferredProvider, queryEmbeddingProvider(successor));
+      assertSame(deferredProvider, producerEmbeddingProvider(successor));
+      assertSame(deferredSplade, queryBindings(successor).spladeEncoder());
+      assertSame(subscription,
+          invokeDeclared(registry, "subscription", new Class<?>[] {Path.class}, root));
+
+      var admitted = new CountDownLatch(1);
+      when(fixture.jobQueue.enqueueEntries(any(), eq("docs"))).thenAnswer(ignored -> {
+        admitted.countDown();
+        return 1;
+      });
+      var callbackFailure = new AtomicReference<Throwable>();
+      Thread callback;
+      try (DefaultWorkerAppServices.WatcherHandoff handoff =
+          deferred.prepareDeferredWatcherHandoffTo(successor)) {
+        callback = Thread.ofVirtual().start(() -> {
+          try {
+            invokeWatcherEvent(watcher, subscription, "CREATE", created);
+          } catch (Throwable failure) {
+            callbackFailure.set(failure);
+          }
+        });
+        assertFalse(admitted.await(100, TimeUnit.MILLISECONDS),
+            "the publication fence must hold a callback until its target changes");
+        handoff.install();
+      }
+      assertTrue(admitted.await(2, TimeUnit.SECONDS));
+      callback.join(2_000L);
+      assertFalse(callback.isAlive());
+      assertNull(callbackFailure.get(), String.valueOf(callbackFailure.get()));
+
+      deferred.close();
+      assertFalse(fixture.watcherExecutor.isShutdown(),
+          "retiring deferred services must not close the transferred physical watcher");
+      assertSame(subscription,
+          invokeDeclared(registry, "subscription", new Class<?>[] {Path.class}, root));
+
+      DefaultWorkerAppServices green = DefaultWorkerAppServices.prepareNativeGreen(
+          fixture.executors, fixture.nativeGreenContext(), () -> true, null,
+          successor.indexingPacing(), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+          fixture.configuration, fixture.candidateConfiguration, successor);
+      assertSame(registry, field(green, "rootWatcherRegistry"));
+      assertSame(watcher, field(green, "workerWatcher"));
+      green.close();
+      successor.close();
+      assertTrue(fixture.watcherExecutor.isShutdown());
+    }
+  }
 
   @Test
   void abortedSuccessorBorrowsProducerAndInstalledSuccessorBecomesItsOnlyCloser(
@@ -424,6 +586,26 @@ final class DefaultWorkerAppServicesProducerTransferTest {
     return field.get(target);
   }
 
+  private static Object invokeDeclared(
+      Object target, String name, Class<?>[] parameterTypes, Object... args) throws Exception {
+    Method method = target.getClass().getDeclaredMethod(name, parameterTypes);
+    method.setAccessible(true);
+    return method.invoke(target, args);
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static void invokeWatcherEvent(
+      Object watcher, Object subscription, String kindName, Path path) throws Exception {
+    Class<?> subscriptionType = Class.forName(
+        "io.justsearch.indexerworker.services.RootWatcherRegistry$Subscription");
+    Class<? extends Enum> kindType = (Class<? extends Enum>) Class.forName(
+        "io.justsearch.indexerworker.services.WorkerMethvinWatcher$Kind");
+    Method method = watcher.getClass().getDeclaredMethod(
+        "handleEvent", subscriptionType, kindType, Path.class);
+    method.setAccessible(true);
+    method.invoke(watcher, subscription, Enum.valueOf(kindType, kindName), path);
+  }
+
   private static final class Fixture implements AutoCloseable {
     private final io.justsearch.core.execution.TestEngineExecutors engineExecutors =
         new io.justsearch.core.execution.TestEngineExecutors();
@@ -439,6 +621,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
     private final WorkerExecutorRegistrations executors = mock(WorkerExecutorRegistrations.class);
     private final RunningRuntime runtime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
     private final RunningRuntime greenRuntime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
+    private final DeferredRuntime deferredRuntime = mock(DeferredRuntime.class, RETURNS_DEEP_STUBS);
     private final JobQueue jobQueue = mock(JobQueue.class);
     private final WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
     private final ResolvedConfig snapshot =
@@ -512,6 +695,17 @@ final class DefaultWorkerAppServicesProducerTransferTest {
               io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
               configuration,
               candidateConfiguration);
+      return incumbent;
+    }
+
+    private DefaultWorkerAppServices newDeferredIncumbent() {
+      InfraContext deferredContext = new InfraContext(
+          context.config(), jobQueue, () -> deferredRuntime, () -> deferredRuntime, signalBus,
+          null, metricRegistry, context.indexBasePath(), context.activeIndexPath(),
+          () -> null, 5_000L);
+      incumbent = new DefaultWorkerAppServices(
+          executors, deferredContext, () -> false, null, IndexingPacing.unthrottled(),
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), configuration);
       return incumbent;
     }
 

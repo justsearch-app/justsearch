@@ -42,7 +42,8 @@ const queryRoleScenario = scenario === 'query-role-commit' || scenario === 'quer
   || scenario === 'query-role-invalid-override-boot'
   || scenario === 'query-role-after-file-crash' || scenario === 'query-role-issued-a'
   || scenario === 'query-role-publication-hold'
-  || scenario === 'query-role-contract-b-settings-a';
+  || scenario === 'query-role-contract-b-settings-a'
+  || scenario === 'query-role-two-owner-rollback';
 const modelLiveABGap = scenario === 'model-live-a-b-gap';
 const modelLiveABCancel = scenario === 'model-live-a-b-cancel';
 const modelLiveABRecomposeFailure = scenario === 'model-live-a-b-recompose-failure';
@@ -90,7 +91,7 @@ function findRetainedModelsRoot() {
   }
 }
 const operationKey = operationFault || bulkFault || bulkGapApproval || installerFault || modelLiveAB
-  || scenario === 'query-role-after-file-crash'
+  || scenario === 'query-role-after-file-crash' || scenario === 'query-role-two-owner-rollback'
   ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
   ? path.resolve(process.env.JUSTSEARCH_WRITER_RECOVERY_WORK)
@@ -200,6 +201,36 @@ if (scenario === 'query-role-after-file-crash') {
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reconfigure';
   env.JUSTSEARCH_OPERATION_FAULT_POINT = 'settings-after-file-replace-before-publication';
 }
+if (scenario === 'query-role-two-owner-rollback') {
+  env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
+  env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reconfigure';
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = 'settings-mid-compose';
+  // Let dev-runner select its explicit compact profile, while removing ambient
+  // per-file/operator overrides that would displace that profile's absent GGUF.
+  // Keep the absence private to this fixture; retained shared model bytes are immutable.
+  const privateGenerativeModels = path.join(work, 'query-two-owner-generative-models');
+  fs.mkdirSync(privateGenerativeModels, { recursive: true });
+  const retainedCitationA = path.join(findRetainedModelsRoot(), 'onnx', 'citation-scorer');
+  const privateCitationA = path.join(privateGenerativeModels, 'onnx', 'citation-scorer');
+  fs.cpSync(retainedCitationA, privateCitationA, { recursive: true, force: true });
+  requireThat(fs.existsSync(path.join(privateCitationA, 'model.onnx'))
+      && fs.existsSync(path.join(privateCitationA, 'tokenizer.json')),
+  'two-owner private model root lacks the complete citation A fixture');
+  const retainedCompactA = path.join(findRetainedModelsRoot(),
+    'compact', 'Qwen3.5-4B-Q4_K_M.gguf');
+  const privateCompactA = path.join(privateGenerativeModels,
+    'compact', 'Qwen3.5-4B-Q4_K_M.gguf');
+  requireThat(fs.existsSync(retainedCompactA),
+    'two-owner A seed requires the retained compact GGUF');
+  fs.mkdirSync(path.dirname(privateCompactA), { recursive: true });
+  if (!fs.existsSync(privateCompactA)) fs.linkSync(retainedCompactA, privateCompactA);
+  env.JUSTSEARCH_MODELS_DIR = privateGenerativeModels;
+  delete env.JUSTSEARCH_LLM_MODEL_PATH;
+  delete env.JUSTSEARCH_CHAT_PROFILE;
+  delete env.JUSTSEARCH_VLM_PROFILE;
+  delete env.JUSTSEARCH_VLM_MODEL;
+  delete env.JUSTSEARCH_MMPROJ_MODEL;
+}
 if (bulkFault || bulkGapApproval) {
   if (BULK_FAULT_CASES[scenario]?.liveStart) {
     env.JUSTSEARCH_MIGRATION_BARRIER_POINT = BULK_FAULT_CASES[scenario].phase;
@@ -255,6 +286,10 @@ if (modelLiveAB) {
     env.JUSTSEARCH_WORKER_DEADLINE_MS = '180000';
   } else if (acceptedWriteDuringBuild) {
     env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-before-switching';
+    if (watcherDeleteDuringBuild) {
+      // Add and delete may each need a separate 60s periodic reconciliation tick.
+      env.JUSTSEARCH_MIGRATION_BARRIER_TIMEOUT_SECONDS = '480';
+    }
   }
   if (distinctModelB) {
     env.JUSTSEARCH_GPU_ENABLED = 'true';

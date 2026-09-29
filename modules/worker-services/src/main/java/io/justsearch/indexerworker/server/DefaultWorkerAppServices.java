@@ -129,6 +129,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       return ownsLoop && ownsWatcher && !closed;
     }
 
+    synchronized boolean ownsWatcher() {
+      return ownsWatcher && !closed;
+    }
+
     boolean closed() { return closed; }
 
     synchronized void replaceModelLease(Runnable release) {
@@ -200,6 +204,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     private final java.util.concurrent.locks.ReentrantLock lock =
         new java.util.concurrent.locks.ReentrantLock();
     private DefaultWorkerAppServices target;
+    private volatile EmbeddingProvider current =
+        io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.INSTANCE;
 
     private EmbeddingProviderTarget(DefaultWorkerAppServices target) {
       this.target = target;
@@ -209,43 +215,94 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     public void accept(EmbeddingProvider provider) {
       lock.lock();
       try {
+        current = provider != null
+            ? provider : io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.INSTANCE;
         target.searchService.setEmbeddingProvider(provider);
         target.healthService.setEmbeddingProvider(provider);
       } finally {
         lock.unlock();
       }
     }
+
+    private EmbeddingProvider current() { return current; }
   }
 
   /** The existing watcher follows the selected writer service without retaining a Blue view. */
   private static final class WatcherCallbacks {
     private volatile Target target;
 
-    private record Target(RunningRuntime runtime, WorkerIngestService ingest,
-        io.justsearch.indexerworker.services.ConfirmedDeletionMarker deletionMarker) {}
+    private record Target(
+        RunningRuntime runtime,
+        WorkerIngestService ingest,
+        io.justsearch.indexerworker.services.ConfirmedDeletionMarker deletionMarker,
+        WorkerMutationAdmission mutationAdmission,
+        Object mutationOwnerToken) {}
+
+    private record RoutedTarget(Target target, WorkerMutationAdmission.Lease lease)
+        implements AutoCloseable {
+      @Override public void close() { lease.close(); }
+    }
 
     private WatcherCallbacks(Target initial) { target = initial; }
 
+    /** Retargets only when admission refused before any callback effect could start. */
+    private RoutedTarget acquireTarget() {
+      while (true) {
+        Target selected = target;
+        try {
+          return new RoutedTarget(
+              selected,
+              selected.mutationAdmission().enter(selected.mutationOwnerToken()));
+        } catch (RuntimeException retiredOwner) {
+          Target successor = target;
+          if (successor == selected || successor.runtime() == null) throw retiredOwner;
+        }
+      }
+    }
+
+    private void route(
+        io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription witness,
+        Runnable effect) {
+      try (RoutedTarget routed = acquireTarget()) {
+        Target selected = routed.target();
+        selected.ingest().acceptWatcherEvent(witness, effect);
+      }
+    }
+
     private void upsert(String collection, Path path) {
-      Target selected = target;
-      if (selected.runtime() == null) return;
-      try {
+      try (RoutedTarget routed = acquireTarget()) {
+        Target selected = routed.target();
+        if (selected.runtime() == null) return;
         selected.ingest().acceptWatcherUpsert(collection, path);
-      } catch (RuntimeException stale) {
-        Target successor = target;
-        if (successor == selected || successor.runtime() == null) throw stale;
-        successor.ingest().acceptWatcherUpsert(collection, path);
+      }
+    }
+
+    private void upsert(
+        io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription witness,
+        String collection,
+        Path path) {
+      try (RoutedTarget routed = acquireTarget()) {
+        Target selected = routed.target();
+        if (selected.runtime() == null) return;
+        selected.ingest().acceptWatcherUpsert(witness, collection, path);
       }
     }
 
     private void delete(String path) {
-      Target selected = target;
-      if (selected.runtime() == null) return;
-      try { deleteAt(selected, path); }
-      catch (RuntimeException stale) {
-        Target successor = target;
-        if (successor == selected || successor.runtime() == null) throw stale;
-        deleteAt(successor, path);
+      try (RoutedTarget routed = acquireTarget()) {
+        Target selected = routed.target();
+        if (selected.runtime() == null) return;
+        deleteAt(selected, path);
+      }
+    }
+
+    private void delete(
+        io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription witness,
+        String path) {
+      try (RoutedTarget routed = acquireTarget()) {
+        Target selected = routed.target();
+        if (selected.runtime() == null) return;
+        deleteAt(selected, witness, path);
       }
     }
 
@@ -257,14 +314,22 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       });
     }
 
+    private static void deleteAt(
+        Target selected,
+        io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription witness,
+        String path) {
+      selected.ingest().acceptWatcherDelete(witness, path, () -> {
+        if (!selected.runtime().isAcceptingWrites()) return;
+        selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
+        selected.deletionMarker().markIfAbsent(path);
+      });
+    }
+
     private void reconcile(Path root, boolean force) {
-      Target selected = target;
-      if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) return;
-      try { selected.ingest().reconcileRootStrict(root, force); }
-      catch (RuntimeException stale) {
-        Target successor = target;
-        if (successor == selected || successor.runtime() == null) throw stale;
-        successor.ingest().reconcileRootStrict(root, force);
+      try (RoutedTarget routed = acquireTarget()) {
+        Target selected = routed.target();
+        if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) return;
+        selected.ingest().reconcileRootStrict(root, force);
       }
     }
   }
@@ -375,6 +440,26 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     return new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
         embeddingTelemetryEvents, indexingPacing, childRegistry, configuration,
         candidateConfiguration, nativeSource);
+  }
+
+  /** Opens the deferred runtime's first writer while retaining the incumbent physical watcher. */
+  public static DefaultWorkerAppServices prepareDeferredWriterUpgrade(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      WorkerServiceConfiguration configuration,
+      DefaultWorkerAppServices deferredSource) {
+    java.util.Objects.requireNonNull(deferredSource, "deferredSource");
+    if (deferredSource.producerRuntime != null || deferredSource.indexingLoop != null
+        || !deferredSource.producerOwnership.ownsWatcher()) {
+      throw new IllegalStateException("Deferred source does not own a watcher-only producer");
+    }
+    return new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
+        embeddingTelemetryEvents, indexingPacing, childRegistry, configuration, null,
+        deferredSource);
   }
 
   private DefaultWorkerAppServices(
@@ -592,8 +677,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     var watcherDeletionMarker =
         new io.justsearch.indexerworker.services.ConfirmedDeletionMarker(
             ctx.documentIdentityStore());
-    this.preparedWatcherTarget =
-        new WatcherCallbacks.Target(ingestRunning, ingestService, watcherDeletionMarker);
+    this.preparedWatcherTarget = new WatcherCallbacks.Target(
+        ingestRunning, ingestService, watcherDeletionMarker, mutationAdmission, mutationOwnerToken);
     this.watcherCallbacks = nativeSource == null
         ? new WatcherCallbacks(preparedWatcherTarget) : nativeSource.watcherCallbacks;
     // Tempdoc 626 §Axis-A — OVERFLOW/burst recovery is now Worker-owned (in-process reconcile),
@@ -604,7 +689,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       this.workerWatcher = new io.justsearch.indexerworker.services.WorkerMethvinWatcher(
           executors.watcherReconcile(), ctx.jobQueue(), workerWatcherCatalog,
           watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
-          ignored -> mutationAdmission.markReplayUncertain());
+          ignored -> mutationAdmission.markReplayUncertain(), watcherCallbacks::route,
+          watcherCallbacks::delete, watcherCallbacks::upsert);
       this.rootWatcherRegistry =
           new io.justsearch.indexerworker.services.RootWatcherRegistry(workerWatcher);
     } else {
@@ -613,18 +699,20 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     }
     this.ingestService.setRootWatcherRegistry(rootWatcherRegistry);
     this.embeddingProviderTarget = new EmbeddingProviderTarget(this);
-    if (nativeSource != null) copyNativeSourceQueryBindings(nativeSource);
+    if (nativeSource != null) copySourceQueryBindings(nativeSource);
   }
 
-  /** A remains the query generation while this newly constructed loop writes Green. */
-  private void copyNativeSourceQueryBindings(DefaultWorkerAppServices source) {
+  /** The source remains the query authority while this newly constructed loop takes write duty. */
+  private void copySourceQueryBindings(DefaultWorkerAppServices source) {
     var bindings = source.encoderBindings.snapshot();
     encoderBindings.publish(bindings);
     healthService.setBgeM3Encoder(bindings.bgeM3Encoder());
     var disambiguation = bindings.disambiguationService();
     searchService.setClusterSnapshotSupplier(
         disambiguation == null ? null : disambiguation::snapshot);
-    var provider = source.indexingLoop.getEmbeddingLifecycle().embeddingProvider();
+    var provider = source.indexingLoop == null
+        ? source.embeddingProviderTarget.current()
+        : source.indexingLoop.getEmbeddingLifecycle().embeddingProvider();
     wireEmbeddingProvider(provider);
     if (source.spladeIdfQueryEncoder != null) {
       wireSpladeIdfQueryEncoder(source.spladeIdfQueryEncoder);
@@ -743,7 +831,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             greenContext.migrationProgressSupplier(),
             greenContext.migrationSwitchingMaxDurationMs());
     this.preparedWatcherTarget = new WatcherCallbacks.Target(
-        greenRuntime, this.ingestService, incumbent.preparedWatcherTarget.deletionMarker());
+        greenRuntime, this.ingestService, incumbent.preparedWatcherTarget.deletionMarker(),
+        mutationAdmission, mutationOwnerToken);
     ingestService.setPathResolutionStore(greenContext.pathResolutionStore());
     ingestService.setDocumentIdentityStore(greenContext.documentIdentityStore());
     ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
@@ -855,6 +944,79 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         || successor.mutationAdmission != mutationAdmission
         || successor.producerOwnership.ownsProducer()) {
       throw new IllegalArgumentException("Successor is not this native producer's prepared Green");
+    }
+  }
+
+  /**
+   * Blocks watcher callbacks across a deferred runtime's last fallible publication step.
+   * Installation is assignment-only: an uninstalled lease leaves the incumbent as exact owner.
+   */
+  public WatcherHandoff prepareDeferredWatcherHandoffTo(DefaultWorkerAppServices successor) {
+    java.util.Objects.requireNonNull(successor, "successor");
+    WorkerMutationAdmission.FinalFence fence;
+    try {
+      fence = mutationAdmission.beginFinalFence(mutationOwnerToken, 10_000L);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while draining deferred watcher callbacks", interrupted);
+    }
+    if (fence == null) {
+      throw new IllegalStateException("Timed out draining deferred watcher callbacks");
+    }
+    boolean retained = false;
+    try {
+      if (producerRuntime != null || indexingLoop != null || !producerOwnership.ownsWatcher()
+          || successor.borrowedFrom != this || successor.producerRuntime == null
+          || successor.indexingLoop == null || successor.workerWatcher != workerWatcher
+          || successor.rootWatcherRegistry != rootWatcherRegistry
+          || successor.watcherCallbacks != watcherCallbacks
+          || successor.mutationAdmission != mutationAdmission
+          || successor.producerOwnership.ownsWatcher()) {
+        throw new IllegalArgumentException("Successor is not this deferred watcher's writer upgrade");
+      }
+      retained = true;
+      return new WatcherHandoff(successor, fence);
+    } finally {
+      if (!retained) fence.close();
+    }
+  }
+
+  public final class WatcherHandoff implements AutoCloseable {
+    private final DefaultWorkerAppServices successor;
+    private final WorkerMutationAdmission.FinalFence fence;
+    private final Thread ownerThread = Thread.currentThread();
+    private boolean installed;
+    private boolean closed;
+
+    private WatcherHandoff(
+        DefaultWorkerAppServices successor, WorkerMutationAdmission.FinalFence fence) {
+      this.successor = successor;
+      this.fence = fence;
+    }
+
+    /** Transfers close ownership and callback routing after deferred publication commits. */
+    public void install() {
+      requireOwnerThread();
+      if (closed) throw new IllegalStateException("Watcher handoff lease is already closed");
+      if (installed) return;
+      fence.install(successor.mutationOwnerToken);
+      producerOwnership.transferWatcherTo(successor.producerOwnership);
+      watcherCallbacks.target = successor.preparedWatcherTarget;
+      fence.certifySuccessor();
+      installed = true;
+    }
+
+    @Override public void close() {
+      requireOwnerThread();
+      if (closed) return;
+      closed = true;
+      fence.close();
+    }
+
+    private void requireOwnerThread() {
+      if (Thread.currentThread() != ownerThread) {
+        throw new IllegalStateException("Watcher handoff lease belongs to its preparing thread");
+      }
     }
   }
 

@@ -854,6 +854,34 @@ final class JobQueueTest {
     assertJobMetadata(file, null, "scan-A", "agent", "MCP");
   }
 
+  @Test
+  void expectedCollectionReadChecksPendingBackoffAndTreatsAbsentRowAsMatch() throws Exception {
+    Path file = Path.of("/exact-collection/pending-backoff.txt");
+    jobQueue.enqueue(List.of(file), "old");
+
+    assertFalse(jobQueue.matchesExpectedCollection(file, "new"));
+    assertTrue(jobQueue.matchesExpectedCollection(file, "old"));
+
+    jobQueue.pollPending(1);
+    jobQueue.markFailed(file, "temporary failure");
+    assertNotNull(
+        readRetryAfterViaJdbc(PathNormalizer.normalizePath(file.toAbsolutePath().toString())),
+        "the stale row must remain PENDING with retry backoff");
+
+    assertFalse(
+        jobQueue.matchesExpectedCollection(file, "new"),
+        "collection mismatch must remain visible while the row is PENDING in backoff");
+    assertTrue(jobQueue.matchesExpectedCollection(file, "old"));
+    assertTrue(
+        jobQueue.matchesExpectedCollection(Path.of("/exact-collection/absent.txt"), "new"),
+        "an absent row is already converged");
+
+    jobQueue.enqueueEntriesWithExactCollection(
+        List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+    assertTrue(jobQueue.matchesExpectedCollection(file, null));
+    assertTrue(jobQueue.matchesExpectedCollection(file, "  "));
+  }
+
   private void assertJobMetadata(
       Path file, String collection, String scanId, String originator, String transport)
       throws SQLException {

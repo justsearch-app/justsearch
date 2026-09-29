@@ -28,6 +28,12 @@ final class MigrationTransitionBarrierTest {
     assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
         data, Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
             "JUSTSEARCH_MIGRATION_BARRIER_POINT", "unknown")::get));
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_MIGRATION_BARRIER_TIMEOUT_SECONDS", "480")::get));
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-before-switching",
+            "JUSTSEARCH_MIGRATION_BARRIER_TIMEOUT_SECONDS", "601")::get));
   }
 
   @Test
@@ -49,7 +55,8 @@ final class MigrationTransitionBarrierTest {
   void installedHandshakeReportsExactGenerationAndDoesNotRetrigger() throws Exception {
     var hook = MigrationTransitionBarrier.fromEnvironment(data,
         Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
-            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-before-pointer-commit")::get);
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-before-pointer-commit",
+            "JUSTSEARCH_MIGRATION_BARRIER_TIMEOUT_SECONDS", "480")::get);
     Path reached = data.resolve("runtime/migration-barrier-reached.json");
     hook.await(new MigrationTransitionBarrier.Transition("migration-green-drained", "a", "b"));
     assertFalse(Files.exists(reached));

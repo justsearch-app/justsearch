@@ -110,6 +110,8 @@ final class WatchedRootsStore {
       Map<Path, String> collections) {}
 
   LoadResult loadPersistedRootsWithErrors() {
+    // Membership is durable intent, not a current filesystem probe. Dropping an unavailable
+    // path here would let a post-pointer Worker boot certify B while silently omitting a root.
     Map<Path, Instant> roots = new LinkedHashMap<>();
     Map<Path, String> errors = new LinkedHashMap<>();
     java.util.Set<Path> completed = new java.util.LinkedHashSet<>();
@@ -128,7 +130,6 @@ final class WatchedRootsStore {
             String pathStr = entry.has("path") ? entry.get("path").asText() : null;
             if (pathStr == null) continue;
             Path path = Path.of(pathStr);
-            if (!Files.exists(path)) continue;
             String lastIndexedStr = entry.has("lastIndexed") ? entry.get("lastIndexed").asText() : null;
             Instant lastIndexed = (lastIndexedStr != null && !lastIndexedStr.isBlank())
                 ? Instant.parse(lastIndexedStr) : NEVER_INDEXED;
@@ -202,16 +203,12 @@ final class WatchedRootsStore {
             String lastIndexedStr = entry.has("lastIndexed") ? entry.get("lastIndexed").asText() : null;
             if (pathStr != null) {
               Path path = Path.of(pathStr);
-              if (Files.exists(path)) {
-                Instant lastIndexed =
-                    (lastIndexedStr != null && !lastIndexedStr.isBlank())
-                        ? Instant.parse(lastIndexedStr)
-                        : NEVER_INDEXED;
-                out.put(path, lastIndexed);
-                loaded++;
-              } else {
-                if (log != null) log.debug("Skipping non-existent persisted root: {}", path);
-              }
+              Instant lastIndexed =
+                  (lastIndexedStr != null && !lastIndexedStr.isBlank())
+                      ? Instant.parse(lastIndexedStr)
+                      : NEVER_INDEXED;
+              out.put(path, lastIndexed);
+              loaded++;
             }
           }
         }
@@ -220,12 +217,8 @@ final class WatchedRootsStore {
         List<String> paths = JSON.readValue(content, new TypeReference<List<String>>() {});
         for (String pathStr : paths) {
           Path path = Path.of(pathStr);
-          if (Files.exists(path)) {
-            out.put(path, NEVER_INDEXED); // No timestamp in old format
-            loaded++;
-          } else {
-            if (log != null) log.debug("Skipping non-existent persisted root: {}", path);
-          }
+          out.put(path, NEVER_INDEXED); // No timestamp in old format
+          loaded++;
         }
       }
 

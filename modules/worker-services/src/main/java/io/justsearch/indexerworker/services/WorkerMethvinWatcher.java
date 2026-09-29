@@ -7,11 +7,13 @@ import io.justsearch.core.execution.EngineExecutorRejectedException.Reason;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.methvin.watcher.DirectoryChangeEvent;
+import io.methvin.watcher.DirectoryChangeListener;
 import io.methvin.watcher.DirectoryWatcher;
 import io.methvin.watcher.hashing.FileHasher;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,6 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -32,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * <p>Replaces the Head-side {@code MethvinWatcherStrategy} (modules/app-indexing) with a watcher
  * that lives in the same process as {@link JobQueue} — events feed straight into the queue with
  * no IPC hop and no per-event gRPC submitBatch. The watcher is registered per root via
- * {@link #registerRoot(Path, String)}; deregistration via {@link #unregisterRoot(Path)} closes
+ * {@link #registerRoot(Path, String, Object)}; deregistration via {@link #unregisterRoot(Path)} closes
  * the underlying Methvin {@code DirectoryWatcher} for that root.
  *
  * <p>Event handling:
@@ -40,13 +44,13 @@ import org.slf4j.LoggerFactory;
  *   <li>{@code CREATE} / {@code MODIFY} → {@link JobQueue#enqueue(List, String)} with the
  *       collection from the watch subscription. {@code WorkerIngestionAuthority} applies its
  *       admission rules when the loop later picks the path up.
- *   <li>{@code DELETE} → forwarded to a {@code Consumer<String> deletePathSink} (B-H.4).
- *       Production wiring routes the sink to {@code IndexingCoordinator.deleteByIdAndChunks}
- *       so the parent doc + its chunks are removed in one Worker-side write. The sink is
- *       best-effort: failures are logged and dropped (the file may already be gone, the
- *       coordinator may be draining, etc.).
- *   <li>{@code OVERFLOW} → logged at warn; the periodic sync flow eventually catches up.
+ *   <li>{@code DELETE} → forwarded to the admission-aware delete route only while the captured
+ *       registration and stable root identity remain current.
+ *   <li>{@code OVERFLOW} → schedules an immediate forced reconciliation under the same witness.
  * </ul>
+ * Every event carries its immutable registration witness through mutation admission and a
+ * per-incarnation drainable event lease. Stale epochs are ignored; routing or identity failures
+ * invalidate migration replay certainty.
  *
  * <p>Telemetry: per-event-kind counters under {@code index.watcher.events_total} with a
  * {@code component=worker_watcher} tag, paralleling the Head-side metric so dashboards can
@@ -66,10 +70,14 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
 
   /** Delay before a burst-triggered reconcile, so a spike coalesces into one walk. */
   static final int BURST_RECONCILE_DELAY_SECONDS = 5;
+  static final int STARTUP_EVENT_BUFFER_LIMIT = 4_096;
 
   private final BiConsumer<String, Path> upsertPathSink;
   private final Consumer<RuntimeException> routingFailureSink;
+  private final EventRouter eventRouter;
   private final Consumer<String> deletePathSink;
+  private final BiConsumer<RootWatcherRegistry.Subscription, String> witnessedDeletePathSink;
+  private final WitnessedUpsertSink witnessedUpsertPathSink;
   private final WorkerWatcherMetricCatalog watcherCatalog;
   // Tempdoc 626 §Axis-A — overflow/burst recovery relocated onto the Worker watcher so the Head
   // watcher could be retired. reconcileSink runs the in-process reconciler (force flag); it is
@@ -81,12 +89,23 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private final Map<Path, Boolean> pendingReconciliations = new ConcurrentHashMap<>();
   private final Map<Path, RootSubscription> watchers = new ConcurrentHashMap<>();
   private final Map<Path, CompletableFuture<Void>> watchFutures = new ConcurrentHashMap<>();
+  private final Map<Path, Object> failedEpochs = new ConcurrentHashMap<>();
 
   public enum Kind {
     CREATE,
     MODIFY,
     DELETE,
     OVERFLOW
+  }
+
+  @FunctionalInterface
+  public interface EventRouter {
+    void route(RootWatcherRegistry.Subscription witness, Runnable effect);
+  }
+
+  @FunctionalInterface
+  public interface WitnessedUpsertSink {
+    void accept(RootWatcherRegistry.Subscription witness, String collection, Path path);
   }
 
   /**
@@ -130,10 +149,47 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       BiConsumer<Path, Boolean> reconcileSink,
       BiConsumer<String, Path> upsertPathSink,
       Consumer<RuntimeException> routingFailureSink) {
+    this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, reconcileSink,
+        upsertPathSink, routingFailureSink, (ignored, effect) -> effect.run());
+  }
+
+  /** Production wiring supplies the mutation-first registration-witness router. */
+  public WorkerMethvinWatcher(
+      EngineExecutorRegistry.Registration reconcileRegistration,
+      JobQueue jobQueue,
+      WorkerWatcherMetricCatalog watcherCatalog,
+      Consumer<String> deletePathSink,
+      BiConsumer<Path, Boolean> reconcileSink,
+      BiConsumer<String, Path> upsertPathSink,
+      Consumer<RuntimeException> routingFailureSink,
+      EventRouter eventRouter) {
+    this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, reconcileSink,
+        upsertPathSink, routingFailureSink, eventRouter,
+        (ignored, path) -> deletePathSink.accept(path),
+        (ignored, collection, path) -> upsertPathSink.accept(collection, path));
+  }
+
+  /** Production delete routing retains the immutable registration through the mutation fence. */
+  public WorkerMethvinWatcher(
+      EngineExecutorRegistry.Registration reconcileRegistration,
+      JobQueue jobQueue,
+      WorkerWatcherMetricCatalog watcherCatalog,
+      Consumer<String> deletePathSink,
+      BiConsumer<Path, Boolean> reconcileSink,
+      BiConsumer<String, Path> upsertPathSink,
+      Consumer<RuntimeException> routingFailureSink,
+      EventRouter eventRouter,
+      BiConsumer<RootWatcherRegistry.Subscription, String> witnessedDeletePathSink,
+      WitnessedUpsertSink witnessedUpsertPathSink) {
     Objects.requireNonNull(jobQueue, "jobQueue");
     this.upsertPathSink = Objects.requireNonNull(upsertPathSink, "upsertPathSink");
     this.routingFailureSink = Objects.requireNonNull(routingFailureSink, "routingFailureSink");
+    this.eventRouter = Objects.requireNonNull(eventRouter, "eventRouter");
     this.deletePathSink = Objects.requireNonNull(deletePathSink, "deletePathSink");
+    this.witnessedDeletePathSink =
+        Objects.requireNonNull(witnessedDeletePathSink, "witnessedDeletePathSink");
+    this.witnessedUpsertPathSink =
+        Objects.requireNonNull(witnessedUpsertPathSink, "witnessedUpsertPathSink");
     this.watcherCatalog = watcherCatalog == null ? WorkerWatcherMetricCatalog.noop() : watcherCatalog;
     this.reconcileSink = reconcileSink == null ? (root, force) -> {} : reconcileSink;
     this.reconcileExecutor =
@@ -164,23 +220,81 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
    * updated). Returns true if the watcher started successfully, false on inotify exhaustion or
    * other soft failure.
    */
-  synchronized boolean registerRoot(Path root, String collection) {
-    Objects.requireNonNull(root, "root");
-    Path normalized = root.toAbsolutePath().normalize();
-    String coll = collection == null || collection.isBlank() ? null : collection;
-    closeWatcherFor(normalized);
-    log.info("Worker watcher registering root: {} (collection={})", normalized, coll);
+  /** Registers a root under the caller's opaque registration incarnation. */
+  synchronized boolean registerRoot(Path root, String collection, Object watcherEpoch) {
     try {
+      RootWatcherRegistry.Subscription registration =
+          new RootWatcherRegistry.Subscription(
+              root.toAbsolutePath().normalize(),
+              collection == null || collection.isBlank() ? null : collection,
+              watcherEpoch,
+              RootIdentity.capture(root));
+      boolean registered = registerRoot(registration);
+      return registered && activateRoot(registration);
+    } catch (IOException failure) {
+      routingFailureSink.accept(
+          new IllegalStateException("Failed to capture worker watcher root identity", failure));
+      return false;
+    }
+  }
+
+  /** Registers a root using the registry-owned immutable witness. */
+  synchronized boolean registerRoot(RootWatcherRegistry.Subscription registration) {
+    Objects.requireNonNull(registration, "registration");
+    Path normalized = registration.root();
+    Object watcherEpoch = registration.watcherEpoch();
+    closeWatcherFor(normalized);
+    log.info("Worker watcher registering root: {} (collection={})", normalized,
+        registration.collection());
+    try {
+      AtomicReference<RootSubscription> subscriptionRef = new AtomicReference<>();
+      DirectoryChangeListener listener =
+          new DirectoryChangeListener() {
+            @Override
+            public void onEvent(DirectoryChangeEvent event) {
+              RootSubscription current = subscriptionRef.get();
+              if (current != null) current.dispatchOrBuffer(event);
+            }
+
+            @Override
+            public void onException(Exception failure) {
+              if (!routeMethvinNullOverflow(normalized, watcherEpoch, failure)) {
+                handleWatcherException(normalized, watcherEpoch, failure);
+              }
+            }
+          };
       DirectoryWatcher watcher =
           DirectoryWatcher.builder()
               .path(normalized)
               .fileHasher(FileHasher.LAST_MODIFIED_TIME)
-              .listener(event -> handleEvent(normalized, coll, event))
+              .listener(listener)
               .build();
-      watchers.put(normalized, new RootSubscription(normalized, coll, watcher));
-      watchFutures.put(normalized, watcher.watchAsync());
-      return true;
+      RootSubscription subscription =
+          new RootSubscription(registration, watcher);
+      subscriptionRef.set(subscription);
+      watchers.put(normalized, subscription);
+      CompletableFuture<Void> future = watcher.watchAsync();
+      watchFutures.put(normalized, future);
+      CompletableFuture<Void> completionObserver = future.whenComplete(
+          (ignored, failure) -> {
+            RuntimeException routed =
+                failure == null
+                    ? new IllegalStateException("Worker watcher stopped unexpectedly for " + normalized)
+                    : new IllegalStateException(
+                        "Worker watcher failed unexpectedly for " + normalized, failure);
+            handleWatcherException(normalized, watcherEpoch, routed);
+          });
+      // Retaining a named stage documents that completion is observed by the lifecycle callback.
+      Objects.requireNonNull(completionObserver);
+      boolean active = isActive(normalized, watcherEpoch);
+      if (!active) {
+        closeWatcherFor(normalized);
+      }
+      return active;
     } catch (IOException e) {
+      closeWatcherFor(normalized);
+      routingFailureSink.accept(
+          new IllegalStateException("Failed to register worker watcher for " + normalized, e));
       if (isInotifyExhausted(e)) {
         log.warn(
             "Inotify limit reached for {}: file changes may not be detected; periodic sync will catch up",
@@ -188,6 +302,31 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
         return false;
       }
       log.warn("Failed to register worker watcher for {}: {}", normalized, e.getMessage());
+      return false;
+    } catch (RuntimeException failure) {
+      closeWatcherFor(normalized);
+      routingFailureSink.accept(
+          new IllegalStateException("Failed to start worker watcher for " + normalized, failure));
+      log.warn(
+          "Worker watcher startup failed (failureType={})",
+          failure.getClass().getSimpleName());
+      return false;
+    }
+  }
+
+  /** Publishes the registration boundary and schedules startup-event drain without routing inline. */
+  synchronized boolean activateRoot(RootWatcherRegistry.Subscription registration) {
+    RootSubscription current = watchers.get(registration.root());
+    if (current == null || current.registration() != registration) {
+      throw new IllegalStateException("Cannot activate a non-current watcher registration");
+    }
+    if (!current.publish()) return false;
+    try {
+      reconcileExecutor.execute(current::drainBufferedEvents);
+      return true;
+    } catch (RuntimeException rejected) {
+      current.discardBufferedEvents();
+      handleWatcherException(registration.root(), registration.watcherEpoch(), rejected);
       return false;
     }
   }
@@ -202,11 +341,13 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private boolean closeWatcherFor(Path normalized) {
     RootSubscription prior = watchers.remove(normalized);
     CompletableFuture<Void> priorFuture = watchFutures.remove(normalized);
+    failedEpochs.remove(normalized);
     burstDetector.removeRoot(normalized);
     if (priorFuture != null) {
       priorFuture.cancel(true);
     }
     if (prior != null) {
+      prior.discardBufferedEvents();
       try {
         prior.watcher().close();
       } catch (IOException e) {
@@ -217,20 +358,139 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     return false;
   }
 
-  private void handleEvent(Path root, String collection, DirectoryChangeEvent event) {
+  /** True only for the current, non-failed incarnation with a live future and open watcher. */
+  boolean isActive(Path root, Object watcherEpoch) {
+    return "ACTIVE".equals(activityStatus(root, watcherEpoch));
+  }
+
+  /** Bounded lifecycle status for diagnostics; contains no root or exception message. */
+  String activityStatus(Path root, Object watcherEpoch) {
+    if (root == null || watcherEpoch == null) return "INVALID_WITNESS";
+    Path normalized = root.toAbsolutePath().normalize();
+    RootSubscription subscription = watchers.get(normalized);
+    CompletableFuture<Void> future = watchFutures.get(normalized);
+    if (subscription == null) return "MISSING_WATCHER";
+    if (subscription.registration().watcherEpoch() != watcherEpoch) return "EPOCH_CHANGED";
+    if (failedEpochs.get(normalized) == watcherEpoch) return "FAILED_EPOCH";
+    if (future == null) return "MISSING_FUTURE";
+    if (future.isCancelled()) return "FUTURE_CANCELLED";
+    if (future.isDone()) return "FUTURE_COMPLETED";
+    if (subscription.watcher().isClosed()) return "WATCHER_CLOSED";
+    return "ACTIVE";
+  }
+
+  /**
+   * Invalidates only the matching current incarnation. This callback deliberately never acquires
+   * the registry or watcher monitor; replacement removes map entries before cancellation, so an
+   * intentional stale callback cannot poison its successor.
+   */
+  boolean handleWatcherException(Path root, Object watcherEpoch, Exception failure) {
+    Path normalized = root.toAbsolutePath().normalize();
+    AtomicBoolean currentEpoch = new AtomicBoolean();
+    AtomicBoolean firstFailure = new AtomicBoolean();
+    watchers.computeIfPresent(
+        normalized,
+        (ignored, current) -> {
+          if (current.registration().watcherEpoch() == watcherEpoch) {
+            currentEpoch.set(true);
+            firstFailure.set(failedEpochs.put(normalized, watcherEpoch) != watcherEpoch);
+          }
+          return current;
+        });
+    if (!currentEpoch.get()) return false;
+    if (firstFailure.get()) {
+      log.warn(
+          "Worker watcher incarnation ended unexpectedly (failureType={})",
+          failure.getClass().getSimpleName(),
+          failure);
+      routingFailureSink.accept(
+          failure instanceof RuntimeException runtime
+              ? runtime
+              : new IllegalStateException(
+                  "Worker watcher failed unexpectedly for " + normalized, failure));
+    }
+    return true;
+  }
+
+  /**
+   * Methvin 0.19.1 passes a null native OVERFLOW context to onEvent, which calls
+   * ConcurrentSkipListMap.get(null) before notifying its listener. Its event loop catches that
+   * exception and continues watching. Restore the lost OVERFLOW notification for this exact
+   * dependency failure; any other watcher exception still invalidates the incarnation.
+   */
+  boolean routeMethvinNullOverflow(Path root, Object watcherEpoch, Exception failure) {
+    if (!isMethvinNullOverflow(failure)) return false;
+    RootSubscription current = watchers.get(root.toAbsolutePath().normalize());
+    if (current == null || current.registration().watcherEpoch() != watcherEpoch) return true;
+    try {
+      current.dispatchOrBuffer(new DirectoryChangeEvent(
+          DirectoryChangeEvent.EventType.OVERFLOW, false, root, null, 1, root));
+    } catch (RuntimeException routingFailure) {
+      handleWatcherException(root, watcherEpoch, routingFailure);
+    }
+    return true;
+  }
+
+  private static boolean isMethvinNullOverflow(Exception failure) {
+    if (!(failure instanceof NullPointerException)) return false;
+    boolean nullMapRead = false;
+    boolean methvinEvent = false;
+    boolean methvinLoop = false;
+    for (StackTraceElement frame : failure.getStackTrace()) {
+      if ("java.util.concurrent.ConcurrentSkipListMap".equals(frame.getClassName())
+          && "get".equals(frame.getMethodName())) nullMapRead = true;
+      if ("io.methvin.watcher.DirectoryWatcher".equals(frame.getClassName())) {
+        if ("onEvent".equals(frame.getMethodName()) && frame.getLineNumber() == 424) {
+          methvinEvent = true;
+        }
+        if ("runEventLoop".equals(frame.getMethodName())) methvinLoop = true;
+      }
+    }
+    return nullMapRead && methvinEvent && methvinLoop;
+  }
+
+  /** Records a failed registration step that occurred outside Methvin after startup. */
+  void reportRegistrationFailure(Path root, Exception failure) {
+    routingFailureSink.accept(
+        failure instanceof RuntimeException runtime
+            ? runtime
+            : new IllegalStateException("Worker watcher registration failed for " + root, failure));
+  }
+
+  private void handleEvent(RootWatcherRegistry.Subscription witness, DirectoryChangeEvent event) {
     Kind kind = mapEventKind(event.eventType());
     if (kind == null) return;
-    watcherCatalog.eventsTotal.increment(WorkerWatcherEventTags.of(kind));
     Path path = event.path();
-    log.trace("Worker watcher event: {} {}", kind, path);
-    switch (kind) {
-      case CREATE, MODIFY -> handleUpsert(root, collection, path);
-      case DELETE -> {
-        handleDelete(root, path);
-        maybeScheduleBurstReconcile(root);
-      }
-      case OVERFLOW -> handleOverflow(root, path);
-    }
+    eventRouter.route(
+        witness,
+        () -> {
+          watcherCatalog.eventsTotal.increment(WorkerWatcherEventTags.of(kind));
+          log.trace("Worker watcher event: {} {}", kind, path);
+          switch (kind) {
+            case CREATE, MODIFY -> handleUpsert(witness, path);
+            case DELETE -> {
+              handleDelete(witness, path);
+              maybeScheduleBurstReconcile(witness.root());
+            }
+            case OVERFLOW -> handleOverflow(witness.root(), path);
+          }
+        });
+  }
+
+  /** Deterministic callback entry used by ownership tests without an OS watcher race. */
+  void handleEvent(RootWatcherRegistry.Subscription witness, Kind kind, Path path) {
+    eventRouter.route(
+        witness,
+        () -> {
+          switch (kind) {
+            case CREATE, MODIFY -> handleUpsert(witness, path);
+            case DELETE -> {
+              handleDelete(witness, path);
+              maybeScheduleBurstReconcile(witness.root());
+            }
+            case OVERFLOW -> handleOverflow(witness.root(), path);
+          }
+        });
   }
 
   /**
@@ -248,6 +508,16 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       log.warn("Worker watcher enqueue failed for {}: {}", path, e.getMessage());
     }
     maybeScheduleBurstReconcile(root);
+  }
+
+  private void handleUpsert(RootWatcherRegistry.Subscription witness, Path path) {
+    try {
+      witnessedUpsertPathSink.accept(witness, witness.collection(), path);
+    } catch (RuntimeException failure) {
+      routingFailureSink.accept(failure);
+      log.warn("Worker watcher enqueue failed for {}: {}", path, failure.getMessage());
+    }
+    maybeScheduleBurstReconcile(witness.root());
   }
 
   /**
@@ -398,6 +668,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
    */
   void handleDelete(Path root, Path path) {
     if (root != null && !Files.exists(root)) {
+      routingFailureSink.accept(
+          new IllegalStateException("Watched root became unavailable during delete routing"));
       log.warn(
           "Worker watcher: watched root {} is unavailable (likely unmounted); skipping delete of {}"
               + " to avoid wiping the folder's index",
@@ -411,6 +683,26 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     } catch (RuntimeException e) {
       routingFailureSink.accept(e);
       log.debug("Worker watcher delete sink failed for {}: {}", path, e.getMessage());
+    }
+  }
+
+  private void handleDelete(RootWatcherRegistry.Subscription witness, Path path) {
+    try {
+      witness.rootIdentity().requireCurrent(witness.root());
+    } catch (IOException unavailableOrRebound) {
+      routingFailureSink.accept(
+          new IllegalStateException(
+              "Watched root identity became unavailable or changed during delete routing",
+              unavailableOrRebound));
+      log.warn("Worker watcher skipped delete because the registered root identity changed");
+      return;
+    }
+    try {
+      String normalizedPath = PathNormalizer.normalizePath(path.toAbsolutePath().toString());
+      witnessedDeletePathSink.accept(witness, normalizedPath);
+    } catch (RuntimeException failure) {
+      routingFailureSink.accept(failure);
+      log.debug("Worker watcher witnessed delete route failed: {}", failure.getMessage());
     }
   }
 
@@ -434,18 +726,17 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
 
   @Override
   public synchronized void close() {
-    for (CompletableFuture<Void> future : watchFutures.values()) {
+    for (Path root : List.copyOf(watchers.keySet())) {
+      closeWatcherFor(root);
+    }
+    // Defensive cleanup for a partially-started registration. Clear before cancellation so its
+    // completion callback is classified as intentional.
+    List<CompletableFuture<Void>> orphanedFutures = List.copyOf(watchFutures.values());
+    watchFutures.clear();
+    for (CompletableFuture<Void> future : orphanedFutures) {
       future.cancel(true);
     }
-    for (RootSubscription sub : watchers.values()) {
-      try {
-        sub.watcher().close();
-      } catch (IOException e) {
-        log.debug("Failed to close worker watcher for {}: {}", sub.root(), e.getMessage());
-      }
-    }
-    watchers.clear();
-    watchFutures.clear();
+    failedEpochs.clear();
     pendingReconciliations.clear();
     for (Runnable queued : reconcileExecutor.shutdownNow()) {
       if (queued instanceof Future<?> future) {
@@ -454,5 +745,86 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
     }
   }
 
-  private record RootSubscription(Path root, String collection, DirectoryWatcher watcher) {}
+  private final class RootSubscription {
+    private enum DeliveryState { STARTING, DRAINING, ACTIVE, DISCARDED }
+
+    private final RootWatcherRegistry.Subscription registration;
+    private final DirectoryWatcher watcher;
+    private final List<DirectoryChangeEvent> bufferedEvents = new ArrayList<>();
+    private DeliveryState deliveryState = DeliveryState.STARTING;
+
+    private RootSubscription(
+        RootWatcherRegistry.Subscription registration, DirectoryWatcher watcher) {
+      this.registration = registration;
+      this.watcher = watcher;
+    }
+
+    RootWatcherRegistry.Subscription registration() { return registration; }
+    DirectoryWatcher watcher() { return watcher; }
+
+    void dispatchOrBuffer(DirectoryChangeEvent event) {
+      boolean overflowed = false;
+      synchronized (this) {
+        if (deliveryState == DeliveryState.DISCARDED) return;
+        if (deliveryState != DeliveryState.ACTIVE) {
+          if (bufferedEvents.size() >= STARTUP_EVENT_BUFFER_LIMIT) {
+            deliveryState = DeliveryState.DISCARDED;
+            bufferedEvents.clear();
+            overflowed = true;
+          } else {
+            bufferedEvents.add(event);
+            return;
+          }
+        }
+      }
+      if (overflowed) {
+        handleWatcherException(
+            registration.root(),
+            registration.watcherEpoch(),
+            new IllegalStateException("Worker watcher startup event buffer limit exceeded"));
+        return;
+      }
+      handleEvent(registration, event);
+    }
+
+    synchronized boolean publish() {
+      if (deliveryState == DeliveryState.DISCARDED) return false;
+      if (deliveryState != DeliveryState.STARTING) {
+        throw new IllegalStateException("Watcher registration is not awaiting publication");
+      }
+      deliveryState = DeliveryState.DRAINING;
+      return true;
+    }
+
+    void drainBufferedEvents() {
+      synchronized (this) {
+        if (deliveryState == DeliveryState.STARTING) {
+          throw new IllegalStateException("Watcher registration was not published before drain");
+        }
+      }
+      while (true) {
+        List<DirectoryChangeEvent> pending;
+        synchronized (this) {
+          if (deliveryState == DeliveryState.DISCARDED) return;
+          if (bufferedEvents.isEmpty()) {
+            deliveryState = DeliveryState.ACTIVE;
+            return;
+          }
+          pending = List.copyOf(bufferedEvents);
+          bufferedEvents.clear();
+        }
+        for (DirectoryChangeEvent event : pending) {
+          synchronized (this) {
+            if (deliveryState == DeliveryState.DISCARDED) return;
+          }
+          handleEvent(registration, event);
+        }
+      }
+    }
+
+    synchronized void discardBufferedEvents() {
+      deliveryState = DeliveryState.DISCARDED;
+      bufferedEvents.clear();
+    }
+  }
 }

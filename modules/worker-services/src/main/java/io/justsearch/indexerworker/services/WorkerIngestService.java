@@ -71,6 +71,7 @@ import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
 import io.justsearch.indexerworker.util.ParseUtils;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.ort.OrtCudaStatus;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -133,7 +134,9 @@ public final class WorkerIngestService {
   private final OperationalMetrics metrics = OperationalMetrics.getInstance();
   private final IndexStatusOps statusOps;
   private final SyncDirectoryOps syncOps;
+  private final SyncDirectoryOps candidateDiscoveryOps;
   private final IngestSwitchBufferOps switchBufferOps;
+  private final ConfirmedDeletionMarker confirmedDeletionMarker;
   /** Serializes one no-file identity's journal admission with its serving projection. */
   private final java.util.concurrent.locks.ReentrantLock[] projectionLocks =
       java.util.stream.IntStream.range(0, 64)
@@ -145,7 +148,6 @@ public final class WorkerIngestService {
   private final WorkerUpgradeQuiescence upgradeQuiescence;
   private final IndexSettleOps settleOps;
   private RootWatcherRegistry rootWatcherRegistry = new RootWatcherRegistry();
-
   // Tempdoc 419 / T5.3 (ADR-0028): scoped reverse-lookup store. Defaults to NOOP so any
   // composition that hasn't wired it sees found=false on every lookup. DefaultWorkerAppServices
   // injects the real SqlitePathResolutionStore via setPathResolutionStore at boot.
@@ -228,6 +230,7 @@ public final class WorkerIngestService {
     this.statusOps.setOpenedRuntimePaths(
         searchLifecycle == null ? null : searchLifecycle.openedIndexPath(),
         ingestLifecycle == null ? null : ingestLifecycle.openedIndexPath());
+    this.confirmedDeletionMarker = new ConfirmedDeletionMarker(() -> this.documentIdentityStore);
     this.syncOps = new SyncDirectoryOps(
         ingestLifecycle != null ? ingestLifecycle.readPathOps() : null,
         ingestLifecycle != null ? ingestLifecycle.pruneOps() : null,
@@ -236,7 +239,14 @@ public final class WorkerIngestService {
         this.indexingPacing,
         // Read through a supplier: the identity store is wired by setDocumentIdentityStore AFTER
         // this constructor runs, so capturing the field here would capture the UNAVAILABLE sentinel.
-        new ConfirmedDeletionMarker(() -> this.documentIdentityStore));
+        confirmedDeletionMarker);
+    this.candidateDiscoveryOps = new SyncDirectoryOps(
+        searchLifecycle != null ? searchLifecycle.readPathOps() : null,
+        null,
+        null,
+        jobQueue,
+        this.indexingPacing,
+        confirmedDeletionMarker);
     this.switchBufferOps =
         new IngestSwitchBufferOps(jobQueue, this.indexGenerationManager);
   }
@@ -318,20 +328,60 @@ public final class WorkerIngestService {
         && active != ingestLifecycle && active.isAcceptingWrites();
   }
 
+  /**
+   * Owns the lock order for a live filesystem callback. Mutation admission is always entered
+   * before the per-registration event lease; watch/unwatch use the same order, so the final
+   * cutover fence cannot deadlock against a draining watcher incarnation. Identity is checked
+   * again at the concrete upsert/delete boundary; filesystem replacement is not atomic with the
+   * effect, but every replacement detected before or after it latches replay uncertainty.
+   */
+  public void acceptWatcherEvent(
+      RootWatcherRegistry.Subscription witness, Runnable effect) {
+    java.util.Objects.requireNonNull(witness, "witness");
+    java.util.Objects.requireNonNull(effect, "effect");
+    try (var ignoredMutation = mutationLease()) {
+      RootWatcherRegistry registry = rootWatcherRegistry;
+      try (RootWatcherRegistry.EventLease eventLease = registry.enterEvent(witness)) {
+        if (eventLease == null) return; // stale epoch: intentionally ignored, successor stays clean
+        effect.run();
+        witness.rootIdentity().requireCurrent(witness.root());
+      } catch (IOException unavailableOrRebound) {
+        if (mutationAdmission != null) mutationAdmission.markReplayUncertain();
+        log.warn(
+            "Watcher event refused because its registered root identity is unavailable or changed");
+      }
+    }
+  }
+
   /** Watcher events share RPC mutation admission and the existing durable switch buffer. */
   public void acceptWatcherUpsert(String collection, Path path) {
     try (var ignoredMutation = mutationLease()) {
-      var entry = WorkerMethvinWatcher.entryForLiveEvent(path);
-      String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
-      if (candidateGeneration != null) {
-        if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
-            || !sbq.enqueueAndBufferFileForGeneration(
-                candidateGeneration, entry, collection)) {
-          throw IngestSwitchBufferOps.switchBufferUnavailable();
-        }
-      } else if (jobQueue.enqueueEntries(List.of(entry), collection) != 1) {
-        throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
+      acceptWatcherUpsertUnderLease(collection, path);
+    }
+  }
+
+  /** Live UPSERT retains its registration identity through concrete queue admission. */
+  public void acceptWatcherUpsert(
+      RootWatcherRegistry.Subscription witness, String collection, Path path) {
+    java.util.Objects.requireNonNull(witness, "witness");
+    try (var ignoredMutation = mutationLease()) {
+      requireWatcherRootCurrent(witness);
+      acceptWatcherUpsertUnderLease(collection, path);
+      requireWatcherRootCurrent(witness);
+    }
+  }
+
+  private void acceptWatcherUpsertUnderLease(String collection, Path path) {
+    var entry = WorkerMethvinWatcher.entryForLiveEvent(path);
+    String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
+    if (candidateGeneration != null) {
+      if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
+          || !sbq.enqueueAndBufferFileForGeneration(
+              candidateGeneration, entry, collection)) {
+        throw IngestSwitchBufferOps.switchBufferUnavailable();
       }
+    } else if (jobQueue.enqueueEntries(List.of(entry), collection) != 1) {
+      throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
     }
   }
 
@@ -339,19 +389,62 @@ public final class WorkerIngestService {
   public void acceptWatcherDelete(String normalizedPath, Runnable directEffect) {
     java.util.Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
-      if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
-        if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
-          switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedPath);
-          return;
-        }
-        throw IngestSwitchBufferOps.switchingUnavailable();
-      }
-      withFileMutationFence(() -> {
-        journalAndProjectDeleteToServing(normalizedPath, CommitReason.WATCHER_DELETE);
-        directEffect.run();
-        return null;
-      });
+      acceptWatcherDeleteUnderLease(normalizedPath, directEffect, false, null, null);
     }
+  }
+
+  /** Live DELETE retains its registration identity through the concrete file-mutation fence. */
+  public void acceptWatcherDelete(
+      RootWatcherRegistry.Subscription witness,
+      String normalizedPath,
+      Runnable directEffect) {
+    java.util.Objects.requireNonNull(witness, "witness");
+    java.util.Objects.requireNonNull(directEffect, "directEffect");
+    try (var ignoredMutation = mutationLease()) {
+      acceptWatcherDeleteUnderLease(
+          normalizedPath, directEffect, false, witness.root(), witness.rootIdentity());
+    }
+  }
+
+  private boolean acceptWatcherDeleteUnderLease(
+      String normalizedPath, Runnable directEffect, boolean requireConfirmedAbsence,
+      Path requiredRoot, RootIdentity expectedRootIdentity) {
+    if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
+      if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
+        switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedPath);
+        return true;
+      }
+      throw IngestSwitchBufferOps.switchingUnavailable();
+    }
+    return withFileMutationFence(() -> {
+      if (expectedRootIdentity != null) {
+        requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
+      }
+      if (requireConfirmedAbsence) {
+        Path path;
+        try {
+          path = Path.of(normalizedPath);
+        } catch (InvalidPathException invalid) {
+          throw WorkerServiceException.unavailable(
+              "Candidate reconciliation found an invalid indexed path");
+        }
+        if (!Files.notExists(path)) {
+          throw WorkerServiceException.unavailable(
+              "Candidate reconciliation could not confirm file absence");
+        }
+      }
+      journalAndProjectDeleteToServing(normalizedPath, CommitReason.WATCHER_DELETE);
+      directEffect.run();
+      if (expectedRootIdentity != null) {
+        requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
+      }
+      return true;
+    });
+  }
+
+  private static void requireWatcherRootCurrent(
+      RootWatcherRegistry.Subscription witness) {
+    requireCandidateRootIdentity(witness.root(), witness.rootIdentity());
   }
 
   private void journalAndProjectDeleteToServing(String normalizedId, CommitReason reason) {
@@ -864,7 +957,7 @@ public final class WorkerIngestService {
     try {
       if (ingestIsServing && (indexGenerationManager == null
           || indexGenerationManager.isIdleActiveGeneration(capturedServingPath))) return;
-    } catch (java.io.IOException | RuntimeException failure) {
+    } catch (IOException | RuntimeException failure) {
       throw new WorkerServiceException(WorkerServiceException.Status.UNAVAILABLE,
           "VDU target state is unavailable; retry after the index is ready", failure);
     }
@@ -920,7 +1013,7 @@ public final class WorkerIngestService {
     final java.util.Optional<String> generation;
     try {
       generation = indexGenerationManager.activeGeneration(capturedServingPath);
-    } catch (java.io.IOException | RuntimeException failure) {
+    } catch (IOException | RuntimeException failure) {
       throw new WorkerServiceException(
           WorkerServiceException.Status.UNAVAILABLE,
           "Active generation state could not be established",
@@ -984,7 +1077,7 @@ public final class WorkerIngestService {
         generation = requireWriter && !ingestIsServing
             ? indexGenerationManager.activeGeneration(capturedServingPath)
             : indexGenerationManager.idleActiveGeneration(capturedServingPath);
-      } catch (java.io.IOException | RuntimeException failure) {
+      } catch (IOException | RuntimeException failure) {
         throw new WorkerServiceException(WorkerServiceException.Status.UNAVAILABLE,
             "Serving generation state could not be established", failure);
       }
@@ -1343,8 +1436,7 @@ public final class WorkerIngestService {
 
       if (!finalCutoverReplay && switchBufferOps.isSwitching()) {
         if (hasDistinctWritableServingTarget()) {
-          throw WorkerServiceException.unavailable(
-              "Directory sync requires candidate-scoped reconciliation during migration; retry after activation");
+          return reconcileCandidateRoot(rootPath, force);
         }
         // Legacy single-runtime switching retains its historical deferred contract.
         return switchBufferOps.bufferDuringSwitchingOrThrow(
@@ -1354,8 +1446,11 @@ public final class WorkerIngestService {
                     sbq, rootPath, force, provenance));
       }
       if (!finalCutoverReplay && switchBufferOps.migratingGeneration() != null) {
+        if (hasDistinctWritableServingTarget()) {
+          return reconcileCandidateRoot(rootPath, force);
+        }
         throw WorkerServiceException.unavailable(
-            "Directory sync requires candidate-scoped reconciliation during migration; retry after activation");
+            "Directory sync requires a writable serving generation during migration; retry shortly");
       }
 
       SyncDirectoryResponse unavailable =
@@ -1366,6 +1461,196 @@ public final class WorkerIngestService {
       }
 
       return syncOps.execute(rootPath, force, provenance);
+    }
+  }
+
+  /**
+   * Reconciles a complete root snapshot through the same candidate-scoped routes as watcher
+   * events. The caller owns one mutation lease from validation through every admission, so the
+   * final fence cannot split discovery from its durable B obligations and A projections.
+   */
+  private SyncDirectoryResponse reconcileCandidateRoot(String rootPath, boolean force) {
+    int added = 0;
+    int deleted = 0;
+    try {
+      Path root = Path.of(rootPath).toAbsolutePath().normalize();
+      RootWatcherRegistry registry = rootWatcherRegistry;
+      RootWatcherRegistry.Subscription subscription = registry.subscription(root);
+      requireCandidateSubscription(registry, root, subscription);
+      try (SyncDirectoryOps.RootDifference difference =
+          candidateDiscoveryOps.discoverCandidateDifference(rootPath, force)) {
+        requireCandidateSubscription(registry, root, subscription);
+        String collection = subscription.collection();
+        for (Path path : difference.additions()) {
+          requireCandidateSubscription(registry, root, subscription);
+          difference.requireCurrentRootIdentity();
+          acceptWatcherUpsertUnderLease(collection, path);
+          added++;
+        }
+        for (String path : difference.deletions()) {
+          requireCandidateSubscription(registry, root, subscription);
+          difference.requireCurrentRootIdentity();
+          if (acceptWatcherDeleteUnderLease(
+              path, () -> deleteCandidateAndMark(path), true, root, difference.rootIdentity())) {
+            deleted++;
+          }
+        }
+        requireCandidateSubscription(registry, root, subscription);
+        difference.requireCurrentRootIdentity();
+      }
+      return syncDirectoryResultResponse(deleted, added);
+    } catch (Exception incomplete) {
+      if (mutationAdmission != null) mutationAdmission.markReplayUncertain();
+      if (incomplete instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
+        Thread.currentThread().interrupt();
+      }
+      log.warn("Candidate root reconciliation failed closed for {}", rootPath, incomplete);
+      throw WorkerServiceException.unavailable(
+          "Candidate root reconciliation was incomplete; cutover remains fenced");
+    }
+  }
+
+  /**
+   * Re-establishes a declared watched root on a committed successor before that successor is
+   * published. The strict disk/index difference is evaluated against the serving B runtime; all
+   * eligible files are re-admitted, including modifications that had no switch-buffer event.
+   */
+  public void reconcileCommittedBootRoot(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding)
+      throws IOException {
+    Path root = binding.path().toAbsolutePath().normalize();
+    try (var ignoredMutation = mutationLease()) {
+      if (searchLifecycle == null || searchLifecycle != ingestLifecycle
+          || !ingestLifecycle.isAcceptingWrites()) {
+        throw new IOException("Committed boot root requires a writable serving successor");
+      }
+      RootWatcherRegistry registry = rootWatcherRegistry;
+      RootWatcherRegistry.WatchResult watched =
+          registry.watch(root.toString(), binding.collection());
+      if (!watched.watching()) {
+        throw new IOException("Committed boot root watcher registration failed: "
+            + watched.errorMessage());
+      }
+      RootWatcherRegistry.Subscription subscription = registry.subscription(root);
+      try (SyncDirectoryOps.RootDifference difference =
+          candidateDiscoveryOps.discoverCandidateDifference(root.toString(), true)) {
+        requireCandidateSubscription(registry, root, subscription);
+        for (Path path : difference.additions()) {
+          requireCandidateSubscription(registry, root, subscription);
+          difference.requireCurrentRootIdentity();
+          if (!committedBootFileMatches(path, subscription.collection())
+              || !jobQueue.matchesExpectedCollection(path, subscription.collection())) {
+            if (switchBufferOps.buildingGenerationForFileAdmission() != null
+                || jobQueue.enqueueEntriesWithExactCollection(
+                    List.of(WorkerMethvinWatcher.entryForLiveEvent(path)),
+                    subscription.collection()) != 1) {
+              throw new IOException("Committed boot root admission failed");
+            }
+          }
+        }
+        for (String path : difference.deletions()) {
+          requireCandidateSubscription(registry, root, subscription);
+          difference.requireCurrentRootIdentity();
+          if (!Files.notExists(Path.of(path))) {
+            throw new IOException("Committed boot delete lost its absence proof");
+          }
+          ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(path);
+          confirmedDeletionMarker.markIfAbsent(path);
+        }
+        requireCandidateSubscription(registry, root, subscription);
+        difference.requireCurrentRootIdentity();
+      }
+    } catch (RuntimeException failure) {
+      if (mutationAdmission != null) mutationAdmission.markReplayUncertain();
+      throw new IOException("Committed boot root reconciliation failed", failure);
+    }
+  }
+
+  /** Final-fence certificate that this exact watcher still matches a complete B/disk snapshot. */
+  public boolean committedBootRootConverged(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding)
+      throws IOException {
+    Path root = binding.path().toAbsolutePath().normalize();
+    RootWatcherRegistry registry = rootWatcherRegistry;
+    RootWatcherRegistry.Subscription subscription = registry.subscription(root);
+    requireCandidateSubscription(registry, root, subscription);
+    if (!java.util.Objects.equals(subscription.collection(),
+        binding.collection() == null || binding.collection().isBlank() ? null : binding.collection())) {
+      throw new IOException("Committed boot root collection changed");
+    }
+    try (SyncDirectoryOps.RootDifference difference =
+        candidateDiscoveryOps.discoverCandidateDifference(root.toString(), true)) {
+      requireCandidateSubscription(registry, root, subscription);
+      difference.requireCurrentRootIdentity();
+      if (!difference.deletions().isEmpty()) return false;
+      // Force mode enumerates every eligible disk file. A path-only comparison would certify a
+      // stale B document after an in-place write that the watcher never delivered.
+      for (Path file : difference.additions()) {
+        requireCandidateSubscription(registry, root, subscription);
+        difference.requireCurrentRootIdentity();
+        if (!committedBootFileMatches(file, binding.collection())
+            || !jobQueue.matchesExpectedCollection(file, binding.collection())) return false;
+      }
+      difference.requireCurrentRootIdentity();
+      return true;
+    }
+  }
+
+  private boolean committedBootFileMatches(Path file, String collection) throws IOException {
+    String id = PathNormalizer.normalizeKey(file);
+    var fields = ingestLifecycle.documentFieldOps();
+    String source = fields.getDocumentField(
+        id, SchemaFields.SOURCE_SHA256);
+    String indexedCollection = fields.getDocumentField(
+        id, SchemaFields.COLLECTION);
+    return io.justsearch.indexerworker.loop.SourceContentHash.sha256(file).equals(source)
+        && java.util.Objects.equals(normalizeRootCollection(collection),
+            normalizeRootCollection(indexedCollection));
+  }
+
+  private static String normalizeRootCollection(String collection) {
+    return collection == null || collection.isBlank() ? null : collection;
+  }
+
+  private void deleteCandidateAndMark(String path) {
+    if (ingestLifecycle == null
+        || ingestLifecycle == searchLifecycle
+        || !ingestLifecycle.isAcceptingWrites()) {
+      throw WorkerServiceException.unavailable(
+          "Candidate writer became unavailable during root reconciliation");
+    }
+    ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(path);
+    confirmedDeletionMarker.markIfAbsent(path);
+  }
+
+  private void requireCandidateSubscription(
+      RootWatcherRegistry expectedRegistry,
+      Path root,
+      RootWatcherRegistry.Subscription expectedSubscription) throws IOException {
+    if (rootWatcherRegistry != expectedRegistry
+        || expectedSubscription == null
+        || !root.equals(expectedSubscription.root())
+        || !expectedRegistry.isCurrentAndActive(expectedSubscription)) {
+      String reason = rootWatcherRegistry != expectedRegistry
+          ? "REGISTRY_CHANGED"
+          : expectedSubscription == null
+              ? "MISSING_SUBSCRIPTION"
+              : !root.equals(expectedSubscription.root())
+                  ? "ROOT_MISMATCH"
+                  : expectedRegistry.currentnessFailure(expectedSubscription);
+      log.warn("Candidate reconciliation subscription rejected (reason={})", reason);
+      throw WorkerServiceException.unavailable(
+          "Candidate reconciliation root subscription changed during admission");
+    }
+  }
+
+  private static void requireCandidateRootIdentity(
+      Path root, RootIdentity expectedRootIdentity) {
+    try {
+      expectedRootIdentity.requireCurrent(root);
+    } catch (IOException changed) {
+      throw WorkerServiceException.unavailable(
+          "Candidate reconciliation root became unavailable or changed");
     }
   }
 
@@ -1432,7 +1717,7 @@ public final class WorkerIngestService {
           .setTotalCount(totalCount)
           .build();
 
-    } catch (java.io.IOException e) {
+    } catch (IOException e) {
       throw new WorkerServiceException(WorkerServiceException.Status.INTERNAL,
           "Pending VDU could not be read", e);
     }
@@ -1448,7 +1733,7 @@ public final class WorkerIngestService {
             SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
         requireEnrichmentReader(ctx);
         return count;
-      } catch (java.io.IOException e) {
+      } catch (IOException e) {
         throw new WorkerServiceException(WorkerServiceException.Status.INTERNAL,
             "Pending embeddings could not be read", e);
       }
@@ -1498,7 +1783,7 @@ public final class WorkerIngestService {
     return requestedMaxRetries <= 0 ? SchemaFields.VDU_MAX_RETRIES : requestedMaxRetries;
   }
 
-  private int readVduRetryCount(String docId) throws java.io.IOException {
+  private int readVduRetryCount(String docId) throws IOException {
     String currentCountStr = ingestLifecycle.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.VDU_RETRY_COUNT);
     return ParseUtils.parseIntSafe(currentCountStr, 0);
   }
@@ -1544,7 +1829,7 @@ public final class WorkerIngestService {
     return markVduErrorResponse("Document not found: " + docId);
   }
 
-  private List<String> processingDocIdsForRecovery() throws java.io.IOException {
+  private List<String> processingDocIdsForRecovery() throws IOException {
     return ingestLifecycle.documentFieldOps().queryDocIdsByFieldOrThrow(
         SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING, RECOVER_VDU_QUERY_LIMIT);
   }
@@ -2138,7 +2423,7 @@ public final class WorkerIngestService {
             () -> validateRecordedGeneration(java.util.Objects.requireNonNull(recorded), ctx),
             switchBufferOps::buildingGenerationForFileAdmission)
             .scan(scanRequest, sink);
-      } catch (java.io.IOException e) {
+      } catch (IOException e) {
         log.warn("ScanRoot walk failed for {}: {}", rootPath, e.getMessage());
         sink.accept(
             io.justsearch.ipc.ScanRootProgress.newBuilder()
@@ -2157,20 +2442,42 @@ public final class WorkerIngestService {
       if (rootPath.isBlank()) {
         throw WorkerServiceException.invalidArgument("WatchRootRequest.root_path is required");
       }
-      RootWatcherRegistry.WatchResult result =
-          rootWatcherRegistry.watch(rootPath, request.getCollection());
-      return io.justsearch.ipc.WatchRootResponse.newBuilder()
-          .setWatching(result.watching())
-          .setErrorMessage(result.errorMessage() == null ? "" : result.errorMessage())
-          .build();
+      // A registration change can leave an event gap after an earlier root scan even if that
+      // scan's incarnation check succeeded. Keep the existing final cutover fence conservative.
+      markReplayUncertainForWatchChangeDuringMigration();
+      try {
+        RootWatcherRegistry.WatchResult result =
+            rootWatcherRegistry.watch(rootPath, request.getCollection());
+        return io.justsearch.ipc.WatchRootResponse.newBuilder()
+            .setWatching(result.watching())
+            .setErrorMessage(result.errorMessage() == null ? "" : result.errorMessage())
+            .build();
+      } finally {
+        // A migration can begin after the first check but before registry mutation completes.
+        // Recheck while this request still holds its mutation lease so the final fence sees it.
+        markReplayUncertainForWatchChangeDuringMigration();
+      }
     }
   }
 
   public io.justsearch.ipc.UnwatchRootResponse unwatchRoot(
       io.justsearch.ipc.UnwatchRootRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
-      boolean removed = rootWatcherRegistry.unwatch(request.getRootPath());
-      return io.justsearch.ipc.UnwatchRootResponse.newBuilder().setUnwatched(removed).build();
+      markReplayUncertainForWatchChangeDuringMigration();
+      try {
+        boolean removed = rootWatcherRegistry.unwatch(request.getRootPath());
+        return io.justsearch.ipc.UnwatchRootResponse.newBuilder().setUnwatched(removed).build();
+      } finally {
+        markReplayUncertainForWatchChangeDuringMigration();
+      }
+    }
+  }
+
+  private void markReplayUncertainForWatchChangeDuringMigration() {
+    if (mutationAdmission != null
+        && hasDistinctWritableServingTarget()
+        && (switchBufferOps.migratingGeneration() != null || switchBufferOps.isSwitching())) {
+      mutationAdmission.markReplayUncertain();
     }
   }
 

@@ -90,6 +90,7 @@ final class WorkerMutationAdmissionTest {
       admission.markReplayUncertain();
       fence.install(b);
       assertFalse(fence.certifySuccessorIfReplayCertain());
+      assertFalse(fence.releaseCertifiedSuccessor());
     }
 
     assertThrows(IllegalStateException.class, () -> admission.enter(a));
@@ -116,6 +117,7 @@ final class WorkerMutationAdmissionTest {
       start.countDown();
       fence.certifySuccessorIfReplayCertain();
       failure.get(1, TimeUnit.SECONDS);
+      assertFalse(fence.releaseCertifiedSuccessor());
     }
 
     assertThrows(IllegalStateException.class, () -> admission.enter(a));
@@ -132,10 +134,52 @@ final class WorkerMutationAdmissionTest {
       assertTrue(fence.armReplayCertificate());
       fence.install(b);
       assertTrue(fence.certifySuccessorIfReplayCertain());
+      assertTrue(fence.releaseCertifiedSuccessor());
     }
 
     try (var successor = admission.enter(b)) {
       assertNotNull(successor);
     }
+  }
+
+  @Test
+  void uncertaintyAfterConditionalCertificationMakesFinalReleaseReportFailure() throws Exception {
+    Object a = new Object();
+    Object b = new Object();
+    var admission = new WorkerMutationAdmission(a);
+
+    try (var fence = admission.beginFinalFence(a, 1_000)) {
+      assertTrue(fence.armReplayCertificate());
+      fence.install(b);
+      assertTrue(fence.certifySuccessorIfReplayCertain());
+      admission.markReplayUncertain();
+      assertFalse(fence.releaseCertifiedSuccessor());
+    }
+
+    assertThrows(IllegalStateException.class, () -> admission.enter(a));
+    assertThrows(IllegalStateException.class, () -> admission.enter(b));
+  }
+
+  @Test
+  void cleanBootFenceReleasesItsUnchangedOwner() throws Exception {
+    Object owner = new Object();
+    var admission = new WorkerMutationAdmission(owner);
+    try (var fence = admission.beginFinalFence(owner, 1_000)) {
+      assertTrue(fence.armReplayCertificate());
+      assertTrue(fence.releaseCurrentOwnerIfReplayCertain());
+    }
+    try (var issued = admission.enter(owner)) { assertNotNull(issued); }
+  }
+
+  @Test
+  void watcherFailureBeforeBootReleaseFencesItsUnchangedOwner() throws Exception {
+    Object owner = new Object();
+    var admission = new WorkerMutationAdmission(owner);
+    try (var fence = admission.beginFinalFence(owner, 1_000)) {
+      assertTrue(fence.armReplayCertificate());
+      admission.markReplayUncertain();
+      assertFalse(fence.releaseCurrentOwnerIfReplayCertain());
+    }
+    assertThrows(IllegalStateException.class, () -> admission.enter(owner));
   }
 }

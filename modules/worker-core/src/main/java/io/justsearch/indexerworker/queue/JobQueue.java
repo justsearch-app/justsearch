@@ -445,6 +445,22 @@ public interface JobQueue extends Closeable {
   }
 
   /**
+   * Reports whether the durable row for one exact path already carries the expected root
+   * collection.
+   *
+   * <p>The expected value is normalized so null and blank both mean the default collection. A
+   * missing row is already converged and therefore matches; an unreadable queue must fail closed.
+   * Implementations without an exact row read must refuse the operation rather than guess.
+   *
+   * @param path the exact file path to inspect
+   * @param expectedCollection the root collection, or null/blank for the default collection
+   * @return true when no row exists or its collection equals the normalized expected collection
+   */
+  default boolean matchesExpectedCollection(Path path, String expectedCollection) {
+    throw new UnsupportedOperationException("Exact collection row read is unavailable");
+  }
+
+  /**
    * Enqueues sized entries tagged with the directory scan that admitted them (tempdoc 812 D2).
    *
    * <p>The scan id is the same {@code ScanRootProgress.scan_id} the Head reads to subscribe to live

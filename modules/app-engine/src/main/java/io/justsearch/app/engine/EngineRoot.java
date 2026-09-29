@@ -521,6 +521,7 @@ public final class EngineRoot implements WorkerHost {
     started.onMigrationRestart(() -> requestRestart(started));
     try {
       started.installProjectionSeedSources(projectionSeedSources);
+      started.bindBootRootBindings(authority.roots().snapshotBindings());
       if (startContext != null) started.bindIndexStartContext(startContext);
       else started.bindBootQueryRoleSelection(exactBootQuery);
       started.start();

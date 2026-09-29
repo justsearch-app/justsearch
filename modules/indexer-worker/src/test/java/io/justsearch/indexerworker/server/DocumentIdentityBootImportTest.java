@@ -314,6 +314,8 @@ final class DocumentIdentityBootImportTest {
         "the crash cut must retain Blue until the successor boot settles replay");
 
     server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
+    server.bindBootRootBindings(List.of(
+        new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, null)));
     server.start();
     server.releaseModelReadyLatchForTests();
 
@@ -328,10 +330,9 @@ final class DocumentIdentityBootImportTest {
             // age every surviving label into staleness just as silently as a re-minted uid.
             .addProjection(SchemaFields.CONTENT_SHA256)
             .build();
-    // A fresh boot over an index that already has segments opens DEFERRED: read-only first, with
-    // the writer and the analyzers arriving on the background upgrade. So both "not ready yet"
-    // shapes are polled through — the call failing outright, and the call answering empty — rather
-    // than being read as the answer.
+    // A committed predecessor now keeps this boot on the synchronous writable path until root
+    // reconciliation completes. Model wiring can still finish asynchronously, so poll both
+    // temporarily unavailable and empty search responses.
     List<SearchResult> uidBearingHits = List.of();
     long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
     Object lastOutcome = "no search attempted";

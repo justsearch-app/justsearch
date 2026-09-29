@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import identity from '../dev/lib/process-identity.cjs';
+import { barrierFiles } from './barrier-files.mjs';
 
 /** Installed query-only settings and subsequent boot use the same exact settings witness. */
 export async function exerciseQueryRoleScenario(c) {
@@ -12,7 +14,28 @@ export async function exerciseQueryRoleScenario(c) {
   const selected = path.join(work, 'query-citation-b');
   const settingsPath = path.join(data, 'ui', 'settings.json');
   const hash = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  const hashLargeFile = file => new Promise((resolve, reject) => {
+    const digest = crypto.createHash('sha256');
+    const input = fs.createReadStream(file);
+    input.on('error', reject);
+    input.on('data', chunk => digest.update(chunk));
+    input.on('end', () => resolve(digest.digest('hex')));
+  });
   const witnessFile = value => value?.startsWith('file:') ? fileURLToPath(value) : value;
+  const stageCitationModel = (destination, modelSource = source) => {
+    fs.mkdirSync(destination, { recursive: true });
+    for (const name of ['model.onnx', 'tokenizer.json']) {
+      const target = path.join(destination, name);
+      if (!fs.existsSync(target)) {
+        if (name === 'tokenizer.json') fs.copyFileSync(path.join(modelSource, name), target);
+        else fs.linkSync(path.join(modelSource, name), target);
+      }
+    }
+    const manifestFile = path.join(modelSource, 'model_manifest.json');
+    if (fs.existsSync(manifestFile)) {
+      fs.copyFileSync(manifestFile, path.join(destination, 'model_manifest.json'));
+    }
+  };
   const read = (response, label) => {
     try { return JSON.parse(response.text); }
     catch { throw new Error(`${label} returned invalid JSON: ${response.text}`); }
@@ -315,24 +338,300 @@ export async function exerciseQueryRoleScenario(c) {
   }
 
   if (scenario === 'query-role-commit' || scenario === 'query-role-after-file-crash'
-      || scenario === 'query-role-issued-a' || scenario === 'query-role-publication-hold') {
-    fs.mkdirSync(selected, { recursive: true });
-    for (const name of ['model.onnx', 'tokenizer.json']) {
-      const target = path.join(selected, name);
-      if (!fs.existsSync(target)) {
-        if (name === 'tokenizer.json') fs.copyFileSync(path.join(source, name), target);
-        else fs.linkSync(path.join(source, name), target);
-      }
-    }
-    const manifestFile = path.join(source, 'model_manifest.json');
-    if (fs.existsSync(manifestFile)) {
-      fs.copyFileSync(manifestFile, path.join(selected, 'model_manifest.json'));
-    }
+      || scenario === 'query-role-issued-a' || scenario === 'query-role-publication-hold'
+      || scenario === 'query-role-two-owner-rollback') {
+    const stagedSource = scenario === 'query-role-two-owner-rollback'
+      ? path.join(work, 'query-two-owner-generative-models', 'onnx', 'citation-scorer')
+      : source;
+    stageCitationModel(selected, stagedSource);
     const operationKey = faultKey ?? createOperationKey();
     const headers = { 'content-type': 'application/json' };
     const token = manifest.head?.sessionToken;
     if (typeof token === 'string' && token.length > 0) {
       headers['X-JustSearch-Session'] = token;
+    }
+    if (scenario === 'query-role-two-owner-rollback') {
+      let servingBefore = before;
+      if (!fs.existsSync(settingsPath)) {
+        const seedKey = createOperationKey();
+        const seededResponse = await request(apiPort, '/api/settings/v2', {
+          method: 'POST', headers, body: JSON.stringify({
+            ui: { chatEnabled: false }, witness: servingBefore.witness, operationKey: seedKey,
+          }),
+        }, 30000);
+        const seeded = read(seededResponse, 'two-owner settings A seed');
+        requireThat(seededResponse.status === 200 && seeded.state === 'COMPLETE'
+            && seeded.operationKey === seedKey && fs.existsSync(settingsPath),
+        `settings owner did not materialize A: HTTP ${seededResponse.status} ${seededResponse.text}`);
+        const servingBeforeResponse = await request(apiPort, '/api/settings/v2');
+        requireThat(servingBeforeResponse.status === 200,
+          `two-owner seeded settings read failed: ${servingBeforeResponse.text}`);
+        servingBefore = read(servingBeforeResponse, 'two-owner seeded settings A');
+        requireThat(JSON.stringify(servingBefore.witness) === JSON.stringify(seeded.witness),
+          `settings owner seed witness drifted: ${servingBeforeResponse.text}`);
+      }
+      const settingsBytes = fs.readFileSync(settingsPath);
+      const statusA = await status();
+      const initialComponents = statusA.readiness.engineComponents;
+      requireThat(typeof initialComponents.generative?.appliedVersion === 'string'
+          && initialComponents.generative.appliedVersion.length > 0,
+        `two-owner fixture lacks applied generative A: ${JSON.stringify(initialComponents)}`);
+      const effectiveBeforeResponse = await request(apiPort, '/api/debug/effective-config');
+      requireThat(effectiveBeforeResponse.status === 200,
+        `two-owner effective config read failed: ${effectiveBeforeResponse.text}`);
+      const effectiveBefore = read(effectiveBeforeResponse, 'two-owner effective config');
+      const resolved = key => effectiveBefore.resolvedConfig?.find(entry => entry.key === key);
+      const effective = key => effectiveBefore.keys?.find(entry => entry.key === key);
+      const serverExecutable = effective('justsearch.server.exe')?.value;
+      const modelsDir = effective('justsearch.models.dir')?.value;
+      const chatProfile = resolved('justsearch.chat.profile');
+      const legacyChatProfile = resolved('justsearch.vlm.profile');
+      const llmModelOverride = resolved('justsearch.llm.model_path');
+      const vlmModelOverride = resolved('justsearch.vlm.model');
+      requireThat(typeof serverExecutable === 'string' && fs.existsSync(serverExecutable)
+          && fs.statSync(serverExecutable).isFile(),
+      `two-owner fixture lacks its managed llama-server executable: ${effectiveBeforeResponse.text}`);
+      requireThat(chatProfile?.value === 'compact' && chatProfile.source === 'env_var'
+          && chatProfile.ordinal === 400 && chatProfile.detail === 'JUSTSEARCH_CHAT_PROFILE'
+          && (legacyChatProfile == null || legacyChatProfile.value == null
+            || legacyChatProfile.value.trim() === '')
+          && (llmModelOverride == null || llmModelOverride.value == null
+            || llmModelOverride.value.trim() === '')
+          && (vlmModelOverride == null || vlmModelOverride.value == null
+            || vlmModelOverride.value.trim() === ''),
+        `compact profile is not the sole generative model owner: ${JSON.stringify({
+          chatProfile, legacyChatProfile, llmModelOverride, vlmModelOverride })}`);
+      requireThat(typeof modelsDir === 'string' && modelsDir.length > 0,
+        `two-owner fixture has no effective models directory: ${JSON.stringify({
+          chatProfile, legacyChatProfile })}`);
+      const citationA = path.join(modelsDir, 'onnx', 'citation-scorer');
+      const citationAModel = path.join(citationA, 'model.onnx');
+      const citationBModel = path.join(selected, 'model.onnx');
+      requireThat(fs.existsSync(path.join(citationA, 'model.onnx'))
+          && fs.existsSync(path.join(citationA, 'tokenizer.json'))
+          && path.resolve(citationA) !== path.resolve(selected),
+        `citation A and candidate B identities are not distinct and complete: ${JSON.stringify({
+          citationA, citationB: selected })}`);
+      const citationASha = hash(citationAModel);
+      const citationBSha = hash(citationBModel);
+      const citationBTokenizerSha = hash(path.join(selected, 'tokenizer.json'));
+      requireThat(citationASha === citationBSha,
+        `candidate B was not staged from private citation A: ${JSON.stringify({
+          citationASha, citationBSha })}`);
+      const configStoreA = JSON.stringify(effectiveBefore.resolvedConfig);
+      const absentGguf = path.join(modelsDir, 'compact', 'Qwen3.5-4B-Q4_K_M.gguf');
+      const retainedCompact = path.join(modelsRoot, 'compact', 'Qwen3.5-4B-Q4_K_M.gguf');
+      const retainedBefore = fs.statSync(retainedCompact);
+      const retainedCompactShaBefore = await hashLargeFile(retainedCompact);
+      requireThat(fs.existsSync(absentGguf)
+          && path.resolve(absentGguf) !== path.resolve(retainedCompact),
+        `A seed did not use its owned compact-model link: ${JSON.stringify({
+          absentGguf, retainedCompact })}`);
+      fs.unlinkSync(absentGguf);
+      const retainedAfter = fs.statSync(retainedCompact);
+      requireThat(!fs.existsSync(absentGguf) && fs.existsSync(retainedCompact)
+          && retainedAfter.size === retainedBefore.size
+          && retainedAfter.mtimeMs === retainedBefore.mtimeMs,
+        `owned compact unlink changed the retained source: ${JSON.stringify({
+          absentGguf, retainedCompact, retainedBefore, retainedAfter })}`);
+      const profileModelAbsent = !fs.existsSync(absentGguf);
+      await modelQuery('query A before two-owner reconfigure');
+      const lexicalBefore = await post(apiPort, '/api/knowledge/search',
+        { query: 'quokka', limit: 5, mode: 'text' }, 15000);
+      requireThat(lexicalBefore.status === 200,
+        `query A search failed before two-owner reconfigure: ${lexicalBefore.text}`);
+
+      const input = {
+        ui: { chatEnabled: true },
+        citationScorerModelPath: selected,
+        witness: servingBefore.witness,
+        operationKey,
+      };
+      const engineLogPath = path.join(data, 'logs', 'engine.log');
+      const engineLogOffset = fs.statSync(engineLogPath).size;
+      const logEvents = () => fs.readFileSync(engineLogPath).subarray(engineLogOffset)
+        .toString('utf8').split(/\r?\n/).filter(Boolean).flatMap(line => {
+          try { return [JSON.parse(line)]; } catch { return []; }
+        });
+      const selectedMessage = `Citation scorer settings selected: model=${citationBModel}, `
+        + `sha256=${citationBSha}, tokenizerSha256=${citationBTokenizerSha}`;
+      const scorerInit = event => event.logger_name === 'io.justsearch.reranker.CitationScorer'
+        && event.message?.startsWith('CitationScorer initialized (CPU-only):');
+      const scorerClose = event => event.logger_name === 'io.justsearch.reranker.CitationScorer'
+        && event.message === 'CitationScorer closed.';
+      const bSelection = event => event.logger_name === 'i.j.i.server.InferenceCompositionRoot'
+        && event.message === selectedMessage;
+      const pending = request(apiPort, '/api/settings/v2', {
+        method: 'POST', headers, body: JSON.stringify(input),
+      }, 180000);
+      const { reachedFile, releaseFile } = barrierFiles(data);
+      const reached = await waitFor('two-owner encoder preparation barrier', 120000, () =>
+        readJson(reachedFile));
+      requireThat(reached?.phase === 'settings-mid-compose'
+          && reached.parentKind === 'reconfigure'
+          && reached.parentKey === operationKey && reached.operationKey === operationKey
+          && reached.cursor === 'encoders' && reached.pid === first.pid
+          && reached.operationRecordId > 0,
+      `two-owner barrier did not name the exact encoder candidate: ${JSON.stringify(reached)}`);
+      requireThat(first.pid === manifest.pid && first.instanceId === manifest.instanceId,
+        'two-owner barrier escaped the admitted Engine identity');
+      const preparedLog = await waitFor('exact citation B preparation log', 30000, () => {
+        const events = logEvents();
+        const selectedAt = events.findIndex(bSelection);
+        const initializedAt = events.findIndex(scorerInit);
+        return selectedAt >= 0 && initializedAt > selectedAt
+          ? { events, selectedAt, initializedAt } : null;
+      });
+      requireThat(preparedLog.events.filter(bSelection).length === 1
+          && preparedLog.events.filter(scorerInit).length === 1
+          && preparedLog.events.filter(scorerClose).length === 0
+          && preparedLog.events[preparedLog.selectedAt].thread_name
+            === preparedLog.events[preparedLog.initializedAt].thread_name,
+      `barrier did not follow one exact B initialization: ${JSON.stringify(preparedLog.events)}`);
+      fs.writeFileSync(releaseFile, `${Date.now()}\n`);
+      const response = await pending;
+      const result = read(response, 'two-owner generative refusal');
+      requireThat(response.status >= 400 && result.state === 'FAILED'
+          && result.operationKey === operationKey
+          && result.operationRecordId === reached.operationRecordId
+          && result.errorCode === 'GENERATIVE_PREPARATION_REFUSED',
+      `absent GGUF did not fail through the generative owner: HTTP ${response.status} ${response.text}`);
+      const requestLog = await waitFor('candidate B close after exact generative refusal', 30000, () => {
+        const events = logEvents();
+        const selectedAt = events.findIndex(bSelection);
+        const initializedAt = events.findIndex(scorerInit);
+        const missingAt = events.findIndex(event => event.message
+          === `    Model path: ${absentGguf} (exists: false)`);
+        const governedAt = events.findIndex(event => event.message?.startsWith(
+          `Chat model governed by profile:compact: model=${absentGguf} `));
+        const closedAt = events.findIndex(scorerClose);
+        return selectedAt >= 0 && initializedAt > selectedAt && missingAt > initializedAt
+          && governedAt > missingAt && closedAt > governedAt
+          ? { events, selectedAt, initializedAt, missingAt, governedAt, closedAt } : null;
+      });
+      const requestThread = requestLog.events[requestLog.selectedAt].thread_name;
+      requireThat(requestLog.events.filter(bSelection).length === 1
+          && requestLog.events.filter(scorerInit).length === 1
+          && requestLog.events.filter(scorerClose).length === 1
+          && [requestLog.initializedAt, requestLog.missingAt, requestLog.governedAt,
+            requestLog.closedAt].every(index => requestLog.events[index].thread_name === requestThread),
+      `one request did not prepare B, refuse the exact compact path, and close B: ${JSON.stringify(
+        requestLog.events)}`);
+
+      const operationPath = path.join(data, 'operations.db');
+      const failed = operationRow(operationPath, operationKey);
+      requireThat(failed?.state === 'FAILED'
+          && failed.id === reached.operationRecordId
+          && failed.failure_reason === 'GENERATIVE_PREPARATION_REFUSED',
+      `two-owner row did not name the generative failure: ${JSON.stringify(failed)}`);
+      const settingsAfter = await request(apiPort, '/api/settings/v2');
+      const restored = read(settingsAfter, 'two-owner restored settings');
+      const statusAfter = await status();
+      const effectiveAfterResponse = await request(apiPort, '/api/debug/effective-config');
+      const effectiveAfter = read(effectiveAfterResponse, 'two-owner restored effective config');
+      const settingsUnchanged = settingsAfter.status === 200
+        && Buffer.compare(settingsBytes, fs.readFileSync(settingsPath)) === 0
+        && JSON.stringify(restored.witness) === JSON.stringify(servingBefore.witness);
+      requireThat(settingsUnchanged,
+      `failed two-owner candidate changed settings A: ${settingsAfter.text}`);
+      const configStoreUnchanged = effectiveAfterResponse.status === 200
+        && JSON.stringify(effectiveAfter.resolvedConfig) === configStoreA;
+      requireThat(configStoreUnchanged,
+      `failed two-owner candidate changed ConfigStore A: ${effectiveAfterResponse.text}`);
+      requireThat(statusAfter.readiness.engineComponents.encoders.appliedVersion
+            === initialComponents.encoders.appliedVersion
+          && statusAfter.readiness.engineComponents.generative.appliedVersion
+            === initialComponents.generative.appliedVersion,
+      `failed two-owner candidate changed applied component versions: ${JSON.stringify({
+        before: initialComponents, after: statusAfter.readiness.engineComponents })}`);
+      const query = await modelQuery('query A after two-owner rollback');
+      const lexical = await post(apiPort, '/api/knowledge/search',
+        { query: 'quokka', limit: 5, mode: 'text' }, 15000);
+      requireThat(lexical.status === 200,
+        `query A search failed after two-owner rollback: ${lexical.text}`);
+      fs.rmSync(selected, { recursive: true });
+      const queryCandidatePathReleased = !fs.existsSync(selected);
+      requireThat(queryCandidatePathReleased,
+        'aborted query candidate retained an owned model-path handle');
+      stageCitationModel(selected, citationA);
+      requireThat(hash(path.join(selected, 'model.onnx')) === citationBSha,
+        'same-key retry B restage changed the candidate model identity');
+      const { reachedFile: retryReachedFile, releaseFile: retryReleaseFile } = barrierFiles(data);
+      fs.rmSync(retryReachedFile, { force: true });
+      fs.rmSync(retryReleaseFile, { force: true });
+      const retryLogBefore = logEvents();
+      const retryCountsBefore = {
+        prepare: retryLogBefore.filter(bSelection).length,
+        initialize: retryLogBefore.filter(scorerInit).length,
+        close: retryLogBefore.filter(scorerClose).length,
+      };
+      const stableRow = JSON.stringify(failed);
+      const retry = await request(apiPort, '/api/settings/v2', {
+        method: 'POST', headers, body: JSON.stringify(input),
+      }, 30000);
+      const retryResult = read(retry, 'two-owner same-key retry');
+      requireThat(retry.status >= 400 && retryResult.state === 'FAILED'
+          && retryResult.operationKey === operationKey
+          && retryResult.operationRecordId === failed.id
+          && retryResult.errorCode === 'GENERATIVE_PREPARATION_REFUSED'
+          && JSON.stringify(operationRow(operationPath, operationKey)) === stableRow
+          && Buffer.compare(settingsBytes, fs.readFileSync(settingsPath)) === 0,
+      `same-key retry changed the failed candidate or settings A: ${retry.text}`);
+      const retryLogAfter = logEvents();
+      const retryCountsAfter = {
+        prepare: retryLogAfter.filter(bSelection).length,
+        initialize: retryLogAfter.filter(scorerInit).length,
+        close: retryLogAfter.filter(scorerClose).length,
+      };
+      requireThat(!fs.existsSync(retryReachedFile)
+          && JSON.stringify(retryCountsAfter) === JSON.stringify(retryCountsBefore),
+        `same-key retry re-executed B preparation or its barrier: ${JSON.stringify({
+          retryCountsBefore, retryCountsAfter, reached: readJson(retryReachedFile) })}`);
+      const retainedCompactShaAfter = await hashLargeFile(retainedCompact);
+      const retainedCompactUnchanged = fs.existsSync(retainedCompact)
+        && retainedCompactShaAfter === retainedCompactShaBefore;
+      const citationAShaAfter = hash(citationAModel);
+      requireThat(retainedCompactUnchanged && citationAShaAfter === citationASha,
+        `scenario changed retained compact or private citation A bytes: ${JSON.stringify({
+          retainedCompactShaBefore, retainedCompactShaAfter, citationASha, citationAShaAfter })}`);
+      const supervisor = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
+      requireThat(supervisor?.pid === first.pid && supervisor.instanceId === first.instanceId
+          && supervisor.incarnation === first.incarnation
+          && supervisor.restartCount === first.restartCount,
+      `two-owner rollback restarted the Engine: ${JSON.stringify(supervisor)}`);
+      console.log('QUERY_ROLE_TWO_OWNER_ROLLBACK_PASS', JSON.stringify({
+        operationKey, reached, failureReason: failed.failure_reason,
+        absentGguf,
+        queryCandidateAborted: requestLog.events.filter(scorerClose).length === 1,
+        queryCandidatePathReleased,
+        chatProfile: { value: chatProfile.value, source: chatProfile.source,
+          ordinal: chatProfile.ordinal, model: absentGguf },
+        profileModelAbsent,
+        ownedProfileLinkRemoved: profileModelAbsent, retainedCompactUnchanged,
+        candidateChatEnabled: input.ui.chatEnabled,
+        citationAPath: citationA,
+        candidateCitationModelPath: input.citationScorerModelPath,
+        citationASha, citationBSha,
+        citationBLog: {
+          selected: requestLog.events[requestLog.selectedAt].message,
+          initialized: requestLog.events[requestLog.initializedAt].message,
+          closed: requestLog.events[requestLog.closedAt].message,
+        },
+        generativeFailureLog: {
+          thread: requestThread,
+          missingPath: requestLog.events[requestLog.missingAt].message,
+          governed: requestLog.events[requestLog.governedAt].message,
+        },
+        retryCountsBefore, retryCountsAfter,
+        retainedCompactShaBefore, retainedCompactShaAfter,
+        witness: restored.witness, settingsUnchanged, configStoreUnchanged,
+        encodersAppliedVersion: initialComponents.encoders.appliedVersion,
+        generativeAppliedVersion: initialComponents.generative.appliedVersion,
+        scorer: query.scorer, lexicalStatus: lexical.status,
+        pid: supervisor.pid, restartCount: supervisor.restartCount,
+        stableRetryRecordId: retryResult.operationRecordId,
+      }));
+      return;
     }
     let heldA = null;
     let heldSettled = false;
@@ -544,4 +843,19 @@ export async function exerciseQueryRoleScenario(c) {
   console.log('QUERY_ROLE_BOOT_PASS', JSON.stringify({ witness: before.witness,
     citation, appliedVersion: initialVersion, scorer: query.scorer,
     sentencesScored: query.sentences_scored, worker: initial.worker?.gpu }));
+}
+
+function operationRow(dbPath, operationKey) {
+  const database = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const rows = database.prepare(`SELECT id, operation_key, kind, state, phase,
+      failure_reason, failure_detail, accepted_settings_revision
+      FROM operations WHERE operation_key = ?`).all(operationKey);
+    if (rows.length > 1) {
+      throw new Error(`operation key is duplicated in SQLite: ${operationKey}`);
+    }
+    return rows[0] ?? null;
+  } finally {
+    database.close();
+  }
 }

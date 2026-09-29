@@ -716,9 +716,11 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /**
-   * A native pointer-before-publication cut can leave exact file witnesses after B is committed.
-   * Verify the already-completed queue row and B's indexed source identity before removing only
-   * those file rows. Other operation kinds still fence predecessor retirement for full replay.
+   * A native pointer-before-publication cut can leave scoped file mutations after B is committed.
+   * Settle the accepted UPSERT receipts against their exact queue revision and B source identity;
+   * replay exact DELETEs on B in accepted order, then durably commit and verify their absence.
+   * Conditional removal keeps a concurrent replacement row from being acknowledged. Broader
+   * operation kinds still fence boot because this path cannot prove their complete effects.
    */
   public static boolean settleCommittedNativeFileWitnesses(
       JobQueue queue, RunningRuntime active, String generation, Logger log) {
@@ -727,14 +729,40 @@ public final class KnowledgeServerMigrationOps {
     try {
       List<SwitchBufferCapableQueue.SwitchBufferOp> selected = scoped.listSwitchBufferOpsStrict()
           .stream().filter(op -> generation.equals(op.generation())).toList();
+      // Refuse unsupported kinds before applying any partial replay on this boot attempt.
+      if (selected.stream().anyMatch(op -> !"UPSERT".equals(op.op())
+          && !"DELETE".equals(op.op()))) return false;
+      // Validate every receipt before touching B. A later unresolved UPSERT must not leave an
+      // earlier DELETE half-applied while the boot attempt waits for its exact queue revision.
       for (var op : selected) {
-        if (!"UPSERT".equals(op.op())) return false;
-        var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload());
-        if (upsert.sourceSha256() == null
-            || !scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
-                upsert.sourceSha256())
-            || !upsert.sourceSha256().equals(active.documentFieldOps()
-                .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256))) return false;
+        if (op.payload() == null || op.payload().isBlank()) return false;
+        if ("UPSERT".equals(op.op())) {
+          var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload());
+          if (!op.key().equals("path:" + upsert.path())
+              || upsert.sourceSha256() == null
+              || !scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
+                  upsert.sourceSha256())
+              || !upsert.sourceSha256().equals(active.documentFieldOps()
+                  .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256))) return false;
+        } else if (!op.key().equals("path:" + op.payload())) {
+          return false;
+        }
+      }
+      boolean deleted = false;
+      for (var op : selected) {
+        if ("DELETE".equals(op.op())) {
+          active.indexingCoordinator().deleteByIdAndChunks(op.payload());
+          if (queue.deleteByExactPath(op.payload()) < 0) return false;
+          deleted = true;
+        }
+      }
+      if (deleted) {
+        active.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
+        active.commitOps().maybeRefreshBlocking();
+        for (var op : selected) {
+          if ("DELETE".equals(op.op()) && active.documentFieldOps()
+              .getDocumentField(op.payload(), SchemaFields.DOC_ID) != null) return false;
+        }
       }
       if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
         return false;

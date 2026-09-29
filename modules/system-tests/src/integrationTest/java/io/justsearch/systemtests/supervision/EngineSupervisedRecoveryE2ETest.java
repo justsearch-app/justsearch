@@ -203,6 +203,63 @@ final class EngineSupervisedRecoveryE2ETest {
     });
   }
 
+  static void runQueryAndGenerativeActualOwnerRollback() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo)
+            && hasRetainedGenerativeRuntime(repo, "compact"),
+        "D1-4 actual-owner rollback requires retained citation and compact generative bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/query-two-owner-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      String output = runInstalledModelScenario(repo, work, "query-role-two-owner-rollback",
+          Map.of(), "QUERY_ROLE_TWO_OWNER_ROLLBACK_PASS");
+      String line = output.lines()
+          .filter(value -> value.startsWith("QUERY_ROLE_TWO_OWNER_ROLLBACK_PASS "))
+          .findFirst().orElseThrow();
+      JsonNode proof = MAPPER.readTree(line.substring(
+          "QUERY_ROLE_TWO_OWNER_ROLLBACK_PASS ".length()));
+      assertEquals("encoders", proof.path("reached").path("cursor").asText(), output);
+      assertEquals("GENERATIVE_PREPARATION_REFUSED",
+          proof.path("failureReason").asText(), output);
+      assertBooleanTrue(proof.path("queryCandidateAborted"), output);
+      assertBooleanTrue(proof.path("queryCandidatePathReleased"), output);
+      assertEquals("compact", proof.path("chatProfile").path("value").asText(), output);
+      assertEquals("env_var", proof.path("chatProfile").path("source").asText(), output);
+      assertEquals(400, proof.path("chatProfile").path("ordinal").asInt(), output);
+      assertTrue(proof.path("chatProfile").path("model").asText().replace('\\', '/')
+          .endsWith("compact/Qwen3.5-4B-Q4_K_M.gguf"), output);
+      assertBooleanTrue(proof.path("profileModelAbsent"), output);
+      assertBooleanTrue(proof.path("ownedProfileLinkRemoved"), output);
+      assertBooleanTrue(proof.path("retainedCompactUnchanged"), output);
+      assertBooleanTrue(proof.path("candidateChatEnabled"), output);
+      assertFalse(proof.path("candidateCitationModelPath").asText().isBlank(), output);
+      assertNotEquals(proof.path("citationAPath").asText(),
+          proof.path("candidateCitationModelPath").asText(), output);
+      assertEquals(proof.path("citationASha").asText(), proof.path("citationBSha").asText(), output);
+      assertTrue(proof.path("citationBLog").path("selected").asText()
+          .contains(proof.path("candidateCitationModelPath").asText()), output);
+      assertTrue(proof.path("citationBLog").path("selected").asText()
+          .contains(proof.path("citationBSha").asText()), output);
+      assertTrue(proof.path("citationBLog").path("initialized").asText()
+          .startsWith("CitationScorer initialized"), output);
+      assertEquals("CitationScorer closed.",
+          proof.path("citationBLog").path("closed").asText(), output);
+      assertTrue(proof.path("generativeFailureLog").path("missingPath").asText()
+          .contains(proof.path("chatProfile").path("model").asText()), output);
+      assertTrue(proof.path("generativeFailureLog").path("missingPath").asText()
+          .endsWith("(exists: false)"), output);
+      assertEquals(proof.path("retryCountsBefore"), proof.path("retryCountsAfter"), output);
+      assertEquals(proof.path("retainedCompactShaBefore").asText(),
+          proof.path("retainedCompactShaAfter").asText(), output);
+      assertBooleanTrue(proof.path("settingsUnchanged"), output);
+      assertBooleanTrue(proof.path("configStoreUnchanged"), output);
+      assertEquals(proof.path("pid").asLong(), proof.path("reached").path("pid").asLong(), output);
+      assertEquals(0, proof.path("restartCount").asInt(), output);
+      assertEquals(proof.path("reached").path("operationRecordId").asLong(),
+          proof.path("stableRetryRecordId").asLong(), output);
+      System.out.println("LIFECYCLE_ACTUAL_OWNER_ROLLBACK_PASS §4 " + proof);
+    });
+  }
+
   static void runSeededBesideSemanticTransition() throws Exception {
     Path repo = repositoryRoot();
     assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
@@ -304,6 +361,63 @@ final class EngineSupervisedRecoveryE2ETest {
       assertTrue(output.contains("\"mode\":\"IN_PLACE\""), output);
       assertEquals(0, result.path("restartCount").asInt(), line);
       System.out.println("LIFECYCLE_ACCEPTED_WRITE_PASS §18 " + line);
+    });
+  }
+
+  static void runSeededInPlaceWatcherDeleteReplay() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-16 watcher replay scenario requires retained CPU A and FP16 CUDA B model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-watcher-delete-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      var environment = new java.util.HashMap<>(inPlaceModelEnvironment());
+      environment.put("JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE", "1");
+      environment.put("JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE", "1");
+      String output = runInstalledModelScenario(repo, work, "model-live-a-b", environment,
+          "MODEL_LIVE_AB_WATCHER_DELETE_PASS");
+      var evidence = markerPayload(output, "MODEL_LIVE_AB_WATCHER_DELETE_PASS");
+      assertEquals("model-live-a-b", evidence.path("scenario").asText(), output);
+      assertEquals("IN_PLACE", evidence.path("mode").asText(), output);
+      String buildingGeneration = evidence.path("buildingGeneration").asText();
+      assertFalse(buildingGeneration.isBlank(), output);
+      var watcher = evidence.path("watcher");
+      assertBooleanTrue(watcher.path("additionVisibleInA"), output);
+      assertTrue(watcher.path("additionHitsInA").asInt() > 0, output);
+      assertEquals("UPSERT", watcher.path("scopedUpsert").path("op").asText(), output);
+      assertEquals(buildingGeneration,
+          watcher.path("scopedUpsert").path("generation").asText(), output);
+      assertFalse(watcher.path("scopedUpsert").path("key").asText().isBlank(), output);
+      assertBooleanTrue(watcher.path("deletionAbsentInA"), output);
+      assertEquals(0, watcher.path("deletionHitsInA").asInt(), output);
+      assertEquals("DELETE", watcher.path("scopedDelete").path("op").asText(), output);
+      assertEquals(buildingGeneration,
+          watcher.path("scopedDelete").path("generation").asText(), output);
+      assertEquals(watcher.path("scopedUpsert").path("key").asText(),
+          watcher.path("scopedDelete").path("key").asText(), output);
+      assertBooleanTrue(watcher.path("bAbsence").path("absentInB"), output);
+      assertEquals(0, watcher.path("bAbsence").path("hitsInB").asInt(), output);
+
+      var acceptedWrite = evidence.path("acceptedWrite");
+      assertBooleanTrue(acceptedWrite.path("visibleInA"), output);
+      assertBooleanTrue(acceptedWrite.path("duringBuild"), output);
+      assertFalse(acceptedWrite.path("operationKey").asText().isBlank(), output);
+      assertEquals(buildingGeneration, acceptedWrite.path("buildingGeneration").asText(), output);
+      assertTrue(acceptedWrite.path("aTextHits").asInt() > 0, output);
+      var bVector = evidence.path("bVector");
+      assertBooleanTrue(bVector.path("visible"), output);
+      assertTrue(bVector.path("hits").asInt() > 0, output);
+      var engine = evidence.path("engine");
+      assertTrue(engine.path("processRestarted").isBoolean(), output);
+      assertFalse(engine.path("processRestarted").asBoolean(), output);
+      assertEquals(0, engine.path("restartCount").asInt(), output);
+      assertTrue(engine.path("pid").asLong() > 0, output);
+      assertFalse(engine.path("instanceId").asText().isBlank(), output);
+      assertTrue(output.contains("MODEL_LIVE_AB_WATCHER_DELETE_SUBMITTED"), output);
+      assertTrue(output.contains("MODEL_LIVE_AB_WATCHER_DELETE_A"), output);
+      assertTrue(output.contains("MODEL_LIVE_AB_ACCEPTED_WRITE"), output);
+      System.out.println("LIFECYCLE_WATCHER_DELETE_REPLAY_PASS §16 " + evidence);
     });
   }
 
@@ -671,7 +785,9 @@ final class EngineSupervisedRecoveryE2ETest {
     Throwable primary = null;
     try {
       long timeoutSeconds = 330L;
-      if (scenario.startsWith("generative-recovery-") || scenario.contains("low-memory")) {
+      if (scenario.startsWith("generative-recovery-") || scenario.contains("low-memory")
+          || "model-live-a-b".equals(scenario)
+              && "1".equals(extraEnvironment.get("JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE"))) {
         timeoutSeconds = 720L;
       }
       assertTrue(process.waitFor(timeoutSeconds, TimeUnit.SECONDS),

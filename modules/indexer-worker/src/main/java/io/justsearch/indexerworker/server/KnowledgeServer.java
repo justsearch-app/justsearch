@@ -35,6 +35,7 @@ import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.app.api.status.MigrationSource;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.QueryRoleSelection;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding;
 import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.indexerworker.liveness.LivenessWindows;
 import io.justsearch.indexerworker.util.IndexRootLock;
@@ -138,7 +139,11 @@ public final class KnowledgeServer implements Closeable {
   private IndexGenerationManager indexGenerationManager;
   private IndexGenerationManager.BootOwnership generationBootOwnership;
   private IndexGenerationManager.BootDisposition generationBootDisposition;
-  private volatile boolean promotedReplaySettled;
+  /** Replay settlement is valid only for this exact active generation. */
+  private volatile String replaySettledGeneration;
+  private List<RootBinding> bootRootBindings = List.of();
+  private boolean bootRootBindingsBound;
+  private volatile String rootReconciliationSettledGeneration;
   private IndexRootLock indexRootLock;
   private boolean closePrepared;
   private WorkerAppServices pendingAppServices;
@@ -623,6 +628,15 @@ public final class KnowledgeServer implements Closeable {
   public void bindBootQueryRoleSelection(QueryRoleSelection selection) {
     if (running) throw new IllegalStateException("Query witness must be bound before Worker start");
     bootQueryRoleSelection = QueryRoleSelectionResolver.enrich(selection);
+  }
+
+  /** Head's already-loaded durable root membership, captured before Worker startup. */
+  public void bindBootRootBindings(List<RootBinding> bindings) {
+    if (running || bootRootBindingsBound) {
+      throw new IllegalStateException("Boot root bindings must be bound exactly once before start");
+    }
+    bootRootBindings = List.copyOf(Objects.requireNonNull(bindings, "bindings"));
+    bootRootBindingsBound = true;
   }
 
   /** Binds a retained physical-attempt capsule before start. */
@@ -1148,6 +1162,10 @@ public final class KnowledgeServer implements Closeable {
       this.migrationProgressStore = new MigrationProgressStore(this.indexBasePath);
       this.persistedMigrationProgressSnapshot = this.migrationProgressStore.readBestEffort();
       IndexGenerationManager.State state = layout.state();
+      boolean committedPredecessorAtBoot = state != null
+          && state.previous_generation() != null
+          && !state.previous_generation().isBlank()
+          && !state.previous_generation().equals(state.active_generation());
       this.buildingIndexPath = null;
       this.migrationEnumeratorDone = false;
       this.migrationEnumeratorFailure = null;
@@ -1290,7 +1308,10 @@ public final class KnowledgeServer implements Closeable {
         if (preOpenMismatch && policyHandledInCatch) {
           throw IndexMetadataParityGuard.schemaMismatch();
         }
-        boolean useDeferredWriter = hasLuceneSegments(activeIndexPath) && !preOpenMismatch;
+        // A committed successor must reconcile durable watched roots before publication. Keep
+        // its writer on the synchronous boot path so no read-only deferred view escapes first.
+        boolean useDeferredWriter = hasLuceneSegments(activeIndexPath) && !preOpenMismatch
+            && !committedPredecessorAtBoot;
         {
           LuceneRuntimeBuilder builder =
               buildIndexRuntime(activeIndexPath)
@@ -1515,7 +1536,7 @@ public final class KnowledgeServer implements Closeable {
                 jobQueue, layout.activeGenerationId())) {
           throw new IOException("Promoted generation switch replay remains unresolved");
         }
-        promotedReplaySettled = true;
+        replaySettledGeneration = layout.activeGenerationId();
       } else if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
           && !rebuildBrakeExhausted && ingestLifecycle instanceof RunningRuntime) {
         drainSwitchBufferBestEffort();
@@ -1621,6 +1642,10 @@ public final class KnowledgeServer implements Closeable {
                 + " budget when it completes.");
       } else {
         appServices.startIndexingLoop();
+      }
+
+      if (committedPredecessorAtBoot) {
+        settleCommittedBootRoots(state.active_generation());
       }
 
       publishServingView(appServices);
@@ -1796,7 +1821,7 @@ public final class KnowledgeServer implements Closeable {
         current.layout().activeGenerationId(), current.layout().state().building_generation(),
         current.layout().state().migration_state(), writable,
         generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED,
-        promotedReplaySettled));
+        current.layout().activeGenerationId().equals(replaySettledGeneration)));
   }
 
   /** Index runtime presence only; no queue query, model call or Head-side readiness dependency. */
@@ -2899,8 +2924,12 @@ public final class KnowledgeServer implements Closeable {
     return newAppServices(infraCtx, ingestLifecycle);
   }
 
-  private DefaultWorkerAppServices newAppServicesForRuntime(RunningRuntime runtime) {
-    return newAppServices(fixedRuntimeContext(runtime, activeIndexPath), runtime);
+  private DefaultWorkerAppServices newAppServicesForRuntime(
+      RunningRuntime runtime, DefaultWorkerAppServices deferredSource) {
+    return DefaultWorkerAppServices.prepareDeferredWriterUpgrade(
+        workerExecutors, fixedRuntimeContext(runtime, activeIndexPath),
+        () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
+        embeddingTelemetry, indexingPacing, childRegistry, serviceConfiguration, deferredSource);
   }
 
   private InfraContext fixedRuntimeContext(RunningRuntime runtime, Path servingPath) {
@@ -3201,8 +3230,10 @@ public final class KnowledgeServer implements Closeable {
       pendingDeferredUpgrade = preparation;
       try {
         RunningRuntime upgraded = preparation.runtime();
-        WorkerAppServices oldServices = Objects.requireNonNull(appServices, "appServices");
-        DefaultWorkerAppServices candidate = newAppServicesForRuntime(upgraded);
+        if (!(appServices instanceof DefaultWorkerAppServices oldServices)) {
+          throw new IllegalStateException("Deferred application services are unavailable");
+        }
+        DefaultWorkerAppServices candidate = newAppServicesForRuntime(upgraded, oldServices);
         pendingAppServices = candidate;
         wireAppServicesPostConstruction(candidate);
         if (initialEncoderSet != null) retainProducerModels(candidate, initialEncoderSet);
@@ -5517,16 +5548,24 @@ public final class KnowledgeServer implements Closeable {
           preparation.retireReader();
           old.releaseModelSets();
         };
+        DefaultWorkerAppServices.WatcherHandoff watcherHandoff = null;
         try {
           if (old.encoderSet != null) successor.attachEncoderSet(old.encoderSet);
           if (old.queryRoleSet != null) successor.attachQueryRoleSet(old.queryRoleSet);
           // Reserve the fallible retirement slot before the upgrade becomes published.
           retiredServingViews.add(old);
+          if (oldServices instanceof DefaultWorkerAppServices oldDefault
+              && preparedServices instanceof DefaultWorkerAppServices preparedDefault) {
+            watcherHandoff = oldDefault.prepareDeferredWatcherHandoffTo(preparedDefault);
+          }
           preparation.markPublished();
+          if (watcherHandoff != null) watcherHandoff.install();
         } catch (RuntimeException | Error failure) {
           retiredServingViews.remove(old);
           successor.releaseModelSets();
           throw failure;
+        } finally {
+          if (watcherHandoff != null) watcherHandoff.close();
         }
         old.retiring = true;
         old.retireCleanup = retireCleanup;
@@ -5591,6 +5630,127 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
+  /**
+   * A pointer committed before a crash is not a root-replay certificate. Reattach the durable
+   * Head membership to B and make a complete disk/B pass while A still owns rollback capacity.
+   * The last observation and admission release share the mutation fence, so a late watcher fault
+   * cannot be mistaken for a clean boot.
+   */
+  private void settleCommittedBootRoots(String expectedActive) throws IOException {
+    if (!bootRootBindingsBound) {
+      throw new IOException("Committed successor boot lacks durable watched-root membership");
+    }
+    if (!(appServices instanceof DefaultWorkerAppServices producer)
+        || !(ingestLifecycle instanceof RunningRuntime active)
+        || ingestLifecycle != searchLifecycle || !active.isAcceptingWrites()
+        || jobQueue == null || indexGenerationManager == null) {
+      throw new IOException("Committed successor boot lacks a writable reconciliation owner");
+    }
+    long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(3);
+    // Native switch-buffer receipts refer to pre-boot accepted queue revisions. Root
+    // reconciliation may replace those revisions, so it cannot start until the exact receipts
+    // have settled against B. This wait is scoped to the generation, never the global queue.
+    if (generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native) {
+      while (true) {
+        boolean paused = false;
+        boolean settled;
+        try {
+          if (!producer.pauseProducerForCutover(10_000)) {
+            throw new IOException("Committed native replay writer did not pause");
+          }
+          paused = true;
+          try (var fence = producer.mutationAdmission().beginFinalFence(
+              producer.mutationOwnerToken(), 10_000)) {
+            if (fence == null) {
+              throw new IOException("Committed native replay mutation fence did not settle");
+            }
+            settled = nativePredecessorReplaySettled(expectedActive);
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Committed native switch replay interrupted", interrupted);
+        } finally {
+          if (paused) producer.resumeProducerAfterCutover();
+        }
+        if (settled) break;
+        if (closeStarted || System.nanoTime() >= deadline) {
+          throw new IOException("Committed native switch replay did not settle before root replay");
+        }
+        try { Thread.sleep(500); }
+        catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Committed native switch replay interrupted", interrupted);
+        }
+      }
+    }
+    for (int attempt = 0; attempt < 3; attempt++) {
+      if (closeStarted || System.nanoTime() >= deadline) break;
+      for (RootBinding binding : bootRootBindings) {
+        producer.ingestService().reconcileCommittedBootRoot(binding);
+      }
+      try {
+        while (true) {
+          active.commitOps().maybeRefreshBlocking();
+          boolean rootsMatch = true;
+          for (RootBinding binding : bootRootBindings) {
+            if (!producer.ingestService().committedBootRootConverged(binding)) {
+              rootsMatch = false;
+              break;
+            }
+          }
+          if (rootsMatch) break;
+          if (closeStarted || System.nanoTime() >= deadline) {
+            throw new IOException("Committed successor root replay did not converge");
+          }
+          Thread.sleep(500);
+        }
+        boolean paused = false;
+        try {
+          if (!producer.pauseProducerForCutover(10_000)) {
+            throw new IOException("Committed successor writer did not pause at its batch boundary");
+          }
+          paused = true;
+          try (var fence = producer.mutationAdmission().beginFinalFence(
+              producer.mutationOwnerToken(), 10_000)) {
+            if (fence == null || !fence.armReplayCertificate()) {
+              throw new IOException("Committed successor watcher replay is uncertain");
+            }
+            active.commitOps().commitAndTrack(
+                io.justsearch.adapters.lucene.runtime.CommitReason.MIGRATION_CUTOVER);
+            active.commitOps().maybeRefreshBlocking();
+            var state = indexGenerationManager.readStateBestEffort();
+            if (state == null || !expectedActive.equals(state.active_generation())
+                || activeIndexPath == null
+                || !indexGenerationManager.resolveGenerationPathStrict(expectedActive)
+                    .equals(activeIndexPath)) {
+              throw new IOException("Committed successor generation changed during root replay");
+            }
+            boolean converged = true;
+            for (RootBinding binding : bootRootBindings) {
+              if (!producer.ingestService().committedBootRootConverged(binding)) {
+                converged = false;
+                break;
+              }
+            }
+            if (converged) {
+              if (!fence.releaseCurrentOwnerIfReplayCertain()) {
+                throw new IOException("Committed successor watcher failed at final release");
+              }
+              rootReconciliationSettledGeneration = expectedActive;
+              return;
+            }
+          }
+        } finally {
+          if (paused) producer.resumeProducerAfterCutover();
+        }
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Committed successor root replay interrupted", interrupted);
+      }
+    }
+    throw new IOException("Committed successor roots did not converge before publication");
+  }
+
   /** Reclaim a committed predecessor only after replay and every old view have settled. */
   private void retryCommittedGenerationRetirement() {
     runtimeSwapLock.lock();
@@ -5611,6 +5771,7 @@ public final class KnowledgeServer implements Closeable {
     // committed operation to retire in that state, and older boot generations need not
     // have an operation-derived UUIDv7 name.
     if (previous.equals(active)) return;
+    if (!active.equals(rootReconciliationSettledGeneration)) return;
     synchronized (servingViewMonitor) {
       if (servingView == null || servingView.retiring || !retiredServingViews.isEmpty()
           || activeIndexPath == null || !active.equals(activeIndexPath.getFileName().toString())) {
@@ -5631,7 +5792,7 @@ public final class KnowledgeServer implements Closeable {
           return;
         }
       } else if (!(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native)
-          || !nativePredecessorReplaySettled()) {
+          || !nativePredecessorReplaySettled(active)) {
         return;
       }
       indexGenerationManager.retirePreviousGeneration(active, previous);
@@ -5644,24 +5805,24 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /** Native boot can finish replay after a pointer-before-publication crash without a new journal. */
-  private boolean nativePredecessorReplaySettled() {
-    if (promotedReplaySettled) return true;
+  private boolean nativePredecessorReplaySettled(String expectedActive) {
+    if (expectedActive.equals(replaySettledGeneration)) return true;
     if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE
         || jobQueue == null || indexGenerationManager == null) {
       return false;
     }
     try {
       var state = indexGenerationManager.readStateBestEffort();
-      if (state == null || state.active_generation() == null) return false;
-      var counts = jobQueue.jobStateCountsStrict();
-      if (counts.pendingCount() != 0 || counts.processingCount() != 0) return false;
+      if (state == null || !expectedActive.equals(state.active_generation())) return false;
       if (!(ingestLifecycle instanceof RunningRuntime active) || active != searchLifecycle
           || activeIndexPath == null
           || !indexGenerationManager.resolveGenerationPathStrict(state.active_generation())
               .equals(activeIndexPath)) return false;
+      // The switch-buffer rows carry exact accepted unit revisions. Unrelated durable queue
+      // backlog is neither part of their proof nor a reason to retain the predecessor forever.
       boolean settled = KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
           jobQueue, active, state.active_generation(), log);
-      if (settled) promotedReplaySettled = true;
+      if (settled) replaySettledGeneration = expectedActive;
       return settled;
     } catch (IOException | RuntimeException unavailable) {
       return false;
@@ -7236,6 +7397,10 @@ public final class KnowledgeServer implements Closeable {
                     try {
                       if (projection != null) projection.admitBeforePointer();
                       migrationTransitionForPublication("migration-before-pointer-commit");
+                      if (!fence.armReplayCertificate()) {
+                        throw new IOException(
+                            "Unrecorded watcher mutation prevents pointer commitment");
+                      }
                       promoted = recordedPromotion == null
                           ? nativePromotion.promote() : recordedPromotion.promote();
                       migrationTransitionForPublication("migration-after-pointer-commit");
@@ -7321,14 +7486,22 @@ public final class KnowledgeServer implements Closeable {
           runtimeSwapLock.lock();
         }
         if (result == null) return null;
-          if (!KnowledgeServerMigrationOps.finishPromotedSwitchReplay(jobQueue, replay.orElseThrow())
-              || !KnowledgeServerMigrationOps.switchBufferEmptyStrict(jobQueue,
-                  buildingGeneration)) {
+          boolean replayClean = KnowledgeServerMigrationOps.finishPromotedSwitchReplay(
+                  jobQueue, replay.orElseThrow())
+              && KnowledgeServerMigrationOps.switchBufferEmptyStrict(jobQueue,
+                  buildingGeneration);
+          if (!replayClean) {
             log.warn("Promoted Green retains switch-buffer versions; ordered recovery will retry exact replay");
-            requestRecovery = true;
           } else {
-            fence.certifySuccessor();
-            promotedReplaySettled = true;
+            fence.certifySuccessorIfReplayCertain();
+          }
+          if (fence.releaseCertifiedSuccessor()) {
+            replaySettledGeneration = result.active_generation();
+            rootReconciliationSettledGeneration = result.active_generation();
+          } else {
+            replaySettledGeneration = null;
+            log.warn("Promoted Green did not release its replay certificate; ordered recovery is required");
+            requestRecovery = true;
           }
         return result;
       }

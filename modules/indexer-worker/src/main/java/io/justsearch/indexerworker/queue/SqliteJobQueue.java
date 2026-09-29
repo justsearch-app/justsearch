@@ -864,6 +864,32 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     return enqueueEntries(entries, collection, null, true);
   }
 
+  /** Reads one committed boot root row under the queue lock. */
+  @Override
+  public boolean matchesExpectedCollection(Path path, String expectedCollection) {
+    if (path == null) return false;
+    String normalizedPath =
+        PathNormalizer.normalizePath(path.toAbsolutePath().toString());
+    String normalizedCollection =
+        expectedCollection == null || expectedCollection.isBlank() ? null : expectedCollection;
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT collection FROM jobs WHERE path = ?")) {
+        query.setString(1, normalizedPath);
+        try (ResultSet row = query.executeQuery()) {
+          return !row.next() || Objects.equals(normalizedCollection, row.getString(1));
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Expected collection row is unreadable", unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
   /**
    * Tempdoc 813 Slice B: the single write path for the jobs table. {@code size_bytes} is listed in
    * the INSERT precisely because the statement is {@code INSERT OR REPLACE} — an unlisted column

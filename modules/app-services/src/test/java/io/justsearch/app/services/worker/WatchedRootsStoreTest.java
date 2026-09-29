@@ -89,6 +89,25 @@ final class WatchedRootsStoreTest {
   }
 
   @Test
+  void unavailablePersistedRootRemainsDeclaredForBootReconciliation() throws Exception {
+    Path missing = tempDir.resolve("temporarily-disconnected").toAbsolutePath();
+    Path rootsFile = tempDir.resolve("watched_roots.json");
+    Files.writeString(rootsFile, new ObjectMapper().writeValueAsString(Map.of(
+        "schemaVersion", 1,
+        "roots", List.of(Map.of("path", missing.toString(), "collection", "archive")))));
+
+    var store = new WatchedRootsStore(rootsFile, null);
+    var loaded = store.loadPersistedRootsWithErrors();
+    assertEquals(WatchedRootsStore.NEVER_INDEXED, loaded.roots().get(missing));
+    assertEquals("archive", loaded.collections().get(missing));
+    assertTrue(store.loadPersistedRoots().containsKey(missing));
+
+    Files.writeString(rootsFile, new ObjectMapper().writeValueAsString(List.of(missing.toString())));
+    assertTrue(store.loadPersistedRootsWithErrors().roots().containsKey(missing),
+        "legacy membership must not disappear because a drive is unavailable");
+  }
+
+  @Test
   @DisplayName("Persists roots in new format and round-trips")
   void persistsAndRoundTrips() throws Exception {
     Path root = tempDir.resolve("root3");
