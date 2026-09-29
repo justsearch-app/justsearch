@@ -3,6 +3,7 @@ package io.justsearch.systemtests.supervision;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -390,6 +391,57 @@ final class EngineSupervisedRecoveryE2ETest {
     });
   }
 
+  static void runSeededInPlaceCombinedMaintenance(String scenario, String expectedBoundary)
+      throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-16 combined maintenance requires retained CPU A and CUDA B model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/lifecycle-low-memory-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      var environment = new java.util.HashMap<>(inPlaceModelEnvironment());
+      environment.put("JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE", "1");
+      String output = runInstalledModelScenario(repo, work, scenario, environment,
+          "MODEL_LIVE_AB_LOW_MEMORY_CRASH_PASS");
+      var result = markerPayload(output, "MODEL_LIVE_AB_LOW_MEMORY_CRASH_PASS");
+      assertEquals(expectedBoundary, result.path("boundary").asText(), output);
+      var floor = result.path("floorEvidence");
+      assertEquals("IN_PLACE", floor.path("mode").asText(), output);
+      assertEquals("candidate_fits_after_source_release", floor.path("reason").asText(), output);
+      assertTrue(floor.path("freeBytes").asLong() <= 1024 * 1024, output);
+      assertTrue(floor.path("footprintBytes").asLong() > floor.path("freeBytes").asLong(), output);
+      assertEquals(1, result.path("restartCount").asInt(), output);
+      assertEquals("COMPLETE", result.path("terminalState").asText(), output);
+      assertEquals(result.path("settingsRevision").path("before").asLong() + 1,
+          result.path("settingsRevision").path("after").asLong(), output);
+      assertBooleanTrue(result.path("latestText"), output);
+      assertBooleanTrue(result.path("latestVector"), output);
+      assertBooleanTrue(result.path("staleAbsent"), output);
+      assertBooleanTrue(result.path("acceptedWrite"), output);
+      for (String role : List.of("embedding", "ner", "splade", "citation-scorer")) {
+        var modelIdentity = result.path("modelIdentities").path(role);
+        assertFalse(modelIdentity.path("modelPath").asText().isBlank(), output);
+        assertFalse(modelIdentity.path("settingsPath").asText().isBlank(), output);
+        assertTrue(modelIdentity.path("sha256").asText().matches("[0-9a-f]{64}"), output);
+      }
+      var embeddingRuntime = result.path("runtimeIdentities").path("embedding");
+      assertEquals(result.path("modelIdentities").path("embedding").path("sha256").asText(),
+          embeddingRuntime.path("fingerprint").asText(), output);
+      assertEquals(result.path("activeGeneration").asText(),
+          embeddingRuntime.path("activeGeneration").asText(), output);
+      assertEquals("READY", embeddingRuntime.path("state").asText(), output);
+      var capturedReplay = result.path("capturedReplay");
+      assertTrue(capturedReplay.path("planned").asText().matches("[0-9a-f]{64}"), output);
+      assertTrue(capturedReplay.path("committed").asText().matches("[0-9a-f]{64}"), output);
+      assertNotEquals(capturedReplay.path("planned").asText(),
+          capturedReplay.path("committed").asText(), output);
+      assertFalse(capturedReplay.path("unitRevision").asText().isBlank(), output);
+      assertEquals(1, capturedReplay.path("supersededEvents").asInt(), output);
+      System.out.println("LIFECYCLE_LOW_MEMORY_COMBINED_PASS §16 " + result);
+    });
+  }
+
   @Test
   @Tag("ai")
   @Timeout(15 * 60)
@@ -618,7 +670,10 @@ final class EngineSupervisedRecoveryE2ETest {
     Process process = builder.start();
     Throwable primary = null;
     try {
-      long timeoutSeconds = scenario.startsWith("generative-recovery-") ? 720L : 330L;
+      long timeoutSeconds = 330L;
+      if (scenario.startsWith("generative-recovery-") || scenario.contains("low-memory")) {
+        timeoutSeconds = 720L;
+      }
       assertTrue(process.waitFor(timeoutSeconds, TimeUnit.SECONDS),
           "D1-16 installed " + scenario + " exceeded " + timeoutSeconds
               + " seconds: " + outputFile);

@@ -33,6 +33,11 @@ export const BULK_FAULT_CASES = Object.freeze({
     phase: 'bulk-before-building-checkpoint', finalIncarnation: 2, faultIncarnation: 1,
     requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
   }),
+  'bulk-captured-edit-before-building-checkpoint': Object.freeze({
+    phase: 'bulk-before-building-checkpoint', capturedEdit: true,
+    finalIncarnation: 2, faultIncarnation: 1,
+    requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 2,
+  }),
   'bulk-promotion-before-terminal': Object.freeze({
     phase: 'bulk-after-promotion', finalIncarnation: 2, faultIncarnation: 1,
     requestedRestartIncarnations: Object.freeze([]), cutAttempts: 1, finalAttempts: 1,
@@ -209,7 +214,7 @@ export async function exerciseBulkGapApproval(c) {
     terminalState: promoted.row.state, terminalReason: promoted.row.failure_reason }));
 }
 
-/** Installed-process proof for the three recorded bulk crash boundaries. */
+/** Installed-process proof for the recorded bulk crash boundaries. */
 export async function exerciseBulkFault(c) {
   const { work, data, indexBase, first, manifest, apiPort, readJson, post,
     requireThat, requireOperationSuccess, matchingHit, scenario, operationKey } = c;
@@ -246,6 +251,7 @@ export async function exerciseBulkFault(c) {
     `bulkfault${scenario.replaceAll('-', '')}bravo`];
   files.forEach((file, index) => fs.writeFileSync(file, `${markers[index]} durable bulk recovery quokka\n`));
   const hashes = files.map(file => sha256(fs.readFileSync(file)));
+  let capturedReplay = null;
   const operationPath = path.join(data, 'operations.db');
   const jobsPath = path.join(data, 'jobs.db');
   const sourceGeneration = readJson(path.join(indexBase, 'state.json'))?.active_generation;
@@ -297,6 +303,30 @@ export async function exerciseBulkFault(c) {
       && currentManifest.instanceId === supervisor.instanceId
       ? { supervisor, manifest: currentManifest } : null;
   });
+  if (selected.capturedEdit) {
+    const captured = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+    const capturedMember = captured.jobs.find(member => samePath(member.path, files[0]));
+    requireThat(captured.walk?.captured_plan === 1
+        && captured.walk.enumeration_outcome === 'COMPLETE'
+        && captured.walk.enumeration_closed_at != null
+        && captured.walk.sealed_at == null
+        && captured.walk.planned_units === files.length
+        && capturedMember?.planned_source_sha256 === hashes[0]
+        && capturedMember.unit_revision != null,
+      `captured edit did not reach the exact closed H1 plan: ${JSON.stringify({
+        walk: captured.walk, member: capturedMember, h1: hashes[0],
+      })}`);
+    const h2Marker = 'freshcapturedreplaycobalt';
+    fs.writeFileSync(files[0], `${h2Marker} changed after capture during recovery\n`);
+    const committed = sha256(fs.readFileSync(files[0]));
+    requireThat(committed !== hashes[0],
+      'captured edit did not change the source identity before the verified kill');
+    capturedReplay = {
+      file: files[0], unitRevision: capturedMember.unit_revision,
+      h1: { marker: markers[0], sha256: hashes[0] },
+      h2: { marker: h2Marker, sha256: committed },
+    };
+  }
   let cut;
   let cooldown;
   if (selected.liveRefusal) {
@@ -315,12 +345,12 @@ export async function exerciseBulkFault(c) {
     cut = snapshot({ operationPath, jobsPath, indexBase, operationKey });
   }
   await dispatched.settled;
-  fs.writeFileSync(path.join(work, 'bulk-cut.json'), JSON.stringify({
-    scenario, operationKey, reached, cooldown, cut,
-  }, null, 2));
+  const cutProof = { scenario, operationKey, reached, cooldown, cut };
+  if (selected.capturedEdit) cutProof.capturedReplay = capturedReplay;
+  fs.writeFileSync(path.join(work, 'bulk-cut.json'), JSON.stringify(cutProof, null, 2));
   assertCommonCut({ cut, reached, prepared, operationKey, selected, roots,
     sourceGeneration, requireThat });
-  assertSelectedCut({ selected, cut, files, hashes, operationKey, requireThat });
+  assertSelectedCut({ selected, cut, files, hashes, capturedReplay, operationKey, requireThat });
 
   const expectedIncarnation = first.incarnation + selected.finalIncarnation - 1;
   const recovered = await waitFor('bulk successor reaches its final physical incarnation', 180000, () => {
@@ -367,16 +397,19 @@ export async function exerciseBulkFault(c) {
       ? observed : null;
   });
   fs.writeFileSync(path.join(work, 'bulk-final.json'), JSON.stringify(final, null, 2));
-  assertFinal({ final, cut, prepared, files, hashes, operationKey, selected, requireThat });
+  assertFinal({ final, cut, prepared, files, hashes, capturedReplay, operationKey, selected,
+    requireThat });
 
   const searchEvidence = [];
   for (let index = 0; index < files.length; index++) {
+    const marker = selected.capturedEdit && index === 0
+      ? capturedReplay.h2.marker : markers[index];
     const search = await waitFor(`promoted target search ${index + 1}`, 60000, async () => {
       try {
         const response = await post(recovered.manifest.head.apiPort, '/api/knowledge/search', {
-          query: markers[index], limit: 10, mode: 'text',
+          query: marker, limit: 10, mode: 'text',
         });
-        return response.status === 200 && matchingHit(response, files[index], markers[index])
+        return response.status === 200 && matchingHit(response, files[index], marker)
           ? response : null;
       } catch { return null; }
     });
@@ -384,7 +417,17 @@ export async function exerciseBulkFault(c) {
       samePath(hit?.fields?.path, files[index]));
     requireThat(matching.length === 1,
       `promoted target must contain exactly one hit for ${files[index]}: ${search.text}`);
-    searchEvidence.push({ path: files[index], matches: matching.length });
+    searchEvidence.push(selected.capturedEdit
+      ? { path: files[index], marker, matches: matching.length }
+      : { path: files[index], matches: matching.length });
+  }
+  if (selected.capturedEdit) {
+    const stale = await post(recovered.manifest.head.apiPort, '/api/knowledge/search', {
+      query: markers[0], limit: 10, mode: 'text',
+    });
+    requireThat(stale.status === 200 && !matchingHit(stale, files[0], markers[0]),
+      `promoted target retained stale H1 content: ${stale.text}`);
+    capturedReplay.staleH1Absent = true;
   }
 
   const stableOperation = final.operation;
@@ -403,6 +446,26 @@ export async function exerciseBulkFault(c) {
     before: { operation: stableOperation, queue: stableQueue },
     after: { operation: afterRetry.operation, queue: queueProjection(afterRetry) },
   })}`);
+  if (selected.capturedEdit) {
+    requireThat(sameJson(afterRetry.state, final.state)
+        && sameJson(afterRetry.generationManifest, final.generationManifest)
+        && sameJson(afterRetry.recordedGenerations, final.recordedGenerations),
+      `same-key replay changed the promoted generation: ${JSON.stringify({
+        before: { state: final.state, manifest: final.generationManifest,
+          generations: final.recordedGenerations },
+        after: { state: afterRetry.state, manifest: afterRetry.generationManifest,
+          generations: afterRetry.recordedGenerations },
+      })}`);
+    const afterRetryLatest = await post(recovered.manifest.head.apiPort,
+      '/api/knowledge/search', { query: capturedReplay.h2.marker, limit: 10, mode: 'text' });
+    const afterRetryStale = await post(recovered.manifest.head.apiPort,
+      '/api/knowledge/search', { query: capturedReplay.h1.marker, limit: 10, mode: 'text' });
+    requireThat(afterRetryLatest.status === 200
+        && matchingHit(afterRetryLatest, capturedReplay.file, capturedReplay.h2.marker)
+        && afterRetryStale.status === 200
+        && !matchingHit(afterRetryStale, capturedReplay.file, capturedReplay.h1.marker),
+      `same-key replay changed captured H2 search: ${afterRetryLatest.text} ${afterRetryStale.text}`);
+  }
 
   const servingAfterResult = readJson(path.join(runtime, 'supervisor.v1.json'));
   requireThat(servingAfterResult?.state === 'running'
@@ -421,6 +484,7 @@ export async function exerciseBulkFault(c) {
       attempts: final.operation.attempts, units_failed: final.operation.units_failed,
     },
     walk: final.walk, members: final.jobs.map(compactMember), search: searchEvidence,
+    ...(selected.capturedEdit ? { capturedReplay } : {}),
     preparationSha256: sha256(Buffer.from(final.operation.preparation_payload, 'utf8')),
   }));
   return { reached, cooldown, recovered, operation: final.operation, walk: final.walk,
@@ -642,7 +706,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
   watcherDeleteDuringBuild = false, gapApproval = false, gapCancellation = false,
   gapRecomposeFailure = false, cancelBeforePointer = false,
-  issuedSearch = false, extraBuildFiles = 0, engineLogWindow = null }) {
+  issuedSearch = false, extraBuildFiles = 0, engineLogWindow = null, crashBoundary = null }) {
   const runtime = path.join(data, 'runtime');
   const { reachedFile, releaseFile } = barrierFiles(data);
   const migrationBarrier = barrierFiles(data, 'migration-barrier');
@@ -666,6 +730,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     'side-by-side activation key is already present');
   if (cancelBeforePointer) requireThat(acceptedWriteDuringBuild && distinctModelB && inPlaceModelB,
     'accepted-write cancellation requires a distinct forced in-place candidate');
+  if (crashBoundary) requireThat(acceptedWriteDuringBuild && distinctModelB && inPlaceModelB
+      && ['installer-before-pointer', 'installer-pointer-before-settings'].includes(crashBoundary),
+    `combined maintenance requires a supported forced in-place crash boundary: ${crashBoundary}`);
   const file = path.join(work, 'installer-root-a', 'installer-0.txt');
   const marker = fs.readFileSync(file, 'utf8').split(/\s+/)[0];
   const removedFile = watcherDeleteDuringBuild
@@ -772,7 +839,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     }
     return;
   }
-  const transitionSampler = distinctModelB
+  const transitionSampler = distinctModelB && !crashBoundary
     ? sampleSemanticAvailability({ apiPort, post, request, marker, file, matchingHit }) : null;
   // The promotion and cancellation paths both leave through this scope.
   try {
@@ -782,6 +849,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   try {
     const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
     const acceptedMarker = 'lexicalbridgecobalt';
+    const changedCapturedMarker = crashBoundary ? 'latestcapturedcobalt' : null;
+    let capturedSourceHashes = null;
+    let combinedFloor = null;
     if (acceptedWriteDuringBuild) {
       const held = await waitFor('migration monitor held before SWITCHING', 300000,
         () => readJson(migrationBarrier.reachedFile));
@@ -812,6 +882,36 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
           return health.status === 200 ? state : null;
         } catch { return null; }
       });
+      if (crashBoundary) {
+        const plannedHash = sha256(fs.readFileSync(file));
+        const capturedBeforeEdit = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+        const capturedMember = capturedBeforeEdit.jobs.find(member => samePath(member.path, file));
+        requireThat(capturedBeforeEdit.walk?.captured_plan === 1
+            && capturedBeforeEdit.walk.enumeration_outcome === 'COMPLETE'
+            && capturedMember?.planned_source_sha256 === plannedHash,
+          `captured edit did not start from the exact H1 plan: ${JSON.stringify({
+            walk: capturedBeforeEdit.walk, capturedMember, plannedHash,
+          })}`);
+        fs.writeFileSync(file, `${changedCapturedMarker} changed after capture during B\n`);
+        capturedSourceHashes = { planned: plannedHash, committed: sha256(fs.readFileSync(file)) };
+        requireThat(capturedSourceHashes.committed !== capturedSourceHashes.planned,
+          'captured edit did not change source identity');
+        await waitFor('MIGRATING watcher edit visible in serving A', 90000, async () => {
+          const state = readJson(path.join(indexBase, 'state.json'));
+          if (state?.active_generation !== sourceGeneration
+              || state.migration_state !== 'MIGRATING') return null;
+          try {
+            const search = await post(apiPort, '/api/knowledge/search',
+              { query: changedCapturedMarker, limit: 10, mode: 'text' }, 30000);
+            return search.status === 200 && matchingHit(search, file, changedCapturedMarker)
+              ? search : null;
+          } catch { return null; }
+        });
+        const staleInA = await post(apiPort, '/api/knowledge/search',
+          { query: marker, limit: 10, mode: 'text' }, 30000);
+        requireThat(staleInA.status === 200 && !matchingHit(staleInA, file, marker),
+          `serving A retained stale captured content after watcher edit: ${staleInA.text}`);
+      }
       if (watcherDeleteDuringBuild) {
         fs.writeFileSync(removedFile, `${removedMarker} accepted by watcher during B\n`);
         await waitFor('MIGRATING watcher addition visible in serving A', 240000, async () => {
@@ -900,13 +1000,67 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
         aTextHits: JSON.parse(visibleInA.text).results?.length ?? 0,
       }));
     }
+    if (crashBoundary) {
+      // The later pointer fault hook may hold publication while /api/status waits for that
+      // same lock. Read the physical mode while the migration barrier still leaves A serving.
+      const floorReply = await request(apiPort, '/api/status', {}, 15000);
+      const floorStatus = floorReply.status === 200 ? JSON.parse(floorReply.text) : null;
+      const floorState = readJson(path.join(indexBase, 'state.json'));
+      const floorOperation = operationRows(operationPath, operationKey)[0];
+      combinedFloor = floorStatus?.readiness?.engineComponents?.encoders;
+      requireThat(floorOperation?.operation_key === operationKey
+          && floorOperation.building_generation_id === `g-${operationKey}`
+          && floorState?.active_generation === sourceGeneration
+          && floorState.building_generation === `g-${operationKey}`
+          && floorState.migration_state === 'MIGRATING'
+          && floorStatus?.worker?.migration?.activeGenerationId === sourceGeneration
+          && floorStatus?.worker?.migration?.buildingGenerationId === `g-${operationKey}`
+          && combinedFloor?.mode === 'IN_PLACE'
+          && combinedFloor.reason === 'candidate_fits_after_source_release'
+          && combinedFloor.freeBytes <= 1024 * 1024
+          && combinedFloor.footprintBytes > combinedFloor.freeBytes
+          && floorStatus?.components?.encoders?.state === 'RELOADING',
+        `combined maintenance missed the held operation's physical floor: ${JSON.stringify({
+          floorOperation, floorState, migration: floorStatus?.worker?.migration,
+          encoders: combinedFloor,
+        })}`);
+    }
     if (acceptedWriteDuringBuild) fs.writeFileSync(migrationBarrier.releaseFile, 'release');
     const reached = await waitFor('settled B before activation marker',
       acceptedWriteDuringBuild ? 300000 : 170000,
       () => readJson(reachedFile));
-    requireThat(reached.phase === 'installer-before-marker'
+    requireThat(reached.phase === (crashBoundary ?? 'installer-before-marker')
       && reached.operationKey === operationKey,
     `side-by-side B stopped at the wrong marker: ${JSON.stringify(reached)}`);
+    if (crashBoundary) {
+      const capturedAtCut = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+      const capturedCutEvidence = requireCapturedH2Settlement({ observed: capturedAtCut,
+        file, hashes: capturedSourceHashes, requireThat, label: 'before crash' });
+      capturedSourceHashes.unitRevisionAtCut = capturedCutEvidence.unitRevision;
+      const floorState = readJson(path.join(indexBase, 'state.json'));
+      const floorOperation = operationRows(operationPath, operationKey)[0];
+      const pointerPublished = crashBoundary === 'installer-pointer-before-settings';
+      const pointerStateCorrect = pointerPublished
+        ? floorState?.active_generation === `g-${operationKey}`
+          && !floorState.building_generation && floorState.migration_state === 'IDLE'
+        : floorState?.active_generation === sourceGeneration
+          && floorState.building_generation === `g-${operationKey}`
+          && floorState.migration_state === 'SWITCHING';
+      requireThat(reached.operationKey === operationKey
+          && floorOperation?.operation_key === operationKey
+          && floorOperation.building_generation_id === `g-${operationKey}`
+          && pointerStateCorrect,
+        `combined maintenance missed the exact pointer boundary: ${JSON.stringify({
+          reached, floorOperation, floorState, encoders: combinedFloor,
+        })}`);
+      await exerciseLowMemoryCrashRecovery({ crashBoundary, reached, combinedFloor, dispatched,
+        changedCapturedFile: file, changedCapturedMarker, staleMarker: marker,
+        capturedSourceHashes,
+        acceptedFile, acceptedMarker, first, manifest, data, runtime,
+        indexBase, operationPath, jobsPath, operationKey, sourceGeneration, sourceManifest,
+        beforeSettings, bRoot, readJson, waitFor, request, post, requireThat, matchingHit });
+      return;
+    }
     const aState = readJson(path.join(indexBase, 'state.json'));
     const bGeneration = `g-${operationKey}`;
     const bManifest = readJson(path.join(indexBase, 'indices', bGeneration,
@@ -1234,6 +1388,232 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     }
     await transitionSampler?.stop();
   }
+}
+
+async function exerciseLowMemoryCrashRecovery({ crashBoundary, reached, combinedFloor, dispatched,
+  changedCapturedFile, changedCapturedMarker, staleMarker, acceptedFile, acceptedMarker,
+  capturedSourceHashes,
+  first, manifest, data, runtime, indexBase, operationPath, jobsPath, operationKey,
+  sourceGeneration, sourceManifest, beforeSettings, bRoot, readJson, waitFor, request, post,
+  requireThat, matchingHit }) {
+  const targetGeneration = `g-${operationKey}`;
+  const faultedSupervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+  const faultedManifest = readJson(path.join(runtime, 'manifest.json'));
+  requireThat(reached.operationKey === operationKey && reached.pid === faultedSupervisor?.pid
+      && faultedSupervisor.runId === first.runId
+      && faultedSupervisor.incarnation === first.incarnation
+      && faultedSupervisor.instanceId === first.instanceId
+      && faultedManifest?.pid === faultedSupervisor.pid
+      && faultedManifest.instanceId === faultedSupervisor.instanceId
+      && manifest.pid === faultedSupervisor.pid && manifest.instanceId === faultedSupervisor.instanceId,
+    `combined maintenance fault did not target the admitted Engine: ${JSON.stringify({
+      reached, first, manifest, faultedSupervisor, faultedManifest,
+    })}`);
+
+  const cut = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+  cut.settings = settingsWitnessOnDisk(data);
+  requireThat(cut.operations.length === 1 && cut.operation?.operation_key === operationKey
+      && cut.operation.operation_ref === 'core.activate-installed-models'
+      && cut.operation.building_generation_id === targetGeneration,
+    `combined maintenance cut changed the accepted operation identity: ${JSON.stringify(cut.operation)}`);
+  const pointerPublished = crashBoundary === 'installer-pointer-before-settings';
+  requireThat(pointerPublished
+      ? cut.state.active_generation === targetGeneration
+        && cut.settings.witness.acceptedRevision === beforeSettings.witness.acceptedRevision
+        && cut.settings.witness.lastCommittedOperationKey
+          === beforeSettings.witness.lastCommittedOperationKey
+      : cut.state.active_generation === sourceGeneration
+        && cut.settings.witness.acceptedRevision === beforeSettings.witness.acceptedRevision
+        && cut.settings.witness.lastCommittedOperationKey
+          === beforeSettings.witness.lastCommittedOperationKey,
+    `combined maintenance cut has the wrong pointer/settings side: ${JSON.stringify({
+      crashBoundary, state: cut.state, settings: cut.settings,
+    })}`);
+
+  const cooldown = await killOwnedEngineAndObserveCooldown({ engine: faultedSupervisor, data,
+    readJson, waitFor, requireThat });
+  await dispatched.settled;
+  const successor = await waitFor('combined maintenance exact successor identity', 180000, () => {
+    const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+    const live = readJson(path.join(runtime, 'manifest.json'));
+    return supervisor?.state === 'running' && supervisor.runId === first.runId
+      && supervisor.incarnation === first.incarnation + 1 && supervisor.restartCount === 1
+      && supervisor.pid !== first.pid && supervisor.instanceId !== first.instanceId
+      && live?.pid === supervisor.pid && live.instanceId === supervisor.instanceId
+      ? { supervisor, manifest: live } : null;
+  });
+
+  const terminal = await waitFor('combined maintenance terminal B convergence', 180000, () => {
+    const observed = snapshot({ operationPath, jobsPath, indexBase, operationKey });
+    observed.settings = settingsWitnessOnDisk(data);
+    return observed.operations.length === 1 && observed.operation?.state === 'COMPLETE'
+      && observed.operation.phase === 'settled'
+      && observed.state?.active_generation === targetGeneration
+      && observed.settings.witness.acceptedRevision
+        === beforeSettings.witness.acceptedRevision + 1
+      && observed.settings.witness.lastCommittedOperationKey === operationKey
+      ? observed : null;
+  });
+  const capturedTerminalEvidence = requireCapturedH2Settlement({ observed: terminal,
+    file: changedCapturedFile, hashes: capturedSourceHashes, requireThat,
+    label: 'after recovery', expectedUnitRevision: capturedSourceHashes.unitRevisionAtCut });
+  const sealedReceipt = parseStoredJson(terminal.walk?.receipt_json,
+    'combined maintenance captured receipt');
+  requireThat(terminal.walk?.sealed_at != null && sealedReceipt.supersededEvents === 1
+      && sealedReceipt.gapCount === 0,
+    `combined maintenance did not seal exact H1→H2 supersession: ${JSON.stringify({
+      walk: terminal.walk, sealedReceipt,
+    })}`);
+  const bManifest = readJson(path.join(indexBase, 'indices', targetGeneration,
+    '.justsearch-index-generation.json'));
+  const modelIdentities = assertCombinedBModelSettings({ bManifest, sourceManifest,
+    sourceSettings: beforeSettings.settings, settings: terminal.settings.settings,
+    bRoot, requireThat });
+  const bFingerprint = modelIdentities.embedding.sha256;
+
+  const converged = await waitFor('combined maintenance B encoder ready', 120000, async () => {
+    try {
+      const live = readJson(path.join(runtime, 'manifest.json'));
+      if (live?.instanceId !== successor.manifest.instanceId
+          || live.pid !== successor.manifest.pid) return null;
+      const response = await request(live.head.apiPort, '/api/status', {}, 15000);
+      if (response.status !== 200) return null;
+      const status = JSON.parse(response.text);
+      return status.worker?.migration?.activeGenerationId === targetGeneration
+        && status.worker?.compatibility?.embeddingFingerprintCurrent === bFingerprint
+        && status.components?.encoders?.state === 'READY' ? { live, status } : null;
+    } catch { return null; }
+  });
+  const latestText = await waitFor('combined maintenance latest text', 60000, async () => {
+    try {
+      const response = await post(converged.live.head.apiPort, '/api/knowledge/search',
+        { query: changedCapturedMarker, limit: 10, mode: 'text' }, 30000);
+      return response.status === 200
+        && matchingHit(response, changedCapturedFile, changedCapturedMarker)
+        ? response : null;
+    } catch { return null; }
+  });
+  const latestVector = await waitFor('combined maintenance latest vector', 120000, async () => {
+    try {
+      const response = await post(converged.live.head.apiPort, '/api/knowledge/search',
+        { query: changedCapturedMarker, limit: 10, mode: 'vector' }, 30000);
+      return response.status === 200
+        && matchingHit(response, changedCapturedFile, changedCapturedMarker)
+        ? response : null;
+    } catch { return null; }
+  });
+  const staleText = await post(converged.live.head.apiPort, '/api/knowledge/search',
+    { query: staleMarker, limit: 10, mode: 'text' }, 30000);
+  requireThat(staleText.status === 200
+      && !matchingHit(staleText, changedCapturedFile, staleMarker),
+    `combined maintenance resurrected stale captured content: ${staleText.text}`);
+  const acceptedWrite = await waitFor('combined maintenance accepted write in B', 60000, async () => {
+    try {
+      const response = await post(converged.live.head.apiPort, '/api/knowledge/search',
+        { query: acceptedMarker, limit: 10, mode: 'text' }, 30000);
+      return response.status === 200 && matchingHit(response, acceptedFile, acceptedMarker)
+        ? response : null;
+    } catch { return null; }
+  });
+  const runtimeIdentities = { embedding: {
+    fingerprint: converged.status.worker.compatibility.embeddingFingerprintCurrent,
+    activeGeneration: converged.status.worker.migration.activeGenerationId,
+    state: converged.status.components.encoders.state,
+  } };
+
+  const finalSupervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+  const finalManifest = readJson(path.join(runtime, 'manifest.json'));
+  requireThat(finalSupervisor?.runId === first.runId
+      && finalSupervisor.incarnation === first.incarnation + 1
+      && finalSupervisor.restartCount === 1
+      && finalSupervisor.instanceId === successor.supervisor.instanceId
+      && finalSupervisor.pid === successor.supervisor.pid
+      && finalManifest?.instanceId === successor.manifest.instanceId
+      && finalManifest.pid === successor.manifest.pid,
+    `combined maintenance used more than one successor: ${JSON.stringify({
+      successor, finalSupervisor, finalManifest,
+    })}`);
+  console.log('MODEL_LIVE_AB_LOW_MEMORY_CRASH_PASS', JSON.stringify({ operationKey,
+    boundary: crashBoundary, floorEvidence: { mode: combinedFloor.mode,
+      reason: combinedFloor.reason, freeBytes: combinedFloor.freeBytes,
+      footprintBytes: combinedFloor.footprintBytes }, sourceGeneration,
+    activeGeneration: terminal.state.active_generation, restartCount: finalSupervisor.restartCount,
+    settingsRevision: { before: beforeSettings.witness.acceptedRevision,
+      after: terminal.settings.witness.acceptedRevision },
+    terminalState: terminal.operation.state, latestText: Boolean(latestText),
+    latestVector: Boolean(latestVector), staleAbsent: true,
+    acceptedWrite: Boolean(acceptedWrite), modelIdentities, runtimeIdentities,
+    capturedReplay: { ...capturedSourceHashes,
+      unitRevision: capturedTerminalEvidence.unitRevision,
+      supersededEvents: sealedReceipt.supersededEvents },
+    faulted: { pid: faultedSupervisor.pid, instanceId: faultedSupervisor.instanceId,
+      incarnation: faultedSupervisor.incarnation },
+    successor: { pid: successor.supervisor.pid, instanceId: successor.supervisor.instanceId,
+      incarnation: successor.supervisor.incarnation }, countedExit: cooldown.lastExit,
+    bFingerprint }));
+}
+
+function requireCapturedH2Settlement({ observed, file, hashes, requireThat, label,
+  expectedUnitRevision = null }) {
+  const member = observed.jobs.find(job => samePath(job.path, file));
+  const terminal = observed.ledger.filter(event => event.unit_revision === member?.unit_revision
+    && event.terminal_coverage === 'INDEXED'
+    && event.planned_source_sha256 === hashes?.planned
+    && event.content_hash === hashes?.committed);
+  requireThat(observed.walk?.captured_plan === 1
+      && observed.walk.enumeration_outcome === 'COMPLETE'
+      && member?.state === 'DONE'
+      && member.planned_source_sha256 === hashes?.planned
+      && member.content_hash === hashes?.committed
+      && (expectedUnitRevision == null || member.unit_revision === expectedUnitRevision)
+      && terminal.length === 1,
+    `combined maintenance lost the exact captured H1→H2 unit ${label}: ${JSON.stringify({
+      member, terminal, expectedUnitRevision, hashes,
+    })}`);
+  return { unitRevision: member.unit_revision };
+}
+
+function assertCombinedBModelSettings({ bManifest, sourceManifest, sourceSettings, settings, bRoot,
+  requireThat }) {
+  const settingsByRole = {
+    embedding: 'embedOnnxModelPath',
+    ner: 'nerModelPath',
+    splade: 'spladeModelPath',
+    'citation-scorer': 'citationScorerModelPath',
+  };
+  const models = bManifest?.models ?? {};
+  const roles = Object.keys(models).sort();
+  requireThat(roles.length > 0 && roles.every(role => settingsByRole[role]),
+    `combined maintenance B manifest contains an unproved model role: ${JSON.stringify(roles)}`);
+  const identities = {};
+  for (const role of roles) {
+    const candidate = models[role];
+    const source = sourceManifest?.models?.[role];
+    const settingsKey = settingsByRole[role];
+    const expectedSettingsPath = path.dirname(candidate?.id ?? '');
+    const expectedSourceSettingsPath = path.dirname(source?.id ?? '');
+    requireThat(typeof candidate?.id === 'string'
+        && /^[0-9a-f]{64}$/i.test(candidate?.sha256 ?? '')
+        && path.resolve(candidate.id).startsWith(path.resolve(bRoot) + path.sep)
+        && typeof source?.id === 'string'
+        && /^[0-9a-f]{64}$/i.test(source.sha256 ?? '')
+        && (candidate.id !== source.id || candidate.sha256 !== source.sha256)
+        && samePath(sourceSettings?.[settingsKey], expectedSourceSettingsPath)
+        && !samePath(sourceSettings?.[settingsKey], expectedSettingsPath)
+        && samePath(settings?.[settingsKey], expectedSettingsPath),
+      `combined maintenance did not converge B ownership for ${role}: ${JSON.stringify({
+        candidate, source, settingsKey, sourceSettingsPath: sourceSettings?.[settingsKey],
+        settingsPath: settings?.[settingsKey], expectedSourceSettingsPath, expectedSettingsPath,
+      })}`);
+    identities[role] = { modelPath: path.resolve(candidate.id),
+      settingsPath: path.resolve(settings[settingsKey]), sha256: candidate.sha256.toLowerCase(),
+      sourceModelPath: path.resolve(source.id),
+      sourceSettingsPath: path.resolve(sourceSettings[settingsKey]) };
+  }
+  requireThat(['embedding', 'ner', 'splade', 'citation-scorer']
+    .every(role => identities[role] != null),
+  `combined maintenance B manifest omitted a required model role: ${JSON.stringify(roles)}`);
+  return identities;
 }
 
 /** The webview's HIGH-risk cancellation uses its own prepared operation and approval. */
@@ -1977,7 +2357,7 @@ function assertCommonCut({ cut, reached, prepared, operationKey, selected, roots
   `accepted preparation is not the original frozen rebuild plan: ${JSON.stringify(plan)}`);
 }
 
-function assertSelectedCut({ selected, cut, files, hashes, operationKey, requireThat }) {
+function assertSelectedCut({ selected, cut, files, hashes, capturedReplay, operationKey, requireThat }) {
   const target = `g-${operationKey}`;
   const row = cut.operation;
   if (selected.liveStart) {
@@ -2027,6 +2407,17 @@ function assertSelectedCut({ selected, cut, files, hashes, operationKey, require
       && generation.source === preparationPlan(row.preparation_payload).source
       && generation.target_index_fingerprint === preparationPlan(row.preparation_payload).target.fingerprint,
     `pre-binding Green metadata is not operation-derived: ${JSON.stringify(generation)}`);
+    if (selected.capturedEdit) {
+      const capturedMember = cut.jobs.find(member => samePath(member.path, files[0]));
+      requireThat(capturedReplay?.unitRevision != null
+          && capturedMember?.unit_revision === capturedReplay.unitRevision
+          && capturedMember.planned_source_sha256 === hashes[0]
+          && capturedReplay.h1?.sha256 === hashes[0]
+          && capturedReplay.h2?.sha256 !== hashes[0],
+        `captured H1 cut lost its original unit revision or source witness: ${JSON.stringify({
+          capturedMember, capturedReplay,
+        })}`);
+    }
     return;
   }
 
@@ -2040,7 +2431,8 @@ function assertSelectedCut({ selected, cut, files, hashes, operationKey, require
   requireExactMembers(cut.jobs, files, hashes, true, requireThat);
 }
 
-function assertFinal({ final, cut, prepared, files, hashes, operationKey, selected, requireThat }) {
+function assertFinal({ final, cut, prepared, files, hashes, capturedReplay, operationKey,
+  selected, requireThat }) {
   const target = `g-${operationKey}`;
   const row = final.operation;
   const receipt = parseStoredJson(row.result_json, 'bulk result');
@@ -2061,10 +2453,11 @@ function assertFinal({ final, cut, prepared, files, hashes, operationKey, select
   requireThat(final.state.active_generation === target && !final.state.building_generation
     && final.state.migration_state === 'IDLE',
   `bulk recovery did not serve the exact target: ${JSON.stringify(final.state)}`);
+  const expectedSupersededEvents = selected.capturedEdit ? 1 : 0;
   requireThat(queueReceipt.version === 2 && queueReceipt.plannedUnits === 2
     && queueReceipt.manifestSha256 === final.walk.manifest_sha256
     && queueReceipt.gapCount === 0 && queueReceipt.failedEvents === 0
-    && queueReceipt.supersededEvents === 0
+    && queueReceipt.supersededEvents === expectedSupersededEvents
     && final.walk.acknowledged_revision === final.walk.revision,
   `bulk recovery did not seal and ACK its exact successful receipt: ${JSON.stringify(final.walk)}`);
   // D1-9's captured-gap witness widened the operation projection to v3. This
@@ -2076,11 +2469,23 @@ function assertFinal({ final, cut, prepared, files, hashes, operationKey, select
     && operationEvidence.capture?.plannedUnits === 2
     && operationEvidence.sealedRevision === final.walk.revision
     && operationEvidence.settlementSha256 === queueReceipt.settlementSha256
-    && operationEvidence.failedEvents === 0 && operationEvidence.supersededEvents === 0
+    && operationEvidence.failedEvents === 0
+    && operationEvidence.supersededEvents === expectedSupersededEvents
     && operationEvidence.refusalCode == null
     && Array.isArray(operationEvidence.capturedGaps) && operationEvidence.capturedGaps.length === 0,
   `operation checkpoint is not bound to the exact queue settlement: ${JSON.stringify(operationEvidence)}`);
-  requireExactMembers(final.jobs, files, hashes, true, requireThat);
+  if (selected.capturedEdit) {
+    requireCapturedH2Settlement({ observed: final, file: files[0],
+      hashes: { planned: hashes[0], committed: capturedReplay.h2.sha256 }, requireThat,
+      label: 'after recovery', expectedUnitRevision: capturedReplay.unitRevision });
+    const unchanged = final.jobs.find(member => samePath(member.path, files[1]));
+    requireThat(unchanged?.state === 'DONE'
+        && unchanged.planned_source_sha256 === hashes[1]
+        && unchanged.content_hash === hashes[1],
+      `captured replay changed an unrelated member: ${JSON.stringify(unchanged)}`);
+  } else {
+    requireExactMembers(final.jobs, files, hashes, true, requireThat);
+  }
   requireThat(cut.jobs.every(before => final.jobs.some(after => samePath(after.path, before.path)
     && after.unit_revision === before.unit_revision
     && after.planned_source_sha256 === before.planned_source_sha256)),
@@ -2088,9 +2493,16 @@ function assertFinal({ final, cut, prepared, files, hashes, operationKey, select
   if (cut.walk.manifest_sha256 != null) requireThat(
     final.walk.manifest_sha256 === cut.walk.manifest_sha256,
     'recovery changed the already closed capture manifest');
+  const supersededLedger = selected.capturedEdit
+    ? final.ledger.filter(event => event.terminal_coverage === 'INDEXED'
+      && event.planned_source_sha256 === capturedReplay.h1.sha256
+      && event.content_hash === capturedReplay.h2.sha256)
+    : [];
   requireThat(final.ledger.length === 2
-    && final.ledger.every(event => event.terminal_coverage === 'INDEXED'
-      && event.content_hash === event.planned_source_sha256),
+    && (!selected.capturedEdit ? final.ledger.every(event => event.terminal_coverage === 'INDEXED'
+      && event.content_hash === event.planned_source_sha256)
+      : supersededLedger.length === 1
+        && final.ledger.every(event => event.terminal_coverage === 'INDEXED')),
   `bulk recovery lacks exact indexed ledger coverage: ${JSON.stringify(final.ledger)}`);
   requireThat(final.recordedGenerations.length === 1 && final.recordedGenerations[0] === target,
     `bulk recovery created more than its one operation-derived target: ${JSON.stringify(final.recordedGenerations)}`);

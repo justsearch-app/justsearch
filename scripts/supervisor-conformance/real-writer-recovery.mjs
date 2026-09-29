@@ -48,22 +48,27 @@ const modelLiveABCancel = scenario === 'model-live-a-b-cancel';
 const modelLiveABRecomposeFailure = scenario === 'model-live-a-b-recompose-failure';
 const modelLiveABAcceptedCancel = scenario === 'model-live-a-b-accepted-cancel';
 const modelLiveABIssuedSearch = scenario === 'model-live-a-b-issued-search';
+const modelLiveABLowMemoryBeforePointer = scenario === 'model-live-a-b-low-memory-before-pointer';
+const modelLiveABLowMemoryPointerBeforeSettings =
+  scenario === 'model-live-a-b-low-memory-pointer-before-settings';
+const modelLiveABLowMemoryCrash = modelLiveABLowMemoryBeforePointer
+  || modelLiveABLowMemoryPointerBeforeSettings;
 const modelLiveABDecision = modelLiveABGap || modelLiveABCancel || modelLiveABRecomposeFailure;
 const modelLiveAB = scenario === 'model-live-a-b' || modelLiveABDecision
-  || modelLiveABAcceptedCancel || modelLiveABIssuedSearch;
+  || modelLiveABAcceptedCancel || modelLiveABIssuedSearch || modelLiveABLowMemoryCrash;
 const generativeRecovery = scenario === 'generative-recovery-success'
   || scenario === 'generative-recovery-exhaustion';
-const acceptedWriteDuringBuild = modelLiveABAcceptedCancel || (modelLiveAB
+const acceptedWriteDuringBuild = modelLiveABAcceptedCancel || modelLiveABLowMemoryCrash || (modelLiveAB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE === '1');
 const watcherDeleteDuringBuild = acceptedWriteDuringBuild
   && process.env.JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE === '1';
 // Create the finite MIGRATING load after A's vector readiness check. The named
 // before-SWITCHING barrier holds the monitor while the watcher probe runs.
 const extraBuildFiles = watcherDeleteDuringBuild ? 300 : acceptedWriteDuringBuild ? 80 : 0;
-const distinctModelB = modelLiveABDecision || modelLiveABAcceptedCancel
+const distinctModelB = modelLiveABDecision || modelLiveABAcceptedCancel || modelLiveABLowMemoryCrash
   || modelLiveABIssuedSearch || (modelLiveAB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_DISTINCT_B === '1');
-const inPlaceModelB = modelLiveABDecision || modelLiveABAcceptedCancel || (distinctModelB
+const inPlaceModelB = modelLiveABDecision || modelLiveABAcceptedCancel || modelLiveABLowMemoryCrash || (distinctModelB
   && process.env.JUSTSEARCH_WRITER_RECOVERY_FORCE_IN_PLACE === '1');
 const mixedChatInstaller = installerFault
   && process.env.JUSTSEARCH_WRITER_RECOVERY_MIXED_CHAT === '1';
@@ -175,7 +180,8 @@ if (['writer', 'processing', 'operation'].includes(scenario) || scenario === und
     schemaVersion: 1, roots: [{ path: corpus }],
   }));
 }
-if (['processing', 'operation'].includes(scenario) || operationFault || bulkFault || installerFault) {
+if (['processing', 'operation'].includes(scenario) || operationFault || bulkFault || installerFault
+    || modelLiveABLowMemoryCrash) {
   // Observe durable state after actual Engine death and before its successor claims it.
   env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
   env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
@@ -235,7 +241,10 @@ if (modelLiveAB) {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reindex';
   env.JUSTSEARCH_OPERATION_FAULT_POINT = modelLiveABDecision
-    ? 'bulk-before-building-checkpoint' : 'installer-before-marker';
+    ? 'bulk-before-building-checkpoint'
+    : modelLiveABLowMemoryBeforePointer ? 'installer-before-pointer'
+      : modelLiveABLowMemoryPointerBeforeSettings ? 'installer-pointer-before-settings'
+        : 'installer-before-marker';
   if (modelLiveABDecision) env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-green-drained';
   else if (modelLiveABIssuedSearch) {
     env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-after-live-activation';
@@ -540,6 +549,8 @@ try {
     await exerciseLiveModelAB({ work, data, indexBase, first, manifest, apiPort, operationKey,
       readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit, distinctModelB,
       inPlaceModelB, acceptedWriteDuringBuild, watcherDeleteDuringBuild, extraBuildFiles,
+      crashBoundary: modelLiveABLowMemoryBeforePointer ? 'installer-before-pointer'
+        : modelLiveABLowMemoryPointerBeforeSettings ? 'installer-pointer-before-settings' : null,
       gapApproval: modelLiveABGap,
       gapCancellation: modelLiveABCancel || modelLiveABRecomposeFailure,
       gapRecomposeFailure: modelLiveABRecomposeFailure,

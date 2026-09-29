@@ -967,12 +967,90 @@ class IndexingLoopTest {
     }
 
     @Test
+    void unreadableCapturedWalkFailsClosedWithoutWritingOrDeferring() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-unreadable-walk", ".txt"), "first");
+      String acceptedHash = SourceContentHash.sha256(file);
+      Files.writeString(file, "second");
+      RecordingQueue queue = new RecordingQueue();
+      queue.recordedWalkUnreadable = true;
+      IndexingLoop loop = newLoop(queue, providerReturning("second"));
+      var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
+          1L, false, acceptedHash);
+
+      assertNull(invokeExtractJob(loop, claim));
+
+      assertEquals(IngestionOutcomeClass.PARSER_FAILED, queue.lastOutcome.outcomeClass());
+      assertFalse(queue.deferred, "unreadable authority must not enter a repeated defer loop");
+      verify(queue.indexingCoordinator, never()).indexSingle(any());
+    }
+
+    @Test
+    void capturedCompleteClaimKeepsH1ReceiptWhileWriterCommitsStableH2() throws Exception {
+      Path file = Files.writeString(Files.createTempFile("js-captured-source", ".txt"), "first");
+      String acceptedHash = SourceContentHash.sha256(file);
+      Files.writeString(file, "second");
+      String committedHash = SourceContentHash.sha256(file);
+      RecordingQueue queue = new RecordingQueue();
+      queue.recordedWalk =
+          new JobQueue.WalkProgress(
+              "scan",
+              "a".repeat(64),
+              1L,
+              2L,
+              JobQueue.WalkEnumerationOutcome.COMPLETE,
+              0L,
+              0L,
+              2L,
+              null,
+              null,
+              0L,
+              true,
+              "b".repeat(64),
+              1L);
+      IndexingLoop loop = newLoop(queue, providerReturning("second"));
+      var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
+          1L, false, acceptedHash);
+
+      Object extracted = invokeExtractJob(loop, claim);
+
+      assertInstanceOf(ExtractedJob.class, extracted);
+      assertEquals(acceptedHash, claim.plannedSourceSha256(), "the issued claim keeps H1");
+      assertEquals(committedHash, ((ExtractedJob) extracted).sourceSha256());
+      invokeWriteExtractedJob(loop, extracted);
+      invokeFinishIdleCommit(loop);
+      verify(queue.indexingCoordinator).indexSingle(any());
+      assertEquals(
+          committedHash,
+          queue.lastTransition.committedContentHash(),
+          "the writer transition carries committed H2");
+      assertEquals(
+          acceptedHash,
+          queue.lastTransition.claim().plannedSourceSha256(),
+          "the terminal transition retains claimed H1");
+      assertNull(queue.supersededSourceHash, "captured membership must not be revised");
+      assertFalse(queue.deferred);
+    }
+
+    @Test
     void changedStreamingCandidateSourceRoutesStableNewHashToAtomicQueueTransition() throws Exception {
       Path file = Files.writeString(Files.createTempFile("js-streaming-source", ".txt"), "first");
       String acceptedHash = SourceContentHash.sha256(file);
       Files.writeString(file, "second");
       RecordingQueue queue = new RecordingQueue();
       queue.acceptStreamingSupersession = true;
+      queue.recordedWalk =
+          new JobQueue.WalkProgress(
+              "scan",
+              "a".repeat(64),
+              1L,
+              2L,
+              JobQueue.WalkEnumerationOutcome.COMPLETE,
+              0L,
+              0L,
+              2L,
+              null,
+              null,
+              0L);
       IndexingLoop loop = newLoop(queue, providerReturning("second"));
       var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
           1L, false, acceptedHash);
@@ -2245,6 +2323,8 @@ class IndexingLoopTest {
     boolean deferred;
     boolean acceptStreamingSupersession;
     String supersededSourceHash;
+    JobQueue.WalkProgress recordedWalk;
+    boolean recordedWalkUnreadable;
     boolean claimRevoked;
     boolean failOutcomeWrites;
     boolean failOutcomeWritesAsIllegalArgument;
@@ -2257,6 +2337,16 @@ class IndexingLoopTest {
         IngestionOutcome staleOutcome, IngestionLedgerEntry entry) {
       supersededSourceHash = observedSha256;
       return acceptStreamingSupersession;
+    }
+
+    @Override
+    public java.util.Optional<JobQueue.WalkProgress> recordedWalk(String operationKey) {
+      if (recordedWalkUnreadable) {
+        throw new JobQueue.RecordedWalkGapException("injected unreadable walk");
+      }
+      return recordedWalk != null && recordedWalk.operationKey().equals(operationKey)
+          ? java.util.Optional.of(recordedWalk)
+          : java.util.Optional.empty();
     }
 
     @Override public boolean putSwitchBuffer(String key, String op, String payload) { return false; }

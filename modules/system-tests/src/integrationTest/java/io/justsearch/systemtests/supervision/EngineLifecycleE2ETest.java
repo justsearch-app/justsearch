@@ -20,9 +20,7 @@ final class EngineLifecycleE2ETest {
       new PendingScenario("generation-mutation-gap-cuts", "D1-8/D1-9", false,
           "edit, removal, addition, supersession, gap decision and both pointer cuts"),
       new PendingScenario("reconfigure-beside-in-place", "D1-4/D1-12/D1-14", true,
-          "beside and in-place reconfigure under the device ceiling"),
-      new PendingScenario("low-memory-combined-maintenance", "D1-9/D1-14", true,
-          "changing inputs, interruption and roll-forward under the device ceiling"));
+          "beside and in-place reconfigure under the device ceiling"));
 
   @Test
   void migrationStartsLiveInTheInstalledEngine() throws Exception {
@@ -56,6 +54,12 @@ final class EngineLifecycleE2ETest {
   @Test
   void refusedRecordedLiveStartUsesOneFreeRestartAndSettles() throws Exception {
     EngineSupervisedRecoveryE2ETest.runScenario("bulk-live-refused-before-green-open");
+  }
+
+  @Test
+  void capturedEditReplaysTheOriginalUnitAfterTheBuildingCheckpointCrash() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runScenario("bulk-captured-edit-before-building-checkpoint");
+    System.out.println("LIFECYCLE_CAPTURED_H2_REPLAY_PASS §16 generation transition");
   }
 
   @Tag("ai")
@@ -95,6 +99,22 @@ final class EngineLifecycleE2ETest {
     EngineSupervisedRecoveryE2ETest.runSeededInPlaceRecomposeFailureCancellation();
   }
 
+  @Tag("ai")
+  @Test
+  @Timeout(14 * 60)
+  void lowMemoryInPlaceChangingInputRecoversBeforePointer() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededInPlaceCombinedMaintenance(
+        "model-live-a-b-low-memory-before-pointer", "installer-before-pointer");
+  }
+
+  @Tag("ai")
+  @Test
+  @Timeout(14 * 60)
+  void lowMemoryInPlaceChangingInputRecoversAfterPointerBeforeSettings() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededInPlaceCombinedMaintenance(
+        "model-live-a-b-low-memory-pointer-before-settings", "installer-pointer-before-settings");
+  }
+
   @Test
   void pendingFeatureScenariosAreNamedAndReported() {
     var names = new HashSet<String>();
@@ -107,6 +127,6 @@ final class EngineLifecycleE2ETest {
           + " ai=" + scenario.requiresAi() + " proof=" + scenario.proof());
     }
     // Reduce this count only when an actual exercise*(c) scenario replaces a pending entry.
-    assertEquals(3, names.size());
+    assertEquals(2, names.size());
   }
 }

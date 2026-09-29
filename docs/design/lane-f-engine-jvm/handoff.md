@@ -5,9 +5,54 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 the current queue, revision, lease, and blocking decisions; D1 owns design and
 acceptance evidence. The brief does not narrow the remaining lane scope.
 
-## Current state (2026-09-29, D1-15 checkpoint)
+## Current state (2026-09-29, active D1-16)
 
-**Lane F is paused for the requested clean handoff, not complete.** D1-15's
+Lane F is active on `codex/lane-f-pr1` in
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`; the main checkout
+and unrelated untracked `modules/app-inference/logs/` remain untouched. The
+existing draft [PR727](https://github.com/justsearch-app/justsearch/pull/727)
+may receive authorized checkpoints, but merge is not authorized before Stage F
+acceptance. The last pushed revision `a4392af9811ec2ce10692a379a30d28a93780ba7`
+passed every exact-SHA job in [CI run 36563926716](https://github.com/justsearch-app/justsearch/actions/runs/36563926716).
+Subsequent local edits are not yet hosted proof.
+
+D1-16 now has local installed proof for both low-memory combined-maintenance
+pointer cuts with real A/B models, an H1→H2 captured unit, one counted restart,
+terminal B settings and embedding runtime, and real text/VECTOR queries:
+`tmp/d1-16-low-memory-before-pointer-r5.log` and
+`tmp/d1-16-low-memory-after-pointer-r2.log`. A separate untagged installed
+H1→H2 crash/replay passed at `tmp/d1-16-captured-h2-installed-r2.log` and the
+full untagged lifecycle task passed at `tmp/d1-16-lifecycle-untagged-h2.log`.
+The focused and full worker-services tests for the captured replay production
+fix passed at `tmp/d1-h2-focused-worker.log` and
+`tmp/d1-h2-worker-module.log`. D1's evidence section records the exact
+assertions and limitations. Each fixture stopped; `justsearch.dev.quick_health`
+reported ABSENT with no foreign run. Independent review found no actionable
+issue in the low-memory oracle; independent review found one retry-oracle
+gap in the new untagged case, which was corrected and rerun.
+The current local tree passed `build -x test spotlessCheck pmdAll` at
+`tmp/d1-16-integrated-static-r2.log` and repository-wide `test` at
+`tmp/d1-16-full-test.log` (11m48s). The first static attempt found and led to
+correction of one PMD unnecessary-qualified-name finding; its red log is
+preserved as `tmp/d1-16-integrated-static.log`.
+
+The two D1-16 pending rows are the broader generation edit/removal/addition,
+gap decision and pointer-cut matrix, and the connected two-component
+reconfigure beside/in-place matrix. D1-4 production wiring exists, but its
+installed actual-owner second-compose failure and full publication/lifetime
+acceptance remain open. Production sorts `encoders` before `generative` in
+the two-owner composer, so the installed second-compose refusal proof must
+prepare a query-role candidate first and then fail generative preparation.
+D1-17 fingerprint statics and other named residue
+also remain open. Continue these items and then D2/E/F; do not treat this
+checkpoint as a handoff stop. A stale query-role ownership sentence in the
+canonical configuration doc was corrected and its docs regeneration/checks
+passed. Required integrated verification and exact-SHA hosted CI must run on
+the next committed checkpoint.
+
+## Prior D1-15 checkpoint (superseded by the state above)
+
+**At this prior checkpoint, Lane F was paused for a clean handoff.** D1-15's
 reason-code re-cut is implemented across Java producers, retention, Health,
 the Lit readiness projection, supervisor semantics, tests and canonical docs.
 The fatal index-schema open refusal is separate from the serving advisory;

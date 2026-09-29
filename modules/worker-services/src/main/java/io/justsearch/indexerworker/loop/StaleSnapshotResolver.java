@@ -88,11 +88,19 @@ public final class StaleSnapshotResolver {
     return handleStale(filePath, envelope, collection, artifact, timing, validation, provenance, claim);
   }
 
-  /** A stable new hash may replace an obsolete streaming candidate witness atomically. */
+  /**
+   * A stable new hash may replace an obsolete streaming candidate witness atomically.
+   *
+   * @return {@code true} when replacement or defer handled the mismatch; {@code false} only when
+   *     an exact complete captured walk may carry the stable source to the writer
+   */
   boolean handleChangedAcceptedSource(
       Path filePath, FileEnvelope envelope, String collection,
       ValidatedExtractionArtifact artifact, String observedSha256,
       JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
+    if (mayReplayCapturedSourceChange(claim)) {
+      return false;
+    }
     IngestionOutcome staleOutcome = ingestionAuthority.staleOutcome(
         FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED, "since admission");
     var entry = LedgerEntryFactory.forEnvelope(
@@ -105,6 +113,27 @@ public final class StaleSnapshotResolver {
       }
     });
     return true;
+  }
+
+  /**
+   * A completed captured enumeration freezes membership, so replacing its H1 source witness would
+   * incorrectly turn it into a streaming walk. The exact unsealed walk instead keeps the issued
+   * claim and lets the writer's ownership and fresh-source checks decide whether stable H2 may
+   * publish. Missing or unreadable progress is never replay permission.
+   */
+  private boolean mayReplayCapturedSourceChange(JobQueue.IndexJob claim) {
+    if (claim == null || claim.scanId() == null || claim.walkEpoch() == null) {
+      return false;
+    }
+    return jobQueue.recordedWalk(claim.scanId())
+        .filter(progress -> claim.scanId().equals(progress.operationKey()))
+        .filter(JobQueue.WalkProgress::capturedPlan)
+        .filter(progress -> progress.enumerationEpoch() == claim.walkEpoch())
+        .filter(
+            progress ->
+                progress.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE)
+        .filter(progress -> progress.sealedAt() == null)
+        .isPresent();
   }
 
   private boolean handleStale(
