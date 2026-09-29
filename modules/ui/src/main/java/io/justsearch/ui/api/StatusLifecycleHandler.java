@@ -594,13 +594,13 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private WorkerViewSample workerSample(boolean fresh) {
     WorkerViewSample cached = lastWorkerSample;
     if (!fresh && cached != null) {
-      return acceptWorkerSample(componentSnapshot(), cached, false);
+      return cached;
     }
     // Only fresh observations share RPC ownership. Cached HTTP reads never acquire this lock.
     synchronized (workerSamplingLock) {
       cached = lastWorkerSample;
       if (!fresh && cached != null) {
-        return acceptWorkerSample(componentSnapshot(), cached, false);
+        return cached;
       }
       EngineComponentSnapshot before = componentSnapshot();
       return acceptWorkerSample(before, observeWorker(), true);
@@ -611,7 +611,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     return componentRegistry == null ? null : componentRegistry.snapshot();
   }
 
-  /** Serialize only cache/publication here; cached readers never wait for an RPC. */
+  /** Serialize fresh cache/publication here; cached readers neither wait nor publish lifecycle. */
   private synchronized WorkerViewSample acceptWorkerSample(
       EngineComponentSnapshot before, WorkerViewSample sampled, boolean fresh) {
     WorkerViewSample sample = !fresh && lastWorkerSample != null ? lastWorkerSample : sampled;

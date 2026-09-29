@@ -42,6 +42,17 @@ describe('computeStability (595 §4.1)', () => {
     });
   });
 
+  it('exact index recovery wins over the coarse UNAVAILABLE Worker fallback', () => {
+    expect(
+      computeStability({
+        ...settledInput,
+        indexComponentState: 'STARTING',
+        indexComponentReasonCode: 'component.recovering',
+        indexState: 'UNAVAILABLE',
+      }),
+    ).toEqual({ kind: 'provisional', cause: 'index-recovery' });
+  });
+
   it('rebuilding when the worker is MIGRATING (building a new generation)', () => {
     expect(computeStability({ ...settledInput, migrationState: 'MIGRATING' })).toEqual({
       kind: 'provisional',
@@ -191,10 +202,14 @@ describe('807 §E.4: lost contact dominates every retained-snapshot cause', () =
     ).toEqual({ kind: 'provisional', cause: 'channel-stale' });
   });
 
-  it('all six retained-cause branches yield channel-stale once contact is lost', () => {
+  it('all seven retained-cause branches yield channel-stale once contact is lost', () => {
     const lost = { phase: 'stale' as const, reachableViaContact: false };
     const retained: ReadonlyArray<Partial<StabilityInput>> = [
       { indexState: 'UNAVAILABLE' },
+      {
+        indexComponentState: 'STARTING',
+        indexComponentReasonCode: 'component.recovering',
+      },
       { migrationState: 'SWITCHING' },
       { migrationState: 'MIGRATING' },
       { buildingGenerationId: 'g2', activeGenerationId: 'g1' },
@@ -361,25 +376,21 @@ describe('computeVerdict (595 §4.2) — the ONE rollup', () => {
     expect(v.severity).toBe('warn');
   });
 
-  it('627: a worker restart in flight ⇒ calm transitioning (Restarting…), NOT degraded/error', () => {
-    // The supervised restart surfaces worker.recovering alongside downstream consequences
-    // (index.not_healthy); its presence promotes the verdict to a calm transitioning state so a
-    // routine self-heal does not read as "Service degraded".
+  it('optional AI recovery cannot promote an unrelated retrieval degradation to transitioning', () => {
     const v = computeVerdict({
       phase: 'connected',
       stability: settled,
       readiness: known({
         ...readyReadiness,
         retrieval: 'degraded',
-        reasonCodes: ['worker.recovering', 'index.not_healthy'],
+        reasonCodes: ['lambdamart.not_configured', 'component.recovering'],
       }),
     });
-    expect(v.kind).toBe('transitioning');
-    expect(v.severity).toBe('busy'); // calm tone (busy→info), reuses the worker-restart wording
-    expect(v.reasons).toContain('worker-restart');
+    expect(v.kind).toBe('degraded');
+    expect(v.severity).toBe('info');
   });
 
-  it('627: a real spawn failure (no worker.recovering) stays degraded/error', () => {
+  it('a real spawn failure stays degraded/error', () => {
     const v = computeVerdict({
       phase: 'connected',
       stability: settled,
@@ -387,6 +398,18 @@ describe('computeVerdict (595 §4.2) — the ONE rollup', () => {
     });
     expect(v.kind).toBe('degraded');
     expect(v.severity).toBe('error');
+  });
+
+  it('exact index recovery has recovery-specific calm wording', () => {
+    const v = computeVerdict({
+      phase: 'connected',
+      stability: { kind: 'provisional', cause: 'index-recovery' },
+      readiness: known(readyReadiness),
+    });
+    expect(v.kind).toBe('transitioning');
+    expect(v.severity).toBe('busy');
+    expect(verdictHeadline(v)).toBe('Recovering search…');
+    expect(verdictBody(v)).toContain('search index is recovering');
   });
 
   it('compat-blocked index ⇒ degraded carrying the specific reindex cause code (600 Design A)', () => {

@@ -2,9 +2,15 @@ package io.justsearch.agent.api.registry;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -61,6 +67,55 @@ final class HandlerRegistryTest {
     assertTrue(ids.contains(a));
     assertTrue(ids.contains(b));
     assertEquals(2, ids.size());
+  }
+
+  @Test
+  void lateRegistrationBecomesVisibleToConcurrentReaders() throws Exception {
+    HandlerRegistry registry = new HandlerRegistry();
+    OperationRef id = new OperationRef("core.late");
+    OperationHandler handler = stub("late");
+    CountDownLatch readerStarted = new CountDownLatch(1);
+    var executor = Executors.newSingleThreadExecutor();
+    try {
+      var resolved =
+          executor.submit(
+              () -> {
+                readerStarted.countDown();
+                while (!Thread.currentThread().isInterrupted()) {
+                  var candidate = registry.resolve(id);
+                  if (candidate.isPresent()) {
+                    return candidate.orElseThrow();
+                  }
+                  Thread.onSpinWait();
+                }
+                throw new InterruptedException("reader stopped before late registration");
+              });
+
+      assertTrue(readerStarted.await(5, TimeUnit.SECONDS));
+      registry.register(id, handler);
+
+      assertSame(handler, resolved.get(5, TimeUnit.SECONDS));
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void registeredIdsIsStableInsertionOrderSnapshot() {
+    HandlerRegistry registry = new HandlerRegistry();
+    OperationRef a = new OperationRef("core.a");
+    OperationRef b = new OperationRef("core.b");
+    OperationRef later = new OperationRef("core.later");
+    registry.register(a, stub("a"));
+    registry.register(b, stub("b"));
+
+    var snapshot = registry.registeredIds();
+    registry.register(later, stub("later"));
+
+    assertEquals(List.of(a, b), new ArrayList<>(snapshot));
+    assertEquals(List.of(a, b, later), new ArrayList<>(registry.registeredIds()));
+    assertThrows(UnsupportedOperationException.class, () -> snapshot.add(later));
   }
 
   @Test

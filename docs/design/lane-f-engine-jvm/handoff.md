@@ -7,37 +7,92 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-29)
 
-**Autonomous continuation:** the owner resumed remaining Lane F work in this
-chat, retaining the D1/D2/E/F acceptance and checkpoint publication authority.
-The startup-lifetime correction is locally verified and ready for its checkpoint
-push. Prior pushed head `de6cedf80` failed hosted run `36480997611` because
-recording a recovery count replaced retained fatal-remedy evidence; that defect
-and the independent lifetime findings are corrected with runnable regressions.
-Initial open now owns the bootstrap lock before publication and through retry
-backoff; close refuses a live opening within five seconds. Timer observation
-stays nonblocking while the separate recovery worker performs physical work.
-Late initial success, manual admission, owner-local close/open, and conditional
-startup progress preserve the actual owner's lifetime.
+**Authorization and scope.** Continue D1/D2/E/F autonomously in this chat, including
+checkpoint publication to existing draft [PR727](https://github.com/justsearch-app/justsearch/pull/727).
+Do not merge before Stage F acceptance. The worktree hold has review-by date 2026-10-04.
 
-Final stress-enabled suite plus Spotless/PMD passed in 9m11s at
-`tmp/5407-d1-7-final-integrated.txt`, with 1,860 XML reports preserved in
-`tmp/5407-suite-xml/` and source manifest `tmp/5407-d1-7-source-sha256.txt`.
-`build -x test` passed in 21s at `tmp/5410-d1-7-final-build.txt`.
-Regeneration coherence and canonical links passed at `tmp/5408` and `tmp/5409`.
-Independent review found no remaining correction-slice defect. Negative controls
-at `tmp/5385`, `tmp/5401`, and `tmp/5406` fail the intended assertions against
-old close, retry-backoff, remedy-overwrite, and pre-lock publication behavior.
-The earlier full-suite fixture failures are preserved at `tmp/5393-suite-xml/`;
-the version and capacity assertions remain intact with corrected physical fixtures.
+**Revision.** Latest pushed `54b92132d243287af94c6a9358199520a3ec08db` passed exact-SHA
+[CI run 36490652907](https://github.com/justsearch-app/justsearch/actions/runs/36490652907).
+Local `codex/lane-f-pr1` is based on `f19e93a3d` with uncommitted D1-7 changes;
+no hosted completion or publication checkpoint is claimed.
 
-This is a prerequisite checkpoint, not D1-7 acceptance. General two-attempt
-policy, all-component deadlines, optional physical owner actions, counted code-5
-escalation, catalog/live snapshots, and installed recovery/model proof remain.
-Continue D1-7 before D1-6 or D1-15. Do not merge before Stage F acceptance.
-The dated checkpoint chronology below is evidence history.
+**Implemented.** Generic component deadlines and two-attempt recovery now own index,
+encoder and generative recovery; only essential index/API failure escalates with counted
+exit5. Exact owner publication precedes READY. Strict Head/API binding occurs before
+recovery publication and background indexing consumption starts afterward. Obsolete monitor
+paths, permissive Head binding, and dead encoder helpers are retired. Recovery reasons use
+the existing generic code and exact index-row UI projection; other D1-15 renames remain.
+
+**Latest verification.** Current evidence and its limits:
+
+- 5519 real CUDA lifecycle: 1/1, no skips, 4m23s; READY/count2 with no stale error fields,
+  two VECTOR hits during/after cancellation, STOP0 and private-cache pruning.
+- 5521 integrated run: red in 14m25s. It exposed ordinary retry being mislabeled as supervised
+  recovery, a close/reaper lock inversion, stale encoder mocks, and a Windows fixture write race.
+  Original XML and both thread dumps are preserved. The verified stuck test executor was
+  stopped; this interrupted suite is not acceptance.
+- 5523 correction run: Head, Engine retry/recovery and dead-code tests pass; overall red for
+  four missed test calls to a removed overload. Those calls are corrected.
+- 5524 Worker correction suite: 104 tests in 10 suites, zero failures/skips, 53s, PMD pass.
+  This includes the original producer-ownership test that exposed the deadlock.
+- 5525 was the red diagnostic full run: 12,207 tests, 33 skips and two mandatory-A
+  restoration fixture failures. The corrected fixtures now assert actual admitted count
+  and exact terminal evidence. Focused correction plus PMD passes at 5528 (43s).
+  Full `test -PincludeStress=true spotlessCheck pmdAll --continue` passes at 5529 in
+  2m29s: 1,861 suites, 12,207 tests, 0 failures, 0 errors and 33 skips; counts are in
+  `tmp/5529-test-counts.json` and suite XML in `tmp/5529-suite-xml/`. `build -x test`
+  passes at 5530 in 18s. The fresh package build 5531 fails because the local package
+  script omitted the signed-mirror exports: Tesseract expected 82,248 bytes and found
+  86,152 after fresh extraction. CI exports both committed Tesseract and llama URL/SHA
+  pairs from `packaging/signed-mirrors.v1.json` (`.github/workflows/build-installer.yml:414-431`);
+  the pins remain unchanged. The 5533 signed-mirror resource step passed, then Tauri
+  failed main-binary selection because the explicit Lane F supervisor-conformance binary
+  made the implicit shell target ambiguous. Root added `default-run = "shell"` to
+  `Cargo.toml`; fresh NSIS build 5534 passes in 3m34s. Extraction and package hash are
+  preserved at 5538. Installer/signature verification was not run by that build.
+- Installed standard index release/exhaustion replay passes at 5532 in 3m50s: both
+  parameterized lock-release and lock-exhaustion cases pass; XML is retained in
+  `tmp/5532-integration-xml/`. 5526 reason-code and regeneration checks pass.
+- UI typecheck and all 6,612 unit tests pass at 5516. The 5518 semantic-pause fixture has
+  no console errors or axe violations; exact index/optional-recovery discrimination is unit
+  proof, not a claimed live UI capture. UI coverage passes at 5520.
+
+**Current packaged-proof failure.** 5539 failed before sending any port mutation:
+Tauri uses Windows Known Folders, so APPDATA/LOCALAPPDATA overrides did not isolate it.
+Startup touched the existing host application profile. Root authenticated shutdown of the
+exact test-owned Engine, and the fixture removed its owned shell; both PIDs are gone.
+Do not rerun the old host fixture. The correction uses the exact production installer in
+Windows Sandbox, with a guest-only guard and actual guest Known Folder paths. No production
+data-directory override, profile relocation, or registry redirection is introduced.
+
+**Packaged-proof dependency.** Corrected Sandbox run 5549 verifies the expected installer and
+Node hashes, then Windows Application Control blocks the unsigned installer before execution.
+The failed receipt is retained in `tmp/5549-sandbox-port/output/`; no test PASS is claimed.
+Guest shutdown was scheduled with exit0 and the host verified all WindowsSandbox processes
+gone. Successful D1-4 execution requires a signed candidate. The signing workflow requires
+the provider's current remaining-signature allocation; none has been supplied for this run.
+Keep this item open for the signed-candidate round rather than bypassing application control.
+
+**Next.** Publish the verified recovery checkpoint, then continue D1-6 and the remaining lane.
+Standard generative recovery passes at 5541 (40s), now requiring
+COMPLETED, the requested exact word, and positive token usage. CUDA replay 5542 passes in
+4m23s, including restored vector queries and 9.49 GB private-cache cleanup. Optional
+generative exhaustion passes at 5543 (29s), with no Engine escalation. Fixture compile,
+Spotless and PMD pass at 5544. Both supervisor adapters pass 18/18 and self-checks
+pass 35/35 at 5500/5502.
+
+D1-4's packaged Tauri fixture still requires successful isolated execution proof. D1-6,
+D1-15, D1-16 and D1-17 remain open, followed by D2, the seven paired E groups and F.
+Checkpoint publication to PR727 is authorized; merging waits for Stage F acceptance.
+The worktree hold has a 2026-10-04 review-by date.
+
+Retain accessible raw evidence through acceptance plus 30 days. [D1](stages/D1.md) owns
+requirements/design and detailed evidence; [September 29 checkpoint history](handoff-checkpoint-history-2026-09-29.md)
+preserves superseded pending statements and diagnostics. The dated checkpoint chronology
+below is evidence history.
 
 The latest hosted-proven checkpoint is
-`00c7a51786740c35edc025975dd7a6c1bba879f6`. PR727 remains open,
+`54b92132d243287af94c6a9358199520a3ec08db` ([run 36490652907](https://github.com/justsearch-app/justsearch/actions/runs/36490652907)). PR727 remains open,
 and the worktree lifecycle hold has a 2026-10-04 review-by date.
 Exact-SHA hosted [run 36476388179](https://github.com/justsearch-app/justsearch/actions/runs/36476388179)
 passed for the D1-7 exit-contract checkpoint. The preceding

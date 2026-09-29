@@ -54,7 +54,7 @@ final class ReasonRetentionTest {
   private static final String SPAWN_FAILED = LifecycleReasonCode.WORKER_SPAWN_FAILED.code();
   private static final String LOST = LifecycleReasonCode.WORKER_LOST.code();
   private static final String CORRUPT = LifecycleReasonCode.WORKER_INDEX_CORRUPT.code();
-  private static final String RECOVERING_CODE = LifecycleReasonCode.WORKER_RECOVERING.code();
+  private static final String RECOVERING_CODE = LifecycleReasonCode.COMPONENT_RECOVERING.code();
   private static final String RECOVERY_EXHAUSTED =
       LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code();
   private static final String MODEL_NOT_FOUND = LifecycleReasonCode.INFERENCE_MODEL_NOT_FOUND.code();
@@ -202,12 +202,11 @@ final class ReasonRetentionTest {
   }
 
   @Test
-  @DisplayName("825: boot recovery supersedes the spawn-failed pin — and nothing else")
+  @DisplayName("component recovery supersedes the spawn-failed pin — and nothing else")
   void recoverySupersedesOnlyTheSpawnFailedPin() {
-    // The ONE exception (tempdoc 825 §D2 mechanism 4). worker.recovering is TRANSIENT and
-    // worker.spawn.failed is a FAULT, so the general rule would drop this write — and pendingReason,
-    // published raw on the runtime manifest and the 503 body, would keep saying "failed to start"
-    // while the Head is actively re-attempting.
+    // The one exception. component.recovering is TRANSIENT and worker.spawn.failed is a FAULT, so
+    // the general rule would drop this write and keep saying "failed to start" while the physical
+    // owner is actively recomposing the component.
     RegistryCapabilityTestFixture recovering = worker();
     recovering.transition(ComponentState.FAILED, SPAWN_FAILED, "Start failed");
     recovering.transition(ComponentState.RELOADING, RECOVERING_CODE, "attempt 1 of 4");
@@ -230,7 +229,7 @@ final class ReasonRetentionTest {
   }
 
   @Test
-  @DisplayName("825: the terminal recovery code lands over the in-flight narration it replaces")
+  @DisplayName("the terminal recovery code lands over the in-flight narration it replaces")
   void terminalRecoveryCodeOverwritesTheRecoveringNarration() {
     RegistryCapabilityTestFixture cap = worker();
     cap.transition(ComponentState.FAILED, SPAWN_FAILED, "Start failed");

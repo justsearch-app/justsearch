@@ -27,7 +27,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
@@ -46,7 +45,7 @@ import tools.jackson.databind.ObjectMapper;
 final class LlamaServerCandidateContextTest {
 
   @Test
-  void explicitCandidateOwnsGpuArgvHashAndScheduledRecoveryAcrossGlobalChanges(@TempDir Path tmp)
+  void explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges(@TempDir Path tmp)
       throws Exception {
     ResolvedConfig globalA = resolved(false, false);
     ResolvedConfig candidateB = resolved(false, true);
@@ -146,248 +145,67 @@ final class LlamaServerCandidateContextTest {
   }
 
   @Test
-  void recoveryContextRelaunchFinalFailureAdvancesSameCrashEpisode(@TempDir Path tmp)
-      throws Exception {
-    HttpServer server = healthyServer();
-    Process child = startSleepingChild();
-    List<Process> launchAttempts = new ArrayList<>();
-    for (int i = 0; i < 8; i++) launchAttempts.add(startSleepingChild());
-    Path executable = Path.of(child.info().command().orElseThrow());
-    Path model = Files.createFile(tmp.resolve("recovery.gguf"));
-    InferenceConfig inference =
-        new InferenceConfig(executable, model, null, server.getAddress().getPort(), 4096, 0, false);
-    LlamaServerConfigContext context =
-        new LlamaServerConfigContext(inference, resolved(false, true, tmp));
-    String hash = ManagedLlamaConfigIdentity.declaredHash(inference, context.resolved(), 0);
-    ManagedChild managed = managedChild(child, executable, model, inference.serverPort(), hash);
-    KillingRegistry registry = new KillingRegistry(managed, launchAttempts);
-    List<List<String>> commands = new java.util.concurrent.CopyOnWriteArrayList<>();
-    AtomicReference<LlamaServerOps> opsReference = new AtomicReference<>();
-    AtomicInteger recoveryCalls = new AtomicInteger();
-    AtomicReference<java.util.function.BooleanSupplier> firstRecoveryGuard =
-        new AtomicReference<>();
-    CountDownLatch firstRecovery = new CountDownLatch(1);
-    CountDownLatch secondRecovery = new CountDownLatch(1);
-    LlamaServerOps ops =
-        newOps(
-            Mode.ONLINE,
-            new RecordingObserver(),
-            guard -> {
-              if (!guard.getAsBoolean()) return;
-              if (recoveryCalls.incrementAndGet() == 1) {
-                firstRecoveryGuard.set(guard);
-                firstRecovery.countDown();
-              } else {
-                secondRecovery.countDown();
-              }
-            },
-            registry,
-            ignored -> false);
-    opsReference.set(ops);
-    try {
-      LlamaServerOps.StartResult started =
-          ops.startLlamaServer(
-              new LlamaServerOps.StartRequest(
-                  context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS));
-      ops.waitForServerHealth(started);
-      server.stop(0);
-      LlamaServerTestAccess.crashCurrent(ops);
-      assertTrue(firstRecovery.await(5, TimeUnit.SECONDS));
-      assertNotNull(firstRecoveryGuard.get());
-      assertTrue(firstRecoveryGuard.get().getAsBoolean());
-
-      ArrayDeque<Process> queuedAttempts = new ArrayDeque<>(launchAttempts);
-      try (MockedConstruction<ProcessBuilder> ignored =
-          Mockito.mockConstruction(
-              ProcessBuilder.class,
-              (builder, construction) -> {
-                @SuppressWarnings("unchecked")
-                List<String> command = (List<String>) construction.arguments().get(0);
-                commands.add(List.copyOf(command));
-                Mockito.when(builder.environment()).thenReturn(new HashMap<>());
-                Mockito.when(builder.start()).thenAnswer(call -> queuedAttempts.removeFirst());
-              })) {
-        // Construction mocking is thread-scoped. Invoke the manager-owned recovery body on this
-        // thread after proving the scheduler delivered the captured-owner callback above.
-        opsReference.get().recoverActiveServer();
-
-        assertTrue(
-            secondRecovery.await(15, TimeUnit.SECONDS),
-            "a failed lower-context physical retry must advance the same crash episode");
-      }
-      assertEquals(2, recoveryCalls.get());
-      assertEquals(2, crashCount(ops));
-      assertTrue(commands.size() >= 2, "recovery must launch and physically retry");
-      assertEquals(commands.size(), registry.registered.size());
-      assertTrue(registry.snapshot().isEmpty(), "every dead physical child row must be retired");
-      assertTrue(
-          commands.stream()
-                  .map(command -> command.get(command.indexOf("-c") + 1))
-                  .distinct()
-                  .count()
-              >= 2,
-          "the physical retry must use a lower context rung");
-      assertEquals(
-          registry.registered.size(),
-          registry.registered.stream().map(ManagedChild::pid).distinct().count());
-      for (int i = 0; i < commands.size(); i++) {
-        ManagedChild registered = registry.registered.get(i);
-        assertEquals(hash, registered.declaredConfigHash());
-        assertEquals(
-            ManagedLlamaConfigIdentity.realizedArgvHash(commands.get(i)),
-            registered.realizedArgvHash());
-      }
-      LlamaServerOps.StartResult failed = ops.activeStartResult().orElseThrow();
-      assertSame(context, failed.context());
-      assertEquals(
-          LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS,
-          failed.adoptionPolicy());
-    } finally {
-      ops.shutdown();
-      child.destroyForcibly();
-      launchAttempts.forEach(Process::destroyForcibly);
-    }
-  }
-
-  private static int crashCount(LlamaServerOps ops) throws Exception {
-    java.lang.reflect.Field field = LlamaServerOps.class.getDeclaredField("crashCount");
-    field.setAccessible(true);
-    return ((AtomicInteger) field.get(ops)).get();
+  void nativeRecoveryEntryPointAndCrashCounterAreRetired() {
+    assertThrows(NoSuchMethodException.class,
+        () -> LlamaServerOps.class.getDeclaredMethod("recoverActiveServer"));
+    assertThrows(NoSuchFieldException.class,
+        () -> LlamaServerOps.class.getDeclaredField("crashCount"));
   }
 
   @Test
-  void recoveryReasoningFallbackUsesCapturedPathsAndThenLowersContextDespiteGlobalC(
-      @TempDir Path tmp) throws Exception {
-    Path dataB = Files.createDirectories(tmp.resolve("data-b"));
-    Path repoB = Files.createDirectories(tmp.resolve("repo-b"));
-    Path runtimeBin = Files.createDirectories(repoB.resolve("runtime").resolve("bin"));
-    Path executableB = Files.createDirectories(tmp.resolve("bin-b")).resolve("llama-server.exe");
-    Files.createFile(executableB);
-    Files.writeString(executableB.getParent().resolve("runtime-version.txt"), "llama.cpp b9999\n");
-    Path modelB = Files.createFile(tmp.resolve("reasoning-b.gguf"));
-    ResolvedConfig resolvedB = resolved(true, true, dataB, repoB);
-    ResolvedConfig globalC = resolved(false, false, tmp.resolve("data-c"), tmp.resolve("repo-c"));
-    ConfigStore previous = ConfigStore.globalOrNull();
-    ConfigStore installed = new ConfigStore(globalC);
-    ConfigStore.setGlobal(installed);
+  void nativeRecoverySchedulerRegistrationIsRetired() {
+    assertThrows(NoSuchFieldException.class,
+        () -> InferenceExecutorRegistrations.class.getDeclaredField("llamaRecovery"));
+  }
 
-    HttpServer server = healthyServer();
-    Process incumbent = startSleepingChild();
-    List<Process> attempts = new ArrayList<>();
-    for (int i = 0; i < 8; i++) attempts.add(startSleepingChild());
-    InferenceConfig inferenceB =
-        new InferenceConfig(
-            executableB, modelB, null, server.getAddress().getPort(), 4096, 0, false);
-    LlamaServerConfigContext contextB = new LlamaServerConfigContext(inferenceB, resolvedB);
-    String hashB = ManagedLlamaConfigIdentity.declaredHash(inferenceB, resolvedB, 0);
-    LlamaServerOps.StartResult incumbentStart =
-        new LlamaServerOps.StartResult(
-            contextB,
-            LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS,
-            LlamaServerOps.StartDisposition.LAUNCHED_MANAGED,
-            hashB);
-    Path expectedLog = expectedLogPath(dataB);
-    KillingRegistry registry = new KillingRegistry(attempts, expectedLog);
-    List<List<String>> commands = new java.util.concurrent.CopyOnWriteArrayList<>();
-    List<HashMap<String, String>> environments =
-        new java.util.concurrent.CopyOnWriteArrayList<>();
-    AtomicReference<java.util.function.BooleanSupplier> recoveryGuard = new AtomicReference<>();
-    CountDownLatch recoveryReady = new CountDownLatch(1);
-    CountDownLatch failedRecovery = new CountDownLatch(1);
-    AtomicInteger callbacks = new AtomicInteger();
-    LlamaServerOps ops =
-        newOps(
-            Mode.ONLINE,
-            new RecordingObserver(),
-            guard -> {
-              if (!guard.getAsBoolean()) return;
-              if (callbacks.incrementAndGet() == 1) {
-                recoveryGuard.set(guard);
-                recoveryReady.countDown();
-              } else {
-                failedRecovery.countDown();
-              }
-            },
-            registry,
-            ignored -> false);
+  @Test
+  void oneShotRecoveryHealthFailureCannotRelaunchFallbackLadders(@TempDir Path tmp)
+      throws Exception {
+    Path data = Files.createDirectories(tmp.resolve("data"));
+    Path executable = Files.createFile(tmp.resolve("llama-server.exe"));
+    Path model = Files.createFile(tmp.resolve("model.gguf"));
+    ResolvedConfig resolved = resolved(true, true, data, tmp);
+    InferenceConfig inference =
+        new InferenceConfig(executable, model, null, 18081, 4096, 0, false);
+    var context = new LlamaServerConfigContext(inference, resolved);
+    var request = new LlamaServerOps.StartRequest(
+        context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+    Process child =
+        new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin",
+                    System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java")
+                    .toString(),
+                "-cp", System.getProperty("java.class.path"),
+                ManagedLlamaAdoptionTest.SleepingChild.class.getName())
+            .start();
+    Path expectedLog = expectedLogPath(data);
+    var registry = new KillingRegistry(List.of(child), expectedLog);
+    LlamaServerOps ops = newOps(
+        Mode.ONLINE, new RecordingObserver(), ignored -> {}, registry, ignored -> false);
     try {
-      installActive(ops, incumbentStart, incumbent);
-      ops.waitForServerHealth(incumbentStart);
-      server.stop(0);
-      LlamaServerTestAccess.crashCurrent(ops);
-      assertTrue(recoveryReady.await(5, TimeUnit.SECONDS));
-      assertTrue(recoveryGuard.get().getAsBoolean());
-
-      ArrayDeque<Process> queued = new ArrayDeque<>(attempts);
       try (MockedConstruction<ProcessBuilder> construction =
           Mockito.mockConstruction(
               ProcessBuilder.class,
-              (builder, invocation) -> {
-                @SuppressWarnings("unchecked")
-                List<String> command = (List<String>) invocation.arguments().get(0);
-                commands.add(List.copyOf(command));
-                HashMap<String, String> environment = new HashMap<>();
-                environments.add(environment);
-                Mockito.when(builder.environment()).thenReturn(environment);
-                Mockito.when(builder.start()).thenAnswer(call -> queued.removeFirst());
+              (builder, ignored) -> {
+                Mockito.when(builder.environment()).thenReturn(new HashMap<>());
+                Mockito.when(builder.start()).thenReturn(child);
               })) {
-        ops.recoverActiveServer();
-        assertTrue(failedRecovery.await(15, TimeUnit.SECONDS));
+        LlamaServerOps.StartResult started = ops.startLlamaServer(request);
 
-        assertTrue(commands.size() >= 3);
-        assertTrue(commands.get(0).contains("--reasoning-budget"));
-        assertFalse(commands.get(1).contains("--reasoning-budget"));
-        assertEquals(flagValue(commands.get(0), "-c"), flagValue(commands.get(1), "-c"));
-        assertTrue(
-            commands.stream()
-                    .skip(2)
-                    .map(command -> flagValue(command, "-c"))
-                    .anyMatch(value -> !value.equals(flagValue(commands.get(1), "-c"))));
-        String expectedPathPrefix =
-            executableB.getParent().toAbsolutePath().normalize()
-                + ";"
-                + runtimeBin.toAbsolutePath().normalize();
-        environments.forEach(
-            environment -> assertTrue(environment.get("Path").startsWith(expectedPathPrefix)));
-        construction.constructed().forEach(
-            builder -> {
-              Mockito.verify(builder)
-                  .redirectOutput(
-                      Mockito.<ProcessBuilder.Redirect>argThat(redirect -> expectedLog.toFile().equals(redirect.file())));
-              Mockito.verify(builder)
-                  .redirectError(
-                      Mockito.<ProcessBuilder.Redirect>argThat(redirect -> expectedLog.toFile().equals(redirect.file())));
-            });
-      }
+        ModeTransitionException failure = assertThrows(
+            ModeTransitionException.class, () -> ops.waitForServerHealthOnce(started));
 
-      assertEquals("b9999", new ServerPropsOps(new RecordingObserver(), () -> 0)
-          .expectedServerBuild(contextB));
-      assertEquals(commands.size(), registry.registered.size());
-      assertTrue(registry.snapshot().isEmpty());
-      for (int i = 0; i < commands.size(); i++) {
-        assertEquals(hashB, registry.registered.get(i).declaredConfigHash());
-        assertEquals(
-            ManagedLlamaConfigIdentity.realizedArgvHash(commands.get(i)),
-            registry.registered.get(i).realizedArgvHash());
+        assertEquals(ModeTransitionException.Reason.PROCESS_EXITED, failure.reason());
+        assertEquals(1, construction.constructed().size(),
+            "one admitted recovery may launch only once");
+        assertEquals(1, registry.registered.size());
+        assertTrue(registry.snapshot().isEmpty(), "dead managed-child ownership is retired");
+        assertSame(context, ops.recoveryStartRequest().orElseThrow().context());
       }
-      assertEquals(2, crashCount(ops));
     } finally {
       ops.shutdown();
-      incumbent.destroyForcibly();
-      attempts.forEach(Process::destroyForcibly);
-      ConfigStore.restoreGlobal(installed, previous);
+      child.destroyForcibly();
     }
-  }
-
-  private static String flagValue(List<String> command, String flag) {
-    return command.get(command.indexOf(flag) + 1);
-  }
-
-  private static Path expectedLogPath(Path dataDir) {
-    String home = System.getenv("JUSTSEARCH_HOME");
-    return home == null || home.isBlank()
-        ? dataDir.resolve("logs").resolve("llama-server.log")
-        : Path.of(home).resolve("logs").resolve("llama-server.log");
   }
 
   @Test
@@ -423,7 +241,7 @@ final class LlamaServerCandidateContextTest {
   }
 
   @Test
-  void armedLaunchedChildCleanExitQueuesCapturedRecovery(@TempDir Path tmp) throws Exception {
+  void armedLaunchedChildCleanExitSignalsCapturedOwnerFailure(@TempDir Path tmp) throws Exception {
     HttpServer server = healthyServer();
     Process child =
         new ProcessBuilder(
@@ -618,35 +436,15 @@ final class LlamaServerCandidateContextTest {
     return builder.build();
   }
 
-  private static Process startSleepingChild() throws Exception {
-    return new ProcessBuilder(
-            Path.of(
-                    System.getProperty("java.home"),
-                    "bin",
-                    System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java")
-                .toString(),
-            "-cp",
-            System.getProperty("java.class.path"),
-            ManagedLlamaAdoptionTest.SleepingChild.class.getName())
-        .start();
-  }
-
-  private static ManagedChild managedChild(
-      Process child, Path executable, Path model, int port, String hash) {
-    return new ManagedChild(
-        "candidate",
-        ManagedChild.Kind.LLAMA_SERVER,
-        child.pid(),
-        child.info().startInstant().orElseThrow().toString(),
-        ManagedChild.normalizePath(executable),
-        "http://127.0.0.1:" + port,
-        model.toString(),
-        hash,
-        "diagnostic-argv");
-  }
-
   private static HttpServer healthyServer() throws Exception {
     return serverWithProps(new CountDownLatch(0), new CountDownLatch(0), new AtomicInteger());
+  }
+
+  private static Path expectedLogPath(Path dataDir) {
+    String home = System.getenv("JUSTSEARCH_HOME");
+    return home == null || home.isBlank()
+        ? dataDir.resolve("logs").resolve("llama-server.log")
+        : Path.of(home).resolve("logs").resolve("llama-server.log");
   }
 
   private static HttpServer serverWithProps(
@@ -745,7 +543,6 @@ final class LlamaServerCandidateContextTest {
         () -> mode,
         observer,
         recovery,
-        ignored -> {},
         (ignored, guard) -> {},
         NoopInferenceTelemetryEvents.INSTANCE,
         registry,
@@ -803,12 +600,6 @@ final class LlamaServerCandidateContextTest {
     private final Path firstLaunchOutput;
     private final List<ManagedChild> registered =
         new java.util.concurrent.CopyOnWriteArrayList<>();
-
-    private KillingRegistry(ManagedChild initial, List<Process> attempts) {
-      children.add(initial);
-      this.attempts = List.copyOf(attempts);
-      this.firstLaunchOutput = null;
-    }
 
     private KillingRegistry(List<Process> attempts, Path firstLaunchOutput) {
       this.attempts = List.copyOf(attempts);

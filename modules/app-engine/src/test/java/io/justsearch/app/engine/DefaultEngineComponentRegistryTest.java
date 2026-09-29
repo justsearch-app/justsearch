@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.component.ComponentRecoveryAction;
 import io.justsearch.core.component.ComponentSpec;
 import io.justsearch.core.component.ComponentSpec.ComposeCapability;
 import io.justsearch.core.component.ComponentState;
@@ -36,6 +37,218 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.Test;
 
 final class DefaultEngineComponentRegistryTest {
+  @Test
+  void wrappedHandlePublishesInitialRecoveredVersionWithHeldCauseAndDesiredVersion() {
+    var lock = new ReentrantReadWriteLock();
+    try (var registry = new DefaultEngineComponentRegistry(budget(), lock)) {
+      var handle = new ReasonRetainingComponentHandle(registry.register(spec("index", Set.of())));
+      handle.setDesiredVersion("desired-b");
+      handle.transition(ComponentState.FAILED, "worker.lost", "physical failure");
+      var before = handle.snapshot();
+      var replacement = new EngineComponentSnapshot.Component(before.spec(), before.state(),
+          before.reasonCode(), before.stateSince(), before.stateSinceMonotonicNanos(), "applied-a",
+          before.desiredVersion(), before.lastCompose(), before.recoveryAttempts(), before.evidence());
+      var prepared = handle.prepareReplacement(replacement);
+      lock.writeLock().lock();
+      try {
+        prepared.validate();
+        prepared.install();
+      } finally {
+        lock.writeLock().unlock();
+      }
+      prepared.notifyObservers();
+      assertEquals(replacement, handle.snapshot());
+      assertEquals(replacement, prepared.snapshot().components().getFirst());
+    }
+  }
+
+  @Test
+  void exactConditionalTransitionReturnsPublicationBeforeAListenerCanAdvanceIt() {
+    var lock = new ReentrantReadWriteLock();
+    try (var registry = new DefaultEngineComponentRegistry(budget(), lock)) {
+      var handle = registry.register(spec("index", Set.of()));
+      handle.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+      var expected = handle.snapshot();
+      try (var ignored = registry.subscribe(snapshot -> {
+        var row = snapshot.components().getFirst();
+        if (row.state() == ComponentState.STARTING) {
+          handle.transition(ComponentState.READY, "worker.ready", "listener raced completion");
+        }
+      })) {
+        var publication = handle.tryTransitionIfUnchanged(expected, ComponentState.STARTING,
+            "component.recovering", "attempt admitted").orElseThrow();
+        assertEquals(ComponentState.STARTING, publication.state());
+        assertEquals("attempt admitted", publication.evidence());
+        assertEquals(ComponentState.READY, handle.snapshot().state());
+      }
+    }
+  }
+
+  @Test
+  void exactConditionalTransitionRejectsStaleCompareAndSwapWithoutPublishing() {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var handle = registry.register(spec("index", Set.of()));
+      handle.transition(ComponentState.FAILED, "worker.lost", "old row");
+      var expected = handle.snapshot();
+      handle.transition(ComponentState.READY, "worker.ready", "new row");
+      var current = registry.snapshot();
+      assertTrue(handle.tryTransitionIfUnchanged(expected, ComponentState.STARTING,
+          "component.recovering", "stale attempt").isEmpty());
+      assertEquals(current, registry.snapshot());
+    }
+  }
+
+  @Test
+  void exactConditionalTransitionMatchedNoOpReturnsCurrentRowWithoutRevisionOrListener() {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var handle = registry.register(spec("index", Set.of()));
+      handle.transition(ComponentState.FAILED, "worker.lost", "same row");
+      var expected = handle.snapshot();
+      long revision = registry.snapshot().revision();
+      var notifications = new AtomicInteger();
+      try (var ignored = registry.subscribe(snapshot -> notifications.incrementAndGet())) {
+        var returned = handle.tryTransitionIfUnchanged(expected, expected.state(),
+            expected.reasonCode(), expected.evidence()).orElseThrow();
+        assertEquals(expected, returned);
+        assertEquals(revision, registry.snapshot().revision());
+        assertEquals(0, notifications.get());
+      }
+    }
+  }
+
+  @Test
+  void retentionExactTransitionReturnsHeldReasonBeforeListenerCanClearIt() {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var raw = registry.register(spec("index", Set.of()));
+      var handle = new ReasonRetainingComponentHandle(raw);
+      handle.transition(ComponentState.FAILED, "worker.index_corrupt", "repair stored index");
+      var expected = handle.snapshot();
+      try (var ignored = registry.subscribe(snapshot -> {
+        var row = snapshot.components().getFirst();
+        if (row.state() == ComponentState.STARTING) {
+          raw.transition(ComponentState.READY, null, "listener cleared recovery");
+        }
+      })) {
+        var returned = handle.tryTransitionIfUnchanged(expected, ComponentState.STARTING,
+            "component.recovering", "retrying applied configuration").orElseThrow();
+        assertEquals(ComponentState.STARTING, returned.state());
+        assertEquals("worker.index_corrupt", returned.reasonCode());
+        assertEquals("repair stored index", returned.evidence());
+        assertEquals(ComponentState.READY, raw.snapshot().state());
+      }
+    }
+  }
+
+  @Test
+  void recoveryResultCarriesOnlyValidTerminalObservations() {
+    var observation = new EngineComponentSnapshot.Component(spec("index", Set.of()),
+        ComponentState.READY, null, Instant.now(), System.nanoTime(), null, null, null, 0, null);
+    assertEquals(ComponentRecoveryAction.Outcome.RECOVERED,
+        ComponentRecoveryAction.Result.recovered(observation).outcome());
+    assertSame(observation, ComponentRecoveryAction.Result.recovered(observation).observation());
+    assertEquals(ComponentRecoveryAction.Outcome.REFUSED,
+        ComponentRecoveryAction.Result.REFUSED.outcome());
+    assertThrows(IllegalArgumentException.class, () ->
+        ComponentRecoveryAction.Result.recovered(observationWithState(ComponentState.FAILED)));
+    assertThrows(NullPointerException.class, () ->
+        ComponentRecoveryAction.Result.failed(null));
+    assertThrows(NullPointerException.class, () ->
+        ComponentRecoveryAction.Result.recovered(null));
+    assertThrows(IllegalArgumentException.class, () ->
+        ComponentRecoveryAction.Result.failed(observation));
+    assertThrows(IllegalArgumentException.class, () ->
+        new ComponentRecoveryAction.Result(ComponentRecoveryAction.Outcome.REFUSED, observation));
+    assertThrows(IllegalArgumentException.class, () ->
+        new ComponentRecoveryAction.Result(ComponentRecoveryAction.Outcome.SUPERSEDED, observation));
+    assertNull(ComponentRecoveryAction.Result.SUPERSEDED.observation());
+  }
+
+  private static EngineComponentSnapshot.Component observationWithState(ComponentState state) {
+    return new EngineComponentSnapshot.Component(spec("index", Set.of()), state, null,
+        Instant.now(), System.nanoTime(), null, null, null, 0, null);
+  }
+
+  @Test
+  void recoveryAdmissionPublishesStateAndCountTogetherAndReturnsItsExactObservation() {
+    var lock = new ReentrantReadWriteLock();
+    try (var registry = new DefaultEngineComponentRegistry(budget(), lock)) {
+      var handle = registry.register(spec("index", Set.of()));
+      handle.setAppliedVersion("applied-a");
+      handle.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+      var expected = handle.snapshot();
+      long revision = registry.snapshot().revision();
+      var seen = new ArrayList<EngineComponentSnapshot>();
+      try (var ignored = registry.subscribe(snapshot -> {
+        assertFalse(lock.isWriteLockedByCurrentThread());
+        seen.add(snapshot);
+        if (snapshot.components().getFirst().state() == ComponentState.STARTING) {
+          handle.transition(ComponentState.READY, null, "new owner serves");
+        }
+      })) {
+        var admitted = handle.tryBeginRecovery(expected, "component.recovering", "same config retry")
+            .orElseThrow();
+        assertEquals(2, seen.size());
+        assertEquals(revision + 1, seen.getFirst().revision());
+        assertEquals(admitted, seen.getFirst().components().getFirst());
+        assertEquals(ComponentState.STARTING, admitted.state());
+        assertEquals(1, admitted.recoveryAttempts());
+        assertEquals("applied-a", admitted.appliedVersion());
+        assertEquals(ComponentState.READY, handle.snapshot().state());
+        assertFalse(handle.transitionIfUnchanged(admitted, ComponentState.FAILED,
+            "worker.spawn_failed", "obsolete recovery completion"));
+      }
+    }
+  }
+
+  @Test
+  void recoveryAdmissionRejectsAChangedConfigurationWithoutSpendingAnAttempt() {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var handle = registry.register(spec("index", Set.of()));
+      handle.setAppliedVersion("applied-a");
+      handle.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+      var expected = handle.snapshot();
+      handle.setAppliedVersion("applied-b");
+      var current = registry.snapshot();
+      assertTrue(handle.tryBeginRecovery(expected, "component.recovering", "stale retry").isEmpty());
+      assertEquals(current, registry.snapshot());
+      assertEquals(0, handle.snapshot().recoveryAttempts());
+    }
+  }
+
+  @Test
+  void recoveryAdmissionRetainsFatalRemedyAndOnlyOneContenderCanClaimTheObservation()
+      throws Exception {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var handle = new ReasonRetainingComponentHandle(registry.register(spec("index", Set.of())));
+      handle.transition(ComponentState.FAILED, "worker.index_schema_mismatch", "repair stored schema");
+      var expected = handle.snapshot();
+      var start = new CountDownLatch(1);
+      var accepted = new AtomicInteger();
+      var failure = new AtomicReference<Throwable>();
+      Runnable claim = () -> {
+        try {
+          assertTrue(start.await(5, TimeUnit.SECONDS));
+          if (handle.tryBeginRecovery(expected, "component.recovering", "generic retry").isPresent()) {
+            accepted.incrementAndGet();
+          }
+        } catch (Throwable thrown) { failure.compareAndSet(null, thrown); }
+      };
+      Thread first = Thread.ofPlatform().start(claim);
+      Thread second = Thread.ofPlatform().start(claim);
+      start.countDown();
+      first.join(5_000);
+      second.join(5_000);
+      assertFalse(first.isAlive());
+      assertFalse(second.isAlive());
+      assertNull(failure.get());
+      assertEquals(1, accepted.get());
+      assertEquals(1, handle.snapshot().recoveryAttempts());
+      assertEquals(ComponentState.STARTING, handle.snapshot().state());
+      assertEquals("worker.index_schema_mismatch", handle.snapshot().reasonCode());
+      assertEquals("repair stored schema", handle.snapshot().evidence());
+    }
+  }
+
   @Test
   void combinedSettingsAndEncoderPublicationHasOneRevisionAndCompleteObserverView() {
     var lock = new ReentrantReadWriteLock();
@@ -178,7 +391,7 @@ final class DefaultEngineComponentRegistryTest {
             ComponentState.FAILED, "worker.lost", "obsolete failure"));
         assertEquals(ready, index.snapshot());
         assertEquals(beforeStale, publications.get());
-        index.transition(ComponentState.RELOADING, "worker.recovering", null);
+        index.transition(ComponentState.RELOADING, "component.recovering", null);
         index.transition(ComponentState.READY, null, null);
         assertFalse(index.transitionIfUnchanged(ready,
             ComponentState.UNAVAILABLE, "worker.lost", "old ready epoch"));
@@ -272,7 +485,7 @@ final class DefaultEngineComponentRegistryTest {
       try (subscription) {
         fault.start();
         assertTrue(entered.await(5, TimeUnit.SECONDS));
-        handle.transition(ComponentState.RELOADING, "worker.recovering", "retry narration");
+        handle.transition(ComponentState.RELOADING, "component.recovering", "retry narration");
         assertEquals(ComponentState.RELOADING, handle.snapshot().state());
         assertEquals("worker.index_corrupt", handle.snapshot().reasonCode());
         assertEquals("precise corruption evidence", handle.snapshot().evidence());
@@ -289,8 +502,8 @@ final class DefaultEngineComponentRegistryTest {
       assertNull(handle.snapshot().reasonCode());
       assertNull(handle.snapshot().evidence());
       handle.transition(ComponentState.FAILED, "worker.spawn.failed", "failed boot");
-      handle.transition(ComponentState.RELOADING, "worker.recovering", "boot retry");
-      assertEquals("worker.recovering", handle.snapshot().reasonCode());
+      handle.transition(ComponentState.RELOADING, "component.recovering", "boot retry");
+      assertEquals("component.recovering", handle.snapshot().reasonCode());
       assertEquals("boot retry", handle.snapshot().evidence());
     }
   }

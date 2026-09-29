@@ -141,6 +141,9 @@ public class LocalApiServer {
   private final HeadApiMetricCatalog apiCatalog;
   private final ComponentHandle apiComponent;
 
+  /** Existing API lifecycle publisher for the composition root's fixed recovery bindings. */
+  public ComponentHandle apiComponent() { return apiComponent; }
+
   /** Creates a new builder. Required: settingsStore, indexBasePath. The bootstrap and per-service
    * overrides are provided via fluent setters (.HeadAssembly, .onlineAiService, etc.).
    * A Knowledge Server also requires the Head search owner or explicit perSourceSearch. */
@@ -878,6 +881,16 @@ public class LocalApiServer {
     return core.statusLifecycleHandler().samplingPeriodMs();
   }
 
+  /**
+   * Gives status sampling the stable, restartable bootstrap before that bootstrap has a client.
+   * Other API surfaces remain unbound until the normal successful handover below.
+   */
+  public void bindPendingKnowledgeServerStatus(
+      KnowledgeServerBootstrap ks, String startError) {
+    core.statusLifecycleHandler().setKnowledgeServer(
+        java.util.Objects.requireNonNull(ks, "ks"), startError);
+  }
+
   public void lateBindKnowledgeServer(KnowledgeServerBootstrap ks, String startError) {
     // The upgrade routes deliberately do NOT cache `ks` here: HeadAssembly.currentKnowledgeServer()
     // is the single owner of that reference (HeadlessApp calls connectKnowledgeServer immediately
@@ -886,7 +899,6 @@ public class LocalApiServer {
     // Update controllers with Worker reference (read from the CoreApiAssembly Result).
     core.debugStateController().setKnowledgeServer(ks);
     core.inferenceHandlers().setKnowledgeServer(ks);
-    core.statusLifecycleHandler().setKnowledgeServer(ks, startError);
     // Tempdoc 400 Phase 2.1 (LR1-c): wire the KnowledgeClient late so
     // /api/debug/session-policies returns the authoritative PolicySnapshot in
     // eval mode. Pre-fix this controller stayed wired with null forever.
@@ -913,7 +925,6 @@ public class LocalApiServer {
           this.lambdaMartReranker,
           this.apiCatalog,
           this.core.configStore());
-      this.knowledgeSearchController = ctrl;
       // Tempdoc 778 — seal the disposition + feature-snapshot streams with the AUTHORED feedback key.
       if (this.HeadAssemblyRef != null) {
         ctrl.setFeedbackCipher(
@@ -929,7 +940,11 @@ public class LocalApiServer {
               this.core.configStore())
           : null;
       KnowledgeRoutes.register(this.app, ctrl, ragCtrl, log);
+      this.knowledgeSearchController = ctrl;
     }
+    // Status sampling can publish index READY. Install it last so READY implies that every
+    // Worker-backed controller and route above is already visible to clients.
+    core.statusLifecycleHandler().setKnowledgeServer(ks, startError);
   }
 
   /**
@@ -1054,7 +1069,7 @@ public class LocalApiServer {
         Set.of(EnvRegistry.API_PORT.configKey()),
         ComponentSpec.ComposeCapability.IN_PLACE,
         java.time.Duration.ZERO,
-        2);
+        0);
   }
 
   private static boolean isBindFailure(Throwable t) {

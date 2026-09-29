@@ -209,7 +209,8 @@ public final class OnnxEmbeddingEncoder implements Closeable {
             modelDir,
             manifest,
             io.justsearch.ort.CapabilityRequirements.EMBEDDING,
-            capabilityContractStrict);
+            capabilityContractStrict,
+            exactModelFile);
     PoolingStrategy poolingStrategy = toPoolingStrategy(capabilities.poolingMode());
     return new EmbeddingAssembly(
         sessions,

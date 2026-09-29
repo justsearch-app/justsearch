@@ -179,6 +179,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   dependsOn(":modules:ui:installDist")
   inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/bulk-fault-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/component-recovery-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/hostile-lock-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/processing-replay-scenario.mjs"))
@@ -332,6 +333,8 @@ val integrationTest = tasks.register<Test>("integrationTest") {
 // Lane F D1-16: lifecycle scenarios have a separate, explicit budget so the
 // existing integration tier's timeout cannot cut off its own fixture diagnostics.
 tasks.register<Test>("lifecycleIntegrationTest") {
+  // Both tasks own an installed Engine stack. Gradle may otherwise run test tasks concurrently.
+  mustRunAfter(tasks.named("integrationTest"))
   description = "Runs installed Engine lifecycle scenarios for Lane F feature acceptance."
   group = "verification"
   dependsOn(":modules:ui:installDist")

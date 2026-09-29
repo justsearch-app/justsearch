@@ -288,6 +288,9 @@ describe('aiStateStore — system-health verdict (595)', () => {
       active?: string;
       docs?: number;
       sizeBytes?: number;
+      indexComponentState?: 'ABSENT' | 'STARTING' | 'READY' | 'RELOADING' | 'FAILED' | 'UNAVAILABLE';
+      indexComponentReasonCode?: string;
+      aiReasonCodes?: string[];
       /** 811 C-4 — omitted means the backend does NOT report the field (the pre-811 shape). */
       searchable?: number;
     } = {},
@@ -311,9 +314,20 @@ describe('aiStateStore — system-health verdict (595)', () => {
         },
       },
       readiness: {
+        engineComponents: {
+          index: {
+            state: over.indexComponentState ?? 'READY',
+            ...(over.indexComponentReasonCode === undefined
+              ? {}
+              : { reasonCode: over.indexComponentReasonCode }),
+          },
+        },
         composites: {
           retrieval: { state: retrieval, reasonCodes },
-          aiFeatures: { state: 'READY', reasonCodes: [] },
+          aiFeatures: {
+            state: over.aiReasonCodes?.length ? 'DEGRADED' : 'READY',
+            reasonCodes: over.aiReasonCodes ?? [],
+          },
         },
       },
       schema: { reindexRequired: false },
@@ -359,6 +373,29 @@ describe('aiStateStore — system-health verdict (595)', () => {
     expect(s.stability).toEqual({ kind: 'provisional', cause: 'worker-restart' });
     expect(s.verdict.kind).toBe('transitioning');
     expect(s.statusLabel).toBe('Restarting…');
+  });
+
+  it('exact index recovery wins over the Worker fallback and uses recovery wording', () => {
+    feed(statusWith('UNKNOWN', [], {
+      indexState: 'UNAVAILABLE',
+      indexComponentState: 'STARTING',
+      indexComponentReasonCode: 'component.recovering',
+    }));
+    const s = getAiState();
+    expect(s.stability).toEqual({ kind: 'provisional', cause: 'index-recovery' });
+    expect(s.verdict.kind).toBe('transitioning');
+    expect(s.statusLabel).toBe('Recovering search…');
+  });
+
+  it('optional AI recovery does not become retrieval recovery', () => {
+    feed(statusWith('DEGRADED', ['lambdamart.not_configured'], {
+      indexComponentState: 'READY',
+      aiReasonCodes: ['component.recovering'],
+    }));
+    const s = getAiState();
+    expect(s.stability).toEqual({ kind: 'settled' });
+    expect(s.verdict.kind).toBe('degraded');
+    expect(s.verdict.severity).toBe('info');
   });
 
   it('a rebuild (migration MIGRATING) ⇒ transitioning, "Rebuilding…"', () => {

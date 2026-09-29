@@ -87,16 +87,15 @@ final class IndexReadinessPublicationTest {
         case "contact" -> when(fixture.client.getWorkerOperationalView(any()))
             .thenThrow(new IllegalStateException("contact lost"));
         case "health" -> when(fixture.client.getWorkerOperationalView(any())).thenReturn(view(false));
-        case "freshness" -> fixture.clock.addAndGet(31_000);
+        case "freshness" -> when(fixture.client.getWorkerOperationalView(any()))
+            .thenAnswer(invocation -> {
+              fixture.clock.addAndGet(31_000);
+              return view(true);
+            });
         default -> throw new AssertionError(missing);
       }
-      if ("freshness".equals(missing)) {
-        fixture.handler.buildStatusSnapshot();
-        verify(fixture.client, times(1)).getWorkerOperationalView(any());
-      } else {
-        fixture.handler.sampleAndBuildStatusSnapshot();
-        verify(fixture.client, times(2)).getWorkerOperationalView(any());
-      }
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      verify(fixture.client, times(2)).getWorkerOperationalView(any());
       assertEquals(ComponentState.UNAVAILABLE,
           fixture.components.handle("index").snapshot().state());
       var result = fixture.components.handle("index").snapshot();
@@ -141,6 +140,26 @@ final class IndexReadinessPublicationTest {
     }
   }
 
+  @Test
+  void cachedFailedSampleCannotClobberANewPhysicalReady() {
+    try (var fixture = fixture()) {
+      when(fixture.client.getWorkerOperationalView(any()))
+          .thenThrow(new IllegalStateException("pre-recovery contact lost"));
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.STARTING,
+          fixture.components.handle("index").snapshot().state());
+      fixture.components.handle("index").transition(ComponentState.READY, null, null);
+
+      var cached = fixture.handler.buildStatusSnapshot();
+
+      assertTrue(cached.meta().workerRpcStale(),
+          "the cached response still reports its failed physical observation");
+      assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state(),
+          "an observational cached read cannot overwrite a newer physical READY owner");
+      verify(fixture.client, times(1)).getWorkerOperationalView(any());
+    }
+  }
+
   @ParameterizedTest
   @EnumSource(value = ComponentState.class, names = {"ABSENT", "RELOADING"})
   void healthyIncumbentCannotErasePhysicalOwnership(ComponentState state) {
@@ -158,6 +177,35 @@ final class IndexReadinessPublicationTest {
       fixture.components.handle("index").transition(state, "worker.lost", null);
       fixture.handler.sampleAndBuildStatusSnapshot();
       assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+    }
+  }
+
+  @Test
+  void pendingBootstrapBindingObservesTheFirstRecoveredReadyOwner() {
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(
+          ComponentState.FAILED, "worker.spawn.failed", "initial open refused");
+      var capability = new RegistryBackedCapability(components, "index", "worker");
+      var client = mock(KnowledgeClient.class);
+      when(client.getWorkerOperationalView(any())).thenReturn(view(true));
+      var server = mock(KnowledgeServerBootstrap.class);
+      when(server.hasClient()).thenReturn(true);
+      BootstrapLeaseFixtures.bind(server, client);
+      var handler = new StatusLifecycleHandler(
+          mock(OnlineAiService.class), mock(io.justsearch.agent.api.AgentService.class), () -> null,
+          null, "initial open refused", indexBase, Instant.now(), () -> "OK", null, null, null,
+          capability, new RegistryBackedCapability(components, "generative", "inference"));
+      handler.setIndexComponent(components, components.handle("index"));
+
+      handler.setKnowledgeServer(server, "initial open refused");
+      components.handle("index").transition(ComponentState.READY, null, null);
+
+      var sampled = handler.sampleAndBuildStatusSnapshot();
+
+      assertFalse(sampled.meta().workerRpcStale());
+      assertEquals(ComponentState.READY, components.handle("index").snapshot().state());
+      verify(client, times(1)).getWorkerOperationalView(any());
     }
   }
 
@@ -217,16 +265,17 @@ final class IndexReadinessPublicationTest {
   }
 
   @Test
-  void staleReadDemotesBlockedSamplerAndQueuesFreshRecovery() throws Exception {
+  void staleReadReportsBlockedSamplerWithoutRepublishingLifecycle() throws Exception {
     try (var fixture = fixture();
         var executors = new io.justsearch.core.execution.TestEngineExecutors();
         var trigger = new io.justsearch.app.services.observability.health.ReadinessReconciliationTrigger(executors)) {
       var initial = new java.util.concurrent.CountDownLatch(1);
       var blocked = new java.util.concurrent.CountDownLatch(1);
       var release = new java.util.concurrent.CountDownLatch(1);
-      var recovered = new java.util.concurrent.CountDownLatch(1);
+      var refreshed = new java.util.concurrent.CountDownLatch(1);
       var calls = new java.util.concurrent.atomic.AtomicInteger();
-      var superseded = new java.util.concurrent.atomic.AtomicReference<io.justsearch.app.api.status.StatusResponse>();
+      var freshResponse = new java.util.concurrent.atomic.AtomicReference<
+          io.justsearch.app.api.status.StatusResponse>();
       var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
       when(fixture.client.getWorkerOperationalView(any())).thenAnswer(invocation -> {
         if (calls.incrementAndGet() == 2) {
@@ -239,12 +288,12 @@ final class IndexReadinessPublicationTest {
       trigger.attach(() -> {
         try {
           var response = fixture.handler.sampleAndBuildStatusSnapshot();
-          if (calls.get() == 2) superseded.set(response);
+          if (calls.get() == 2) freshResponse.set(response);
         } catch (RuntimeException | Error error) {
           failure.set(error);
         } finally {
           if (calls.get() == 1) initial.countDown();
-          if (calls.get() >= 3) recovered.countDown();
+          if (calls.get() >= 2) refreshed.countDown();
         }
       });
       try {
@@ -260,13 +309,14 @@ final class IndexReadinessPublicationTest {
         // This must complete before release: the cached path does not acquire the RPC lock.
         var stale = fixture.handler.buildStatusSnapshot();
         assertTrue(stale.meta().workerRpcStale());
-        assertEquals(ComponentState.UNAVAILABLE, fixture.components.handle("index").snapshot().state());
+        assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state(),
+            "cached age reporting cannot become a second lifecycle publisher");
         release.countDown();
-        assertTrue(recovered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertTrue(refreshed.await(5, java.util.concurrent.TimeUnit.SECONDS));
         org.junit.jupiter.api.Assertions.assertNull(failure.get());
         samplerExecutor.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
-        assertEquals(3, calls.get(), "exactly one follow-up, with no self-publication feedback");
-        assertTrue(superseded.get().meta().workerRpcStale(), "invalidated RPC cannot become the cache");
+        assertEquals(2, calls.get(), "cached reads cannot enqueue lifecycle feedback samples");
+        assertFalse(freshResponse.get().meta().workerRpcStale());
         assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
         assertFalse(fixture.handler.buildStatusSnapshot().meta().workerRpcStale());
       } finally {

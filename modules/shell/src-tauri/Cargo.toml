@@ -1,5 +1,6 @@
 [package]
 name = "shell"
+default-run = "shell"
 version = "0.3.0"
 description = "A Tauri App"
 authors = ["JustSearch Contributors"]

@@ -152,7 +152,8 @@ class KnowledgeServerStartupConfigurationTest {
           .when(
               () ->
                   OnnxEmbeddingEncoder.buildAssembly(
-                      same(sessions), eq(capturedModel), eq(1536), eq(4096), eq(false)))
+                      same(sessions), eq(capturedModel), eq(1536), eq(4096), eq(false),
+                      eq(capturedModel.resolve("model.onnx"))))
           .thenReturn(assembly);
 
       var worker = WorkerConfig.load(captured);
@@ -202,7 +203,8 @@ class KnowledgeServerStartupConfigurationTest {
         embeddingAssembly.verify(
             () ->
                 OnnxEmbeddingEncoder.buildAssembly(
-                    same(sessions), eq(capturedModel), eq(1536), eq(4096), eq(false)));
+                    same(sessions), eq(capturedModel), eq(1536), eq(4096), eq(false),
+                    eq(capturedModel.resolve("model.onnx"))));
       } finally {
         server.close();
       }
@@ -416,7 +418,8 @@ class KnowledgeServerStartupConfigurationTest {
                   .thenReturn(sessions);
               embeddingAssemblyMock
                   .when(() -> OnnxEmbeddingEncoder.buildAssembly(
-                      same(sessions), eq(capturedModel), eq(1536), eq(4096), eq(false)))
+                      same(sessions), eq(capturedModel), eq(1536), eq(4096), eq(false),
+                      eq(capturedModel.resolve("model.onnx"))))
                   .thenReturn(assembly);
               invokeDeferredModelInitialization(server);
             }

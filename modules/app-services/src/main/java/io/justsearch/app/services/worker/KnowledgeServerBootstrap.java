@@ -143,15 +143,13 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private final java.util.concurrent.atomic.AtomicInteger bootFaultsRemaining;
 
     /**
-     * Tempdoc 825: true while {@link KnowledgeServerHealthMonitor}'s boot-recovery arm owns the
-     * narration for an in-flight re-attempt. The arm holds the capability at RECOVERING for the whole
-     * recovery arc, so every per-attempt transition this class would otherwise make — PENDING on
-     * entry, DEGRADED on failure, OFFLINE on the teardown between attempts — is suppressed. Without
-     * it a four-attempt recovery narrates a dozen worker-down/worker-starting occurrences and the
-     * "no flapping for a boot that ultimately succeeds" acceptance fails. The READY transition is
-     * never suppressed: success must always be narrated.
+     * True while the generic index action owns an admitted physical replacement. The registry has
+     * already published STARTING, so this bootstrap suppresses its internal close/open narration;
+     * the action publishes the one terminal observation.
      */
-    private volatile boolean bootRecoveryInFlight;
+    private volatile boolean indexRecoveryInFlight;
+    /** True only while an admitted physical replacement performs its bounded startup checks. */
+    private boolean physicalRecoveryStartup;
 
     /**
      * Tempdoc 915 R1: the last fatal INDEX verdict this bootstrap read out of the dying worker's
@@ -172,6 +170,22 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * anti-staleness bound {@link io.justsearch.app.services.lifecycle.ReasonRetention} uses.
      */
     private volatile WorkerDown latchedIndexFatalVerdict;
+
+    /** Physical index owner invoked while this bootstrap retains its initialization lock. */
+    @FunctionalInterface
+    public interface RecoveryOwner {
+        io.justsearch.core.component.ComponentRecoveryAction.Result recover(
+                io.justsearch.core.component.ComponentRecoveryAction.Request request,
+                RecoveryBody body) throws Exception;
+    }
+
+    /** One close/open body plus the sticky fatal verdict observed during that attempt. */
+    public interface RecoveryBody {
+        boolean run(java.util.function.BooleanSupplier mayOpen) throws Exception;
+        default void preparePublication() throws Exception {}
+        LifecycleReasonCode fatalReasonCode();
+        String fatalDetail();
+    }
 
     private AppInstanceLock appLock;
     private IpcTelemetry ipcTelemetry;
@@ -236,10 +250,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
             throw new IllegalStateException("KnowledgeServerBootstrap already started");
         }
 
-        // Tempdoc 825: during a boot-recovery arc the monitor holds the capability at RECOVERING and
-        // owns the narration; dropping back to PENDING here would re-enter RECOVERING on the next
-        // attempt and emit a worker.restart-attempted occurrence per cycle.
-        if (!bootRecoveryInFlight) {
+        // An admitted generic recovery already published STARTING and owns the terminal narration.
+        if (!indexRecoveryInFlight) {
             indexComponent.transition(
                 ComponentState.STARTING, LifecycleReasonCode.WORKER_STARTING.code(), "Worker starting");
         }
@@ -343,10 +355,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private void awaitHealthyAndComplete() throws InterruptedException {
         long retryBudgetMs = config.healthCheckRetryBudgetMs();
         long healthCheckStartMs = System.currentTimeMillis();
-        boolean healthy = checkHealth();
+        boolean healthy = checkStartupHealth();
         while (!healthy && (System.currentTimeMillis() - healthCheckStartMs) < retryBudgetMs) {
             Thread.sleep(1000);
-            healthy = checkHealth();
+            healthy = checkStartupHealth();
         }
         long healthCheckElapsedMs = System.currentTimeMillis() - healthCheckStartMs;
 
@@ -388,14 +400,14 @@ public final class KnowledgeServerBootstrap implements Closeable {
         startWithRetry(DEFAULT_START_ATTEMPTS, DEFAULT_START_RETRY_BACKOFF_MS);
     }
 
-    /** Publishes the initial owner only after it has claimed its complete opening lifetime. */
-    public void startWithRetry(java.util.function.Consumer<KnowledgeServerBootstrap> onOpening)
+    /** Publishes the initial owner under its lifetime lock and performs one uncounted opening. */
+    public void startInitial(java.util.function.Consumer<KnowledgeServerBootstrap> onOpening)
             throws IOException, InterruptedException {
         java.util.Objects.requireNonNull(onOpening, "onOpening");
         initLock.lockInterruptibly();
         try {
             onOpening.accept(this);
-            startWithRetryLocked(DEFAULT_START_ATTEMPTS, DEFAULT_START_RETRY_BACKOFF_MS);
+            startWithRetryLocked(1, 0);
         } finally {
             initLock.unlock();
         }
@@ -447,8 +459,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         }
         retryPending = false;
         // The per-attempt narration was suppressed; the final verdict lands exactly once, here —
-        // unless the boot-recovery arm owns this arc's narration (tempdoc 825), in which case the
-        // verdict is ITS terminal give-up. transitionWorkerDown is the one funnel and owns that rule.
+        // unless the generic index action owns this physical attempt's terminal narration.
         transitionWorkerDown(
             LifecycleReasonCode.WORKER_SPAWN_FAILED,
             "Start failed: " + (last == null ? "unknown" : last.getMessage()));
@@ -461,58 +472,112 @@ public final class KnowledgeServerBootstrap implements Closeable {
         throw new IOException("Knowledge Server start failed after " + maxAttempts + " attempts", last);
     }
 
+    /** Runs recovery health and ready initialization against the exact not-yet-accepted view. */
+    private boolean checkStartupHealth() {
+        if (!physicalRecoveryStartup) return checkHealth();
+        try (WorkerHost.ServingLease view = java.util.Objects.requireNonNull(
+                workerHost.captureStartupHealthView(), "startup health serving view")) {
+            return view.withClient(client, ignored -> checkHealth());
+        } catch (RuntimeException failure) {
+            log.debug("Recovery startup health view unavailable", failure);
+            return false;
+        }
+    }
+
     /**
-     * Tempdoc 825: ONE boot-recovery attempt, with this class's per-attempt narration suppressed.
-     * Called only by {@link KnowledgeServerHealthMonitor}'s boot-recovery arm, which decides whether
-     * an attempt is due ({@link BootRecoveryDecision}), holds the capability at RECOVERING across the
-     * arc, and narrates the terminal give-up. The attempt budget lives in {@link BootRecoveryPolicy},
-     * so this deliberately does NOT re-run the boot-time 3-attempt retry inside one cycle.
+     * Runs component recovery in the established Bootstrap-to-Root lock order.
      *
-     * <p>The flag is set and cleared around the single call, so a throwing attempt cannot leave the
-     * bootstrap permanently unable to narrate.
+     * <p>The owner performs admission and physical validation while {@code initLock} is held, then
+     * invokes the supplied body exactly once to close and reopen. This prevents the inverse
+     * Root-to-Bootstrap order used by the retired bound-index retry path.
      */
-    public boolean startForRecovery() throws IOException, InterruptedException {
+    public io.justsearch.core.component.ComponentRecoveryAction.Result recomposeForRecovery(
+            io.justsearch.core.component.ComponentRecoveryAction.Request request,
+            RecoveryOwner owner) throws Exception {
+        return recomposeForRecovery(request, owner, () -> {});
+    }
+
+    /** Carries the structural binding callback into the physical owner's pre-publication phase. */
+    public io.justsearch.core.component.ComponentRecoveryAction.Result recomposeForRecovery(
+            io.justsearch.core.component.ComponentRecoveryAction.Request request,
+            RecoveryOwner owner, Runnable preparePublication) throws Exception {
+        java.util.Objects.requireNonNull(request, "request");
+        java.util.Objects.requireNonNull(owner, "owner");
+        java.util.Objects.requireNonNull(preparePublication, "preparePublication");
         initLock.lockInterruptibly();
         try {
-            bootRecoveryInFlight = true;
-            startWithRetry(1, 0);
-            return physicalHealthy && healthyInitializationComplete;
+            return owner.recover(request, new RecoveryBody() {
+                @Override
+                public boolean run(java.util.function.BooleanSupplier mayOpen) throws Exception {
+                    java.util.Objects.requireNonNull(mayOpen, "mayOpen");
+                    indexRecoveryInFlight = true;
+                    physicalRecoveryStartup = true;
+                    try {
+                        if (closeLocked() != ShutdownOutcome.GRACEFUL) {
+                            throw new IOException("Index owner refused local close");
+                        }
+                        if (!mayOpen.getAsBoolean()) return false;
+                        startWithRetryLocked(1, 0);
+                        return physicalHealthy && healthyInitializationComplete;
+                    } finally {
+                        physicalRecoveryStartup = false;
+                        indexRecoveryInFlight = false;
+                    }
+                }
+
+                @Override public void preparePublication() {
+                    preparePublication.run();
+                }
+
+                @Override public LifecycleReasonCode fatalReasonCode() {
+                    return indexFatalCode();
+                }
+
+                @Override public String fatalDetail() {
+                    return indexFatalDetail();
+                }
+            });
         } finally {
-            bootRecoveryInFlight = false;
             initLock.unlock();
         }
     }
 
-    /** The physical owner retains initialization and recovery narration across local replacement. */
-    public boolean recomposeForRecovery(java.util.function.BooleanSupplier stillAdmitted)
-            throws IOException, InterruptedException {
-        java.util.Objects.requireNonNull(stillAdmitted, "stillAdmitted");
+    /** Production component action bound to this bootstrap's exact physical host. */
+    public io.justsearch.core.component.ComponentRecoveryAction.Result recoverIndex(
+            io.justsearch.core.component.ComponentRecoveryAction.Request request) throws Exception {
+        return recoverIndex(request, () -> {});
+    }
+
+    /** Recovers the index and binds Head surfaces before its READY publication becomes observable. */
+    public io.justsearch.core.component.ComponentRecoveryAction.Result recoverIndex(
+            io.justsearch.core.component.ComponentRecoveryAction.Request request,
+            Runnable preparePublication) throws Exception {
+        return recomposeForRecovery(request, workerHost::recoverIndex, preparePublication);
+    }
+
+    /** Preserves the index and its client while replacing its optional native model owners. */
+    public io.justsearch.core.component.ComponentRecoveryAction.Result recoverEncoders(
+            io.justsearch.core.component.ComponentRecoveryAction.Request request) throws Exception {
+        java.util.Objects.requireNonNull(request, "request");
         initLock.lockInterruptibly();
         try {
-            if (!stillAdmitted.getAsBoolean()) return false;
-            bootRecoveryInFlight = true;
-            if (closeLocked() != ShutdownOutcome.GRACEFUL) {
-                throw new IOException("Index owner refused local close");
+            if (request.cancelled() || client == null) {
+                return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
             }
-            if (!stillAdmitted.getAsBoolean()) return false;
-            startWithRetry(1, 0);
-            return physicalHealthy && healthyInitializationComplete;
+            return workerHost.recoverEncoders(request);
         } finally {
-            bootRecoveryInFlight = false;
             initLock.unlock();
         }
     }
 
     /** Whether a per-attempt worker-down / worker-starting transition would be a lie right now. */
     private boolean narrationSuppressed() {
-        return retryPending || bootRecoveryInFlight;
+        return retryPending || indexRecoveryInFlight;
     }
 
     /**
-     * Tempdoc 825: whether a knowledge-port client is bound (it was a gRPC client until lane F
-     * stage A item A6 made the port an in-process call). This is the discriminator between the health
-     * monitor's two arms — a bound client means the bootstrap is up and {@link #checkHealth()} owns
-     * it; no client means {@code start()} never completed and the boot-recovery arm owns it.
+     * Whether a knowledge-port client is bound (it was a gRPC client until lane F stage A item A6
+     * made the port an in-process call).
      */
     public boolean hasClient() {
         return client != null;
@@ -533,6 +598,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     boolean automaticRootProducersSuppressed() { return !automaticRootProducers; }
+
+    /** Data-directory anchor for the installed recovery harness barrier. */
+    Path dataDirForHarness() { return config.dataDir(); }
 
     /**
      * Returns true if the Knowledge Server is ready.
@@ -905,7 +973,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
         // Stop the energy poll before the signal bus goes: its transitional MMF write would
         // otherwise race the unmap. The poller is restartable, and the last polled state survives,
-        // so a boot-recovery restart resumes without a UNKNOWN window.
+        // so a physical replacement resumes without an UNKNOWN window.
         try {
             energyPoller.close();
         } catch (Exception e) {
@@ -931,7 +999,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
             // Lane F item A6: the index half is in this JVM, so "shutdown" is an ordered close, not
             // a process termination — GRACEFUL is the only outcome that can be reported honestly.
             try {
-                workerHost.close();
+                if (indexRecoveryInFlight) workerHost.closeForRecovery();
+                else workerHost.close();
             } catch (RuntimeException e) {
                 log.warn("Error closing in-process worker host", e);
                 outcome = ShutdownOutcome.FAILED;
@@ -952,9 +1021,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
         }
 
         try {
-            // Suppressed between boot attempts AND across boot-recovery cycles (tempdoc 825): a retry
-            // would immediately re-enter PENDING, and the OFFLINE flap in between is narration of a
-            // state the Head was never actually in.
+            // A retry immediately re-enters STARTING, so an ABSENT transition between owners would
+            // narrate a state the Head never exposed.
             if (outcome == ShutdownOutcome.GRACEFUL && !narrationSuppressed()) {
                 indexComponent.transition(
                     ComponentState.ABSENT,

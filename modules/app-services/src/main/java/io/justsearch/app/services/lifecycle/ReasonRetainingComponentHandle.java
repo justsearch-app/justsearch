@@ -7,6 +7,7 @@ import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentSnapshot;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Stateless publication policy shared by every physical and supervisory writer of a component.
@@ -26,8 +27,20 @@ public final class ReasonRetainingComponentHandle implements ComponentHandle {
   }
 
   @Override
+  public boolean belongsTo(io.justsearch.core.component.EngineComponentRegistry registry) {
+    return delegate.belongsTo(registry);
+  }
+
+  @Override
   public EngineComponentSnapshot.Component snapshot() {
     return delegate.snapshot();
+  }
+
+  /** Complete owner-prepared rows already include their reason and evidence policy. */
+  @Override
+  public io.justsearch.core.component.EngineComponentRegistry.PreparedBatch prepareReplacement(
+      EngineComponentSnapshot.Component replacement) {
+    return delegate.prepareReplacement(replacement);
   }
 
   @Override
@@ -40,11 +53,18 @@ public final class ReasonRetainingComponentHandle implements ComponentHandle {
   @Override
   public boolean transitionIfUnchanged(EngineComponentSnapshot.Component expected,
       ComponentState state, String reasonCode, String evidence) {
+    return tryTransitionIfUnchanged(expected, state, reasonCode, evidence).isPresent();
+  }
+
+  @Override
+  public Optional<EngineComponentSnapshot.Component> tryTransitionIfUnchanged(
+      EngineComponentSnapshot.Component expected, ComponentState state, String reasonCode,
+      String evidence) {
     Objects.requireNonNull(expected, "expected");
     Objects.requireNonNull(state, "state");
     boolean retained = ReasonRetention.retainHeld(
         expected.reasonCode(), reasonCode, RegistryBackedCapability.healthOf(state));
-    return delegate.transitionIfUnchanged(expected, state,
+    return delegate.tryTransitionIfUnchanged(expected, state,
         retained ? expected.reasonCode() : reasonCode,
         retained ? expected.evidence() : evidence);
   }
@@ -68,6 +88,17 @@ public final class ReasonRetainingComponentHandle implements ComponentHandle {
   @Override
   public void setAppliedVersion(String digest) {
     delegate.setAppliedVersion(digest);
+  }
+
+  @Override
+  public Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
+      EngineComponentSnapshot.Component expected, String reasonCode, String evidence) {
+    Objects.requireNonNull(expected, "expected");
+    boolean retained = ReasonRetention.retainHeld(expected.reasonCode(), reasonCode,
+        RegistryBackedCapability.healthOf(ComponentState.STARTING));
+    return delegate.tryBeginRecovery(expected,
+        retained ? expected.reasonCode() : reasonCode,
+        retained ? expected.evidence() : evidence);
   }
 
   @Override

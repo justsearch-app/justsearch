@@ -34,7 +34,7 @@ import java.util.function.Supplier;
  *
  * <p>Three lazy suppliers handle Worker late-binding: {@code knowledgeServerSupplier},
  * {@code knowledgeClientSupplier}, and {@code indexingServiceSupplier} are invoked at
- * handler-dispatch time after {@code connectKnowledgeServer} populates the bootstrap's Worker
+ * handler-dispatch time after {@code prepareKnowledgeServerBinding} populates the bootstrap's Worker
  * fields. The substrate phase itself only stores the suppliers; it doesn't invoke them.
  */
 public final class SubstratePhase {

@@ -130,7 +130,9 @@ The core of the modern architecture. `app-services` acts as the **Process Manage
     `MainSignalBus` and the ephemeral-gRPC-port handoff went at item A10.
 *   **Liveness** *(retired)*: the MMF heartbeat and its "Suicide Pact" went with the child process
     at item A11 — one JVM has no peer to outlive. The two signals that survived the bus are fields
-    on the in-process `GpuSchedulingGauge` (`modules/core`). Crash supervision is stage B's work.
+    on the in-process `GpuSchedulingGauge` (`modules/core`). Engine host supervision owns process
+    crash detection, the bounded restart budget, and cooldown; `KnowledgeServerHealthMonitor` owns
+    in-process component recovery before escalation.
 
 ### 2. Application Facade (Legacy/Local)
 The `DefaultAppFacade` provides the interface for the **Local/In-Process** stack.

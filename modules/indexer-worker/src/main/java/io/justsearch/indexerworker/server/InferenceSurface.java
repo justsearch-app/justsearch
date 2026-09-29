@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.server;
 
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.indexerworker.bgem3.BgeM3Assembly;
 import io.justsearch.indexerworker.embed.onnx.EmbeddingAssembly;
 import io.justsearch.indexerworker.ner.NerAssembly;
@@ -9,9 +10,9 @@ import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.PolicySnapshot;
 import io.justsearch.ort.SessionHandle;
 import io.justsearch.reranker.RerankerAssembly;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -99,7 +100,7 @@ public record InferenceSurface(
     missing.addAll(unavailable);
     return new InferenceSurface(embedding, ner, reranker, citation, splade, bgeM3, policies,
         handles, new ComponentObservation(componentObservation.configurationDigest(),
-            requested, missing));
+            requested, missing, componentObservation.querySelection()));
   }
 
   /** Transfers the two independently replaceable query roles away from index-role lifetime. */
@@ -133,10 +134,10 @@ public record InferenceSurface(
     return new Partition(
         new InferenceSurface(embedding, ner, Optional.empty(), Optional.empty(), splade, bgeM3,
             policyFor(indexRoles), indexHandles,
-            observationFor(indexRoles, projection.indexDigest())),
+            observationFor(indexRoles, projection.indexDigest(), false)),
         new InferenceSurface(Optional.empty(), Optional.empty(), reranker, citation,
             Optional.empty(), Optional.empty(), policyFor(queryRoles), queryHandles,
-            observationFor(queryRoles, projection.queryDigest())));
+            observationFor(queryRoles, projection.queryDigest(), true)));
   }
 
   private PolicySnapshot policyFor(Set<EncoderRole> roles) {
@@ -147,7 +148,8 @@ public record InferenceSurface(
     return new PolicySnapshot(policies.runtime(), selected);
   }
 
-  private ComponentObservation observationFor(Set<EncoderRole> roles, String domainDigest) {
+  private ComponentObservation observationFor(
+      Set<EncoderRole> roles, String domainDigest, boolean retainQuerySelection) {
     Set<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
     Set<EncoderRole> missing = EnumSet.noneOf(EncoderRole.class);
     requested.addAll(componentObservation.requestedRoles());
@@ -155,7 +157,8 @@ public record InferenceSurface(
     requested.retainAll(roles);
     missing.retainAll(roles);
     return new ComponentObservation(componentObservation.configurationDigest().map(ignored -> domainDigest),
-        requested, missing);
+        requested, missing,
+        retainQuerySelection ? componentObservation.querySelection() : Optional.empty());
   }
 
   record Partition(InferenceSurface index, InferenceSurface query) {}
@@ -164,10 +167,18 @@ public record InferenceSurface(
   public record ComponentObservation(
       Optional<String> configurationDigest,
       Set<EncoderRole> requestedRoles,
-      Set<EncoderRole> missingRoles) {
+      Set<EncoderRole> missingRoles,
+      Optional<QueryRoleSelection> querySelection) {
+
+    /** Back-compatible constructor for observations that predate an exact query witness. */
+    public ComponentObservation(Optional<String> configurationDigest,
+        Set<EncoderRole> requestedRoles, Set<EncoderRole> missingRoles) {
+      this(configurationDigest, requestedRoles, missingRoles, Optional.empty());
+    }
 
     public ComponentObservation {
       configurationDigest = Optional.ofNullable(configurationDigest).orElseGet(Optional::empty);
+      querySelection = Optional.ofNullable(querySelection).orElseGet(Optional::empty);
       requestedRoles = immutableRoles(requestedRoles);
       missingRoles = immutableRoles(missingRoles);
       if (!requestedRoles.containsAll(missingRoles)) {
@@ -176,16 +187,16 @@ public record InferenceSurface(
     }
 
     public static ComponentObservation unknown() {
-      return new ComponentObservation(Optional.empty(), Set.of(), Set.of());
+      return new ComponentObservation(Optional.empty(), Set.of(), Set.of(), Optional.empty());
     }
 
-    static ComponentObservation composed(
-        String appliedVersion, Set<EncoderRole> requestedRoles, Set<EncoderRole> presentRoles) {
+    static ComponentObservation composed(String appliedVersion, Set<EncoderRole> requestedRoles,
+        Set<EncoderRole> presentRoles, Optional<QueryRoleSelection> querySelection) {
       Set<EncoderRole> missingRoles = EnumSet.noneOf(EncoderRole.class);
       missingRoles.addAll(requestedRoles);
       missingRoles.removeAll(presentRoles);
       return new ComponentObservation(
-          Optional.of(appliedVersion), requestedRoles, missingRoles);
+          Optional.of(appliedVersion), requestedRoles, missingRoles, querySelection);
     }
 
     public boolean hasRequestedRoles() {

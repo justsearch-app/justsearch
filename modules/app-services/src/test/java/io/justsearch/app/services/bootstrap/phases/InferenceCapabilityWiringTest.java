@@ -68,14 +68,36 @@ final class InferenceCapabilityWiringTest {
   }
 
   @Test
-  void transitioningAndIndexingMapToReloadingAndUnavailable() {
+  void initialTransitionIsStartingAndIndexingIsUnavailable() {
     Fixture transitioning = fixture(Mode.TRANSITIONING, true, null);
-    assertEquals(ComponentState.RELOADING, transitioning.handle().snapshot().state());
+    assertEquals(ComponentState.STARTING, transitioning.handle().snapshot().state());
 
     Fixture indexing = fixture(Mode.INDEXING, true, null);
     assertEquals(ComponentState.UNAVAILABLE, indexing.handle().snapshot().state());
     assertEquals(LifecycleReasonCode.INFERENCE_GPU_YIELDED_TO_INDEXING.code(),
         indexing.handle().snapshot().reasonCode());
+  }
+
+  @Test
+  void transitioningFromReadyRetainsReloadingState() {
+    Fixture fixture = fixture(Mode.ONLINE, true, null);
+    fixture.mode().set(Mode.TRANSITIONING);
+    transitionListener(fixture.manager()).onModeTransition(
+        Mode.ONLINE, Mode.TRANSITIONING, TransitionReason.CONFIG_APPLY);
+    assertEquals(ComponentState.RELOADING, fixture.handle().snapshot().state());
+  }
+
+  @Test
+  void transitioningAfterCrashStartsDeadlineAndRetainsCause() {
+    Fixture fixture = fixture(Mode.ONLINE, true, null);
+    ModeTransitionListener listener = transitionListener(fixture.manager());
+    fixture.mode().set(Mode.OFFLINE);
+    listener.onModeTransition(Mode.ONLINE, Mode.OFFLINE, TransitionReason.CRASH_RECOVERY);
+    fixture.mode().set(Mode.TRANSITIONING);
+    listener.onModeTransition(Mode.OFFLINE, Mode.TRANSITIONING, TransitionReason.CRASH_RECOVERY);
+    assertEquals(ComponentState.STARTING, fixture.handle().snapshot().state());
+    assertEquals(LifecycleReasonCode.INFERENCE_CRASHED.code(),
+        fixture.handle().snapshot().reasonCode());
   }
 
   @Test
@@ -95,6 +117,39 @@ final class InferenceCapabilityWiringTest {
     assertEquals(ComponentState.UNAVAILABLE, chosen.handle().snapshot().state());
     assertEquals(LifecycleReasonCode.INFERENCE_DEACTIVATED.code(),
         chosen.handle().snapshot().reasonCode());
+  }
+
+  @Test
+  void failedInitialActivationIsEligibleForRecovery() {
+    Fixture fixture = fixture(Mode.TRANSITIONING, true, null);
+    fixture.mode().set(Mode.OFFLINE);
+    transitionListener(fixture.manager()).onModeTransition(
+        Mode.TRANSITIONING, Mode.OFFLINE, TransitionReason.AUTO_START);
+    assertEquals(ComponentState.FAILED, fixture.handle().snapshot().state());
+    assertEquals(LifecycleReasonCode.INFERENCE_ACTIVATION_FAILED.code(),
+        fixture.handle().snapshot().reasonCode());
+  }
+
+  @Test
+  void failedInitialActivationAfterDeadlineRemainsFailed() {
+    Fixture fixture = fixture(Mode.TRANSITIONING, true, null);
+    fixture.handle().transition(ComponentState.FAILED,
+        LifecycleReasonCode.COMPONENT_START_TIMEOUT.code(), "waiting for server health");
+    fixture.mode().set(Mode.OFFLINE);
+    transitionListener(fixture.manager()).onModeTransition(
+        Mode.TRANSITIONING, Mode.OFFLINE, TransitionReason.AUTO_START);
+    assertEquals(ComponentState.FAILED, fixture.handle().snapshot().state());
+  }
+
+  @Test
+  void chosenStopDuringInitialActivationIsNotFailure() {
+    Fixture fixture = fixture(Mode.TRANSITIONING, true, null);
+    fixture.mode().set(Mode.OFFLINE);
+    transitionListener(fixture.manager()).onModeTransition(
+        Mode.TRANSITIONING, Mode.OFFLINE, TransitionReason.USER_SWITCH);
+    assertEquals(ComponentState.UNAVAILABLE, fixture.handle().snapshot().state());
+    assertEquals(LifecycleReasonCode.INFERENCE_DEACTIVATED.code(),
+        fixture.handle().snapshot().reasonCode());
   }
 
   @Test

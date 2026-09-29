@@ -218,6 +218,7 @@ surfaced through the indexing-jobs API.
 
 **Durability.** Kill the Engine while jobs are PROCESSING and restart:
 `JobQueue.recoverStuckJobs()` moves them back to PENDING. Note the honest cost ADR-0049 records —
-there is no longer a second address space, so an OOM in indexing takes the API with it. Supervision
-is stage B's work, and until it lands the mitigation is admission control and per-operation budgets,
-not a restart budget.
+there is no longer a second address space, so an OOM in indexing takes the API with it. Engine host
+supervision bounds process replacement, while the in-process component monitor performs local
+recovery before an essential failure escalates. Admission control and per-operation budgets still
+protect the shared address space.

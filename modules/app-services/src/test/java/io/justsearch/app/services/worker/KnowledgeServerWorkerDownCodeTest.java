@@ -138,7 +138,7 @@ final class KnowledgeServerWorkerDownCodeTest {
       fixture
           .indexComponent()
           .transition(
-              ComponentState.STARTING, LifecycleReasonCode.WORKER_RECOVERING.code(), "a1");
+              ComponentState.STARTING, LifecycleReasonCode.COMPONENT_RECOVERING.code(), "a1");
       bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_SPAWN_FAILED, "Start failed");
 
       assertEquals(

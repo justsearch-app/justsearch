@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
@@ -219,24 +220,43 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
   private boolean mutate(DefaultComponentHandle handle,
       EngineComponentSnapshot.Component expected, EngineComponentSnapshot expectedRegistry,
       Mutation mutation) {
+    return mutateAndCapture(handle, expected, expectedRegistry, mutation).isPresent();
+  }
+
+  /**
+   * Applies one conditional mutation and captures the handle row before observer delivery. The
+   * capture is deliberately part of the publication critical section: observers may immediately
+   * publish a newer row, but callers of the exact-returning primitive retain the row they won.
+   */
+  private Optional<EngineComponentSnapshot.Component> mutateAndCapture(
+      DefaultComponentHandle handle, EngineComponentSnapshot.Component expected,
+      EngineComponentSnapshot expectedRegistry, Mutation mutation) {
     EngineComponentSnapshot published;
     List<Consumer<EngineComponentSnapshot>> observers;
+    EngineComponentSnapshot.Component exact;
     publicationLock.writeLock().lock();
     try {
       synchronized (monitor) {
         ensureOpen();
-        if (expectedRegistry != null && !expectedRegistry.equals(snapshotLocked())) return false;
-        if (expected != null && !expected.equals(handle.snapshotLocked())) return false;
-        if (!mutation.apply(handle)) return true;
+        if (expectedRegistry != null && !expectedRegistry.equals(snapshotLocked())) {
+          return Optional.empty();
+        }
+        if (expected != null && !expected.equals(handle.snapshotLocked())) {
+          return Optional.empty();
+        }
+        if (!mutation.apply(handle)) {
+          return Optional.of(handle.snapshotLocked());
+        }
         revision++;
         published = snapshotLocked();
         observers = listenersLocked();
+        exact = handle.snapshotLocked();
       }
     } finally {
       publicationLock.writeLock().unlock();
     }
     publish(observers, published);
-    return true;
+    return Optional.of(exact);
   }
 
   private EngineComponentSnapshot snapshotLocked() {
@@ -401,6 +421,11 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     }
 
     @Override
+    public boolean belongsTo(EngineComponentRegistry registry) {
+      return registry == DefaultEngineComponentRegistry.this;
+    }
+
+    @Override
     public EngineComponentSnapshot.Component snapshot() {
       publicationLock.readLock().lock();
       try {
@@ -427,8 +452,15 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     @Override
     public boolean transitionIfUnchanged(EngineComponentSnapshot.Component expected,
         ComponentState next, String nextReasonCode, String nextEvidence) {
+      return tryTransitionIfUnchanged(expected, next, nextReasonCode, nextEvidence).isPresent();
+    }
+
+    @Override
+    public Optional<EngineComponentSnapshot.Component> tryTransitionIfUnchanged(
+        EngineComponentSnapshot.Component expected, ComponentState next,
+        String nextReasonCode, String nextEvidence) {
       Objects.requireNonNull(expected, "expected");
-      return transition(expected, null, next, nextReasonCode, nextEvidence);
+      return transitionExact(expected, null, next, nextReasonCode, nextEvidence);
     }
 
     @Override
@@ -441,10 +473,18 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     private boolean transition(EngineComponentSnapshot.Component expected,
         EngineComponentSnapshot expectedRegistry,
         ComponentState next, String nextReasonCode, String nextEvidence) {
+      return transitionExact(expected, expectedRegistry, next, nextReasonCode, nextEvidence)
+          .isPresent();
+    }
+
+    private Optional<EngineComponentSnapshot.Component> transitionExact(
+        EngineComponentSnapshot.Component expected,
+        EngineComponentSnapshot expectedRegistry,
+        ComponentState next, String nextReasonCode, String nextEvidence) {
       Objects.requireNonNull(next, "state");
       optionalNonBlank(nextReasonCode, "reasonCode");
       optionalNonBlank(nextEvidence, "evidence");
-      return mutate(this, expected, expectedRegistry, handle -> {
+      return mutateAndCapture(this, expected, expectedRegistry, handle -> {
         boolean stateChanged = handle.state != next;
         if (!stateChanged && Objects.equals(handle.reasonCode, nextReasonCode)
             && Objects.equals(handle.evidence, nextEvidence)) return false;
@@ -465,6 +505,23 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
       mutate(this, handle -> {
         if (Objects.equals(handle.appliedVersion, digest)) return false;
         handle.appliedVersion = digest;
+        return true;
+      });
+    }
+
+    @Override
+    public Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
+        EngineComponentSnapshot.Component expected, String nextReasonCode, String nextEvidence) {
+      Objects.requireNonNull(expected, "expected");
+      optionalNonBlank(nextReasonCode, "reasonCode");
+      optionalNonBlank(nextEvidence, "evidence");
+      return mutateAndCapture(this, expected, null, handle -> {
+        handle.state = ComponentState.STARTING;
+        handle.stateSince = Instant.now();
+        handle.stateSinceMonotonicNanos = System.nanoTime();
+        handle.reasonCode = nextReasonCode;
+        handle.evidence = nextEvidence;
+        handle.recoveryAttempts++;
         return true;
       });
     }

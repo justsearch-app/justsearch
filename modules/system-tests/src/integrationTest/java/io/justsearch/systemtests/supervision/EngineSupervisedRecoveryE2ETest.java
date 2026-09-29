@@ -23,11 +23,30 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.io.TempDir;
 
 /** Installed Engine proofs for durable recovery, migration and hostile filesystem survival. */
 @Timeout(7 * 60)
 final class EngineSupervisedRecoveryE2ETest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  @Test
+  void deterministicLockHandleCanCloseAfterIntruderCleanup(@TempDir Path directory)
+      throws Exception {
+    Path lockPath = directory.resolve("index.index.lock");
+    try (var intruder = new FileIntruder(directory)) {
+      var hold = intruder.holdExclusive(lockPath);
+      intruder.close();
+      hold.close();
+      hold.close();
+      try (var channel = java.nio.channels.FileChannel.open(lockPath,
+          java.nio.file.StandardOpenOption.WRITE);
+          var reacquired = channel.tryLock()) {
+        assertTrue(reacquired != null && reacquired.isValid(),
+            "intruder cleanup must release the exact OS lock");
+      }
+    }
+  }
 
   @Test
   @Tag("ai")
@@ -354,10 +373,136 @@ final class EngineSupervisedRecoveryE2ETest {
       String evidence = failedRecompose.path("evidence").asText();
       assertTrue(evidence.contains("B refused: Candidate awaits gap acceptance"), output);
       assertTrue(evidence.contains("A recompose refused:"), output);
+      var manualRecovery = result.path("manualEncoderRecovery");
+      assertEquals("encoders", manualRecovery.path("receipt").path("component").asText(), output);
+      assertEquals("ACCEPTED", manualRecovery.path("receipt").path("recovery").asText(), output);
+      assertEquals("UNAVAILABLE", manualRecovery.path("before").path("state").asText(), output);
+      assertEquals("READY", manualRecovery.path("ready").path("state").asText(), output);
+      assertTrue(manualRecovery.path("ready").path("reasonCode").isMissingNode(), output);
+      // EngineComponentView omits null fields; READY must carry no stale failure evidence.
+      assertTrue(manualRecovery.path("ready").path("evidence").isMissingNode(), output);
+      assertEquals(failedRecompose.path("recoveryAttempts").asInt() + 1,
+          manualRecovery.path("ready").path("recoveryAttempts").asInt(), output);
       assertTrue(result.path("aVectorHitsDuringWait").asInt() > 0, output);
       assertTrue(result.path("aVectorHitsAfterCancel").asInt() > 0, output);
       System.out.println("LIFECYCLE_RECOMPOSE_FAILURE_CANCEL_PASS §16 " + result);
     });
+  }
+
+  @Test
+  @Tag("ai")
+  @Timeout(15 * 60)
+  void realGenerativeChildRecoversOnTheSecondSameConfigurationAttempt() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedGenerativeRuntime(repo, "compact"),
+        "generative recovery requires retained compact GGUF and cuda12 runtime bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/generative-recovery-success-" + UUID.randomUUID());
+    String output = runInstalledModelScenario(repo, work, "generative-recovery-success",
+        Map.of("JUSTSEARCH_CHAT_PROFILE", "compact"),
+        "GENERATIVE_RECOVERY_SUCCESS_PASS");
+    var result = markerPayload(output, "GENERATIVE_RECOVERY_SUCCESS_PASS");
+    assertRecordedOnlineIntent(result.path("activation"), output);
+    assertInitialGenerativeReady(result, output);
+    assertEquals("FAILED", result.path("held").path("state").asText(), output);
+    assertEquals(0, result.path("held").path("recoveryAttempts").asInt(), output);
+    assertEquals(429, result.path("busy").path("status").asInt(), output);
+    assertEquals("ADMISSION_ENGINE_LIMIT",
+        result.path("busy").path("body").path("errorCode").asText(), output);
+    assertEquals(1, result.path("failedOne").path("recoveryAttempts").asInt(), output);
+    assertEquals(202, result.path("accepted").path("status").asInt(), output);
+    assertEquals("READY", result.path("terminal").path("row").path("state").asText(), output);
+    assertEquals(2,
+        result.path("terminal").path("row").path("recoveryAttempts").asInt(), output);
+    assertFalse(result.path("terminal").path("replacement").path("id").asText().isBlank(), output);
+    assertTrue(result.path("terminal").path("replacement").path("pid").asLong() > 0, output);
+    assertFalse(result.path("child").path("id").asText().equals(
+        result.path("terminal").path("replacement").path("id").asText()), output);
+    assertFalse(result.path("child").path("pid").asLong()
+        == result.path("terminal").path("replacement").path("pid").asLong(), output);
+    assertEquals(result.path("child").path("executable").asText(),
+        result.path("terminal").path("replacement").path("executable").asText(), output);
+    assertEquals(result.path("child").path("modelPath").asText(),
+        result.path("terminal").path("replacement").path("modelPath").asText(), output);
+    assertEquals("match",
+        result.path("terminal").path("replacementVerified").path("verdict").asText(), output);
+    assertEquals(200, result.path("terminal").path("chat").path("status").asInt(), output);
+    assertFalse(result.path("terminal").path("chat").path("terminal")
+        .path("finalResponse").asText().isBlank(), output);
+    assertEquals(0, result.path("finalSupervisor").path("restartCount").asInt(), output);
+  }
+
+  @Test
+  @Tag("ai")
+  @Timeout(15 * 60)
+  void realGenerativeChildSpendsTwoAttemptsWithoutEscalatingOptionalFailure() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedGenerativeRuntime(repo, "compact"),
+        "generative recovery requires retained compact GGUF and cuda12 runtime bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/generative-recovery-exhaustion-"
+        + UUID.randomUUID());
+    String output = runInstalledModelScenario(repo, work, "generative-recovery-exhaustion",
+        Map.of("JUSTSEARCH_CHAT_PROFILE", "compact"),
+        "GENERATIVE_RECOVERY_EXHAUSTION_PASS");
+    var result = markerPayload(output, "GENERATIVE_RECOVERY_EXHAUSTION_PASS");
+    assertRecordedOnlineIntent(result.path("activation"), output);
+    assertInitialGenerativeReady(result, output);
+    assertEquals(429, result.path("busy").path("status").asInt(), output);
+    assertEquals(1, result.path("failedOne").path("recoveryAttempts").asInt(), output);
+    assertEquals(202, result.path("accepted").path("status").asInt(), output);
+    assertEquals("FAILED", result.path("terminal").path("state").asText(), output);
+    assertEquals(2, result.path("terminal").path("recoveryAttempts").asInt(), output);
+    assertEquals(503, result.path("terminal").path("exhausted").path("status").asInt(), output);
+    assertEquals("WORKER_RECOVERY_EXHAUSTED",
+        result.path("terminal").path("exhausted").path("body").path("errorCode").asText(), output);
+    assertEquals(0, result.path("finalSupervisor").path("restartCount").asInt(), output);
+    assertEquals(result.path("first").path("instanceId").asText(),
+        result.path("finalSupervisor").path("instanceId").asText(), output);
+  }
+
+  @Test
+  @Tag("ai")
+  @Timeout(15 * 60)
+  void standardProfileGenerativeRecoveryAnswersARealChat() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedGenerativeRuntime(repo, "standard"),
+        "standard generative recovery requires retained 9B GGUF, projector and cuda12 runtime");
+    Path work = repo.resolve("tmp/lane-f-takeover/generative-recovery-standard-"
+        + UUID.randomUUID());
+    String output = runInstalledModelScenario(repo, work, "generative-recovery-success",
+        Map.of("JUSTSEARCH_CHAT_PROFILE", "standard"),
+        "GENERATIVE_RECOVERY_SUCCESS_PASS");
+    var result = markerPayload(output, "GENERATIVE_RECOVERY_SUCCESS_PASS");
+    assertRecordedOnlineIntent(result.path("activation"), output);
+    assertInitialGenerativeReady(result, output);
+    assertEquals("standard", result.path("profile").path("profileId").asText(), output);
+    assertEquals("Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+        result.path("profile").path("modelFile").asText(), output);
+    assertBooleanTrue(result.path("profile").path("mmprojActive"), output);
+    assertEquals("READY", result.path("terminal").path("row").path("state").asText(), output);
+    assertEquals(2,
+        result.path("terminal").path("row").path("recoveryAttempts").asInt(), output);
+    assertEquals(200, result.path("terminal").path("chat").path("status").asInt(), output);
+    var chatTerminal = result.path("terminal").path("chat").path("terminal");
+    assertEquals("COMPLETED", chatTerminal.path("disposition").asText(), output);
+    assertEquals("quokka",
+        chatTerminal.path("finalResponse").asText().strip().toLowerCase(Locale.ROOT), output);
+    assertTrue(chatTerminal.path("totalTokensUsed").asLong() > 0, output);
+    assertEquals(0, result.path("finalSupervisor").path("restartCount").asInt(), output);
+  }
+
+  private static void assertRecordedOnlineIntent(JsonNode activation, String output) {
+    assertEquals(200, activation.path("status").asInt(), output);
+    assertBooleanTrue(activation.path("body").path("success"), output);
+    assertEquals("online", activation.path("body").path("requested").asText(), output);
+    assertTrue(java.util.Set.of("recorded", "converged")
+        .contains(activation.path("body").path("state").asText()), output);
+    assertFalse(activation.path("body").path("operationKey").asText().isBlank(), output);
+    assertTrue(activation.path("body").path("acceptedRevision").asLong() > 0, output);
+  }
+
+  private static void assertInitialGenerativeReady(JsonNode result, String output) {
+    assertEquals("READY", result.path("initialGenerative").path("state").asText(), output);
+    assertEquals(0, result.path("initialGenerative").path("recoveryAttempts").asInt(), output);
   }
 
   private static JsonNode markerPayload(String output, String marker) throws Exception {
@@ -472,8 +617,10 @@ final class EngineSupervisedRecoveryE2ETest {
     Process process = builder.start();
     Throwable primary = null;
     try {
-      assertTrue(process.waitFor(330, TimeUnit.SECONDS),
-          "D1-16 installed " + scenario + " exceeded 330 seconds: " + outputFile);
+      long timeoutSeconds = scenario.startsWith("generative-recovery-") ? 720L : 330L;
+      assertTrue(process.waitFor(timeoutSeconds, TimeUnit.SECONDS),
+          "D1-16 installed " + scenario + " exceeded " + timeoutSeconds
+              + " seconds: " + outputFile);
       String output = Files.readString(outputFile, StandardCharsets.UTF_8);
       assertEquals(0, process.exitValue(), output);
       assertTrue(output.contains(marker), output);
@@ -542,10 +689,26 @@ final class EngineSupervisedRecoveryE2ETest {
     return false;
   }
 
+  private static boolean hasRetainedStandardEmbedding(Path repo) {
+    for (Path ancestor = repo; ancestor != null; ancestor = ancestor.getParent()) {
+      Path model = ancestor.resolve("models/onnx/gte-multilingual-base");
+      if (Files.isRegularFile(model.resolve("model.onnx"))
+          && Files.isRegularFile(model.resolve("model_fp16.onnx"))
+          && Files.isRegularFile(model.resolve("tokenizer.json"))) return true;
+    }
+    return false;
+  }
+
   @ParameterizedTest
-  @ValueSource(strings = {"writer", "migration", "lock-ingest", "processing",
-      "lock-index-release", "lock-index-exhaustion"})
+  @ValueSource(strings = {"writer", "migration", "lock-ingest", "processing"})
   void supervisedRecoveryUsesTheCorrectExitAndReopensDurableState(String scenario) throws Exception {
+    runScenario(scenario);
+  }
+
+  @ParameterizedTest
+  @Tag("ai")
+  @ValueSource(strings = {"lock-index-release", "lock-index-exhaustion"})
+  void supervisedIndexRecoveryUsesTheRetainedStandardEmbedding(String scenario) throws Exception {
     runScenario(scenario);
   }
 
@@ -569,6 +732,10 @@ final class EngineSupervisedRecoveryE2ETest {
           "the repository's process identity collector currently supports Windows only");
     }
     Path repo = repositoryRoot();
+    if (indexLockScenario) {
+      assumeTrue(hasRetainedStandardEmbedding(repo),
+          "installed index recovery requires retained standard embedding model bytes");
+    }
     if (scenario.startsWith("installer-")) {
       assumeTrue(hasRetainedInstallerModels(repo),
           "installed standard-model activation requires retained model bytes; run on a model-equipped host");
@@ -606,6 +773,9 @@ final class EngineSupervisedRecoveryE2ETest {
     boolean recoveryBarrierReleased = false;
     boolean indexLockReleased = false;
     long initialBarrierSeenAt = 0L;
+    String firstRunId = null;
+    int firstIncarnation = -1;
+    int firstPid = -1;
     boolean intruderStarted = false;
     if ("lock-boot".equals(scenario)) {
       Files.createDirectories(work.resolve("data"));
@@ -626,12 +796,35 @@ final class EngineSupervisedRecoveryE2ETest {
           Path initialRelease = runtime.resolve("index-start-initial-release");
           Path recoveryReached = runtime.resolve("index-start-recovery-1-reached.json");
           Path recoveryRelease = runtime.resolve("index-start-recovery-1-release");
+          Path recoveryProof = work.resolve("index-start-recovery-proofed");
           if (!initialBarrierReleased && indexLock == null
               && Files.isRegularFile(initialReached)) {
+            Path firstSupervisorPath = runtime.resolve("supervisor.v1.json");
+            Path firstManifestPath = runtime.resolve("manifest.json");
+            // The worker hook can publish the admission marker before the supervisor
+            // projection. Keep polling this loop until both identity witnesses exist;
+            // reading either path before its atomic publication makes the installed
+            // recovery proof fail with a transient NoSuchFileException.
+            if (!Files.isRegularFile(firstSupervisorPath)
+                || !Files.isRegularFile(firstManifestPath)) {
+              continue;
+            }
             JsonNode marker = MAPPER.readTree(Files.readString(initialReached));
             assertEquals("index-start", marker.path("point").asText(), marker.toString());
             assertEquals("initial", marker.path("attempt").asText(), marker.toString());
             assertEquals(0, marker.path("recoveryAttempts").asInt(), marker.toString());
+            assertEquals("STARTING", marker.path("indexState").asText(), marker.toString());
+            assertTrue(marker.hasNonNull("stateSince"), marker.toString());
+            JsonNode firstSupervisor = MAPPER.readTree(Files.readString(firstSupervisorPath));
+            JsonNode firstManifest = MAPPER.readTree(Files.readString(firstManifestPath));
+            firstRunId = firstSupervisor.path("runId").asText();
+            firstIncarnation = firstSupervisor.path("incarnation").asInt(-1);
+            assertFalse(firstRunId.isBlank(), firstSupervisor.toString());
+            assertTrue(firstIncarnation >= 1, firstSupervisor.toString());
+            firstPid = firstSupervisor.path("pid").asInt(-1);
+            assertTrue(firstPid > 0, firstSupervisor.toString());
+            assertEquals(firstPid, firstManifest.path("pid").asInt(-1), firstManifest.toString());
+            assertEquals(firstPid, marker.path("pid").asInt(-1), marker.toString());
             Path indexBase = Path.of(marker.path("indexBase").asText());
             Path lockFile = indexBase.resolveSibling(indexBase.getFileName() + ".index.lock");
             indexLock = intruder.holdExclusive(lockFile);
@@ -648,11 +841,14 @@ final class EngineSupervisedRecoveryE2ETest {
             }
           }
           if (initialBarrierReleased && !recoveryBarrierReleased
-              && Files.isRegularFile(recoveryReached)) {
+              && Files.isRegularFile(recoveryReached)
+              && Files.isRegularFile(recoveryProof)) {
             JsonNode marker = MAPPER.readTree(Files.readString(recoveryReached));
             assertEquals("index-start", marker.path("point").asText(), marker.toString());
             assertEquals("recovery-1", marker.path("attempt").asText(), marker.toString());
             assertEquals(1, marker.path("recoveryAttempts").asInt(), marker.toString());
+            assertEquals("STARTING", marker.path("indexState").asText(), marker.toString());
+            assertEquals(firstPid, marker.path("pid").asInt(-1), marker.toString());
             if ("lock-index-release".equals(scenario)) {
               indexLock.close();
               indexLockReleased = true;
@@ -667,7 +863,12 @@ final class EngineSupervisedRecoveryE2ETest {
             JsonNode state = Files.isRegularFile(supervisor)
                 ? MAPPER.readTree(Files.readString(supervisor)) : null;
             JsonNode lastExit = state == null ? null : state.path("lastExit");
-            if (lastExit != null && lastExit.path("code").asInt(-1) == 5
+            if (lastExit != null
+                && state.path("runId").asText().equals(firstRunId)
+                && lastExit.path("incarnation").asInt(-1) == firstIncarnation
+                && lastExit.path("code").asInt(-1) == 5
+                && lastExit.path("reason").asText().equals("escalated_restart")
+                && lastExit.path("class").asText().equals("TRANSIENT")
                 && lastExit.path("counted").asBoolean(false)) {
               indexLock.close();
               indexLockReleased = true;
@@ -780,12 +981,23 @@ final class EngineSupervisedRecoveryE2ETest {
     } else if ("lock-index-release".equals(scenario)) {
       assertTrue(output.contains("INDEX_LOCK_RELEASE_PASS"), output);
       assertTrue(indexLockReleased, "the exact index lock was not released before retry");
+      String engineLog = Files.readString(work.resolve("data/logs/engine.log"));
+      assertFalse(engineLog.contains("Recovery/API cleanup failed"), engineLog);
+      assertFalse(engineLog.contains("Head cleanup incomplete"), engineLog);
     } else if ("lock-index-exhaustion".equals(scenario)) {
       assertTrue(output.contains("INDEX_LOCK_EXHAUSTION_PASS"), output);
       assertTrue(indexLockReleased, "the exact index lock was not released after escalation");
     } else {
       assertTrue(output.contains("LOCK_SURVIVAL_PASS"), output);
       assertTrue(intruder.acquiredLockCount() > 0, "the attack must acquire real filesystem locks");
+    }
+    if (indexLockScenario) {
+      String marker = "lock-index-release".equals(scenario)
+          ? "INDEX_LOCK_RELEASE_PASS" : "INDEX_LOCK_EXHAUSTION_PASS";
+      var result = markerPayload(output, marker);
+      assertEquals(429, result.path("busyRecovery").path("status").asInt(), output);
+      assertEquals("ADMISSION_ENGINE_LIMIT",
+          result.path("busyRecovery").path("body").path("errorCode").asText(), output);
     }
     assertTrue(output.contains("PASS"), output);
     assertTrue(output.contains("\"portsClosed\":true"), output);
@@ -804,6 +1016,22 @@ final class EngineSupervisedRecoveryE2ETest {
           && Files.isRegularFile(models.resolve("splade/naver-splade-v3/tokenizer.json"))
           && Files.isRegularFile(models.resolve("onnx/citation-scorer/model.onnx"))
           && Files.isRegularFile(models.resolve("onnx/citation-scorer/tokenizer.json"))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean hasRetainedGenerativeRuntime(Path repo, String profile) {
+    String model = "standard".equals(profile) ? "Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+        : "compact/Qwen3.5-4B-Q4_K_M.gguf";
+    String mmproj = "standard".equals(profile) ? "mmproj-F16.gguf"
+        : "compact/mmproj-F16.gguf";
+    for (Path ancestor = repo; ancestor != null; ancestor = ancestor.getParent()) {
+      if (Files.isRegularFile(ancestor.resolve("models").resolve(model))
+          && Files.isRegularFile(ancestor.resolve("models").resolve(mmproj))
+          && Files.isRegularFile(ancestor.resolve(
+              "modules/ui/native-bin/llama-server/variants/cuda12/llama-server.exe"))) {
         return true;
       }
     }

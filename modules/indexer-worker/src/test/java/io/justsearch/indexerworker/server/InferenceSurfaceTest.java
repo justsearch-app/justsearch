@@ -18,6 +18,7 @@ import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import io.justsearch.ort.SessionHandle.Lease;
 import io.justsearch.reranker.RerankerAssembly;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -302,7 +303,8 @@ class InferenceSurfaceTest {
   @DisplayName("a composed lexical-only surface is unavailable")
   void noRequestedRolesAreUnavailable() {
     InferenceSurface.ComponentObservation observation =
-        InferenceSurface.ComponentObservation.composed("digest", Set.of(), Set.of());
+        InferenceSurface.ComponentObservation.composed(
+            "digest", Set.of(), Set.of(), Optional.empty());
 
     assertTrue(observation.configurationDigest().isPresent());
     assertFalse(observation.hasRequestedRoles());
@@ -314,7 +316,8 @@ class InferenceSurfaceTest {
   void requestedMissingRoleIsUnavailable() {
     InferenceSurface.ComponentObservation observation =
         InferenceSurface.ComponentObservation.composed(
-            "digest", Set.of(EncoderRole.EMBEDDING, EncoderRole.NER), Set.of(EncoderRole.NER));
+            "digest", Set.of(EncoderRole.EMBEDDING, EncoderRole.NER), Set.of(EncoderRole.NER),
+            Optional.empty());
 
     assertEquals(Set.of(EncoderRole.EMBEDDING), observation.missingRoles());
     assertFalse(observation.compositionSatisfied());
@@ -327,7 +330,7 @@ class InferenceSurfaceTest {
         InferenceSurface.ComponentObservation.composed(
             "digest",
             Set.of(EncoderRole.EMBEDDING, EncoderRole.CITATION),
-            Set.of(EncoderRole.EMBEDDING, EncoderRole.CITATION));
+            Set.of(EncoderRole.EMBEDDING, EncoderRole.CITATION), Optional.empty());
 
     assertTrue(observation.missingRoles().isEmpty());
     assertTrue(observation.compositionSatisfied());
@@ -340,7 +343,7 @@ class InferenceSurfaceTest {
         InferenceSurface.ComponentObservation.composed(
             "digest",
             Set.of(EncoderRole.BGE_M3, EncoderRole.SPLADE),
-            Set.of(EncoderRole.SPLADE));
+            Set.of(EncoderRole.SPLADE), Optional.empty());
 
     assertEquals(Set.of(EncoderRole.BGE_M3), observation.missingRoles());
     assertFalse(observation.compositionSatisfied());
@@ -349,7 +352,7 @@ class InferenceSurfaceTest {
   @Test
   void unavailableBootOverrideSurvivesQueryPartition() {
     var original = InferenceSurface.ComponentObservation.composed("digest",
-        Set.of(EncoderRole.EMBEDDING), Set.of(EncoderRole.EMBEDDING));
+        Set.of(EncoderRole.EMBEDDING), Set.of(EncoderRole.EMBEDDING), Optional.empty());
     var surface = new InferenceSurface(Optional.empty(), Optional.empty(), Optional.empty(),
         Optional.empty(), Optional.empty(), Optional.empty(), emptySnapshot(), List.of(), original);
 
@@ -370,9 +373,11 @@ class InferenceSurfaceTest {
   void partitionKeepsQueryHandleIndependentOfIndexRetirement() {
     CountingHandle index = new CountingHandle();
     CountingHandle query = new CountingHandle();
+    var querySelection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
+        QueryRoleSelection.Role.disabled());
     var observation = InferenceSurface.ComponentObservation.composed("digest",
         Set.of(EncoderRole.EMBEDDING, EncoderRole.RERANKER),
-        Set.of(EncoderRole.EMBEDDING, EncoderRole.RERANKER));
+        Set.of(EncoderRole.EMBEDDING, EncoderRole.RERANKER), Optional.of(querySelection));
     var composed = new InferenceSurface(Optional.empty(), Optional.empty(),
         Optional.of(new RerankerAssembly(query, null, null)), Optional.empty(),
         Optional.empty(), Optional.empty(), emptySnapshot(), List.of(index, query), observation);
@@ -388,6 +393,9 @@ class InferenceSurfaceTest {
         owners.index().componentObservation().configurationDigest());
     assertEquals(Optional.of("query-digest"),
         owners.query().componentObservation().configurationDigest());
+    assertTrue(owners.index().componentObservation().querySelection().isEmpty());
+    assertEquals(Optional.of(querySelection),
+        owners.query().componentObservation().querySelection());
 
     owners.index().close();
     assertEquals(1, index.closeCount.get());

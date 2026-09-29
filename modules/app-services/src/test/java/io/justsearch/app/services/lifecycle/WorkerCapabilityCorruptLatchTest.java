@@ -52,7 +52,7 @@ final class WorkerCapabilityCorruptLatchTest {
 
     // The supervisor restarts, fails again, and gives up. Each of these would overwrite the reason
     // slot under last-writer-wins — and the marker is already gone, so the cause would be lost.
-    cap.transition(ComponentState.RELOADING, LifecycleReasonCode.WORKER_RECOVERING.code(), "a1");
+    cap.transition(ComponentState.RELOADING, LifecycleReasonCode.COMPONENT_RECOVERING.code(), "a1");
     assertEquals(CORRUPT, cap.pendingReason(), "the latched cause survives the restart narration");
     assertEquals(
         CapabilityHealth.RECOVERING, cap.health(), "the new HEALTH is always applied; only the reason is retained");

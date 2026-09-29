@@ -1,8 +1,8 @@
 package io.justsearch.app.inference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.ConfigCode;
@@ -39,8 +39,8 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>This test pins the emit-from-handleServerCrash invariant: the typed
  * {@link InferenceFailure.HealthFailure} with {@link HealthCode#PROCESS_DIED} and
- * {@code restartTriggered=true} must reach the events sink. Removing the emit (or weakening
- * its tag) breaks this test.
+ * {@code restartTriggered=false} must reach the events sink because the component monitor now owns
+ * restart admission. Removing the emit or adding a native retry breaks this test.
  */
 final class LlamaServerOpsCrashTelemetryTest {
   private final java.util.List<LlamaServerOps> owned = new java.util.ArrayList<>();
@@ -51,10 +51,11 @@ final class LlamaServerOpsCrashTelemetryTest {
   }
 
   @Test
-  @DisplayName("Bug F: handleServerCrash emits onHealthFailure(PROCESS_DIED, restart_triggered)")
+  @DisplayName("process death emits telemetry and one component failure signal")
   void bugF_processDeath_emitsTypedHealthFailure() throws Exception {
     RecordingEvents events = new RecordingEvents();
-    LlamaServerOps ops = newOps(events, () -> Mode.ONLINE, () -> false);
+    AtomicInteger failures = new AtomicInteger();
+    LlamaServerOps ops = newOps(events, () -> Mode.ONLINE, () -> false, failures::incrementAndGet);
 
     LlamaServerTestAccess.crashCurrent(ops);
 
@@ -66,66 +67,54 @@ final class LlamaServerOpsCrashTelemetryTest {
     assertNotNull(emitted.failure());
     assertEquals(HealthCode.PROCESS_DIED, emitted.failure().code());
     assertEquals(1, emitted.consecutiveCount(), "first crash → count=1");
-    assertTrue(
-        emitted.restartTriggered(),
-        "process death always counts as restart_triggered (no probe-failure threshold gating)");
+    assertFalse(emitted.restartTriggered(), "the component monitor owns restart admission");
+    assertEquals(1, failures.get());
   }
 
   @Test
-  @DisplayName("Bug F: a second crash before recovery still emits, with crashCount=2")
-  void bugF_secondCrash_incrementsCount() throws Exception {
+  @DisplayName("one physical owner emits only one component failure signal")
+  void duplicateCrashCallbackIsDeduplicatedPerOwner() throws Exception {
     RecordingEvents events = new RecordingEvents();
-    LlamaServerOps ops = newOps(events, () -> Mode.ONLINE, () -> false);
+    AtomicInteger failures = new AtomicInteger();
+    LlamaServerOps ops = newOps(events, () -> Mode.ONLINE, () -> false, failures::incrementAndGet);
 
     LlamaServerTestAccess.crashCurrent(ops);
     LlamaServerTestAccess.crashCurrent(ops);
 
-    assertEquals(2, events.healthFailures.size());
+    assertEquals(1, events.healthFailures.size());
     assertEquals(1, events.healthFailures.get(0).consecutiveCount());
-    assertEquals(2, events.healthFailures.get(1).consecutiveCount());
-  }
-
-  @Test
-  @DisplayName("Brain give-up: reaching MAX_CRASHES fires goOfflineFromMaxCrashes (terminal OFFLINE)")
-  void maxCrashes_triggersTerminalGiveUp() throws Exception {
-    RecordingEvents events = new RecordingEvents();
-    AtomicInteger giveUps = new AtomicInteger(0);
-    LlamaServerOps ops =
-        newOps(events, () -> Mode.ONLINE, () -> false, giveUps::incrementAndGet);
-
-    // Recovery callbacks are no-ops; each owned crash emits synchronously and only the
-    // cap schedules terminal OFFLINE. Await that callback without inducing extra crashes.
-    int cap = BrainSupervisionPolicy.defaults().maxCrashes();
-    for (int i = 0; i < cap; i++) {
-      LlamaServerTestAccess.crashCurrent(ops);
-    }
-
-    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
-    while (giveUps.get() == 0 && System.nanoTime() < deadline) {
-      Thread.sleep(10);
-    }
-
-    assertEquals(1, giveUps.get(),
-        "reaching maxCrashes (" + cap + ") must fire one terminal give-up callback");
-    assertTrue(
-        events.healthFailures.stream().anyMatch(h -> h.consecutiveCount() >= cap),
-        "a PROCESS_DIED health failure at or past the cap must have been emitted");
+    assertEquals(1, failures.get());
   }
 
   // ==================== Test helpers ====================
 
-  private LlamaServerOps newOps(
-      InferenceTelemetryEvents events,
-      Supplier<Mode> currentMode,
-      Supplier<Boolean> usingExternal) throws Exception {
-    return newOps(events, currentMode, usingExternal, () -> {});
+  @Test
+  void healthThresholdSignalsOwnerWithoutClaimingRestartAdmission() throws Exception {
+    RecordingEvents events = new RecordingEvents();
+    AtomicInteger failures = new AtomicInteger();
+    LlamaServerOps ops = newOps(events, () -> Mode.ONLINE, () -> false, failures::incrementAndGet);
+    java.util.concurrent.ScheduledFuture<?> periodic =
+        org.mockito.Mockito.mock(java.util.concurrent.ScheduledFuture.class);
+    var taskField = LlamaServerOps.class.getDeclaredField("periodicHealthTask");
+    taskField.setAccessible(true);
+    taskField.set(ops, periodic);
+
+    for (int attempt = 0; attempt < 3; attempt++) {
+      ops.handlePeriodicHealthFailure("health timeout", false);
+    }
+
+    assertEquals(3, events.healthFailures.size());
+    assertEquals(1, failures.get());
+    events.healthFailures.forEach(event -> assertFalse(event.restartTriggered()));
+    org.mockito.Mockito.verify(periodic).cancel(false);
+    org.junit.jupiter.api.Assertions.assertNull(taskField.get(ops));
   }
 
   private LlamaServerOps newOps(
       InferenceTelemetryEvents events,
       Supplier<Mode> currentMode,
       Supplier<Boolean> usingExternal,
-      Runnable goOfflineFromMaxCrashes) throws Exception {
+      Runnable managedFailure) throws Exception {
     AtomicReference<String> modelIdRef = new AtomicReference<>(null);
     AtomicReference<Integer> contextRef = new AtomicReference<>(null);
     PropsObserver propsObserver =
@@ -157,8 +146,7 @@ final class LlamaServerOpsCrashTelemetryTest {
             null, // gpuCapabilitiesService — not exercised in handleServerCrash path
             currentMode,
             propsObserver,
-            ignored -> {},
-            ignored -> goOfflineFromMaxCrashes.run(),
+            ignored -> managedFailure.run(),
             (reason, guard) -> {}, // goOfflineFromExternalFailure
             events);
     // Preserve the original 'usingExternal' supplier semantics for the legacy test contract:
@@ -180,7 +168,7 @@ final class LlamaServerOpsCrashTelemetryTest {
     record HealthFailureCall(
         InferenceFailure.HealthFailure failure, int consecutiveCount, boolean restartTriggered) {}
 
-    // Keep event recording safe for callbacks delivered by the recovery scheduler.
+    // Health probes and process-exit callbacks can emit from different threads.
     final java.util.List<HealthFailureCall> healthFailures =
         new java.util.concurrent.CopyOnWriteArrayList<>();
     final AtomicInteger ignoredCallCount = new AtomicInteger();

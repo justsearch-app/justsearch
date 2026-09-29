@@ -157,10 +157,8 @@ class SupervisionContractTest {
     // NOT BrainSupervisionPolicy.defaults(), whose healthCheckTimeoutMs reads the
     // justsearch.inference.health_check_timeout_ms sysprop. Asserting against defaults() would make
     // this drift check fail for the wrong reason if any JVM-shared test (or eval mode) set that sysprop.
-    assertEquals(BrainSupervisionPolicy.DEFAULT_MAX_CRASHES, pol.get("maxCrashes").asInt());
-    assertEquals(
-        BrainSupervisionPolicy.DEFAULT_CRASH_RECOVERY_DELAY_MS,
-        pol.get("crashRecoveryDelayMs").longValue());
+    assertTrue(pol.get("maxCrashes") == null, "Component monitor owns the recovery budget");
+    assertTrue(pol.get("crashRecoveryDelayMs") == null, "Component monitor owns recovery backoff");
     assertEquals(
         BrainSupervisionPolicy.DEFAULT_CONSECUTIVE_FAILURES_BEFORE_RESTART,
         pol.get("consecutiveFailuresBeforeRestart").asInt());

@@ -324,7 +324,7 @@ public final class RemoteIndexingJobsBridge {
       started.set(false);
       snapshotDelivered.completeExceptionally(
           new IllegalStateException(
-              "Worker not connected yet; retry start() after connectKnowledgeServer."));
+              "Worker not connected yet; retry start() after prepareKnowledgeServerBinding."));
       return;
     }
     Consumer<IndexingJobsFrame> onFrame =

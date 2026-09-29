@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -90,6 +91,52 @@ public final class TestEngineComponents implements EngineComponentRegistry {
   }
 
   @Override
+  public PreparedBatch prepareBatch(
+      Map<String, EngineComponentSnapshot.Component> replacements) {
+    Objects.requireNonNull(replacements, "replacements");
+    synchronized (monitor) {
+      ensureOpen();
+      var updates = new ArrayList<PreparedUpdate>(replacements.size());
+      for (var entry : Map.copyOf(replacements).entrySet()) {
+        String name = Objects.requireNonNull(entry.getKey(), "replacement name");
+        var desired = Objects.requireNonNull(entry.getValue(), "replacement for " + name);
+        var handle = components.get(name);
+        if (handle == null) {
+          throw new IllegalArgumentException("Component is not registered: " + name);
+        }
+        if (!handle.spec.equals(desired.spec())) {
+          throw new IllegalArgumentException("Replacement spec does not match component: " + name);
+        }
+        var before = handle.snapshotLocked();
+        updates.add(new PreparedUpdate(handle, before,
+            withPublicationStateSince(before, desired)));
+      }
+      boolean changed = updates.stream().anyMatch(update -> !update.before.equals(update.desired));
+      long nextRevision = changed ? revision + 1 : revision;
+      var byName = new LinkedHashMap<String, EngineComponentSnapshot.Component>();
+      for (var update : updates) byName.put(update.handle.spec.name(), update.desired);
+      var rows = components.values().stream()
+          .map(handle -> byName.getOrDefault(handle.spec.name(), handle.snapshotLocked()))
+          .sorted(Comparator.comparing(row -> row.spec().name()))
+          .toList();
+      var prepared = new EngineComponentSnapshot(nextRevision, rows);
+      var observers = changed ? listenersLocked() : List.<Consumer<EngineComponentSnapshot>>of();
+      return new TestPreparedBatch(revision, updates, prepared, observers, changed);
+    }
+  }
+
+  private static EngineComponentSnapshot.Component withPublicationStateSince(
+      EngineComponentSnapshot.Component before, EngineComponentSnapshot.Component desired) {
+    boolean changed = before.state() != desired.state();
+    return new EngineComponentSnapshot.Component(
+        desired.spec(), desired.state(), desired.reasonCode(),
+        changed ? Instant.now() : before.stateSince(),
+        changed ? System.nanoTime() : before.stateSinceMonotonicNanos(),
+        desired.appliedVersion(), desired.desiredVersion(), desired.lastCompose(),
+        desired.recoveryAttempts(), desired.evidence());
+  }
+
+  @Override
   public Subscription subscribe(Consumer<EngineComponentSnapshot> listener) {
     Objects.requireNonNull(listener, "listener");
     synchronized (monitor) {
@@ -126,19 +173,34 @@ public final class TestEngineComponents implements EngineComponentRegistry {
       EngineComponentSnapshot.Component expected,
       EngineComponentSnapshot expectedRegistry,
       Mutation mutation) {
+    return mutateAndCapture(handle, expected, expectedRegistry, mutation).isPresent();
+  }
+
+  /** Captures the winning row before test listeners receive the publication. */
+  private Optional<EngineComponentSnapshot.Component> mutateAndCapture(
+      TestComponentHandle handle,
+      EngineComponentSnapshot.Component expected,
+      EngineComponentSnapshot expectedRegistry,
+      Mutation mutation) {
     EngineComponentSnapshot published;
     List<Consumer<EngineComponentSnapshot>> listeners;
+    EngineComponentSnapshot.Component exact;
     synchronized (monitor) {
       ensureOpen();
-      if (expectedRegistry != null && !expectedRegistry.equals(snapshotLocked())) return false;
-      if (expected != null && !expected.equals(handle.snapshotLocked())) return false;
-      if (!mutation.apply(handle)) return true;
+      if (expectedRegistry != null && !expectedRegistry.equals(snapshotLocked())) {
+        return Optional.empty();
+      }
+      if (expected != null && !expected.equals(handle.snapshotLocked())) {
+        return Optional.empty();
+      }
+      if (!mutation.apply(handle)) return Optional.of(handle.snapshotLocked());
       revision++;
       published = snapshotLocked();
       listeners = listenersLocked();
+      exact = handle.snapshotLocked();
     }
     publish(listeners, published);
-    return true;
+    return Optional.of(exact);
   }
 
   private EngineComponentSnapshot snapshotLocked() {
@@ -184,6 +246,80 @@ public final class TestEngineComponents implements EngineComponentRegistry {
     boolean apply(TestComponentHandle handle);
   }
 
+  private record PreparedUpdate(TestComponentHandle handle,
+      EngineComponentSnapshot.Component before,
+      EngineComponentSnapshot.Component desired) {}
+
+  private final class TestPreparedBatch implements PreparedBatch {
+    private final long baseRevision;
+    private final List<PreparedUpdate> updates;
+    private final EngineComponentSnapshot preparedSnapshot;
+    private final List<Consumer<EngineComponentSnapshot>> observers;
+    private final boolean changed;
+    private boolean installed;
+    private boolean notified;
+
+    private TestPreparedBatch(long baseRevision, List<PreparedUpdate> updates,
+        EngineComponentSnapshot preparedSnapshot,
+        List<Consumer<EngineComponentSnapshot>> observers, boolean changed) {
+      this.baseRevision = baseRevision;
+      this.updates = List.copyOf(updates);
+      this.preparedSnapshot = preparedSnapshot;
+      this.observers = List.copyOf(observers);
+      this.changed = changed;
+    }
+
+    @Override public EngineComponentSnapshot snapshot() { return preparedSnapshot; }
+
+    @Override
+    public void validate() {
+      synchronized (monitor) {
+        ensureOpen();
+        if (installed || revision != baseRevision
+            || updates.stream().anyMatch(update ->
+                !update.before.equals(update.handle.snapshotLocked()))) {
+          throw new IllegalStateException("prepared test component batch is stale");
+        }
+      }
+    }
+
+    @Override
+    public void install() {
+      synchronized (monitor) {
+        ensureOpen();
+        if (installed || revision != baseRevision
+            || updates.stream().anyMatch(update ->
+                !update.before.equals(update.handle.snapshotLocked()))) {
+          throw new IllegalStateException("prepared test component batch is stale");
+        }
+        if (changed) {
+          updates.forEach(update -> update.handle.installPrepared(update.desired));
+          revision = preparedSnapshot.revision();
+        }
+        installed = true;
+      }
+    }
+
+    @Override
+    public void notifyObservers() {
+      synchronized (monitor) {
+        if (!installed || notified) {
+          throw new IllegalStateException(
+              "prepared test component observers require one installed batch");
+        }
+        notified = true;
+      }
+      publish(observers, preparedSnapshot);
+    }
+
+    @Override
+    public void commit() {
+      validate();
+      install();
+      notifyObservers();
+    }
+  }
+
   private final class TestComponentHandle implements ComponentHandle {
     private final ComponentSpec spec;
     private ComponentState state = ComponentState.ABSENT;
@@ -209,6 +345,16 @@ public final class TestEngineComponents implements EngineComponentRegistry {
     }
 
     @Override
+    public PreparedBatch prepareReplacement(EngineComponentSnapshot.Component replacement) {
+      return TestEngineComponents.this.prepareBatch(Map.of(spec.name(), replacement));
+    }
+
+    @Override
+    public boolean belongsTo(EngineComponentRegistry registry) {
+      return registry == TestEngineComponents.this;
+    }
+
+    @Override
     public EngineComponentSnapshot.Component snapshot() {
       synchronized (monitor) {
         return snapshotLocked();
@@ -226,8 +372,17 @@ public final class TestEngineComponents implements EngineComponentRegistry {
         ComponentState next,
         String nextReasonCode,
         String nextEvidence) {
+      return tryTransitionIfUnchanged(expected, next, nextReasonCode, nextEvidence).isPresent();
+    }
+
+    @Override
+    public Optional<EngineComponentSnapshot.Component> tryTransitionIfUnchanged(
+        EngineComponentSnapshot.Component expected,
+        ComponentState next,
+        String nextReasonCode,
+        String nextEvidence) {
       Objects.requireNonNull(expected, "expected");
-      return transition(expected, null, next, nextReasonCode, nextEvidence);
+      return transitionExact(expected, null, next, nextReasonCode, nextEvidence);
     }
 
     @Override
@@ -246,10 +401,20 @@ public final class TestEngineComponents implements EngineComponentRegistry {
         ComponentState next,
         String nextReasonCode,
         String nextEvidence) {
+      return transitionExact(expected, expectedRegistry, next, nextReasonCode, nextEvidence)
+          .isPresent();
+    }
+
+    private Optional<EngineComponentSnapshot.Component> transitionExact(
+        EngineComponentSnapshot.Component expected,
+        EngineComponentSnapshot expectedRegistry,
+        ComponentState next,
+        String nextReasonCode,
+        String nextEvidence) {
       Objects.requireNonNull(next, "state");
       optionalNonBlank(nextReasonCode, "reasonCode");
       optionalNonBlank(nextEvidence, "evidence");
-      return mutate(
+      return mutateAndCapture(
           this,
           expected,
           expectedRegistry,
@@ -281,6 +446,23 @@ public final class TestEngineComponents implements EngineComponentRegistry {
             handle.appliedVersion = digest;
             return true;
           });
+    }
+
+    @Override
+    public Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
+        EngineComponentSnapshot.Component expected, String nextReasonCode, String nextEvidence) {
+      Objects.requireNonNull(expected, "expected");
+      optionalNonBlank(nextReasonCode, "reasonCode");
+      optionalNonBlank(nextEvidence, "evidence");
+      return mutateAndCapture(this, expected, null, handle -> {
+        handle.state = ComponentState.STARTING;
+        handle.stateSince = Instant.now();
+        handle.stateSinceMonotonicNanos = System.nanoTime();
+        handle.reasonCode = nextReasonCode;
+        handle.evidence = nextEvidence;
+        handle.recoveryAttempts++;
+        return true;
+      });
     }
 
     @Override
@@ -330,6 +512,18 @@ public final class TestEngineComponents implements EngineComponentRegistry {
           lastCompose,
           recoveryAttempts,
           evidence);
+    }
+
+    private void installPrepared(EngineComponentSnapshot.Component desired) {
+      state = desired.state();
+      reasonCode = desired.reasonCode();
+      stateSince = desired.stateSince();
+      stateSinceMonotonicNanos = desired.stateSinceMonotonicNanos();
+      appliedVersion = desired.appliedVersion();
+      desiredVersion = desired.desiredVersion();
+      lastCompose = desired.lastCompose();
+      recoveryAttempts = desired.recoveryAttempts();
+      evidence = desired.evidence();
     }
   }
 

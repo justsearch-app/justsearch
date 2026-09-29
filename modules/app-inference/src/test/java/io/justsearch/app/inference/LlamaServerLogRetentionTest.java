@@ -165,7 +165,6 @@ final class LlamaServerLogRetentionTest {
           }
         },
         ignored -> {},
-        ignored -> {},
         (reason, guard) -> {},
         InferenceTelemetryEvents.noop());
   }

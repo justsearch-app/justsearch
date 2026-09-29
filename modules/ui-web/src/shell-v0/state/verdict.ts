@@ -45,6 +45,7 @@ export type ProvisionalCause =
   | 'rebuilding'
   | 'generation-switch'
   | 'worker-restart'
+  | 'index-recovery'
   // 630: a brief window after OS resume while the worker re-reconciles files changed during sleep.
   | 'catching-up'
   // 649: the poll-specific data is stale (aged past the freshness window) BUT the backend is provably
@@ -119,6 +120,9 @@ export interface SystemHealthVerdict {
 
 export interface StabilityInput {
   readonly phase: ConnectionPhase;
+  /** Exact engine-component owner for a supervised in-place index recovery. */
+  readonly indexComponentState?: string | null;
+  readonly indexComponentReasonCode?: string | null;
   /** `worker.core.indexState` — `'UNAVAILABLE'` is the worker-down fallback. */
   readonly indexState: string | null | undefined;
   /** `worker.migration.*` — the rebuild / generation-switch signal (595 §9.1). */
@@ -176,6 +180,15 @@ export function computeStability(i: StabilityInput): Stability {
   // consumes (`computeReachability`, 40 s window) — no second authority, no new number.
   if (i.phase === 'stale' && i.reachableViaContact === false) {
     return { kind: 'provisional', cause: 'channel-stale' };
+  }
+  // The index component is the exact recovery owner. Read this before the coarse Worker fallback
+  // so an admitted index recovery keeps its truthful identity even while the Worker view is
+  // temporarily UNAVAILABLE. Optional AI/generative recovery cannot satisfy this predicate.
+  if (
+    (i.indexComponentState ?? '').toUpperCase() === 'STARTING' &&
+    i.indexComponentReasonCode === 'component.recovering'
+  ) {
+    return { kind: 'provisional', cause: 'index-recovery' };
   }
   // Worker process down/restarting: a SUCCESSFUL poll returned the fallback view
   // (ConnectionPhase stays `connected`, so this is NOT caught by phase — 595 §9.1).
@@ -327,13 +340,6 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
   // Tempdoc 600 Design A: the reindex/compat cause is no longer a boolean shortcut — it arrives as
   // a real reason code on the `retrieval` composite (index.blocked_legacy / .schema_mismatch / …),
   // so it flows through the ONE degraded path below and is named by the CAUSE_ROWS vocabulary.
-  // Tempdoc 627: a supervised Worker restart in flight surfaces `worker.recovering` on the retrieval
-  // composite (alongside downstream consequences like index.not_healthy). Treat its presence as a calm
-  // "Restarting…" transitioning state, not an alarming "Service degraded" — a routine self-heal should
-  // not read as a failure. (`includes`, not sole-reason: the restart is the root, the rest is downstream.)
-  if (r.retrieval === 'degraded' && r.reasonCodes.includes('worker.recovering')) {
-    return { kind: 'transitioning', severity: 'busy', reasons: ['worker-restart'] };
-  }
   if (r.retrieval === 'degraded') {
     return { kind: 'degraded', severity: severityForCodes(r.reasonCodes), reasons: r.reasonCodes };
   }
@@ -374,6 +380,8 @@ export function verdictHeadline(v: SystemHealthVerdict): string {
           return 'Reconnecting…';
         case 'worker-restart':
           return 'Restarting…';
+        case 'index-recovery':
+          return 'Recovering search…';
         case 'generation-switch':
           return 'Switching index…';
         case 'catching-up':
@@ -452,6 +460,8 @@ export function verdictBody(v: SystemHealthVerdict): string {
           return 'Reconnecting to the backend; holding last-known values.';
         case 'worker-restart':
           return 'The knowledge server is restarting; counts will settle shortly.';
+        case 'index-recovery':
+          return 'The search index is recovering; counts will settle shortly.';
         case 'generation-switch':
           return 'Switching to the freshly-built index; this completes shortly.';
         case 'catching-up':

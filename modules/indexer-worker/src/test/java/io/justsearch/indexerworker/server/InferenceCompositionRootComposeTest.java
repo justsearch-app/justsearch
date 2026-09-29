@@ -10,12 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import io.justsearch.configuration.EnvRegistry;
-import io.justsearch.configuration.model.HardwareProfile;
-import io.justsearch.configuration.model.ModelPrecision;
-import io.justsearch.configuration.model.ExecutionProvider;
-import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile;
+import io.justsearch.app.api.settings.QueryRoleSelection;
+import io.justsearch.configuration.EnvRegistry;
+import io.justsearch.configuration.model.DownloadProfile;
+import io.justsearch.configuration.model.ExecutionProvider;
+import io.justsearch.configuration.model.HardwareProfile;
+import io.justsearch.configuration.model.InstallContract;
+import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.indexerworker.index.IndexGenerationManager.ModelArtifact;
@@ -27,8 +29,10 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,6 +55,207 @@ import org.slf4j.LoggerFactory;
 @DisplayName("InferenceCompositionRoot.compose (§14.28 U6)")
 class InferenceCompositionRootComposeTest {
 
+  @Test
+  void indexPlanFreezesContractAInsteadOfConfiguredB(@TempDir Path dir) throws Exception {
+    Path contractRoot = dir.resolve("contract");
+    Path selectedDir = contractRoot.resolve("onnx/embedding");
+    Path configuredDir = dir.resolve("configured-B");
+    Files.createDirectories(selectedDir);
+    Files.createDirectories(configuredDir);
+    Path selected = Files.writeString(selectedDir.resolve("model.onnx"), "selected-A");
+    Files.writeString(selectedDir.resolve("tokenizer.json"), "tokenizer-A");
+    Files.writeString(configuredDir.resolve("model.onnx"), "configured-B");
+    Files.writeString(configuredDir.resolve("tokenizer.json"), "tokenizer-B");
+    var cfg = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "true",
+        EnvRegistry.EMBED_ONNX_MODEL_PATH.configKey(), configuredDir.toString(),
+        EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "false",
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false"));
+    var installed = new InstallContract.InstalledModel("embedding", "model.onnx",
+        ModelPrecision.FP32, ExecutionProvider.CPU, "onnx/embedding", sha256(selected),
+        List.of("model.onnx", "tokenizer.json"), false, null);
+    var contract = new InstallContract(2, System.currentTimeMillis(), HardwareProfile.cpuOnly(),
+        DownloadProfile.CPU, Map.of("embedding", installed), contractRoot);
+    var captured = new AtomicReference<InferenceCompositionRoot.CapturedCompositionPlan>();
+
+    assertThrows(IllegalStateException.class, () -> InferenceCompositionRoot.compose(
+        EncoderConfigurationProjection.from(cfg), HardwareProfile.cpuOnly(), contract,
+        contractRoot, NO_GPU, io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP,
+        null, null, ignored -> {}, plan -> {
+          captured.set(plan);
+          throw new IllegalStateException("stop-before-native");
+        }));
+
+    IndexCompositionPlan.RolePlan embedding =
+        captured.get().indexPlan().role(EncoderRole.EMBEDDING);
+    assertEquals(selected.toAbsolutePath().normalize(), embedding.variant().modelFile());
+    assertEquals(embedding.variant(), embedding.policy().variant());
+    assertEquals(selectedDir.toAbsolutePath().normalize(), embedding.metadataDirectory());
+  }
+
+  @Test
+  void indexCaptureFailureStillPublishesKnownQueryWitness(@TempDir Path dir) throws Exception {
+    Path embeddingDir = dir.resolve("embedding");
+    Path rerankerDir = dir.resolve("reranker");
+    Files.createDirectories(embeddingDir);
+    Files.createDirectories(rerankerDir);
+    Files.writeString(embeddingDir.resolve("model.onnx"), "embedding-model");
+    Files.writeString(embeddingDir.resolve("tokenizer.json"), "embedding-tokenizer");
+    Files.writeString(embeddingDir.resolve("model_manifest.json"), "{not-json");
+    Files.writeString(rerankerDir.resolve("model.onnx"), "reranker-model");
+    Files.writeString(rerankerDir.resolve("tokenizer.json"), "reranker-tokenizer");
+    var cfg = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "true",
+        EnvRegistry.EMBED_ONNX_MODEL_PATH.configKey(), embeddingDir.toString(),
+        EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "true",
+        EnvRegistry.RERANK_MODEL_PATH.configKey(), rerankerDir.toString(),
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false"));
+    var query = new AtomicReference<InferenceSurface.ComponentObservation>();
+    var fullPlan = new AtomicReference<InferenceCompositionRoot.CapturedCompositionPlan>();
+
+    InferenceSurface surface = InferenceCompositionRoot.compose(
+        EncoderConfigurationProjection.from(cfg), HardwareProfile.cpuOnly(), null, null, NO_GPU,
+        io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, null, null, query::set,
+        fullPlan::set);
+
+    assertEquals(QueryRoleSelection.State.SELECTED,
+        query.get().querySelection().orElseThrow().reranker().state());
+    assertEquals(Set.of(EncoderRole.RERANKER), query.get().requestedRoles());
+    assertTrue(query.get().missingRoles().contains(EncoderRole.RERANKER));
+    assertTrue(surface.embedding().isEmpty());
+    assertTrue(fullPlan.get().indexPlan().role(EncoderRole.EMBEDDING).captureFailed());
+    assertThrows(IllegalStateException.class,
+        () -> InferenceCompositionRoot.validateCaptured(fullPlan.get().indexPlan()));
+  }
+
+  @Test
+  void capturedOptionalSidecarAppearanceRefusesBeforeNative(@TempDir Path modelDir)
+      throws Exception {
+    Path model = Files.writeString(modelDir.resolve("model.onnx"), "model-A");
+    Path tokenizer = Files.writeString(modelDir.resolve("tokenizer.json"), "tokenizer-A");
+    var cfg = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "true",
+        EnvRegistry.EMBED_ONNX_MODEL_PATH.configKey(), modelDir.toString(),
+        EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "false",
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false"));
+    var captured = new AtomicReference<InferenceCompositionRoot.CapturedCompositionPlan>();
+    assertThrows(IllegalStateException.class, () -> InferenceCompositionRoot.compose(
+        EncoderConfigurationProjection.from(cfg), HardwareProfile.cpuOnly(), null, null, NO_GPU,
+        io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, null, null, ignored -> {},
+        plan -> {
+          captured.set(plan);
+          throw new IllegalStateException("stop-before-native");
+        }));
+    assertEquals(model.toAbsolutePath().normalize(), captured.get().indexPlan()
+        .role(EncoderRole.EMBEDDING).variant().modelFile());
+
+    Files.writeString(tokenizer, "tokenizer-B");
+    assertThrows(IllegalStateException.class,
+        () -> InferenceCompositionRoot.validateCaptured(captured.get().indexPlan()));
+    Files.writeString(tokenizer, "tokenizer-A");
+    InferenceCompositionRoot.validateCaptured(captured.get().indexPlan());
+
+    Files.writeString(modelDir.resolve("pooling_config.json"), "{\"pooling_mode\":\"cls\"}");
+    assertThrows(IllegalStateException.class,
+        () -> InferenceCompositionRoot.validateCaptured(captured.get().indexPlan()));
+  }
+
+  @Test
+  void bgePlanPreResolvesExactSpladeFallback(@TempDir Path dir) throws Exception {
+    Path bgeDir = dir.resolve("bge");
+    Path spladeDir = dir.resolve("splade");
+    Files.createDirectories(bgeDir);
+    Files.createDirectories(spladeDir);
+    Path bge = Files.writeString(bgeDir.resolve("model_fp16_with_sparse.onnx"), "bge-A");
+    Files.writeString(bgeDir.resolve("tokenizer.json"), "bge-tokenizer");
+    Files.writeString(bgeDir.resolve("model_manifest.json"),
+        "{\"cpu\":\"model_fp16_with_sparse.onnx\",\"gpu\":\"model_fp16_with_sparse.onnx\"}");
+    Path splade = Files.writeString(spladeDir.resolve("model.onnx"), "splade-A");
+    Files.writeString(spladeDir.resolve("tokenizer.json"), "splade-tokenizer");
+    Files.writeString(spladeDir.resolve("vocab.txt"), "[UNK]\nhello\n");
+    var cfg = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.SPARSE_MODEL.configKey(), "bge-m3",
+        EnvRegistry.BGE_M3_ENABLED.configKey(), "true",
+        EnvRegistry.BGE_M3_MODEL_PATH.configKey(), bgeDir.toString(),
+        EnvRegistry.SPLADE_ENABLED.configKey(), "true",
+        EnvRegistry.SPLADE_MODEL_PATH.configKey(), spladeDir.toString(),
+        EnvRegistry.SPLADE_QUERY_MODE.configKey(), "idf",
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "false",
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false"));
+    var captured = new AtomicReference<InferenceCompositionRoot.CapturedCompositionPlan>();
+    assertThrows(IllegalStateException.class, () -> InferenceCompositionRoot.compose(
+        EncoderConfigurationProjection.from(cfg), HardwareProfile.cpuOnly(), null, null, NO_GPU,
+        io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, null, null, ignored -> {},
+        plan -> {
+          captured.set(plan);
+          throw new IllegalStateException("stop-before-native");
+        }));
+
+    IndexCompositionPlan plan = captured.get().indexPlan();
+    assertTrue(plan.bgeM3Selected());
+    assertEquals(bge.toAbsolutePath().normalize(),
+        plan.role(EncoderRole.BGE_M3).variant().modelFile());
+    assertEquals(splade.toAbsolutePath().normalize(),
+        plan.role(EncoderRole.SPLADE).variant().modelFile());
+
+    Files.writeString(bgeDir.resolve("config.json"), "{\"hidden_size\":1024}");
+    Files.writeString(spladeDir.resolve("sentence_bert_config.json"),
+        "{\"max_seq_length\":512}");
+    InferenceCompositionRoot.validateCaptured(plan);
+    Files.writeString(spladeDir.resolve("idf.json"), "{\"hello\":1.0}");
+    assertThrows(IllegalStateException.class,
+        () -> InferenceCompositionRoot.validateCaptured(plan));
+  }
+
+  @Test
+  void recoveredObservationCombinesIndexAWithCurrentQueryB() {
+    Map<String, String> base = Map.of(
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "false",
+        EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "false",
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false");
+    var cfgA = TestResolvedConfigHelper.fromEntries(base);
+    var cfgBEntries = new java.util.HashMap<>(base);
+    cfgBEntries.put(EnvRegistry.RERANK_MAX_SEQ_LEN.configKey(), "384");
+    var cfgB = TestResolvedConfigHelper.fromEntries(cfgBEntries);
+    var capturedA = new AtomicReference<InferenceCompositionRoot.CapturedCompositionPlan>();
+    var capturedB = new AtomicReference<InferenceCompositionRoot.CapturedCompositionPlan>();
+    InferenceCompositionRoot.compose(EncoderConfigurationProjection.from(cfgA),
+        HardwareProfile.cpuOnly(), null, null, NO_GPU,
+        io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, null, null, ignored -> {},
+        capturedA::set);
+    InferenceCompositionRoot.compose(EncoderConfigurationProjection.from(cfgB),
+        HardwareProfile.cpuOnly(), null, null, NO_GPU,
+        io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, null, null, ignored -> {},
+        capturedB::set);
+
+    InferenceSurface recovered = InferenceCompositionRoot.composeCaptured(
+        capturedA.get().indexPlan(), capturedB.get().queryProjection(),
+        capturedB.get().queryObservation(), NO_GPU,
+        io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP);
+
+    assertNotEquals(capturedA.get().queryProjection().queryDigest(),
+        capturedB.get().queryProjection().queryDigest());
+    EncoderConfigurationProjection merged = capturedA.get().indexPlan().projection()
+        .withQueryFrom(capturedB.get().queryProjection());
+    assertEquals(merged.digest(),
+        recovered.componentObservation().configurationDigest().orElseThrow());
+    InferenceSurface.Partition partition = recovered.partitionQueryRoles(merged);
+    assertEquals(capturedA.get().indexPlan().projection().indexDigest(),
+        partition.index().componentObservation().configurationDigest().orElseThrow());
+    assertEquals(capturedB.get().queryProjection().queryDigest(),
+        partition.query().componentObservation().configurationDigest().orElseThrow());
+  }
+
   private ConfigStore originalStore;
 
   @BeforeEach
@@ -66,6 +271,134 @@ class InferenceCompositionRootComposeTest {
   }
 
   private static final GpuArbiter NO_GPU = () -> false;
+
+  @Test
+  void bootCompositionCapturesContractSelectionInsteadOfConfiguredDirectory(@TempDir Path root)
+      throws IOException {
+    Path contractRoot = root.resolve("contract-models");
+    Path contractDir = contractRoot.resolve("onnx/reranker");
+    Path configuredDir = root.resolve("configured-reranker");
+    Files.createDirectories(contractDir);
+    Files.createDirectories(configuredDir);
+    Path model = Files.writeString(contractDir.resolve("model.onnx"), "selected-A");
+    Path tokenizer = Files.writeString(contractDir.resolve("tokenizer.json"), "tokenizer-A");
+    Files.writeString(configuredDir.resolve("model.onnx"), "unselected-B");
+    Files.writeString(configuredDir.resolve("tokenizer.json"), "tokenizer-B");
+    var cfg = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "false",
+        EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "true",
+        EnvRegistry.RERANK_MODEL_PATH.configKey(), configuredDir.toString(),
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false"));
+    var installed = new InstallContract.InstalledModel("reranker", "model.onnx",
+        ModelPrecision.FP32, ExecutionProvider.CPU, "onnx/reranker", sha256(model),
+        List.of("model.onnx", "tokenizer.json"), false, null);
+    var contract = new InstallContract(2, System.currentTimeMillis(), HardwareProfile.cpuOnly(),
+        DownloadProfile.CPU, Map.of("reranker", installed), contractRoot);
+
+    var early = new AtomicReference<InferenceSurface.ComponentObservation>();
+    var stopped = assertThrows(IllegalStateException.class, () ->
+        InferenceCompositionRoot.compose(EncoderConfigurationProjection.from(cfg),
+            HardwareProfile.cpuOnly(), contract, contractRoot, NO_GPU,
+            io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, null, null,
+            observation -> {
+              early.set(observation);
+              throw new IllegalStateException("stop-before-native-assembly");
+            }));
+    assertEquals("stop-before-native-assembly", stopped.getMessage());
+    assertEquals(QueryRoleSelection.State.SELECTED,
+        early.get().querySelection().orElseThrow().reranker().state());
+    assertEquals(QueryRoleSelection.State.DISABLED,
+        early.get().querySelection().orElseThrow().citation().state());
+    assertEquals(Set.of(EncoderRole.RERANKER), early.get().requestedRoles());
+    assertEquals(Set.of(EncoderRole.RERANKER), early.get().missingRoles());
+
+    InferenceSurface first = InferenceCompositionRoot.compose(
+        EncoderConfigurationProjection.from(cfg), HardwareProfile.cpuOnly(), contract,
+        contractRoot, NO_GPU, io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP);
+    QueryRoleSelection captured = first.componentObservation().querySelection().orElseThrow();
+
+    assertEquals(QueryRoleSelection.State.SELECTED, captured.reranker().state());
+    assertEquals(model.toAbsolutePath().normalize(), captured.reranker().model().path());
+    assertEquals(sha256(model), captured.reranker().model().sha256());
+    assertEquals(Files.size(model), captured.reranker().model().sizeBytes());
+    assertEquals(tokenizer.toAbsolutePath().normalize(), captured.reranker().tokenizer().path());
+    assertEquals(ModelPrecision.FP32, captured.reranker().precision());
+    assertEquals(ExecutionProvider.CPU, captured.reranker().targetEp());
+    assertTrue(first.reranker().isEmpty(), "invalid ONNX fixture must fail assembly");
+    assertEquals(Set.of(EncoderRole.RERANKER),
+        first.componentObservation().missingRoles());
+
+    Files.writeString(model, "different-model-bytes-B");
+    InferenceSurface recovered = InferenceCompositionRoot.composeQueryRoles(
+        EncoderConfigurationProjection.from(cfg), captured, HardwareProfile.cpuOnly(), NO_GPU,
+        io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP);
+
+    assertEquals(captured, recovered.componentObservation().querySelection().orElseThrow());
+    assertEquals(Set.of(EncoderRole.RERANKER),
+        recovered.componentObservation().missingRoles());
+  }
+
+  @Test
+  void generationQueryRoleDoesNotOverrideDisabledConfiguration(@TempDir Path modelDir)
+      throws IOException {
+    Path model = Files.writeString(modelDir.resolve("model.onnx"), "generation-model");
+    var cfg = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "false",
+        EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "false",
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false"));
+    var generation = GenerationModelSelection.accepted(Map.of(
+        "reranker", new ModelArtifact(model.toString(), sha256(model))), "splade", 768);
+
+    InferenceSurface surface = InferenceCompositionRoot.compose(
+        EncoderConfigurationProjection.from(cfg), HardwareProfile.cpuOnly(), null,
+        null, NO_GPU, io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, generation);
+
+    QueryRoleSelection witness = surface.componentObservation().querySelection().orElseThrow();
+    assertEquals(QueryRoleSelection.State.DISABLED, witness.reranker().state());
+    assertFalse(surface.componentObservation().requestedRoles().contains(EncoderRole.RERANKER));
+  }
+
+  @Test
+  void requestedUnresolvedQueryRoleDiffersFromIntentionalDisablement() {
+    var requestedCfg = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "false",
+        EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "true",
+        EnvRegistry.RERANK_MODEL_PATH.configKey(), "absent-reranker",
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false"));
+    var disabledCfg = TestResolvedConfigHelper.fromEntries(Map.of(
+        EnvRegistry.AI_EMBED_ENABLED.configKey(), "false",
+        EnvRegistry.SPLADE_ENABLED.configKey(), "false",
+        EnvRegistry.NER_ENABLED.configKey(), "false",
+        EnvRegistry.RERANK_ENABLED.configKey(), "false",
+        EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false"));
+
+    var early = new AtomicReference<InferenceSurface.ComponentObservation>();
+    InferenceSurface requested = InferenceCompositionRoot.compose(
+        EncoderConfigurationProjection.from(requestedCfg), HardwareProfile.cpuOnly(), null, null,
+        NO_GPU, io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, null, null,
+        early::set);
+    InferenceSurface disabled = InferenceCompositionRoot.compose(disabledCfg,
+        HardwareProfile.cpuOnly(), null, null, NO_GPU);
+
+    assertEquals(QueryRoleSelection.State.DISABLED,
+        requested.componentObservation().querySelection().orElseThrow().reranker().state());
+    assertEquals(Set.of(EncoderRole.RERANKER), requested.componentObservation().requestedRoles());
+    assertEquals(Set.of(EncoderRole.RERANKER), requested.componentObservation().missingRoles());
+    assertEquals(QueryRoleSelection.State.DISABLED,
+        early.get().querySelection().orElseThrow().reranker().state());
+    assertEquals(Set.of(EncoderRole.RERANKER), early.get().requestedRoles());
+    assertEquals(Set.of(EncoderRole.RERANKER), early.get().missingRoles());
+    assertEquals(QueryRoleSelection.State.DISABLED,
+        disabled.componentObservation().querySelection().orElseThrow().reranker().state());
+    assertTrue(disabled.componentObservation().requestedRoles().isEmpty());
+    assertTrue(disabled.componentObservation().missingRoles().isEmpty());
+  }
 
   @Test
   void changedWitnessedTokenizerDisablesOnlyThatQueryRole(@TempDir Path modelDir)
@@ -88,6 +421,7 @@ class InferenceCompositionRootComposeTest {
         surface.componentObservation().requestedRoles());
     assertEquals(projection.queryDigest(),
         surface.componentObservation().configurationDigest().orElseThrow());
+    assertEquals(selection, surface.componentObservation().querySelection().orElseThrow());
   }
 
   @Test
@@ -264,7 +598,7 @@ class InferenceCompositionRootComposeTest {
         HardwareProfile.cpuOnly(), null, null, NO_GPU,
         io.justsearch.ort.telemetry.OrtSessionTelemetryEvents.NOOP, selection);
     assertEquals(Set.of(EncoderRole.EMBEDDING), surface.componentObservation().missingRoles());
-    assertTrue(selection.hasUnavailableModel());
+    assertFalse(surface.componentObservation().compositionSatisfied());
   }
 
   @Test

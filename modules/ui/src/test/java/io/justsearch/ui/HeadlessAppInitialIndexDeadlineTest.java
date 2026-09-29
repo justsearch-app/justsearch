@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -42,6 +44,62 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 final class HeadlessAppInitialIndexDeadlineTest {
+  @Test
+  void bootstrapConstructionFailurePropagatesToFatalStartup(@TempDir Path dir) throws Exception {
+    try (var executors = new TestEngineExecutors();
+        var components = TestEngineComponents.fourComponents()) {
+      var root = mock(EngineRoot.class);
+      when(root.executors()).thenReturn(executors);
+      when(root.components()).thenReturn(components);
+      // Exercise the real bootstrap constructor's physical-owner invariant.
+      when(root.indexComponent()).thenReturn(components.handle("encoders"));
+      when(root.publicationLock()).thenReturn(new ReentrantReadWriteLock());
+      var config = new KnowledgeServerConfig(
+          false, dir, dir, dir, 1_000, 1_000, 1, 5_000, 1_000, 0, 64, 0, 0);
+      var callbacks = new java.util.concurrent.atomic.AtomicInteger();
+
+      var thrown = assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> invokeTryStartKnowledgeServer(config, root, owner -> {
+            assertNull(owner);
+            callbacks.incrementAndGet();
+          }));
+
+      var fatal = assertInstanceOf(IllegalStateException.class, thrown.getCause());
+      assertEquals("Index bootstrap could not be constructed", fatal.getMessage());
+      assertInstanceOf(IllegalArgumentException.class, fatal.getCause());
+      assertEquals(1, callbacks.get());
+      verify(root, never()).start(any(GpuSchedulingGauge.class), any(IpcTelemetry.class));
+    }
+  }
+
+  @Test
+  @Timeout(15)
+  void productionInitialFailurePerformsOneUncountedPhysicalAttempt(@TempDir Path dir)
+      throws Exception {
+    try (var executors = new TestEngineExecutors();
+        var components = TestEngineComponents.fourComponents()) {
+      var root = mock(EngineRoot.class);
+      when(root.executors()).thenReturn(executors);
+      when(root.components()).thenReturn(components);
+      when(root.indexComponent()).thenReturn(components.handle("index"));
+      when(root.publicationLock()).thenReturn(new ReentrantReadWriteLock());
+      when(root.start(any(GpuSchedulingGauge.class), any(IpcTelemetry.class)))
+          .thenThrow(new java.io.IOException("index open refused"));
+      var config = new KnowledgeServerConfig(
+          false, dir, dir, dir, 1_000, 1_000, 1, 5_000, 1_000, 0, 64, 0, 0);
+      var opening = new AtomicReference<KnowledgeServerBootstrap>();
+      try {
+        invokeTryStartKnowledgeServer(config, root, opening::set);
+        verify(root, times(1)).start(any(GpuSchedulingGauge.class), any(IpcTelemetry.class));
+        assertNotNull(opening.get());
+        assertFalse(opening.get().hasClient());
+        assertEquals(0, components.handle("index").snapshot().recoveryAttempts());
+      } finally {
+        if (opening.get() != null) opening.get().closeForUpgrade();
+      }
+    }
+  }
+
   @Test
   void deadlineEndsOnlyTheApiWaitAndPreservesTheInitialPhysicalOwner() {
     try (var components = new TestEngineComponents()) {

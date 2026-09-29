@@ -2,7 +2,7 @@
 package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.model.HardwareProfile;
@@ -137,7 +137,7 @@ class InferenceCompositionRootFootprintTest {
             selection);
 
     assertEquals(0L, footprint);
-    assertFalse(selection.hasUnavailableModel());
+    assertTrue(selection.availableFingerprint("embedding").isEmpty());
   }
 
   private static Map<String, String> disabledRoles() {

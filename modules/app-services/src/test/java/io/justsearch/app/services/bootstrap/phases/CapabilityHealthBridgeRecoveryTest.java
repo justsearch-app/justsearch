@@ -31,7 +31,7 @@ final class CapabilityHealthBridgeRecoveryTest {
 
     CapabilityHealthBridge.emitRecoveryOccurrence(
         new RecoveryOccurrence(
-            RecoveryOccurrence.Kind.ATTEMPTED, new RecoveryContext(2, "boot", 2000)),
+            RecoveryOccurrence.Kind.ATTEMPTED, new RecoveryContext(2, "index", 2000)),
         occurrences,
         changes,
         HEAD);
@@ -39,7 +39,7 @@ final class CapabilityHealthBridgeRecoveryTest {
     HealthEvent event = onlyEvent(occurrences, "worker.restart-attempted");
     LifecycleEvent body = (LifecycleEvent) event.body();
     assertEquals(2, body.attributes().get("attempt"));
-    assertEquals("boot", body.attributes().get("faultKind"));
+    assertEquals("index", body.attributes().get("faultKind"));
     assertEquals(2000L, body.attributes().get("backoffMs"));
     assertEquals("health-events.worker.restart-attempted.message",
         event.i18nKey().orElseThrow());
@@ -53,7 +53,7 @@ final class CapabilityHealthBridgeRecoveryTest {
 
     CapabilityHealthBridge.emitRecoveryOccurrence(
         new RecoveryOccurrence(
-            RecoveryOccurrence.Kind.RECOVERED, new RecoveryContext(3, "boot", 4000)),
+            RecoveryOccurrence.Kind.RECOVERED, new RecoveryContext(3, "index", 4000)),
         occurrences,
         changes,
         HEAD);

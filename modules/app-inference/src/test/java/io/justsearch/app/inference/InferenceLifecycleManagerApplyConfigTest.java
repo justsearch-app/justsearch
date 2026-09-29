@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference;
 
+import com.sun.net.httpserver.HttpServer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -20,22 +22,34 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.ModeTransitionException;
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.inference.InferenceLifecycleManager.ConfigApplyDisposition;
 import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
+import io.justsearch.app.inference.telemetry.TransitionReason;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+import io.justsearch.core.component.ComponentRecoveryAction;
+import io.justsearch.core.component.ComponentSpec;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentSnapshot;
 import io.justsearch.gpu.GpuCapabilities;
 import io.justsearch.gpu.GpuCapabilitiesService;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -126,8 +140,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertThrows(IllegalStateException.class,
           () -> manager.askQuestion("context", "question", 64),
           "chat must refuse before it can enqueue against the private candidate");
-      server.recovery.accept(() -> server.active.get() == incumbent);
-      verify(server.mock(), never()).recoverActiveServer();
+      server.failure.accept(() -> server.active.get() == incumbent);
 
       prepared.withLifecycleLock(() -> {
         prepared.validateForCommit();
@@ -137,8 +150,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertSame(b, manager.currentConfig());
       assertEquals(8192, manager.configuredContextTokens());
-      server.recovery.accept(() -> true);
-      verify(server.mock(), times(1)).recoverActiveServer();
+      server.failure.accept(() -> true);
     }
   }
 
@@ -212,10 +224,9 @@ final class InferenceLifecycleManagerApplyConfigTest {
         var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
       manager.switchToOnlineMode();
       var prepared = manager.prepareResolvedConfig(b, resolvedB);
-      server.recovery.accept(() -> true);
+      server.failure.accept(() -> true);
       assertThrows(IllegalStateException.class,
           () -> prepared.withLifecycleLock(prepared::validateForCommit));
-      verify(server.mock(), never()).recoverActiveServer();
       prepared.abort();
     }
   }
@@ -332,12 +343,11 @@ final class InferenceLifecycleManagerApplyConfigTest {
         prepared.installAfterSettingsCommit();
       }));
       assertTrue(ownerLocked.await(5, TimeUnit.SECONDS));
-      var recovery = tasks.submit(() -> server.recovery.accept(() -> true));
+      var recovery = tasks.submit(() -> server.failure.accept(() -> true));
       assertThrows(TimeoutException.class, () -> recovery.get(100, TimeUnit.MILLISECONDS));
       releaseOwner.countDown();
       guarded.get(5, TimeUnit.SECONDS);
       recovery.get(5, TimeUnit.SECONDS);
-      verify(server.mock(), never()).recoverActiveServer();
       prepared.retireAfterSettingsCommit();
     } finally {
       releaseOwner.countDown();
@@ -398,7 +408,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       var preparing = tasks.submit(() -> manager.prepareResolvedConfig(b, resolvedB));
       assertTrue(candidateHealth.await(5, TimeUnit.SECONDS));
-      var recovery = tasks.submit(() -> server.recovery.accept(() -> server.active.get() == incumbent));
+      var recovery = tasks.submit(() -> server.failure.accept(() -> server.active.get() == incumbent));
       assertThrows(
           TimeoutException.class,
           () -> recovery.get(100, TimeUnit.MILLISECONDS),
@@ -407,7 +417,6 @@ final class InferenceLifecycleManagerApplyConfigTest {
       releaseHealth.countDown();
       var prepared = preparing.get(5, TimeUnit.SECONDS);
       recovery.get(5, TimeUnit.SECONDS);
-      verify(server.mock(), never()).recoverActiveServer();
       prepared.abort();
     } finally {
       releaseHealth.countDown();
@@ -818,7 +827,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
   }
 
   @Test
-  void recoveryRejectsReplacedOwnersAndCannotRestartAfterPreservingChildOnClose() throws Exception {
+  void managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose() throws Exception {
     InferenceConfig a = config(0, 4096);
     ResolvedConfig resolvedA = resolved("a", true);
     installGlobal(resolvedA);
@@ -827,23 +836,23 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop());
       try {
         manager.switchToOnlineMode();
-        server.recovery.accept(() -> false);
-        verify(server.mock(), never()).recoverActiveServer();
-        server.recovery.accept(() -> true);
-        verify(server.mock(), times(1)).recoverActiveServer();
+        server.failure.accept(() -> false);
+        assertEquals(Mode.ONLINE, manager.getCurrentMode());
+        server.failure.accept(() -> true);
+        assertEquals(Mode.OFFLINE, manager.getCurrentMode());
       } finally {
         manager.setStopServerOnClose(false);
         manager.close();
       }
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
       assertNotNull(server.active.get(), "preserved child ownership remains available for adoption");
-      server.recovery.accept(() -> true);
-      verify(server.mock(), times(1)).recoverActiveServer();
+      server.failure.accept(() -> true);
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
     }
   }
 
   @Test
-  void queuedRecoveryWaitsForApplyThenRejectsItsReplacedPhysicalOwner() throws Exception {
+  void queuedFailureSignalWaitsForApplyThenRejectsItsReplacedPhysicalOwner() throws Exception {
     InferenceConfig a = config(0, 4096);
     InferenceConfig b = config(0, 8192);
     ResolvedConfig resolvedA = resolved("a", true);
@@ -876,7 +885,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
         assertTrue(candidateHealth.await(5, TimeUnit.SECONDS));
         var recovery = tasks.submit(() -> {
           recoveryEntered.countDown();
-          server.recovery.accept(() -> server.active.get() == incumbent);
+          server.failure.accept(() -> server.active.get() == incumbent);
         });
         assertTrue(recoveryEntered.await(5, TimeUnit.SECONDS));
         assertThrows(TimeoutException.class, () -> recovery.get(100, TimeUnit.MILLISECONDS),
@@ -884,7 +893,6 @@ final class InferenceLifecycleManagerApplyConfigTest {
         releaseHealth.countDown();
         assertEquals(ConfigApplyDisposition.APPLIED, apply.get(5, TimeUnit.SECONDS).disposition());
         recovery.get(5, TimeUnit.SECONDS);
-        verify(server.mock(), never()).recoverActiveServer();
         assertSame(b, manager.currentConfig());
       } finally {
         releaseHealth.countDown();
@@ -945,10 +953,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void exhaustedRecoveryCleansChildOrRetainsFailedCleanupOwnershipOffline(boolean refuseStop)
-      throws Exception {
+  @Test
+  void managedFailureOnlyDemotesAndLeavesPhysicalCleanupToAdmittedRecovery() throws Exception {
     InferenceConfig a = config(0, 4096);
     ResolvedConfig resolvedA = resolved("a", true);
     installGlobal(resolvedA);
@@ -957,17 +963,463 @@ final class InferenceLifecycleManagerApplyConfigTest {
         var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
       manager.switchToOnlineMode();
       var incumbent = server.active.get();
-      if (refuseStop) server.failNextStop(new IllegalStateException("child still alive"));
-      server.terminal.accept(() -> true);
+      server.failure.accept(() -> true);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
-      verify(server.mock()).stopLlamaServer();
-      if (refuseStop) {
-        assertSame(incumbent, server.active.get());
-        assertTrue(manager.lastFailure().orElseThrow().detail().contains("child still alive"));
-      } else {
-        assertNull(server.active.get());
-      }
+      verify(server.mock(), never()).stopLlamaServer();
+      assertSame(incumbent, server.active.get());
     }
+  }
+
+  @Test
+  void admittedRecoveryRestartsServingAButNeverNewDesiredB() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      manager.applyResolvedConfig(b, resolvedB, InferenceLifecycleManager.RestartPolicy.APPLY_ONLY);
+      server.failure.accept(() -> true);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "B", 0));
+
+      var result = manager.recoverComponent(request, ignored -> "A");
+
+      assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
+      assertEquals(2, server.starts.size(), "one admission must cause exactly one launch");
+      assertSame(a, server.starts.getLast().context().inference());
+      assertSame(resolvedA, server.starts.getLast().context().resolved());
+      assertEquals(1, result.observation().recoveryAttempts());
+    }
+  }
+
+  @Test
+  void admittedRecoveryDrainsARealRequestBeforeOnePhysicalReplacement() throws Exception {
+    var requestEntered = new CountDownLatch(1);
+    var releaseRequest = new CountDownLatch(1);
+    HttpServer tokenServer = blockingTokenServer(requestEntered, releaseRequest);
+    InferenceConfig base = config(0, 4096);
+    InferenceConfig a = new InferenceConfig(base.serverExecutable(), base.modelPath(), null,
+        tokenServer.getAddress().getPort(), base.contextSize(), base.gpuLayers(), false);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop());
+        var tasks = Executors.newVirtualThreadPerTaskExecutor()) {
+      manager.switchToOnlineMode();
+      var requestUse = tasks.submit(() -> manager.countTokens("held request"));
+      assertTrue(requestEntered.await(5, TimeUnit.SECONDS));
+      server.failure.accept(() -> true);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+      var recovery = tasks.submit(() -> manager.recoverComponent(request, ignored -> "A"));
+      assertTrue(request.awaitBegun(5, TimeUnit.SECONDS));
+
+      assertThrows(TimeoutException.class, () -> recovery.get(100, TimeUnit.MILLISECONDS));
+      assertEquals(1, request.current().recoveryAttempts());
+      verify(server.mock(), never()).stopLlamaServer();
+      assertEquals(1, server.starts.size());
+
+      releaseRequest.countDown();
+      requestUse.get(5, TimeUnit.SECONDS);
+      var result = recovery.get(5, TimeUnit.SECONDS);
+      assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
+      verify(server.mock(), times(1)).stopLlamaServer();
+      assertEquals(2, server.starts.size(), "the admission launches exactly one replacement");
+      assertEquals(1, result.observation().recoveryAttempts());
+    } finally {
+      releaseRequest.countDown();
+      tokenServer.stop(0);
+    }
+  }
+
+  @Test
+  void cancelledRecoveryWaitingForARealRequestNeverStopsOrLaunches() throws Exception {
+    var requestEntered = new CountDownLatch(1);
+    var releaseRequest = new CountDownLatch(1);
+    HttpServer tokenServer = blockingTokenServer(requestEntered, releaseRequest);
+    InferenceConfig base = config(0, 4096);
+    InferenceConfig a = new InferenceConfig(base.serverExecutable(), base.modelPath(), null,
+        tokenServer.getAddress().getPort(), base.contextSize(), base.gpuLayers(), false);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop());
+        var tasks = Executors.newVirtualThreadPerTaskExecutor()) {
+      manager.switchToOnlineMode();
+      var requestUse = tasks.submit(() -> manager.countTokens("held request"));
+      assertTrue(requestEntered.await(5, TimeUnit.SECONDS));
+      server.failure.accept(() -> true);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+      var recovery = tasks.submit(() -> manager.recoverComponent(request, ignored -> "A"));
+      assertTrue(request.awaitBegun(5, TimeUnit.SECONDS));
+
+      request.cancel();
+      releaseRequest.countDown();
+      requestUse.get(5, TimeUnit.SECONDS);
+      var result = recovery.get(5, TimeUnit.SECONDS);
+
+      assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
+      assertEquals(1, request.current().recoveryAttempts());
+      verify(server.mock(), never()).stopLlamaServer();
+      assertEquals(1, server.starts.size(), "cancelled drain must not launch a replacement");
+    } finally {
+      releaseRequest.countDown();
+      tokenServer.stop(0);
+    }
+  }
+
+  @Test
+  void explicitIndexingStopDuringDrainSupersedesTheSameRetainedStartRequest() throws Exception {
+    var requestEntered = new CountDownLatch(1);
+    var releaseRequest = new CountDownLatch(1);
+    HttpServer tokenServer = blockingTokenServer(requestEntered, releaseRequest);
+    InferenceConfig base = config(0, 4096);
+    InferenceConfig a = new InferenceConfig(base.serverExecutable(), base.modelPath(), null,
+        tokenServer.getAddress().getPort(), base.contextSize(), base.gpuLayers(), false);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop());
+        var tasks = Executors.newVirtualThreadPerTaskExecutor()) {
+      manager.switchToOnlineMode();
+      var requestUse = tasks.submit(() -> manager.countTokens("held request"));
+      assertTrue(requestEntered.await(5, TimeUnit.SECONDS));
+      server.failure.accept(() -> true);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+      var recovery = tasks.submit(() -> manager.recoverComponent(request, ignored -> "A"));
+      assertTrue(request.awaitBegun(5, TimeUnit.SECONDS));
+      assertTrue(server.recoveryReserved.await(5, TimeUnit.SECONDS));
+      LlamaServerOps.StartRequest retainedRecovery = server.retained.get();
+      assertNotNull(retainedRecovery);
+
+      manager.switchToIndexingMode(TransitionReason.USER_SWITCH);
+      assertSame(retainedRecovery, server.retained.get(),
+          "the explicit stop deliberately leaves the same retry context retained");
+      assertEquals(Mode.INDEXING, manager.getCurrentMode());
+      releaseRequest.countDown();
+      requestUse.get(5, TimeUnit.SECONDS);
+      var result = recovery.get(5, TimeUnit.SECONDS);
+
+      assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
+      assertEquals(Mode.INDEXING, manager.getCurrentMode());
+      verify(server.mock(), times(1)).stopLlamaServer();
+      assertEquals(1, server.starts.size(),
+          "recovery must not reopen A after the explicit same-context stop");
+    } finally {
+      releaseRequest.countDown();
+      tokenServer.stop(0);
+    }
+  }
+
+  @Test
+  void interruptedRequestDrainCountsFailureWithoutPhysicalReplacement() throws Exception {
+    var requestEntered = new CountDownLatch(1);
+    var releaseRequest = new CountDownLatch(1);
+    HttpServer tokenServer = blockingTokenServer(requestEntered, releaseRequest);
+    InferenceConfig base = config(0, 4096);
+    InferenceConfig a = new InferenceConfig(base.serverExecutable(), base.modelPath(), null,
+        tokenServer.getAddress().getPort(), base.contextSize(), base.gpuLayers(), false);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    var recoveryResult = new AtomicReference<ComponentRecoveryAction.Result>();
+    var recoveryFailure = new AtomicReference<Throwable>();
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop());
+        var tasks = Executors.newVirtualThreadPerTaskExecutor()) {
+      manager.switchToOnlineMode();
+      var requestUse = tasks.submit(() -> manager.countTokens("held request"));
+      assertTrue(requestEntered.await(5, TimeUnit.SECONDS));
+      server.failure.accept(() -> true);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+      Thread recovery = Thread.ofVirtual().start(() -> {
+        try {
+          recoveryResult.set(manager.recoverComponent(request, ignored -> "A"));
+        } catch (Throwable failure) {
+          recoveryFailure.set(failure);
+        }
+      });
+      assertTrue(request.awaitBegun(5, TimeUnit.SECONDS));
+
+      recovery.interrupt();
+      recovery.join(5_000);
+      assertFalse(recovery.isAlive());
+      assertNull(recoveryFailure.get());
+      assertEquals(ComponentRecoveryAction.Outcome.FAILED, recoveryResult.get().outcome());
+      assertEquals(1, recoveryResult.get().observation().recoveryAttempts());
+      assertTrue(recoveryResult.get().observation().evidence().contains("drain interrupted"));
+      verify(server.mock(), never()).stopLlamaServer();
+      assertEquals(1, server.starts.size());
+
+      releaseRequest.countDown();
+      requestUse.get(5, TimeUnit.SECONDS);
+    } finally {
+      releaseRequest.countDown();
+      tokenServer.stop(0);
+    }
+  }
+
+  @Test
+  void explicitIndexingDuringFailedPrelaunchDrainSupersedesRetainedInitialRequest()
+      throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop());
+        var lease = requestGateLease(manager);
+        var tasks = Executors.newVirtualThreadPerTaskExecutor()) {
+      var attemptedA = new LlamaServerOps.StartRequest(
+          new LlamaServerConfigContext(a, resolvedA),
+          LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL);
+      server.retained.set(attemptedA);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+      var recovery = tasks.submit(() -> manager.recoverComponent(request, ignored -> "A"));
+      assertTrue(request.awaitBegun(5, TimeUnit.SECONDS));
+      assertTrue(server.recoveryReserved.await(5, TimeUnit.SECONDS));
+
+      manager.switchToIndexingMode(TransitionReason.USER_SWITCH);
+      assertSame(attemptedA, server.retained.get());
+      lease.close();
+      var result = recovery.get(5, TimeUnit.SECONDS);
+
+      assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
+      assertEquals(Mode.INDEXING, manager.getCurrentMode());
+      verify(server.mock(), times(1)).stopLlamaServer();
+      assertEquals(0, server.starts.size(),
+          "recovery must not open failed initial A after explicit indexing intent");
+    }
+  }
+
+  @Test
+  void timeoutPublicationDoesNotCancelLateSameOwnerReady() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+      server.onHealth = ignored -> request.publishTimeout();
+
+      var result = manager.recoverComponent(request, ignored -> "A");
+
+      assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
+      assertEquals(ComponentState.READY, result.observation().state());
+      assertEquals(1, result.observation().recoveryAttempts());
+    }
+  }
+
+  @Test
+  void failedRetryKeepsClosedLifecycleCauseAndAddsTypedFailureEvidence() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      server.failNextHealth(healthFailure("recovery health timeout"));
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+
+      var result = manager.recoverComponent(request, ignored -> "A");
+
+      assertEquals(ComponentRecoveryAction.Outcome.FAILED, result.outcome());
+      assertEquals("inference.crashed", result.observation().reasonCode());
+      assertTrue(LifecycleReasonCode.allowedCodes().contains(result.observation().reasonCode()));
+      assertTrue(result.observation().evidence().contains("health_timeout"));
+    }
+  }
+
+  @Test
+  void retainedFailedInitialAIsPreferredAfterDesiredChangesToB() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      var attemptedA = new LlamaServerOps.StartRequest(
+          new LlamaServerConfigContext(a, resolvedA),
+          LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL);
+      server.retained.set(attemptedA);
+      manager.applyResolvedConfig(b, resolvedB, InferenceLifecycleManager.RestartPolicy.APPLY_ONLY);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "B", 0));
+
+      var result = manager.recoverComponent(request, ignored -> "A");
+
+      assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
+      assertEquals(1, server.starts.size());
+      assertSame(a, server.starts.getFirst().context().inference());
+      assertSame(resolvedA, server.starts.getFirst().context().resolved());
+    }
+  }
+
+  @Test
+  void foreignExternalOwnerRefusesBeforeAdmission() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      server.active.set(new LlamaServerOps.StartResult(
+          new LlamaServerConfigContext(a, resolvedA),
+          LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL,
+          LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL,
+          null));
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+
+      var result = manager.recoverComponent(request, ignored -> "A");
+
+      assertEquals(ComponentRecoveryAction.Outcome.REFUSED, result.outcome());
+      assertEquals(0, request.current().recoveryAttempts());
+      assertEquals(0, server.starts.size());
+    }
+  }
+
+  @Test
+  void appliedVersionMismatchRefusesWithoutSpendingAttemptOrStoppingOwner() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "stale", "stale", 0));
+
+      var result = manager.recoverComponent(request, ignored -> "physical-A");
+
+      assertEquals(ComponentRecoveryAction.Outcome.REFUSED, result.outcome());
+      assertEquals(0, request.current().recoveryAttempts());
+      verify(server.mock(), never()).stopLlamaServer();
+      assertEquals(1, server.starts.size());
+    }
+  }
+
+  @Test
+  void cancellationAfterPhysicalClosePreventsLaunchButKeepsSpentAttempt() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+      server.onStop = request::cancel;
+
+      var result = manager.recoverComponent(request, ignored -> "A");
+
+      assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
+      assertEquals(1, request.current().recoveryAttempts());
+      assertEquals(1, server.starts.size(), "cancelled recovery must not launch after close");
+    }
+  }
+
+  @Test
+  void autonomousActivationCannotStealRetainedFailureButExplicitUserActivationCan()
+      throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      server.retained.set(new LlamaServerOps.StartRequest(
+          new LlamaServerConfigContext(a, resolvedA),
+          LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL));
+      when(server.mock().componentRecoveryPending()).thenAnswer(ignored -> server.retained.get() != null);
+
+      var refused = assertThrows(
+          ModeTransitionException.class,
+          () -> manager.switchToOnlineMode(TransitionReason.AUTO_START));
+      assertEquals(ModeTransitionException.Reason.ONLINE_START_FAILED, refused.reason());
+      assertTrue(manager.componentRecoveryPending());
+      assertEquals(0, server.starts.size());
+
+      var procedureRefused = assertThrows(
+          ModeTransitionException.class,
+          () -> manager.switchToOnlineMode(TransitionReason.VDU_ENTER));
+      assertEquals(ModeTransitionException.Reason.ONLINE_START_FAILED, procedureRefused.reason());
+      assertEquals(0, server.starts.size());
+
+      manager.switchToOnlineMode(TransitionReason.USER_SWITCH);
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+      assertEquals(1, server.starts.size());
+    }
+  }
+
+  @Test
+  void queuedVduEnterCannotLaunchAfterAutonomousOwnerFails() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    var healthEntered = new CountDownLatch(1);
+    var releaseHealth = new CountDownLatch(1);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop());
+        var tasks = Executors.newVirtualThreadPerTaskExecutor()) {
+      when(server.mock().componentRecoveryPending())
+          .thenAnswer(ignored -> server.retained.get() != null);
+      server.failNextHealth(healthFailure("initial owner failed"));
+      server.onHealth = ignored -> {
+        healthEntered.countDown();
+        try {
+          if (!releaseHealth.await(5, TimeUnit.SECONDS)) {
+            throw new AssertionError("test did not release initial health wait");
+          }
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(interrupted);
+        }
+      };
+
+      var initial = tasks.submit(() -> {
+        manager.switchToOnlineMode(TransitionReason.AUTO_START);
+        return null;
+      });
+      assertTrue(healthEntered.await(5, TimeUnit.SECONDS));
+      var vdu = tasks.submit(() -> {
+        manager.switchToOnlineMode(TransitionReason.VDU_ENTER);
+        return null;
+      });
+      assertThrows(TimeoutException.class, () -> vdu.get(100, TimeUnit.MILLISECONDS),
+          "VDU enter must queue behind the current physical owner");
+
+      releaseHealth.countDown();
+      assertInstanceOf(ModeTransitionException.class,
+          assertThrows(ExecutionException.class, () -> initial.get(5, TimeUnit.SECONDS)).getCause());
+      var refused = assertInstanceOf(ModeTransitionException.class,
+          assertThrows(ExecutionException.class, () -> vdu.get(5, TimeUnit.SECONDS)).getCause());
+      assertEquals(ModeTransitionException.Reason.ONLINE_START_FAILED, refused.reason());
+      assertEquals(1, server.starts.size(), "queued VDU must not launch desired configuration");
+    } finally {
+      releaseHealth.countDown();
+    }
+  }
+
+  private static EngineComponentSnapshot.Component component(
+      ComponentState state, String applied, String desired, int attempts) {
+    var spec = new ComponentSpec("generative", false, Set.of(),
+        ComponentSpec.ComposeCapability.IN_PLACE, Duration.ofSeconds(180), 2);
+    return new EngineComponentSnapshot.Component(
+        spec, state, state == ComponentState.READY ? null : "inference.crashed",
+        Instant.EPOCH, 1L, applied, desired, null, attempts, "test");
   }
 
   private InferenceLifecycleManager manager(
@@ -1064,6 +1516,37 @@ final class InferenceLifecycleManagerApplyConfigTest {
     return new InferenceConfig(executable, model, null, 18081, contextSize, gpuLayers, false);
   }
 
+  private static HttpServer blockingTokenServer(
+      CountDownLatch requestEntered, CountDownLatch releaseRequest) throws Exception {
+    HttpServer server =
+        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    server.createContext("/tokenize", exchange -> {
+      requestEntered.countDown();
+      try {
+        if (!releaseRequest.await(10, TimeUnit.SECONDS)) {
+          throw new AssertionError("test did not release token request");
+        }
+        byte[] response = "{\"tokens\":[1]}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.sendResponseHeaders(200, response.length);
+        exchange.getResponseBody().write(response);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+      } finally {
+        exchange.close();
+      }
+    });
+    server.start();
+    return server;
+  }
+
+  private static GenerativeRequestGate.Lease requestGateLease(
+      InferenceLifecycleManager manager) throws Exception {
+    var field = InferenceLifecycleManager.class.getDeclaredField("requestGate");
+    field.setAccessible(true);
+    return ((GenerativeRequestGate) field.get(manager)).acquire();
+  }
+
   private static String expectedHash(InferenceConfig config, ResolvedConfig resolved) {
     int effectiveLayers = resolved.ai().gpuAccelerationAllowed() ? config.gpuLayers() : 0;
     return ManagedLlamaConfigIdentity.declaredHash(config, resolved, effectiveLayers);
@@ -1092,6 +1575,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
   private static final class FakeServer implements AutoCloseable {
     private final AtomicReference<LlamaServerOps.StartResult> active = new AtomicReference<>();
+    private final AtomicReference<LlamaServerOps.StartRequest> retained = new AtomicReference<>();
     private final List<LlamaServerOps.StartRequest> starts = new ArrayList<>();
     private final ArrayDeque<ModeTransitionException> healthFailures = new ArrayDeque<>();
     private final AtomicReference<RuntimeException> stopFailure = new AtomicReference<>();
@@ -1100,9 +1584,10 @@ final class InferenceLifecycleManagerApplyConfigTest {
     private final MockedConstruction<LlamaServerOps> construction;
     private Consumer<LlamaServerOps.StartRequest> onStart = request -> {};
     private Consumer<LlamaServerOps.StartResult> onHealth = result -> {};
+    private Runnable onStop = () -> {};
+    private final CountDownLatch recoveryReserved = new CountDownLatch(1);
     private PropsObserver propsObserver;
-    private Consumer<BooleanSupplier> recovery;
-    private Consumer<BooleanSupplier> terminal;
+    private Consumer<BooleanSupplier> failure;
 
     @SuppressWarnings("unchecked") // Capture the typed manager callback at the constructor seam.
     private FakeServer() {
@@ -1111,12 +1596,12 @@ final class InferenceLifecycleManagerApplyConfigTest {
               LlamaServerOps.class,
               (server, context) -> {
                 propsObserver = (PropsObserver) context.arguments().get(5);
-                recovery = (Consumer<BooleanSupplier>) context.arguments().get(6);
-                terminal = (Consumer<BooleanSupplier>) context.arguments().get(7);
+                failure = (Consumer<BooleanSupplier>) context.arguments().get(6);
                 when(server.startLlamaServer(any()))
                     .thenAnswer(
                         invocation -> {
                           LlamaServerOps.StartRequest request = invocation.getArgument(0);
+                          retained.set(request);
                           starts.add(request);
                           onStart.accept(request);
                           String hash = wrongNextHash.getAndSet(false)
@@ -1136,12 +1621,65 @@ final class InferenceLifecycleManagerApplyConfigTest {
                           RuntimeException failure = stopFailure.getAndSet(null);
                           if (failure != null) throw failure;
                           active.set(null);
+                          onStop.run();
                           return null;
                         })
                     .when(server)
                     .stopLlamaServer();
                 when(server.activeStartResult())
                     .thenAnswer(invocation -> Optional.ofNullable(active.get()));
+                when(server.recoveryStartRequest())
+                    .thenAnswer(invocation -> {
+                      var owner = active.get();
+                      if (owner != null) {
+                        if (owner.disposition() == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL) {
+                          return Optional.empty();
+                        }
+                        return Optional.of(new LlamaServerOps.StartRequest(
+                            owner.context(), owner.adoptionPolicy()));
+                      }
+                      return Optional.ofNullable(retained.get());
+                    });
+                when(server.reserveRecoveryStart(any()))
+                    .thenAnswer(invocation -> {
+                      LlamaServerOps.StartRequest request = invocation.getArgument(0);
+                      var owner = active.get();
+                      boolean reserved;
+                      if (owner != null) {
+                        if (owner.disposition() == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL
+                            || owner.context() != request.context()
+                            || owner.adoptionPolicy() != request.adoptionPolicy()) return false;
+                        retained.set(request);
+                        reserved = true;
+                      } else {
+                        reserved = retained.get() == request;
+                      }
+                      if (reserved) recoveryReserved.countDown();
+                      return reserved;
+                    });
+                when(server.ownsRecoveryAttempt(any()))
+                    .thenAnswer(invocation -> {
+                      LlamaServerOps.StartRequest request = invocation.getArgument(0);
+                      var owner = active.get();
+                      return owner != null
+                          ? owner.disposition() != LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL
+                              && owner.context() == request.context()
+                              && owner.adoptionPolicy() == request.adoptionPolicy()
+                          : retained.get() == request;
+                    });
+                doAnswer(invocation -> {
+                  LlamaServerOps.StartRequest request = invocation.getArgument(0);
+                  LlamaServerOps.StartResult result = invocation.getArgument(1);
+                  if (active.get() != result || retained.get() != request) {
+                    throw new IllegalStateException("owner changed");
+                  }
+                  retained.set(null);
+                  return null;
+                }).when(server).acceptVerifiedStart(any(), any());
+                doAnswer(invocation -> {
+                  retained.set(invocation.getArgument(0));
+                  return null;
+                }).when(server).retainAttemptedStartRequest(any());
                 when(server.activeManagedCandidateAlive(any()))
                     .thenAnswer(invocation -> candidateAlive.get()
                         && active.get() == invocation.getArgument(0));
@@ -1155,6 +1693,16 @@ final class InferenceLifecycleManagerApplyConfigTest {
                         })
                     .when(server)
                     .waitForServerHealth(any());
+                doAnswer(
+                        invocation -> {
+                          LlamaServerOps.StartResult result = invocation.getArgument(0);
+                          onHealth.accept(result);
+                          ModeTransitionException failure = healthFailures.pollFirst();
+                          if (failure != null) throw failure;
+                          return null;
+                        })
+                    .when(server)
+                    .waitForServerHealthOnce(any());
               });
     }
 
@@ -1173,6 +1721,62 @@ final class InferenceLifecycleManagerApplyConfigTest {
     @Override
     public void close() {
       construction.close();
+    }
+  }
+
+  private static final class TestRecoveryRequest implements ComponentRecoveryAction.Request {
+    private final EngineComponentSnapshot.Component expected;
+    private final AtomicReference<EngineComponentSnapshot.Component> current;
+    private volatile EngineComponentSnapshot.Component admitted;
+    private volatile boolean cancelled;
+    private final CountDownLatch begun = new CountDownLatch(1);
+
+    private TestRecoveryRequest(EngineComponentSnapshot.Component expected) {
+      this.expected = expected;
+      this.current = new AtomicReference<>(expected);
+    }
+
+    @Override public EngineComponentSnapshot.Component expected() { return expected; }
+    @Override public EngineComponentSnapshot.Component current() { return current.get(); }
+    @Override public Optional<EngineComponentSnapshot.Component> admitted() {
+      return Optional.ofNullable(admitted);
+    }
+    @Override public boolean begin() {
+      var starting = copy(current.get(), ComponentState.STARTING, "inference.starting",
+          current.get().recoveryAttempts() + 1, "admitted");
+      if (!current.compareAndSet(expected, starting)) return false;
+      admitted = starting;
+      begun.countDown();
+      return true;
+    }
+    @Override public Optional<EngineComponentSnapshot.Component> complete(
+        EngineComponentSnapshot.Component expectedCurrent, ComponentState state,
+        String reasonCode, String evidence) {
+      var terminal = copy(expectedCurrent, state, reasonCode,
+          expectedCurrent.recoveryAttempts(), evidence);
+      return current.compareAndSet(expectedCurrent, terminal)
+          ? Optional.of(terminal) : Optional.empty();
+    }
+    @Override public boolean cancelled() { return cancelled; }
+
+    private void cancel() { cancelled = true; }
+
+    private boolean awaitBegun(long timeout, TimeUnit unit) throws InterruptedException {
+      return begun.await(timeout, unit);
+    }
+
+    private void publishTimeout() {
+      var before = current.get();
+      current.set(copy(before, ComponentState.FAILED, "component.start_timeout",
+          before.recoveryAttempts(), "deadline observed"));
+    }
+
+    private static EngineComponentSnapshot.Component copy(
+        EngineComponentSnapshot.Component source, ComponentState state, String reason,
+        int attempts, String evidence) {
+      return new EngineComponentSnapshot.Component(
+          source.spec(), state, reason, Instant.now(), System.nanoTime(),
+          source.appliedVersion(), source.desiredVersion(), source.lastCompose(), attempts, evidence);
     }
   }
 }

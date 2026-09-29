@@ -29,12 +29,11 @@ public final class InferenceCapabilityWiring {
    * drove {@code READY}; the reported gap (tempdoc 737 §15 Phase 2b "Phase-3 finding") was that a
    * background procedure (VDU) can hold the engine {@code ONLINE} under soft-off
    * ({@code chatEnabled=false}), and the old derivation projected chat as available to users
-   * during that window. {@code READY} now requires BOTH engine Healthy ({@code mode==ONLINE})
-   * AND the user's persisted chat-enabled spec bit; engine Healthy with {@code chatEnabled=false}
-   * yields {@code DEGRADED} with {@link RuntimeStatus#REASON_ENGINE_UP_FOR_BACKGROUND} — the same
-   * reason code {@code RuntimeReconciler.refreshStatus} stamps onto the ENGINE condition for the
-   * identical situation, so the two surfaces agree. OFFLINE / TRANSITIONING / INDEXING mappings
-   * are unchanged.
+   * during that window. {@code READY} requires both a healthy engine ({@code mode==ONLINE})
+   * and the user's persisted chat-enabled spec bit. An online background-only runtime projects
+   * {@code ABSENT} with {@link RuntimeStatus#REASON_ENGINE_UP_FOR_BACKGROUND}. A transition from
+   * READY retains RELOADING; initial activation and recovery project STARTING so the component's
+   * declared start deadline applies.
    *
    * <p><b>Re-derivation mechanism</b> (mirror-initial-then-forward, the
    * {@code standalone-capability-stays-stuck} medicine): the mode-change listener re-derives on
@@ -126,7 +125,8 @@ public final class InferenceCapabilityWiring {
     return switch (mode) {
       case ONLINE -> new Projection(ComponentState.READY, null, "inference runtime is online");
       case TRANSITIONING -> new Projection(
-          ComponentState.RELOADING,
+          currentState == ComponentState.READY || currentState == ComponentState.RELOADING
+              ? ComponentState.RELOADING : ComponentState.STARTING,
           LifecycleReasonCode.INFERENCE_STARTING.code(),
           "inference runtime is transitioning");
       case INDEXING -> new Projection(
@@ -149,6 +149,12 @@ public final class InferenceCapabilityWiring {
       // A spec observation has no physical failure cause. Preserve the last physical observation
       // until a mode callback or activation producer publishes newer evidence.
       return null;
+    }
+    if (reason == TransitionReason.AUTO_START
+        && (currentState == ComponentState.STARTING || currentState == ComponentState.FAILED)) {
+      return new Projection(ComponentState.FAILED,
+          LifecycleReasonCode.INFERENCE_ACTIVATION_FAILED.code(),
+          "requested inference activation returned offline");
     }
     LifecycleReasonCode reasonCode = offlineCode(reason);
     ComponentState state = reasonCode == LifecycleReasonCode.INFERENCE_CRASHED

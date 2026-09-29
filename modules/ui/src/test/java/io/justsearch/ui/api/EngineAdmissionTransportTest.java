@@ -209,25 +209,34 @@ final class EngineAdmissionTransportTest {
     org.mockito.Mockito.doReturn(new io.justsearch.core.execution.EngineExecutorRegistry.Limits(1, 4))
         .when(registry).limits(io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
     var bootstrap = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
-    org.mockito.Mockito.when(bootstrap.workerCapability())
-        .thenReturn(io.justsearch.app.services.bootstrap.CapabilityGraph.unavailable().worker());
     var components = TestEngineComponents.fourComponents();
-    org.mockito.Mockito.when(bootstrap.indexComponent()).thenReturn(components.handle("index"));
+    components.handle("index").transition(io.justsearch.core.component.ComponentState.FAILED,
+        io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+        "test recovery target");
     var attempted = new CountDownLatch(1);
     var attemptFinished = new CountDownLatch(1);
-    org.mockito.Mockito.doAnswer(invocation -> {
+    io.justsearch.core.component.ComponentRecoveryAction action = request -> {
       attempted.countDown();
       try {
-        return false;
+        return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
       } finally {
         attemptFinished.countDown();
       }
-    }).when(bootstrap).startForRecovery();
+    };
     try (var fixture = new Fixture(2, 8);
         components;
         registry;
         var monitor = new io.justsearch.app.services.worker.KnowledgeServerHealthMonitor(
             registry, bootstrap, 60_000)) {
+      monitor.componentRegistry(components);
+      var bindings = new java.util.LinkedHashMap<String,
+          io.justsearch.app.services.worker.ComponentRecoveryBinding>();
+      for (var row : components.snapshot().components()) {
+        bindings.put(row.spec().name(), new io.justsearch.app.services.worker.ComponentRecoveryBinding(
+            components.handle(row.spec().name()),
+            "index".equals(row.spec().name()) ? action : null));
+      }
+      monitor.componentRecoveryBindings(bindings, ignored -> {});
       var field = io.justsearch.app.services.worker.KnowledgeServerHealthMonitor.class
           .getDeclaredField("recoveryExecutor");
       field.setAccessible(true);

@@ -81,8 +81,8 @@ final class FileIntruder implements AutoCloseable {
    * <p>This is deliberately separate from the random intruder workload, whose {@code .lock}
    * exclusion remains load-bearing. The installed recovery proof uses this method at a worker
    * startup barrier so contention is deterministic. {@link FileChannel#tryLock()} makes an
-   * already-held lock an immediate fixture failure instead of accidentally adding the worker's
-   * 60-second acquisition timeout to the test setup.
+   * already-held lock an immediate fixture failure instead of adding an unrelated wait to the
+   * deterministic setup.
    */
   ExclusiveHold holdExclusive(Path exactLockFile) throws IOException {
     Objects.requireNonNull(exactLockFile, "exactLockFile");
@@ -94,23 +94,44 @@ final class FileIntruder implements AutoCloseable {
           "deterministic hold must target an exact .index.lock below " + target);
     }
     Files.createDirectories(lockFile.getParent());
-    FileChannel channel = FileChannel.open(lockFile, StandardOpenOption.CREATE,
-        StandardOpenOption.READ, StandardOpenOption.WRITE);
-    FileLock lock;
+    FileChannel channel = null;
+    FileLock lock = null;
     try {
+      channel = FileChannel.open(lockFile, StandardOpenOption.CREATE,
+          StandardOpenOption.READ, StandardOpenOption.WRITE);
       lock = channel.tryLock();
-    } catch (OverlappingFileLockException alreadyHeld) {
-      channel.close();
-      throw new IOException("Exact index lock is already held: " + lockFile, alreadyHeld);
+      if (lock == null) {
+        throw new IOException("Exact index lock is already held: " + lockFile);
+      }
+      activeChannels.add(channel);
+      activeLocks.add(lock);
+      recordAcquisition(lockFile, true);
+      return new ExclusiveHold(lock, channel);
+    } catch (IOException | RuntimeException | Error failure) {
+      IOException overlapping = failure instanceof OverlappingFileLockException
+          ? new IOException("Exact index lock is already held: " + lockFile, failure) : null;
+      Throwable cleanupFailure = overlapping == null ? failure : overlapping;
+      if (lock != null) {
+        activeLocks.remove(lock);
+        try {
+          lock.release();
+        } catch (IOException cleanup) {
+          cleanupFailure.addSuppressed(cleanup);
+        }
+      }
+      if (channel != null) {
+        activeChannels.remove(channel);
+        try {
+          channel.close();
+        } catch (IOException cleanup) {
+          cleanupFailure.addSuppressed(cleanup);
+        }
+      }
+      if (overlapping != null) throw overlapping;
+      if (failure instanceof Error error) throw error;
+      if (failure instanceof RuntimeException runtime) throw runtime;
+      throw (IOException) failure;
     }
-    if (lock == null) {
-      channel.close();
-      throw new IOException("Exact index lock is already held: " + lockFile);
-    }
-    activeChannels.add(channel);
-    activeLocks.add(lock);
-    recordAcquisition(lockFile, true);
-    return new ExclusiveHold(lock, channel);
   }
 
   final class ExclusiveHold implements AutoCloseable {
@@ -129,7 +150,8 @@ final class FileIntruder implements AutoCloseable {
       activeLocks.remove(lock);
       activeChannels.remove(channel);
       try {
-        lock.release();
+        // The intruder-stop handshake may already have closed every tracked channel.
+        if (lock.isValid()) lock.release();
       } finally {
         channel.close();
       }

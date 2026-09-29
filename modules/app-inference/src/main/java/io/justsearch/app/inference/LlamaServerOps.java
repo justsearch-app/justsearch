@@ -89,9 +89,6 @@ final class LlamaServerOps {
   private static final String ALLOW_HEALTH_ONLY_EXTERNAL_ADOPTION_PROP =
       "justsearch.inference.external.allow_health_only_adoption";
 
-  // Crash recovery (values declared by SUPERVISION_POLICY / supervision-contract.v1.json, tempdoc 627)
-  private static final int MAX_CRASHES = SUPERVISION_POLICY.maxCrashes();
-
   // Periodic health monitoring
   private static final long PERIODIC_HEALTH_INTERVAL_MS = SUPERVISION_POLICY.periodicHealthIntervalMs();
   private static final int CONSECUTIVE_FAILURES_BEFORE_RESTART =
@@ -114,7 +111,6 @@ final class LlamaServerOps {
   private static final Duration HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(1);
   private static final Duration PROPS_PROBE_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration PERIODIC_HEALTH_TIMEOUT = Duration.ofSeconds(5);
-  private static final long CRASH_RECOVERY_DELAY_MS = SUPERVISION_POLICY.crashRecoveryDelayMs();
 
   // ==================== Owned Fields ====================
 
@@ -126,6 +122,9 @@ final class LlamaServerOps {
   private volatile CompletableFuture<?> crashMonitor;
   private final Object ownershipMonitor = new Object();
   private volatile ActiveServer activeServer;
+  private volatile ActiveServer failureSignalledOwner;
+  /** Exact last attempted managed start, retained across ordinary failed cleanup for recovery. */
+  private volatile StartRequest retainedStartRequest;
 
   // VRAM status (for debugging)
   private volatile List<String> lastEffectiveVramFlags = List.of();
@@ -147,10 +146,6 @@ final class LlamaServerOps {
   private volatile String contextRungReason;
   private volatile int contextSlots;
   private volatile String contextKvType;
-
-  // Crash recovery
-  private final AtomicInteger crashCount = new AtomicInteger(0);
-  private final ScheduledExecutorService recoveryScheduler;
 
   // Health monitoring (separate from recovery so a slow health probe cannot block recovery)
   private final ScheduledExecutorService healthScheduler;
@@ -177,8 +172,7 @@ final class LlamaServerOps {
   private volatile boolean usingExternal = false;
 
   // Mode transition callbacks
-  private final Consumer<BooleanSupplier> recoverManagedServer;
-  private final Consumer<BooleanSupplier> goOfflineFromMaxCrashes;
+  private final Consumer<BooleanSupplier> managedServerFailed;
   private final BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure;
 
   // Composition: props interpretation and external diagnostics
@@ -263,13 +257,12 @@ final class LlamaServerOps {
       GpuCapabilitiesService gpuCapabilitiesService,
       Supplier<Mode> currentMode,
       PropsObserver propsObserver,
-      Consumer<BooleanSupplier> recoverManagedServer,
-      Consumer<BooleanSupplier> goOfflineFromMaxCrashes,
+      Consumer<BooleanSupplier> managedServerFailed,
       BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
       InferenceTelemetryEvents events) {
     this(
         executors, httpClient, objectMapper, gpuCapabilitiesService, currentMode, propsObserver,
-        recoverManagedServer, goOfflineFromMaxCrashes, goOfflineFromExternalFailure, events,
+        managedServerFailed, goOfflineFromExternalFailure, events,
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
@@ -281,14 +274,13 @@ final class LlamaServerOps {
       GpuCapabilitiesService gpuCapabilitiesService,
       Supplier<Mode> currentMode,
       PropsObserver propsObserver,
-      Consumer<BooleanSupplier> recoverManagedServer,
-      Consumer<BooleanSupplier> goOfflineFromMaxCrashes,
+      Consumer<BooleanSupplier> managedServerFailed,
       BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     this(
         executors, httpClient, objectMapper, gpuCapabilitiesService, currentMode, propsObserver,
-        recoverManagedServer, goOfflineFromMaxCrashes, goOfflineFromExternalFailure, events, childRegistry,
+        managedServerFailed, goOfflineFromExternalFailure, events, childRegistry,
         LlamaServerOps::terminateManagedHandle);
   }
 
@@ -300,8 +292,7 @@ final class LlamaServerOps {
       GpuCapabilitiesService gpuCapabilitiesService,
       Supplier<Mode> currentMode,
       PropsObserver propsObserver,
-      Consumer<BooleanSupplier> recoverManagedServer,
-      Consumer<BooleanSupplier> goOfflineFromMaxCrashes,
+      Consumer<BooleanSupplier> managedServerFailed,
       BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
@@ -310,31 +301,24 @@ final class LlamaServerOps {
     this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     this.gpuCapabilitiesService = gpuCapabilitiesService;
     this.currentMode = currentMode;
-    this.recoverManagedServer =
-        Objects.requireNonNull(recoverManagedServer, "recoverManagedServer");
-    this.goOfflineFromMaxCrashes =
-        Objects.requireNonNull(goOfflineFromMaxCrashes, "goOfflineFromMaxCrashes");
+    this.managedServerFailed =
+        Objects.requireNonNull(managedServerFailed, "managedServerFailed");
     this.goOfflineFromExternalFailure =
         Objects.requireNonNull(goOfflineFromExternalFailure, "goOfflineFromExternalFailure");
     this.events = Objects.requireNonNull(events, "events");
     this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
     this.managedHandleTermination =
         Objects.requireNonNull(managedHandleTermination, "managedHandleTermination");
-    ScheduledExecutorService openedRecovery = null;
     ScheduledExecutorService openedHealth = null;
     java.util.concurrent.ExecutorService openedExit = null;
     try {
-      openedRecovery =
-          executors.llamaRecovery.openScheduled(daemonFactory("Server-Recovery"));
       openedHealth = executors.llamaHealth.openScheduled(daemonFactory("Server-Health"));
       openedExit = executors.llamaExit.open(daemonFactory("Server-Exit"));
     } catch (RuntimeException | Error failure) {
       cancelIfOpened(openedExit);
       cancelIfOpened(openedHealth);
-      cancelIfOpened(openedRecovery);
       throw failure;
     }
-    this.recoveryScheduler = openedRecovery;
     this.healthScheduler = openedHealth;
     this.exitExecutor = openedExit;
     this.propsOps =
@@ -346,6 +330,7 @@ final class LlamaServerOps {
   StartResult startLlamaServer(StartRequest request)
       throws IOException, ModeTransitionException {
     Objects.requireNonNull(request, "request");
+    retainedStartRequest = request;
     // A failed configuration rollback may retry start; never overwrite its retained child.
     closeUnregisteredChild();
     LOG.info("Starting llama-server...");
@@ -459,6 +444,11 @@ final class LlamaServerOps {
             declaredConfigHash);
     launchManagedLlamaServer(command, launched);
     return launched;
+  }
+
+  /** Captures an initial attempt before manager-side asset/VRAM validation can fail. */
+  void retainAttemptedStartRequest(StartRequest request) {
+    retainedStartRequest = Objects.requireNonNull(request, "request");
   }
 
   /**
@@ -681,17 +671,12 @@ final class LlamaServerOps {
    * consumes a rung from a finite ladder.
    */
   void waitForServerHealth(StartResult expected) throws ModeTransitionException {
-    waitForServerHealth(expected, false);
-  }
-
-  private void waitForServerHealth(StartResult expected, boolean resetCrashBudgetOnReady)
-      throws ModeTransitionException {
     Objects.requireNonNull(expected, "expected");
     while (true) {
       ActiveServer active = requireActive(expected);
       try {
         awaitServerHealth(active);
-        armRuntimeMonitoring(active, resetCrashBudgetOnReady);
+        armRuntimeMonitoring(active);
         return;
       } catch (ModeTransitionException e) {
         if (relaunchWithoutReasoningBudget(active, e)) {
@@ -703,6 +688,82 @@ final class LlamaServerOps {
         retireFailedPhysicalOwner(active);
         throw e;
       }
+    }
+  }
+
+  /** One recovery health wait. Unlike initial composition, this never nests a launch ladder. */
+  void waitForServerHealthOnce(StartResult expected) throws ModeTransitionException {
+    Objects.requireNonNull(expected, "expected");
+    ActiveServer active = requireActive(expected);
+    try {
+      awaitServerHealth(active);
+      armRuntimeMonitoring(active);
+    } catch (ModeTransitionException failure) {
+      retireFailedPhysicalOwner(active);
+      throw failure;
+    }
+  }
+
+  /** Clears retained failed-attempt input only after the manager verifies the accepted owner. */
+  void acceptVerifiedStart(StartRequest request, StartResult result) {
+    ActiveServer owner = activeServer;
+    if (owner == null || owner.start() != result || retainedStartRequest != request) {
+      throw new IllegalStateException("Verified llama-server ownership changed before acceptance");
+    }
+    retainedStartRequest = null;
+  }
+
+  /** Active serving A wins; otherwise recovery may retry the exact retained failed initial A. */
+  java.util.Optional<StartRequest> recoveryStartRequest() {
+    synchronized (ownershipMonitor) {
+      ActiveServer owner = activeServer;
+      if (owner != null) {
+        if (owner.start().disposition() == StartDisposition.ADOPTED_EXTERNAL) {
+          return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(
+            new StartRequest(owner.start().context(), owner.start().adoptionPolicy()));
+      }
+      return java.util.Optional.ofNullable(retainedStartRequest);
+    }
+  }
+
+  /** Fences the exact active/retained owner and preserves its request before physical cleanup. */
+  boolean reserveRecoveryStart(StartRequest request) {
+    Objects.requireNonNull(request, "request");
+    synchronized (ownershipMonitor) {
+      ActiveServer owner = activeServer;
+      if (owner != null) {
+        if (owner.start().disposition() == StartDisposition.ADOPTED_EXTERNAL
+            || owner.start().context() != request.context()
+            || owner.start().adoptionPolicy() != request.adoptionPolicy()) {
+          return false;
+        }
+        retainedStartRequest = request;
+        return true;
+      }
+      return retainedStartRequest == request;
+    }
+  }
+
+  /** Exact process/config owner proof used before terminal recovery publication. */
+  boolean ownsRecoveryAttempt(StartRequest request) {
+    synchronized (ownershipMonitor) {
+      ActiveServer owner = activeServer;
+      if (owner != null) {
+        return owner.start().disposition() != StartDisposition.ADOPTED_EXTERNAL
+            && owner.start().context() == request.context()
+            && owner.start().adoptionPolicy() == request.adoptionPolicy();
+      }
+      return retainedStartRequest == request;
+    }
+  }
+
+  /** True while autonomous activation would steal a failed physical owner's retry. */
+  boolean componentRecoveryPending() {
+    synchronized (ownershipMonitor) {
+      return retainedStartRequest != null
+          || (activeServer != null && failureSignalledOwner == activeServer);
     }
   }
 
@@ -1368,7 +1429,7 @@ final class LlamaServerOps {
     installActive(result, started, null);
   }
 
-  private void armRuntimeMonitoring(ActiveServer owner, boolean resetCrashBudgetOnReady)
+  private void armRuntimeMonitoring(ActiveServer owner)
       throws ModeTransitionException {
     synchronized (ownershipMonitor) {
       if (!isActive(owner) || !ownedPhysicalServerAlive(owner)) {
@@ -1376,7 +1437,6 @@ final class LlamaServerOps {
             ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
             "llama-server ownership changed before runtime monitoring was armed");
       }
-      if (resetCrashBudgetOnReady) crashCount.set(0);
     }
     stopPeriodicHealthCheck();
     if (crashMonitor != null) {
@@ -1664,13 +1724,13 @@ final class LlamaServerOps {
   private void handlePeriodicHealthFailure(
       String reason, boolean external, ActiveServer owner) {
     int failures;
-    boolean restartTriggered;
+    boolean failureThresholdReached;
     synchronized (ownershipMonitor) {
       if (activeServer != owner) return;
       lastPeriodicHealthError.set(reason);
       failures = consecutiveHealthFailures.incrementAndGet();
-      restartTriggered = failures >= CONSECUTIVE_FAILURES_BEFORE_RESTART;
-      if (restartTriggered) stopPeriodicHealthCheckLocked();
+      failureThresholdReached = failures >= CONSECUTIVE_FAILURES_BEFORE_RESTART;
+      if (failureThresholdReached) stopPeriodicHealthCheckLocked();
     }
     LOG.warn(
         "llama-server periodic health check failed ({}/{}): {}",
@@ -1684,17 +1744,17 @@ final class LlamaServerOps {
     try {
       InferenceFailure.HealthFailure failure =
           new InferenceFailure.HealthFailure(classifyHealthFailure(reason), reason, null);
-      events.onHealthFailure(failure, failures, restartTriggered);
+      events.onHealthFailure(failure, failures, false);
     } catch (RuntimeException ex) {
       LOG.warn("Telemetry events.onHealthFailure threw: {}", ex.getMessage());
     }
 
-    if (restartTriggered) {
+    if (failureThresholdReached) {
       LOG.error("Too many consecutive health failures, treating as crash");
       if (external) {
         goOfflineFromExternalFailure.accept(reason, () -> isActive(owner));
       } else {
-        handleManagedCrash(owner);
+        signalManagedFailure(owner, false);
       }
     }
   }
@@ -1734,7 +1794,7 @@ final class LlamaServerOps {
     lastPeriodicHealthError.set(null);
   }
 
-  // ==================== Crash Recovery ====================
+  // ==================== Failure signalling ====================
 
   private void handleManagedCrash(ActiveServer owner) {
     if (!isActive(owner)) return;
@@ -1743,17 +1803,18 @@ final class LlamaServerOps {
 
   private void handleServerCrash(ActiveServer owner) {
     if (!isActive(owner)) return;
-    recordServerCrash(owner, () -> isActive(owner));
+    signalManagedFailure(owner, true);
   }
 
-  private void recordServerCrash(ActiveServer owner, BooleanSupplier stillCurrent) {
-    int crashes;
+  private void signalManagedFailure(ActiveServer owner, boolean processExited) {
     synchronized (ownershipMonitor) {
-      if (activeServer != owner) return;
-      crashes = crashCount.incrementAndGet();
+      if (activeServer != owner || failureSignalledOwner == owner) return;
+      failureSignalledOwner = owner;
     }
-    LOG.warn("Server crash #{}", crashes);
-
+    if (!processExited) {
+      managedServerFailed.accept(() -> isActive(owner));
+      return;
+    }
     // Tempdoc 412 follow-up Bug F: process-death scenarios reach this method via the
     // crashMonitor future (Process.waitFor returning without cancellation), bypassing
     // handlePeriodicHealthFailure entirely (its early-return at the process-dead check skips
@@ -1765,64 +1826,12 @@ final class LlamaServerOps {
       InferenceFailure.HealthFailure failure =
           new InferenceFailure.HealthFailure(
               HealthCode.PROCESS_DIED, "llama-server process exited unexpectedly", null);
-      events.onHealthFailure(failure, crashes, /* restartTriggered */ true);
+      events.onHealthFailure(failure, 1, /* restartTriggered */ false);
     } catch (RuntimeException ex) {
       LOG.warn("Telemetry events.onHealthFailure (process-died) threw: {}", ex.getMessage());
     }
 
-    if (crashes >= MAX_CRASHES) {
-      LOG.error("Max crashes exceeded, entering OFFLINE mode");
-      scheduleTerminalOffline(stillCurrent);
-      return;
-    }
-
-    // Crash recovery delay: immediate for first crash, 5s thereafter (fire-and-forget)
-    long delay = crashes == 1 ? 0 : CRASH_RECOVERY_DELAY_MS;
-    scheduleRecoveryTask(owner, delay);
-  }
-
-  @SuppressWarnings("FutureReturnValueIgnored")
-  private void scheduleTerminalOffline(BooleanSupplier stillCurrent) {
-    // Owner replacement during background recovery is serialized on this scheduler. Manager-driven
-    // replacement is serialized by the runner lock, where the callback rechecks stillCurrent.
-    recoveryScheduler.execute(() -> goOfflineFromMaxCrashes.accept(stillCurrent));
-  }
-
-  @SuppressWarnings("FutureReturnValueIgnored") // fire-and-forget recovery task
-  private void scheduleRecoveryTask(ActiveServer owner, long delay) {
-    recoveryScheduler.schedule(
-        () -> recoverManagedServer.accept(() -> isActive(owner)), delay, TimeUnit.MILLISECONDS);
-  }
-
-  /** Called by the manager while holding its transition lock after rechecking the owner guard. */
-  void recoverActiveServer() {
-    ActiveServer owner = activeServer;
-    if (owner != null) recover(owner);
-  }
-
-  private void recover(ActiveServer owner) {
-    StartResult recoveryStart = owner.start();
-    try {
-      if (!isActive(owner)) return;
-      LOG.info("Attempting server restart...");
-      // Ensure any owned process is stopped before attempting restart (prevents port conflicts).
-      if (!stopLlamaServerAndConfirm()) {
-        throw new IOException("managed llama-server remains alive after bounded termination");
-      }
-      installActive(recoveryStart, null, null);
-      StartResult restarted =
-          startLlamaServer(
-              new StartRequest(recoveryStart.context(), recoveryStart.adoptionPolicy()));
-      recoveryStart = restarted;
-      waitForServerHealth(restarted, true);
-      LOG.info("Server recovered");
-    } catch (Exception e) {
-      LOG.error("Recovery failed", e);
-      ActiveServer failed = activeServer;
-      if (failed != null && failed.start() == recoveryStart) {
-        handleServerCrash(failed);
-      }
-    }
+    managedServerFailed.accept(() -> isActive(owner));
   }
 
   // ==================== State Accessors ====================
@@ -1842,6 +1851,7 @@ final class LlamaServerOps {
     ActiveServer owner = new ActiveServer(start, launchedProcess, adoptedHandle);
     synchronized (ownershipMonitor) {
       activeServer = owner;
+      failureSignalledOwner = null;
       resetHealthDiagnosticsLocked();
     }
     return owner;
@@ -1929,9 +1939,8 @@ final class LlamaServerOps {
     return cudaRuntimeWarning;
   }
 
-  void resetCrashCounters() {
+  void resetHealthFailures() {
     synchronized (ownershipMonitor) {
-      crashCount.set(0);
       consecutiveHealthFailures.set(0);
     }
   }
@@ -1964,11 +1973,10 @@ final class LlamaServerOps {
       crashMonitor = null;
     }
     healthScheduler.shutdownNow();
-    recoveryScheduler.shutdownNow();
     cancelQueued(exitExecutor);
+    retainedStartRequest = null;
     try {
       healthScheduler.awaitTermination(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
-      recoveryScheduler.awaitTermination(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }

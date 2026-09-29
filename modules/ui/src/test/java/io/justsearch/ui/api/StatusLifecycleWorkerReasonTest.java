@@ -52,7 +52,7 @@ final class StatusLifecycleWorkerReasonTest {
           "Set index.schema_mismatch.policy=BLUE_GREEN_MIGRATE");
       handle.transition(
           ComponentState.RELOADING,
-          LifecycleReasonCode.WORKER_RECOVERING.code(),
+          LifecycleReasonCode.COMPONENT_RECOVERING.code(),
           "attempt 1");
       handle.transition(
           ComponentState.FAILED,
@@ -109,10 +109,10 @@ final class StatusLifecycleWorkerReasonTest {
   void reloadingKeepsRecoveryCause() {
     LifecycleSnapshotV2.Component component = indexComponent(handle -> handle.transition(
         ComponentState.RELOADING,
-        LifecycleReasonCode.WORKER_RECOVERING.code(),
+        LifecycleReasonCode.COMPONENT_RECOVERING.code(),
         "attempt 1"));
     assertEquals(ComponentState.RELOADING, component.state());
-    assertEquals(LifecycleReasonCode.WORKER_RECOVERING.code(), component.reason_code());
+    assertEquals(LifecycleReasonCode.COMPONENT_RECOVERING.code(), component.reason_code());
   }
 
   @Test

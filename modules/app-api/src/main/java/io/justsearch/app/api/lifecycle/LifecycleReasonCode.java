@@ -15,6 +15,9 @@ import java.util.Set;
  * <p>Stability: stable (API contract)
  */
 public enum LifecycleReasonCode {
+  COMPONENT_START_TIMEOUT("component.start_timeout"),
+  COMPONENT_RECOVERING("component.recovering"),
+  COMPONENT_RECOVERY_FAILED("component.recovery_failed"),
   // --- Worker ---
   WORKER_SPAWN_FAILED("worker.spawn.failed"),
   WORKER_NOT_CONFIGURED("worker.not_configured"),
@@ -32,10 +35,6 @@ public enum LifecycleReasonCode {
   // re-attempt loop (KnowledgeServerHealthMonitor's boot-recovery arm) tried and stopped trying.
   // The terminal twin of worker.spawn.failed, which permits local recovery attempts.
   WORKER_SPAWN_RECOVERY_EXHAUSTED("worker.spawn_recovery_exhausted"),
-  // Tempdoc 627 — transient: a supervised restart is in flight (capability RECOVERING). Distinct from
-  // worker.spawn.failed so the FE verdict renders a routine self-heal as a calm "Restarting…" transient
-  // (not an alarming "Service degraded"); it self-recovers when the worker comes back.
-  WORKER_RECOVERING("worker.recovering"),
   // Tempdoc 837 S3 (fix c) — the worker WAS serving and stopped answering. Distinct from
   // worker.spawn.failed, which now means only "it never started": the two states have different
   // truths (the index was reachable a moment ago) and the collapsed wording told a user whose
@@ -235,7 +234,7 @@ public enum LifecycleReasonCode {
       // the consumer, and after the 837 S3 sweep the code is only ever SET where the worker
       // genuinely never started. Classifying it GENERIC would let a stale worker.lost outrank a real
       // subsequent spawn failure.
-      case WORKER_SPAWN_FAILED,
+      case COMPONENT_START_TIMEOUT, COMPONENT_RECOVERY_FAILED, WORKER_SPAWN_FAILED,
           WORKER_LOST,
           // Tempdoc 825: terminal, and the last thing anyone learned about the worker — a later
           // TRANSIENT write (a stray worker.starting) must not erase why we stopped trying.
@@ -252,8 +251,7 @@ public enum LifecycleReasonCode {
       case INFERENCE_OFFLINE -> RetentionClass.GENERIC;
 
       // Progress / scheduled / intentional, plus every code no capability ever holds.
-      case WORKER_STARTING,
-          WORKER_RECOVERING,
+      case COMPONENT_RECOVERING, WORKER_STARTING,
           WORKER_SHUT_DOWN,
           WORKER_NOT_CONNECTED,
           WORKER_NOT_CONFIGURED,

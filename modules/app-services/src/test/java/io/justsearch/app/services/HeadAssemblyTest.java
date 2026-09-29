@@ -551,7 +551,7 @@ class HeadAssemblyTest {
   @org.junit.jupiter.params.provider.EnumSource(
       value = io.justsearch.app.api.lifecycle.CapabilityHealth.class,
       names = {"PENDING", "READY"})
-  void connectKnowledgeServerRegistersAgentToolsWithoutBootNpe(
+  void prepareKnowledgeServerBindingRegistersAgentToolsWithoutBootNpe(
       io.justsearch.app.api.lifecycle.CapabilityHealth health) throws Exception {
     Telemetry telemetry = new NoopTelemetry();
     var components = io.justsearch.core.component.TestEngineComponents.fourComponents();
@@ -591,7 +591,7 @@ class HeadAssemblyTest {
       var gpuGauge = new io.justsearch.core.scheduling.GpuSchedulingGauge();
       gpuGauge.setMainGpuActive(true);
       org.mockito.Mockito.when(ks.gpuScheduling()).thenReturn(gpuGauge);
-      bootstrap.connectKnowledgeServer(ks);
+      bootstrap.prepareKnowledgeServerBinding(ks);
       assertFalse(gpuGauge.isMainGpuActive(), "connect seeds the current offline inference mode");
       assertTrue(
           bootstrap.agentToolsRegistration().get(),
@@ -608,7 +608,7 @@ class HeadAssemblyTest {
    * <p>Drives the real bootstrap â†’ connect ordering (not a direct {@code OfflineCoordinator}
    * construction, which bypasses the bug entirely â€” see {@code unreachable-seed-green}). Asserts
    * (a) the coordinator now builds at bootstrap despite the null client, and (b) after {@code
-   * connectKnowledgeServer}, {@code startOfflineProcessing} resolves the live client and drives
+   * prepareKnowledgeServerBinding}, {@code startOfflineProcessing} resolves the live client and drives
    * real Worker calls â€” proving the supplier, not a frozen null, reaches the coordinator.
    */
   @Test
@@ -663,14 +663,14 @@ class HeadAssemblyTest {
 
       org.mockito.Mockito.when(ks.gpuScheduling())
           .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
-      bootstrap.connectKnowledgeServer(ks);
+      bootstrap.prepareKnowledgeServerBinding(ks);
 
       // Same coordinator instance both API entry points read (HeadInfraRegistry / ServicePhase
       // Output both derive from HeadAssembly.this.offlineCoordinator).
       var coordinatorAfterConnect = bootstrap.headInfraRegistry().offlineCoordinator();
       assertTrue(
           coordinatorAtBootstrap == coordinatorAfterConnect,
-          "connectKnowledgeServer must not replace the coordinator instance (no rebuild needed;"
+          "prepareKnowledgeServerBinding must not replace the coordinator instance (no rebuild needed;"
               + " the live supplier resolves the client itself)");
 
       // Await the owned procedure: it must resolve the POST-connect client, not a frozen value.
@@ -851,21 +851,21 @@ class HeadAssemblyTest {
    * <p>Post-merge: the 429 substrate retired the reflective field. The same contract is now
    * enforced by direct dispatch through {@code defaultFacade.lateBindWorkerServices(client,
    * client, documentService)} â€” compile-time checked, no reflection needed. The behavioral
-   * pin retained here is: constructing with {@code knowledgeServer=null} and calling
-   * {@code connectKnowledgeServer(null)} must not throw.
+   * pin retained here is that construction with {@code knowledgeServer=null} remains valid;
+   * the strict publication boundary must reject a missing server.
    */
   @Test
-  void connectKnowledgeServerLateBindDoesNotThrowOnNullCtor() throws Exception {
+  void disconnectedConstructionRejectsMissingServerAtPublication() throws Exception {
     // Construct with knowledgeServer=null (the round-15 cold-start sequence).
     try (HeadAssembly bootstrap =
         new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), new NoopTelemetry(), new ConfigManagerBootstrap(), null, new io.justsearch.app.services.settings.UiSettingsStore(io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
         new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
         org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
 
-      // connectKnowledgeServer(null) is documented as a no-op (early return on ks == null).
-      // Post-merge, this is the entire contract â€” the 429 substrate dispatches via
-      // defaultFacade.lateBindWorkerServices when ks != null, no reflective field probe.
-      bootstrap.connectKnowledgeServer(null);
+      // A disconnected Head is valid, but the strict publication boundary requires a server.
+      assertThrows(IllegalArgumentException.class,
+          () -> bootstrap.prepareKnowledgeServerBinding(null));
+      assertNull(bootstrap.currentKnowledgeServer());
     }
   }
 
@@ -905,7 +905,7 @@ class HeadAssemblyTest {
       var writerFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
       Thread writer = Thread.startVirtualThread(() -> {
         try {
-          bootstrap.connectKnowledgeServer(ks, () -> {
+          bootstrap.prepareKnowledgeServerBinding(ks, () -> {
             if (firstStep.compareAndSet(true, false)) {
               writerPaused.countDown();
               try {
@@ -963,7 +963,7 @@ class HeadAssemblyTest {
   }
 
   @Test
-  void failedAgentToolRegistrationKeepsCommittedServingViewButDegradesConnect() throws Exception {
+  void failedAgentToolRegistrationKeepsCommittedServingViewButRejectsPublication() throws Exception {
     try (HeadAssembly bootstrap =
         new HeadAssembly(mockOperationStore(),
             org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
@@ -988,19 +988,95 @@ class HeadAssemblyTest {
       org.mockito.Mockito.when(ks.gpuScheduling())
           .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
 
-      // Exercise the actual post-publication failure branch while keeping the real graph.
+      // Keep the committed graph owned while propagating strict preparation failure.
+      int previousRebuilds = bootstrap.rebuildHistory().snapshot().size();
       try (var failedRegistration = org.mockito.Mockito.mockStatic(
           io.justsearch.app.services.bootstrap.phases.AgentToolHandlers.class,
           invocation -> { throw new IllegalStateException("registration failed"); })) {
-        bootstrap.connectKnowledgeServer(ks);
+        assertThrows(IllegalStateException.class,
+            () -> bootstrap.prepareKnowledgeServerBinding(ks));
         assertFalse(failedRegistration.isClosed());
       }
       try (HeadAssembly.ServingCapture view = bootstrap.captureServingView()) {
         assertSame(client, view.knowledgeClient());
       }
-      var connect = bootstrap.rebuildHistory().snapshot().getLast();
-      assertEquals(io.justsearch.app.services.bootstrap.PhaseRecord.DEGRADED, connect.outcome());
-      assertEquals("agent_tools.registration_failed", connect.reasonCode());
+      assertEquals(previousRebuilds, bootstrap.rebuildHistory().snapshot().size(),
+          "failed preparation must not record a successful graph publication");
+    }
+  }
+
+  @Test
+  void recoveredWorkerPreparationRejectsFalseAgentToolRegistration() throws Exception {
+    try (HeadAssembly bootstrap = newDisconnectedHeadAssembly()) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> bootstrap.prepareKnowledgeServerBinding(null));
+      var missingClient = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+      org.mockito.Mockito.when(missingClient.publicationLock())
+          .thenReturn(ConfigStore.global().publicationLock());
+      assertThrows(
+          IllegalStateException.class,
+          () -> bootstrap.prepareKnowledgeServerBinding(missingClient));
+
+      var client = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeClient.class);
+      var ks = recoveryKnowledgeServer(client);
+      try (var _ = org.mockito.Mockito.mockStatic(
+          io.justsearch.app.services.bootstrap.phases.AgentToolHandlers.class,
+          invocation -> false)) {
+        var failure = assertThrows(
+            IllegalStateException.class,
+            () -> bootstrap.prepareKnowledgeServerBinding(ks));
+        assertEquals("Agent tool registration refused Worker publication", failure.getMessage());
+      }
+    }
+  }
+
+  @Test
+  void recoveredWorkerPreparationPropagatesAgentToolRegistrationFailure() throws Exception {
+    try (HeadAssembly bootstrap = newDisconnectedHeadAssembly()) {
+      var client = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeClient.class);
+      var ks = recoveryKnowledgeServer(client);
+      var expected = new IllegalStateException("registration failed");
+      try (var _ = org.mockito.Mockito.mockStatic(
+          io.justsearch.app.services.bootstrap.phases.AgentToolHandlers.class,
+          invocation -> { throw expected; })) {
+        assertSame(expected, assertThrows(
+            IllegalStateException.class,
+            () -> bootstrap.prepareKnowledgeServerBinding(ks)));
+      }
+    }
+  }
+
+  @Test
+  void recoveredWorkerPreparationDefersIndexingJobsUntilActivation() throws Exception {
+    try (HeadAssembly bootstrap = newDisconnectedHeadAssembly()) {
+      var client = org.mockito.Mockito.mock(
+          io.justsearch.app.services.worker.KnowledgeClient.class);
+      var ks = recoveryKnowledgeServer(client);
+      try (var successfulRegistration = org.mockito.Mockito.mockStatic(
+          io.justsearch.app.services.bootstrap.phases.AgentToolHandlers.class,
+          invocation -> true)) {
+        bootstrap.prepareKnowledgeServerBinding(ks);
+        org.mockito.Mockito.verify(client, org.mockito.Mockito.never())
+            .subscribeIndexingJobs(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+
+        bootstrap.activateKnowledgeServerBinding();
+
+        org.mockito.Mockito.verify(client)
+            .subscribeIndexingJobs(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+        assertFalse(successfulRegistration.isClosed());
+      }
     }
   }
 
@@ -1031,17 +1107,44 @@ class HeadAssemblyTest {
       org.mockito.Mockito.when(lease.client()).thenReturn(client);
 
       assertThrows(IllegalStateException.class,
-          () -> bootstrap.connectKnowledgeServer(ks, () -> {
+          () -> bootstrap.prepareKnowledgeServerBinding(ks, () -> {
             throw new IllegalStateException("publication interrupted");
           }));
       assertNull(bootstrap.currentKnowledgeServer());
       assertThrows(IllegalStateException.class, bootstrap::captureServingView);
 
-      bootstrap.connectKnowledgeServer(ks);
+      bootstrap.prepareKnowledgeServerBinding(ks);
       try (HeadAssembly.ServingCapture view = bootstrap.captureServingView()) {
         assertSame(client, view.knowledgeClient());
       }
     }
+  }
+
+  private HeadAssembly newDisconnectedHeadAssembly() throws Exception {
+    return new HeadAssembly(
+        mockOperationStore(),
+        org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        new NoopTelemetry(),
+        new ConfigManagerBootstrap(),
+        null,
+        new io.justsearch.app.services.settings.UiSettingsStore(
+            io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.IN_MEMORY),
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+        new io.justsearch.app.services.lease.OperationLeaseServiceImpl(),
+        org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class));
+  }
+
+  private static io.justsearch.app.services.worker.KnowledgeServerBootstrap recoveryKnowledgeServer(
+      io.justsearch.app.services.worker.KnowledgeClient client) {
+    var ks = org.mockito.Mockito.mock(
+        io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+    org.mockito.Mockito.when(ks.client()).thenReturn(client);
+    org.mockito.Mockito.when(ks.publicationLock())
+        .thenReturn(ConfigStore.global().publicationLock());
+    org.mockito.Mockito.when(ks.gpuScheduling())
+        .thenReturn(new io.justsearch.core.scheduling.GpuSchedulingGauge());
+    return ks;
   }
 
   @Test

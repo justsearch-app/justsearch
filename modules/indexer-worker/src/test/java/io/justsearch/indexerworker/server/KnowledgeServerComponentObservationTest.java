@@ -10,10 +10,13 @@ import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.indexerworker.embed.EmbeddingService;
+import io.justsearch.indexerworker.index.IndexGenerationManager.ModelArtifact;
 import io.justsearch.ort.EncoderRole;
 import io.justsearch.reranker.CrossEncoderReranker;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -131,6 +134,67 @@ class KnowledgeServerComponentObservationTest {
       verify(component).setDesiredVersion(bProjection.digest());
       verify(component).setAppliedVersion(bProjection.digest());
       verify(component).transition(ComponentState.READY, null, null);
+      server.close();
+    }
+  }
+
+  @Test
+  void restoredReadyOwnerDoesNotPublishHistoricalSelectionFailure() throws Exception {
+    Path selectedModel = dir.resolve("active/model.onnx").toAbsolutePath().normalize();
+    Files.createDirectories(selectedModel.getParent());
+    Files.writeString(selectedModel, "restored generation model");
+    var identity = GenerationModelSelection.captureIdentity(selectedModel);
+    Files.delete(selectedModel);
+    var selection = GenerationModelSelection.accepted(Map.of(
+        "embedding", new ModelArtifact(selectedModel.toString(), identity.sha256())),
+        "splade", 768);
+    org.junit.jupiter.api.Assertions.assertTrue(selection.variant("embedding", false).isEmpty());
+    Files.writeString(selectedModel, "restored generation model");
+    org.junit.jupiter.api.Assertions.assertTrue(selection.variant("embedding", false).isPresent());
+
+    var configuration = new ResolvedConfigBuilder().build();
+    var desired = EncoderConfigurationProjection.from(configuration);
+    var selected = EncoderConfigurationProjection.from(configuration, selection);
+    var component = mock(ComponentHandle.class);
+    var workerConfig = mock(io.justsearch.indexerworker.WorkerConfig.class);
+    when(workerConfig.dataDir()).thenReturn(dir);
+    try (var executors = new TestEngineExecutors()) {
+      var server = new KnowledgeServer(executors, workerConfig, null,
+          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, component);
+      var configurationField = KnowledgeServer.class.getDeclaredField("startupConfiguration");
+      configurationField.setAccessible(true);
+      configurationField.set(server, configuration);
+      var selectionField = KnowledgeServer.class.getDeclaredField("initialModelSelection");
+      selectionField.setAccessible(true);
+      selectionField.set(server, selection);
+
+      var indexSurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
+          new InferenceSurface.ComponentObservation(Optional.of(selected.indexDigest()),
+              Set.of(EncoderRole.EMBEDDING), Set.of()));
+      var fingerprint = IndexFingerprint.ModelFingerprint.present(identity.sha256());
+      var index = new EncoderSet(indexSurface,
+          new EncoderSet.ModelIdentity(fingerprint, fingerprint, fingerprint, false, 768));
+      var embedding = index.own(mock(EmbeddingService.class));
+      index.bindEmbedding(embedding);
+      when(embedding.isAvailable()).thenReturn(true);
+      var querySurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
+          new InferenceSurface.ComponentObservation(Optional.of(desired.queryDigest()),
+              Set.of(), Set.of()));
+      var query = new QueryRoleSet(querySurface);
+      var indexField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+      indexField.setAccessible(true);
+      indexField.set(server, index);
+      var queryField = KnowledgeServer.class.getDeclaredField("initialQueryRoleSet");
+      queryField.setAccessible(true);
+      queryField.set(server, query);
+
+      server.publishEncoderComposition();
+
+      verify(component).transition(ComponentState.READY, null, null);
+      verify(component).setDesiredVersion(desired.digest());
+      verify(component).setAppliedVersion(selected.withQueryFrom(desired).digest());
       server.close();
     }
   }

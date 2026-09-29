@@ -258,15 +258,17 @@ final class HeadlessAppShutdownWiringTest {
     var release = new CountDownLatch(1);
     var bound = new java.util.concurrent.atomic.AtomicBoolean();
     var handedOver = new java.util.concurrent.atomic.AtomicBoolean();
-    var occurrences = new java.util.concurrent.CopyOnWriteArrayList<
-        io.justsearch.app.services.worker.RecoveryOccurrence>();
     try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
         var components = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
       var knowledge = mock(KnowledgeServerBootstrap.class);
-      when(knowledge.indexComponent()).thenReturn(components.handle("index"));
       when(knowledge.hasClient()).thenAnswer(ignored -> bound.get());
       when(knowledge.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
-      when(knowledge.startForRecovery()).thenAnswer(ignored -> {
+      components.handle("index").transition(
+          io.justsearch.core.component.ComponentState.FAILED,
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+          "test recovery target");
+      io.justsearch.core.component.ComponentRecoveryAction recovery = request -> {
+        assertTrue(request.begin());
         entered.countDown();
         boolean released = false;
         while (!released) {
@@ -278,11 +280,19 @@ final class HeadlessAppShutdownWiringTest {
           }
         }
         bound.set(true);
-        return true;
-      });
+        return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
+      };
       var health = new io.justsearch.app.services.worker.KnowledgeServerHealthMonitor(
           executors, knowledge);
-      health.onRecoveryOccurrence(occurrences::add);
+      health.componentRegistry(components);
+      var bindings = new java.util.LinkedHashMap<String,
+          io.justsearch.app.services.worker.ComponentRecoveryBinding>();
+      for (var row : components.snapshot().components()) {
+        bindings.put(row.spec().name(), new io.justsearch.app.services.worker.ComponentRecoveryBinding(
+            components.handle(row.spec().name()),
+            "index".equals(row.spec().name()) ? recovery : null));
+      }
+      health.componentRecoveryBindings(bindings, ignored -> {});
       health.onRecoveryConnected(ignored -> handedOver.set(true));
       var api = mock(LocalApiServer.class);
       doAnswer(ignored -> {
@@ -292,9 +302,8 @@ final class HeadlessAppShutdownWiringTest {
         health.close(); // Join the late task before checking its external effects.
         assertTrue(bound.get(), "the physical start really finished after shutdown began");
         assertFalse(handedOver.get());
-        assertEquals(java.util.List.of(
-            io.justsearch.app.services.worker.RecoveryOccurrence.Kind.ATTEMPTED),
-            occurrences.stream().map(io.justsearch.app.services.worker.RecoveryOccurrence::kind).toList());
+        assertEquals(1, components.handle("index").snapshot().recoveryAttempts(),
+            "the admitted physical attempt was real before shutdown revoked callbacks");
         return null;
       }).when(api).stop();
       try {

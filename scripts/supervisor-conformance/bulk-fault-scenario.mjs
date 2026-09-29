@@ -1537,6 +1537,29 @@ async function exerciseLiveModelGapDecision(c) {
       fs.renameSync(hiddenSourceModel, sourceModel);
     }
   }
+  let manualEncoderRecovery;
+  if (gapRecomposeFailure) {
+    requireThat(failedRecompose?.state === 'UNAVAILABLE'
+      && failedRecompose.recoveryAttempts === 1,
+    `manual encoder recovery requires the exact failed A restoration: ${JSON.stringify(failedRecompose)}`);
+    const accepted = await request(apiPort, '/api/engine/components/encoders/recover', {
+      method: 'POST', headers: sessionHeaders(manifest), body: '{}',
+    }, 30000);
+    const receipt = parseJson(accepted, 'manual encoder recovery');
+    requireThat(accepted.status === 202 && receipt.component === 'encoders'
+      && receipt.recovery === 'ACCEPTED',
+    `manual encoder recovery was not accepted: HTTP ${accepted.status} ${accepted.text}`);
+    const ready = await waitFor('manual encoder recovery restores exact A', 120000,
+      async () => {
+        const reply = await request(apiPort, '/api/status', {}, 15000);
+        if (reply.status !== 200) return null;
+        const component = JSON.parse(reply.text)?.readiness?.engineComponents?.encoders;
+        return component?.state === 'READY'
+          && component.recoveryAttempts === failedRecompose.recoveryAttempts + 1
+          ? component : null;
+      });
+    manualEncoderRecovery = { receipt, before: failedRecompose, ready };
+  }
   const aVector = await waitFor('recomposed A serves VECTOR during installer gap wait',
     120000, async () => {
       try {
@@ -1615,7 +1638,8 @@ async function exerciseLiveModelGapDecision(c) {
       aVectorHitsDuringWait: JSON.parse(aVector.text).results.length,
       aVectorHitsAfterCancel: JSON.parse(resumedA.text).results.length,
       terminalState: retired.row.state, ...(semantic ? { semantic } : {}),
-      ...(failedRecompose ? { failedRecompose } : {}) }));
+      ...(failedRecompose ? { failedRecompose } : {}),
+      ...(manualEncoderRecovery ? { manualEncoderRecovery } : {}) }));
     return;
   }
   const acceptanceKey = createOperationKey();

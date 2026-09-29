@@ -153,6 +153,18 @@ final class QueryRoleSelectionResolver {
         tokenizer, variant.precision(), targetEp);
   }
 
+  /** Captures a resolved variant exactly, without performing any further variant discovery. */
+  static QueryRoleSelection.Role captureResolvedVariant(
+      io.justsearch.configuration.model.VariantSelection variant) throws IOException {
+    Objects.requireNonNull(variant, "variant");
+    ModelFile model = GenerationModelSelection.captureIdentity(variant.modelFile());
+    ModelFile tokenizer = GenerationModelSelection.captureIdentity(
+        Objects.requireNonNull(model.path().getParent(), "model directory")
+            .resolve("tokenizer.json"));
+    return QueryRoleSelection.Role.selected(model.path().getFileName().toString(), model,
+        tokenizer, variant.precision(), variant.executionProvider());
+  }
+
   private static ModelVariant registered(String packageId, ModelFile file) {
     var modelPackage = REGISTRY.findPackage(packageId);
     if (modelPackage == null) return null;

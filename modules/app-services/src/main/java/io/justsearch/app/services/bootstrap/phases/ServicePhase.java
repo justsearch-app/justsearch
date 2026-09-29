@@ -227,7 +227,8 @@ public final class ServicePhase {
               // Wired here at the composition root because the app-api OnlineAiLifecycleControl
               // interface cannot reference the app-inference TransitionReason type.
               manager::switchToOnlineMode,
-              manager::switchToIndexingMode);
+              manager::switchToIndexingMode,
+              manager::componentRecoveryPending);
 
       offlineCoordinator =
           OfflineCoordinatorBuilder.build(

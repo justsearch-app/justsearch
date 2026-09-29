@@ -65,14 +65,12 @@ final class ReasonRetention {
   }
 
   /**
-   * Tempdoc 825 §D2.4 — the ONE honest supersede: the Head has RESUMED trying after a failed boot, so
-   * {@code worker.recovering} is strictly newer information than the {@code worker.spawn.failed} pin
-   * it replaces. Without this arm the boot-recovery narration is silently dropped (held FAULT beats
-   * incoming TRANSIENT) and {@code pendingReason()} — published raw on the runtime manifest and the
-   * 503 body — keeps telling the operator the worker "failed to start" while a re-attempt is in
-   * flight.
+   * The one honest supersede: an admitted component recovery is strictly newer information than
+   * the {@code worker.spawn.failed} pin it replaces. Without this arm the recovery narration is
+   * silently dropped (held FAULT beats incoming TRANSIENT), so the lifecycle projection keeps
+   * claiming the index failed to start while its physical owner is actively recomposing it.
    *
-   * <p>Deliberately keyed on BOTH codes, not on "incoming is worker.recovering":
+   * <p>Deliberately keyed on BOTH codes, not on "incoming is component.recovering":
    *
    * <ul>
    *   <li>{@code worker.index_corrupt} is STICKY and is retained by the branch above — a recovery
@@ -84,6 +82,6 @@ final class ReasonRetention {
    */
   private static boolean recoverySupersedesSpawnFailure(String heldCode, String incomingCode) {
     return LifecycleReasonCode.WORKER_SPAWN_FAILED.code().equals(heldCode)
-        && LifecycleReasonCode.WORKER_RECOVERING.code().equals(incomingCode);
+        && LifecycleReasonCode.COMPONENT_RECOVERING.code().equals(incomingCode);
   }
 }

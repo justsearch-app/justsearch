@@ -19,15 +19,12 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /** Resolves exact model files owned by an active generation, independent of desired settings. */
 final class GenerationModelSelection {
   private final Map<String, ModelArtifact> models;
   private final String sparseModel;
   private final Integer vectorDimension;
-  private final Set<String> unavailable = ConcurrentHashMap.newKeySet();
 
   private GenerationModelSelection(GenerationManifest manifest) {
     this.models = Map.copyOf(manifest.models());
@@ -85,10 +82,6 @@ final class GenerationModelSelection {
         fingerprint("embedding"), fingerprint("splade"), fingerprint("ner"));
   }
 
-  boolean hasUnavailableModel() {
-    return !unavailable.isEmpty();
-  }
-
   Optional<Path> metadataDirectory(String packageId) {
     ModelArtifact artifact = models.get(packageId);
     return artifact == null ? Optional.empty() : Optional.of(Path.of(artifact.id()).getParent());
@@ -141,10 +134,7 @@ final class GenerationModelSelection {
 
   /** Exact generation variant for the current execution policy; never consults install state. */
   Optional<VariantSelection> variant(String packageId, boolean gpuEnabled) {
-    Optional<VariantSelection> selected = verify(packageId)
-        .map(model -> DevModeVariantProbe.probeExact(model.file(), gpuEnabled));
-    if (selected.isEmpty() && includes(packageId)) unavailable.add(packageId);
-    return selected;
+    return verify(packageId).map(model -> DevModeVariantProbe.probeExact(model.file(), gpuEnabled));
   }
 
   private static String sha256(Path file) throws IOException {

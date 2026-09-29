@@ -164,7 +164,7 @@ Delegates to package-private collaborators: **`LlamaServerOps`** (process spawn/
         * By default, adoption is verified via `GET /props` (not just `GET /health`) to avoid accidentally adopting an unrelated HTTP service.
         * Dev escape hatch: `-Djustsearch.inference.external.allow_health_only_adoption=true` (allows health-only adoption when `/props` is missing/unparseable).
         * Adopted servers are still monitored; if the external server becomes unhealthy mid-session, inference transitions to Offline (no process handle to restart).
-    *   **Crash Recovery:** If the owned server crashes while in Online mode, it stops and restarts it (with cleanup first). Health checks and crash recovery run on independent schedulers (`healthScheduler`, `recoveryScheduler`), preventing a slow health probe from blocking recovery.
+    *   **Crash Recovery:** Native health and process-exit callbacks mark the exact managed owner Offline and report its failure once. `KnowledgeServerHealthMonitor` is the sole automatic admission, backoff, and retry-budget authority. For one admitted attempt, the manager validates the retained exact `StartRequest`, drains requests, retires the failed child, and starts one same-configuration replacement; a failed replacement is retired before failure is published. The exact request is retained even when initial startup never produced a child. Autonomous Online and VDU transitions cannot bypass this retry authority; explicit user or settings intent remains separate. Adopted external processes are refused by local recovery. Health monitoring retains its own scheduler, but there is no native recovery scheduler or independent crash retry budget.
     *   **Mode State Machine:** `ModeStateMachine` validates all mode transitions (`beginTransition` → `complete`/`rollback`, `forceOffline` for emergencies). No raw state assignments — all transitions go through validated operations with precondition checks.
     *   **Effective Runtime Info:** Reads `/props` to capture best-effort runtime `n_ctx` and `model_alias`, which is surfaced via `/api/inference/status` and used as the request `model` id.
     *   **Inference refresh:** The Brain settings surface submits the current witnessed `/api/settings/v2` values with an explicit refresh intent through accepted `core.reconfigure` preparation. The settings owner applies the refresh to the runtime with `RESTART_IF_ONLINE`.
@@ -193,14 +193,16 @@ All ORT consumers (embedding, SPLADE, NER, BGE-M3, cross-encoder reranker, citat
 
 1. `RuntimePolicyResolver.resolve(cfg, hardware)` → `RuntimePolicy` — JVM-wide session settings (arena, CUDA provider, session, profiling).
 2. `ModelSessionPolicyResolver.resolve(role, cfg, hardware, variant)` → `ModelSessionPolicy` — per-encoder GPU / CPU / lifecycle / RunOptions.
-3. `InferenceCompositionRoot.compose(cfg, hardware, contract, modelsDir, arbiter)` → `InferenceSurface`. Resolves each encoder's `VariantSelection` (via `VariantSelector`, or `DevModeVariantProbe` when the install contract is absent), calls `OrtSessionAssembler.buildManager(Composition, arbiter)`, wraps sessions as `SessionHandle`, constructs encoders with pre-built `<Role>Assembly` (shape + tokenizer + vocabulary / label-mapping), returns the typed surface.
+3. `InferenceCompositionRoot.compose(...)` captures an immutable `IndexCompositionPlan` before native assembly. The plan fixes each index role's `VariantSelection`, runtime/session policy, pre-resolved BGE/SPLADE fallback, and the consulted model/manifest/sidecar candidate set as either a present SHA-256-and-size witness or an absence witness. Initial assembly and `composeCaptured(...)` retry use that same plan; independently owned query roles are supplied from their current captured projection.
 4. Encoders consume `SessionHandle` only — they do zero filesystem I/O in constructors. `ClosurePropertyTest` (ArchUnit) enforces this.
+
+Encoder recovery validates the captured witnesses before admission and again before native assembly. A changed file, a newly appeared absence-witnessed file, or a newly missing present-witnessed file refuses recovery before native retirement. Known missing roles remain a coherent `UNAVAILABLE` result. One admitted, owner-locked attempt replaces the native model owners in place while the lexical index stays open, then publishes the replacement only after its captured composition is ready.
 
 **Key classes:**
 
 | Class | Purpose |
 |-------|---------|
-| `InferenceCompositionRoot.compose(...)` | Single production entry point; returns `InferenceSurface` |
+| `InferenceCompositionRoot.compose(...)` / `composeCaptured(...)` | Captures the immutable index-role plan and assembles the initial or exact retry `InferenceSurface` |
 | `InferenceSurface` | Typed bundle of ready-to-use encoders + `PolicySnapshot` + `List<SessionHandle>` for lifecycle management |
 | `OrtSessionAssembler` | The only caller of ORT setters in production. Entries: `buildManager(Composition, GpuArbiter)`, `verifyModelSession(...)` (Gradle verify-model task), `probeModelNames(...)` |
 | `SessionOptionsApplier` | Walks `RuntimePolicy` + `ModelSessionPolicy` fields → ORT setters. Every option value flows from a policy field (§6 closure property) |

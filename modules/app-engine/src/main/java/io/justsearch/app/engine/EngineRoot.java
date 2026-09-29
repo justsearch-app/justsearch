@@ -113,6 +113,8 @@ public final class EngineRoot implements WorkerHost {
   /** The shared physical and sampled index publisher, with the same reason-retention policy. */
   public io.justsearch.core.component.ComponentHandle indexComponent() { return indexComponent; }
 
+  public io.justsearch.core.component.ComponentHandle encoderComponent() { return encoderComponent; }
+
   /** The same owner is shared by the API front, library calls and ordered shutdown. */
   public io.justsearch.app.api.EngineAdmissionService admission() { return admission; }
 
@@ -147,6 +149,19 @@ public final class EngineRoot implements WorkerHost {
         io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
         io.justsearch.core.component.ComponentHandle indexComponent,
         io.justsearch.core.component.ComponentHandle encoderComponent);
+
+    default io.justsearch.configuration.resolved.ResolvedConfig captureConfiguration() {
+      return null;
+    }
+
+    default KnowledgeServer create(GpuSchedulingGauge gauge,
+        io.justsearch.core.execution.EngineExecutorRegistry executors,
+        io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+        io.justsearch.core.component.ComponentHandle indexComponent,
+        io.justsearch.core.component.ComponentHandle encoderComponent,
+        io.justsearch.configuration.resolved.ResolvedConfig exactConfiguration) {
+      return create(gauge, executors, ingestion, indexComponent, encoderComponent);
+    }
   }
   private final ServerFactory serverFactory;
   private boolean clientReady;
@@ -161,6 +176,7 @@ public final class EngineRoot implements WorkerHost {
   private boolean terminalWriterExitAccepted;
 
   private volatile KnowledgeServer server;
+  private KnowledgeServer.IndexStartContext retainedIndexStartContext;
   private volatile java.util.function.Supplier<io.justsearch.app.api.settings.QueryRoleSelection>
       queryRoleBootSelection = () -> null;
 
@@ -349,20 +365,42 @@ public final class EngineRoot implements WorkerHost {
       java.util.function.Supplier<io.justsearch.configuration.resolved.ConfigStore> authority) {
     // Process boot supplies its explicit owner; embedded compatibility constructors resolve at start.
     var gpuCapabilities = new io.justsearch.gpu.GpuCapabilitiesService();
-    return (gauge, executorRegistry, ingestion, indexComponent, encoderComponent) -> {
-      var configStore = authority.get();
-      var startupConfiguration = configStore.get();
-      WorkerConfig workerConfig = WorkerConfig.load(startupConfiguration);
-      // Dev reload signals arrive under this runtime directory from the owning dev tool.
-      return new KnowledgeServer(
-          executorRegistry, workerConfig,
-          new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
-          childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration,
-          configStore::get, configStore.publicationLock(), () -> {
-            var device = gpuCapabilities.snapshot().effective();
-            return new io.justsearch.core.component.DeviceMemoryLine(
-                device.totalVramBytes(), device.freeVramBytes());
-          });
+    return new ServerFactory() {
+      @Override
+      public io.justsearch.configuration.resolved.ResolvedConfig captureConfiguration() {
+        return authority.get().get();
+      }
+
+      @Override
+      public KnowledgeServer create(GpuSchedulingGauge gauge,
+          io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+          io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+          io.justsearch.core.component.ComponentHandle indexComponent,
+          io.justsearch.core.component.ComponentHandle encoderComponent) {
+        return create(gauge, executorRegistry, ingestion, indexComponent, encoderComponent,
+            captureConfiguration());
+      }
+
+      @Override
+      public KnowledgeServer create(GpuSchedulingGauge gauge,
+          io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+          io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+          io.justsearch.core.component.ComponentHandle indexComponent,
+          io.justsearch.core.component.ComponentHandle encoderComponent,
+          io.justsearch.configuration.resolved.ResolvedConfig startupConfiguration) {
+        var configStore = authority.get();
+        WorkerConfig workerConfig = WorkerConfig.load(startupConfiguration);
+        // Dev reload signals arrive under this runtime directory from the owning dev tool.
+        return new KnowledgeServer(
+            executorRegistry, workerConfig,
+            new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
+            childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration,
+            configStore::get, configStore.publicationLock(), () -> {
+              var device = gpuCapabilities.snapshot().effective();
+              return new io.justsearch.core.component.DeviceMemoryLine(
+                  device.totalVramBytes(), device.freeVramBytes());
+            });
+      }
     };
   }
 
@@ -447,8 +485,24 @@ public final class EngineRoot implements WorkerHost {
       throw new IOException("EngineRoot cannot start while its previous server close is incomplete");
     }
     liveMigrationStartAttempt = null;
-    KnowledgeServer started = serverFactory.create(gpuScheduling, executors, recordedIngestion,
-        indexComponent, encoderComponent);
+    KnowledgeServer.IndexStartContext startContext = retainedIndexStartContext;
+    io.justsearch.configuration.resolved.ResolvedConfig exactConfiguration = startContext == null
+        ? serverFactory.captureConfiguration() : startContext.configuration();
+    io.justsearch.app.api.settings.QueryRoleSelection exactBootQuery = startContext == null
+        ? queryRoleBootSelection.get() : startContext.bootQuerySelection();
+    if (startContext == null && exactConfiguration != null) {
+      startContext = KnowledgeServer.IndexStartContext.unresolved(
+          exactConfiguration, exactBootQuery);
+      retainedIndexStartContext = startContext;
+    }
+    KnowledgeServer started;
+    try {
+      started = serverFactory.create(gpuScheduling, executors, recordedIngestion,
+          indexComponent, encoderComponent, exactConfiguration);
+    } catch (RuntimeException | Error constructorFailure) {
+      // The exact pre-construction input remains available for a counted initial recovery.
+      throw constructorFailure;
+    }
     synchronized (terminalWriterFaultOwnerLock) {
       if (terminalWriterExitAccepted) {
         throw new IOException("EngineRoot cannot restart after accepting a terminal writer fault");
@@ -460,9 +514,11 @@ public final class EngineRoot implements WorkerHost {
     started.onMigrationRestart(() -> requestRestart(started));
     try {
       started.installProjectionSeedSources(projectionSeedSources);
-      started.bindBootQueryRoleSelection(queryRoleBootSelection.get());
+      if (startContext != null) started.bindIndexStartContext(startContext);
+      else started.bindBootQueryRoleSelection(exactBootQuery);
       started.start();
     } catch (IOException | RuntimeException | Error failure) {
+      retainedIndexStartContext = started.failedIndexStartContext();
       // A failed start may also have failed cleanup. Retain that physical owner until its
       // close latch confirms completion, so retry cannot overlap a live queue or activation.
       boolean closed = false;
@@ -517,6 +573,7 @@ public final class EngineRoot implements WorkerHost {
       throw failure;
     }
     log.info("Engine composed the index half in-process (no worker process, no channel)");
+    retainedIndexStartContext = null;
     return built;
   }
 
@@ -525,6 +582,17 @@ public final class EngineRoot implements WorkerHost {
     KnowledgeServer current = server;
     if (current == null) throw new IllegalStateException("Index serving owner is unavailable");
     var lease = current.captureServingView();
+    return servingLease(lease);
+  }
+
+  @Override
+  public WorkerHost.ServingLease captureStartupHealthView() {
+    KnowledgeServer current = server;
+    if (current == null) throw new IllegalStateException("Index serving owner is unavailable");
+    return servingLease(current.captureStartupHealthView());
+  }
+
+  private static WorkerHost.ServingLease servingLease(KnowledgeServer.ServingLease lease) {
     return new WorkerHost.ServingLease() {
       @Override
       public <T> T withClient(KnowledgeClient client,
@@ -578,6 +646,284 @@ public final class EngineRoot implements WorkerHost {
 
   @Override
   public synchronized void close() {
+    closeIndex(true);
+  }
+
+  @Override
+  public synchronized void closeForRecovery() {
+    closeIndex(false);
+  }
+
+  /** One same-physical-context index recovery, called with Bootstrap.initLock already held. */
+  @Override
+  public synchronized io.justsearch.core.component.ComponentRecoveryAction.Result recoverIndex(
+      io.justsearch.core.component.ComponentRecoveryAction.Request request,
+      io.justsearch.app.services.worker.KnowledgeServerBootstrap.RecoveryBody body)
+      throws Exception {
+    Objects.requireNonNull(request, "request");
+    Objects.requireNonNull(body, "body");
+    KnowledgeServer incumbent = server;
+    KnowledgeServer.IndexStartContext context;
+    if (incumbent != null) {
+      var reserved = incumbent.reserveIndexRecovery(request);
+      if (reserved.isEmpty()) {
+        return request.admitted().isPresent()
+            ? io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED
+            : io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
+      }
+      context = reserved.orElseThrow();
+    } else {
+      context = retainedIndexStartContext;
+      if (context == null || request.cancelled()
+          || !Objects.equals(request.expected().appliedVersion(), context.priorAppliedDigest())
+          || !request.begin()) {
+        return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
+      }
+      context = context.forRecovery(context.priorAppliedDigest());
+    }
+    retainedIndexStartContext = context;
+    boolean healthy;
+    try {
+      healthy = body.run(() -> !request.cancelled());
+    } catch (Exception | Error failure) {
+      if (hasRecoverySupersession(failure)) {
+        return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+      }
+      return completeFailedRecovery(request, body, context, failure);
+    }
+    if (request.cancelled()) {
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    if (!healthy) {
+      return completeFailedRecovery(request, body, context,
+          new IOException("Recovered index did not become healthy"));
+    }
+    KnowledgeServer replacement = server;
+    if (replacement == null || replacement == incumbent) {
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    long modelWaitMs = Math.max(1L, request.expected().spec().startDeadline().toMillis());
+    if (!replacement.awaitIndexRecoveryQueryWitness(modelWaitMs)) {
+      return completeFailedRecovery(request, body, context,
+          new IOException("Recovered query selection did not finish"));
+    }
+    final java.util.Optional<KnowledgeServer.IndexStartContext> finalized;
+    try {
+      finalized = replacement.finalizeIndexRecovery(context);
+    } catch (KnowledgeServer.IndexRecoveryWitnessException missingWitness) {
+      return completeFailedRecovery(request, body, context, missingWitness);
+    }
+    if (finalized.isEmpty()) {
+      retireSupersededReplacement();
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    KnowledgeServer.IndexStartContext actual = finalized.orElseThrow();
+    if (!samePhysicalContext(context, actual)) {
+      retireSupersededReplacement();
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    String physicalDigest = actual.priorAppliedDigest();
+    if (context.priorAppliedDigest() != null
+        && !context.priorAppliedDigest().equals(physicalDigest)) {
+      retireSupersededReplacement();
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    var current = request.current();
+    var admitted = request.admitted().orElse(null);
+    if (!sameRecoveryLineage(admitted, current, context.priorAppliedDigest())) {
+      retireSupersededReplacement();
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    try {
+      body.preparePublication();
+    } catch (Exception | Error failure) {
+      return completeFailedRecovery(request, body, context, failure);
+    }
+    if (request.cancelled()) {
+      retireSupersededReplacement();
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    current = request.current();
+    admitted = request.admitted().orElse(null);
+    if (!sameRecoveryLineage(admitted, current, context.priorAppliedDigest())) {
+      retireSupersededReplacement();
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    if (context.priorAppliedDigest() == null) {
+      current = installInitialRecoveredVersions(current, physicalDigest);
+      if (current == null) {
+        retireSupersededReplacement();
+        return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+      }
+    }
+    try {
+      replacement.armIndexRecoveryServing(current);
+    } catch (KnowledgeServer.IndexRecoverySupersededException superseded) {
+      retireSupersededReplacement();
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    java.util.Optional<io.justsearch.core.component.EngineComponentSnapshot.Component> completed;
+    boolean servingAccepted = false;
+    try {
+      if (request.cancelled()) {
+        return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+      }
+      completed = request.complete(current,
+          io.justsearch.core.component.ComponentState.READY, null, null);
+      if (completed.isEmpty()) {
+        return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+      }
+      replacement.confirmIndexRecoveryServing(completed.orElseThrow());
+      servingAccepted = true;
+    } catch (KnowledgeServer.IndexRecoverySupersededException superseded) {
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    } finally {
+      if (!servingAccepted) {
+        replacement.disarmIndexRecoveryServing();
+        retireSupersededReplacement();
+      }
+    }
+    replacement.acceptIndexRecovery();
+    return io.justsearch.core.component.ComponentRecoveryAction.Result.recovered(
+        completed.orElseThrow());
+  }
+
+  /** Keeps the current index lifetime stable while its native model owners are replaced. */
+  @Override
+  public synchronized io.justsearch.core.component.ComponentRecoveryAction.Result recoverEncoders(
+      io.justsearch.core.component.ComponentRecoveryAction.Request request) throws Exception {
+    Objects.requireNonNull(request, "request");
+    if (server == null || request.cancelled()) {
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
+    }
+    return server.recoverEncoders(request);
+  }
+
+  private io.justsearch.core.component.ComponentRecoveryAction.Result completeFailedRecovery(
+      io.justsearch.core.component.ComponentRecoveryAction.Request request,
+      io.justsearch.app.services.worker.KnowledgeServerBootstrap.RecoveryBody body,
+      KnowledgeServer.IndexStartContext context, Throwable failure) {
+    var current = request.current();
+    var admitted = request.admitted().orElse(null);
+    if (!sameRecoveryLineage(admitted, current, context.priorAppliedDigest())) {
+      return io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED;
+    }
+    var fatal = body.fatalReasonCode();
+    String reason = fatal == null
+        ? io.justsearch.app.api.lifecycle.LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code()
+        : fatal.code();
+    String evidence = fatal == null
+        ? "Physical recovery failed: " + recoveryFailureDetail(failure) : body.fatalDetail();
+    var completed = request.complete(current,
+        io.justsearch.core.component.ComponentState.FAILED, reason, evidence);
+    return completed.<io.justsearch.core.component.ComponentRecoveryAction.Result>map(
+        io.justsearch.core.component.ComponentRecoveryAction.Result::failed)
+        .orElse(io.justsearch.core.component.ComponentRecoveryAction.Result.SUPERSEDED);
+  }
+
+  private static String recoveryFailureDetail(Throwable failure) {
+    String outer = failure.getMessage();
+    String concrete = outer;
+    Throwable current = failure;
+    for (int depth = 0; depth < 32; depth++) {
+      Throwable cause = current.getCause();
+      if (cause == null || cause == current) break;
+      current = cause;
+      if (current.getMessage() != null && !current.getMessage().isBlank()) {
+        concrete = current.getMessage();
+      }
+    }
+    if (outer == null || outer.isBlank()) return concrete == null ? failure.toString() : concrete;
+    return concrete == null || concrete.equals(outer) ? outer : outer + ": " + concrete;
+  }
+
+  private void retireSupersededReplacement() {
+    try {
+      closeIndex(false);
+    } catch (RuntimeException incomplete) {
+      log.warn("Superseded index replacement retained after incomplete close", incomplete);
+    }
+  }
+
+  private static boolean hasRecoverySupersession(Throwable failure) {
+    for (Throwable current = failure; current != null && current != current.getCause();
+         current = current.getCause()) {
+      if (current instanceof KnowledgeServer.IndexRecoverySupersededException) return true;
+    }
+    return false;
+  }
+
+  private boolean sameRecoveryLineage(
+      io.justsearch.core.component.EngineComponentSnapshot.Component admitted,
+      io.justsearch.core.component.EngineComponentSnapshot.Component current,
+      String priorAppliedDigest) {
+    return admitted != null && current != null && admitted.spec().equals(current.spec())
+        && admitted.recoveryAttempts() == current.recoveryAttempts()
+        && Objects.equals(admitted.desiredVersion(), current.desiredVersion())
+        && Objects.equals(priorAppliedDigest, current.appliedVersion());
+  }
+
+  private static boolean samePhysicalContext(KnowledgeServer.IndexStartContext expected,
+      KnowledgeServer.IndexStartContext actual) {
+    return expected.configuration().equals(actual.configuration())
+        && (expected.generationState() == null
+            || expected.generationState().equals(actual.generationState()))
+        && (expected.generationManifest() == null
+            || expected.generationManifest().equals(actual.generationManifest()))
+        && (expected.bootOwnership() == null
+            || expected.bootOwnership().equals(actual.bootOwnership()))
+        && (expected.bootDisposition() == null
+            || expected.bootDisposition() == actual.bootDisposition())
+        && (expected.queryObservation() == null
+            || sameQueryContext(expected.queryObservation(), actual.queryObservation()));
+  }
+
+  private static boolean sameQueryContext(
+      io.justsearch.indexerworker.server.InferenceSurface.ComponentObservation expected,
+      io.justsearch.indexerworker.server.InferenceSurface.ComponentObservation actual) {
+    if (expected == null || actual == null) return expected == actual;
+    if (!expected.querySelection().equals(actual.querySelection())
+        || !expected.requestedRoles().equals(actual.requestedRoles())) return false;
+    var selection = expected.querySelection().orElseThrow();
+    return expected.missingRoles().stream().allMatch(role -> switch (role) {
+      case RERANKER -> selection.reranker().state()
+          != io.justsearch.app.api.settings.QueryRoleSelection.State.DISABLED
+          || actual.missingRoles().contains(role);
+      case CITATION -> selection.citation().state()
+          != io.justsearch.app.api.settings.QueryRoleSelection.State.DISABLED
+          || actual.missingRoles().contains(role);
+      default -> false;
+    });
+  }
+
+  private io.justsearch.core.component.EngineComponentSnapshot.Component
+      installInitialRecoveredVersions(
+          io.justsearch.core.component.EngineComponentSnapshot.Component current,
+          String physicalDigest) {
+    if (physicalDigest == null) return null;
+    var replacement = new io.justsearch.core.component.EngineComponentSnapshot.Component(
+        current.spec(), current.state(), current.reasonCode(), current.stateSince(),
+        current.stateSinceMonotonicNanos(), physicalDigest,
+        current.desiredVersion() == null ? physicalDigest : current.desiredVersion(),
+        current.lastCompose(), current.recoveryAttempts(), current.evidence());
+    io.justsearch.core.component.EngineComponentRegistry.PreparedBatch prepared;
+    var publication = publicationLock().writeLock();
+    publication.lock();
+    try {
+      if (!current.equals(indexComponent.snapshot())) return null;
+      prepared = indexComponent.prepareReplacement(replacement);
+      prepared.validate();
+      prepared.install();
+    } finally {
+      publication.unlock();
+    }
+    prepared.notifyObservers();
+    return prepared.snapshot().components().stream()
+        .filter(component -> component.spec().name().equals(current.spec().name()))
+        .findFirst().orElseThrow();
+  }
+
+  private void closeIndex(boolean publishIndexStopped) {
     // Ordered shutdown closes admission and drains physical users before this index owner.
     // A direct close with live work cannot safely destroy its client/queue dependencies.
     if (admission.activeWorkCount() != 0
@@ -600,7 +946,8 @@ public final class EngineRoot implements WorkerHost {
     }
     if (s != null) {
       try {
-        s.close();
+        if (publishIndexStopped) s.close();
+        else s.closeForRecovery();
       } catch (IOException e) {
         log.warn("Error closing the in-process index half", e);
         throw new IllegalStateException("In-process index close incomplete; owner retained for retry", e);

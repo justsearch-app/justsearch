@@ -81,6 +81,7 @@ final class EngineLifecycleE2ETest {
 
   @Tag("ai")
   @Test
+  @Timeout(14 * 60)
   void failedInPlaceARecomposeCancelsBAndRestoresA() throws Exception {
     EngineSupervisedRecoveryE2ETest.runSeededInPlaceRecomposeFailureCancellation();
   }

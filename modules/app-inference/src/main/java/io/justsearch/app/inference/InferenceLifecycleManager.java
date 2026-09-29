@@ -23,6 +23,11 @@ import io.justsearch.app.api.ModeChangeListener;
 import io.justsearch.app.api.OnlineAiService.AiUsage;
 import io.justsearch.app.api.OnlineAiService.VisionCompletionResult;
 import io.justsearch.app.api.SamplingParams;
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.api.lifecycle.RetentionClass;
+import io.justsearch.core.component.ComponentRecoveryAction;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentSnapshot;
 import net.jcip.annotations.ThreadSafe;
 import java.io.Closeable;
 import java.io.IOException;
@@ -38,6 +43,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +114,7 @@ public class InferenceLifecycleManager
    */
   private volatile PreparedConfigApply preparedConfigApply;
   private volatile boolean precommitComposition;
+  private volatile boolean closed;
 
   /** A null resolved snapshot exists only for the legacy constructor before context capture. */
   private record ConfiguredInference(
@@ -276,8 +283,7 @@ public class InferenceLifecycleManager
               gpuCapabilitiesService,
               runner::currentMode,
               propsObserver,
-              this::recoverManagedServer,
-              this::handleMaxCrashOffline,
+              this::handleManagedServerFailure,
               this::handleExternalFailureOffline,
               this.events,
               childRegistry);
@@ -304,8 +310,8 @@ public class InferenceLifecycleManager
         config.gpuLayers());
   }
 
-  /** Crash-recovery callback installed on {@link LlamaServerOps}. Tempdoc 518 P1. */
-  private void handleMaxCrashOffline(java.util.function.BooleanSupplier stillOwned) {
+  /** One native failure signal; the Engine component monitor owns every retry decision. */
+  private void handleManagedServerFailure(java.util.function.BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
       if (precommitComposition) {
         invalidatePreparedCandidate(stillOwned);
@@ -313,28 +319,183 @@ public class InferenceLifecycleManager
       }
       if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
       tokenOps.clearCaches();
-      InferenceFailure cleanupFailure = null;
-      try {
-        serverOps.stopLlamaServer();
-      } catch (RuntimeException failure) {
-        cleanupFailure = new InferenceFailure.TransitionFailure(
-            TransitionCode.ONLINE_START_FAILED,
-            "Recovery exhausted and child cleanup failed: " + safeMessage(failure), failure);
-      }
-      runner.runForceOffline(TransitionReason.CRASH_RECOVERY, cleanupFailure);
+      runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
     }
   }
 
-  /** Serializes a captured physical server's recovery with apply, detach and close. */
-  private void recoverManagedServer(java.util.function.BooleanSupplier stillOwned) {
+  /** Performs exactly one monitor-admitted retry of the same physical applied configuration. */
+  public ComponentRecoveryAction.Result recoverComponent(
+      ComponentRecoveryAction.Request request,
+      Function<InferenceConfig, String> appliedVersionOf) throws Exception {
+    Objects.requireNonNull(request, "request");
+    Objects.requireNonNull(appliedVersionOf, "appliedVersionOf");
+    final LlamaServerOps.StartRequest retry;
+    final LlamaServerOps.StartResult physicalOwner;
+    final long recoveryGeneration;
+    final EngineComponentSnapshot.Component admitted;
     synchronized (runner.lock()) {
-      if (precommitComposition) {
-        invalidatePreparedCandidate(stillOwned);
-        return;
+      EngineComponentSnapshot.Component expected = request.expected();
+      if (closed || request.cancelled()) return ComponentRecoveryAction.Result.SUPERSEDED;
+      if (expected.state() != ComponentState.FAILED
+          || !sameRecoveryLineage(expected, request.current(), expected.recoveryAttempts())) {
+        return ComponentRecoveryAction.Result.REFUSED;
       }
-      if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
-      serverOps.recoverActiveServer();
+      retry = serverOps.recoveryStartRequest().orElse(null);
+      physicalOwner = serverOps.activeStartResult().orElse(null);
+      recoveryGeneration = runner.generation();
+      if (retry == null
+          || !Objects.equals(
+              expected.appliedVersion(), appliedVersionOf.apply(retry.context().inference()))
+          || !request.begin()) {
+        return ComponentRecoveryAction.Result.REFUSED;
+      }
+      admitted = request.admitted().orElse(null);
+      if (admitted == null
+          || !sameRecoveryLineage(expected, admitted, expected.recoveryAttempts() + 1)) {
+        return ComponentRecoveryAction.Result.SUPERSEDED;
+      }
+      if (request.cancelled() || !serverOps.reserveRecoveryStart(retry)) {
+        return ComponentRecoveryAction.Result.SUPERSEDED;
+      }
     }
+
+    final GenerativeRequestGate.Hold admissionHold;
+    try {
+      admissionHold = requestGate.closeAndDrain(Duration.ofSeconds(30));
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return completeRecoveryDrainFailure(request, admitted, retry, physicalOwner,
+          recoveryGeneration, interrupted, "generative request drain interrupted");
+    } catch (IllegalStateException drainFailure) {
+      return completeRecoveryDrainFailure(request, admitted, retry, physicalOwner,
+          recoveryGeneration, drainFailure, "generative request drain failed");
+    }
+
+    try {
+      synchronized (runner.lock()) {
+        if (currentRecoveryOwner(request, admitted, retry) == null
+            || !samePhysicalRecoveryOwner(retry, physicalOwner, recoveryGeneration)) {
+          return ComponentRecoveryAction.Result.SUPERSEDED;
+        }
+        try {
+          tokenOps.clearCaches();
+          serverOps.stopLlamaServer();
+          if (closed || request.cancelled()) return ComponentRecoveryAction.Result.SUPERSEDED;
+
+          runner.clearProps();
+          serverOps.resetHealthFailures();
+          LlamaServerOps.StartResult started = serverOps.startLlamaServer(retry);
+          serverOps.waitForServerHealthOnce(started);
+          verifyAppliedServer(retry, started);
+
+          if (currentRecoveryOwner(request, admitted, retry) == null) {
+            return ComponentRecoveryAction.Result.SUPERSEDED;
+          }
+          runner.run(
+              TransitionReason.CRASH_RECOVERY,
+              ignored -> {},
+              prior -> TransitionOutcome.success(
+                  Mode.ONLINE,
+                  runner.view().withPhase(Mode.ONLINE).withExternal(false)));
+          EngineComponentSnapshot.Component terminal =
+              currentRecoveryOwner(request, admitted, retry);
+          if (terminal == null) return ComponentRecoveryAction.Result.SUPERSEDED;
+          return request.complete(terminal, ComponentState.READY, null,
+                  "same-configuration generative recovery verified healthy")
+              .map(ComponentRecoveryAction.Result::recovered)
+              .orElse(ComponentRecoveryAction.Result.SUPERSEDED);
+        } catch (Exception failure) {
+          LOG.error("Generative component recovery failed", failure);
+          return completeRecoveryFailure(
+              request, admitted, retry, failure, "same-configuration recovery failed");
+        }
+      }
+    } finally {
+      admissionHold.close();
+    }
+  }
+
+  private boolean samePhysicalRecoveryOwner(
+      LlamaServerOps.StartRequest retry,
+      LlamaServerOps.StartResult expectedActive,
+      long expectedGeneration) {
+    if (runner.generation() != expectedGeneration) return false;
+    LlamaServerOps.StartResult currentActive = serverOps.activeStartResult().orElse(null);
+    if (expectedActive != null) return currentActive == expectedActive;
+    return currentActive == null && serverOps.recoveryStartRequest().orElse(null) == retry;
+  }
+
+  private ComponentRecoveryAction.Result completeRecoveryDrainFailure(
+      ComponentRecoveryAction.Request request,
+      EngineComponentSnapshot.Component admitted,
+      LlamaServerOps.StartRequest retry,
+      LlamaServerOps.StartResult physicalOwner,
+      long recoveryGeneration,
+      Exception failure,
+      String evidencePrefix) {
+    synchronized (runner.lock()) {
+      if (!samePhysicalRecoveryOwner(retry, physicalOwner, recoveryGeneration)) {
+        return ComponentRecoveryAction.Result.SUPERSEDED;
+      }
+      return completeRecoveryFailure(request, admitted, retry, failure, evidencePrefix);
+    }
+  }
+
+  private ComponentRecoveryAction.Result completeRecoveryFailure(
+      ComponentRecoveryAction.Request request,
+      EngineComponentSnapshot.Component admitted,
+      LlamaServerOps.StartRequest retry,
+      Exception failure,
+      String evidencePrefix) {
+    synchronized (runner.lock()) {
+      EngineComponentSnapshot.Component terminal = currentRecoveryOwner(request, admitted, retry);
+      if (terminal == null) return ComponentRecoveryAction.Result.SUPERSEDED;
+      String reasonCode = retainedLifecycleCause(terminal.reasonCode());
+      if (reasonCode == null) {
+        reasonCode = retainedLifecycleCause(request.expected().reasonCode());
+      }
+      if (reasonCode == null) {
+        reasonCode = LifecycleReasonCode.INFERENCE_ACTIVATION_FAILED.code();
+      }
+      String typedFailure = failure instanceof ModeTransitionException transition
+          ? transition.failure().wireCode() : failure.getClass().getSimpleName();
+      return request.complete(
+              terminal,
+              ComponentState.FAILED,
+              reasonCode,
+              evidencePrefix + " [" + typedFailure + "]: " + safeMessage(failure))
+          .map(ComponentRecoveryAction.Result::failed)
+          .orElse(ComponentRecoveryAction.Result.SUPERSEDED);
+    }
+  }
+
+  private EngineComponentSnapshot.Component currentRecoveryOwner(
+      ComponentRecoveryAction.Request request,
+      EngineComponentSnapshot.Component admitted,
+      LlamaServerOps.StartRequest retry) {
+    EngineComponentSnapshot.Component current = request.current();
+    if (closed || request.cancelled() || !serverOps.ownsRecoveryAttempt(retry)
+        || !sameRecoveryLineage(admitted, current, admitted.recoveryAttempts())) {
+      return null;
+    }
+    return current;
+  }
+
+  private static boolean sameRecoveryLineage(
+      EngineComponentSnapshot.Component baseline,
+      EngineComponentSnapshot.Component current,
+      int expectedAttempts) {
+    return current != null
+        && baseline.spec().equals(current.spec())
+        && Objects.equals(baseline.appliedVersion(), current.appliedVersion())
+        && Objects.equals(baseline.desiredVersion(), current.desiredVersion())
+        && current.recoveryAttempts() == expectedAttempts;
+  }
+
+  private static String retainedLifecycleCause(String reasonCode) {
+    RetentionClass retention = LifecycleReasonCode.retentionClassOf(reasonCode);
+    return retention == RetentionClass.FAULT || retention == RetentionClass.STICKY
+        ? reasonCode : null;
   }
 
   private void invalidatePreparedCandidate(java.util.function.BooleanSupplier stillOwned) {
@@ -486,6 +647,13 @@ public class InferenceLifecycleManager
     return serverOps.getCudaRuntimeWarning();
   }
 
+  /** Whether the component monitor, rather than autonomous convergence, owns the failed attempt. */
+  public boolean componentRecoveryPending() {
+    synchronized (runner.lock()) {
+      return serverOps.componentRecoveryPending();
+    }
+  }
+
   // ==================== Mode Transitions ====================
 
   @Override
@@ -500,7 +668,14 @@ public class InferenceLifecycleManager
    * here with {@code USER_SWITCH} for source-compatibility.
    */
   public void switchToOnlineMode(TransitionReason reason) throws ModeTransitionException {
-    runner.run(
+    synchronized (runner.lock()) {
+      if ((reason == TransitionReason.AUTO_START || reason == TransitionReason.VDU_ENTER)
+          && serverOps.componentRecoveryPending()) {
+        throw modeTransition(
+            ModeTransitionException.Reason.ONLINE_START_FAILED,
+            "Generative recovery owns the failed applied configuration");
+      }
+      runner.run(
         reason,
         events::onStartupFailure,
         priorView -> {
@@ -509,6 +684,8 @@ public class InferenceLifecycleManager
             return TransitionOutcome.success(Mode.ONLINE, priorView);
           }
 
+          var startRequest = configuredStartRequest();
+          serverOps.retainAttemptedStartRequest(startRequest);
           // Validate BYO assets before attempting to start.
           try {
             configuredInference().validate();
@@ -520,7 +697,6 @@ public class InferenceLifecycleManager
                 priorView);
           }
 
-          var startRequest = configuredStartRequest();
           // VRAM precondition uses the same captured policy as the launch.
           if (startRequest.effectiveGpuLayers() > 0) {
             gpuCapabilitiesService.invalidateNvidiaSmiCache();
@@ -562,7 +738,7 @@ public class InferenceLifecycleManager
             // fires) will repopulate via runner.mergeProps; if /props doesn't fire, the view
             // remains correctly null rather than carrying the prior server's stale data.
             runner.clearProps();
-            serverOps.resetCrashCounters();
+            serverOps.resetHealthFailures();
             var started = serverOps.startLlamaServer(startRequest);
             serverOps.waitForServerHealth(started);
             verifyAppliedServer(startRequest, started);
@@ -607,6 +783,7 @@ public class InferenceLifecycleManager
                 priorView, e);
           }
         });
+    }
   }
 
   private TransitionOutcome failedOnlineStartup(
@@ -1041,7 +1218,7 @@ public class InferenceLifecycleManager
             stopFailure);
       }
       try {
-        serverOps.resetCrashCounters();
+        serverOps.resetHealthFailures();
         LlamaServerOps.StartResult started = serverOps.startLlamaServer(request);
         serverOps.waitForServerHealth(started);
         verifyAppliedServer(request, started);
@@ -1128,7 +1305,7 @@ public class InferenceLifecycleManager
       if (priorMode == Mode.ONLINE) {
         var restore = new LlamaServerOps.StartRequest(
             incumbent.context(), LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
-        serverOps.resetCrashCounters();
+        serverOps.resetHealthFailures();
         var restored = serverOps.startLlamaServer(restore);
         serverOps.waitForServerHealth(restored);
         verifyAppliedServer(restore, restored);
@@ -1390,7 +1567,7 @@ public class InferenceLifecycleManager
               "Incumbent server stop failed: " + safeMessage(stopFailure), stopFailure), priorView);
     }
     try {
-      serverOps.resetCrashCounters();
+      serverOps.resetHealthFailures();
       runner.clearProps();
       long startupStarted = System.currentTimeMillis();
       LlamaServerOps.StartResult started = serverOps.startLlamaServer(request);
@@ -1420,6 +1597,7 @@ public class InferenceLifecycleManager
       if (request.adoptionPolicy() != LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL) {
         throw new IllegalStateException("Managed configuration witness is required");
       }
+      serverOps.acceptVerifiedStart(request, started);
       return;
     }
     String expected = ManagedLlamaConfigIdentity.declaredHash(request.context().inference(),
@@ -1427,6 +1605,7 @@ public class InferenceLifecycleManager
     if (!expected.equals(started.declaredConfigHash())) {
       throw new IllegalStateException("Managed server configuration witness does not match candidate");
     }
+    serverOps.acceptVerifiedStart(request, started);
   }
 
   private ApplyExecution restoreIncumbent(
@@ -1443,7 +1622,7 @@ public class InferenceLifecycleManager
             TransitionRunner.mapExceptionToFailure(candidate), priorView);
       }
       var restore = new LlamaServerOps.StartRequest(incumbent.context(), policy);
-      serverOps.resetCrashCounters();
+      serverOps.resetHealthFailures();
       runner.clearProps();
       var restored = serverOps.startLlamaServer(restore);
       serverOps.waitForServerHealth(restored);
@@ -1526,7 +1705,7 @@ public class InferenceLifecycleManager
               next.validate();
 
               serverOps.stopLlamaServer();
-              serverOps.resetCrashCounters();
+              serverOps.resetHealthFailures();
               tokenOps.clearCaches();
 
               // Tempdoc 518 fix A: wipe stale /props from external server before starting
@@ -2024,6 +2203,7 @@ public class InferenceLifecycleManager
   @Override
   public void close() {
     synchronized (runner.lock()) {
+      closed = true;
       LOG.info("Closing InferenceLifecycleManager (stopServer={})...", stopServerOnClose);
       RuntimeException terminationFailure = null;
       try {

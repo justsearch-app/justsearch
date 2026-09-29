@@ -1,6 +1,7 @@
 package io.justsearch.app.services.bootstrap.phases;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -31,6 +32,7 @@ import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -408,12 +410,118 @@ final class AgentToolFactoryCompositionTest {
     assertNotNull(out.readDocumentTool());
   }
 
+  @Test
+  @DisplayName("file MOVE updates paths through the current Worker client")
+  void fileMoveUsesCurrentWorkerClientAfterReplacement(@TempDir Path dataDir) throws Exception {
+    Path root = dataDir.resolve("indexed");
+    Files.createDirectories(root);
+    Path source = root.resolve("source.txt");
+    Path destination = root.resolve("moved.txt");
+    Files.writeString(source, "content");
+
+    KnowledgeClient replacedClient = mock(KnowledgeClient.class);
+    KnowledgeClient currentClient = mock(KnowledgeClient.class);
+    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
+    var currentLease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    when(bootstrap.captureClient()).thenReturn(currentLease);
+    when(currentLease.withClient(any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0))
+            .apply(currentClient));
+    io.justsearch.app.api.IndexingService indexing =
+        mock(io.justsearch.app.api.IndexingService.class);
+    when(indexing.getWatchedPaths(any(EngineContext.class))).thenReturn(List.of(root));
+
+    AgentToolFactory.Output output =
+        AgentToolFactory.assemble(
+            mock(SearchPerSourceExecutor.class),
+            dataDir,
+            bootstrap,
+            replacedClient,
+            indexing,
+            OnlineAiService.unavailable(),
+            null,
+            null,
+            null,
+            mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(),
+            () -> indexing,
+            null);
+    replacedClient.close();
+    EngineContext context = TestEngineContexts.internal();
+    String move =
+        """
+        {"operations": [{"op": "MOVE", "source": "%s", "destination": "%s"}]}
+        """.formatted(jsonPath(source), jsonPath(destination));
+
+    var result = output.fileOperationsTool().execute(move, context);
+
+    assertTrue(result.success(), result.message());
+    assertFalse(Files.exists(source));
+    assertTrue(Files.exists(destination));
+    Map<Path, Path> expected = Map.of(
+        source.toAbsolutePath().normalize(), destination.toAbsolutePath().normalize());
+    verify(currentClient).updateDocumentPaths(expected, context);
+    verify(replacedClient, org.mockito.Mockito.never())
+        .updateDocumentPaths(any(), any(EngineContext.class));
+    verify(currentLease).close();
+  }
+
+  @Test
+  @DisplayName("file MOVE never falls back to a replaced client when capture is unavailable")
+  void fileMoveWithoutCurrentWorkerNeverUsesReplacedClient(@TempDir Path dataDir) throws Exception {
+    Path root = dataDir.resolve("indexed");
+    Files.createDirectories(root);
+    Path source = root.resolve("source.txt");
+    Path destination = root.resolve("moved.txt");
+    Files.writeString(source, "content");
+
+    KnowledgeClient replacedClient = mock(KnowledgeClient.class);
+    KnowledgeClient unavailableCurrentClient = mock(KnowledgeClient.class);
+    KnowledgeServerBootstrap bootstrap = mock(KnowledgeServerBootstrap.class);
+    var unavailableLease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    when(bootstrap.captureClient()).thenReturn(unavailableLease);
+    when(unavailableLease.withClient(any()))
+        .thenThrow(new IllegalStateException("Worker unavailable"));
+    io.justsearch.app.api.IndexingService indexing =
+        mock(io.justsearch.app.api.IndexingService.class);
+    when(indexing.getWatchedPaths(any(EngineContext.class))).thenReturn(List.of(root));
+    AgentToolFactory.Output output =
+        AgentToolFactory.assemble(
+            mock(SearchPerSourceExecutor.class), dataDir, bootstrap, replacedClient, indexing,
+            OnlineAiService.unavailable(), null, null, null, mock(DocumentService.class),
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable(),
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(), () -> indexing, null);
+    String move =
+        """
+        {"operations": [{"op": "MOVE", "source": "%s", "destination": "%s"}]}
+        """.formatted(jsonPath(source), jsonPath(destination));
+
+    var result = output.fileOperationsTool().execute(move, TestEngineContexts.internal());
+
+    assertTrue(
+        result.success(),
+        "filesystem success remains the existing best-effort index-update contract");
+    assertFalse(Files.exists(source));
+    assertTrue(Files.exists(destination));
+    verify(bootstrap).captureClient();
+    verify(replacedClient, org.mockito.Mockito.never())
+        .updateDocumentPaths(any(), any(EngineContext.class));
+    verify(unavailableCurrentClient, org.mockito.Mockito.never())
+        .updateDocumentPaths(any(), any(EngineContext.class));
+    verify(unavailableLease).close();
+  }
+
+  private static String jsonPath(Path path) {
+    return path.toString().replace("\\", "\\\\");
+  }
+
   /**
    * The eager guard, restated at its real scope by tempdoc 913 D5.
    *
    * <p>What the guard is FOR: no Worker, no Worker-backed tool. Every tool below reaches the
-   * Worker (search/browse/ingest/read through the adapter, file-operations through
-   * {@code knowledgeClient::updateDocumentPaths}), so building one without a client is either an
+   * Worker (search/browse/ingest/read through the adapter, file-operations through a current
+   * bootstrap client lease), so building one without a client is either an
    * NPE or a tool that lies about what it can do. That part is unchanged and still asserted.
    *
    * <p>What changed: {@code fileOperationLog} was swept into the same all-null arm despite

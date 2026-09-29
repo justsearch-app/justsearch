@@ -168,7 +168,8 @@ public final class BertNerInference implements Closeable {
             modelDir,
             manifest,
             io.justsearch.ort.CapabilityRequirements.NER,
-            capabilityContractStrict);
+            capabilityContractStrict,
+            exactModelFile);
     BioTagDecoder.LabelMapping labelMapping = toLabelMapping(capabilities.labelMapping());
     return new NerAssembly(sessions, shape, tokenizer, labelMapping, capabilities);
   }

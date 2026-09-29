@@ -162,7 +162,7 @@ final class WorkerRecordedScanAdmissionTest extends LuceneExecutorTestBase {
         assertFalse(Files.exists(state), "the worker must not restore the missing current state");
         assertArrayEquals(validState, Files.readAllBytes(previous));
 
-        Files.write(state, validState);
+        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(state, validState);
         scan.get(3, TimeUnit.SECONDS);
 
         assertEquals(1L, frames.stream().filter(ScanRootProgress::getComplete).count());

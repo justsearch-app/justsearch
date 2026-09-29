@@ -60,7 +60,7 @@ class StatusLifecycleHandlerManifestFallbackTest {
                     names.get(position) + " input " + state);
               }
 
-              var response = handler.buildStatusSnapshot();
+              var response = handler.sampleAndBuildStatusSnapshot();
               var accepted = components.registry().snapshot();
               var expected = LifecycleProjection.project(accepted, Instant.now());
               publisher.publishLifecycle(accepted);

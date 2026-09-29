@@ -94,8 +94,6 @@
       "role": "Brain (llama-server inference)",
       "authority": "io.justsearch.app.inference.BrainSupervisionPolicy",
       "policy": {
-        "maxCrashes": 3,
-        "crashRecoveryDelayMs": 5000,
         "consecutiveFailuresBeforeRestart": 3,
         "periodicHealthIntervalMs": 30000,
         "healthCheckTimeoutMs": 120000
@@ -104,8 +102,8 @@
         {
           "mode": "clean-exit",
           "detection": "Process.waitFor crash monitor (LlamaServerOps.handleServerCrash)",
-          "recovery": "restart with backoff (0ms first crash, crashRecoveryDelayMs after), reset on healthy restart",
-          "terminalState": "forceOffline -> Mode.OFFLINE + bounded failure-history after maxCrashes; capability OFFLINE via InferenceCapabilityWiring",
+          "recovery": "One failure signal to the generative component. The common component monitor owns admission, backoff and at most two same-applied-configuration attempts; the native owner performs one launch per admission.",
+          "terminalState": "FAILED after the component budget is exhausted; the optional generative component remains unavailable while the Engine serves other components.",
           "guards": [
             "io.justsearch.app.inference.LlamaServerOpsCrashTelemetryTest"
           ]
@@ -113,7 +111,7 @@
         {
           "mode": "hang",
           "detection": "periodic /health poll (LlamaServerOps.schedulePeriodicHealthCheck, periodicHealthIntervalMs, consecutiveFailuresBeforeRestart) while the process is alive",
-          "recovery": "managed: handleServerCrash (restart). external-adopted: goOfflineFromExternalFailure (no restart — no handle).",
+          "recovery": "managed: handleServerCrash signals component failure for the common monitor. external-adopted: goOfflineFromExternalFailure; recovery never kills or restarts a foreign process.",
           "terminalState": "forceOffline -> OFFLINE after the streak",
           "guards": [
             "io.justsearch.app.inference.LlamaServerOpsCrashTelemetryTest",
@@ -123,8 +121,8 @@
         {
           "mode": "oom",
           "detection": "Process.waitFor crash monitor (OOM exits the server process -> same path as clean-exit crash)",
-          "recovery": "restart with backoff (same as clean-exit)",
-          "terminalState": "forceOffline -> OFFLINE after maxCrashes",
+          "recovery": "Common component monitor admission and budget, identical to clean-exit; no native retry scheduler.",
+          "terminalState": "Generative component FAILED after its shared monitor budget is exhausted",
           "guards": [
             "audit-verdict"
           ],
@@ -133,8 +131,8 @@
         {
           "mode": "partial-boot",
           "detection": "LlamaServerOps.waitForServerHealth: process exits during model load, or /health never ready before healthCheckTimeoutMs deadline (diagnosed via log-tail: arch mismatch / CUDA OOM / missing DLL / port-in-use)",
-          "recovery": "throw ModeTransitionException -> revert to prior mode (OFFLINE), failure diagnosed and recorded",
-          "terminalState": "OFFLINE with a typed startup-failure reason",
+          "recovery": "Retain the exact attempted StartRequest before launch. The common component monitor can admit up to two attempts of that configuration after the initial failure; each uses health polling without a nested relaunch ladder.",
+          "terminalState": "Generative component FAILED with the startup cause after its monitor budget is exhausted",
           "guards": [
             "audit-verdict"
           ],

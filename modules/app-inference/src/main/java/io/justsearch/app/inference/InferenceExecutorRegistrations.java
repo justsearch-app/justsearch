@@ -18,7 +18,6 @@ final class InferenceExecutorRegistrations implements AutoCloseable {
   final EngineExecutorRegistry.Registration backgroundCallbacks;
   final EngineExecutorRegistry.Registration streamWatchdog;
   final EngineExecutorRegistry.Registration llamaHealth;
-  final EngineExecutorRegistry.Registration llamaRecovery;
   final EngineExecutorRegistry.Registration llamaExit;
   final int callbackQueueCapacity;
   final int retryAfterSeconds;
@@ -45,8 +44,6 @@ final class InferenceExecutorRegistrations implements AutoCloseable {
           Kind.BACKGROUND, Mode.SCHEDULED, 1, background.maxQueue());
       llamaHealth = register(registry, acquired, "inference.llama-health",
           Kind.BACKGROUND, Mode.SCHEDULED, 1, background.maxQueue());
-      llamaRecovery = register(registry, acquired, "inference.llama-recovery",
-          Kind.BACKGROUND, Mode.SCHEDULED, 1, background.maxQueue());
       llamaExit = register(registry, acquired, "inference.llama-exit", Kind.BACKGROUND,
           Mode.PLATFORM, 1, background.maxQueue());
     } catch (RuntimeException | Error failure) {
@@ -66,7 +63,7 @@ final class InferenceExecutorRegistrations implements AutoCloseable {
   @Override
   public void close() {
     closeReverse(List.of(http, foregroundRequests, backgroundRequests, foregroundCallbacks,
-        backgroundCallbacks, streamWatchdog, llamaHealth, llamaRecovery, llamaExit), null);
+        backgroundCallbacks, streamWatchdog, llamaHealth, llamaExit), null);
   }
 
   private static void closeReverse(

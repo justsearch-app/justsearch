@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
  * the infra-health server, whose shutdown+awaitTermination this note was written for.)
  *
  * <p>This record is populated by {@link io.justsearch.app.services.HeadAssembly} during
- * construction (and partially populated again after {@code connectKnowledgeServer} runs and the
+ * construction (and partially populated again after {@code prepareKnowledgeServerBinding} runs and the
  * worker channel comes up). Step 7 will refactor the construction site into a phase function
  * that returns this record; Step 8 will rewrite the bootstrap's {@code close()} to consult it.
  */

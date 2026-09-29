@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
  * io.justsearch.app.api.ServiceGraph}, {@link io.justsearch.app.services.bootstrap.SubstrateGraph},
  * {@link io.justsearch.app.services.bootstrap.OrchestrationHandles}), and exposes them via
  * {@link #core()} / {@link #workers()} / {@link #inference()} / {@link #capabilities()} /
- * {@link #substrate()}. Lifecycle hooks: {@link #connectKnowledgeServer},
+ * {@link #substrate()}. Lifecycle hooks: {@link #prepareKnowledgeServerBinding},
  * {@link #close}. §31 Phase 3 dissolved the registerLateBoundHandlers hook.
  */
 public final class HeadAssembly implements AutoCloseable {
@@ -128,7 +128,7 @@ public final class HeadAssembly implements AutoCloseable {
   }
   private final KnowledgeHttpApiAdapter agentSearchAdapter;
   // Tempdoc 913 D5: the ONE file-operation journal for the process. Held for the same reason
-  // agentSearchAdapter is — connectKnowledgeServer hands it to AgentToolHandlers.registerLateBound
+  // agentSearchAdapter is — prepareKnowledgeServerBinding hands it to AgentToolHandlers.registerLateBound
   // so the write side (FileOperationsTool) and the read side (AgentRunQueryService.operationHistory
   // → GET /api/chat/agent/history) are the same instance over the same directory.
   private final FileOperationLog fileOperationLog;
@@ -281,7 +281,7 @@ public final class HeadAssembly implements AutoCloseable {
 
   // Tempdoc 541 §5.2 + fix-pass A.1: Memoized agent-tool late-bind registration. The body
   // invokes AgentToolHandlers.registerLateBound at first .get(); idempotent thereafter.
-  // Triggered by connectKnowledgeServer when Worker becomes available. Set in the primary
+  // Triggered by prepareKnowledgeServerBinding when Worker becomes available. Set in the primary
   // constructor; the secondary test constructor uses a no-op resolved instance.
   private final io.justsearch.app.services.bootstrap.Memoized<Boolean> agentToolsRegistration;
 
@@ -297,7 +297,7 @@ public final class HeadAssembly implements AutoCloseable {
 
   /**
    * Tempdoc 541 fix-pass Tier 4 (C-revised): bounded ring buffer of rebuild events recorded
-   * after the initial sealed BootTrace. Each {@code connectKnowledgeServer} invocation adds
+   * after the initial sealed BootTrace. Each {@code prepareKnowledgeServerBinding} invocation adds
    * a record with timing + outcome. BootRoutes exposes the snapshot via the {@code rebuilds}
    * field of the {@code /api/boot/phases} envelope.
    */
@@ -901,7 +901,7 @@ public final class HeadAssembly implements AutoCloseable {
     // result is whether the prerequisites were met (true — including the case where every ref
     // was already registered, 876 B.5) or not (false — missing worker capability, knowledge
     // server, or data dir)
-    // missing prerequisites). connectKnowledgeServer triggers the resolve when the Worker
+    // missing prerequisites). prepareKnowledgeServerBinding triggers the resolve when the Worker
     // becomes available; the original symbolic lambdamart-load LAZY entry is replaced by a
     // real "agent-tools-registration" LAZY/PENDING entry that flips to READY via Tier 4's
     // RebuildHistory ring buffer.
@@ -981,7 +981,7 @@ public final class HeadAssembly implements AutoCloseable {
         io.justsearch.app.services.bootstrap.Memoized.of(
             () -> {
               // Tempdoc 868 §B.2: read at RESOLVE time — the memo body runs after
-              // connectKnowledgeServer reassembles the graph with the fresh Worker-backed services,
+              // prepareKnowledgeServerBinding reassembles the graph with the fresh Worker-backed services,
               // so capturing a value at composition time would bind the pre-connect (index-less)
               // IndexingService / DocumentService.
               var indexing = this.services.worker().indexing();
@@ -1003,7 +1003,7 @@ public final class HeadAssembly implements AutoCloseable {
     bootTraceBuilder.record(
         io.justsearch.app.services.bootstrap.PhaseRecord.lazyPending(
             "agent-tools-registration",
-            "deferred until connectKnowledgeServer binds the client and services"));
+            "deferred until prepareKnowledgeServerBinding binds the client and services"));
     // Tempdoc 541 §4.2: seal the boot trace at composition-root completion. Post-seal reads
     // see the final immutable snapshot.
     var sealedTrace = bootTraceBuilder.seal();
@@ -1585,14 +1585,33 @@ public final class HeadAssembly implements AutoCloseable {
     public void close() { clientLease.close(); }
   }
 
-  /** Late-bind the Knowledge Server after async Worker startup; rebuilds the held graph. */
-  public void connectKnowledgeServer(KnowledgeServerBootstrap ks) {
-    connectKnowledgeServer(ks, () -> {});
+  /**
+   * Publishes the recovered Worker's structural graph before its component READY row is visible.
+   * Agent tools are part of that graph, so a false or failed registration rejects preparation.
+   * Indexing-job consumption starts only after the exact READY publication succeeds.
+   */
+  public void prepareKnowledgeServerBinding(KnowledgeServerBootstrap ks) {
+    prepareKnowledgeServerBinding(ks, () -> {});
+  }
+
+  /** Activates background indexing-job consumption for an already-published Worker graph. */
+  public void activateKnowledgeServerBinding() {
+    if (this.substrateOut.indexingJobsBridge() != null) {
+      try {
+        this.substrateOut.indexingJobsBridge().start();
+      } catch (RuntimeException e) {
+        log.warn("RemoteIndexingJobsBridge.start failed at activateKnowledgeServerBinding", e);
+      }
+    }
   }
 
   /** Package-private publication step hook permits deterministic lock-boundary regression tests. */
-  void connectKnowledgeServer(KnowledgeServerBootstrap ks, Runnable publicationStepHook) {
-    if (ks == null) return;
+  void prepareKnowledgeServerBinding(
+      KnowledgeServerBootstrap ks,
+      Runnable publicationStepHook) {
+    if (ks == null) {
+      throw new IllegalArgumentException("Recovered Knowledge Server is required");
+    }
     Objects.requireNonNull(publicationStepHook, "publicationStepHook");
     if (ks.publicationLock() != publicationLock) {
       throw new IllegalArgumentException("Knowledge Server must share the process publication lock");
@@ -1602,6 +1621,9 @@ public final class HeadAssembly implements AutoCloseable {
     // exporters) can see post-boot substrate mutations that the sealed BootTrace can't.
     long t_rebuild_0 = System.currentTimeMillis();
     KnowledgeClient client = ks.client();
+    if (client == null) {
+      throw new IllegalStateException("Recovered Knowledge Server client is unavailable");
+    }
     io.justsearch.app.services.bootstrap.phases.InferenceWiring.refreshGpuStatus(
         this.inferenceManager, ks);
     IndexingService newIndexing = client;
@@ -1658,23 +1680,11 @@ public final class HeadAssembly implements AutoCloseable {
     } finally {
       publicationLock.writeLock().unlock();
     }
-    if (this.substrateOut.indexingJobsBridge() != null) {
-      try {
-        this.substrateOut.indexingJobsBridge().start();
-      } catch (RuntimeException e) {
-        log.warn("RemoteIndexingJobsBridge.start failed at connectKnowledgeServer", e);
-      }
-    }
     // Bind tools after the client and service graph exist. Readiness is sampled from that client,
     // so waiting for READY here would make composition depend on its own eventual result.
     // Request admission remains governed by the capability/condition gates.
-    boolean agentToolsReady = false;
-    if (client != null) {
-      try {
-        agentToolsReady = Boolean.TRUE.equals(this.agentToolsRegistration.get());
-      } catch (RuntimeException e) {
-        log.error("Agent tool registration failed after Worker publication", e);
-      }
+    if (!Boolean.TRUE.equals(this.agentToolsRegistration.get())) {
+      throw new IllegalStateException("Agent tool registration refused Worker publication");
     }
     log.info(
         "Knowledge Server late-bound into HeadAssembly (capability health: {})",
@@ -1685,8 +1695,7 @@ public final class HeadAssembly implements AutoCloseable {
     // Degraded outcome carrying the actual health name in the reason code.
     long t_rebuild_1 = System.currentTimeMillis();
     var workerHealth = this.capabilities.worker().health();
-    if (workerHealth == io.justsearch.app.api.lifecycle.CapabilityHealth.READY
-        && agentToolsReady) {
+    if (workerHealth == io.justsearch.app.api.lifecycle.CapabilityHealth.READY) {
       this.rebuildHistory.record(
           io.justsearch.app.services.bootstrap.PhaseRecord.ready(
               "worker-connect", t_rebuild_0, t_rebuild_1, null));
@@ -1696,16 +1705,14 @@ public final class HeadAssembly implements AutoCloseable {
               "worker-connect",
               t_rebuild_0,
               t_rebuild_1,
-              client != null && !agentToolsReady
-                  ? "agent_tools.registration_failed"
-                  : "worker.connected." + (workerHealth == null ? "null" : workerHealth.name().toLowerCase()),
+              "worker.connected." + (workerHealth == null ? "null" : workerHealth.name().toLowerCase()),
               null));
     }
   }
 
   // §12.D: registerAgentToolHandlers helper deleted — superseded by the Memoized<Boolean>
   // agentToolsRegistration field which inlines the AgentToolHandlers.registerLateBound call
-  // (see field declaration ~line 220 + connectKnowledgeServer's .get() trigger). The
+  // (see field declaration ~line 220 + prepareKnowledgeServerBinding's .get() trigger). The
   // private helper had no remaining callers; UnreferencedCodeTest flagged it as dead.
   // Slice 491 defect 3 (2026-05-12) historical context is preserved in the Memoized
   // field's javadoc.
@@ -2021,6 +2028,12 @@ public final class HeadAssembly implements AutoCloseable {
   /** The same generative owner used by mode and activation producers. */
   public io.justsearch.core.component.ComponentHandle generativeComponent() {
     return generativeComponent;
+  }
+
+  /** Physical action used by the shared component monitor; absent when inference is unconfigured. */
+  public io.justsearch.core.component.ComponentRecoveryAction generativeRecoveryAction() {
+    return inferenceManager == null ? null
+        : request -> inferenceManager.recoverComponent(request, HeadAssembly::generativeAppliedVersion);
   }
 
   /** Fixed settings owner for the Head-managed generative runtime. */

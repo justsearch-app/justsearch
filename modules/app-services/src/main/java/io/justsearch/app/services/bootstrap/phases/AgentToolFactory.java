@@ -172,7 +172,12 @@ public final class AgentToolFactory {
     FileOperationsTool fileOperationsTool =
         new FileOperationsTool(
             indexingService::getWatchedPaths,
-            knowledgeClient::updateDocumentPaths,
+            (pathMappings, engineContext) -> {
+              try (var lease = knowledgeServer.captureClient()) {
+                return lease.withClient(
+                    current -> current.updateDocumentPaths(pathMappings, engineContext));
+              }
+            },
             fileOperationLog,
             rootsView);
     // Tempdoc 883 decision 3: ONE live context budget for the whole bundle, read per tool call.

@@ -81,6 +81,19 @@ const CAUSE_ROWS: ReadonlyArray<{
   severity?: ReasonSeverity;
 }> = [
   {
+    code: 'component.start_timeout',
+    wording: 'A service did not finish starting in time',
+  },
+  {
+    code: 'component.recovering',
+    wording: 'A service is recovering',
+    severity: 'info',
+  },
+  {
+    code: 'component.recovery_failed',
+    wording: 'A service could not recover',
+  },
+  {
     code: 'engine.restart_exhausted',
     wording: 'JustSearch could not restart',
     severity: 'error',
@@ -251,13 +264,6 @@ const CAUSE_ROWS: ReadonlyArray<{
     code: 'worker.spawn_recovery_exhausted',
     wording: 'The knowledge server failed to start and could not be recovered',
     severity: 'error',
-  },
-  // Tempdoc 627 — transient: a supervised restart is in flight. Calm (info) + no remedy — it self-recovers;
-  // the verdict promotes this to a "Restarting…" transitioning state so a routine self-heal isn't alarming.
-  {
-    code: 'worker.recovering',
-    wording: 'The knowledge server is restarting',
-    severity: 'info',
   },
   // Tempdoc 837 S3 — the worker WAS serving and stopped answering. `worker.spawn.failed` told these
   // users their knowledge server "failed to start", which is false: it started fine and then died.
@@ -526,7 +532,6 @@ const RETRIEVAL_IMPAIRING_CODES: ReadonlySet<string> = new Set([
   // The knowledge server is not serving (or not serving yet): retrieval as a whole is impaired, so
   // the "search is fully working" claim would be flatly false.
   'worker.starting',
-  'worker.recovering',
   'worker.spawn.failed',
   // Tempdoc 825 — the boot-recovery budget is spent and no worker is serving. Same rule as its
   // siblings: omission would let the banner claim "search is fully working" over nothing at all.

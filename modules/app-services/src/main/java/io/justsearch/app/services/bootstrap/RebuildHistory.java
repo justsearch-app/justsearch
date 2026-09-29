@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Tempdoc 541 fix-pass Tier 4 (C-revised) — bounded ring buffer of rebuild events that
  * happen <em>after</em> a sealed {@link BootTrace}.
  *
- * <p>Per investigation against {@code HeadAssembly.connectKnowledgeServer}: a pure
+ * <p>Per investigation against {@code HeadAssembly.prepareKnowledgeServerBinding}: a pure
  * {@code RebuildPhase} doesn't fit because that method has 7 field mutations + 2 lifecycle
  * side effects (indexingJobsBridge.start, registerAgentToolHandlers) that cannot be
  * expressed as a "produce a new Output" body. Instead of forcing the side effects through a
@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * entry is evicted in append order. Reads return a defensive copy from oldest to newest.
  *
  * <p><strong>Thread safety:</strong> appends are single-writer by convention (the head's
- * main thread invoking {@code connectKnowledgeServer} or holding the agent-tools Memoized's
+ * main thread invoking {@code prepareKnowledgeServerBinding} or holding the agent-tools Memoized's
  * resolution); reads use a defensive {@link Collections#unmodifiableList} over a snapshot.
  * Concurrent appends would race; today there is no such path. If multi-writer becomes a
  * concern, wrap the ArrayList in a synchronized list and document the contract revision.

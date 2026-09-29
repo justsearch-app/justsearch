@@ -1,9 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.core.component;
 
+import java.util.Optional;
+
 /** The physical owner uses this handle to publish observations of its existing lifecycle. */
 public interface ComponentHandle {
   ComponentSpec spec();
+
+  /** Identity check for composition projections, including wrappers around this handle. */
+  boolean belongsTo(EngineComponentRegistry registry);
 
   EngineComponentSnapshot.Component snapshot();
 
@@ -28,11 +33,32 @@ public interface ComponentHandle {
       ComponentState state, String reasonCode, String evidence);
 
   /**
+   * As {@link #transitionIfUnchanged(EngineComponentSnapshot.Component, ComponentState, String,
+   * String)}, returning the exact component row captured at publication time. The returned row is
+   * captured before listeners run, so a listener racing a caller cannot change the witness.
+   * A matched no-op returns the current row without publishing; an obsolete observation returns
+   * {@link Optional#empty()}.
+   */
+  Optional<EngineComponentSnapshot.Component> tryTransitionIfUnchanged(
+      EngineComponentSnapshot.Component expected, ComponentState state, String reasonCode,
+      String evidence);
+
+  /**
    * As above, but validates the whole registry observation atomically. Use for an observation
    * whose preconditions include other components, such as index readiness requiring API READY.
    */
   boolean transitionIfUnchanged(EngineComponentSnapshot expected,
       ComponentState state, String reasonCode, String evidence);
+
+  /**
+   * Atomically admits one physical recovery by replacing the exact expected observation with
+   * STARTING and incrementing its cumulative attempt count. The physical owner calls this only
+   * after validating its current instance and applied configuration under its own lifetime lock.
+   * Returns the exact admitted observation, or empty if another publication won; a lost admission
+   * changes neither state nor count. Observer delivery follows publication as for transitions.
+   */
+  Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
+      EngineComponentSnapshot.Component expected, String reasonCode, String evidence);
 
   void setAppliedVersion(String digest);
 

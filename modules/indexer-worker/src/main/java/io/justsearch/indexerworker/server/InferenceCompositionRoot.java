@@ -26,6 +26,9 @@ import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.GpuArbiter;
 import io.justsearch.ort.GpuSessionConfig;
 import io.justsearch.ort.ModelArtifacts;
+import io.justsearch.ort.ModelCapabilityResolver;
+import io.justsearch.ort.ModelManifest;
+import io.justsearch.ort.CapabilityRequirements;
 import io.justsearch.ort.ModelSessionPolicy;
 import io.justsearch.ort.ModelSessionPolicyResolver;
 import io.justsearch.ort.OrtSessionAssembler;
@@ -39,15 +42,20 @@ import io.justsearch.reranker.CitationScorerConfig;
 import io.justsearch.reranker.CrossEncoderReranker;
 import io.justsearch.reranker.RerankerAssembly;
 import io.justsearch.reranker.RerankerConfig;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -358,14 +366,116 @@ public final class InferenceCompositionRoot {
       OrtSessionTelemetryEvents events,
       GenerationModelSelection selection,
       QueryRoleSelection witnessedQuery) {
+    return compose(projection, hardware, contract, modelsDir, arbiter, events, selection,
+        witnessedQuery, ignored -> {});
+  }
+
+  static InferenceSurface compose(
+      EncoderConfigurationProjection projection,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir,
+      GpuArbiter arbiter,
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection,
+      QueryRoleSelection witnessedQuery,
+      Consumer<InferenceSurface.ComponentObservation> queryWitness) {
+    return compose(projection, hardware, contract, modelsDir, arbiter, events, selection,
+        witnessedQuery, queryWitness, ignored -> {});
+  }
+
+  /** Combined pre-native witness used by the physical owner to retain exact retry authority. */
+  record CapturedCompositionPlan(IndexCompositionPlan indexPlan,
+      EncoderConfigurationProjection queryProjection,
+      InferenceSurface.ComponentObservation queryObservation) {}
+
+  static InferenceSurface compose(
+      EncoderConfigurationProjection projection,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir,
+      GpuArbiter arbiter,
+      OrtSessionTelemetryEvents events,
+      GenerationModelSelection selection,
+      QueryRoleSelection witnessedQuery,
+      Consumer<InferenceSurface.ComponentObservation> queryWitness,
+      Consumer<CapturedCompositionPlan> planWitness) {
+    QueryPlan rerankerPlan = resolveRerankerPlan(projection.reranker(), hardware, contract,
+        modelsDir, selection, witnessedQuery == null ? null : witnessedQuery.reranker());
+    QueryPlan citationPlan = resolveCitationPlan(projection.citation(), hardware, contract,
+        modelsDir, selection, witnessedQuery == null ? null : witnessedQuery.citation());
+    EnumSet<EncoderRole> requestedQuery = EnumSet.noneOf(EncoderRole.class);
+    EnumSet<EncoderRole> missingQuery = EnumSet.noneOf(EncoderRole.class);
+    EnumSet<EncoderRole> requestedRoles = EnumSet.noneOf(EncoderRole.class);
+    recordQueryPlan(EncoderRole.RERANKER, rerankerPlan, requestedRoles, requestedQuery,
+        missingQuery);
+    recordQueryPlan(EncoderRole.CITATION, citationPlan, requestedRoles, requestedQuery,
+        missingQuery);
+    QueryRoleSelection querySelection = new QueryRoleSelection(
+        rerankerPlan.attemptedRole(), citationPlan.attemptedRole());
+    InferenceSurface.ComponentObservation queryObservation =
+        new InferenceSurface.ComponentObservation(
+        Optional.of(projection.queryDigest()), requestedQuery, missingQuery,
+        Optional.of(querySelection));
+    queryWitness.accept(queryObservation);
+    IndexCompositionPlan indexPlan = captureIndexPlan(
+        projection, hardware, contract, modelsDir, selection);
+    planWitness.accept(new CapturedCompositionPlan(indexPlan, projection, queryObservation));
+    return assembleCaptured(indexPlan, projection, queryObservation, arbiter, events, false);
+  }
+
+  /** Replays one immutable index plan with the independently retained current query owner. */
+  static InferenceSurface composeCaptured(
+      IndexCompositionPlan plan,
+      EncoderConfigurationProjection currentQueryProjection,
+      InferenceSurface.ComponentObservation currentQuery,
+      GpuArbiter arbiter,
+      OrtSessionTelemetryEvents events) {
+    return assembleCaptured(plan, currentQueryProjection, currentQuery, arbiter, events, true);
+  }
+
+  private static InferenceSurface assembleCaptured(
+      IndexCompositionPlan plan,
+      EncoderConfigurationProjection currentQueryProjection,
+      InferenceSurface.ComponentObservation currentQuery,
+      GpuArbiter arbiter,
+      OrtSessionTelemetryEvents events,
+      boolean strictRetryValidation) {
+    Objects.requireNonNull(plan, "plan");
+    Objects.requireNonNull(currentQueryProjection, "currentQueryProjection");
+    Objects.requireNonNull(currentQuery, "currentQuery");
+    if (!currentQuery.configurationDigest().equals(
+        Optional.of(currentQueryProjection.queryDigest()))) {
+      throw new IllegalArgumentException("Current query projection and observation disagree");
+    }
+    QueryRoleSelection querySelection = currentQuery.querySelection().orElseThrow(() ->
+        new IllegalArgumentException("Current query composition selection is unknown"));
+    if (strictRetryValidation) {
+      validateCapturedQueryRole("reranker", querySelection.reranker());
+      validateCapturedQueryRole("citation", querySelection.citation());
+    }
+    if (strictRetryValidation) {
+      validateCaptured(plan);
+    } else {
+      validateKnownInputs(plan);
+    }
+    EncoderConfigurationProjection projection = plan.projection();
     ResolvedConfig cfg = projection.config();
+    ResolvedConfig queryCfg = currentQueryProjection.config();
+    HardwareProfile hardware = plan.hardware();
+    QueryPlan rerankerPlan = resolveRerankerPlan(currentQueryProjection.reranker(), hardware,
+        null, null,
+        null, querySelection.reranker());
+    QueryPlan citationPlan = resolveCitationPlan(currentQueryProjection.citation(), hardware,
+        null, null,
+        null, querySelection.citation());
     List<SessionHandle> handles = new ArrayList<>();
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
     EnumSet<EncoderRole> requestedRoles = EnumSet.noneOf(EncoderRole.class);
+    requestedRoles.addAll(currentQuery.requestedRoles());
 
     // BGE-M3 replaces the separate Embedding + SPLADE encoders when selected.
-    String sparseModel = projection.sparseModel();
-    boolean bgeM3Selected = "bge-m3".equalsIgnoreCase(sparseModel);
+    boolean bgeM3Selected = plan.bgeM3Selected();
 
     Optional<EmbeddingAssembly> embedding =
         bgeM3Selected
@@ -373,44 +483,37 @@ public final class InferenceCompositionRoot {
             : composeEmbeddingRole(
                 projection.embedding(),
                 cfg,
-                hardware,
-                contract,
-                modelsDir,
+                plan.runtimePolicy(),
+                plan.role(EncoderRole.EMBEDDING),
                 arbiter,
                 handles,
                 policies,
                 requestedRoles,
-                events,
-                selection);
+                events);
 
     Optional<NerAssembly> ner =
         composeNerRole(
             projection.ner(),
             cfg,
-            hardware,
-            contract,
-            modelsDir,
+            plan.runtimePolicy(),
+            plan.role(EncoderRole.NER),
             arbiter,
             handles,
             policies,
             requestedRoles,
-            events,
-            selection);
+            events);
 
     Optional<BgeM3Assembly> bgeM3 =
         bgeM3Selected
             ? composeBgeM3Role(
                 projection.bgeM3(),
-                cfg,
-                hardware,
-                contract,
-                modelsDir,
+                plan.runtimePolicy(),
+                plan.role(EncoderRole.BGE_M3),
                 arbiter,
                 handles,
                 policies,
                 requestedRoles,
-                events,
-                selection)
+                events)
             : Optional.empty();
 
     // If BGE-M3 was selected but failed, fall back to SPLADE (matches today's KnowledgeServer
@@ -420,49 +523,40 @@ public final class InferenceCompositionRoot {
         spladeActive
             ? composeSpladeRole(
                 projection.splade(),
-                cfg,
-                hardware,
-                contract,
-                modelsDir,
+                plan.runtimePolicy(),
+                plan.role(EncoderRole.SPLADE),
                 arbiter,
                 handles,
                 policies,
                 requestedRoles,
-                events,
-                selection)
+                events)
             : Optional.empty();
 
-    Optional<RerankerAssembly> reranker =
+    QueryComposition rerankerComposition =
         composeRerankerRole(
-            projection.reranker(),
-            cfg,
+            currentQueryProjection.reranker(),
+            queryCfg,
             hardware,
-            contract,
-            modelsDir,
             arbiter,
             handles,
             policies,
-            requestedRoles,
             events,
-            selection,
-            witnessedQuery == null ? null : witnessedQuery.reranker());
+            rerankerPlan);
 
-    Optional<RerankerAssembly> citation =
+    QueryComposition citationComposition =
         composeCitationRole(
-            projection.citation(),
-            cfg,
+            currentQueryProjection.citation(),
+            queryCfg,
             hardware,
-            contract,
-            modelsDir,
             handles,
             policies,
-            requestedRoles,
             events,
-            selection,
-            witnessedQuery == null ? null : witnessedQuery.citation());
+            null,
+            citationPlan);
 
-    RuntimePolicy runtime = RuntimePolicyResolver.resolve(cfg, hardware);
-    PolicySnapshot snapshot = new PolicySnapshot(runtime, policies);
+    Optional<RerankerAssembly> reranker = rerankerComposition.assembly();
+    Optional<RerankerAssembly> citation = citationComposition.assembly();
+    PolicySnapshot snapshot = new PolicySnapshot(plan.runtimePolicy(), policies);
     EnumSet<EncoderRole> presentRoles = EnumSet.noneOf(EncoderRole.class);
     embedding.ifPresent(ignored -> presentRoles.add(EncoderRole.EMBEDDING));
     ner.ifPresent(ignored -> presentRoles.add(EncoderRole.NER));
@@ -480,7 +574,34 @@ public final class InferenceCompositionRoot {
         snapshot,
         handles,
         InferenceSurface.ComponentObservation.composed(
-            projection.digest(), requestedRoles, presentRoles));
+            projection.withQueryFrom(currentQueryProjection).digest(), requestedRoles,
+            presentRoles, Optional.of(querySelection)));
+  }
+
+  /** Pure pre-admission validation; the physical owner calls this before retirement. */
+  static void validateCaptured(IndexCompositionPlan plan) {
+    Objects.requireNonNull(plan, "plan");
+    if (!plan.complete()) {
+      throw new IllegalStateException("Captured index composition plan is incomplete");
+    }
+    validateKnownInputs(plan);
+  }
+
+  private static void validateKnownInputs(IndexCompositionPlan plan) {
+    try {
+      plan.validateInputs();
+    } catch (IOException changed) {
+      throw new IllegalStateException("Captured index composition inputs are no longer valid",
+          changed);
+    }
+  }
+
+  private static void validateCapturedQueryRole(String label, QueryRoleSelection.Role role) {
+    if (role.state() != QueryRoleSelection.State.SELECTED) return;
+    if (!GenerationModelSelection.verifyIdentity(role.model())
+        || !GenerationModelSelection.verifyIdentity(role.tokenizer())) {
+      throw new IllegalStateException("Captured " + label + " input changed before native assembly");
+    }
   }
 
   /** Composes only the independently mutable query roles from one committed byte witness. */
@@ -493,12 +614,18 @@ public final class InferenceCompositionRoot {
     List<SessionHandle> handles = new ArrayList<>();
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
     EnumSet<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
-    Optional<RerankerAssembly> reranker = composeRerankerRole(projection.reranker(), cfg,
-        hardware, null, null, arbiter, handles, policies, requested, events, null,
-        selection.reranker());
-    Optional<RerankerAssembly> citation = composeCitationRole(projection.citation(), cfg,
-        hardware, null, null, handles, policies, requested, events, null,
-        selection.citation());
+    QueryPlan rerankerPlan = resolveRerankerPlan(projection.reranker(), hardware, null, null,
+        null, selection.reranker());
+    QueryPlan citationPlan = resolveCitationPlan(projection.citation(), hardware, null, null,
+        null, selection.citation());
+    if (rerankerPlan.requested()) requested.add(EncoderRole.RERANKER);
+    if (citationPlan.requested()) requested.add(EncoderRole.CITATION);
+    QueryComposition rerankerComposition = composeRerankerRole(projection.reranker(), cfg,
+        hardware, arbiter, handles, policies, events, rerankerPlan);
+    QueryComposition citationComposition = composeCitationRole(projection.citation(), cfg,
+        hardware, handles, policies, events, null, citationPlan);
+    Optional<RerankerAssembly> reranker = rerankerComposition.assembly();
+    Optional<RerankerAssembly> citation = citationComposition.assembly();
     EnumSet<EncoderRole> present = EnumSet.noneOf(EncoderRole.class);
     reranker.ifPresent(ignored -> present.add(EncoderRole.RERANKER));
     citation.ifPresent(ignored -> present.add(EncoderRole.CITATION));
@@ -506,7 +633,111 @@ public final class InferenceCompositionRoot {
         Optional.empty(), Optional.empty(),
         new PolicySnapshot(RuntimePolicyResolver.resolve(cfg, hardware), policies), handles,
         InferenceSurface.ComponentObservation.composed(projection.queryDigest(), requested,
-            present));
+            present, Optional.of(new QueryRoleSelection(rerankerComposition.attemptedRole(),
+                citationComposition.attemptedRole()))));
+  }
+
+  private static IndexCompositionPlan captureIndexPlan(
+      EncoderConfigurationProjection projection,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir,
+      GenerationModelSelection generation) {
+    Objects.requireNonNull(projection, "projection");
+    Objects.requireNonNull(hardware, "hardware");
+    ResolvedConfig cfg = projection.config();
+    RuntimePolicy runtime = RuntimePolicyResolver.resolve(cfg, hardware);
+    boolean bgeSelected = "bge-m3".equalsIgnoreCase(projection.sparseModel());
+    EnumMap<EncoderRole, IndexCompositionPlan.RolePlan> roles =
+        new EnumMap<>(EncoderRole.class);
+    if (!bgeSelected) {
+      roles.put(EncoderRole.EMBEDDING, captureRolePlan(EncoderRole.EMBEDDING,
+          projection.embedding().enabled(), projection.embedding().isReady(), "embedding",
+          projection.embedding().modelPath(), projection.embedding().gpuEnabled(), cfg, hardware,
+          contract, modelsDir, generation, CapabilityRequirements.EMBEDDING,
+          MetadataKind.EMBEDDING, false));
+    }
+    roles.put(EncoderRole.NER, captureRolePlan(EncoderRole.NER, projection.ner().enabled(),
+        projection.ner().isReady(), "ner", projection.ner().modelPath(),
+        projection.ner().gpuEnabled(), cfg, hardware, contract, modelsDir, generation,
+        CapabilityRequirements.NER, MetadataKind.NER, false));
+    if (bgeSelected) {
+      roles.put(EncoderRole.BGE_M3, captureRolePlan(EncoderRole.BGE_M3, true,
+          projection.bgeM3().isReady(), "embedding", projection.bgeM3().modelPath(),
+          projection.bgeM3().gpuEnabled(), cfg, hardware, contract, modelsDir, generation,
+          CapabilityRequirements.BGEM3, MetadataKind.BGE_M3, false));
+    }
+    // Capture the fallback before BGE native construction. It must never be discovered only
+    // after BGE rejects and the source generation has already been retired.
+    roles.put(EncoderRole.SPLADE, captureRolePlan(EncoderRole.SPLADE,
+        projection.splade().enabled(), projection.splade().isReady(), "splade",
+        projection.splade().modelPath(), projection.splade().gpuEnabled(), cfg, hardware,
+        contract, modelsDir, generation, CapabilityRequirements.SPLADE, MetadataKind.SPLADE,
+        projection.splade().isIdfQueryMode()));
+    IndexCompositionPlan plan = new IndexCompositionPlan(projection, hardware, runtime, roles,
+        bgeSelected);
+    validateKnownInputs(plan);
+    return plan;
+  }
+
+  private enum MetadataKind { EMBEDDING, NER, SPLADE, BGE_M3 }
+
+  private static IndexCompositionPlan.RolePlan captureRolePlan(
+      EncoderRole role,
+      boolean requested,
+      boolean ready,
+      String packageId,
+      Path configuredModelDir,
+      boolean gpuEnabled,
+      ResolvedConfig cfg,
+      HardwareProfile hardware,
+      InstallContract contract,
+      Path modelsDir,
+      GenerationModelSelection generation,
+      CapabilityRequirements requirements,
+      MetadataKind metadataKind,
+      boolean captureSpladeIdf) {
+    if (!ready) return IndexCompositionPlan.RolePlan.unavailable(requested);
+    try {
+      VariantSelection variant = resolveVariant(packageId, contract, hardware, modelsDir,
+          configuredModelDir, gpuEnabled, generation);
+      if (variant == null) return IndexCompositionPlan.RolePlan.unavailable(requested);
+      Path modelDir = variant.modelFile().toAbsolutePath().normalize().getParent();
+      List<IndexCompositionPlan.InputWitness> inputs = new ArrayList<>();
+      inputs.add(IndexCompositionPlan.InputWitness.capture(variant.modelFile()));
+      Path manifestPath = ModelCapabilityResolver.manifestPath(modelDir);
+      inputs.add(IndexCompositionPlan.InputWitness.capture(manifestPath));
+      // The manifest witness is frozen before parsing because it can name custom sidecars. The
+      // plan-wide validation after capture proves the parsed bytes still match this witness.
+      ModelManifest manifest = ModelManifest.loadOrDefault(modelDir);
+      LinkedHashSet<Path> candidates = new LinkedHashSet<>();
+      // Only embedding and NER call ModelCapabilityResolver today. SPLADE/BGE must not refuse a
+      // retry because an unrelated capability sidecar appeared beside their actual inputs.
+      if (metadataKind == MetadataKind.EMBEDDING || metadataKind == MetadataKind.NER) {
+        candidates.addAll(ModelCapabilityResolver.inputCandidates(modelDir, manifest)
+            .forRequirements(requirements));
+      }
+      candidates.remove(manifestPath);
+      switch (metadataKind) {
+        case EMBEDDING, BGE_M3 -> candidates.add(modelDir.resolve("tokenizer.json"));
+        case NER -> candidates.add(modelDir.resolve(manifest.tokenizer()));
+        case SPLADE -> {
+          candidates.add(modelDir.resolve("tokenizer.json"));
+          candidates.add(modelDir.resolve("vocab.txt"));
+          if (captureSpladeIdf) candidates.add(modelDir.resolve("idf.json"));
+        }
+      }
+      for (Path candidate : candidates) {
+        inputs.add(IndexCompositionPlan.InputWitness.capture(candidate));
+      }
+      ModelSessionPolicy policy = ModelSessionPolicyResolver.resolve(role, cfg, hardware, variant);
+      return new IndexCompositionPlan.RolePlan(requested, variant, policy, modelDir, inputs, null);
+    } catch (Exception captureFailure) {
+      log.warn("{} composition input capture failed; role will be unavailable: {}", role,
+          captureFailure.getMessage());
+      log.debug("{} composition input capture failure", role, captureFailure);
+      return IndexCompositionPlan.RolePlan.captureFailed(requested, captureFailure);
+    }
   }
 
   // -------- Per-role composition helpers (tempdoc 397 §14.26 T2-C1). --------
@@ -514,25 +745,17 @@ public final class InferenceCompositionRoot {
   private static Optional<EmbeddingAssembly> composeEmbeddingRole(
       EmbeddingConfig embedCfg,
       ResolvedConfig cfg,
-      HardwareProfile hardware,
-      InstallContract contract,
-      Path modelsDir,
+      RuntimePolicy runtime,
+      IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
       List<SessionHandle> handles,
-      java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events,
-      GenerationModelSelection selection) {
-    if (embedCfg.enabled()) {
+      OrtSessionTelemetryEvents events) {
+    if (rolePlan.requested()) {
       requestedRoles.add(EncoderRole.EMBEDDING);
     }
-    if (!embedCfg.isReady()) {
-      return Optional.empty();
-    }
-    VariantSelection variant =
-        resolveVariant(
-            "embedding", contract, hardware, modelsDir, embedCfg.modelPath(), embedCfg.gpuEnabled(),
-            selection);
+    VariantSelection variant = rolePlan.variant();
     if (variant == null) {
       log.warn(
           "Embedding: no variant resolved (dev mode without contract or model absent); vector"
@@ -541,25 +764,19 @@ public final class InferenceCompositionRoot {
     }
     try {
       SessionHandle sessions =
-          compose(
+          composeCapturedHandle(
               EncoderRole.EMBEDDING.consumerName(),
-              EncoderRole.EMBEDDING,
-              cfg,
-              hardware,
+              runtime,
+              rolePlan.policy(),
               variant,
               arbiter,
               events);
-      EmbeddingAssembly assembly = selection == null
-          ? OnnxEmbeddingEncoder.buildAssembly(sessions, embedCfg.modelPath(),
-              embedCfg.contextLength(), embedCfg.lateChunkingContextLength(),
-              cfg.ai().capabilityContractStrict())
-          : OnnxEmbeddingEncoder.buildAssembly(sessions, embedCfg.modelPath(),
-              embedCfg.contextLength(), embedCfg.lateChunkingContextLength(),
-              cfg.ai().capabilityContractStrict(), variant.modelFile());
+      EmbeddingAssembly assembly = OnnxEmbeddingEncoder.buildAssembly(sessions,
+          rolePlan.metadataDirectory(), embedCfg.contextLength(),
+          embedCfg.lateChunkingContextLength(), cfg.ai().capabilityContractStrict(),
+          variant.modelFile());
       handles.add(assembly.sessions());
-      policies.put(
-          EncoderRole.EMBEDDING,
-          ModelSessionPolicyResolver.resolve(EncoderRole.EMBEDDING, cfg, hardware, variant));
+      policies.put(EncoderRole.EMBEDDING, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
       // Tempdoc 710 Wave 2 Move 1: widened from OrtException — ModelCapabilityResolver throws
@@ -577,43 +794,30 @@ public final class InferenceCompositionRoot {
   private static Optional<NerAssembly> composeNerRole(
       NerConfig nerCfg,
       ResolvedConfig cfg,
-      HardwareProfile hardware,
-      InstallContract contract,
-      Path modelsDir,
+      RuntimePolicy runtime,
+      IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
       List<SessionHandle> handles,
-      java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events,
-      GenerationModelSelection selection) {
-    if (nerCfg.enabled()) {
+      OrtSessionTelemetryEvents events) {
+    if (rolePlan.requested()) {
       requestedRoles.add(EncoderRole.NER);
     }
-    if (!nerCfg.isReady()) {
-      return Optional.empty();
-    }
-    VariantSelection variant =
-        resolveVariant("ner", contract, hardware, modelsDir, nerCfg.modelPath(),
-            nerCfg.gpuEnabled(), selection);
+    VariantSelection variant = rolePlan.variant();
     if (variant == null) {
       log.info("NER: no variant resolved; NER will be unavailable.");
       return Optional.empty();
     }
     try {
       SessionHandle sessions =
-          compose(
-              EncoderRole.NER.consumerName(), EncoderRole.NER, cfg, hardware, variant, arbiter, events);
-      Path modelDir = variant.modelFile().getParent();
-      NerAssembly assembly = selection == null
-          ? io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
-              sessions, modelDir, nerCfg.maxSequenceLength(), cfg.ai().capabilityContractStrict())
-          : io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
-              sessions, modelDir, nerCfg.maxSequenceLength(), cfg.ai().capabilityContractStrict(),
-              variant.modelFile());
+          composeCapturedHandle(EncoderRole.NER.consumerName(), runtime, rolePlan.policy(),
+              variant, arbiter, events);
+      NerAssembly assembly = io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
+          sessions, rolePlan.metadataDirectory(), nerCfg.maxSequenceLength(),
+          cfg.ai().capabilityContractStrict(), variant.modelFile());
       handles.add(assembly.sessions());
-      policies.put(
-          EncoderRole.NER,
-          ModelSessionPolicyResolver.resolve(EncoderRole.NER, cfg, hardware, variant));
+      policies.put(EncoderRole.NER, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
       log.error("NER composition failed — NER will be unavailable", e);
@@ -623,46 +827,36 @@ public final class InferenceCompositionRoot {
 
   private static Optional<BgeM3Assembly> composeBgeM3Role(
       BgeM3Config bgeCfg,
-      ResolvedConfig cfg,
-      HardwareProfile hardware,
-      InstallContract contract,
-      Path modelsDir,
+      RuntimePolicy runtime,
+      IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
       List<SessionHandle> handles,
-      java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events,
-      GenerationModelSelection selection) {
+      OrtSessionTelemetryEvents events) {
     // Selection itself is the request. A disabled/missing BGE-M3 remains observable even when
     // the compatible SPLADE fallback is usable.
     requestedRoles.add(EncoderRole.BGE_M3);
-    if (!bgeCfg.isReady()) {
-      log.warn("BGE-M3 selected but model not found, falling back to SPLADE");
-      return Optional.empty();
-    }
-    VariantSelection variant =
-        resolveVariant(
-            "embedding", contract, hardware, modelsDir, bgeCfg.modelPath(), bgeCfg.gpuEnabled(),
-            selection);
+    VariantSelection variant = rolePlan.variant();
     if (variant == null) {
       log.warn("BGE-M3: no variant resolved; falling back to SPLADE");
       return Optional.empty();
     }
     try {
       SessionHandle sessions =
-          compose(
+          composeCapturedHandle(
               EncoderRole.BGE_M3.consumerName(),
-              EncoderRole.BGE_M3,
-              cfg,
-              hardware,
+              runtime,
+              rolePlan.policy(),
               variant,
               arbiter,
               events);
-      BgeM3Assembly assembly = BgeM3Encoder.buildAssembly(sessions, bgeCfg);
+      BgeM3Config capturedConfig = new BgeM3Config(bgeCfg.enabled(),
+          rolePlan.metadataDirectory(), bgeCfg.maxSequenceLength(), bgeCfg.gpuEnabled(),
+          bgeCfg.gpuDeviceId(), bgeCfg.gpuMemLimitBytes());
+      BgeM3Assembly assembly = BgeM3Encoder.buildAssembly(sessions, capturedConfig);
       handles.add(assembly.sessions());
-      policies.put(
-          EncoderRole.BGE_M3,
-          ModelSessionPolicyResolver.resolve(EncoderRole.BGE_M3, cfg, hardware, variant));
+      policies.put(EncoderRole.BGE_M3, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
       log.warn(
@@ -674,47 +868,38 @@ public final class InferenceCompositionRoot {
 
   private static Optional<SpladeAssembly> composeSpladeRole(
       SpladeConfig spladeCfg,
-      ResolvedConfig cfg,
-      HardwareProfile hardware,
-      InstallContract contract,
-      Path modelsDir,
+      RuntimePolicy runtime,
+      IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
       List<SessionHandle> handles,
-      java.util.Map<EncoderRole, ModelSessionPolicy> policies,
+      Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
-      OrtSessionTelemetryEvents events,
-      GenerationModelSelection selection) {
-    if (spladeCfg.enabled()) {
+      OrtSessionTelemetryEvents events) {
+    if (rolePlan.requested()) {
       requestedRoles.add(EncoderRole.SPLADE);
     }
-    if (!spladeCfg.isReady()) {
-      return Optional.empty();
-    }
-    VariantSelection variant =
-        resolveVariant(
-            "splade", contract, hardware, modelsDir, spladeCfg.modelPath(),
-            spladeCfg.gpuEnabled(), selection);
+    VariantSelection variant = rolePlan.variant();
     if (variant == null) {
       log.info("SPLADE: no variant resolved; sparse retrieval disabled.");
       return Optional.empty();
     }
     try {
       SessionHandle sessions =
-          compose(
+          composeCapturedHandle(
               EncoderRole.SPLADE.consumerName(),
-              EncoderRole.SPLADE,
-              cfg,
-              hardware,
+              runtime,
+              rolePlan.policy(),
               variant,
               arbiter,
               events);
-      SpladeAssembly assembly = selection == null
-          ? SpladeEncoder.buildAssembly(sessions, spladeCfg)
-          : SpladeEncoder.buildAssembly(sessions, spladeCfg, variant.modelFile());
+      SpladeConfig capturedConfig = new SpladeConfig(spladeCfg.enabled(),
+          rolePlan.metadataDirectory(), spladeCfg.maxSequenceLength(), spladeCfg.gpuEnabled(),
+          spladeCfg.gpuDeviceId(), spladeCfg.gpuMemLimitBytes(), spladeCfg.queryMode(),
+          spladeCfg.activation());
+      SpladeAssembly assembly = SpladeEncoder.buildAssembly(sessions, capturedConfig,
+          variant.modelFile());
       handles.add(assembly.sessions());
-      policies.put(
-          EncoderRole.SPLADE,
-          ModelSessionPolicyResolver.resolve(EncoderRole.SPLADE, cfg, hardware, variant));
+      policies.put(EncoderRole.SPLADE, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
       log.warn("Failed to initialize SPLADE encoder (non-fatal): {}", e.getMessage());
@@ -723,41 +908,85 @@ public final class InferenceCompositionRoot {
     }
   }
 
-  private static Optional<RerankerAssembly> composeRerankerRole(
+  private record QueryPlan(VariantSelection variant, QueryRoleSelection.Role attemptedRole,
+      boolean requested) {}
+
+  private static void recordQueryPlan(EncoderRole role, QueryPlan plan,
+      Set<EncoderRole> allRequested, Set<EncoderRole> queryRequested,
+      Set<EncoderRole> queryMissing) {
+    if (!plan.requested()) return;
+    allRequested.add(role);
+    queryRequested.add(role);
+    queryMissing.add(role);
+  }
+
+  private static QueryPlan resolveRerankerPlan(RerankerConfig config, HardwareProfile hardware,
+      InstallContract contract, Path modelsDir, GenerationModelSelection selection,
+      QueryRoleSelection.Role witnessed) {
+    if (witnessed != null && witnessed.state() == QueryRoleSelection.State.DISABLED) {
+      return new QueryPlan(null, witnessed, false);
+    }
+    boolean requested = witnessed != null || config.enabled();
+    if (witnessed == null && !config.isReady()) {
+      return new QueryPlan(null, QueryRoleSelection.Role.disabled(), requested);
+    }
+    VariantSelection variant = witnessed == null
+        ? resolveVariant("reranker", contract, hardware, modelsDir, config.modelPath(),
+            config.gpuEnabled(), selection)
+        : witnessedVariant(witnessed, config.gpuEnabled());
+    return captureQueryPlan("Search reranker", variant, witnessed, requested);
+  }
+
+  private static QueryPlan resolveCitationPlan(CitationScorerConfig config,
+      HardwareProfile hardware, InstallContract contract, Path modelsDir,
+      GenerationModelSelection selection, QueryRoleSelection.Role witnessed) {
+    if (witnessed != null && witnessed.state() == QueryRoleSelection.State.DISABLED) {
+      return new QueryPlan(null, witnessed, false);
+    }
+    boolean requested = witnessed != null || config != null && config.enabled();
+    if (config == null || witnessed == null && !config.isReady()) {
+      return new QueryPlan(null, witnessed == null ? QueryRoleSelection.Role.disabled() : witnessed,
+          requested);
+    }
+    VariantSelection variant = witnessed == null
+        ? resolveVariant("citation-scorer", contract, hardware, modelsDir, config.modelPath(),
+            false, selection)
+        : witnessed.targetEp() == ExecutionProvider.CPU ? witnessedVariant(witnessed, false) : null;
+    return captureQueryPlan("Citation scorer", variant, witnessed, requested);
+  }
+
+  private static QueryPlan captureQueryPlan(String label, VariantSelection variant,
+      QueryRoleSelection.Role witnessed, boolean requested) {
+    if (variant == null) {
+      log.info("{}: no variant resolved; role disabled.", label);
+      return new QueryPlan(null,
+          witnessed == null ? QueryRoleSelection.Role.disabled() : witnessed, requested);
+    }
+    if (witnessed != null) return new QueryPlan(variant, witnessed, requested);
+    try {
+      return new QueryPlan(variant, QueryRoleSelectionResolver.captureResolvedVariant(variant),
+          requested);
+    } catch (IOException | IllegalArgumentException captureFailure) {
+      log.warn("{} selection capture failed (non-fatal): {}", label,
+          captureFailure.getMessage());
+      log.debug("{} selection capture failed (stack trace)", label, captureFailure);
+      return new QueryPlan(null, QueryRoleSelection.Role.disabled(), requested);
+    }
+  }
+
+  private static QueryComposition composeRerankerRole(
       RerankerConfig rerankCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
-      InstallContract contract,
-      Path modelsDir,
       GpuArbiter arbiter,
       List<SessionHandle> handles,
-      java.util.Map<EncoderRole, ModelSessionPolicy> policies,
-      Set<EncoderRole> requestedRoles,
+      Map<EncoderRole, ModelSessionPolicy> policies,
       OrtSessionTelemetryEvents events,
-      GenerationModelSelection selection,
-      QueryRoleSelection.Role witnessed) {
-    if (witnessed != null && witnessed.state() == QueryRoleSelection.State.DISABLED) {
-      return Optional.empty();
-    }
-    if (witnessed != null || rerankCfg.enabled()) {
-      requestedRoles.add(EncoderRole.RERANKER);
-    }
-    if (witnessed == null && !rerankCfg.isReady()) {
-      return Optional.empty();
-    }
-    VariantSelection variant = witnessed == null
-        ? resolveVariant(
-            "reranker",
-            contract,
-            hardware,
-            modelsDir,
-            rerankCfg.modelPath(),
-            rerankCfg.gpuEnabled(),
-            selection)
-        : witnessedVariant(witnessed, rerankCfg.gpuEnabled());
+      QueryPlan plan) {
+    VariantSelection variant = plan.variant();
+    QueryRoleSelection.Role attempted = plan.attemptedRole();
     if (variant == null) {
-      log.info("Search reranker: no variant resolved; reranking disabled.");
-      return Optional.empty();
+      return new QueryComposition(Optional.empty(), attempted);
     }
     SessionHandle sessions = null;
     try {
@@ -779,59 +1008,34 @@ public final class InferenceCompositionRoot {
       io.justsearch.indexerworker.metrics.OperationalMetrics.getInstance()
           .registerEncoder(EncoderRole.RERANKER.consumerName(), rerankerProfiler);
       sessions.setOrtRunRecorder(rerankerProfiler::recordOrtCall);
-      RerankerAssembly assembly = witnessed == null
-          ? CrossEncoderReranker.buildAssembly(sessions,
-              rerankCfg.modelPath().resolve("tokenizer.json"), rerankCfg.maxSequenceLength())
-          : CrossEncoderReranker.buildAssembly(sessions, witnessed.tokenizer().path(),
-              witnessed.model().path(), rerankCfg.maxSequenceLength());
+      RerankerAssembly assembly = CrossEncoderReranker.buildAssembly(sessions,
+          attempted.tokenizer().path(), attempted.model().path(), rerankCfg.maxSequenceLength());
       handles.add(assembly.sessions());
       policies.put(
           EncoderRole.RERANKER,
           ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, hardware, variant));
-      return Optional.of(assembly);
+      return new QueryComposition(Optional.of(assembly), attempted);
     } catch (Exception e) {
       retireFailedQueryHandle(sessions, e);
       log.warn("Failed to initialize search reranker (non-fatal): {}", e.getMessage());
       log.debug("Failed to initialize search reranker (stack trace)", e);
-      return Optional.empty();
+      return new QueryComposition(Optional.empty(), attempted);
     }
   }
 
-  private static Optional<RerankerAssembly> composeCitationRole(
+  private static QueryComposition composeCitationRole(
       CitationScorerConfig citationCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
-      InstallContract contract,
-      Path modelsDir,
       List<SessionHandle> handles,
-      java.util.Map<EncoderRole, ModelSessionPolicy> policies,
-      Set<EncoderRole> requestedRoles,
+      Map<EncoderRole, ModelSessionPolicy> policies,
       OrtSessionTelemetryEvents events,
       GenerationModelSelection selection,
-      QueryRoleSelection.Role witnessed) {
-    if (witnessed != null && witnessed.state() == QueryRoleSelection.State.DISABLED) {
-      return Optional.empty();
-    }
-    if (witnessed != null || citationCfg != null && citationCfg.enabled()) {
-      requestedRoles.add(EncoderRole.CITATION);
-    }
-    if (citationCfg == null || witnessed == null && !citationCfg.isReady()) {
-      return Optional.empty();
-    }
-    VariantSelection variant = witnessed == null
-        ? resolveVariant(
-            "citation-scorer",
-            contract,
-            hardware,
-            modelsDir,
-            citationCfg.modelPath(),
-            /* gpuEnabled= */ false,
-            selection)
-        : witnessed.targetEp() == ExecutionProvider.CPU
-            ? witnessedVariant(witnessed, false) : null;
+      QueryPlan plan) {
+    VariantSelection variant = plan.variant();
+    QueryRoleSelection.Role attempted = plan.attemptedRole();
     if (variant == null) {
-      log.info("Citation scorer: no variant resolved; citation scoring disabled.");
-      return Optional.empty();
+      return new QueryComposition(Optional.empty(), attempted);
     }
     SessionHandle sessions = null;
     try {
@@ -854,15 +1058,12 @@ public final class InferenceCompositionRoot {
       io.justsearch.indexerworker.metrics.OperationalMetrics.getInstance()
           .registerEncoder(EncoderRole.CITATION.consumerName(), citationProfiler);
       sessions.setOrtRunRecorder(citationProfiler::recordOrtCall);
-      RerankerAssembly assembly = witnessed == null
-          ? CitationScorer.buildAssembly(sessions,
-              citationCfg.modelPath().resolve("tokenizer.json"), citationCfg.maxSequenceLength())
-          : CitationScorer.buildAssembly(sessions, witnessed.tokenizer().path(),
-              witnessed.model().path(), citationCfg.maxSequenceLength());
-      if (witnessed != null) {
+      RerankerAssembly assembly = CitationScorer.buildAssembly(sessions,
+          attempted.tokenizer().path(), attempted.model().path(), citationCfg.maxSequenceLength());
+      if (attempted.state() == QueryRoleSelection.State.SELECTED) {
         log.info("Citation scorer settings selected: model={}, sha256={}, tokenizerSha256={}",
-            witnessed.model().path(), witnessed.model().sha256(),
-            witnessed.tokenizer().sha256());
+            attempted.model().path(), attempted.model().sha256(),
+            attempted.tokenizer().sha256());
       }
       if (selection != null) {
         log.info("Citation scorer generation selected: model={}, sha256={}",
@@ -871,13 +1072,22 @@ public final class InferenceCompositionRoot {
       }
       handles.add(assembly.sessions());
       policies.put(EncoderRole.CITATION, policy);
-      return Optional.of(assembly);
+      return new QueryComposition(Optional.of(assembly), attempted);
     } catch (Exception e) {
       retireFailedQueryHandle(sessions, e);
       log.warn("Citation scorer init failed (non-fatal): {}", e.getMessage());
       log.debug("Citation scorer init failed (stack trace)", e);
-      return Optional.empty();
+      return new QueryComposition(Optional.empty(), attempted);
     }
+  }
+
+  private record QueryComposition(Optional<RerankerAssembly> assembly,
+      QueryRoleSelection.Role attemptedRole) {
+    private QueryComposition {
+      Objects.requireNonNull(assembly, "assembly");
+      Objects.requireNonNull(attemptedRole, "attemptedRole");
+    }
+
   }
 
   private static void retireFailedQueryHandle(SessionHandle sessions, Exception cause) {
@@ -996,6 +1206,21 @@ public final class InferenceCompositionRoot {
       throws OrtException {
     ModelSessionPolicy policy = ModelSessionPolicyResolver.resolve(role, cfg, hardware, variant);
     return buildHandle(consumerName, cfg, hardware, policy, variant, arbiter, events);
+  }
+
+  private static SessionHandle composeCapturedHandle(
+      String consumerName,
+      RuntimePolicy runtime,
+      ModelSessionPolicy policy,
+      VariantSelection variant,
+      GpuArbiter arbiter,
+      OrtSessionTelemetryEvents events) throws OrtException {
+    if (!variant.equals(policy.variant())) {
+      throw new IllegalArgumentException("Captured variant and session policy disagree");
+    }
+    ModelArtifacts artifacts = new ModelArtifacts(variant.modelFile(), variant.modelFile());
+    return OrtSessionAssembler.buildManager(consumerName,
+        new Composition(runtime, policy, artifacts), arbiter, events);
   }
 
   private static SessionHandle buildHandle(

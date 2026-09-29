@@ -828,6 +828,8 @@ function buildSnapshot(): AiState {
   const migration = status?.worker?.migration;
   const stability = computeStability({
     phase,
+    indexComponentState: status?.readiness?.engineComponents?.['index']?.state,
+    indexComponentReasonCode: status?.readiness?.engineComponents?.['index']?.reasonCode,
     indexState: status?.worker?.core?.indexState,
     migrationState: migration?.migrationState,
     // Tempdoc 837 §2.3 — WHY the rebuild is running, carried as an additive facet of the transition
@@ -1023,6 +1025,8 @@ function stampSettledIndex(snap: StatusSnapshot): void {
   const migration = snap.worker?.migration;
   const stability = computeStability({
     phase: 'connected',
+    indexComponentState: snap.readiness?.engineComponents?.['index']?.state,
+    indexComponentReasonCode: snap.readiness?.engineComponents?.['index']?.reasonCode,
     indexState: snap.worker?.core?.indexState,
     migrationState: migration?.migrationState,
     activeGenerationId: migration?.activeGenerationId,

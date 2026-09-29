@@ -40,7 +40,7 @@ final class ManagedLlamaAdoptionTest {
     LlamaServerOps ops =
         new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
             HttpClient.newHttpClient(), new ObjectMapper(), null, () -> Mode.OFFLINE,
-            new NoopPropsObserver(), ignored -> {}, ignored -> {}, (ignored, guard) -> {},
+            new NoopPropsObserver(), ignored -> {}, (ignored, guard) -> {},
             NoopInferenceTelemetryEvents.INSTANCE, ManagedChildRegistry.noop());
     try {
       ops.rollbackFailedRegistration(process, new IOException("disk full"));
@@ -63,7 +63,7 @@ final class ManagedLlamaAdoptionTest {
         new InferenceConfig(tmp.resolve("llama.exe"), tmp.resolve("model.gguf"), null, 1, 1, 0, false);
     LlamaServerOps ops = new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
         HttpClient.newHttpClient(), new ObjectMapper(), null, () -> Mode.OFFLINE,
-        new NoopPropsObserver(), ignored -> {}, ignored -> {}, (ignored, guard) -> {},
+        new NoopPropsObserver(), ignored -> {}, (ignored, guard) -> {},
         NoopInferenceTelemetryEvents.INSTANCE, ManagedChildRegistry.noop());
     try {
       ops.rollbackFailedRegistration(process, new IOException("disk full"));
@@ -282,7 +282,7 @@ final class ManagedLlamaAdoptionTest {
           termination == null && managedCrashHandler == null
               ? new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
                   HttpClient.newHttpClient(), new ObjectMapper(), null, mode::get,
-                  new NoopPropsObserver(), ignored -> {}, ignored -> {}, (ignored, guard) -> {},
+                  new NoopPropsObserver(), ignored -> {}, (ignored, guard) -> {},
                   NoopInferenceTelemetryEvents.INSTANCE, registry)
               : new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
                   HttpClient.newHttpClient(), new ObjectMapper(), null, mode::get,
@@ -290,7 +290,7 @@ final class ManagedLlamaAdoptionTest {
                   guard -> {
                     if (guard.getAsBoolean()) managedCrashHandler.run();
                   },
-                  ignored -> {}, (ignored, guard) -> {},
+                  (ignored, guard) -> {},
                   NoopInferenceTelemetryEvents.INSTANCE, registry,
                   termination == null ? handle -> true : termination);
     }

@@ -55,8 +55,8 @@ graph TD
 *   **Sidecar host:** the Engine runs as a child process of the Tauri shell.
 *   **Composition:** `io.justsearch.app.engine.EngineRoot` is the composition root. It is the only module permitted to see both halves; it binds every port and owns the two sequences that span them, startup and shutdown.
 *   **API gateway:** exposes the REST surface used by the UI (e.g. `/api/status`, `/api/health`, `/api/knowledge/*`, `/api/inference/*`) plus the MCP endpoint, and reaches the index half through port calls.
-*   **Watchdog:** monitors `llama-server` (`InferenceLifecycleManager`, policy in `BrainSupervisionPolicy`). There is no worker-process watchdog — the Worker's `SupervisionPolicy` went with the process it supervised.
-*   **Deterministic failure surfacing:** index-half startup failures are captured and surfaced via `/api/status`, and a corrupt index or schema mismatch stamps a fatal-reason marker so the UI can offer "Rebuild index" instead of blind-restarting.
+*   **Component recovery:** `KnowledgeServerHealthMonitor` owns component deadlines, the single serialized admission slot, backoff, and retry budgets. Physical component owners report exact failures and perform one admitted action; they do not run competing retry loops. There is no worker-process watchdog.
+*   **Deterministic failure surfacing:** recoverable candidate failures and permitted degraded states remain observable through component and readiness state. An observed essential-index corruption or schema-mismatch reason bypasses local retries and immediately requests the Engine's ordered, counted restart (exit code 5). Process-fatal failures and OOM remain process/supervisor events rather than component recovery outcomes.
 *   **One log:** `%DATA_DIR%/logs/engine.log`. There is no separate `worker.log`.
 *   **`--add-modules=jdk.incubator.vector`** was removed to enable the JDK 25 AOT cache's full-module-graph optimization; Lucene uses its scalar fallback. See tempdoc 269 §D4a.
 
@@ -123,7 +123,7 @@ detect and the ordinal-450 tier had nothing left to cross.
 *   **Role:** Providing Intelligence (LLM Chat & RAG).
 *   **VRAM Management:**
     *   **Zombie Killing:** On Windows, `Process.destroy()` can leave VRAM locked. We use `taskkill /F /PID` to enforce release.
-    *   **Hung/Crash Recovery:** The manager monitors health periodically and will hard-kill a hung owned process; it also restarts on crashes when in Online mode.
+    *   **Hung/Crash Recovery:** Health or process-exit detection marks the exact managed owner Offline and reports its failure once. `KnowledgeServerHealthMonitor` is the sole automatic retry authority; `InferenceLifecycleManager` only performs the one same-configuration recovery action that the monitor admits.
     *   **External Instance Adoption:** If a healthy `llama-server` is already listening on the configured port, the manager can **adopt** it after probing `GET /props` (prevents restart loops and avoids accidentally adopting unrelated HTTP services). Adopted servers are still health-monitored; if they die mid-session, inference switches to Offline.
     *   **Health & Props:** The manager polls `GET /health` during startup and reads `GET /props` (best-effort) to learn the *actual* `n_ctx` and `model_alias` for diagnostics.
 
@@ -182,8 +182,10 @@ the halves removed one *class* of that risk and left the rest, so the ownership 
 The system is designed to work even if parts fail:
 *   **No GPU:** Inference Manager detects VRAM shortage and refuses to start `Online Mode`, falling back to keyword search.
 *   **Models not loaded yet:** the ports answer before the encoders finish loading — search degrades to BM25, the indexing loop skips embedding/SPLADE, and ingest queues normally.
-*   **Index unusable:** a corrupt index or an exhausted rebuild brake leaves search serving read-only while `/api/status` reports why, instead of crashing the boot.
-*   **Index-half failure is now Engine failure.** This is the honest cost ADR-0049 records: recovery isolation is gone. An OOM or wedge in indexing takes the API with it, where before the API survived to report it. Supervision — crash detection, restart budget, cooldown — is stage B's work; until it lands the mitigation is admission control and per-operation budgets, not a second address space.
+*   **Candidate and degraded states:** a refused candidate or optional model failure is reported without replacing a valid serving owner; known missing encoder roles publish coherent `UNAVAILABLE` component state, and downstream readiness degrades where the serving contract permits it.
+*   **Essential index failure:** observed index corruption or schema mismatch skips local component retries and requests the ordered, counted Engine restart path immediately. The runtime does not promise a read-only incumbent or a UI rebuild action for these fatal causes.
+*   **Process-fatal failure:** an Engine OOM or other process-fatal error follows the host-supervisor path, outside the component retry budget.
+*   **Index-half failure is now Engine failure.** This is the honest cost ADR-0049 records: recovery isolation is gone. An OOM or wedge in indexing takes the API with it, where before the API survived to report it. Engine host supervision now provides crash detection, a bounded restart budget, and cooldown; component recovery can escalate an essential failure through the Engine's counted restart path. Admission control and per-operation budgets still protect the shared address space.
 
 ## Current implementation notes / living docs
 

@@ -47,6 +47,15 @@ public interface WorkerHost extends Closeable {
   ServingLease captureServingView();
 
   /**
+   * Retains the just-opened physical view while Bootstrap performs health and ready initialization.
+   * Implementations may admit an accepted recovery view here while ordinary serving capture stays
+   * fenced until the recovery coordinator publishes its terminal result.
+   */
+  default ServingLease captureStartupHealthView() {
+    return captureServingView();
+  }
+
+  /**
    * The OS process id that owns the index — this JVM's own pid for an in-process host.
    *
    * <p>Kept because the bootstrap's PID validation and the health monitor both report it, and
@@ -57,6 +66,22 @@ public interface WorkerHost extends Closeable {
    * @return the owning pid, or 0 when not started
    */
   long ownerPid();
+
+  /** Retires a failed/recovering index while preserving the owner's recovery observation. */
+  default void closeForRecovery() { close(); }
+
+  /** Performs one admitted physical index recovery under the bootstrap's initialization lock. */
+  default io.justsearch.core.component.ComponentRecoveryAction.Result recoverIndex(
+      io.justsearch.core.component.ComponentRecoveryAction.Request request,
+      KnowledgeServerBootstrap.RecoveryBody body) throws Exception {
+    return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
+  }
+
+  /** Replaces only native encoder owners while the bootstrap serializes index lifetime. */
+  default io.justsearch.core.component.ComponentRecoveryAction.Result recoverEncoders(
+      io.justsearch.core.component.ComponentRecoveryAction.Request request) throws Exception {
+    return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
+  }
 
   /** Stops the index half. Idempotent. */
   @Override

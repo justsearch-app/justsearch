@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -72,6 +73,68 @@ public final class ModelCapabilityResolver {
   private ModelCapabilityResolver() {}
 
   /**
+   * Exact conservative union of filesystem candidates the resolver may consult for the requested
+   * capability facts. This is intentionally not a dynamic trace of only paths opened on one run:
+   * present and absent paths both matter because a later file appearance can change a fallback.
+   * Custom manifest references are resolved here, beside the code that consumes them, so callers
+   * which freeze model inputs do not maintain a parallel filename inventory.
+   */
+  public record InputCandidates(
+      Path manifest,
+      Path sentenceTransformersPooling,
+      Path legacyPooling,
+      Path sentenceBertConfig,
+      Path modelConfig,
+      Path sentenceTransformersConfig,
+      Path legacyPrefixConfig,
+      Path labelConfig) {
+
+    /** Immutable set containing only candidates relevant to {@code requirements}. */
+    public Set<Path> forRequirements(CapabilityRequirements requirements) {
+      java.util.LinkedHashSet<Path> paths = new java.util.LinkedHashSet<>();
+      paths.add(manifest);
+      if (requirements.requires(CapabilityRequirements.Fact.POOLING)) {
+        paths.add(sentenceTransformersPooling);
+        paths.add(legacyPooling);
+      }
+      if (requirements.requires(CapabilityRequirements.Fact.CONTEXT_LENGTH)) {
+        paths.add(sentenceBertConfig);
+        paths.add(modelConfig);
+      }
+      if (requirements.requires(CapabilityRequirements.Fact.DIMENSION)) {
+        paths.add(modelConfig);
+      }
+      if (requirements.requires(CapabilityRequirements.Fact.PREFIXES)) {
+        paths.add(sentenceTransformersConfig);
+        paths.add(legacyPrefixConfig);
+      }
+      if (requirements.requires(CapabilityRequirements.Fact.LABELS)) {
+        paths.add(labelConfig);
+      }
+      return Set.copyOf(paths);
+    }
+  }
+
+  /** Builds the candidate projection shared by resolution and pre-native input capture. */
+  public static InputCandidates inputCandidates(Path modelDir, ModelManifest manifest) {
+    Path exactDir = modelDir.toAbsolutePath().normalize();
+    return new InputCandidates(
+        manifestPath(exactDir),
+        exactDir.resolve("1_Pooling").resolve("config.json"),
+        exactDir.resolve(manifest.poolingConfig()).normalize(),
+        exactDir.resolve("sentence_bert_config.json"),
+        exactDir.resolve("config.json"),
+        exactDir.resolve("config_sentence_transformers.json"),
+        exactDir.resolve("prefix_config.json"),
+        exactDir.resolve(manifest.labelConfig()).normalize());
+  }
+
+  /** Exact manifest candidate used by {@link ModelManifest#loadOrDefault}. */
+  public static Path manifestPath(Path modelDir) {
+    return modelDir.toAbsolutePath().normalize().resolve("model_manifest.json");
+  }
+
+  /**
    * Resolves capabilities for {@code modelDir}. Logs every degraded/undeclared fact at WARN — but
    * only for facts {@code requirements} names; a fact the consuming role never reads is never
    * resolved and never warned about (tempdoc 710 Wave 2 Move 2 — see {@link
@@ -96,7 +159,19 @@ public final class ModelCapabilityResolver {
       ModelManifest manifest,
       CapabilityRequirements requirements,
       boolean strict) {
+    return resolve(packageId, modelDir, manifest, requirements, strict, null);
+  }
+
+  /** Resolves capabilities against an already-selected exact ONNX variant. */
+  public static ModelCapabilities resolve(
+      String packageId,
+      Path modelDir,
+      ModelManifest manifest,
+      CapabilityRequirements requirements,
+      boolean strict,
+      Path exactModelPath) {
     List<String> warnings = new ArrayList<>();
+    InputCandidates inputs = inputCandidates(modelDir, manifest);
 
     // Embedded ONNX metadata_props (tempdoc 711 Item 3): one short-lived probe session per
     // resolve() call, not per fact — every resolveX below that consults embedded metadata reads
@@ -109,21 +184,22 @@ public final class ModelCapabilityResolver {
             || requirements.requires(CapabilityRequirements.Fact.PRECISION)
             || requirements.requires(CapabilityRequirements.Fact.PREFIXES);
     Map<String, String> embedded =
-        needsEmbeddedMetadata ? readEmbeddedMetadata(modelDir, manifest, warnings) : Map.of();
+        needsEmbeddedMetadata
+            ? readEmbeddedMetadata(modelDir, manifest, exactModelPath, warnings) : Map.of();
 
     ModelCapabilities.PoolingMode poolingMode =
         requirements.requires(CapabilityRequirements.Fact.POOLING)
-            ? resolvePoolingMode(modelDir, manifest, embedded, warnings)
+            ? resolvePoolingMode(manifest, inputs, embedded, warnings)
             : ModelCapabilities.PoolingMode.UNKNOWN;
     int contextLength =
         requirements.requires(CapabilityRequirements.Fact.CONTEXT_LENGTH)
-            ? resolveContextLength(modelDir, manifest, embedded, warnings)
+            ? resolveContextLength(manifest, inputs, embedded, warnings)
             : 0;
     int dimension = 0;
     if (requirements.requires(CapabilityRequirements.Fact.DIMENSION)) {
-      dimension = resolveDimension(modelDir, manifest, embedded, warnings);
+      dimension = resolveDimension(manifest, inputs, embedded, warnings);
       if (dimension <= 0) {
-        dimension = probeStaticEmbeddingDimension(modelDir, manifest, warnings);
+        dimension = probeStaticEmbeddingDimension(modelDir, manifest, exactModelPath, warnings);
       }
     }
     ModelPrecision cpuPrecision = null;
@@ -146,11 +222,11 @@ public final class ModelCapabilityResolver {
     }
     String[] prefixes =
         requirements.requires(CapabilityRequirements.Fact.PREFIXES)
-            ? resolvePrefixes(modelDir, manifest, embedded, warnings)
+            ? resolvePrefixes(manifest, inputs, embedded, warnings)
             : new String[] {null, null};
     Map<String, String> labelMapping =
         requirements.requires(CapabilityRequirements.Fact.LABELS)
-            ? resolveLabelMapping(modelDir, manifest, warnings)
+            ? resolveLabelMapping(modelDir, manifest, inputs, warnings)
             : Map.of();
 
     for (String warning : warnings) {
@@ -184,7 +260,8 @@ public final class ModelCapabilityResolver {
   // ---------------------------------------------------------------------------
 
   private static ModelCapabilities.PoolingMode resolvePoolingMode(
-      Path modelDir, ModelManifest manifest, Map<String, String> embedded, List<String> warnings) {
+      ModelManifest manifest, InputCandidates inputs, Map<String, String> embedded,
+      List<String> warnings) {
     String declared = manifest.capabilities().poolingMode();
     String embeddedValue = embedded.get(META_POOLING_MODE);
     if (declared != null && !declared.isBlank()) {
@@ -210,7 +287,7 @@ public final class ModelCapabilityResolver {
     }
 
     // Sentence-transformers ecosystem: 1_Pooling/config.json, both schema generations.
-    Path stPooling = modelDir.resolve("1_Pooling").resolve("config.json");
+    Path stPooling = inputs.sentenceTransformersPooling();
     if (Files.exists(stPooling)) {
       try {
         JsonNode root = readJson(stPooling);
@@ -234,7 +311,7 @@ public final class ModelCapabilityResolver {
 
     // Legacy sidecar — deprecated generation, kept as a fallback during the migration window
     // (tombstone: removed once packs ship manifests, tempdoc 657).
-    Path legacy = modelDir.resolve(manifest.poolingConfig());
+    Path legacy = inputs.legacyPooling();
     if (Files.exists(legacy)) {
       try {
         String content = Files.readString(legacy);
@@ -269,7 +346,8 @@ public final class ModelCapabilityResolver {
   // ---------------------------------------------------------------------------
 
   private static int resolveContextLength(
-      Path modelDir, ModelManifest manifest, Map<String, String> embedded, List<String> warnings) {
+      ModelManifest manifest, InputCandidates inputs, Map<String, String> embedded,
+      List<String> warnings) {
     Integer declared = manifest.capabilities().contextLength();
     Integer embeddedValue = parseEmbeddedInt(embedded.get(META_CONTEXT_LENGTH), "context_length", warnings);
     if (declared != null && declared > 0) {
@@ -280,8 +358,8 @@ public final class ModelCapabilityResolver {
       return embeddedValue;
     }
 
-    Integer stSeqLen = readIntField(modelDir.resolve("sentence_bert_config.json"), "max_seq_length", warnings);
-    Integer configMaxPos = readIntField(modelDir.resolve("config.json"), "max_position_embeddings", warnings);
+    Integer stSeqLen = readIntField(inputs.sentenceBertConfig(), "max_seq_length", warnings);
+    Integer configMaxPos = readIntField(inputs.modelConfig(), "max_position_embeddings", warnings);
 
     if (stSeqLen != null && configMaxPos != null) {
       if (!stSeqLen.equals(configMaxPos)) {
@@ -317,7 +395,8 @@ public final class ModelCapabilityResolver {
   // ---------------------------------------------------------------------------
 
   private static int resolveDimension(
-      Path modelDir, ModelManifest manifest, Map<String, String> embedded, List<String> warnings) {
+      ModelManifest manifest, InputCandidates inputs, Map<String, String> embedded,
+      List<String> warnings) {
     Integer declared = manifest.capabilities().embeddingDimension();
     Integer embeddedValue =
         parseEmbeddedInt(embedded.get(META_EMBEDDING_DIMENSION), "embedding_dimension", warnings);
@@ -328,7 +407,7 @@ public final class ModelCapabilityResolver {
     if (embeddedValue != null && embeddedValue > 0) {
       return embeddedValue;
     }
-    Integer hiddenSize = readIntField(modelDir.resolve("config.json"), "hidden_size", warnings);
+    Integer hiddenSize = readIntField(inputs.modelConfig(), "hidden_size", warnings);
     if (hiddenSize != null && hiddenSize > 0) {
       return hiddenSize;
     }
@@ -344,9 +423,10 @@ public final class ModelCapabilityResolver {
    * OnnxEmbeddingEncoder}, not a hard error.
    */
   private static int probeStaticEmbeddingDimension(
-      Path modelDir, ModelManifest manifest, List<String> warnings) {
+      Path modelDir, ModelManifest manifest, Path exactModelPath, List<String> warnings) {
     try {
-      Path modelFile = manifest.resolveExistingModelFile(modelDir);
+      Path modelFile = exactModelPath != null ? exactModelPath
+          : manifest.resolveExistingModelFile(modelDir);
       if (!Files.isRegularFile(modelFile)) {
         return 0;
       }
@@ -387,9 +467,10 @@ public final class ModelCapabilityResolver {
    * — this is the only place a probe session is opened for that purpose.
    */
   private static Map<String, String> readEmbeddedMetadata(
-      Path modelDir, ModelManifest manifest, List<String> warnings) {
+      Path modelDir, ModelManifest manifest, Path exactModelPath, List<String> warnings) {
     try {
-      Path modelFile = manifest.resolveExistingModelFile(modelDir);
+      Path modelFile = exactModelPath != null ? exactModelPath
+          : manifest.resolveExistingModelFile(modelDir);
       if (!Files.isRegularFile(modelFile)) {
         return Map.of();
       }
@@ -528,7 +609,8 @@ public final class ModelCapabilityResolver {
   // ---------------------------------------------------------------------------
 
   private static String[] resolvePrefixes(
-      Path modelDir, ModelManifest manifest, Map<String, String> embedded, List<String> warnings) {
+      ModelManifest manifest, InputCandidates inputs, Map<String, String> embedded,
+      List<String> warnings) {
     ModelManifest.Capabilities caps = manifest.capabilities();
     String doc = caps.documentPrefix();
     String query = caps.queryPrefix();
@@ -556,7 +638,7 @@ public final class ModelCapabilityResolver {
     // (S-C.R: verified unpopulated in practice for gte-multilingual-base AND
     // multilingual-e5-large — absence is never "no prefix").
     if (doc == null || query == null) {
-      Path stPrompts = modelDir.resolve("config_sentence_transformers.json");
+      Path stPrompts = inputs.sentenceTransformersConfig();
       if (Files.exists(stPrompts)) {
         try {
           JsonNode root = readJson(stPrompts);
@@ -583,7 +665,7 @@ public final class ModelCapabilityResolver {
 
     // Legacy sidecar — deprecated generation.
     if (doc == null || query == null) {
-      Path legacy = modelDir.resolve("prefix_config.json");
+      Path legacy = inputs.legacyPrefixConfig();
       if (Files.exists(legacy)) {
         try {
           JsonNode root = readJson(legacy);
@@ -618,8 +700,8 @@ public final class ModelCapabilityResolver {
   // ---------------------------------------------------------------------------
 
   private static Map<String, String> resolveLabelMapping(
-      Path modelDir, ModelManifest manifest, List<String> warnings) {
-    Path configFile = modelDir.resolve(manifest.labelConfig());
+      Path modelDir, ModelManifest manifest, InputCandidates inputs, List<String> warnings) {
+    Path configFile = inputs.labelConfig();
     if (!Files.exists(configFile)) {
       warnings.add(
           "label config '" + manifest.labelConfig() + "' not found in " + modelDir);

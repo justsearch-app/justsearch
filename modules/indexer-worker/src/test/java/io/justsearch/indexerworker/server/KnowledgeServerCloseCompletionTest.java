@@ -708,11 +708,16 @@ final class KnowledgeServerCloseCompletionTest {
         io.justsearch.app.api.NativeQuiescence.QUIESCED, server.nativeQuiescence());
   }
   private static void attachQueryOwner(KnowledgeServer server, Object view) throws Exception {
+    var querySelection = new io.justsearch.app.api.settings.QueryRoleSelection(
+        io.justsearch.app.api.settings.QueryRoleSelection.Role.disabled(),
+        io.justsearch.app.api.settings.QueryRoleSelection.Role.disabled());
     var surface = new InferenceSurface(java.util.Optional.empty(), java.util.Optional.empty(),
         java.util.Optional.empty(), java.util.Optional.empty(), java.util.Optional.empty(),
         java.util.Optional.empty(),
         new io.justsearch.ort.PolicySnapshot(io.justsearch.ort.RuntimePolicy.defaults(),
-            new java.util.TreeMap<>()), java.util.List.of());
+            new java.util.TreeMap<>()), java.util.List.of(),
+        new InferenceSurface.ComponentObservation(java.util.Optional.empty(), java.util.Set.of(),
+            java.util.Set.of(), java.util.Optional.of(querySelection)));
     var owner = new QueryRoleSet(surface);
     var attach = view.getClass().getDeclaredMethod("attachQueryRoleSet", QueryRoleSet.class);
     attach.setAccessible(true);

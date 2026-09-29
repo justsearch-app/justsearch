@@ -3,23 +3,24 @@ package io.justsearch.app.services.worker;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.ComponentRecoveryAction;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -29,107 +30,135 @@ import org.junit.jupiter.api.io.TempDir;
 /** Physical close/open recovery must leave readiness publication to the sampler. */
 final class BootstrapRecomposeRecoveryTest {
   @Test
-  @Timeout(30)
-  void boundReplacementHasNoAbsentGapAndClosesAndOpensOnce(@TempDir Path tempDir)
+  void encoderRecoveryKeepsTheExistingClientAndIndexObservation(@TempDir Path tempDir)
       throws Exception {
-    KnowledgeClient oldClient = healthyClient();
-    when(oldClient.isHealthy(any())).thenReturn(true, false);
-    KnowledgeClient replacementClient = healthyClient();
-    ControlledWorkerHost host = new ControlledWorkerHost(oldClient, replacementClient);
+    var host = spy(new ControlledWorkerHost(healthyClient()));
+    var request = mock(ComponentRecoveryAction.Request.class);
+    when(host.recoverEncoders(request)).thenReturn(ComponentRecoveryAction.Result.REFUSED);
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(
         configFor(tempDir), null, host, false)) {
-      KnowledgeServerBootstrap bootstrap = fixture.bootstrap();
+      var bootstrap = fixture.bootstrap();
+      assertEquals(ComponentRecoveryAction.Result.REFUSED, bootstrap.recoverEncoders(request));
+      verify(host, never()).recoverEncoders(request);
       bootstrap.start();
-
-      // The bootstrap has proved physical health. The component sampler is the separate owner of
-      // the readiness handover, so establish the incumbent's sampled READY state explicitly.
-      fixture.publishSamplerReady();
-      List<String> transitions = fixture.recordIndexTransitions();
-
-      // Model the monitor's caller-owned recovery precondition: a real physical loss is observed,
-      // then the monitor publishes STARTING/worker.recovering before asking the owner to recompose.
-      assertFalse(bootstrap.checkHealth(), "the incumbent must expose its physical loss first");
-      bootstrap.indexComponent().transition(
-          ComponentState.STARTING,
-          LifecycleReasonCode.WORKER_RECOVERING.code(),
-          "Reopening index with the current configuration (attempt 1)");
-      assertEquals(ComponentState.STARTING, bootstrap.indexComponent().snapshot().state());
-
-      assertTrue(
-          bootstrap.recomposeForRecovery(() -> true),
-          "a healthy replacement must report physical health");
-      assertEquals(2, host.startCount(), "one initial open plus one replacement open");
-      assertEquals(1, host.closeCount(), "one old physical owner close per recompose");
-      verify(oldClient).close();
-      verify(replacementClient, never()).close();
-
-      // The owner is physically bound while the sampler still has to publish the handover.
-      assertEquals(ComponentState.STARTING, bootstrap.indexComponent().snapshot().state());
-      assertTrue(
-          transitions.stream().noneMatch(event -> event.startsWith("OFFLINE/")),
-          "recompose must not publish ABSENT/OFFLINE between the two bound owners: "
-              + transitions);
-
-      fixture.publishSamplerReady();
-      assertEquals(ComponentState.READY, bootstrap.indexComponent().snapshot().state());
-      assertEquals(
-          List.of(
-              "DEGRADED/worker.lost",
-              "PENDING/worker.lost",
-              "READY/null"),
-          transitions,
-          "the handover must retain the observed fault until READY, with no shutdown publication");
-      assertTrue(bootstrap.isReady(), "the bound replacement is ready after the sampler handover");
+      var client = bootstrap.client();
+      var index = bootstrap.indexComponent().snapshot();
+      assertEquals(ComponentRecoveryAction.Result.REFUSED, bootstrap.recoverEncoders(request));
+      verify(host).recoverEncoders(request);
+      assertSame(client, bootstrap.client(), "native recovery must retain the exact index client");
+      assertEquals(index, bootstrap.indexComponent().snapshot());
+      assertEquals(1, host.startCount());
+      assertEquals(0, host.closeCount());
     }
   }
 
   @Test
   @Timeout(30)
-  void admissionRevokedWhileCloseIsHeldPreventsTheSubsequentOpen(@TempDir Path tempDir)
+  void ownerCallbackRetainsFatalVerdictAcrossSuppressedCloseOpen(@TempDir Path tempDir)
       throws Exception {
     KnowledgeClient oldClient = healthyClient();
     KnowledgeClient replacementClient = healthyClient();
     ControlledWorkerHost host = new ControlledWorkerHost(oldClient, replacementClient);
-    host.holdClose();
-    AtomicBoolean admitted = new AtomicBoolean(true);
-    AtomicReference<Boolean> result = new AtomicReference<>();
-    AtomicReference<Throwable> threadFailure = new AtomicReference<>();
-    Thread recomposer = null;
-
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(
         configFor(tempDir), null, host, false)) {
       KnowledgeServerBootstrap bootstrap = fixture.bootstrap();
       bootstrap.start();
-      fixture.publishSamplerReady();
+      io.justsearch.ipc.WorkerFatalReasonMarker.write(tempDir,
+          io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_CORRUPT);
 
-      recomposer = new Thread(() -> {
+      var result = bootstrap.recomposeForRecovery(
+          mock(ComponentRecoveryAction.Request.class), (request, body) -> {
+            bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_SPAWN_FAILED,
+                "suppressed generic failure");
+            assertEquals(LifecycleReasonCode.WORKER_INDEX_CORRUPT,
+                body.fatalReasonCode());
+            assertTrue(body.fatalDetail().contains("corrupt"));
+            assertTrue(body.run(() -> true));
+            return ComponentRecoveryAction.Result.REFUSED;
+          });
+
+      assertEquals(ComponentRecoveryAction.Result.REFUSED, result);
+      assertEquals(1, host.closeCount());
+      assertEquals(2, host.startCount());
+    }
+  }
+
+  @Test
+  void prepublicationCallbackIsCarriedToThePhysicalOwner(@TempDir Path tempDir)
+      throws Exception {
+    var callbacks = new AtomicInteger();
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(
+        configFor(tempDir), null, new ControlledWorkerHost(healthyClient()), false)) {
+      var result = fixture.bootstrap().recomposeForRecovery(
+          mock(ComponentRecoveryAction.Request.class),
+          (request, body) -> {
+            body.preparePublication();
+            return ComponentRecoveryAction.Result.REFUSED;
+          },
+          callbacks::incrementAndGet);
+
+      assertEquals(ComponentRecoveryAction.Result.REFUSED, result);
+      assertEquals(1, callbacks.get());
+    }
+  }
+
+  @Test
+  @Timeout(30)
+  void bootstrapCallbackSerializesConcurrentOwnerClose(@TempDir Path tempDir)
+      throws Exception {
+    ControlledWorkerHost host = new ControlledWorkerHost(healthyClient(), healthyClient());
+    host.holdClose();
+    Object rootOwner = new Object();
+    AtomicReference<Throwable> recoveryFailure = new AtomicReference<>();
+    AtomicReference<Throwable> closeFailure = new AtomicReference<>();
+    CountDownLatch closeAttempted = new CountDownLatch(1);
+    Thread recovery = null;
+    Thread concurrentClose = null;
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(
+        configFor(tempDir), null, host, false)) {
+      var bootstrap = fixture.bootstrap();
+      bootstrap.start();
+      recovery = Thread.ofVirtual().start(() -> {
         try {
-          result.set(bootstrap.recomposeForRecovery(admitted::get));
+          bootstrap.recomposeForRecovery(mock(ComponentRecoveryAction.Request.class),
+              (request, body) -> {
+                synchronized (rootOwner) {
+                  return body.run(() -> true)
+                      ? ComponentRecoveryAction.Result.REFUSED
+                      : ComponentRecoveryAction.Result.SUPERSEDED;
+                }
+              });
         } catch (Throwable failure) {
-          threadFailure.set(failure);
+          recoveryFailure.set(failure);
         }
-      }, "bootstrap-recompose-admission-test");
-      recomposer.start();
+      });
+      assertTrue(host.closeEntered().await(5, TimeUnit.SECONDS));
+      concurrentClose = Thread.ofVirtual().start(() -> {
+        try {
+          closeAttempted.countDown();
+          synchronized (rootOwner) {
+            host.close();
+          }
+        } catch (Throwable failure) {
+          closeFailure.set(failure);
+        }
+      });
 
-      assertTrue(
-          host.closeEntered().await(5, TimeUnit.SECONDS),
-          "recompose must reach the physical close before admission is revoked");
-      admitted.set(false);
+      assertTrue(closeAttempted.await(5, TimeUnit.SECONDS));
+      assertTrue(concurrentClose.isAlive(),
+          "a concurrent Root close must wait behind the admitted recovery owner");
       host.releaseClose();
-      joinAndAssertSucceeded(recomposer, threadFailure);
-
-      assertEquals(Boolean.FALSE, result.get(), "recompose must refuse the post-close open");
-      assertEquals(1, host.startCount(), "admission revocation must prevent a replacement open");
-      assertEquals(1, host.closeCount(), "the held close still executes exactly once");
-      assertFalse(bootstrap.hasClient(), "the closed physical owner must not be retained as bound");
+      recovery.join(5_000);
+      concurrentClose.join(5_000);
+      assertFalse(recovery.isAlive());
+      assertFalse(concurrentClose.isAlive(),
+          "Root close must proceed after Bootstrap releases the ordered recovery callback");
+      assertNull(recoveryFailure.get(), String.valueOf(recoveryFailure.get()));
+      assertNull(closeFailure.get(), String.valueOf(closeFailure.get()));
     } finally {
       host.releaseClose();
-      if (recomposer != null && recomposer.isAlive()) {
-        recomposer.join(TimeUnit.SECONDS.toMillis(5));
-        if (recomposer.isAlive()) {
-          fail("recompose thread did not terminate during bounded cleanup");
-        }
-      }
+      if (recovery != null) recovery.join(5_000);
+      if (concurrentClose != null) concurrentClose.join(5_000);
     }
   }
 
@@ -143,16 +172,6 @@ final class BootstrapRecomposeRecoveryTest {
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.isHealthy(any())).thenReturn(true);
     return client;
-  }
-
-  private static void joinAndAssertSucceeded(
-      Thread thread, AtomicReference<Throwable> threadFailure) throws Exception {
-    thread.join(TimeUnit.SECONDS.toMillis(5));
-    assertFalse(thread.isAlive(), "recompose thread did not terminate");
-    Throwable failure = threadFailure.get();
-    if (failure != null) {
-      throw new AssertionError("recompose thread failed", failure);
-    }
   }
 
   /** A deterministic in-process host whose close can hold the bootstrap's recompose lock. */

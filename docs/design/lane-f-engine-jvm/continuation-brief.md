@@ -6,7 +6,7 @@ Updated 2026-09-28 after Batch C. Start with the
 [stage D1](stages/D1.md) owns acceptance. Historical checkpoint logs are optional
 background, not a work queue. This brief adds no acceptance waiver.
 
-**Current queue:** use the [handoff current state](handoff.md#current-state-2026-09-28).
+**Current queue:** use the [handoff current state](handoff.md#current-state-2026-09-29).
 Batch C is pushed as commit `8fdc9da57c64238c810e5a9a3f0f377ede1e4d73`
 with tested source tree `e1aaefc5e133632d4c0a1bf1651996b139cbf21d`.
 [D1-14](stages/D1.md#d1-14--beside-or-in-place-the-device-line-the-floor-override-and-a-recomposed-on-refusal)

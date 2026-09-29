@@ -1099,10 +1099,78 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     if (candidateConfiguration == null || producerEncoderBindings == encoderBindings) {
       throw new IllegalStateException("No detached candidate producer is available");
     }
+    return prepareTextOnlyView(activeRuntime);
+  }
+
+  /** A lexical serving view over this exact live producer while its native models are replaced. */
+  public WorkerAppServices prepareTextOnlyEncoderRecoveryView(
+      io.justsearch.adapters.lucene.runtime.LuceneRuntime activeRuntime) {
+    if (candidateConfiguration != null || producerEncoderBindings != encoderBindings
+        || !producerOwnership.ownsProducer() || indexingLoop == null) {
+      throw new IllegalStateException("Encoder recovery requires the live active producer");
+    }
+    return prepareTextOnlyView(activeRuntime);
+  }
+
+  private WorkerAppServices prepareTextOnlyView(
+      io.justsearch.adapters.lucene.runtime.LuceneRuntime activeRuntime) {
     var lexicalSearch = WorkerSearchService.textOnlyCandidateView(
         java.util.Objects.requireNonNull(activeRuntime, "activeRuntime"));
     lexicalSearch.setActiveGenerationSupplier(ingestService.activeGenerationSupplier());
     return new TextOnlyCandidateView(this, lexicalSearch, healthService.textOnlyView());
+  }
+
+  /**
+   * Issued native views have drained; detach the producer from the retiring model owner without
+   * changing the already-published lexical view.
+   */
+  public void parkProducerModelsForEncoderRecovery() {
+    if (candidateConfiguration != null || producerEncoderBindings != encoderBindings
+        || !producerOwnership.ownsProducer() || indexingLoop == null) {
+      throw new IllegalStateException("Encoder recovery requires the live active producer");
+    }
+    producerOwnership.clearModelLease();
+    encoderBindings.publish(EncoderBindings.Snapshot.empty());
+    indexingLoop.getEmbeddingLifecycle().setEmbeddingProvider(null);
+    spladeIdfQueryEncoder = null;
+    searchReranker = null;
+    citationScorer = null;
+    searchService.setSpladeIdfQueryEncoder(null);
+    searchService.setSearchReranker(null);
+    searchService.setCitationScorer(null);
+    searchService.setClusterSnapshotSupplier(null);
+    healthService.setBgeM3Encoder(null);
+    clearNativeStatusDiagnostics();
+    wireStageEnabled(false, false, false);
+  }
+
+  /** Publishes one newly-owned complete model set after encoder recovery composition succeeds. */
+  public void wireRecoveredEncoders(EmbeddingProvider embedding,
+      EncoderBindings.Snapshot bindings, SpladeIdfQueryEncoder idf,
+      CrossEncoderReranker reranker, io.justsearch.reranker.CitationScorer citation,
+      GpuDiagnosticSuppliers diagnostics) {
+    if (candidateConfiguration != null || producerEncoderBindings != encoderBindings
+        || !producerOwnership.ownsProducer() || indexingLoop == null) {
+      throw new IllegalStateException("Encoder recovery requires the live active producer");
+    }
+    EncoderBindings.Snapshot exact = java.util.Objects.requireNonNull(bindings, "bindings");
+    encoderBindings.publish(exact);
+    indexingLoop.getEmbeddingLifecycle().setEmbeddingProvider(embedding);
+    embeddingProviderTarget.accept(embedding);
+    spladeIdfQueryEncoder = idf;
+    searchReranker = reranker;
+    citationScorer = citation;
+    searchService.setSpladeIdfQueryEncoder(idf);
+    searchService.setSearchReranker(reranker);
+    searchService.setCitationScorer(citation);
+    var disambiguation = exact.disambiguationService();
+    searchService.setClusterSnapshotSupplier(
+        disambiguation == null ? null : disambiguation::snapshot);
+    healthService.setBgeM3Encoder(exact.bgeM3Encoder());
+    clearNativeStatusDiagnostics();
+    wireGpuDiagnostics(java.util.Objects.requireNonNull(diagnostics, "diagnostics"));
+    wireStageEnabled(embedding != null, exact.spladeEncoder() != null,
+        exact.nerService() != null);
   }
 
   private record TextOnlyCandidateView(DefaultWorkerAppServices incumbent,
@@ -1151,6 +1219,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     if (candidateConfiguration == null || producerEncoderBindings == encoderBindings) {
       throw new IllegalStateException("No detached candidate producer is available");
     }
+    clearNativeStatusDiagnostics();
+  }
+
+  private void clearNativeStatusDiagnostics() {
     healthService.setEmbeddingProvider(null);
     healthService.setBgeM3Encoder(null);
     ingestService.setSpladeOrtCudaStatusSupplier(null);

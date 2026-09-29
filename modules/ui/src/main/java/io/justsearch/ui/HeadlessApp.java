@@ -5,6 +5,7 @@ import io.justsearch.app.services.HeadAssembly;
 import io.justsearch.app.config.ConfigManagerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
+import io.justsearch.app.services.worker.ComponentRecoveryBinding;
 import io.justsearch.app.util.AppInstanceLock;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.EnvRegistry;
@@ -579,7 +580,9 @@ public class HeadlessApp {
       java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> workerFuture,
       java.util.concurrent.CompletableFuture<KnowledgeServerBootstrap> constructedWorker,
       io.justsearch.core.component.ComponentHandle indexComponent,
-      io.justsearch.core.component.EngineComponentRegistry componentRegistry) {
+      io.justsearch.core.component.EngineComponentRegistry componentRegistry,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      Runnable componentEscalation) {
     KnowledgeServerStartResult ksStart = awaitInitialIndexStart(workerFuture, indexComponent);
     if (ksStart == null && workerFuture.isDone()) {
       // Completion may race the timed wait. Bind a completed owner immediately instead of
@@ -601,7 +604,7 @@ public class HeadlessApp {
     if (!initialStartPending && knowledgeServer != null && knowledgeServer.hasClient()) {
       connectAndBind(bootstrap, apiServer, knowledgeServer, knowledgeServerStartError);
       healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer,
-          componentRegistry, null);
+          componentRegistry, null, encoderComponent, componentEscalation);
       if (bootstrap.capabilities().worker().available()) {
         log.info("Knowledge Server connected â€” search and indexing now available");
       } else {
@@ -613,11 +616,12 @@ public class HeadlessApp {
     } else if (knowledgeServer != null) {
       // Tempdoc 825 (Option B): the bootstrap failed to start, but it is provably restartable
       // (KnowledgeServerBootstrapRestartabilityTest), so it is no longer discarded. The surfaces
-      // late-bind with null as before â€” there is no client to give them yet â€” and the SAME health
-      // monitor that polls a live worker takes the boot-recovery arm instead, re-attempting the
-      // bootstrap under a bounded budget and performing the handover if it comes up. Before this,
-      // this branch started no monitor at all: /api/health served 503 for the life of the process.
-      apiServer.lateBindKnowledgeServer(null, knowledgeServerStartError);
+      // A completed failed start is safe to expose to Status as a restartable owner. An unfinished
+      // start remains private to the monitor until its normal handover, because the sampler could
+      // otherwise publish READY before the Worker-backed controllers and routes are installed.
+      if (!initialStartPending) {
+        apiServer.bindPendingKnowledgeServerStatus(knowledgeServer, knowledgeServerStartError);
+      }
       // Deliberately NO transition here. The bootstrap that just failed is the producer of this
       // verdict and has already narrated it exactly once (startWithRetry's final catch), with the
       // code it actually knows to be true â€” worker.spawn.failed, either fatal index code
@@ -627,7 +631,8 @@ public class HeadlessApp {
       // logged, and /api/health served, the generic spawn failure for a deliberate refusal.
       // Re-stamping the generic code here would destroy that specific cause all over again.
       healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer,
-          componentRegistry, initialStartPending ? workerFuture : null);
+          componentRegistry, initialStartPending ? workerFuture : null,
+          encoderComponent, componentEscalation);
       if (initialStartPending) {
         log.warn("Index startup exceeded its wait while the API remains available; monitoring its"
             + " physical owner until it completes");
@@ -687,8 +692,13 @@ public class HeadlessApp {
       LocalApiServer apiServer,
       KnowledgeServerBootstrap knowledgeServer,
       String startError) {
-    bootstrap.connectKnowledgeServer(knowledgeServer);
+    bootstrap.prepareKnowledgeServerBinding(knowledgeServer);
     apiServer.lateBindKnowledgeServer(knowledgeServer, startError);
+    bootstrap.activateKnowledgeServerBinding();
+    requestReadinessReconciliation(bootstrap);
+  }
+
+  private static void requestReadinessReconciliation(HeadAssembly bootstrap) {
     // Client binding is structural and need not change any registry state. Sample only after both
     // composition seams see the new client, including a late boot-recovery handover.
     var readinessTrigger = bootstrap.substrate().health().readinessReconciliationTrigger();
@@ -703,10 +713,28 @@ public class HeadlessApp {
   private static KnowledgeServerHealthMonitor startHealthMonitor(
       HeadAssembly bootstrap, LocalApiServer apiServer, KnowledgeServerBootstrap knowledgeServer,
       io.justsearch.core.component.EngineComponentRegistry componentRegistry,
-      java.util.concurrent.CompletableFuture<?> initialStartup) {
+      java.util.concurrent.CompletableFuture<?> initialStartup,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      Runnable componentEscalation) {
     KnowledgeServerHealthMonitor monitor = new KnowledgeServerHealthMonitor(bootstrap.executors(), knowledgeServer);
+    try {
     monitor.componentRegistry(componentRegistry);
+    monitor.componentRecoveryBindings(Map.of(
+        "index", new ComponentRecoveryBinding(knowledgeServer.indexComponent(), request ->
+            knowledgeServer.recoverIndex(request, () -> {
+              bootstrap.prepareKnowledgeServerBinding(knowledgeServer);
+              apiServer.lateBindKnowledgeServer(knowledgeServer, null);
+            })),
+        "encoders", new ComponentRecoveryBinding(encoderComponent, knowledgeServer::recoverEncoders),
+        "generative", new ComponentRecoveryBinding(bootstrap.generativeComponent(),
+            bootstrap.generativeRecoveryAction()),
+        "api", new ComponentRecoveryBinding(apiServer.apiComponent(), null)),
+        failed -> componentEscalation.run());
     monitor.onRecoveryConnected(recovered -> connectAndBind(bootstrap, apiServer, recovered, null));
+    monitor.onRecoveryPublished(recovered -> {
+      bootstrap.activateKnowledgeServerBinding();
+      requestReadinessReconciliation(bootstrap);
+    });
     if (initialStartup != null) monitor.observeInitialStartup(initialStartup);
     var health = bootstrap.substrate().health();
     monitor.onRecoveryOccurrence(occurrence ->
@@ -729,7 +757,6 @@ public class HeadlessApp {
         monitor.tickIntervalSupplier(apiServer::statusSamplingPeriodMs);
       }
     }
-    try {
       monitor.start();
       apiServer.bindWorkerRecovery(monitor);
       apiServer.bindComponentRecovery(monitor);
@@ -1049,6 +1076,7 @@ public class HeadlessApp {
     io.justsearch.app.engine.DefaultEngineProcessResources processResources = null;
     java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> pendingIndexStartup = null;
     boolean fatalStartup = false;
+    boolean orderedShutdownComplete = false;
     Telemetry telemetry = null;
     KnowledgeServerHealthMonitor healthMonitor = null;
     HeadAssembly bootstrap = null;
@@ -1136,6 +1164,13 @@ public class HeadlessApp {
 
       final var restartManifestPublisher = manifestPublisher;
       Runnable requestedRestartAction = localRestartAction(
+          terminalWriterShutdown,
+          reason -> {
+            restartManifestPublisher.markShutdownPending(reason.wire());
+            return null;
+          },
+          code -> Runtime.getRuntime().halt(code));
+      Runnable componentEscalation = componentEscalationAction(
           terminalWriterShutdown,
           reason -> {
             restartManifestPublisher.markShutdownPending(reason.wire());
@@ -1301,7 +1336,7 @@ public class HeadlessApp {
       // Phase 3: Wait for Worker and connect
       WorkerConnectionResult workerResult = connectWorker(
           apiPhase, workerFuture, constructedWorker, engineRoot.indexComponent(),
-          engineRoot.components());
+          engineRoot.components(), engineRoot.encoderComponent(), componentEscalation);
       knowledgeServer = workerResult.knowledgeServer();
       healthMonitor = workerResult.healthMonitor();
 
@@ -1403,6 +1438,9 @@ public class HeadlessApp {
       lifecycleShutdownBridge.install(shutdownCoordinator::shutdownAndExit);
 
       latch.await();
+      // The sole latch release happens after the memoized ordered sequence returns. Its owners may
+      // include the process component registry, so the fatal-start fallback must not re-enter them.
+      orderedShutdownComplete = true;
       log.info("HeadlessApp stopped.");
 
     } catch (Exception e) {
@@ -1414,101 +1452,101 @@ public class HeadlessApp {
       e.printStackTrace(System.err);
       fatalStartup = true;
     } finally {
-      boolean workCleanupComplete = processRoot == null;
-      if (processRoot != null) {
+      if (!orderedShutdownComplete) {
+        boolean workCleanupComplete = processRoot == null;
+        if (processRoot != null) {
+          try {
+            processRoot.admission().beginClosing();
+            processRoot.operationAttempts().beginClosing();
+            processRoot.admission().cancelInteractive("shutdown");
+            processRoot.quiesceProducers();
+            boolean admitted = processRoot.admission().awaitDrained(java.time.Duration.ofSeconds(5));
+            boolean bodies = processRoot.operationAttempts().awaitDrained(java.time.Duration.ofSeconds(5));
+            workCleanupComplete = admitted && bodies;
+          } catch (RuntimeException failure) {
+            log.warn("Live work drain incomplete; retaining its dependencies", failure);
+          }
+        }
         try {
-          processRoot.admission().beginClosing();
-          processRoot.operationAttempts().beginClosing();
-          processRoot.admission().cancelInteractive("shutdown");
-          processRoot.quiesceProducers();
-          boolean admitted = processRoot.admission().awaitDrained(java.time.Duration.ofSeconds(5));
-          boolean bodies = processRoot.operationAttempts().awaitDrained(java.time.Duration.ofSeconds(5));
-          workCleanupComplete = admitted && bodies;
-        } catch (RuntimeException failure) {
-          log.warn("Live work drain incomplete; retaining its dependencies", failure);
+          stopRecoveryAndApi(healthMonitor, apiServer);
+        } catch (Exception failure) {
+          log.warn("Recovery/API cleanup failed", failure);
         }
-      }
-      try {
-        stopRecoveryAndApi(healthMonitor, apiServer);
-      } catch (Exception failure) {
-        log.warn("Recovery/API cleanup failed", failure);
-      }
-      boolean headCleanupComplete = workCleanupComplete && bootstrap == null;
-      try {
-        if (workCleanupComplete) {
-          if (bootstrap != null) bootstrap.close();
-          headCleanupComplete = true;
+        boolean headCleanupComplete = workCleanupComplete && bootstrap == null;
+        try {
+          if (workCleanupComplete) {
+            if (bootstrap != null) bootstrap.close();
+            headCleanupComplete = true;
+          }
+        } catch (Exception failure) {
+          log.warn("Head cleanup incomplete; retaining index and operation dependencies", failure);
         }
-      } catch (Exception failure) {
-        log.warn("Head cleanup incomplete; retaining index and operation dependencies", failure);
-      }
-      boolean indexCleanupComplete = false;
-      try {
-        if (!headCleanupComplete) {
-          log.warn("Index cleanup waits for Head procedure termination");
-        } else if (knowledgeServer != null) {
-          indexCleanupComplete = knowledgeServer.closeForUpgrade() == io.justsearch.app.services.worker.ShutdownOutcome.GRACEFUL;
-        } else if (processRoot != null) {
-          // Never let an unfinished startup acquire a database after its close. If it cannot
-          // quiesce in five seconds, retain the store until the fatal process exit.
-          if (awaitIndexStartupForCleanup(pendingIndexStartup, java.time.Duration.ofSeconds(5))) {
-            processRoot.close();
+        boolean indexCleanupComplete = false;
+        try {
+          if (!headCleanupComplete) {
+            log.warn("Index cleanup waits for Head procedure termination");
+          } else if (knowledgeServer != null) {
+            indexCleanupComplete = knowledgeServer.closeForUpgrade() == io.justsearch.app.services.worker.ShutdownOutcome.GRACEFUL;
+          } else if (processRoot != null) {
+            // Never let an unfinished startup acquire a database after its close. If it cannot
+            // quiesce in five seconds, retain the store until the fatal process exit.
+            if (awaitIndexStartupForCleanup(pendingIndexStartup, java.time.Duration.ofSeconds(5))) {
+              processRoot.close();
+              indexCleanupComplete = true;
+            }
+          } else {
             indexCleanupComplete = true;
           }
-        } else {
-          indexCleanupComplete = true;
+        } catch (Exception ignored) {
+          // best effort
         }
-      } catch (Exception ignored) {
-        // best effort
-      }
-      boolean operationsCleanupComplete = operations == null;
-      try {
-        if (operations != null && workCleanupComplete && headCleanupComplete && indexCleanupComplete) {
-          operations.close();
-          operationsCleanupComplete = true;
-        }
-      } catch (java.io.IOException closeFailure) {
-        log.warn("Failed to close operations store during cleanup", closeFailure);
-      }
-      try {
-        if (telemetry != null && headCleanupComplete) {
-          telemetry.close();
-        }
-      } catch (Exception ignored) {
-        // best effort
-      }
-      boolean processResourcesCleanupComplete = processResources == null;
-      if (processResources != null && workCleanupComplete && headCleanupComplete
-          && indexCleanupComplete && operationsCleanupComplete) {
+        boolean operationsCleanupComplete = operations == null;
         try {
-          processResources.close();
-          processResourcesCleanupComplete = true;
-        } catch (RuntimeException failure) {
-          log.warn("Process resources cleanup incomplete; retaining instance lock", failure);
+          if (operations != null && workCleanupComplete && headCleanupComplete && indexCleanupComplete) {
+            operations.close();
+            operationsCleanupComplete = true;
+          }
+        } catch (java.io.IOException closeFailure) {
+          log.warn("Failed to close operations store during cleanup", closeFailure);
+        }
+        try {
+          if (telemetry != null && headCleanupComplete) {
+            telemetry.close();
+          }
+        } catch (Exception ignored) {
+          // best effort
+        }
+        boolean processResourcesCleanupComplete = processResources == null;
+        if (processResources != null && workCleanupComplete && headCleanupComplete
+            && indexCleanupComplete && operationsCleanupComplete) {
+          try {
+            processResources.close();
+            processResourcesCleanupComplete = true;
+          } catch (RuntimeException failure) {
+            log.warn("Process resources cleanup incomplete; retaining instance lock", failure);
+          }
+        }
+        // Tempdoc 501 Phase 1: the ordered sequence owns normal manifest cleanup. This fallback
+        // closes it only when startup or another error prevents that sequence from completing.
+        try {
+          if (manifestPublisher != null) {
+            manifestPublisher.close();
+          }
+        } catch (Exception e) {
+          log.debug("Manifest publisher close failed in finally (non-fatal)", e);
+        }
+        // Tempdoc 501 Phase 3: release the app instance lock if we acquired it. Idempotent
+        // (AppInstanceLock.close() returns silently if already closed).
+        try {
+          if (workCleanupComplete && headCleanupComplete && indexCleanupComplete
+              && operationsCleanupComplete && processResourcesCleanupComplete
+              && appInstanceLock != null) appInstanceLock.close();
+        } catch (Exception e) {
+          log.debug("AppInstanceLock close failed in finally (non-fatal)", e);
         }
       }
-      // Tempdoc 501 Phase 1: idempotent manifest cleanup. The shutdown hook above already
-      // closed the publisher under SIGTERM/clean-exit; this finally block covers the path
-      // where main returns from `latch.await()` after the hook fired. Calling close() twice
-      // is safe.
-      try {
-        if (manifestPublisher != null) {
-          manifestPublisher.close();
-        }
-      } catch (Exception e) {
-        log.debug("Manifest publisher close failed in finally (non-fatal)", e);
-      }
-      // Tempdoc 501 Phase 3: release the app instance lock if we acquired it. Idempotent
-      // (AppInstanceLock.close() returns silently if already closed).
-      try {
-        if (workCleanupComplete && headCleanupComplete && indexCleanupComplete
-            && operationsCleanupComplete && processResourcesCleanupComplete
-            && appInstanceLock != null) appInstanceLock.close();
-      } catch (Exception e) {
-        log.debug("AppInstanceLock close failed in finally (non-fatal)", e);
-      }
-      // Tempdoc 501 Phase 18: api-port.txt is gone, the manifest publisher's
-      // close() (above) handles its own file cleanup.
+      // Tempdoc 501 Phase 18: api-port.txt is gone; the ordered sequence or fallback manifest
+      // close above owns the remaining file cleanup.
     }
     if (fatalStartup) {
       int fatalCode = io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT;
@@ -1802,7 +1840,7 @@ public class HeadlessApp {
       // DEGRADED and started no health monitor, so nothing recovered for the life of the process.
       // Expose the pending owner only after its startup lock is held. A timed-out API wait can
       // then safely hand this owner to ordered shutdown, even before its physical open begins.
-      bootstrap.startWithRetry(onConstructed);
+      bootstrap.startInitial(onConstructed);
       log.info("Knowledge Server physical connection established; component readiness: {}",
           bootstrap.indexComponent().snapshot().state());
       return new KnowledgeServerStartResult(bootstrap, null);
@@ -1814,7 +1852,12 @@ public class HeadlessApp {
       log.error("Fix: Close the other instance, or launch with a different data dir via -Djustsearch.data.dir=<path>.");
       throw new RuntimeException(e);
     } catch (Exception e) {
-      if (bootstrap == null) onConstructed.accept(null);
+      if (bootstrap == null) {
+        onConstructed.accept(null);
+        // Without a physical owner there is no local recovery action or monitor to supervise.
+        // Propagate into ordered startup cleanup and the supervisor's fatal-start classification.
+        throw new IllegalStateException("Index bootstrap could not be constructed", e);
+      }
       // Elevated to ERROR - this is a critical failure that affects core functionality
       log.error("=== KNOWLEDGE SERVER FAILED TO START ===");
       log.error("Indexing and search features will be UNAVAILABLE.");
@@ -1850,6 +1893,33 @@ public class HeadlessApp {
       io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
       java.util.function.IntConsumer fatalHalt,
       java.util.function.Consumer<Runnable> launch) {
+    return dispatchRestartAction(shutdown, publishPending, fatalHalt, launch, false);
+  }
+
+  static Runnable componentEscalationAction(
+      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
+      io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
+      java.util.function.IntConsumer fatalHalt) {
+    return componentEscalationAction(shutdown, publishPending, fatalHalt, action -> {
+      Thread restartThread = new Thread(action, "engine-component-escalation");
+      restartThread.setDaemon(false);
+      restartThread.start();
+    });
+  }
+
+  static Runnable componentEscalationAction(
+      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
+      io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
+      java.util.function.IntConsumer fatalHalt,
+      java.util.function.Consumer<Runnable> launch) {
+    return dispatchRestartAction(shutdown, publishPending, fatalHalt, launch, true);
+  }
+
+  private static Runnable dispatchRestartAction(
+      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
+      io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
+      java.util.function.IntConsumer fatalHalt,
+      java.util.function.Consumer<Runnable> launch, boolean escalated) {
     var scheduled = new java.util.concurrent.atomic.AtomicBoolean();
     return () -> {
       if (!scheduled.compareAndSet(false, true)) return;
@@ -1860,7 +1930,7 @@ public class HeadlessApp {
           sequence = shutdown.join();
         } catch (java.util.concurrent.CompletionException bootFailure) {
           // Startup already owns its fatal cleanup; never introduce a competing exit.
-          log.debug("Migration restart binding failed with Engine startup", bootFailure);
+          log.debug("Local restart binding failed with Engine startup", bootFailure);
           return;
         }
         try {
@@ -1868,14 +1938,15 @@ public class HeadlessApp {
         } catch (Exception publicationFailure) {
           // Blocking teardown without a published handoff would have no host deadline. A fatal
           // process stop preserves the durable queue for the successor and charges crash recovery.
-          log.error("Cannot publish migration shutdown handoff; terminating Engine", publicationFailure);
+          log.error("Cannot publish local restart handoff; terminating Engine", publicationFailure);
           fatalHalt.accept(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
           return;
         }
-        sequence.runAndExit(io.justsearch.app.engine.ShutdownRequest.Reason.RESTART);
+        if (escalated) sequence.runAndExitEscalated();
+        else sequence.runAndExit(io.justsearch.app.engine.ShutdownRequest.Reason.RESTART);
         });
       } catch (RuntimeException | Error dispatchFailure) {
-        log.error("Cannot dispatch migration restart; terminating Engine", dispatchFailure);
+        log.error("Cannot dispatch local restart; terminating Engine", dispatchFailure);
         fatalHalt.accept(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
       }
     };

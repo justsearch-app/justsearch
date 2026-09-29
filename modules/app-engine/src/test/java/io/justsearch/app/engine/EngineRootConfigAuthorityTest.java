@@ -8,6 +8,7 @@ import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.services.bootstrap.OperationAuthority;
+import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
@@ -17,12 +18,66 @@ import io.justsearch.indexerworker.queue.SqlitePathResolutionStore;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.indexerworker.server.RecordedIngestionLifecycle;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 final class EngineRootConfigAuthorityTest {
   @TempDir Path directory;
+
+  @Test
+  void constructorFailureRetainsExactConfigurationAndNullBootQueryInput() throws Exception {
+    var configA = store(90).get();
+    var configB = store(directory.resolve("desired-b"), 5).get();
+    var desired = new AtomicReference<>(configA);
+    var constructedWith = new ArrayList<io.justsearch.configuration.resolved.ResolvedConfig>();
+    EngineRoot.ServerFactory factory = new EngineRoot.ServerFactory() {
+      @Override public io.justsearch.configuration.resolved.ResolvedConfig captureConfiguration() {
+        return desired.get();
+      }
+
+      @Override public KnowledgeServer create(GpuSchedulingGauge gauge,
+          io.justsearch.core.execution.EngineExecutorRegistry executors,
+          RecordedIngestionLifecycle ingestion,
+          io.justsearch.core.component.ComponentHandle indexComponent,
+          io.justsearch.core.component.ComponentHandle encoderComponent) {
+        throw new AssertionError("exact-configuration overload required");
+      }
+
+      @Override public KnowledgeServer create(GpuSchedulingGauge gauge,
+          io.justsearch.core.execution.EngineExecutorRegistry executors,
+          RecordedIngestionLifecycle ingestion,
+          io.justsearch.core.component.ComponentHandle indexComponent,
+          io.justsearch.core.component.ComponentHandle encoderComponent,
+          io.justsearch.configuration.resolved.ResolvedConfig exactConfiguration) {
+        constructedWith.add(exactConfiguration);
+        throw new IllegalStateException("constructor refused");
+      }
+    };
+    var root = new EngineRoot(mock(OperationStore.class), mock(OperationAttemptRunner.class),
+        factory, 1_000, 100);
+    try {
+      assertThrows(IllegalStateException.class,
+          () -> root.start(new GpuSchedulingGauge(), IpcTelemetry.noop()));
+      desired.set(configB);
+      assertThrows(IllegalStateException.class,
+          () -> root.start(new GpuSchedulingGauge(), IpcTelemetry.noop()));
+
+      assertEquals(java.util.List.of(configA, configA), constructedWith,
+          "a constructor failure retains the pre-construction A snapshot");
+      var retained = EngineRoot.class.getDeclaredField("retainedIndexStartContext");
+      retained.setAccessible(true);
+      var context = (KnowledgeServer.IndexStartContext) retained.get(root);
+      assertSame(configA, context.configuration());
+      assertNull(context.bootQuerySelection(), "a captured null input remains unresolved input");
+      assertNull(context.queryObservation(), "constructor failure has no fabricated outcome");
+    } finally {
+      root.close();
+      root.processResources().close();
+    }
+  }
 
   @Test
   void explicitProcessCompositionRetainsStoreAcrossGlobalReplacement() throws Exception {

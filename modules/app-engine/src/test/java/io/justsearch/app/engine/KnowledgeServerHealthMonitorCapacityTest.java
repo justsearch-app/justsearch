@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +12,11 @@ import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
 import io.justsearch.app.services.worker.WorkerRecoveryAuthority.Verdict;
+import io.justsearch.app.services.worker.ComponentRecoveryBinding;
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.core.component.ComponentRecoveryAction;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.core.context.RetainedStateBudget;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.core.execution.EngineExecutorSpec;
@@ -20,6 +24,8 @@ import io.justsearch.core.execution.EngineExecutorSpec.Kind;
 import io.justsearch.core.execution.EngineExecutorSpec.Mode;
 import java.time.Duration;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
@@ -28,10 +34,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.AfterEach;
 
 /** Real global timer capacity, including competition while a health callback is running. */
 @Timeout(15)
 final class KnowledgeServerHealthMonitorCapacityTest {
+  private final List<TestEngineComponents> componentFixtures = new ArrayList<>();
+
   @Test
   void competingTimerDuringHealthCheckCannotPermanentlyStopPolling() throws Exception {
     var entered = new CountDownLatch(1);
@@ -40,6 +49,7 @@ final class KnowledgeServerHealthMonitorCapacityTest {
     var ticks = new AtomicInteger();
     try (var registry = registry();
         var monitor = new KnowledgeServerHealthMonitor(registry, bootstrap(true), 20)) {
+      bindReadyComponents(monitor);
       var other = otherScheduler(registry);
       monitor.onTick(() -> {
         if (ticks.incrementAndGet() == 1) {
@@ -79,6 +89,7 @@ final class KnowledgeServerHealthMonitorCapacityTest {
     var delay = new java.util.concurrent.atomic.AtomicLong(1_000);
     try (var registry = registry();
         var monitor = new KnowledgeServerHealthMonitor(registry, bootstrap(true), 3_000)) {
+      bindReadyComponents(monitor);
       monitor.tickIntervalSupplier(delay::get);
       monitor.onTick(() -> {
         switch (ticks.incrementAndGet()) {
@@ -111,6 +122,7 @@ final class KnowledgeServerHealthMonitorCapacityTest {
     logger.addAppender(appender);
     try (var registry = registry();
         var monitor = new KnowledgeServerHealthMonitor(registry, bootstrap(true), 20)) {
+      bindReadyComponents(monitor);
       var held = otherScheduler(registry).schedule(() -> {}, 1, TimeUnit.DAYS);
       var ticked = new CountDownLatch(1);
       monitor.onTick(ticked::countDown);
@@ -154,6 +166,7 @@ final class KnowledgeServerHealthMonitorCapacityTest {
     logger.addAppender(appender);
     try (var registry = registry();
         var monitor = new KnowledgeServerHealthMonitor(registry, bootstrap(true), 20)) {
+      bindReadyComponents(monitor);
       var held = otherScheduler(registry).schedule(() -> {}, 1, TimeUnit.DAYS);
       var starting = new FutureTask<Void>(() -> { monitor.start(); return null; });
       Thread caller = Thread.ofVirtual().start(starting);
@@ -185,6 +198,7 @@ final class KnowledgeServerHealthMonitorCapacityTest {
   void exhaustedStartupIsVisibleBoundedAndCanBeRetried() throws Exception {
     try (var registry = registry();
         var monitor = new KnowledgeServerHealthMonitor(registry, bootstrap(true), 20)) {
+      bindReadyComponents(monitor);
       var held = otherScheduler(registry).schedule(() -> {}, 1, TimeUnit.DAYS);
       long before = System.nanoTime();
       var refusal = assertThrows(EngineExecutorRejectedException.class, monitor::start);
@@ -202,9 +216,12 @@ final class KnowledgeServerHealthMonitorCapacityTest {
   void manualCapacityRefusalKeepsRetryAfterAndReleasesAttemptSlot() throws Exception {
     var bootstrap = bootstrap(false);
     var attempted = new CountDownLatch(1);
-    doAnswer(invocation -> { attempted.countDown(); return null; }).when(bootstrap).startForRecovery();
     try (var registry = registry();
         var monitor = new KnowledgeServerHealthMonitor(registry, bootstrap, 10_000)) {
+      bindFailedIndex(monitor, request -> {
+        attempted.countDown();
+        return ComponentRecoveryAction.Result.REFUSED;
+      });
       // Physical recovery now has its own worker. Saturate that concrete queue, not the timer
       // whose continued availability is required while recovery is blocked.
       var field = KnowledgeServerHealthMonitor.class.getDeclaredField("recoveryExecutor");
@@ -217,7 +234,7 @@ final class KnowledgeServerHealthMonitorCapacityTest {
         if (!release.await(5, TimeUnit.SECONDS)) throw new AssertionError("test did not release recovery queue");
         return null;
       });
-      var queued = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+      var queued = new ArrayList<java.util.concurrent.Future<?>>();
       try {
         assertTrue(entered.await(2, TimeUnit.SECONDS));
         for (int i = 0; i < registry.limits(Kind.BACKGROUND).maxQueue(); i++) {
@@ -242,6 +259,7 @@ final class KnowledgeServerHealthMonitorCapacityTest {
   void closedExecutorDoesNotClaimRecoveryOrSuccessfulStartup() {
     try (var registry = registry();
         var monitor = new KnowledgeServerHealthMonitor(registry, bootstrap(false), 20)) {
+      bindReadyComponents(monitor);
       registry.close();
       assertEquals(EngineExecutorRejectedException.Reason.CLOSED,
           assertThrows(EngineExecutorRejectedException.class, monitor::start).reason());
@@ -249,13 +267,45 @@ final class KnowledgeServerHealthMonitorCapacityTest {
     }
   }
 
+  @AfterEach
+  void closeComponentFixtures() {
+    componentFixtures.forEach(TestEngineComponents::close);
+  }
+
+  private void bindReadyComponents(KnowledgeServerHealthMonitor monitor) {
+    bind(monitor, null, false);
+  }
+
+  private void bindFailedIndex(
+      KnowledgeServerHealthMonitor monitor, ComponentRecoveryAction action) {
+    bind(monitor, action, true);
+  }
+
+  private void bind(
+      KnowledgeServerHealthMonitor monitor, ComponentRecoveryAction indexAction, boolean failed) {
+    var components = TestEngineComponents.fourComponents();
+    componentFixtures.add(components);
+    for (var row : components.snapshot().components()) {
+      components.handle(row.spec().name()).transition(ComponentState.READY, null, "test ready");
+    }
+    if (failed) {
+      components.handle("index").transition(ComponentState.FAILED,
+          LifecycleReasonCode.WORKER_SPAWN_FAILED.code(), "test recovery target");
+    }
+    monitor.componentRegistry(components);
+    var bindings = new java.util.LinkedHashMap<String, ComponentRecoveryBinding>();
+    for (var row : components.snapshot().components()) {
+      bindings.put(row.spec().name(), new ComponentRecoveryBinding(
+          components.handle(row.spec().name()),
+          "index".equals(row.spec().name()) ? indexAction : null));
+    }
+    monitor.componentRecoveryBindings(bindings, ignored -> {});
+  }
+
   private static KnowledgeServerBootstrap bootstrap(boolean hasClient) {
     var bootstrap = mock(KnowledgeServerBootstrap.class);
     when(bootstrap.hasClient()).thenReturn(hasClient);
-    var components = io.justsearch.core.component.TestEngineComponents.fourComponents();
-    when(bootstrap.indexComponent()).thenReturn(components.handle("index"));
-    when(bootstrap.workerCapability()).thenReturn(
-        new io.justsearch.app.services.lifecycle.RegistryBackedCapability(components, "index", "worker"));
+    when(bootstrap.tryCheckHealth()).thenReturn(java.util.Optional.of(hasClient));
     return bootstrap;
   }
 

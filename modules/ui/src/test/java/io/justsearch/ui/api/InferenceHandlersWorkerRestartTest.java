@@ -29,11 +29,11 @@ import org.mockito.ArgumentCaptor;
  * hatch was dead in exactly the state they would reach for it.
  *
  * <p>These cases pin the ROUTING, not the recovery: the authority is a stub, because the budget and
- * the vetoes are the monitor's law and are pinned by {@code BootRecoveryDecisionTest} /
- * {@code KnowledgeServerBootRecoveryTest}. What must not regress here is that the endpoint consults
- * the one authority instead of growing a second restart path.
+ * verdicts are the generic component monitor's law and are pinned by its focused tests. What must
+ * not regress here is that the endpoint consults the one authority instead of growing a second
+ * restart path.
  */
-@DisplayName("POST /api/worker/restart routes through the boot-recovery authority")
+@DisplayName("POST /api/worker/restart routes through the component recovery authority")
 final class InferenceHandlersWorkerRestartTest {
 
   private static InferenceHandlers handlersWithNoWorker() {
