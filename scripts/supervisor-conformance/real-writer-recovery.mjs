@@ -485,7 +485,7 @@ async function exerciseIndexLockRecovery(c) {
         return status.readiness?.engineComponents?.api?.state === 'READY'
           && index?.state === 'FAILED'
           && index.recoveryAttempts === 0
-          && index.reasonCode === 'component.start_timeout'
+          && index.reasonCode === 'component.start_deadline'
           && waitedResource.includes('index root lock at')
           && statusStateSinceObserved && markerDeadlineElapsed ? status : null;
       } catch (error) {
@@ -500,7 +500,7 @@ async function exerciseIndexLockRecovery(c) {
   }
   fs.writeFileSync(path.join(work, 'index-start-deadline-proved'),
     JSON.stringify({ initial, status: deadlineStatus, observedAt: new Date().toISOString() }));
-  console.log('INDEX_START_TIMEOUT', JSON.stringify({ initial, status: deadlineStatus }));
+  console.log('INDEX_START_DEADLINE', JSON.stringify({ initial, status: deadlineStatus }));
   await waitFor('initial barrier release after deadline proof', 30000,
     () => fs.existsSync(path.join(runtime, 'index-start-initial-release')));
   const recovery = await waitFor('index-start recovery-1 barrier', 120000,

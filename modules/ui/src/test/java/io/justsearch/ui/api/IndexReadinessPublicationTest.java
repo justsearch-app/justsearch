@@ -100,7 +100,7 @@ final class IndexReadinessPublicationTest {
           fixture.components.handle("index").snapshot().state());
       var result = fixture.components.handle("index").snapshot();
       assertEquals("contact".equals(missing) || "freshness".equals(missing)
-          ? "worker.lost" : "worker.unavailable", result.reasonCode());
+          ? "index.failed" : "index.unavailable", result.reasonCode());
       String expectedEvidence = switch (missing) {
         case "api" -> "apiReady=false";
         case "contact" -> "contact lost";
@@ -131,7 +131,7 @@ final class IndexReadinessPublicationTest {
   void cachedHealthySampleCannotPromoteANewPhysicalStart() {
     try (var fixture = fixture()) {
       fixture.handler.sampleAndBuildStatusSnapshot();
-      fixture.components.handle("index").transition(ComponentState.STARTING, "worker.starting", null);
+      fixture.components.handle("index").transition(ComponentState.STARTING, "index.starting", null);
       fixture.handler.buildStatusSnapshot();
       assertEquals(ComponentState.STARTING, fixture.components.handle("index").snapshot().state());
       verify(fixture.client, times(1)).getWorkerOperationalView(any());
@@ -174,7 +174,7 @@ final class IndexReadinessPublicationTest {
   @EnumSource(value = ComponentState.class, names = {"FAILED", "UNAVAILABLE"})
   void freshHealthyObservationCanRecoverRetainedClient(ComponentState state) {
     try (var fixture = fixture()) {
-      fixture.components.handle("index").transition(state, "worker.lost", null);
+      fixture.components.handle("index").transition(state, "index.failed", null);
       fixture.handler.sampleAndBuildStatusSnapshot();
       assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
     }
@@ -185,7 +185,7 @@ final class IndexReadinessPublicationTest {
     try (var components = TestEngineComponents.fourComponents()) {
       components.handle("api").transition(ComponentState.READY, null, null);
       components.handle("index").transition(
-          ComponentState.FAILED, "worker.spawn.failed", "initial open refused");
+          ComponentState.FAILED, "index.failed", "initial open refused");
       var capability = new RegistryBackedCapability(components, "index", "worker");
       var client = mock(KnowledgeClient.class);
       when(client.getWorkerOperationalView(any())).thenReturn(view(true));
@@ -348,7 +348,7 @@ final class IndexReadinessPublicationTest {
   private Fixture fixture() {
     var components = TestEngineComponents.fourComponents();
     components.handle("api").transition(ComponentState.READY, null, null);
-    components.handle("index").transition(ComponentState.STARTING, "worker.starting", null);
+    components.handle("index").transition(ComponentState.STARTING, "index.starting", null);
     var capability = new RegistryBackedCapability(components, "index", "worker");
     var client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(any())).thenReturn(view(true));

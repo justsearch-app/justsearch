@@ -25,7 +25,7 @@ test('stageAndVerify retries transport/readiness failures with one key and still
       if (ingestCalls === 1) throw new TypeError('socket reset after request write');
       if (ingestCalls === 2) {
         return json({ error: 'Worker capability unavailable', unavailable: 'worker',
-          health: 'PENDING', reason: 'worker.starting' }, 503);
+          health: 'PENDING', reason: 'index.starting' }, 503);
       }
       return json({ success: true, message: 'accepted', structuredData: {
         operationKey: body.idempotencyKey, operationRecordId: 27,

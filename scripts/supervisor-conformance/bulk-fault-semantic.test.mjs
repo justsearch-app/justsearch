@@ -6,12 +6,21 @@ test('availability before reload does not certify recovery', () => {
   const summary = summarizeSemanticAvailability([
     { at: 1, outcome: 'available' },
     { at: 10, outcome: 'reloading' },
-    { at: 20, outcome: 'worker-starting' },
+    { at: 20, outcome: 'index-starting' },
   ], 0, 30, []);
   assert.equal(summary.available, 1);
   assert.equal(summary.reloadingRefusals, 1);
   assert.equal(summary.recoveredAfterRefusal, false);
   assert.equal(summary.refusalWindowMs, 20);
+});
+
+test('index-starting samples contribute to the API outage window', () => {
+  const summary = summarizeSemanticAvailability([
+    { at: 10, outcome: 'index-starting' },
+    { at: 20, outcome: 'index-starting' },
+  ], 0, 30, []);
+  assert.equal(summary.apiOutageSamples, 2);
+  assert.equal(summary.apiOutageWindowMs, 10);
 });
 
 test('only a matching vector response after the last refusal certifies recovery', () => {
@@ -29,7 +38,7 @@ test('only a matching vector response after the last refusal certifies recovery'
 
 const inPlaceRun = () => [
   { at: 0, outcome: 'available', hybrid: 'available', encoders: 'READY' },
-  { at: 10, outcome: 'worker-starting', hybrid: 'worker-starting', encoders: null },
+  { at: 10, outcome: 'index-starting', hybrid: 'index-starting', encoders: null },
   { at: 20, outcome: 'transport', hybrid: 'transport', encoders: null },
   { at: 30, outcome: 'available', hybrid: 'available', encoders: 'READY' },
   { at: 40, outcome: 'reloading', hybrid: 'available', encoders: 'RELOADING' },

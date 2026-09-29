@@ -265,7 +265,7 @@ final class HeadlessAppShutdownWiringTest {
       when(knowledge.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
       components.handle("index").transition(
           io.justsearch.core.component.ComponentState.FAILED,
-          io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_FAILED.code(),
           "test recovery target");
       io.justsearch.core.component.ComponentRecoveryAction recovery = request -> {
         assertTrue(request.begin());

@@ -104,7 +104,7 @@ export async function exerciseMigrationRestart(c) {
   } finally {
     const sampled = await availability.stop();
     console.log('MIGRATION_LIVE_API_AVAILABILITY', JSON.stringify(sampled));
-    requireThat(sampled.samples >= 10 && sampled.workerStarting === 0
+    requireThat(sampled.samples >= 10 && sampled.indexStarting === 0
       && sampled.transport === 0 && sampled.apiOutageWindowMs === 0,
     `live migration had an API outage: ${JSON.stringify(sampled)}`);
   }
@@ -195,7 +195,7 @@ function sampleLiveApiAvailability({ apiPort, post }) {
           query: 'migrationretainedmarker', limit: 5, mode: 'text',
         }, 10000);
         observations.push({ at, outcome: reply.status === 503
-          && reply.text.includes('"reason":"worker.starting"') ? 'worker-starting'
+          && reply.text.includes('"reason":"index.starting"') ? 'index-starting'
           : `http-${reply.status}` });
       } catch {
         observations.push({ at, outcome: 'transport' });
@@ -206,14 +206,14 @@ function sampleLiveApiAvailability({ apiPort, post }) {
   return { async stop() {
     running = false;
     await task;
-    const outages = observations.filter(item => item.outcome === 'worker-starting'
+    const outages = observations.filter(item => item.outcome === 'index-starting'
       || item.outcome === 'transport');
     return { samples: observations.length,
-      workerStarting: outages.filter(item => item.outcome === 'worker-starting').length,
+      indexStarting: outages.filter(item => item.outcome === 'index-starting').length,
       transport: outages.filter(item => item.outcome === 'transport').length,
       apiOutageWindowMs: outages.length === 0 ? 0
         : Math.round(outages.at(-1).at - outages[0].at),
       unexpected: observations.filter(item => item.outcome !== 'http-200'
-        && item.outcome !== 'worker-starting' && item.outcome !== 'transport').length };
+        && item.outcome !== 'index-starting' && item.outcome !== 'transport').length };
   } };
 }

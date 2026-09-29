@@ -640,7 +640,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       return indexComponent.transitionIfUnchanged(before, ComponentState.READY, null, null);
     } else if (!ready && index.state() == ComponentState.READY) {
       String reason = (sample.failed() || stale)
-          ? LifecycleReasonCode.WORKER_LOST.code() : LifecycleReasonCode.WORKER_UNAVAILABLE.code();
+          ? LifecycleReasonCode.INDEX_FAILED.code() : LifecycleReasonCode.INDEX_UNAVAILABLE.code();
       String evidence = sample.failureReason() != null ? sample.failureReason()
           : "apiReady=" + apiReady + ", contactFresh=" + !stale
               + ", indexHealthy=" + (sample.view().core() != null && sample.view().core().indexHealthy());
@@ -1271,10 +1271,10 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     }
     String windowState = workerView.telemetry().throughputWindowState();
     if ("STALLED".equalsIgnoreCase(windowState)) {
-      return LifecycleReasonCode.WORKER_THROUGHPUT_STALLED.code();
+      return LifecycleReasonCode.INDEX_THROUGHPUT_STALLED.code();
     }
     if ("DEGRADED".equalsIgnoreCase(windowState)) {
-      return LifecycleReasonCode.WORKER_THROUGHPUT_DEGRADED.code();
+      return LifecycleReasonCode.INDEX_THROUGHPUT_DEGRADED.code();
     }
     return null;
   }
@@ -1490,6 +1490,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         String embeddingRebuildReason = embeddingRebuildReason(workerView);
         boolean encoderReloading =
             lifecycleSnapshot.components().encoders().state() == ComponentState.RELOADING;
+        boolean indexModelMissing = LifecycleReasonCode.INDEX_MODEL_NOT_INSTALLED.code().equals(
+            lifecycleSnapshot.components().encoders().reason_code());
         String denseUnavailableReason = denseUnavailableReason(workerView);
         String state;
         String reason;
@@ -1503,7 +1505,21 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           // INITIALIZING here, so it does not produce embeddingRebuildReason. The owned
           // encoder component is the direct signal of this semantic pause.
           state = READINESS_DEGRADED;
-          reason = LifecycleReasonCode.INDEX_EMBEDDING_REBUILDING.code();
+          reason = LifecycleReasonCode.ENCODERS_RELOADING.code();
+        } else if (indexModelMissing) {
+          // The active generation names an artifact that is absent or changed. Lexical
+          // search remains available, but the selected semantic model cannot serve.
+          state = READINESS_DEGRADED;
+          reason = LifecycleReasonCode.INDEX_MODEL_NOT_INSTALLED.code();
+        } else if ("SWITCHING".equals(workerView.migration().migrationState())) {
+          // The Worker is activating the successor generation. A remains queryable until
+          // the cutover, so this is a transition rather than a failed index.
+          state = READINESS_DEGRADED;
+          reason = LifecycleReasonCode.INDEX_ACTIVATING.code();
+        } else if ("AWAITING_ACCEPTANCE".equals(workerView.migration().migrationState())) {
+          // The recorded candidate is parked for an operator decision while A serves.
+          state = READINESS_DEGRADED;
+          reason = LifecycleReasonCode.MIGRATION_AWAITING_GAP_ACCEPTANCE.code();
         } else if (compatBlockedReason != null) {
           // Tempdoc 600 Design A: a serving index can be HEALTHY for keyword search yet have its
           // dense/semantic leg BLOCKED (a legacy index with no embedding fingerprint, or a
@@ -1555,10 +1571,10 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         String reason;
         if (embReady == null) {
           state = READINESS_UNKNOWN;
-          reason = LifecycleReasonCode.WORKER_HEALTH_EMBEDDING_PROBE_MISSING.code();
+          reason = LifecycleReasonCode.ENCODERS_HEALTH_EMBEDDING_PROBE_MISSING.code();
         } else if (!Boolean.TRUE.equals(embReady)) {
           state = READINESS_NOT_READY;
-          reason = LifecycleReasonCode.WORKER_HEALTH_EMBEDDING_NOT_READY.code();
+          reason = LifecycleReasonCode.ENCODERS_HEALTH_EMBEDDING_NOT_READY.code();
         } else if (rebuildReason != null) {
           // The probe means "the encoder is loaded", not "the corpus is embedded". During an
           // in-place rebuild the encoder is up while queries cannot use embeddings, so a bare

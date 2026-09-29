@@ -1,7 +1,7 @@
 {
   "kind": "readiness-reason-codes.v1",
   "note": "Tempdoc 600 PART IX/X — the degradation-cause reason vocabulary is ONE closed authority. The producer (StatusLifecycleHandler) emits readiness reason codes from the closed LifecycleReasonCode enum; the FE CAUSE_ROWS table words them (code -> wording/remedy/severity). This register's gate (scripts/ci/check-readiness-reason-codes.mjs) enforces producer<->consumer correspondence so neither can drift: FORWARD = every enum code that is NOT exempt has a CAUSE_ROWS row (so a user can never be shown a raw `Degraded: <code>` string in the degradation banner); BACKWARD = every CAUSE_ROWS code is a real enum member OR a declared FE-derived code (no dead/typo rows); PRODUCER (tempdoc 837 §5) = every enum code is referenced by at least one modules/**/src/main Java source outside the enum's own file, by enum NAME or quoted code string, matched AFTER comment-stripping. The two allow-lists below are the only curated artifact (the search-issuance gate's allowedReferences pattern); note that noWordingExempt does NOT exempt from the PRODUCER direction, since the two lists answer different questions (a code can legitimately never reach the banner and still need an emit site).",
-  "producerDirectionNote": "Tempdoc 837 §4/§5. Four ORT_CUDA_* codes lived in this vocabulary with no producer for months, two of them carrying user-facing wording for a state that could not occur; S1 deleted them and S2 added the direction that makes the class unrepresentable. Post-S1 all 44 codes have an emit-site reference, so the PRODUCER direction runs with an EMPTY effective exemption — there is deliberately no new allow-list. If a future code appears to need one, that is a design conversation, not a one-line entry. KNOWN UNCOVERED SEAM (837 §5.4): a reference is not an emission (a consumer's `X.code().equals(...)` satisfies the check), and tap coverage is separate — a code can have an emit site, a wording row, and still produce no Condition, because LifecycleSnapshotTap's (dimension, state, code) rows are not registered anywhere. Closing that needs a triple register and is not built.",
+  "producerDirectionNote": "Tempdoc 837 §4/§5 and Lane F D1-15. Four ORT_CUDA_* codes lived in this vocabulary with no producer for months; the producer direction prevents that drift. The 61 current lifecycle codes have no producer exemption. A new code requires a real emission site. The desktop-owned engine.escalated_restart is FE-derived from supervisor lastExit.reason. Tap coverage remains a separate check: a reason with an emit site and wording row can still miss a (dimension, state, code) Condition mapping.",
   "producer": {
     "file": "modules/app-api/src/main/java/io/justsearch/app/api/lifecycle/LifecycleReasonCode.java",
     "symbol": "LifecycleReasonCode"
@@ -22,18 +22,6 @@
     {
       "code": "settings.reset_from_corrupt",
       "why": "Head-owned ConditionStore condition (SettingsRecoveryNotice, tempdoc 882 item 24); never on the readiness envelope, so never reaches wordCauses. The user sees it on the Health surface, which renders conditions with the Java-side message."
-    },
-    {
-      "code": "worker.not_configured",
-      "why": "NOT_CONFIGURED state on INDEX_SERVING -> verdict 'checking', never rendered by wordCauses (PART X)"
-    },
-    {
-      "code": "worker.not_started",
-      "why": "NOT_CONFIGURED state on INDEX_SERVING -> verdict 'checking'"
-    },
-    {
-      "code": "worker.unavailable",
-      "why": "NOT_READY state on INDEX_SERVING -> verdict 'checking' (reproduced live: no banner)"
     },
     {
       "code": "index.not_healthy",
@@ -65,6 +53,10 @@
     }
   ],
   "feDerived": [
+    {
+      "code": "engine.escalated_restart",
+      "why": "The Engine exits before it can emit a lifecycle snapshot. The desktop recovery view derives this reason from the supervisor's lastExit.reason=escalated_restart observation."
+    },
     {
       "code": "engine.restart_exhausted",
       "why": "Lane F B14: the desktop recovery surface derives exhaustion from the current host's supervisor event or in-memory snapshot; an unavailable Engine cannot emit it. No disk predecessor state is read."

@@ -161,8 +161,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * the worker refused deterministically on all three {@link #startWithRetry} attempts, each
      * per-attempt catch consumed the freshly-written marker while {@code retryPending} suppressed the
      * narration, and the final catch — the one call that IS allowed to narrate — found no marker and
-     * reported the generic {@code worker.spawn.failed}. Head readiness then rode the boot-recovery
-     * ladder to {@code worker.spawn_recovery_exhausted} and the real cause never reached the user.
+     * reported the generic {@code index.failed}. Head readiness then rode the boot-recovery
+     * ladder to {@code component.recovery_exhausted} and the real cause never reached the user.
      * The corruption axis has the identical hole; it escapes only when its first worker-down call
      * happens to land outside a suppressed arc.
      *
@@ -253,7 +253,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         // An admitted generic recovery already published STARTING and owns the terminal narration.
         if (!indexRecoveryInFlight) {
             indexComponent.transition(
-                ComponentState.STARTING, LifecycleReasonCode.WORKER_STARTING.code(), "Worker starting");
+                ComponentState.STARTING, LifecycleReasonCode.INDEX_STARTING.code(), "Worker starting");
         }
         log.info("Starting Knowledge Server integration...");
 
@@ -326,7 +326,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             awaitHealthyAndComplete();
         } catch (Exception e) {
             transitionWorkerDown(
-                LifecycleReasonCode.WORKER_SPAWN_FAILED, "Start failed: " + e.getMessage());
+                LifecycleReasonCode.INDEX_FAILED, "Start failed: " + e.getMessage());
             log.error("Failed to start Knowledge Server integration", e);
             try {
                 if (closeForUpgrade() != ShutdownOutcome.GRACEFUL) {
@@ -380,7 +380,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             // site without a suppression guard. The rule now lives in transitionWorkerDown, so
             // this call is unconditional and the funnel decides.
             transitionWorkerDown(
-                LifecycleReasonCode.WORKER_SPAWN_FAILED,
+                LifecycleReasonCode.INDEX_FAILED,
                 "Health check failed after " + healthCheckElapsedMs + "ms");
             log.warn("Knowledge Server health check failed after {}ms budget; auxiliary services not initialized — background monitor will retry",
                     healthCheckElapsedMs);
@@ -465,7 +465,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         // The per-attempt narration was suppressed; the final verdict lands exactly once, here —
         // unless the generic index action owns this physical attempt's terminal narration.
         transitionWorkerDown(
-            LifecycleReasonCode.WORKER_SPAWN_FAILED,
+            LifecycleReasonCode.INDEX_FAILED,
             "Start failed: " + (last == null ? "unknown" : last.getMessage()));
         if (last instanceof IOException io) {
             throw io;
@@ -813,12 +813,12 @@ public final class KnowledgeServerBootstrap implements Closeable {
         String fatal = io.justsearch.ipc.WorkerFatalReasonMarker.readAndClear(config.dataDir());
         if (io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_CORRUPT.equals(fatal)) {
             return latchIndexFatal(
-                    new WorkerDown(LifecycleReasonCode.WORKER_INDEX_CORRUPT, INDEX_CORRUPT_DETAIL));
+                    new WorkerDown(LifecycleReasonCode.INDEX_CORRUPT, INDEX_CORRUPT_DETAIL));
         }
         if (io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH.equals(fatal)) {
             return latchIndexFatal(
                     new WorkerDown(
-                            LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH, INDEX_SCHEMA_MISMATCH_DETAIL));
+                            LifecycleReasonCode.INDEX_SCHEMA_OPEN_REFUSED, INDEX_SCHEMA_MISMATCH_DETAIL));
         }
         // Tempdoc 915 R1: no marker on disk does NOT mean no fatal index verdict — an earlier call in
         // this same boot arc already consumed it. Re-offering the latched one is what makes the
@@ -920,7 +920,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         physicalHealthy = false;
         healthyInitializationComplete = false;
         if (wasHealthy) {
-            transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, detail);
+            transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, detail);
             log.warn("Knowledge Server health check failed");
         }
     }
@@ -1030,7 +1030,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             if (outcome == ShutdownOutcome.GRACEFUL && !narrationSuppressed()) {
                 indexComponent.transition(
                     ComponentState.ABSENT,
-                    LifecycleReasonCode.WORKER_SHUT_DOWN.code(),
+                    LifecycleReasonCode.INDEX_SHUT_DOWN.code(),
                     "Worker shut down");
             }
         } finally {

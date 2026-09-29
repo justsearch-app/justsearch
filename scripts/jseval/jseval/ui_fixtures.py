@@ -630,7 +630,7 @@ def _search_body(variant: str) -> str:
 def _status_body(variant: str) -> str:
     """The status response for a variant. 'degraded' (tempdoc 697 activation) flips
     `readiness.composites.retrieval` to DEGRADED with a real `LifecycleReasonCode`
-    (`worker.health.embedding_not_ready` — LifecycleReasonCode.java:29) so the chat
+    (`encoders.health.embedding_not_ready` — LifecycleReasonCode.java) so the chat
     window's collapsed degradation pill (`.degradation-banner-collapsed`,
     UnifiedChatView.renderCollapsedDegradationBanner) renders deterministically. The
     reason code carries 'warn' severity (verdict.ts severityForCodes), not 'error', so
@@ -754,7 +754,7 @@ def _status_body(variant: str) -> str:
         d = json.loads(_BODY_STATUS)
         d["readiness"]["composites"]["retrieval"] = {
             "state": "DEGRADED",
-            "reasonCodes": ["worker.health.embedding_not_ready"],
+            "reasonCodes": ["encoders.health.embedding_not_ready"],
         }
         d["worker"]["core"]["indexedDocuments"] = 1
         return json.dumps(d)

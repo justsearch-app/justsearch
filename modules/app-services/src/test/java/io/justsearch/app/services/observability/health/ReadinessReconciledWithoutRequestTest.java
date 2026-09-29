@@ -78,7 +78,7 @@ final class ReadinessReconciledWithoutRequestTest {
     // Stands in for StatusLifecycleHandler.buildReadinessEnvelope: the one authority for the
     // envelope. The trigger re-runs the SAME computation; it never computes a second one.
     AtomicReference<ReadinessEnvelopeView> envelope =
-        new AtomicReference<>(indexServing("NOT_READY", "worker.starting"));
+        new AtomicReference<>(indexServing("NOT_READY", "index.starting"));
 
     AtomicInteger reconciles = new AtomicInteger();
     CountDownLatch seeded = new CountDownLatch(1);
@@ -100,7 +100,7 @@ final class ReadinessReconciledWithoutRequestTest {
       assertTrue(seeded.await(5, SECONDS), "the attach self-seed did not reconcile");
       assertTrue(
           conditions.find("index.unavailable", "worker").isPresent(),
-          "a NOT_READY/worker.starting envelope must assert index.unavailable");
+          "a NOT_READY/index.starting envelope must assert index.unavailable");
 
       // The worker comes back. Nothing calls /api/status — there is no handler in this graph.
       envelope.set(indexServing("READY", null));

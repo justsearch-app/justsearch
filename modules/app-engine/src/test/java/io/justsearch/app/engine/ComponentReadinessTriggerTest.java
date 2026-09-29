@@ -34,7 +34,7 @@ final class ComponentReadinessTriggerTest {
       var api = components.register(spec("api"));
       var index = components.register(spec("index"));
       api.transition(ComponentState.READY, null, null);
-      index.transition(ComponentState.STARTING, "worker.starting", null);
+      index.transition(ComponentState.STARTING, "index.starting", null);
       var runs = new AtomicInteger();
       var done = new CountDownLatch(1);
       var failure = new AtomicReference<Throwable>();
@@ -64,7 +64,7 @@ final class ComponentReadinessTriggerTest {
       var api = components.register(spec("api"));
       var index = components.register(spec("index"));
       api.transition(ComponentState.READY, null, null);
-      index.transition(ComponentState.STARTING, "worker.starting", null);
+      index.transition(ComponentState.STARTING, "index.starting", null);
       var observed = new CountDownLatch(1);
       var release = new CountDownLatch(1);
       var completed = new CountDownLatch(2);

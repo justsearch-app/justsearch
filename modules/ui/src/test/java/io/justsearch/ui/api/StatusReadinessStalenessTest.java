@@ -294,7 +294,7 @@ final class StatusReadinessStalenessTest {
     COMPONENTS.transition(
         "index",
         workerAvailable ? ComponentState.READY : ComponentState.UNAVAILABLE,
-        workerAvailable ? null : "worker.unavailable",
+        workerAvailable ? null : "index.unavailable",
         workerAvailable ? "Worker serving" : "Worker unavailable");
     var graph = COMPONENTS.capabilities();
     StatusLifecycleHandler handler = new StatusLifecycleHandler(

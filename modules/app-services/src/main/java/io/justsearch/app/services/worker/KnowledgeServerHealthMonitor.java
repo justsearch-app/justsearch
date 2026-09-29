@@ -447,7 +447,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
             || retention == RetentionClass.STICKY;
         recoveryBindings.get(row.spec().name()).handle().transitionIfUnchanged(row,
             ComponentState.FAILED, causeHeld ? row.reasonCode()
-                : LifecycleReasonCode.COMPONENT_START_TIMEOUT.code(),
+                : LifecycleReasonCode.COMPONENT_START_DEADLINE.code(),
             "Start deadline exceeded while waiting for " + awaited);
       }
     }
@@ -523,8 +523,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   private boolean immediateEscalation(
       EngineComponentSnapshot.Component row) {
     return row.spec().essential()
-        && (LifecycleReasonCode.WORKER_INDEX_CORRUPT.code().equals(row.reasonCode())
-            || LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH.code().equals(row.reasonCode()));
+        && (LifecycleReasonCode.INDEX_CORRUPT.code().equals(row.reasonCode())
+            || LifecycleReasonCode.INDEX_SCHEMA_OPEN_REFUSED.code().equals(row.reasonCode()));
   }
 
   private static boolean eligibleForComponentRecovery(
@@ -556,20 +556,32 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       if (operatorRequested && binding.action() == null) {
         return ComponentRecoveryAuthority.Outcome.OWNER_UNAVAILABLE;
       }
+      boolean budgetExhausted;
       synchronized (componentRecoveryLock) {
         var episode = componentEpisodes.computeIfAbsent(name, ignored -> new ComponentEpisode());
         int budget = Math.min(2, Math.min(row.spec().recoveryBudget(), recoveryPolicy.maxAttempts()));
         int attempts = Math.max(0, row.recoveryAttempts() - episode.recoveredBaseline);
-        if (attempts >= budget
-            || (!operatorRequested && immediateEscalation(row))) {
+        budgetExhausted = attempts >= budget;
+        if (!budgetExhausted && !operatorRequested && immediateEscalation(row)) {
           if (row.spec().essential() && binding.handle().snapshot().equals(row)) escalation = row;
           return ComponentRecoveryAuthority.Outcome.EXHAUSTED;
         }
-        long backoff = recoveryPolicy.backoffMs(attempts + 1);
-        if (!operatorRequested && episode.lastAttemptMs >= 0
-            && nowMs.getAsLong() - episode.lastAttemptMs < backoff) {
-          return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+        if (!budgetExhausted) {
+          long backoff = recoveryPolicy.backoffMs(attempts + 1);
+          if (!operatorRequested && episode.lastAttemptMs >= 0
+              && nowMs.getAsLong() - episode.lastAttemptMs < backoff) {
+            return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+          }
         }
+      }
+      if (budgetExhausted) {
+        var terminal = LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code().equals(row.reasonCode())
+            ? Optional.of(row)
+            : binding.handle().tryTransitionIfUnchanged(row, ComponentState.FAILED,
+                LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code(),
+                "Component recovery attempt budget exhausted");
+        if (row.spec().essential()) escalation = terminal.orElse(null);
+        return ComponentRecoveryAuthority.Outcome.EXHAUSTED;
       }
       if (binding.action() == null) return ComponentRecoveryAuthority.Outcome.OWNER_UNAVAILABLE;
       recoveryExecutor.execute(() -> attemptComponentRecovery(binding, operatorRequested));

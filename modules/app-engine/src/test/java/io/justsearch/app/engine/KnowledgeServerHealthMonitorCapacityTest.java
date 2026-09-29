@@ -294,7 +294,7 @@ final class KnowledgeServerHealthMonitorCapacityTest {
     }
     if (failed) {
       components.handle("index").transition(ComponentState.FAILED,
-          LifecycleReasonCode.WORKER_SPAWN_FAILED.code(), "test recovery target");
+          LifecycleReasonCode.INDEX_FAILED.code(), "test recovery target");
     }
     monitor.componentRegistry(components);
     var bindings = new java.util.LinkedHashMap<String, ComponentRecoveryBinding>();

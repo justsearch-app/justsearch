@@ -6,8 +6,11 @@
     "symbol": "classifyConsequence",
     "caveatExports": [
       "KEYWORD_FALLBACK_CAVEAT",
+      "SEARCH_UNAVAILABLE_CAVEAT",
+      "MODEL_UNAVAILABLE_CAVEAT",
       "PASSAGE_REDUCED_CAVEAT",
-      "OPTIONAL_CAPABILITY_CAVEAT"
+      "OPTIONAL_CAPABILITY_CAVEAT",
+      "AI_UNAVAILABLE_CAVEAT"
     ]
   },
   "scanRoot": "modules/ui-web/src",

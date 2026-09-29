@@ -60,7 +60,7 @@ final class CapabilityHealthBridgeReplayTest {
   void startingIndexSeedsPendingConditionAsCurrentState() throws Exception {
     try (var components = TestEngineComponents.fourComponents()) {
       components.handle("index").transition(
-          ComponentState.STARTING, "worker.starting", "Worker startup is in progress");
+          ComponentState.STARTING, "index.starting", "Worker startup is in progress");
       ConditionStore conditions = new ConditionStore();
 
       try (AutoCloseable ignored = CapabilityHealthBridge.wireListeners(
@@ -83,7 +83,7 @@ final class CapabilityHealthBridgeReplayTest {
       bridge.close();
 
       components.handle("index").transition(
-          ComponentState.FAILED, "worker.lost", "late failure");
+          ComponentState.FAILED, "index.failed", "late failure");
       components.handle("generative").transition(
           ComponentState.FAILED, "inference.crashed", "late failure");
 

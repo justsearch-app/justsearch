@@ -1767,7 +1767,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
     private void publishTimeout() {
       var before = current.get();
-      current.set(copy(before, ComponentState.FAILED, "component.start_timeout",
+      current.set(copy(before, ComponentState.FAILED, "component.start_deadline",
           before.recoveryAttempts(), "deadline observed"));
     }
 

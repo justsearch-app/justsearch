@@ -92,7 +92,9 @@ export class EngineRecovery extends JfElement {
       <section aria-labelledby="recovery-title" data-testid="engine-recovery">
         <h1 id="recovery-title">${terminal
           ? reasonFor('engine.restart_exhausted').wording
-          : 'Connecting to JustSearch'}</h1>
+          : this.supervisor?.lastExit?.reason === 'escalated_restart'
+            ? reasonFor('engine.escalated_restart').wording
+            : 'Connecting to JustSearch'}</h1>
         <p role="status">${terminal
           ? 'You can check for an update or try connecting again.'
           : 'JustSearch is starting or recovering. Update controls are available while you wait.'}</p>

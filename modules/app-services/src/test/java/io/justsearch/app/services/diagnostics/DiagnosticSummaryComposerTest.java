@@ -31,10 +31,10 @@ final class DiagnosticSummaryComposerTest {
     var lifecycle =
         new DiagnosticSummaryComposer.LifecycleMetadata(
             new LifecycleSnapshotV2.Lifecycle(
-                LifecycleState.LIFECYCLE_STATE_DEGRADED, "worker.lost", "excluded message"),
+                LifecycleState.LIFECYCLE_STATE_DEGRADED, "index.failed", "excluded message"),
             new LifecycleSnapshotV2.Components(
                 component(ComponentState.READY, null),
-                component(ComponentState.UNAVAILABLE, "worker.lost"),
+                component(ComponentState.UNAVAILABLE, "index.failed"),
                 component(ComponentState.ABSENT, null),
                 component(ComponentState.ABSENT, "inference.deactivated")));
     var inputs =

@@ -21,6 +21,8 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class KnowledgeServerComponentObservationTest {
   @TempDir Path dir;
@@ -35,10 +37,10 @@ class KnowledgeServerComponentObservationTest {
       var server = new KnowledgeServer(executors, config, null,
           ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), index, null);
       try {
-        index.transition(ComponentState.STARTING, "worker.starting", "initial open");
+        index.transition(ComponentState.STARTING, "index.starting", "initial open");
         server.recordIndexStartupWait("index root lock");
         org.junit.jupiter.api.Assertions.assertEquals("index root lock", index.snapshot().evidence());
-        index.transition(ComponentState.FAILED, "worker.spawn.failed", "deadline: index root lock");
+        index.transition(ComponentState.FAILED, "index.failed", "deadline: index root lock");
         var expired = index.snapshot();
         server.recordIndexStartupWait("Lucene generation");
         org.junit.jupiter.api.Assertions.assertEquals(expired, index.snapshot(),
@@ -195,6 +197,124 @@ class KnowledgeServerComponentObservationTest {
       verify(component).transition(ComponentState.READY, null, null);
       verify(component).setDesiredVersion(desired.digest());
       verify(component).setAppliedVersion(selected.withQueryFrom(desired).digest());
+      server.close();
+    }
+  }
+
+  @Test
+  void missingActiveGenerationModelNamesTheIndexModelCause() throws Exception {
+    Path selectedModel = dir.resolve("active/model.onnx").toAbsolutePath().normalize();
+    var selection = GenerationModelSelection.accepted(Map.of(
+        "embedding", new ModelArtifact(selectedModel.toString(), "a".repeat(64))),
+        "splade", 768);
+    var configuration = new ResolvedConfigBuilder().build();
+    var selected = EncoderConfigurationProjection.from(configuration, selection);
+    var desired = EncoderConfigurationProjection.from(configuration);
+    var component = mock(ComponentHandle.class);
+    var workerConfig = mock(io.justsearch.indexerworker.WorkerConfig.class);
+    when(workerConfig.dataDir()).thenReturn(dir);
+    try (var executors = new TestEngineExecutors()) {
+      var server = new KnowledgeServer(executors, workerConfig, null,
+          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, component);
+      var configurationField = KnowledgeServer.class.getDeclaredField("startupConfiguration");
+      configurationField.setAccessible(true);
+      configurationField.set(server, configuration);
+      var selectionField = KnowledgeServer.class.getDeclaredField("initialModelSelection");
+      selectionField.setAccessible(true);
+      selectionField.set(server, selection);
+      var indexSurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
+          new InferenceSurface.ComponentObservation(Optional.of(selected.indexDigest()),
+              Set.of(EncoderRole.EMBEDDING), Set.of(EncoderRole.EMBEDDING)));
+      var fingerprint = IndexFingerprint.ModelFingerprint.present("selected-model");
+      var index = new EncoderSet(indexSurface,
+          new EncoderSet.ModelIdentity(fingerprint, fingerprint, fingerprint, false, 768));
+      var querySurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
+          new InferenceSurface.ComponentObservation(Optional.of(desired.queryDigest()),
+              Set.of(), Set.of()));
+      var indexField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+      indexField.setAccessible(true);
+      indexField.set(server, index);
+      var queryField = KnowledgeServer.class.getDeclaredField("initialQueryRoleSet");
+      queryField.setAccessible(true);
+      queryField.set(server, new QueryRoleSet(querySurface));
+
+      server.publishEncoderComposition();
+
+      verify(component).transition(ComponentState.UNAVAILABLE,
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_MODEL_NOT_INSTALLED.code(),
+          "missing_roles=EMBEDDING");
+      server.close();
+    }
+  }
+
+  @ParameterizedTest(name = "missing selected {0} bytes publish the model-not-installed cause")
+  @ValueSource(strings = {"reranker", "citation-scorer"})
+  void missingActiveGenerationQueryModelNamesTheIndexModelCause(String packageId) throws Exception {
+    Path selectedModel = dir.resolve(packageId + "/model.onnx").toAbsolutePath().normalize();
+    assertMissingSelectedQueryModelCause(packageId, selectedModel, "a".repeat(64));
+  }
+
+  @ParameterizedTest(name = "changed selected {0} bytes publish the model-not-installed cause")
+  @ValueSource(strings = {"reranker", "citation-scorer"})
+  void changedActiveGenerationQueryModelNamesTheIndexModelCause(String packageId) throws Exception {
+    Path selectedModel = dir.resolve(packageId + "/model.onnx").toAbsolutePath().normalize();
+    Files.createDirectories(selectedModel.getParent());
+    Files.writeString(selectedModel, "captured " + packageId + " bytes");
+    String selectedSha = GenerationModelSelection.captureIdentity(selectedModel).sha256();
+    Files.writeString(selectedModel, "changed " + packageId + " bytes");
+    assertMissingSelectedQueryModelCause(packageId, selectedModel, selectedSha);
+  }
+
+  private void assertMissingSelectedQueryModelCause(String packageId, Path selectedModel,
+      String selectedSha) throws Exception {
+    var selection = GenerationModelSelection.accepted(Map.of(
+        packageId, new ModelArtifact(selectedModel.toString(), selectedSha)), "splade", 768);
+    org.junit.jupiter.api.Assertions.assertTrue(selection.verify(packageId).isEmpty(),
+        "the selected bytes must be unavailable before publishing readiness");
+    var configuration = new ResolvedConfigBuilder().build();
+    var selected = EncoderConfigurationProjection.from(configuration, selection);
+    var component = mock(ComponentHandle.class);
+    var workerConfig = mock(io.justsearch.indexerworker.WorkerConfig.class);
+    when(workerConfig.dataDir()).thenReturn(dir);
+    try (var executors = new TestEngineExecutors()) {
+      var server = new KnowledgeServer(executors, workerConfig, null,
+          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, component);
+      var configurationField = KnowledgeServer.class.getDeclaredField("startupConfiguration");
+      configurationField.setAccessible(true);
+      configurationField.set(server, configuration);
+      var selectionField = KnowledgeServer.class.getDeclaredField("initialModelSelection");
+      selectionField.setAccessible(true);
+      selectionField.set(server, selection);
+      var indexSurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
+          new InferenceSurface.ComponentObservation(Optional.of(selected.indexDigest()),
+              Set.of(), Set.of()));
+      var fingerprint = IndexFingerprint.ModelFingerprint.present("selected-model");
+      var index = new EncoderSet(indexSurface,
+          new EncoderSet.ModelIdentity(fingerprint, fingerprint, fingerprint, false, 768));
+      EncoderRole role = switch (packageId) {
+        case "reranker" -> EncoderRole.RERANKER;
+        case "citation-scorer" -> EncoderRole.CITATION;
+        default -> throw new IllegalArgumentException("Unexpected query package: " + packageId);
+      };
+      var querySurface = new InferenceSurface(Optional.empty(), Optional.empty(),
+          Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
+          new InferenceSurface.ComponentObservation(Optional.of(selected.queryDigest()),
+              Set.of(role), Set.of(role)));
+      var indexField = KnowledgeServer.class.getDeclaredField("initialEncoderSet");
+      indexField.setAccessible(true);
+      indexField.set(server, index);
+      var queryField = KnowledgeServer.class.getDeclaredField("initialQueryRoleSet");
+      queryField.setAccessible(true);
+      queryField.set(server, new QueryRoleSet(querySurface));
+
+      server.publishEncoderComposition();
+
+      verify(component).transition(ComponentState.UNAVAILABLE,
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_MODEL_NOT_INSTALLED.code(),
+          "missing_roles=" + role.name());
       server.close();
     }
   }

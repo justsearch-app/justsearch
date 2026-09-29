@@ -24,23 +24,23 @@ final class StatusLifecycleWorkerReasonTest {
   }
 
   @Test
-  @DisplayName("a lost worker reports worker.lost, not worker.spawn.failed")
+  @DisplayName("a lost worker reports index.failed, not index.failed")
   void lostWorkerReportsLost() {
     LifecycleSnapshotV2.Component component = indexComponent(handle -> handle.transition(
         ComponentState.FAILED,
-        LifecycleReasonCode.WORKER_LOST.code(),
+        LifecycleReasonCode.INDEX_FAILED.code(),
         "Health check failed"));
     assertEquals(ComponentState.FAILED, component.state());
-    assertEquals(LifecycleReasonCode.WORKER_LOST.code(), component.reason_code());
+    assertEquals(LifecycleReasonCode.INDEX_FAILED.code(), component.reason_code());
   }
 
   @Test
   void corruptIndexReportsPreciseCause() {
     LifecycleSnapshotV2.Component component = indexComponent(handle -> handle.transition(
         ComponentState.FAILED,
-        LifecycleReasonCode.WORKER_INDEX_CORRUPT.code(),
+        LifecycleReasonCode.INDEX_CORRUPT.code(),
         "Set index.recovery.policy=BACKUP_REBUILD"));
-    assertEquals(LifecycleReasonCode.WORKER_INDEX_CORRUPT.code(), component.reason_code());
+    assertEquals(LifecycleReasonCode.INDEX_CORRUPT.code(), component.reason_code());
   }
 
   @Test
@@ -48,7 +48,7 @@ final class StatusLifecycleWorkerReasonTest {
     LifecycleSnapshotV2.Component component = indexComponent(handle -> {
       handle.transition(
           ComponentState.FAILED,
-          LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH.code(),
+          LifecycleReasonCode.INDEX_SCHEMA_OPEN_REFUSED.code(),
           "Set index.schema_mismatch.policy=BLUE_GREEN_MIGRATE");
       handle.transition(
           ComponentState.RELOADING,
@@ -56,27 +56,27 @@ final class StatusLifecycleWorkerReasonTest {
           "attempt 1");
       handle.transition(
           ComponentState.FAILED,
-          LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
+          LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code(),
           "attempts exhausted");
     });
     assertEquals(ComponentState.FAILED, component.state());
     assertEquals(
-        LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH.code(), component.reason_code());
+        LifecycleReasonCode.INDEX_SCHEMA_OPEN_REFUSED.code(), component.reason_code());
   }
 
   @Test
   void spawnFailureAndRecoveryExhaustionPassThrough() {
     assertEquals(
-        LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+        LifecycleReasonCode.INDEX_FAILED.code(),
         indexComponent(handle -> handle.transition(
             ComponentState.FAILED,
-            LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+            LifecycleReasonCode.INDEX_FAILED.code(),
             "start failed")).reason_code());
     assertEquals(
-        LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
+        LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code(),
         indexComponent(handle -> handle.transition(
             ComponentState.FAILED,
-            LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
+            LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code(),
             "attempts exhausted")).reason_code());
   }
 
@@ -92,16 +92,16 @@ final class StatusLifecycleWorkerReasonTest {
   @Test
   void absenceDistinguishesShutdownFromNeverConfigured() {
     assertEquals(
-        LifecycleReasonCode.WORKER_SHUT_DOWN.code(),
+        LifecycleReasonCode.INDEX_SHUT_DOWN.code(),
         indexComponent(handle -> handle.transition(
             ComponentState.ABSENT,
-            LifecycleReasonCode.WORKER_SHUT_DOWN.code(),
+            LifecycleReasonCode.INDEX_SHUT_DOWN.code(),
             "Worker shut down")).reason_code());
     assertEquals(
-        LifecycleReasonCode.WORKER_NOT_CONFIGURED.code(),
+        LifecycleReasonCode.INDEX_UNAVAILABLE.code(),
         indexComponent(handle -> handle.transition(
             ComponentState.ABSENT,
-            LifecycleReasonCode.WORKER_NOT_CONFIGURED.code(),
+            LifecycleReasonCode.INDEX_UNAVAILABLE.code(),
             "Worker not configured")).reason_code());
   }
 

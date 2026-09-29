@@ -39,13 +39,13 @@ immutable registry observation; none owns a mutable lifecycle copy.
       "workerControlPlane": { "state": "READY", "reasonCode": null, "source": "lifecycle_snapshot", "observedAt": "...", "stale": false, "stalenessMs": 0 },
       "indexServing": { "state": "READY", "reasonCode": null, "source": "worker_status", "observedAt": "...", "stale": false, "stalenessMs": 0 },
       "ai": { "state": "DEGRADED", "reasonCode": "inference.offline", "source": "lifecycle_inference", "observedAt": "...", "stale": false, "stalenessMs": 0 },
-      "embedding": { "state": "UNKNOWN", "reasonCode": "worker.health.embedding_probe_missing", "source": "worker_health_check", "observedAt": "...", "stale": false, "stalenessMs": 0 },
+      "embedding": { "state": "UNKNOWN", "reasonCode": "encoders.health.embedding_probe_missing", "source": "worker_health_check", "observedAt": "...", "stale": false, "stalenessMs": 0 },
       "visualTextExtraction": { "state": "READY", "reasonCode": null, "source": "worker_status", "observedAt": "...", "stale": false, "stalenessMs": 0 },
       "visualDocumentUnderstanding": { "state": "READY", "reasonCode": null, "source": "head_vdu_status", "observedAt": "...", "stale": false, "stalenessMs": 0 }
     },
     "composites": {
       "retrieval": { "state": "READY", "reasonCodes": [] },
-      "aiFeatures": { "state": "UNKNOWN", "reasonCodes": ["inference.offline", "worker.health.embedding_probe_missing"] }
+      "aiFeatures": { "state": "UNKNOWN", "reasonCodes": ["inference.offline", "encoders.health.embedding_probe_missing"] }
     }
   }
 }
@@ -132,14 +132,14 @@ Interpretation:
 ## State Mapping Rules
 
 1. Registry `index` state maps to `readiness.components.workerControlPlane.state`.
-2. Registry `index` state supplies the essential part of `readiness.components.indexServing`; compatibility, embedding and throughput observations can still degrade that diagnostic while the registry component remains `READY`. During a Flow B in-place model change, the Worker owned `encoders=RELOADING` state means A's dense encoder has been retired while its lexical view still serves. `indexServing` reports `DEGRADED` with `index.embedding_rebuilding` until the new encoder is published, including while the Green index compatibility probe is `INITIALIZING`. A BESIDE build leaves encoders ready and does not assert this reason.
+2. Registry `index` state supplies the essential part of `readiness.components.indexServing`; compatibility, embedding and throughput observations can still degrade that diagnostic while the registry component remains `READY`. During a Flow B in-place model change, the Worker owned `encoders=RELOADING` state means A's dense encoder has been retired while its lexical view still serves. `indexServing` reports `DEGRADED` with `encoders.reloading` until the new encoder is published, including while the Green index compatibility probe is `INITIALIZING`. A BESIDE build leaves encoders ready and does not assert this reason. A missing or changed model selected by the active generation reports `index.model_not_installed` while lexical search remains available. Migration `SWITCHING` reports `index.activating`; a parked recorded candidate awaiting a gap decision reports `migration.awaiting_gap_acceptance` while A continues serving.
 3. Registry `generative` state maps to `readiness.components.ai.state` with source `lifecycle_inference`: `READY` → `READY`, `ABSENT` → `NOT_CONFIGURED`, `STARTING` → `NOT_READY`, and `RELOADING`/`FAILED`/`UNAVAILABLE` → `DEGRADED`.
 4. Worker embedding probe maps to `readiness.components.embedding.state` with source `worker_health_check`.
 5. Worker visual extraction status maps missing baseline readable visual text to `readiness.components.visualTextExtraction` with source `worker_status`.
 6. Head VDU capability status maps enrichment-only visual understanding blockers to `readiness.components.visualDocumentUnderstanding` with source `head_vdu_status`.
 7. OCR and VDU blockers degrade `retrieval` only while baseline visual text is still missing. VDU enrichment-only blockers degrade `aiFeatures`, not `retrieval`.
 8. Missing embedding probe boolean maps to `UNKNOWN` with reason code:
-- `worker.health.embedding_probe_missing`
+- `encoders.health.embedding_probe_missing`
 9. Composite state precedence:
 - `NOT_READY`
 - `UNKNOWN`
@@ -155,24 +155,26 @@ Interpretation:
 ## Reason Code Taxonomy
 
 Common reason codes:
-1. `worker.not_configured`
-2. `worker.not_started`
-3. `worker.starting`
-4. `worker.unavailable`
-5. `index.not_healthy`
-6. `inference.starting`
-7. `inference.offline`
-8. `worker.health.embedding_not_ready`
-9. `worker.health.embedding_probe_missing`
-10. `worker.status_missing`
-11. `ocr.disabled`
-12. `ocr.engine_missing`
-13. `ocr.language_missing`
-14. `vdu.ai_offline`
-15. `vdu.insufficient_vram`
-16. `vdu.missing_mmproj`
-17. `vdu.circuit_open`
-18. `index.embedding_rebuilding` — semantic retrieval is paused during an in-place embedding rebuild or Flow B encoder reload; keyword retrieval remains available.
+1. `engine.not_started`, `index.starting`, `index.unavailable`, `index.failed`, `index.shut_down`
+2. `component.start_deadline`, `component.recovering`, `component.recovery_exhausted`
+3. `index.corrupt`, `index.schema_open_refused` (fatal open refusal), `index.schema_mismatch` (serving advisory), `index.not_healthy`
+4. `encoders.reloading`, `encoders.health.embedding_not_ready`, `encoders.health.embedding_probe_missing`
+5. `index.model_not_installed`, `index.activating`, `migration.awaiting_gap_acceptance`
+6. `index.throughput_stalled`, `index.throughput_degraded`
+7. `inference.starting`, `inference.offline`
+8. `ocr.disabled`, `ocr.engine_missing`, `ocr.language_missing`
+9. `vdu.ai_offline`, `vdu.insufficient_vram`, `vdu.missing_mmproj`, `vdu.circuit_open`
+10. `index.embedding_rebuilding` — semantic retrieval is paused during an in-place embedding rebuild; keyword retrieval remains available.
+
+For a serving migration, `LifecycleSnapshotTap` asserts distinct
+`index.activating` (informational) and `index.awaiting-gap-acceptance` (warning)
+Health conditions. Both replace any earlier `index.unavailable` assertion for
+the INDEX_SERVING dimension because the current generation remains queryable.
+The condition clears when that dimension returns to READY.
+Missing or changed files selected by an active generation produce
+`index.model_not_installed` and the role-neutral `index.model-unavailable`
+condition. Because the selected role may be a reranker or citation scorer,
+that condition does not assert a keyword-only fallback.
 
 Worker `health_check.ai_ready` remains worker-local telemetry and is non-authoritative for governance readiness.
 
@@ -251,11 +253,11 @@ Example of the same envelope after Worker contact is lost (components abbreviate
 {
   "readiness": {
     "components": {
-      "indexServing": { "state": "NOT_READY", "reasonCode": "worker.unavailable", "source": "worker_status", "observedAt": "2026-02-19T07:59:12Z", "stale": true, "stalenessMs": 48000 },
-      "workerControlPlane": { "state": "NOT_READY", "reasonCode": "worker.spawn_failed", "source": "lifecycle_snapshot", "observedAt": "2026-02-19T08:00:00Z", "stale": false, "stalenessMs": 0 }
+      "indexServing": { "state": "NOT_READY", "reasonCode": "index.failed", "source": "worker_status", "observedAt": "2026-02-19T07:59:12Z", "stale": true, "stalenessMs": 48000 },
+      "workerControlPlane": { "state": "NOT_READY", "reasonCode": "index.failed", "source": "lifecycle_snapshot", "observedAt": "2026-02-19T08:00:00Z", "stale": false, "stalenessMs": 0 }
     },
     "composites": {
-      "retrieval": { "state": "NOT_READY", "reasonCodes": ["worker.unavailable", "worker.spawn_failed"], "stale": true, "maxStalenessMs": 48000 },
+      "retrieval": { "state": "NOT_READY", "reasonCodes": ["index.failed"], "stale": true, "maxStalenessMs": 48000 },
       "telemetry": { "state": "READY", "reasonCodes": [], "stale": false, "maxStalenessMs": 0 }
     }
   },

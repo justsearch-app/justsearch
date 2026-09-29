@@ -50,7 +50,7 @@ import org.junit.jupiter.api.io.TempDir;
 final class LifecycleContractTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern REASON_CODE =
-      Pattern.compile("^(head|worker|ipc|inference)\\.[a-z0-9_]+(\\.[a-z0-9_]+)*$");
+      Pattern.compile("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$");
 
   @TempDir Path tempDir;
 
@@ -123,7 +123,7 @@ final class LifecycleContractTest {
     OnlineAiService __onlineAi = OnlineAiService.unavailable();
 
     // The physical owner, rather than a consumer fallback, records startup failure.
-    indexComponent.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+    indexComponent.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
         "worker failed to start (test)");
     LocalApiServer server =
         serverBuilder(settingsStore).onlineAiService(__onlineAi)
@@ -536,7 +536,7 @@ final class LifecycleContractTest {
           "DEGRADED",
           json.path("readiness").path("components").path("indexServing").path("state").asText(""));
       assertEquals(
-          "worker.throughput_stalled",
+          "index.throughput_stalled",
           json.path("readiness").path("components").path("indexServing").path("reasonCode").asText(""));
     } finally {
       server.stop();
@@ -648,7 +648,7 @@ final class LifecycleContractTest {
   }
 
   private void stubWorkerReady(KnowledgeServerBootstrap mockKs) {
-    indexComponent.transition(ComponentState.STARTING, "worker.starting", null);
+    indexComponent.transition(ComponentState.STARTING, "index.starting", null);
     var cap = new RegistryBackedCapability(components, "index", "worker");
     when(mockKs.hasClient()).thenReturn(true);
     when(mockKs.workerCapability()).thenReturn(cap);

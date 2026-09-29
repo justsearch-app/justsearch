@@ -86,7 +86,7 @@ describe('the window says when capability is reduced, and says nothing when it i
   });
   it('projects a banner for a degraded verdict and NONE for a healthy one', () => {
     // The mutation probe: this pair fails if the condition inverts, in whichever direction.
-    expect(projectSv3Degradation(snapshotFor(degraded(['worker.health.embedding_not_ready'])))).not.toBeNull();
+    expect(projectSv3Degradation(snapshotFor(degraded(['encoders.health.embedding_not_ready'])))).not.toBeNull();
     expect(projectSv3Degradation(snapshotFor(HEALTHY))).toBeNull();
   });
 
@@ -98,13 +98,13 @@ describe('the window says when capability is reduced, and says nothing when it i
     // The tier decision is the AUTHORITY's (`warrantsSearchDegradationBanner`), consumed rather than
     // re-derived — an `info` verdict still HAS a notice, so a local severity test could not tell
     // "there is nothing to say" from "this does not warrant warning-tier chrome".
-    const verdict = degraded(['worker.throughput_degraded'], 'info');
+    const verdict = degraded(['index.throughput_degraded'], 'info');
     expect(readinessNotice(verdict)).not.toBeNull();
     expect(projectSv3Degradation(snapshotFor(verdict))).toBeNull();
   });
 
   it('speaks the shared authority\'s wording, comparing against its own output rather than a literal', () => {
-    const verdict = degraded(['worker.health.embedding_not_ready']);
+    const verdict = degraded(['encoders.health.embedding_not_ready']);
     const notice = readinessNotice(verdict)!;
     const projected = projectSv3Degradation(snapshotFor(verdict))!;
     expect(projected.headline).toBe(notice.headline);
@@ -222,7 +222,7 @@ describe('the composer slot holds one banner, never the same fact twice', () => 
   });
 
   it('KEEPS a reason the banner does not word — a refusal with no reason on screen is the worse failure', () => {
-    const banner = bannerFor(degraded(['worker.health.embedding_not_ready']));
+    const banner = bannerFor(degraded(['encoders.health.embedding_not_ready']));
     const reason = reasonFor('no_documents').wording;
     expect(sv3ComposerReason(banner, reason)).toBe(reason);
   });
@@ -279,7 +279,7 @@ async function mountComposer(over: {
 
 describe('the banner rests at one line and discloses the rest', () => {
   const banner = (): Sv3Degradation =>
-    projectSv3Degradation(snapshotFor(degraded(['worker.health.embedding_not_ready'])))!;
+    projectSv3Degradation(snapshotFor(degraded(['encoders.health.embedding_not_ready'])))!;
 
   afterEach(() => {
     for (const child of [...document.body.children]) child.remove();
@@ -356,7 +356,7 @@ describe('the banner rests at one line and discloses the rest', () => {
 
 describe('the banner announces nothing and hides nothing (830 audit)', () => {
   const banner = (): Sv3Degradation =>
-    projectSv3Degradation(snapshotFor(degraded(['worker.health.embedding_not_ready'])))!;
+    projectSv3Degradation(snapshotFor(degraded(['encoders.health.embedding_not_ready'])))!;
 
   afterEach(() => {
     for (const child of [...document.body.children]) child.remove();
@@ -408,7 +408,7 @@ describe('the banner announces nothing and hides nothing (830 audit)', () => {
 
 describe('Simple and Detailed decide how much banner (E3)', () => {
   const banner = (): Sv3Degradation =>
-    projectSv3Degradation(snapshotFor(degraded(['worker.health.embedding_not_ready'])))!;
+    projectSv3Degradation(snapshotFor(degraded(['encoders.health.embedding_not_ready'])))!;
 
   afterEach(() => {
     for (const child of [...document.body.children]) child.remove();
@@ -530,7 +530,7 @@ describe('the mounted window renders the banner from the observed-state authorit
   }
 
   it('shows the banner for a degraded readiness composite and NOT for a ready one', async () => {
-    feedStatus({ retrieval: { state: 'DEGRADED', reasonCodes: ['worker.health.embedding_not_ready'] } });
+    feedStatus({ retrieval: { state: 'DEGRADED', reasonCodes: ['encoders.health.embedding_not_ready'] } });
     const el = await mountWindow();
     const composer = await composerOf(el);
     expect(el.aiSnapshot?.verdict.kind).toBe('degraded');
@@ -548,7 +548,7 @@ describe('the mounted window renders the banner from the observed-state authorit
   });
 
   it('follows the app-wide mode without a re-mount', async () => {
-    feedStatus({ retrieval: { state: 'DEGRADED', reasonCodes: ['worker.health.embedding_not_ready'] } });
+    feedStatus({ retrieval: { state: 'DEGRADED', reasonCodes: ['encoders.health.embedding_not_ready'] } });
     const el = await mountWindow();
     expect(q(await composerOf(el), 'sv3-degradation-causes')).toBeNull();
 

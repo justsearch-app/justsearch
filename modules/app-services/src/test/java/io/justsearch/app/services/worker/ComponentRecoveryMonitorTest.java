@@ -141,8 +141,8 @@ final class ComponentRecoveryMonitorTest {
   @Test
   void essentialIndexFatalReasonsEscalateOnFirstTickWithoutAdmittingRecovery() {
     for (var reason : new LifecycleReasonCode[] {
-        LifecycleReasonCode.WORKER_INDEX_CORRUPT,
-        LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH}) {
+        LifecycleReasonCode.INDEX_CORRUPT,
+        LifecycleReasonCode.INDEX_SCHEMA_OPEN_REFUSED}) {
       try (var components = new TestEngineComponents()) {
         var index = components.register(spec("index", true, Duration.ZERO, 2));
         index.transition(ComponentState.FAILED, reason.code(), "observable fatal index refusal");
@@ -171,8 +171,8 @@ final class ComponentRecoveryMonitorTest {
   @Test
   void optionalIndexFatalReasonsUseLocalRecoveryWithoutEscalating() throws Exception {
     for (var reason : new LifecycleReasonCode[] {
-        LifecycleReasonCode.WORKER_INDEX_CORRUPT,
-        LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH}) {
+        LifecycleReasonCode.INDEX_CORRUPT,
+        LifecycleReasonCode.INDEX_SCHEMA_OPEN_REFUSED}) {
       try (var components = new TestEngineComponents()) {
         var optional = components.register(spec("index", false, Duration.ZERO, 2));
         optional.transition(ComponentState.FAILED, reason.code(), "optional fatal index row");
@@ -221,7 +221,7 @@ final class ComponentRecoveryMonitorTest {
 
         var noOwner = bindings(components, null);
         monitor.componentRecoveryBindings(noOwner, ignored -> {});
-        optional.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+        optional.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
             "optional owner missing");
         assertEquals(ComponentRecoveryAuthority.Outcome.OWNER_UNAVAILABLE,
             monitor.requestComponentRecovery("generative"));
@@ -234,7 +234,7 @@ final class ComponentRecoveryMonitorTest {
   void oneHeldOptionalAttemptSharesSlotWithAutomaticAndManualRequests() throws Exception {
     try (var components = new TestEngineComponents()) {
       var optional = components.register(spec("generative", false, Duration.ofMillis(1), 2));
-      optional.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      optional.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "owner lost");
       var entered = new CountDownLatch(1);
       var release = new CountDownLatch(1);
@@ -273,9 +273,9 @@ final class ComponentRecoveryMonitorTest {
     try (var components = new TestEngineComponents()) {
       var required = components.register(spec("api", true, Duration.ofMillis(1), 2));
       var optional = components.register(spec("encoders", false, Duration.ofMillis(1), 2));
-      required.transition(ComponentState.STARTING, LifecycleReasonCode.WORKER_STARTING.code(),
+      required.transition(ComponentState.STARTING, LifecycleReasonCode.INDEX_STARTING.code(),
           "api bind");
-      optional.transition(ComponentState.STARTING, LifecycleReasonCode.WORKER_STARTING.code(),
+      optional.transition(ComponentState.STARTING, LifecycleReasonCode.INDEX_STARTING.code(),
           "encoder load");
       var bootstrap = bootstrapWithoutClient();
       try (var monitor = monitor(components, bootstrap)) {
@@ -293,9 +293,9 @@ final class ComponentRecoveryMonitorTest {
     try (var components = new TestEngineComponents()) {
       var encoders = components.register(spec("encoders", false, Duration.ZERO, 2));
       var index = components.register(spec("index", true, Duration.ZERO, 2));
-      encoders.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      encoders.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "encoder owner lost");
-      index.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "index owner lost");
       var optionalCalls = new AtomicInteger();
       var indexCalls = new AtomicInteger();
@@ -341,7 +341,7 @@ final class ComponentRecoveryMonitorTest {
     long[] now = {1_000};
     try (var components = new TestEngineComponents()) {
       var optional = components.register(spec("generative", false, Duration.ZERO, 5));
-      optional.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      optional.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "owner lost");
       var attempts = new AtomicInteger();
       var escalations = new AtomicInteger();
@@ -373,6 +373,8 @@ final class ComponentRecoveryMonitorTest {
         assertEquals(0, escalations.get());
         assertEquals(ComponentRecoveryAuthority.Outcome.EXHAUSTED,
             monitor.requestComponentRecovery("generative"));
+        assertEquals(LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code(),
+            optional.snapshot().reasonCode(), "the exhausted budget must reach lifecycle consumers");
       }
     }
   }
@@ -382,7 +384,7 @@ final class ComponentRecoveryMonitorTest {
     long[] now = {1_000};
     try (var components = new TestEngineComponents()) {
       var optional = components.register(spec("generative", false, Duration.ZERO, 1));
-      optional.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      optional.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "owner lost");
       var attempts = new AtomicInteger();
       var actionFailure = new AtomicReference<Throwable>();
@@ -412,7 +414,7 @@ final class ComponentRecoveryMonitorTest {
   void pendingInitialIndexFutureKeepsGenericRecoveryFromReplacingItsOwner() {
     try (var components = new TestEngineComponents()) {
       var index = components.register(spec("index", true, Duration.ZERO, 2));
-      index.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "initial owner deadline");
       var bootstrap = bootstrapWithoutClient();
       var startup = new CompletableFuture<Void>();
@@ -526,7 +528,7 @@ final class ComponentRecoveryMonitorTest {
     long[] now = {1_000};
     try (var components = new TestEngineComponents()) {
       var required = components.register(spec("api", true, Duration.ZERO, 5));
-      required.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      required.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "owner lost");
       var attempts = new AtomicInteger();
       var escalations = new AtomicInteger();
@@ -564,7 +566,7 @@ final class ComponentRecoveryMonitorTest {
   void readyThenFailedBetweenTicksStartsAFreshRecoveryEpisode() throws Exception {
     try (var components = new TestEngineComponents()) {
       var handle = components.register(spec("generative", false, Duration.ZERO, 2));
-      handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "initial owner lost");
       var attempts = new AtomicInteger();
       ComponentRecoveryAction action = request -> {
@@ -579,7 +581,7 @@ final class ComponentRecoveryMonitorTest {
         await(() -> attempts.get() == 1 && handle.snapshot().state() == ComponentState.READY);
         awaitIdle(monitor);
 
-        handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+        handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
             "owner failed again before the next tick");
         monitor.tick();
         await(() -> attempts.get() == 2 && handle.snapshot().state() == ComponentState.READY);
@@ -594,7 +596,7 @@ final class ComponentRecoveryMonitorTest {
   void failedEvidenceDoesNotResetTheCumulativeBudget() throws Exception {
     try (var components = new TestEngineComponents()) {
       var handle = components.register(spec("generative", false, Duration.ZERO, 2));
-      handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "initial failure");
       var attempts = new AtomicInteger();
       ComponentRecoveryAction action = request -> {
@@ -632,7 +634,7 @@ final class ComponentRecoveryMonitorTest {
   void delayedOlderReadySnapshotCannotCloseTheCurrentRecoveryEpisode() throws Exception {
     try (var components = new TestEngineComponents()) {
       var handle = components.register(spec("generative", false, Duration.ZERO, 2));
-      handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "initial failure");
       var firstReadySnapshot = new AtomicReference<EngineComponentSnapshot>();
       var readyEntered = new CountDownLatch(1);
@@ -671,7 +673,7 @@ final class ComponentRecoveryMonitorTest {
 
         publisher.start();
         assertTrue(readyEntered.await(5, TimeUnit.SECONDS));
-        handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+        handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
             "failure superseded the older ready row");
         monitor.tick();
         assertTrue(actionStarted.await(5, TimeUnit.SECONDS));
@@ -706,7 +708,7 @@ final class ComponentRecoveryMonitorTest {
   void exactReadyTerminalFollowedByNewFailureCannotTriggerIndexPublication() throws Exception {
     try (var components = new TestEngineComponents()) {
       var index = components.register(spec("index", true, Duration.ZERO, 2));
-      index.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "index owner lost");
       var bootstrap = mock(KnowledgeServerBootstrap.class);
       when(bootstrap.indexComponent()).thenReturn(index);
@@ -717,7 +719,7 @@ final class ComponentRecoveryMonitorTest {
       ComponentRecoveryAction action = request -> {
         assertTrue(request.begin());
         var terminal = recovered(request, index, "index ready", "ready");
-        index.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+        index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
             "new index failure");
         return terminal;
       };
@@ -740,7 +742,7 @@ final class ComponentRecoveryMonitorTest {
   void deadlineFailureThenExactReadyCompletionIsAccepted() throws Exception {
     try (var components = new TestEngineComponents()) {
       var handle = components.register(spec("generative", false, Duration.ofMillis(1), 2));
-      handle.transition(ComponentState.STARTING, LifecycleReasonCode.WORKER_STARTING.code(),
+      handle.transition(ComponentState.STARTING, LifecycleReasonCode.INDEX_STARTING.code(),
           "waiting for owner");
       ComponentRecoveryAction action = request -> {
         assertTrue(request.begin());
@@ -775,7 +777,7 @@ final class ComponentRecoveryMonitorTest {
       throws Exception {
     try (var components = new TestEngineComponents()) {
       var generative = components.register(spec("generative", false, Duration.ZERO, 2));
-      generative.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      generative.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "managed child exited");
       var calls = new AtomicInteger();
       var bootstrap = bootstrapWithoutClient();
@@ -820,7 +822,7 @@ final class ComponentRecoveryMonitorTest {
       throws Exception {
     try (var components = new TestEngineComponents()) {
       var generative = components.register(spec("generative", false, Duration.ZERO, 2));
-      generative.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      generative.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "managed child exited");
       var calls = new AtomicInteger();
       var bootstrap = bootstrapWithoutClient();
@@ -856,7 +858,7 @@ final class ComponentRecoveryMonitorTest {
       throws Exception {
     try (var components = new TestEngineComponents()) {
       var generative = components.register(spec("generative", false, Duration.ZERO, 2));
-      generative.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      generative.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "managed child exited");
       var bootstrap = bootstrapWithoutClient();
       when(bootstrap.dataDirForHarness()).thenReturn(data);
@@ -942,7 +944,7 @@ final class ComponentRecoveryMonitorTest {
   void progressObservationThenExactReadyCompletionIsAccepted() throws Exception {
     try (var components = new TestEngineComponents()) {
       var handle = components.register(spec("generative", false, Duration.ZERO, 2));
-      handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "owner lost");
       ComponentRecoveryAction action = request -> {
         assertTrue(request.begin());
@@ -972,7 +974,7 @@ final class ComponentRecoveryMonitorTest {
     try (var components = new TestEngineComponents()) {
       var index = components.register(spec("index", true, Duration.ZERO, 2));
       var generative = components.register(spec("generative", false, Duration.ZERO, 2));
-      generative.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      generative.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "generative owner lost");
       var bootstrap = mock(KnowledgeServerBootstrap.class);
       when(bootstrap.indexComponent()).thenReturn(index);
@@ -1018,7 +1020,7 @@ final class ComponentRecoveryMonitorTest {
   void recoveryPublishedCallbackMayCloseMonitorWithoutSelfAwait() throws Exception {
     try (var components = new TestEngineComponents()) {
       var index = components.register(spec("index", true, Duration.ZERO, 2));
-      index.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "index owner lost");
       var bootstrap = mock(KnowledgeServerBootstrap.class);
       when(bootstrap.indexComponent()).thenReturn(index);
@@ -1059,7 +1061,7 @@ final class ComponentRecoveryMonitorTest {
   void throwingRecoveryPublishedCallbackDoesNotRetryReadyPhysicalOwner() throws Exception {
     try (var components = new TestEngineComponents()) {
       var index = components.register(spec("index", true, Duration.ZERO, 2));
-      index.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "index owner lost");
       var bootstrap = mock(KnowledgeServerBootstrap.class);
       when(bootstrap.indexComponent()).thenReturn(index);
@@ -1097,7 +1099,7 @@ final class ComponentRecoveryMonitorTest {
   void throwingEscalationCallbackIsRetriedOnTheNextTick() {
     try (var components = new TestEngineComponents()) {
       var required = components.register(spec("api", true, Duration.ZERO, 0));
-      required.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      required.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "owner lost");
       var escalations = new AtomicInteger();
       ComponentRecoveryAction action = request -> {
@@ -1121,7 +1123,7 @@ final class ComponentRecoveryMonitorTest {
   void staleRowAfterActionStartsCannotBeOverwrittenByItsFailure() throws Exception {
     try (var components = new TestEngineComponents()) {
       var handle = components.register(spec("generative", false, Duration.ZERO, 2));
-      handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "old row");
       var actionCalled = new CountDownLatch(1);
       var release = new CountDownLatch(1);
@@ -1158,7 +1160,7 @@ final class ComponentRecoveryMonitorTest {
   void beginIsOneShotAndOnlyTheFirstCallCounts() throws Exception {
     try (var components = new TestEngineComponents()) {
       var handle = components.register(spec("generative", false, Duration.ZERO, 2));
-      handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "owner lost");
       var secondBegin = new AtomicReference<Boolean>();
       var actionFailure = new AtomicReference<Throwable>();
@@ -1186,12 +1188,12 @@ final class ComponentRecoveryMonitorTest {
   void ownerRowChangeBeforeBeginRefusesWithoutSpendingRecovery() throws Exception {
     try (var components = new TestEngineComponents()) {
       var handle = components.register(spec("generative", false, Duration.ZERO, 2));
-      handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+      handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
           "old row");
       var actionCalled = new CountDownLatch(1);
       var actionFailure = new AtomicReference<Throwable>();
       ComponentRecoveryAction action = request -> {
-        handle.transition(ComponentState.FAILED, LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+        handle.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
             "newer physical observation");
         actionCalled.countDown();
         assertFalse(request.begin());

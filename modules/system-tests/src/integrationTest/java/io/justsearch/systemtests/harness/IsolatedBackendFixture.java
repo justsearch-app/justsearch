@@ -97,13 +97,13 @@ public final class IsolatedBackendFixture {
 
   /**
    * Tempdoc 825 (charter item 3): the TERMINAL worker reason code. Its whole reason for existing is
-   * that it is unambiguous — {@code worker.spawn.failed} means "failed, recovery pending or in
+   * that it is unambiguous — {@code index.failed} means "failed, recovery pending or in
    * flight" and would fail fast on a boot that is about to succeed, which is why tempdoc 836
    * deliberately left this fixture blind. Once this appears in the body, the Head has stopped
    * trying, so every remaining millisecond of the health budget is spent waiting for nothing.
    */
   private static final List<String> TERMINAL_WORKER_REASONS =
-      List.of("worker.spawn_recovery_exhausted");
+      List.of("component.recovery_exhausted");
 
   private final String ownerLabel = resolveOwnerLabel();
 
@@ -453,7 +453,7 @@ public final class IsolatedBackendFixture {
    * Tempdoc 825 (charter item 3): stop waiting the moment the Head says it has stopped trying — on
    * EITHER terminal path (review F2(b)): this tempdoc's boot-recovery give-up, and supervision's own
    * give-up, which boot recovery deliberately does not supersede. Before the terminal code existed
-   * there was nothing safe to key on — {@code worker.spawn.failed} is emitted mid-recovery too — so a
+   * there was nothing safe to key on — {@code index.failed} is emitted mid-recovery too — so a
    * bricked boot burned the whole {@value #HEALTH_TIMEOUT_MS}ms budget and reported a bare timeout.
    * This turns that into an immediate, causally-named failure.
    */

@@ -68,9 +68,9 @@ final class BootstrapRecomposeRecoveryTest {
 
       var result = bootstrap.recomposeForRecovery(
           mock(ComponentRecoveryAction.Request.class), (request, body) -> {
-            bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_SPAWN_FAILED,
+            bootstrap.transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED,
                 "suppressed generic failure");
-            assertEquals(LifecycleReasonCode.WORKER_INDEX_CORRUPT,
+            assertEquals(LifecycleReasonCode.INDEX_CORRUPT,
                 body.fatalReasonCode());
             assertTrue(body.fatalDetail().contains("corrupt"));
             assertTrue(body.run(() -> true));

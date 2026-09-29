@@ -78,7 +78,6 @@ import java.util.Map;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -858,7 +857,7 @@ public final class KnowledgeServer implements Closeable {
     if (indexComponent != null && (recoveryStartContext == null
         || !recoveryStartContext.recoveryAttempt())) {
       indexComponent.transition(io.justsearch.core.component.ComponentState.STARTING,
-          io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_STARTING.code(), null);
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_STARTING.code(), null);
     }
     running = true;
     long t0 = System.nanoTime();
@@ -1673,7 +1672,7 @@ public final class KnowledgeServer implements Closeable {
       if (indexComponent != null && (recoveryStartContext == null
           || !recoveryStartContext.recoveryAttempt())) {
         indexComponent.transition(io.justsearch.core.component.ComponentState.FAILED,
-            io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(), null);
+            io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_FAILED.code(), null);
       }
       log.error("Failed to start KnowledgeServer", e);
       // tempdoc 628 Stage D-part2: if startup failed because the index is corrupt and could not be
@@ -2201,7 +2200,7 @@ public final class KnowledgeServer implements Closeable {
       var completed = request.complete(terminalBase,
           degraded ? io.justsearch.core.component.ComponentState.UNAVAILABLE
               : io.justsearch.core.component.ComponentState.READY,
-          null, degraded ? terminalPublication.evidence()
+          terminalPublication.reasonCode(), degraded ? terminalPublication.evidence()
               : "Exact captured encoder plan recomposed");
       if (completed.isEmpty()) {
         var raced = request.current();
@@ -2209,7 +2208,7 @@ public final class KnowledgeServer implements Closeable {
           completed = request.complete(raced,
               degraded ? io.justsearch.core.component.ComponentState.UNAVAILABLE
                   : io.justsearch.core.component.ComponentState.READY,
-              null, degraded ? terminalPublication.evidence()
+              terminalPublication.reasonCode(), degraded ? terminalPublication.evidence()
                   : "Exact captured encoder plan recomposed after its deadline");
         }
       }
@@ -2264,7 +2263,7 @@ public final class KnowledgeServer implements Closeable {
     }
     if (admitted.equals(current)) return true;
     return current.state() == io.justsearch.core.component.ComponentState.FAILED
-        && io.justsearch.app.api.lifecycle.LifecycleReasonCode.COMPONENT_START_TIMEOUT.code()
+        && io.justsearch.app.api.lifecycle.LifecycleReasonCode.COMPONENT_START_DEADLINE.code()
             .equals(current.reasonCode());
   }
 
@@ -2279,7 +2278,7 @@ public final class KnowledgeServer implements Closeable {
     }
     if (installed.equals(current)) return true;
     return current.state() == io.justsearch.core.component.ComponentState.FAILED
-        && io.justsearch.app.api.lifecycle.LifecycleReasonCode.COMPONENT_START_TIMEOUT.code()
+        && io.justsearch.app.api.lifecycle.LifecycleReasonCode.COMPONENT_START_DEADLINE.code()
             .equals(current.reasonCode());
   }
 
@@ -3453,9 +3452,19 @@ public final class KnowledgeServer implements Closeable {
   private io.justsearch.core.component.EngineComponentSnapshot.Component encoderObservation(
       io.justsearch.core.component.ComponentState state, String desiredVersion,
       String appliedVersion, String evidence) {
+    return encoderObservation(state, desiredVersion, appliedVersion, evidence, null);
+  }
+
+  private io.justsearch.core.component.EngineComponentSnapshot.Component encoderObservation(
+      io.justsearch.core.component.ComponentState state, String desiredVersion,
+      String appliedVersion, String evidence, String reasonCode) {
     var before = encoderComponent.snapshot();
     return new io.justsearch.core.component.EngineComponentSnapshot.Component(
-        before.spec(), state, null, before.stateSince(), before.stateSinceMonotonicNanos(),
+        before.spec(), state,
+        state == io.justsearch.core.component.ComponentState.RELOADING
+            ? io.justsearch.app.api.lifecycle.LifecycleReasonCode.ENCODERS_RELOADING.code()
+            : reasonCode,
+        before.stateSince(), before.stateSinceMonotonicNanos(),
         appliedVersion == null ? before.appliedVersion() : appliedVersion,
         desiredVersion == null ? before.desiredVersion() : desiredVersion,
         before.lastCompose(), before.recoveryAttempts(), evidence);
@@ -4449,14 +4458,14 @@ public final class KnowledgeServer implements Closeable {
     if (publication.appliedVersion() != null) {
       encoderComponent.setAppliedVersion(publication.appliedVersion());
     }
-    encoderComponent.transition(publication.state(), null, publication.evidence());
+    encoderComponent.transition(publication.state(), publication.reasonCode(), publication.evidence());
     } finally {
       runtimeSwapLock.unlock();
     }
   }
 
   private record EncoderPublication(io.justsearch.core.component.ComponentState state,
-      String desiredVersion, String appliedVersion, String evidence,
+      String desiredVersion, String appliedVersion, String evidence, String reasonCode,
       Set<io.justsearch.ort.EncoderRole> missingRoles, boolean coherent) {}
 
   private io.justsearch.core.component.EngineComponentSnapshot.Component encoderCompositionObservation(
@@ -4464,7 +4473,7 @@ public final class KnowledgeServer implements Closeable {
       GenerationModelSelection selection) {
     var publication = encoderPublication(owner, queryOwner, configuration, selection);
     return encoderObservation(publication.state(), publication.desiredVersion(),
-        publication.appliedVersion(), publication.evidence());
+        publication.appliedVersion(), publication.evidence(), publication.reasonCode());
   }
 
   private EncoderPublication encoderPublication(EncoderSet owner, QueryRoleSet queryOwner,
@@ -4515,10 +4524,17 @@ public final class KnowledgeServer implements Closeable {
         ? (!requested.isEmpty() ? null : "no_encoder_roles_requested")
         : "missing_roles=" + missing.stream()
             .map(Enum::name).sorted().collect(java.util.stream.Collectors.joining(","));
+    boolean selectedModelMissing = selection != null && missing.stream()
+        .map(io.justsearch.ort.EncoderRole::packageId)
+        .distinct()
+        .anyMatch(id -> selection.includes(id) && selection.verify(id).isEmpty());
+    String reasonCode = selectedModelMissing
+        ? io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_MODEL_NOT_INSTALLED.code()
+        : null;
     return new EncoderPublication(ready ? io.justsearch.core.component.ComponentState.READY
         : intentionallyAbsent ? io.justsearch.core.component.ComponentState.ABSENT
         : io.justsearch.core.component.ComponentState.UNAVAILABLE,
-        desiredVersion, appliedVersion, evidence, Set.copyOf(missing), coherent);
+        desiredVersion, appliedVersion, evidence, reasonCode, Set.copyOf(missing), coherent);
   }
 
   /** Builds a private query successor while retaining the exact currently issued A view. */
@@ -6103,7 +6119,7 @@ public final class KnowledgeServer implements Closeable {
         // shutdown to completion. That is what EngineRoot.close() consults.
         if (publishIndexStopped && indexComponent != null) {
           indexComponent.transition(io.justsearch.core.component.ComponentState.ABSENT,
-              io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SHUT_DOWN.code(), null);
+              io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_SHUT_DOWN.code(), null);
           indexComponent.setAppliedVersion(null);
         }
         if (encoderComponent != null) {

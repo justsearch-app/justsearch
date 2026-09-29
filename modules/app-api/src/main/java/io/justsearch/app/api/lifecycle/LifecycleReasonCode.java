@@ -15,56 +15,31 @@ import java.util.Set;
  * <p>Stability: stable (API contract)
  */
 public enum LifecycleReasonCode {
-  COMPONENT_START_TIMEOUT("component.start_timeout"),
+  COMPONENT_START_DEADLINE("component.start_deadline"),
   COMPONENT_RECOVERING("component.recovering"),
   COMPONENT_RECOVERY_FAILED("component.recovery_failed"),
-  // --- Worker ---
-  WORKER_SPAWN_FAILED("worker.spawn.failed"),
-  WORKER_NOT_CONFIGURED("worker.not_configured"),
-  WORKER_STARTING("worker.starting"),
-  WORKER_THROUGHPUT_STALLED("worker.throughput_stalled"),
-  WORKER_THROUGHPUT_DEGRADED("worker.throughput_degraded"),
-  // Tempdoc 600 PART IX — consolidated from raw string literals in StatusLifecycleHandler into the
-  // one closed readiness vocabulary (string values unchanged). Worker-availability + embedding-probe
-  // readiness states emitted onto the `retrieval`/`aiFeatures` composites.
-  WORKER_NOT_STARTED("worker.not_started"),
-  WORKER_UNAVAILABLE("worker.unavailable"),
-  WORKER_HEALTH_EMBEDDING_NOT_READY("worker.health.embedding_not_ready"),
-  WORKER_HEALTH_EMBEDDING_PROBE_MISSING("worker.health.embedding_probe_missing"),
-  // Tempdoc 825 — the Head's BOOT-recovery budget is spent: the worker never started, the bounded
-  // re-attempt loop (KnowledgeServerHealthMonitor's boot-recovery arm) tried and stopped trying.
-  // The terminal twin of worker.spawn.failed, which permits local recovery attempts.
-  WORKER_SPAWN_RECOVERY_EXHAUSTED("worker.spawn_recovery_exhausted"),
-  // Tempdoc 837 S3 (fix c) — the worker WAS serving and stopped answering. Distinct from
-  // worker.spawn.failed, which now means only "it never started": the two states have different
-  // truths (the index was reachable a moment ago) and the collapsed wording told a user whose
-  // worker had just died that it "failed to start". Emitted only where the call site already knows
-  // it was READY (KnowledgeServerBootstrap.checkHealth, KnowledgeServerHealthMonitor's tick).
-  WORKER_LOST("worker.lost"),
-  // Tempdoc 837 S3 — the worker exited fatally because the index is corrupt and could not be
-  // auto-recovered under the fail-closed policy (tempdoc 628 Stage D). The dying worker stamps
-  // WorkerFatalReasonMarker; the Head reads it once (readAndClear DELETES it), so this cause is
-  // observable exactly once per crash and WorkerCapability latches it until READY.
-  WORKER_INDEX_CORRUPT("worker.index_corrupt"),
-  // Tempdoc 915 (live validation D-obs): the worker refused to start because the committed index
-  // shape is not the one this runtime writes, under index.schema_mismatch.policy=FAIL_CLOSED.
-  // Same marker mechanism as WORKER_INDEX_CORRUPT and the same once-per-crash observability; a
-  // separate code because the remedy differs - a rebuild under a policy that permits one, or a
-  // policy change, not a corruption repair.
-  WORKER_INDEX_SCHEMA_MISMATCH("worker.index_schema_mismatch"),
-  // Tempdoc 837 S3 — orderly teardown (KnowledgeServerBootstrap.closeForUpgrade). Not a failure:
-  // distinguishing it from worker.not_configured keeps "we stopped it" from reading as
-  // "it was never set up".
-  WORKER_SHUT_DOWN("worker.shut_down"),
-  // Tempdoc 837 S3 — the pre-transition default: the Head is up and nothing has been observed about
-  // the worker yet. Distinct from worker.starting (a start was actually attempted); it is the reason
-  // published on the runtime manifest and the 503 body from process start until the first transition.
-  WORKER_NOT_CONNECTED("worker.not_connected"),
+  COMPONENT_RECOVERY_EXHAUSTED("component.recovery_exhausted"),
+  // --- Engine components ---
+  ENGINE_NOT_STARTED("engine.not_started"),
+  ENCODERS_RELOADING("encoders.reloading"),
+  ENCODERS_HEALTH_EMBEDDING_NOT_READY("encoders.health.embedding_not_ready"),
+  ENCODERS_HEALTH_EMBEDDING_PROBE_MISSING("encoders.health.embedding_probe_missing"),
 
-  // --- Index serving / embedding compatibility (tempdoc 600: Design A + PART IX consolidation) ---
+  // --- Index serving / embedding compatibility ---
+  INDEX_STARTING("index.starting"),
+  INDEX_ACTIVATING("index.activating"),
+  INDEX_FAILED("index.failed"),
+  INDEX_CORRUPT("index.corrupt"),
+  INDEX_SHUT_DOWN("index.shut_down"),
+  INDEX_UNAVAILABLE("index.unavailable"),
+  INDEX_THROUGHPUT_STALLED("index.throughput_stalled"),
+  INDEX_THROUGHPUT_DEGRADED("index.throughput_degraded"),
+  INDEX_MODEL_NOT_INSTALLED("index.model_not_installed"),
   INDEX_NOT_HEALTHY("index.not_healthy"),
   INDEX_BLOCKED_LEGACY("index.blocked_legacy"),
   INDEX_SCHEMA_MISMATCH("index.schema_mismatch"),
+  INDEX_SCHEMA_OPEN_REFUSED("index.schema_open_refused"),
+  MIGRATION_AWAITING_GAP_ACCEPTANCE("migration.awaiting_gap_acceptance"),
   // Tempdoc 915 §C: the Worker gave up on automatic rebuilds for this index shape after
   // MAX_AUTO_REBUILD_ATTEMPTS. Search still serves the existing index read-only; ingestion does
   // not resume without an operator.
@@ -211,8 +186,8 @@ public enum LifecycleReasonCode {
    *
    * <p>Codes a {@link Capability} never holds — the {@code index.*} / {@code ocr.*} / {@code vdu.*}
    * / {@code telemetry.*} / {@code lambdamart.*} / {@code gpu.*} / {@code chunk_embedding.*} /
-   * {@code worker.throughput_*} / {@code worker.health.*} / {@code worker.not_started} /
-   * {@code worker.unavailable} families are computed per-request in {@code StatusLifecycleHandler}
+   * {@code index.throughput_*} / {@code encoders.health.*} / {@code engine.not_started} /
+   * {@code index.unavailable} families are computed per-request in {@code StatusLifecycleHandler}
    * from worker views and never enter a reason slot — are classified {@link RetentionClass#TRANSIENT}
    * so the classification stays total: never-retained is the safe default for a code that cannot be
    * held anyway. The {@code local_api.*} family is never held for a different reason (tempdoc 884
@@ -221,24 +196,18 @@ public enum LifecycleReasonCode {
    */
   public RetentionClass retentionClass() {
     return switch (this) {
-      // Unrepeatable: the fatal-reason marker is deleted as it is read (tempdoc 628/837 §3.1).
-      case WORKER_INDEX_CORRUPT, WORKER_INDEX_SCHEMA_MISMATCH -> RetentionClass.STICKY;
+      // Fatal marker evidence is consumed once; exhausted recovery is terminal until READY.
+      case INDEX_CORRUPT, INDEX_SCHEMA_OPEN_REFUSED,
+          COMPONENT_RECOVERY_EXHAUSTED -> RetentionClass.STICKY;
 
       // Tempdoc 882 item 24: observed exactly once, at load, and never re-derived. The file that
       // proved it has already been moved aside. A later TRANSIENT write must not erase the only
       // notice the user gets that their preferences were reset.
       case SETTINGS_RESET_FROM_CORRUPT, SETTINGS_RECOVERY_REQUIRED, OPERATIONS_HISTORY_RESET, OPERATIONS_PERSISTENCE_FAILED -> RetentionClass.STICKY;
 
-      // Real causes. WORKER_SPAWN_FAILED is deliberately NOT generic even though
-      // resolveWorkerReasonCode uses it as a consumer-side fallback: fallback-ness is a property of
-      // the consumer, and after the 837 S3 sweep the code is only ever SET where the worker
-      // genuinely never started. Classifying it GENERIC would let a stale worker.lost outrank a real
-      // subsequent spawn failure.
-      case COMPONENT_START_TIMEOUT, COMPONENT_RECOVERY_FAILED, WORKER_SPAWN_FAILED,
-          WORKER_LOST,
-          // Tempdoc 825: terminal, and the last thing anyone learned about the worker — a later
-          // TRANSIENT write (a stray worker.starting) must not erase why we stopped trying.
-          WORKER_SPAWN_RECOVERY_EXHAUSTED,
+      // Physical failure is a real cause, whether the index never opened or was lost after READY.
+      case COMPONENT_START_DEADLINE, COMPONENT_RECOVERY_FAILED,
+          INDEX_FAILED, INDEX_MODEL_NOT_INSTALLED,
           INFERENCE_CRASHED,
           INFERENCE_MODEL_NOT_CONFIGURED,
           INFERENCE_MODEL_NOT_FOUND,
@@ -251,16 +220,15 @@ public enum LifecycleReasonCode {
       case INFERENCE_OFFLINE -> RetentionClass.GENERIC;
 
       // Progress / scheduled / intentional, plus every code no capability ever holds.
-      case COMPONENT_RECOVERING, WORKER_STARTING,
-          WORKER_SHUT_DOWN,
-          WORKER_NOT_CONNECTED,
-          WORKER_NOT_CONFIGURED,
-          WORKER_NOT_STARTED,
-          WORKER_UNAVAILABLE,
-          WORKER_THROUGHPUT_STALLED,
-          WORKER_THROUGHPUT_DEGRADED,
-          WORKER_HEALTH_EMBEDDING_NOT_READY,
-          WORKER_HEALTH_EMBEDDING_PROBE_MISSING,
+      case COMPONENT_RECOVERING, INDEX_STARTING, INDEX_ACTIVATING,
+          INDEX_SHUT_DOWN,
+          INDEX_UNAVAILABLE,
+          ENGINE_NOT_STARTED,
+          ENCODERS_RELOADING,
+          INDEX_THROUGHPUT_STALLED,
+          INDEX_THROUGHPUT_DEGRADED,
+          ENCODERS_HEALTH_EMBEDDING_NOT_READY,
+          ENCODERS_HEALTH_EMBEDDING_PROBE_MISSING,
           INFERENCE_STARTING,
           INFERENCE_GPU_YIELDED_TO_INDEXING,
           INFERENCE_UP_FOR_BACKGROUND,
@@ -269,6 +237,7 @@ public enum LifecycleReasonCode {
           INDEX_BLOCKED_LEGACY,
           INDEX_SCHEMA_MISMATCH,
           INDEX_REBUILD_BRAKE_EXHAUSTED,
+          MIGRATION_AWAITING_GAP_ACCEPTANCE,
           INDEX_EMBEDDING_REBUILDING,
           INDEX_EMBEDDING_LEGACY,
           INDEX_EMBEDDING_MISMATCH,

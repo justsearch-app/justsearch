@@ -77,9 +77,9 @@ final class CapabilityHealthBridgeRecoveryTest {
               changes,
               HEAD)) {
         components.handle("index").transition(
-            ComponentState.STARTING, "worker.starting", "attempt in progress");
+            ComponentState.STARTING, "index.starting", "attempt in progress");
         components.handle("index").transition(
-            ComponentState.FAILED, "worker.spawn_recovery_exhausted", "attempts exhausted");
+            ComponentState.FAILED, "component.recovery_exhausted", "attempts exhausted");
         components.handle("index").transition(ComponentState.READY, null, "recovered");
 
         assertTrue(

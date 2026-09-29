@@ -10,6 +10,8 @@ import { projectAvailability, unavailableBecause, type Availability } from './av
 import {
   AI_UNAVAILABLE_CAVEAT,
   KEYWORD_FALLBACK_CAVEAT,
+  SEARCH_UNAVAILABLE_CAVEAT,
+  MODEL_UNAVAILABLE_CAVEAT,
   OPTIONAL_CAPABILITY_CAVEAT,
   PASSAGE_REDUCED_CAVEAT,
   reasonFor,
@@ -191,6 +193,24 @@ describe('projectAvailability (tempdoc 596)', () => {
     expect(a.kind).toBe('degraded');
     expect(a.kind === 'degraded' && a.caveat).toBe(PASSAGE_REDUCED_CAVEAT);
     expect(a.kind === 'degraded' && a.caveat.toLowerCase()).not.toContain('keyword');
+  });
+
+  it('D1-15: a missing selected query model does not assert keyword-only retrieval', () => {
+    const a = projectAvailability(
+      'documents',
+      aiState({ chat: true, docs: 5, degradedSeverity: 'warn', reasons: ['index.model_not_installed'] }),
+    );
+    expect(a.kind === 'degraded' && a.caveat).toBe(MODEL_UNAVAILABLE_CAVEAT);
+    expect(a.kind === 'degraded' && a.caveat).not.toContain('keyword');
+  });
+
+  it('D1-15: a fatal schema open refusal does not claim keyword search still serves', () => {
+    const a = projectAvailability(
+      'documents',
+      aiState({ chat: true, docs: 5, degradedSeverity: 'warn', reasons: ['index.schema_open_refused'] }),
+    );
+    expect(a.kind === 'degraded' && a.caveat).toBe(SEARCH_UNAVAILABLE_CAVEAT);
+    expect(a.kind === 'degraded' && a.caveat).not.toContain('keyword');
   });
 
   it('805 §G.2: an AI-model cause → the calm caveat (retrieval is untouched)', () => {

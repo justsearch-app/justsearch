@@ -221,7 +221,8 @@ final class EngineSupervisedRecoveryE2ETest {
       assertEquals(semantic.path("sampledRequests").asInt(), semantic.path("available").asInt(), line);
       assertEquals(semantic.path("hybridSampled").asInt(), semantic.path("hybridAvailable").asInt(), line);
       assertEquals(0, semantic.path("reloadingRefusals").asInt(), line);
-      assertEquals(0, semantic.path("workerStarting").asInt(), line);
+      assertTrue(semantic.has("indexStarting"), line);
+      assertEquals(0, semantic.path("indexStarting").asInt(), line);
       assertEquals(0, semantic.path("transport").asInt(), line);
       assertEquals(0, semantic.path("apiOutageWindowMs").asInt(), line);
       assertEquals(0, result.path("restartCount").asInt(), line);

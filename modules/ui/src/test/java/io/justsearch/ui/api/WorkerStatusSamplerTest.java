@@ -320,7 +320,7 @@ final class WorkerStatusSamplerTest {
     components.transition(
         "index",
         attached.getAsBoolean() ? ComponentState.READY : ComponentState.STARTING,
-        attached.getAsBoolean() ? null : "worker.starting",
+        attached.getAsBoolean() ? null : "index.starting",
         attached.getAsBoolean() ? "Worker serving" : "Worker starting");
     KnowledgeServerBootstrap ks = mock(KnowledgeServerBootstrap.class);
     BootstrapLeaseFixtures.bind(ks, client);

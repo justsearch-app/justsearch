@@ -573,7 +573,7 @@ describe('StatusDeck (slice 461)', () => {
     const DEGRADED_WARN = {
       kind: 'degraded',
       severity: 'warn',
-      reasons: ['worker.health.embedding_not_ready'],
+      reasons: ['encoders.health.embedding_not_ready'],
     } as AiState['verdict'];
 
     function degradedDeck(): StatusDeck {

@@ -134,7 +134,7 @@ final class InferenceCapabilityWiringTest {
   void failedInitialActivationAfterDeadlineRemainsFailed() {
     Fixture fixture = fixture(Mode.TRANSITIONING, true, null);
     fixture.handle().transition(ComponentState.FAILED,
-        LifecycleReasonCode.COMPONENT_START_TIMEOUT.code(), "waiting for server health");
+        LifecycleReasonCode.COMPONENT_START_DEADLINE.code(), "waiting for server health");
     fixture.mode().set(Mode.OFFLINE);
     transitionListener(fixture.manager()).onModeTransition(
         Mode.TRANSITIONING, Mode.OFFLINE, TransitionReason.AUTO_START);

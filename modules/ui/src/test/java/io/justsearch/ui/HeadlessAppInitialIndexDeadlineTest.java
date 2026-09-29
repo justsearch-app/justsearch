@@ -105,7 +105,7 @@ final class HeadlessAppInitialIndexDeadlineTest {
     try (var components = new TestEngineComponents()) {
       var index = components.register(new ComponentSpec("index", true, Set.of(),
           ComponentSpec.ComposeCapability.BESIDE, Duration.ofMillis(1), 2));
-      index.transition(ComponentState.STARTING, "worker.starting", "index root lock");
+      index.transition(ComponentState.STARTING, "index.starting", "index root lock");
       var opening = new CompletableFuture<String>();
 
       assertNull(HeadlessApp.awaitInitialIndexStart(opening, index));

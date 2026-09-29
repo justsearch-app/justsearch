@@ -215,7 +215,7 @@ final class KnowledgeServerRecoveryCloseTest {
       encoder.transition(ComponentState.FAILED, "encoder.failed", "test failure");
       doAnswer(invocation -> {
         encoder.transition(ComponentState.FAILED,
-            io.justsearch.app.api.lifecycle.LifecycleReasonCode.COMPONENT_START_TIMEOUT.code(),
+            io.justsearch.app.api.lifecycle.LifecycleReasonCode.COMPONENT_START_DEADLINE.code(),
             "deadline elapsed during exact composition");
         return null;
       }).when(producer).wireRecoveredEncoders(
@@ -473,7 +473,7 @@ final class KnowledgeServerRecoveryCloseTest {
       try {
         server.start();
         assertTrue(server.awaitIndexRecoveryModels(10_000));
-        index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+        index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
         var request = new RecoveryRequest(index);
 
         var context = server.reserveIndexRecovery(request).orElseThrow();
@@ -509,7 +509,7 @@ final class KnowledgeServerRecoveryCloseTest {
       try {
         server.start();
         assertTrue(server.awaitIndexRecoveryModels(10_000));
-        index.transition(ComponentState.FAILED, "worker.lost", "first failure");
+        index.transition(ComponentState.FAILED, "index.failed", "first failure");
         var first = server.reserveIndexRecovery(new RecoveryRequest(index)).orElseThrow();
 
         index.transition(ComponentState.FAILED, "component.recovery_failed", "partial close");
@@ -540,7 +540,7 @@ final class KnowledgeServerRecoveryCloseTest {
       try {
         server.start();
         assertTrue(server.awaitIndexRecoveryModels(10_000));
-        index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+        index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
         var request = new RecoveryRequest(index, () -> {
           try {
             server.closeForRecovery();
@@ -587,7 +587,7 @@ final class KnowledgeServerRecoveryCloseTest {
       try {
         server.start();
         Object published = server.appServices();
-        index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+        index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
         var context = server.reserveIndexRecovery(new RecoveryRequest(index)).orElseThrow();
 
         initializer.get().run();
@@ -620,7 +620,7 @@ final class KnowledgeServerRecoveryCloseTest {
           ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), index, null, snapshot);
       incumbent.start();
       assertTrue(incumbent.awaitIndexRecoveryModels(10_000));
-      index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+      index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
       var context = incumbent.reserveIndexRecovery(new RecoveryRequest(index)).orElseThrow();
       incumbent.closeForRecovery();
 
@@ -665,7 +665,7 @@ final class KnowledgeServerRecoveryCloseTest {
           ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), index, null, snapshot);
       incumbent.start();
       assertTrue(incumbent.awaitIndexRecoveryModels(10_000));
-      index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+      index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
       var context = incumbent.reserveIndexRecovery(new RecoveryRequest(index)).orElseThrow();
       incumbent.closeForRecovery();
 
@@ -712,7 +712,7 @@ final class KnowledgeServerRecoveryCloseTest {
       incumbent.start();
       assertTrue(incumbent.awaitIndexRecoveryModels(10_000));
       assertEquals(ComponentState.ABSENT, encoder.snapshot().state());
-      index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+      index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
       var context = incumbent.reserveIndexRecovery(new RecoveryRequest(index)).orElseThrow();
       incumbent.closeForRecovery();
       assertEquals(ComponentState.ABSENT, encoder.snapshot().state(),
@@ -743,7 +743,7 @@ final class KnowledgeServerRecoveryCloseTest {
         replacement.armIndexRecoveryServing(expectedCurrent);
         assertTrue(index.transitionIfUnchanged(expectedCurrent, ComponentState.READY, null, null));
         replacement.confirmIndexRecoveryServing(index.snapshot());
-        index.transition(ComponentState.UNAVAILABLE, "worker.lost", "transient health narration");
+        index.transition(ComponentState.UNAVAILABLE, "index.failed", "transient health narration");
         try (var accepted = replacement.captureServingView()) {
           assertNotNull(accepted,
               "the confirmed physical handover survives later mutable lifecycle narration");
@@ -852,7 +852,7 @@ final class KnowledgeServerRecoveryCloseTest {
       var server = realServer(executors, snapshot, index, RecordedIngestionLifecycle.denied());
       try {
         server.start();
-        index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+        index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
         var before = index.snapshot();
 
         assertTrue(server.reserveIndexRecovery(new RecoveryRequest(index)).isEmpty());
@@ -886,7 +886,7 @@ final class KnowledgeServerRecoveryCloseTest {
             "the bootstrap health owner has not yet published READY");
         assertNotNull(started.appliedVersion(), "real index owner must publish its applied digest");
 
-        index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+        index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
         var failed = index.snapshot();
         server.closeForRecovery();
         assertTrue(server.awaitClosed(0));
@@ -902,7 +902,7 @@ final class KnowledgeServerRecoveryCloseTest {
       var retry = realServer(executors, snapshot, index, RecordedIngestionLifecycle.denied());
       try {
         retry.start();
-        index.transition(ComponentState.FAILED, "worker.lost", "second physical owner failed");
+        index.transition(ComponentState.FAILED, "index.failed", "second physical owner failed");
         var admitted = index.tryBeginRecovery(index.snapshot(), "component.recovering", "retry")
             .orElseThrow();
         retry.closeForRecovery();

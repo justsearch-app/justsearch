@@ -81,7 +81,7 @@ final class ReadinessTriggerCompositionTest {
 
     var components = TestEngineComponents.fourComponents();
     components.handle("api").transition(ComponentState.STARTING, "api.starting", null);
-    components.handle("index").transition(ComponentState.STARTING, "worker.starting", null);
+    components.handle("index").transition(ComponentState.STARTING, "index.starting", null);
 
     KnowledgeServerBootstrap knowledgeServer = mock(KnowledgeServerBootstrap.class);
     KnowledgeClient client = mock(KnowledgeClient.class);

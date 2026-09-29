@@ -63,7 +63,7 @@ class WorkerBootRecoveryE2ETest {
   void bootRecoveryConvergesWithoutAProcessRestart() throws Exception {
     // start() is itself the primary assertion: awaitWorkerReady blocks on components.index.state =
     // READY inside the fixture's 90s worker gate, and (tempdoc 825) fails FAST if the Head narrates
-    // worker.spawn_recovery_exhausted — the give-up this run must not reach.
+    // component.recovery_exhausted — the give-up this run must not reach.
     BACKEND.withSystemProperty("justsearch.worker.boot.faultInjectAttempts", INJECTED_BOOT_FAULTS);
     BACKEND.start();
 
@@ -75,7 +75,7 @@ class WorkerBootRecoveryE2ETest {
         healthBody.path("components").path("index").path("state").asText(),
         "the index must be serving after recovery; body: " + health);
     assertFalse(
-        health.contains("worker.spawn_recovery_exhausted"),
+        health.contains("component.recovery_exhausted"),
         "the recovery budget must not have been spent; body: " + health);
 
     String status = get("/api/status");

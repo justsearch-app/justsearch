@@ -24,7 +24,7 @@ public record CapabilityGraph(Capability worker, Capability inference) {
   /** Explicit immutable unavailable graph for an isolated SearchPort-only composition. */
   public static CapabilityGraph unavailable() {
     return new CapabilityGraph(
-        new Unavailable("worker", true, LifecycleReasonCode.WORKER_NOT_CONNECTED.code()),
+        new Unavailable("worker", true, LifecycleReasonCode.ENGINE_NOT_STARTED.code()),
         new Unavailable("inference", false, LifecycleReasonCode.INFERENCE_MODEL_NOT_CONFIGURED.code()));
   }
 

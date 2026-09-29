@@ -39,9 +39,9 @@ final class WorkerCapabilityCorruptLatchTest {
     return fixture;
   }
 
-  private static final String CORRUPT = LifecycleReasonCode.WORKER_INDEX_CORRUPT.code();
-  private static final String LOST = LifecycleReasonCode.WORKER_LOST.code();
-  private static final String SPAWN_FAILED = LifecycleReasonCode.WORKER_SPAWN_FAILED.code();
+  private static final String CORRUPT = LifecycleReasonCode.INDEX_CORRUPT.code();
+  private static final String LOST = LifecycleReasonCode.INDEX_FAILED.code();
+  private static final String SPAWN_FAILED = LifecycleReasonCode.INDEX_FAILED.code();
   private static final String REMEDY = "Set index.recovery.policy=BACKUP_REBUILD to rebuild it.";
 
   @Test
@@ -63,7 +63,7 @@ final class WorkerCapabilityCorruptLatchTest {
 
     cap.transition(
         ComponentState.FAILED,
-        LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
+        LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code(),
         "gave up");
     assertEquals(
         CORRUPT,
@@ -114,7 +114,7 @@ final class WorkerCapabilityCorruptLatchTest {
     assertEquals(List.of(), observed, "a write that changed nothing must not notify");
 
     // A health change still notifies, even while the reason is retained.
-    cap.transition(ComponentState.ABSENT, LifecycleReasonCode.WORKER_SHUT_DOWN.code(), null);
+    cap.transition(ComponentState.ABSENT, LifecycleReasonCode.INDEX_SHUT_DOWN.code(), null);
     assertEquals(List.of(CapabilityHealth.OFFLINE), observed, "health changes always notify");
     assertEquals(CORRUPT, cap.pendingReason());
   }

@@ -218,6 +218,8 @@ export interface ReadinessView {
   // emitted on the `retrieval` composite by the worker. The verdict reads it via `reasonCodes`, and
   // `readinessNotice.isReindexCause` recognizes it. This collapses the prior fork (boolean + code).
   reasonCodes: string[];
+  /** Retrieval-only causes retain ownership for generic component deadlines/exhaustion. */
+  retrievalReasonCodes?: string[];
 }
 
 export interface AiState {
@@ -810,6 +812,7 @@ function computeReadiness(): Maybe<ReadinessView> {
     retrieval: toState('retrieval'),
     aiFeatures: toState('aiFeatures'),
     reasonCodes,
+    retrievalReasonCodes: composites['retrieval']?.reasonCodes ?? [],
   });
 }
 

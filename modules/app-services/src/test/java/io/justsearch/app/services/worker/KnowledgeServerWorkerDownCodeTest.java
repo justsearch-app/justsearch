@@ -22,7 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
  * corrupt index) is decided inside the shared helper from the dying worker's fatal-reason marker.
  *
  * <p>Before this, every one of those sites wrote free prose that the {@code /api/status} consumer
- * discarded and replaced with {@code worker.spawn.failed} — so a worker that had been serving for an
+ * discarded and replaced with {@code index.failed} — so a worker that had been serving for an
  * hour and died was reported as having "failed to start", and the corrupt-index remedy the Head had
  * computed was thrown away.
  */
@@ -35,17 +35,17 @@ final class KnowledgeServerWorkerDownCodeTest {
   }
 
   @Test
-  @DisplayName("never-started sites pass worker.spawn.failed; the prose becomes the detail")
+  @DisplayName("never-started sites pass index.failed; the prose becomes the detail")
   void neverStartedYieldsSpawnFailed(@TempDir Path tempDir) {
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
       var bootstrap = fixture.bootstrap();
 
       bootstrap.transitionWorkerDown(
-          LifecycleReasonCode.WORKER_SPAWN_FAILED, "Health check failed after 4200ms");
+          LifecycleReasonCode.INDEX_FAILED, "Health check failed after 4200ms");
 
       var cap = bootstrap.workerCapability();
       assertEquals(CapabilityHealth.DEGRADED, cap.health());
-      assertEquals(LifecycleReasonCode.WORKER_SPAWN_FAILED.code(), cap.pendingReason());
+      assertEquals(LifecycleReasonCode.INDEX_FAILED.code(), cap.pendingReason());
       assertEquals(
           "Health check failed after 4200ms",
           cap.pendingDetail(),
@@ -54,12 +54,12 @@ final class KnowledgeServerWorkerDownCodeTest {
   }
 
   @Test
-  @DisplayName("the was-READY sites pass worker.lost — the distinction the user could not see")
+  @DisplayName("the was-READY sites pass index.failed — the distinction the user could not see")
   void lostYieldsWorkerLost(@TempDir Path tempDir) {
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
-      fixture.bootstrap().transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
+      fixture.bootstrap().transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, "Health check failed");
       assertEquals(
-          LifecycleReasonCode.WORKER_LOST.code(),
+          LifecycleReasonCode.INDEX_FAILED.code(),
           fixture.bootstrap().workerCapability().pendingReason());
     }
   }
@@ -76,11 +76,11 @@ final class KnowledgeServerWorkerDownCodeTest {
       var bootstrap = fixture.bootstrap();
 
       bootstrap.transitionWorkerDown(
-          LifecycleReasonCode.WORKER_SPAWN_FAILED,
+          LifecycleReasonCode.INDEX_FAILED,
           "Worker process crashed (exit code 1) before writing port to signal file");
 
       var cap = bootstrap.workerCapability();
-      assertEquals(LifecycleReasonCode.WORKER_INDEX_SCHEMA_MISMATCH.code(), cap.pendingReason());
+      assertEquals(LifecycleReasonCode.INDEX_SCHEMA_OPEN_REFUSED.code(), cap.pendingReason());
       assertTrue(
           cap.pendingDetail().contains("index.schema_mismatch.policy"),
           "and names the setting that produced the refusal, which the crash message never could");
@@ -96,10 +96,10 @@ final class KnowledgeServerWorkerDownCodeTest {
     WorkerFatalReasonMarker.write(tempDir, WorkerFatalReasonMarker.INDEX_CORRUPT);
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
       var bootstrap = fixture.bootstrap();
-      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, "Health check failed");
 
       var cap = bootstrap.workerCapability();
-      assertEquals(LifecycleReasonCode.WORKER_INDEX_CORRUPT.code(), cap.pendingReason());
+      assertEquals(LifecycleReasonCode.INDEX_CORRUPT.code(), cap.pendingReason());
       assertTrue(
           cap.pendingDetail().contains("index.recovery.policy=BACKUP_REBUILD"),
           "the concrete remedy the Head already knew now reaches the user instead of being discarded");
@@ -115,10 +115,10 @@ final class KnowledgeServerWorkerDownCodeTest {
     WorkerFatalReasonMarker.write(tempDir, "out_of_memory");
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
       var bootstrap = fixture.bootstrap();
-      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, "Health check failed");
 
       assertEquals(
-          LifecycleReasonCode.WORKER_LOST.code(),
+          LifecycleReasonCode.INDEX_FAILED.code(),
           bootstrap.workerCapability().pendingReason(),
           "628's fail-loud-with-the-RIGHT-reason thesis: never offer a rebuild for a non-corruption death");
     }
@@ -132,19 +132,19 @@ final class KnowledgeServerWorkerDownCodeTest {
       var bootstrap = fixture.bootstrap();
       var cap = bootstrap.workerCapability();
 
-      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_LOST, "Health check failed");
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, "Health check failed");
       // The supervisor restarts; the index is still corrupt so the restart fails, and the marker is
       // already gone — a second read cannot recover the cause.
       fixture
           .indexComponent()
           .transition(
               ComponentState.STARTING, LifecycleReasonCode.COMPONENT_RECOVERING.code(), "a1");
-      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_SPAWN_FAILED, "Start failed");
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, "Start failed");
 
       assertEquals(
-          LifecycleReasonCode.WORKER_INDEX_CORRUPT.code(),
+          LifecycleReasonCode.INDEX_CORRUPT.code(),
           cap.pendingReason(),
-          "without the latch this reports worker.spawn.failed and the real cause is unrecoverable");
+          "without the latch this reports index.failed and the real cause is unrecoverable");
     }
   }
 }

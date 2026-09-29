@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The rule keys on the HELD code's class, never on the incoming code's genericness. §1.4's first
  * draft keyed on the incoming code and was a wrong-gate: once the worker bootstrap started stamping
- * {@code worker.starting}, the literal rule retained a STARTING worker as the reported cause of a
+ * {@code index.starting}, the literal rule retained a STARTING worker as the reported cause of a
  * spawn failure. {@link #transientNeverOutranksFault()} is that regression, and it is the
  * amendment's proof — it FAILS against §1.4's rule and passes against §D.1's.
  *
@@ -50,17 +50,26 @@ final class ReasonRetentionTest {
     return fixture;
   }
 
-  private static final String STARTING = LifecycleReasonCode.WORKER_STARTING.code();
-  private static final String SPAWN_FAILED = LifecycleReasonCode.WORKER_SPAWN_FAILED.code();
-  private static final String LOST = LifecycleReasonCode.WORKER_LOST.code();
-  private static final String CORRUPT = LifecycleReasonCode.WORKER_INDEX_CORRUPT.code();
+  private static final String STARTING = LifecycleReasonCode.INDEX_STARTING.code();
+  private static final String SPAWN_FAILED = LifecycleReasonCode.INDEX_FAILED.code();
+  private static final String LOST = LifecycleReasonCode.INDEX_FAILED.code();
+  private static final String CORRUPT = LifecycleReasonCode.INDEX_CORRUPT.code();
   private static final String RECOVERING_CODE = LifecycleReasonCode.COMPONENT_RECOVERING.code();
   private static final String RECOVERY_EXHAUSTED =
-      LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code();
+      LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code();
   private static final String MODEL_NOT_FOUND = LifecycleReasonCode.INFERENCE_MODEL_NOT_FOUND.code();
   private static final String OFFLINE = LifecycleReasonCode.INFERENCE_OFFLINE.code();
   private static final String CRASHED = LifecycleReasonCode.INFERENCE_CRASHED.code();
   private static final String DEACTIVATED = LifecycleReasonCode.INFERENCE_DEACTIVATED.code();
+
+  @Test
+  @DisplayName("D1-15: fatal schema refusal is sticky while the serving schema advisory is transient")
+  void schemaReasonsHaveDistinctRetention() {
+    assertEquals(RetentionClass.STICKY,
+        LifecycleReasonCode.INDEX_SCHEMA_OPEN_REFUSED.retentionClass());
+    assertEquals(RetentionClass.TRANSIENT,
+        LifecycleReasonCode.INDEX_SCHEMA_MISMATCH.retentionClass());
+  }
 
   @Test
   @DisplayName("D.1 #1: a specific FAULT outranks the generic fallback that follows it")
@@ -100,7 +109,7 @@ final class ReasonRetentionTest {
     assertEquals(
         SPAWN_FAILED,
         cap.pendingReason(),
-        "worker.starting is progress narration — stale the moment anything else happens. §1.4's "
+        "index.starting is progress narration — stale the moment anything else happens. §1.4's "
             + "literal rule (retain whenever the held reason is 'a different known code') reported a "
             + "STARTING worker as the cause of a spawn failure.");
     assertEquals(CapabilityHealth.DEGRADED, cap.health());
@@ -128,7 +137,7 @@ final class ReasonRetentionTest {
     cap.transition(ComponentState.FAILED, LOST, "Health check failed");
 
     // The next down-transition reads the fatal-reason marker and learns WHY it was lost. If a held
-    // FAULT outranked this, the corrupt cause would be rejected whenever a worker.lost tick happened
+    // FAULT outranked this, the corrupt cause would be rejected whenever a index.failed tick happened
     // to land first — and the marker is already deleted, so it would be lost permanently.
     cap.transition(ComponentState.FAILED, CORRUPT, "the remedy paragraph");
 
@@ -204,7 +213,7 @@ final class ReasonRetentionTest {
   @Test
   @DisplayName("component recovery supersedes the spawn-failed pin — and nothing else")
   void recoverySupersedesOnlyTheSpawnFailedPin() {
-    // The one exception. component.recovering is TRANSIENT and worker.spawn.failed is a FAULT, so
+    // The one exception. component.recovering is TRANSIENT and index.failed is a FAULT, so
     // the general rule would drop this write and keep saying "failed to start" while the physical
     // owner is actively recomposing the component.
     RegistryCapabilityTestFixture recovering = worker();
@@ -254,7 +263,7 @@ final class ReasonRetentionTest {
     }
     assertEquals(
         RetentionClass.STICKY,
-        LifecycleReasonCode.WORKER_INDEX_CORRUPT.retentionClass(),
+        LifecycleReasonCode.INDEX_CORRUPT.retentionClass(),
         "exactly one STICKY member: the marker is deleted as it is read");
     assertEquals(
         RetentionClass.GENERIC,
@@ -262,7 +271,7 @@ final class ReasonRetentionTest {
         "exactly one GENERIC member");
     assertEquals(
         RetentionClass.FAULT,
-        LifecycleReasonCode.WORKER_SPAWN_FAILED.retentionClass(),
+        LifecycleReasonCode.INDEX_FAILED.retentionClass(),
         "fallback-ness is a property of the CONSUMER — spawn-failed is only ever SET where it is true");
     assertEquals(
         RetentionClass.TRANSIENT,

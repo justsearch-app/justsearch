@@ -1206,7 +1206,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   if (semantic) {
     const violations = inPlaceModelB ? inPlaceSemanticViolations(semantic)
       : besideSemanticViolations(semantic);
-    requireThat(semantic.workerStarting === 0 && semantic.transport === 0
+    requireThat(semantic.indexStarting === 0 && semantic.transport === 0
       && semantic.apiOutageWindowMs === 0 && violations.length === 0,
     `live model transition violated D1-18: ${JSON.stringify({ violations, semantic })}`);
   }
@@ -1286,8 +1286,8 @@ function sampleSemanticAvailability({ apiPort, post, request, marker, file, matc
       && body?.searchTrace?.degradation?.vectorBlockedReason === 'REBUILD_IN_PROGRESS') {
       return 'reloading';
     }
-    if (reply.status === 503 && reply.text.includes('"reason":"worker.starting"')) {
-      return 'worker-starting';
+    if (reply.status === 503 && reply.text.includes('"reason":"index.starting"')) {
+      return 'index-starting';
     }
     if (unexpectedSamples.length < 5) unexpectedSamples.push({
       mode: vector ? 'vector' : 'hybrid', status: reply.status, body: reply.text.slice(0, 400),
@@ -1344,8 +1344,8 @@ export function summarizeSemanticAvailability(observations, started, ended, unex
   const transitionMs = Math.round(ended - started);
   const refusalWindowMs = firstRefusal == null ? 0
     : Math.round((firstRecovery ?? ended) - firstRefusal);
-  // Whole-API outage (restart): every route answers 503 worker.starting or not at all.
-  const outage = observations.filter(sample => sample.outcome === 'worker-starting'
+  // Whole-API outage (restart): every route answers 503 index.starting or not at all.
+  const outage = observations.filter(sample => sample.outcome === 'index-starting'
     || sample.outcome === 'transport');
   const apiOutageWindowMs = outage.length === 0 ? 0
     : Math.round(outage.at(-1).at - outage[0].at);
@@ -1370,7 +1370,7 @@ export function summarizeSemanticAvailability(observations, started, ended, unex
     reloadingRefusals: refusals.length,
     available: observations.filter(sample => sample.outcome === 'available').length,
     recoveredAfterRefusal: firstRecovery != null,
-    workerStarting: observations.filter(sample => sample.outcome === 'worker-starting').length,
+    indexStarting: observations.filter(sample => sample.outcome === 'index-starting').length,
     transport: observations.filter(sample => sample.outcome === 'transport').length,
     unexpected: observations.filter(sample => sample.outcome.startsWith('unexpected-')
       || sample.outcome === 'available-unmatched').length,

@@ -96,7 +96,7 @@ final class EngineRootIndexRecoveryTest {
     try (var _ = root.processResources(); root) {
       var harness = new Harness(root);
       harness.body = (mayOpen) -> {
-        harness.handle.transition(ComponentState.FAILED, "component.start_timeout", "late");
+        harness.handle.transition(ComponentState.FAILED, "component.start_deadline", "late");
         set(root, "server", harness.replacement);
         return true;
       };
@@ -297,7 +297,7 @@ final class EngineRootIndexRecoveryTest {
       assertTrue(incumbent.awaitIndexRecoveryModels(10_000));
       set(root, "server", incumbent);
       var index = root.indexComponent();
-      index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+      index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
       var request = new TestRequest(index, new AtomicBoolean(),
           () -> index.setDesiredVersion("superseding-configuration"));
 
@@ -403,7 +403,7 @@ final class EngineRootIndexRecoveryTest {
       var handle = root.indexComponent();
       handle.setDesiredVersion("desired-b");
       handle.transition(ComponentState.FAILED,
-          io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_FAILED.code(),
           "initial start failed");
       var request = new TestRequest(handle, new AtomicBoolean());
       ResolvedConfig configuration = ResolvedConfig.builder().contributeEnvRegistry().build();
@@ -498,7 +498,7 @@ final class EngineRootIndexRecoveryTest {
       assertTrue(incumbent.awaitIndexRecoveryModels(10_000));
       set(root, "server", incumbent);
       var index = root.indexComponent();
-      index.transition(ComponentState.FAILED, "worker.lost", "physical owner failed");
+      index.transition(ComponentState.FAILED, "index.failed", "physical owner failed");
       var request = new TestRequest(index, new AtomicBoolean());
 
       try {
@@ -643,7 +643,7 @@ final class EngineRootIndexRecoveryTest {
       bootstrap.startInitial(ignored -> {});
       var initial = server(root);
       assertTrue(initial.awaitIndexRecoveryModels(10_000));
-      root.indexComponent().transition(ComponentState.FAILED, "worker.lost",
+      root.indexComponent().transition(ComponentState.FAILED, "index.failed",
           "installed recovery fixture");
 
       var result = bootstrap.recoverIndex(
@@ -765,7 +765,7 @@ final class EngineRootIndexRecoveryTest {
       handle = root.indexComponent();
       handle.setDesiredVersion("applied-a");
       handle.setAppliedVersion("applied-a");
-      handle.transition(ComponentState.FAILED, "worker.lost", "failed owner");
+      handle.transition(ComponentState.FAILED, "index.failed", "failed owner");
       request = new TestRequest(handle, cancelled);
       ResolvedConfig configuration = ResolvedConfig.builder().contributeEnvRegistry().build();
       QueryRoleSelection disabled = new QueryRoleSelection(

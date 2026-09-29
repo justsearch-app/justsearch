@@ -211,7 +211,7 @@ final class EngineAdmissionTransportTest {
     var bootstrap = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
     var components = TestEngineComponents.fourComponents();
     components.handle("index").transition(io.justsearch.core.component.ComponentState.FAILED,
-        io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+        io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_FAILED.code(),
         "test recovery target");
     var attempted = new CountDownLatch(1);
     var attemptFinished = new CountDownLatch(1);

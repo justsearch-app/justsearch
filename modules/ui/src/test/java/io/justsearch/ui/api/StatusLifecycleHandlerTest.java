@@ -57,7 +57,7 @@ final class StatusLifecycleHandlerTest {
   void throughputReadinessReasonReturnsStalled() {
     WorkerOperationalView workerView = workerView(12, 6, 2, "STALLED");
     assertEquals(
-        "worker.throughput_stalled",
+        "index.throughput_stalled",
         StatusLifecycleHandler.throughputReadinessReason(workerView));
   }
 
@@ -275,9 +275,9 @@ final class StatusLifecycleHandlerTest {
     ReadinessEnvelopeView paused = handler.buildReadinessEnvelope(
         view, encoderReloadingProjection(), freshContact());
     assertEquals("DEGRADED", paused.components().get("indexServing").state());
-    assertEquals("index.embedding_rebuilding", paused.components().get("indexServing").reasonCode());
+    assertEquals("encoders.reloading", paused.components().get("indexServing").reasonCode());
     assertTrue(paused.composites().get("retrieval").reasonCodes()
-        .contains("index.embedding_rebuilding"));
+        .contains("encoders.reloading"));
     assertEquals("DEGRADED", paused.composites().get("retrieval").state());
 
     ReadinessEnvelopeView beside = handler.buildReadinessEnvelope(
@@ -286,7 +286,7 @@ final class StatusLifecycleHandlerTest {
             true),
         readyProjection(), freshContact());
     assertFalse(beside.composites().get("retrieval").reasonCodes()
-        .contains("index.embedding_rebuilding"));
+        .contains("encoders.reloading"));
   }
 
   @Test
@@ -474,7 +474,7 @@ final class StatusLifecycleHandlerTest {
   void workerShutDownIsANotConfiguredVerdictNotAnError() {
     StatusLifecycleHandler handler = newHandler();
     COMPONENTS.transition(
-        "index", ComponentState.ABSENT, "worker.shut_down", "orderly shutdown");
+        "index", ComponentState.ABSENT, "index.shut_down", "orderly shutdown");
 
     ReadinessEnvelopeView env =
         handler.buildReadinessEnvelope(
@@ -482,11 +482,11 @@ final class StatusLifecycleHandlerTest {
             COMPONENTS.projection(),
             freshContact());
 
-    // The branch that used to key on worker.not_configured alone: without shut_down joining it, an
+    // The branch that used to key on index.unavailable alone: without shut_down joining it, an
     // orderly teardown would fall through to the ERROR-shaped branches and the tap row for
-    // (INDEX_SERVING, NOT_CONFIGURED, worker.shut_down) would be dead on arrival.
+    // (INDEX_SERVING, NOT_CONFIGURED, index.shut_down) would be dead on arrival.
     assertEquals("NOT_CONFIGURED", env.components().get("indexServing").state());
-    assertEquals("worker.shut_down", env.components().get("indexServing").reasonCode());
+    assertEquals("index.shut_down", env.components().get("indexServing").reasonCode());
   }
 
   /** Worker answered during this response build — the provenance these state/reason tests assume. */

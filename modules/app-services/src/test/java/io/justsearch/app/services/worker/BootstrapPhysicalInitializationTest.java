@@ -44,16 +44,16 @@ final class BootstrapPhysicalInitializationTest {
       io.justsearch.ipc.WorkerFatalReasonMarker.write(dir,
           io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_SCHEMA_MISMATCH);
       fixture.bootstrap.transitionWorkerDown(
-          io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED, "refused");
-      assertEquals("worker.index_schema_mismatch", fixture.bootstrap.indexFatalCode().code());
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_FAILED, "refused");
+      assertEquals("index.schema_open_refused", fixture.bootstrap.indexFatalCode().code());
       fixture.publishSamplerReady();
-      assertEquals("worker.index_schema_mismatch", fixture.bootstrap.indexFatalCode().code());
+      assertEquals("index.schema_open_refused", fixture.bootstrap.indexFatalCode().code());
       fixture.healthy.set(true);
       assertTrue(fixture.bootstrap.checkHealth());
       org.junit.jupiter.api.Assertions.assertNull(fixture.bootstrap.indexFatalCode());
       fixture.healthy.set(false);
       assertFalse(fixture.bootstrap.checkHealth());
-      assertEquals("worker.lost", fixture.capability.pendingReason());
+      assertEquals("index.failed", fixture.capability.pendingReason());
     }
   }
 
@@ -66,7 +66,7 @@ final class BootstrapPhysicalInitializationTest {
       when(fixture.client.isHealthy(any()))
           .thenThrow(new IllegalStateException("health observation failed")).thenReturn(true);
       assertThrows(IllegalStateException.class, fixture.bootstrap::checkHealth);
-      assertEquals("worker.lost", fixture.capability.pendingReason());
+      assertEquals("index.failed", fixture.capability.pendingReason());
       assertTrue(fixture.bootstrap.checkHealth());
       assertTrue(fixture.bootstrap.checkHealth());
       verify(fixture.client, times(2)).reindexPersistedRoots(any());
@@ -80,16 +80,16 @@ final class BootstrapPhysicalInitializationTest {
       fixture.healthy.set(true);
       fixture.bootstrap.start();
       assertTrue(fixture.bootstrap.checkHealth());
-      fixture.indexComponent.transition(ComponentState.STARTING, "worker.starting", null);
+      fixture.indexComponent.transition(ComponentState.STARTING, "index.starting", null);
       assertTrue(fixture.bootstrap.checkHealth());
       verify(fixture.client).reindexPersistedRoots(any());
       verify(fixture.client).startPeriodicSync();
 
       // A physical loss is still a loss when sampled readiness was independently non-READY.
-      fixture.indexComponent.transition(ComponentState.STARTING, "worker.starting", null);
+      fixture.indexComponent.transition(ComponentState.STARTING, "index.starting", null);
       fixture.healthy.set(false);
       assertFalse(fixture.bootstrap.checkHealth());
-      assertEquals("worker.lost", fixture.capability.pendingReason());
+      assertEquals("index.failed", fixture.capability.pendingReason());
       fixture.healthy.set(true);
       assertTrue(fixture.bootstrap.checkHealth());
       assertTrue(fixture.bootstrap.checkHealth());

@@ -5,7 +5,46 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 the current queue, revision, lease, and blocking decisions; D1 owns design and
 acceptance evidence. The brief does not narrow the remaining lane scope.
 
-## Current state (2026-09-29)
+## Current state (2026-09-29, D1-15 checkpoint)
+
+**Lane F is paused for the requested clean handoff, not complete.** D1-15's
+reason-code re-cut is implemented across Java producers, retention, Health,
+the Lit readiness projection, supervisor semantics, tests and canonical docs.
+The fatal index-schema open refusal is separate from the serving advisory;
+terminal retrieval reasons remain visible on a fresh NOT_READY response without
+misclassifying optional AI failures. Migration activation and parked-gap reasons
+retain search availability; missing manifest-selected model roles have neutral
+model-unavailable wording. The D1-15 acceptance table and evidence are in D1.
+
+**Local proof on the D1-15 tree.** `tmp/d1-15-integrated3.log` records
+`test -PincludeStress=true spotlessCheck pmdAll --continue --max-workers=2`
+green in 14m33s. `tmp/d1-15-build-final.log` records `build -x test`
+green. `tmp/d1-15-ui-typecheck-final.log` and `tmp/d1-15-ui-unit-final.log`
+record frontend typecheck and 491 files/6,631 tests green. The readiness-code
+gate (61 producer-backed, 57 worded), consequence gate, supervisor semantic
+7/7, UI coverage, docs regeneration checks and `git diff --check` pass.
+The independent D1-15 reviewer reported no actionable defect on this diff.
+
+**Live-proof limitation.** This chat's `justsearch-dev` MCP process was launched
+from the older main checkout. Its preflight still requires the retired
+`modules:indexer-worker:installDist` output, although this Lane F worktree's
+single-process Gradle project has no such task. The exact failed task attempt
+is in `tmp/d1-15-worker-dist.log`. No dev stack was started or displaced.
+Restart the MCP client against this worktree's `.codex/config.toml` and current
+server, then run owned live `/api/debug/state`, `/api/health`, status and a
+standard-profile real-model query on the D1-15 revision. Do not claim those
+checks from the static/local suite.
+
+**Next owner actions.** Confirm the pushed checkpoint and its exact-SHA hosted
+CI, repair the MCP client binding and finish D1-15 live proof, then continue
+D1-16/17, D2, all seven paired E groups and F. D1-4's signed Windows Sandbox
+candidate and current signing-provider allocation remain external dependencies.
+Do not merge PR727 before Stage F acceptance. The held worktree is
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify` on
+`codex/lane-f-pr1`; preserve the unrelated untracked
+`modules/app-inference/logs/`. The main checkout's foreign edits are untouched.
+
+## Prior 2026-09-29 checkpoint (superseded by the state above)
 
 **Active after the user's resume instruction.** D1-6 remains in verification; it is not
 D1 completion. D1-15 has only a read-only implementation map. Continue the lane without

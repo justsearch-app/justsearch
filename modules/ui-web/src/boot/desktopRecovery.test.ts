@@ -52,6 +52,17 @@ describe('desktop boot recovery', () => {
     expect(mocks.endpoint).toHaveBeenCalledOnce();
   });
 
+  it('words an escalated Engine exit from the supervisor observation while the API is down', async () => {
+    mocks.invoke.mockImplementation(async (command) => command === 'supervisor_state'
+      ? { ...terminal, state: 'restarting', lastExit: { code: 42, reason: 'escalated_restart', class: 'counted' } }
+      : { state: 'up_to_date', currentVersion: '1.0' });
+    const root = document.getElementById('root')!;
+    expect(await resolveBootWithRecovery(root)).toBeNull();
+    const recovery = root.querySelector('jf-engine-recovery') as EngineRecovery;
+    await recovery.updateComplete;
+    expect(recovery.shadowRoot?.textContent).toContain('JustSearch is restarting after a serious failure');
+  });
+
   it('removes the recovery surface when the real API is available', async () => {
     mocks.endpoint.mockResolvedValue({ baseUrl: 'http://127.0.0.1:40404' });
     const root = document.getElementById('root')!;

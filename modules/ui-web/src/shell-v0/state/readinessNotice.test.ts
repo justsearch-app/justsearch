@@ -16,6 +16,8 @@ import {
   reasonFor,
   severityForCodes,
   KEYWORD_FALLBACK_CAVEAT,
+  SEARCH_UNAVAILABLE_CAVEAT,
+  MODEL_UNAVAILABLE_CAVEAT,
   PASSAGE_REDUCED_CAVEAT,
   OPTIONAL_CAPABILITY_CAVEAT,
   AI_UNAVAILABLE_CAVEAT,
@@ -40,6 +42,33 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(notice?.causes).toEqual(['Semantic search is being rebuilt — keyword results are complete, semantic ranking resumes when it finishes.']);
     expect(warrantsSearchDegradationBanner(paused)).toBe(true);
     expect(readinessNotice({ ...paused, reasons: ['rebuilding', 'source:embedding_model_change'] })).toBeNull();
+  });
+  it('D1-15: presents activating and parked-candidate transitions while A remains available', () => {
+    const activating = readinessNotice({
+      kind: 'transitioning', severity: 'info', reasons: ['generation-switch', 'index.activating'],
+    });
+    expect(activating?.headline).toBe('Activating the new index.');
+    expect(activating?.body).toContain('current index remains available');
+    expect(activating?.body).toContain('until cutover');
+    expect(activating?.causes).toEqual(['The search index is activating']);
+    expect(readinessNotice({
+      kind: 'transitioning', severity: 'warn', reasons: ['generation-switch', 'overdue', 'index.activating'],
+    })).toBeNull();
+
+    const awaiting = readinessNotice({
+      kind: 'transitioning', severity: 'warn', reasons: ['rebuilding', 'migration.awaiting_gap_acceptance'],
+    });
+    expect(awaiting?.headline).toBe('Index migration needs operator review.');
+    expect(awaiting?.body).toContain('current index remains available');
+    expect(awaiting?.body).toContain('operator');
+    expect(awaiting?.body).not.toContain('keyword');
+    expect(awaiting?.causes).toEqual(['An index migration is waiting for an operator to review data gaps']);
+
+    // Even an incomplete stability projection must not turn this recognized serving
+    // diagnostic into the generic keyword-only fallback.
+    const degradedAwaiting = readinessNotice(degraded('warn', ['migration.awaiting_gap_acceptance']));
+    expect(degradedAwaiting?.body).toContain('current index remains available');
+    expect(degradedAwaiting?.body).not.toContain('keyword');
   });
   it('returns null for every non-rendering verdict (the banner does not render)', () => {
     for (const kind of ['operational', 'checking', 'connecting'] as const) {
@@ -90,7 +119,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
   });
 
   it('an IMPAIRING degradation (severity warn) keeps the "Semantic search degraded / keyword results" wording', () => {
-    const n = readinessNotice(degraded('warn', ['worker.health.embedding_not_ready']));
+    const n = readinessNotice(degraded('warn', ['encoders.health.embedding_not_ready']));
     expect(n!.headline).toBe('Semantic search degraded.');
     expect(n!.body).toContain('keyword results');
     expect(n!.causes).toEqual(['The semantic embedding index is not ready']);
@@ -129,6 +158,17 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(n!.remedy).toEqual({ kind: 'operation', operationId: 'core.rebuild-index' });
     // The headline+body already ARE the cause; no bullet that restates them.
     expect(n!.causes).toEqual([]);
+  });
+
+  it('D1-15: fatal schema open refusal has its own error reason, separate from the serving advisory', () => {
+    expect(severityForCodes(['index.schema_open_refused'])).toBe('error');
+    expect(reasonFor('index.schema_open_refused').wording).toContain('search is unavailable');
+    expect(reasonFor('index.schema_mismatch').wording).toContain('search is fully working');
+    expect(classifyConsequence(['index.schema_open_refused'])).toBe('search-unavailable');
+    const n = readinessNotice(degraded('error', ['index.schema_open_refused']));
+    expect(n?.body).toContain('before searching');
+    expect(n?.body).not.toContain('keyword');
+    expect(SEARCH_UNAVAILABLE_CAVEAT).not.toContain('keyword');
   });
 
   it('804 §D1: the advisory notice still lists OTHER info causes (fresh install: schema + LambdaMART)', () => {
@@ -204,7 +244,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
 
   it('804 §B5: a RETRIEVAL-impairing cause alongside the AI cause keeps the "keyword results" wording', () => {
     const n = readinessNotice(
-      degraded('warn', ['worker.health.embedding_not_ready', 'inference.offline']),
+      degraded('warn', ['encoders.health.embedding_not_ready', 'inference.offline']),
     );
     expect(n!.headline).toBe('Semantic search degraded.');
     expect(n!.body).toContain('Showing keyword results');
@@ -327,13 +367,13 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
 describe('classifyConsequence (805 §G.2)', () => {
   it('retrieval-impaired: a positively-known dense block', () => {
     expect(classifyConsequence(['index.dense_unavailable'])).toBe('retrieval-impaired');
-    expect(classifyConsequence(['worker.health.embedding_not_ready'])).toBe('retrieval-impaired');
-    expect(classifyConsequence(['worker.health.embedding_probe_missing'])).toBe('retrieval-impaired');
+    expect(classifyConsequence(['encoders.health.embedding_not_ready'])).toBe('retrieval-impaired');
+    expect(classifyConsequence(['encoders.health.embedding_probe_missing'])).toBe('retrieval-impaired');
     // (837 S6 retired `index.rebuilding`: a generation rebuild is a transition, not a degradation,
     // so it can never reach this classifier. `index.embedding_rebuilding` — the in-place rebuild
     // that leaves stability settled — is the one that genuinely does.)
     expect(classifyConsequence(['index.embedding_rebuilding'])).toBe('retrieval-impaired');
-    expect(classifyConsequence(['worker.spawn.failed'])).toBe('retrieval-impaired');
+    expect(classifyConsequence(['index.failed'])).toBe('search-unavailable');
     // The reindex causes are retrieval-impairing too (the banner returns earlier for them, but the
     // classifier is consumed by other surfaces that have no reindex branch).
     expect(classifyConsequence(['index.embedding_mismatch'])).toBe('retrieval-impaired');
@@ -345,6 +385,15 @@ describe('classifyConsequence (805 §G.2)', () => {
     // over a trace with dense retrieval + the cross-encoder live (round 11, tempdoc 734 R11-F1).
     expect(classifyConsequence(['chunk_embedding.not_ready'])).toBe('passage-reduced');
     expect(classifyConsequence(['chunk_embedding.in_progress'])).toBe('passage-reduced');
+  });
+
+  it('D1-15: a missing index-selected model has a role-neutral consequence', () => {
+    expect(classifyConsequence(['index.model_not_installed'])).toBe('model-unavailable');
+    const n = readinessNotice(degraded('warn', ['index.model_not_installed']));
+    expect(n?.headline).toBe('An index model is unavailable.');
+    expect(n?.body).toContain('Text search remains available');
+    expect(n?.body).not.toContain('keyword');
+    expect(MODEL_UNAVAILABLE_CAVEAT).not.toContain('keyword');
   });
 
   it('ai-unavailable: the AI-model codes, retrieval untouched', () => {
@@ -413,8 +462,8 @@ describe('warrantsSearchDegradationBanner (round-14 finding 9)', () => {
   });
 
   it('warn / error / unreachable keep the banner (the gate is severity, not "no banner ever")', () => {
-    expect(warrantsSearchDegradationBanner(degraded('warn', ['worker.health.embedding_not_ready']))).toBe(true);
-    expect(warrantsSearchDegradationBanner(degraded('error', ['worker.spawn_recovery_exhausted']))).toBe(true);
+    expect(warrantsSearchDegradationBanner(degraded('warn', ['encoders.health.embedding_not_ready']))).toBe(true);
+    expect(warrantsSearchDegradationBanner(degraded('error', ['component.recovery_exhausted']))).toBe(true);
     expect(
       warrantsSearchDegradationBanner({ kind: 'unreachable', severity: 'error', reasons: ['binding.unreachable'] }),
     ).toBe(true);
@@ -482,77 +531,79 @@ describe('remedy targets resolve to the surface that owns the capability', () =>
  * that emits it, and the consequence-set membership must be a decision, not an omission (omission
  * silently selects `cosmetic` for an AI code and `impairing` for everything else).
  */
-describe('readinessNotice — tempdoc 837 worker + inference rows', () => {
-  it('worker.lost words the state it is actually emitted in (it was serving, then stopped)', () => {
-    expect(reasonFor('worker.lost').wording).toBe(
-      'The knowledge server stopped responding and does not restart itself — restart JustSearch to recover it',
+describe('readinessNotice — index and inference rows', () => {
+  it('index.failed does not claim a start failure or terminal recovery', () => {
+    // Lane F D1 replaces the child Worker with a supervised Engine component. The same
+    // index failure code can describe initial failure or loss after serving; recovery
+    // remains possible until component.recovery_exhausted is observed.
+    expect(reasonFor('index.failed').wording).toContain('recovery may be in progress');
+    expect(reasonFor('index.failed').wording).not.toMatch(
+      /failed to start|could not start|did not start|never started|does not restart itself/i,
     );
-    // The collapsed code claimed a start failure for a worker that had started fine.
-    expect(reasonFor('worker.spawn.failed').wording).toContain('failed to start');
-    // 837 S3's bar, restated at its own intent rather than by substring. This assertion used to be
-    // `not.toContain('start')`, which lane F stage A item A11 turned into a false negative: the row
-    // now has to say "restart JustSearch" (A11 deleted the supervisor that used to restart it), and
-    // "restart" contains "start". The PROPERTY 837 set — never claim a START FAILURE for a server
-    // that started fine and then died — is unchanged and is what is asserted here. Tightened, not
-    // weakened: a bare substring also passed on "the server did not start", which this rejects.
-    expect(reasonFor('worker.lost').wording).not.toMatch(
-      /failed to start|could not start|did not start|never started/i,
-    );
+    const n = readinessNotice(degraded('error', ['index.failed']));
+    expect(n!.causes).toContain(reasonFor('index.failed').wording);
   });
 
-  it('worker.lost tells the user to restart, because nothing restarts it for them (A11)', () => {
-    // The load-bearing half of the row after lane F stage A item A11 deleted crash detection and
-    // the restart budget: a stopped Engine stays stopped. If this ever reverts to a bare "stopped
-    // responding", the notice silently reads as "wait, it is coming back" — which it is not, until
-    // stage B restores supervision. Then this assertion should be deleted WITH that restoration,
-    // not before it.
-    expect(reasonFor('worker.lost').wording).toMatch(/restart JustSearch/);
-    const n = readinessNotice(degraded('error', ['worker.lost']));
-    expect(n!.causes).toContain(reasonFor('worker.lost').wording);
-  });
-
-  it('worker.index_corrupt carries no fake one-click remedy — Open Health, like its precedent', () => {
-    const r = reasonFor('worker.index_corrupt');
+  it('index.corrupt carries no fake one-click remedy — Open Health, like its precedent', () => {
+    const r = reasonFor('index.corrupt');
     expect(r.wording).toBe('The search index is corrupt and could not be repaired automatically');
     // No operation exists for index.recovery.policy=BACKUP_REBUILD, so the row must not invent one:
     // it declares NO remedy (the vdu.missing_mmproj precedent) and the banner supplies Open Health.
     expect(r.remedy).toBeUndefined();
-    const n = readinessNotice(degraded('error', ['worker.index_corrupt']));
+    const n = readinessNotice(degraded('error', ['index.corrupt']));
     expect(n!.remedy).toEqual({ kind: 'navigate', target: 'core.health-surface', label: 'Open Health' });
   });
 
-  it('the non-serving worker codes are all retrieval-impairing (omission would over-claim)', () => {
-    for (const code of [
-      'worker.lost',
-      'worker.index_corrupt',
-      'worker.shut_down',
-      'worker.not_connected',
-    ]) {
+  it('terminal index failures name search unavailability, while intentional startup/stop remain transient', () => {
+    for (const code of ['index.failed', 'index.corrupt', 'index.schema_open_refused',
+      'component.start_deadline', 'component.recovery_exhausted']) {
+      expect(classifyConsequence([code]), code).toBe('search-unavailable');
+    }
+    for (const code of ['index.starting', 'index.shut_down', 'engine.not_started']) {
       expect(classifyConsequence([code]), code).toBe('retrieval-impaired');
     }
   });
 
   it('825: the boot-recovery terminal code is worded apart from the pin it succeeds', () => {
-    const r = reasonFor('worker.spawn_recovery_exhausted');
-    expect(r.wording).toBe('The knowledge server failed to start and could not be recovered');
-    // `worker.spawn.failed` now means "failed, recovery pending or in flight" — its wording must not
+    const r = reasonFor('component.recovery_exhausted');
+    expect(r.wording).toBe('A service could not be recovered after repeated attempts');
+    // `index.failed` now means "failed, recovery pending or in flight" — its wording must not
     // read as a dead end while the Head is still re-attempting, and this one must.
-    expect(reasonFor('worker.spawn.failed').wording).not.toContain('could not be recovered');
-    expect(severityForCodes(['worker.spawn_recovery_exhausted'])).toBe('error');
-    expect(classifyConsequence(['worker.spawn_recovery_exhausted'])).toBe('retrieval-impaired');
+    expect(reasonFor('index.failed').wording).not.toContain('could not be recovered');
+    expect(severityForCodes(['component.recovery_exhausted'])).toBe('error');
+    expect(classifyConsequence(['component.recovery_exhausted'])).toBe('search-unavailable');
     // No one-click remedy: a respawn is exactly what just failed its whole budget.
     expect(r.remedy).toBeUndefined();
-    expect(warrantsSearchDegradationBanner(degraded('error', ['worker.spawn_recovery_exhausted']))).toBe(
+    expect(warrantsSearchDegradationBanner(degraded('error', ['component.recovery_exhausted']))).toBe(
       true,
     );
   });
 
   it('severity: a lost/corrupt server is error; a shutdown or a not-yet-connected one is calm', () => {
-    expect(severityForCodes(['worker.lost'])).toBe('error');
-    expect(severityForCodes(['worker.index_corrupt'])).toBe('error');
-    expect(severityForCodes(['worker.shut_down'])).toBe('info');
-    expect(severityForCodes(['worker.not_connected'])).toBe('info');
-    expect(warrantsSearchDegradationBanner(degraded('error', ['worker.lost']))).toBe(true);
+    expect(severityForCodes(['index.failed'])).toBe('error');
+    expect(severityForCodes(['index.corrupt'])).toBe('error');
+    expect(severityForCodes(['index.shut_down'])).toBe('info');
+    expect(severityForCodes(['engine.not_started'])).toBe('info');
+    expect(warrantsSearchDegradationBanner(degraded('error', ['index.failed']))).toBe(true);
+  });
+
+  it('Lane F new codes have distinct truthful wording and severity', () => {
+    const cases: Array<[string, string, 'info' | 'warn' | 'error']> = [
+      ['encoders.reloading', 'models are reloading', 'info'],
+      ['index.activating', 'index is activating', 'info'],
+      ['component.start_deadline', 'did not finish starting in time', 'warn'],
+      ['component.recovery_exhausted', 'after repeated attempts', 'error'],
+      ['engine.escalated_restart', 'restarting after a serious failure', 'error'],
+      ['index.model_not_installed', 'model selected by the index is missing or has changed', 'warn'],
+      ['migration.awaiting_gap_acceptance', 'operator to review data gaps', 'warn'],
+    ];
+    for (const [code, phrase, severity] of cases) {
+      expect(reasonFor(code).wording, code).toContain(phrase);
+      expect(severityForCodes([code]), code).toBe(severity);
+    }
+    expect(classifyConsequence(['encoders.reloading'])).toBe('retrieval-impaired');
+    expect(classifyConsequence(['index.model_not_installed'])).toBe('model-unavailable');
+    expect(classifyConsequence(['index.dense_unavailable', 'index.model_not_installed'])).toBe('retrieval-impaired');
   });
 
   it('S4: the two new inference codes are calm and stay OUT of the banner', () => {

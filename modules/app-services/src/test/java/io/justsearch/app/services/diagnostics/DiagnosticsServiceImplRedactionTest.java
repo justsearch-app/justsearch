@@ -79,14 +79,14 @@ final class DiagnosticsServiceImplRedactionTest {
             new LifecycleSnapshotV2.Lifecycle(LifecycleState.LIFECYCLE_STATE_DEGRADED, null, null),
             new LifecycleSnapshotV2.Components(
                 component(ComponentState.READY, null),
-                component(ComponentState.ABSENT, "worker.shut_down"),
+                component(ComponentState.ABSENT, "index.shut_down"),
                 component(ComponentState.ABSENT, null),
                 component(ComponentState.ABSENT, "inference.deactivated")));
 
     String summary = service(() -> () -> lifecycle).buildDiagnosticSummary();
 
     assertTrue(summary.contains("app.version: 1.2.3-test"));
-    assertTrue(summary.contains("lifecycle.index.reason: worker.shut_down"));
+    assertTrue(summary.contains("lifecycle.index.reason: index.shut_down"));
     assertTrue(summary.contains("lifecycle.generative.reason: inference.deactivated"));
     assertFalse(summary.contains("debug-state"));
     assertTrue(summary.endsWith("note: " + DiagnosticSummaryComposer.LOCAL_ONLY_NOTE + "\n"));

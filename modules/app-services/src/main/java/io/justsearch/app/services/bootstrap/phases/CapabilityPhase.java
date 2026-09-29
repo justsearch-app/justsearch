@@ -15,8 +15,8 @@ import java.util.Set;
  */
 public final class CapabilityPhase {
 
-  /** Reason code: Worker bootstrap was null at phase entry (async-start path). */
-  public static final String REASON_WORKER_NOT_CONNECTED = "worker.not_connected";
+  /** Reason code: the index bootstrap was absent at phase entry (async-start path). */
+  public static final String REASON_ENGINE_NOT_STARTED = "engine.not_started";
 
   /** Reason code: inference not configured (lite mode, AI disabled, or env flag). */
   public static final String REASON_INFERENCE_NOT_CONFIGURED = "inference.not_configured";
@@ -36,7 +36,7 @@ public final class CapabilityPhase {
       java.util.Objects.requireNonNull(graph, "graph");
       Set<String> reasons = new LinkedHashSet<>();
       if (knowledgeServer == null) {
-        reasons.add(REASON_WORKER_NOT_CONNECTED);
+        reasons.add(REASON_ENGINE_NOT_STARTED);
       }
       if (!inferenceConfigured) {
         reasons.add(REASON_INFERENCE_NOT_CONFIGURED);

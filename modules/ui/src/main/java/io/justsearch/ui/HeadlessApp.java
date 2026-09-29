@@ -624,8 +624,8 @@ public class HeadlessApp {
       }
       // Deliberately NO transition here. The bootstrap that just failed is the producer of this
       // verdict and has already narrated it exactly once (startWithRetry's final catch), with the
-      // code it actually knows to be true â€” worker.spawn.failed, either fatal index code
-      // (worker.index_corrupt / worker.index_schema_mismatch). The fatal-index latch carries the
+      // code it actually knows to be true: index.failed or either fatal index code
+      // (index.corrupt / index.schema_open_refused). The fatal-index latch carries the
       // specific cause across the three
       // SUPPRESSED start attempts that each consumed the one-shot marker â€” without it this branch
       // logged, and /api/health served, the generic spawn failure for a deliberate refusal.
@@ -647,14 +647,14 @@ public class HeadlessApp {
       indexComponent
           .transition(
               io.justsearch.core.component.ComponentState.FAILED,
-              io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_SPAWN_FAILED.code(),
+              io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_FAILED.code(),
               "Worker spawn failed: " + knowledgeServerStartError);
       log.warn("Knowledge Server failed to start: {}", knowledgeServerStartError);
     } else {
       indexComponent
           .transition(
               io.justsearch.core.component.ComponentState.ABSENT,
-              io.justsearch.app.api.lifecycle.LifecycleReasonCode.WORKER_NOT_CONFIGURED.code(),
+              io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_UNAVAILABLE.code(),
               "Worker not configured");
     }
 

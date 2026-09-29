@@ -371,7 +371,7 @@ describe('computeVerdict (595 §4.2) — the ONE rollup', () => {
     const v = computeVerdict({
       phase: 'connected',
       stability: settled,
-      readiness: known({ ...readyReadiness, retrieval: 'degraded', reasonCodes: ['worker.health.embedding_not_ready'] }),
+      readiness: known({ ...readyReadiness, retrieval: 'degraded', reasonCodes: ['encoders.health.embedding_not_ready'] }),
     });
     expect(v.severity).toBe('warn');
   });
@@ -394,7 +394,7 @@ describe('computeVerdict (595 §4.2) — the ONE rollup', () => {
     const v = computeVerdict({
       phase: 'connected',
       stability: settled,
-      readiness: known({ ...readyReadiness, retrieval: 'degraded', reasonCodes: ['worker.spawn.failed'] }),
+      readiness: known({ ...readyReadiness, retrieval: 'degraded', reasonCodes: ['index.failed'] }),
     });
     expect(v.kind).toBe('degraded');
     expect(v.severity).toBe('error');
@@ -473,17 +473,67 @@ describe('D1-14 — semantic pause during an in-place build', () => {
   });
 });
 
+describe('D1-15 — migration readiness reasons remain reachable through transitions', () => {
+  it('carries index.activating through a SWITCHING verdict', () => {
+    const stability = computeStability({ ...settledInput, migrationState: 'SWITCHING' });
+    const verdict = computeVerdict({
+      phase: 'connected',
+      stability,
+      readiness: known({
+        ...readyReadiness,
+        retrieval: 'degraded',
+        reasonCodes: ['index.activating'],
+      }),
+    });
+
+    expect(verdict).toEqual({
+      kind: 'transitioning',
+      severity: 'info',
+      reasons: ['generation-switch', 'index.activating'],
+    });
+    expect(verdictHeadline(verdict)).toBe('Activating new index…');
+    expect(verdictBody(verdict)).toContain('current index remains available');
+  });
+
+  it('carries a parked candidate reason without claiming A fell back to keyword-only', () => {
+    const stability = computeStability({
+      ...settledInput,
+      migrationState: 'AWAITING_ACCEPTANCE',
+      buildingGenerationId: 'g2',
+    });
+    const verdict = computeVerdict({
+      phase: 'connected',
+      stability,
+      readiness: known({
+        ...readyReadiness,
+        retrieval: 'degraded',
+        reasonCodes: ['migration.awaiting_gap_acceptance'],
+      }),
+    });
+
+    expect(verdict).toEqual({
+      kind: 'transitioning',
+      severity: 'warn',
+      reasons: ['rebuilding', 'migration.awaiting_gap_acceptance'],
+    });
+    expect(verdictHeadline(verdict)).toBe('Migration needs operator review');
+    expect(verdictBody(verdict)).toContain('current index remains available');
+    expect(verdictBody(verdict)).toContain('operator');
+    expect(verdictBody(verdict)).not.toContain('keyword');
+  });
+});
+
 describe('severityForCodes (595 §10.5)', () => {
   it('maps the cosmetic codes to info and hard failures to error', () => {
     expect(severityForCodes(['lambdamart.not_configured'])).toBe('info');
-    expect(severityForCodes(['worker.spawn.failed'])).toBe('error');
+    expect(severityForCodes(['index.failed'])).toBe('error');
   });
   it('defaults an unknown or empty code set to warn (never silently info)', () => {
     expect(severityForCodes(['some.future.code'])).toBe('warn');
     expect(severityForCodes([])).toBe('warn');
   });
   it('takes the worst-of across mixed codes', () => {
-    expect(severityForCodes(['lambdamart.not_configured', 'worker.health.embedding_not_ready'])).toBe('warn');
+    expect(severityForCodes(['lambdamart.not_configured', 'encoders.health.embedding_not_ready'])).toBe('warn');
   });
 });
 
@@ -645,6 +695,15 @@ describe('verdictBody — AI-only degradations do not claim retrieval is degrade
     expect(
       verdictBody({ kind: 'degraded', severity: 'warn', reasons: ['index.dense_unavailable'] }),
     ).toBe('Retrieval is degraded. See recent events for detail.');
+  });
+
+  it('D1-15: missing model and fatal schema refusal have distinct consequences', () => {
+    const model = verdictBody({ kind: 'degraded', severity: 'warn', reasons: ['index.model_not_installed'] });
+    expect(model).toContain('text search remains available');
+    expect(model).not.toContain('Retrieval is degraded');
+    const fatal = verdictBody({ kind: 'degraded', severity: 'error', reasons: ['index.schema_open_refused'] });
+    expect(fatal).toContain('search is unavailable');
+    expect(fatal).not.toContain('Retrieval is degraded');
   });
 
   it('an unclassifiable cause keeps the conservative sentence (never the calmer AI claim)', () => {
