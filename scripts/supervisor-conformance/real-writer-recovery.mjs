@@ -95,6 +95,7 @@ if (modelLiveAB || bulkGapApproval) {
   }
 }
 const lockScenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO?.startsWith('lock-');
+const indexLockScenario = scenario === 'lock-index-release' || scenario === 'lock-index-exhaustion';
 const indexBase = path.join(lockScenario ? data : work, 'index');
 const aiEnabled = process.env.JUSTSEARCH_WRITER_RECOVERY_AI_ENABLED === '1';
 fs.mkdirSync(path.join(data, 'runtime'), { recursive: true });
@@ -141,6 +142,16 @@ delete env.JUSTSEARCH_MIGRATION_BARRIER_REFUSE;
 delete env.JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY;
 delete env.JUSTSEARCH_ISSUED_CITATION_BARRIER_ANSWER;
 delete env.JUSTSEARCH_QUERY_PUBLICATION_BARRIER;
+delete env.JUSTSEARCH_INDEX_START_BARRIERS;
+if (indexLockScenario) {
+  env.JUSTSEARCH_INDEX_START_BARRIERS = 'index-start-initial,index-start-recovery-1';
+  env.JUSTSEARCH_AI_EMBED_ENABLED = 'true';
+  env.JUSTSEARCH_EMBED_ONNX_MODEL_PATH = path.join(
+    findRetainedModelsRoot(), 'onnx', 'gte-multilingual-base');
+  env.JUSTSEARCH_EMBED_GPU_ENABLED = 'false';
+  env.JUSTSEARCH_CHAT_PROFILE = 'standard';
+  delete env.AI_OFFLINE;
+}
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
 if (['writer', 'processing', 'operation'].includes(scenario) || scenario === undefined
     || operationFault || lockScenario) {
@@ -405,6 +416,171 @@ function filesBelow(root, predicate) {
 function requireThat(condition, message) {
   if (!condition) throw new Error(message);
 }
+async function exerciseIndexLockRecovery(c) {
+  const { scenario, work, data, indexBase, first, manifest, apiPort, readJson, waitFor,
+    request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit } = c;
+  const runtime = path.join(data, 'runtime');
+  const initial = await waitFor('initial index-start barrier', 90000,
+    () => readJson(path.join(runtime, 'index-start-initial-reached.json')));
+  requireThat(initial.point === 'index-start' && initial.attempt === 'initial'
+    && initial.recoveryAttempts === 0, `invalid initial barrier marker: ${JSON.stringify(initial)}`);
+  requireThat(path.resolve(initial.indexBase) === path.resolve(indexBase),
+    `initial barrier used an unexpected index base: ${JSON.stringify(initial)}`);
+  const settingsPath = path.join(data, 'ui', 'settings.json');
+  const settingsBefore = readJson(settingsPath);
+  requireThat(settingsBefore && typeof settingsBefore === 'object',
+    `settings witness was not retained before recovery: ${settingsPath}`);
+  const deadlineStatus = await waitFor('index start deadline while barrier is held', 75000,
+    async () => {
+      try {
+        const response = await request(apiPort, '/api/status', {}, 15000);
+        if (response.status !== 200) return null;
+        const status = JSON.parse(response.text);
+        return status.components?.api?.state === 'READY'
+          && status.components?.index?.state === 'FAILED'
+          && status.components.index.recoveryAttempts === 0 ? status : null;
+      } catch { return null; }
+    });
+  fs.writeFileSync(path.join(work, 'index-start-deadline-proved'),
+    JSON.stringify({ initial, status: deadlineStatus, observedAt: new Date().toISOString() }));
+  console.log('INDEX_START_TIMEOUT', JSON.stringify({ initial, status: deadlineStatus }));
+  await waitFor('initial barrier release after deadline proof', 30000,
+    () => fs.existsSync(path.join(runtime, 'index-start-initial-release')));
+  const recovery = await waitFor('index-start recovery-1 barrier', 120000,
+    () => readJson(path.join(runtime, 'index-start-recovery-1-reached.json')));
+  requireThat(recovery.point === 'index-start' && recovery.attempt === 'recovery-1'
+    && recovery.recoveryAttempts === 1, `invalid recovery barrier marker: ${JSON.stringify(recovery)}`);
+  requireThat(path.resolve(recovery.indexBase) === path.resolve(indexBase),
+    `recovery barrier used an unexpected index base: ${JSON.stringify(recovery)}`);
+  if (scenario === 'lock-index-release') {
+    const ready = await waitFor('same-incarnation index READY after lock release', 120000,
+      async () => {
+        try {
+          const response = await request(apiPort, '/api/status', {}, 15000);
+          if (response.status !== 200) return null;
+          const status = JSON.parse(response.text);
+          return status.components?.api?.state === 'READY'
+            && status.components?.index?.state === 'READY'
+            && status.components.index.recoveryAttempts === 1 ? status : null;
+        } catch { return null; }
+      });
+    const finalSupervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+    const finalManifest = readJson(path.join(runtime, 'manifest.json'));
+    requireThat(finalSupervisor?.runId === first.runId
+      && finalSupervisor?.incarnation === first.incarnation,
+    `release arc changed supervisor identity: ${JSON.stringify(finalSupervisor)}`);
+    requireThat(finalManifest?.instanceId === manifest.instanceId,
+      `release arc changed Engine instance: ${JSON.stringify(finalManifest)}`);
+    const settings = readJson(settingsPath);
+    requireThat(JSON.stringify(settings) === JSON.stringify(settingsBefore),
+      'release arc changed the settings witness while recovering the index');
+    const refusalLog = await waitFor('release-arc root-lock refusal evidence', 30000, () => {
+      const log = path.join(work, 'state', 'runs', first.runId, 'logs', 'engine.log');
+      if (!fs.existsSync(log)) return null;
+      const text = fs.readFileSync(log, 'utf8');
+      return text.includes('Failed to acquire index root lock') ? text : null;
+    });
+    const refusalCount = refusalLog.split('Failed to acquire index root lock').length - 1;
+    requireThat(refusalCount >= 1, `release arc lacked a real root-lock refusal: ${refusalCount}`);
+    const vectorDoc = path.join(work, 'index-lock-release-vector.txt');
+    const marker = 'index-lock-release-unique-vector-marker';
+    fs.writeFileSync(vectorDoc, `${marker} standard model recovery proof\n`);
+    const operationKey = createOperationKey();
+    const receiptResponse = await waitFor('release-arc vector document acceptance', 90000,
+      async () => {
+        try {
+          const response = await post(apiPort, '/api/knowledge/ingest', {
+            paths: [vectorDoc], idempotencyKey: operationKey,
+          });
+          return response.status >= 200 && response.status < 300 ? response : null;
+        } catch { return null; }
+      });
+    const receipt = requireOperationSuccess(receiptResponse, 'release-arc vector ingest');
+    const vector = await waitFor('release-arc real standard-model VECTOR query', 120000,
+      async () => {
+        try {
+          const response = await post(apiPort, '/api/knowledge/search',
+            { query: marker, limit: 10, mode: 'vector' }, 30000);
+          if (response.status !== 200) return null;
+          const body = JSON.parse(response.text);
+          return body.searchTrace?.effectiveMode === 'VECTOR'
+            && matchingHit(response, vectorDoc, marker) ? body : null;
+        } catch { return null; }
+      });
+    console.log('INDEX_LOCK_RELEASE_PASS', JSON.stringify({ first, manifest, initial,
+      deadlineStatus, recovery, ready, finalSupervisor, finalManifest, settings, settingsBefore,
+      refusalCount, receipt, vector, vectorDoc }));
+    return;
+  }
+  const escalated = await waitFor('counted escalated restart after two index refusals', 180000,
+    () => {
+      const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+      const lastExit = supervisor?.lastExit;
+      return supervisor?.runId === first.runId && supervisor?.incarnation === first.incarnation
+        && lastExit?.incarnation === first.incarnation
+        && lastExit?.code === 5 && lastExit?.class === 'TRANSIENT'
+        && lastExit?.counted === true && lastExit.reason === 'escalated_restart'
+        ? { supervisor, lastExit } : null;
+    });
+  const firstIncarnationLog = await waitFor('two root-lock refusal records', 30000, () => {
+    const log = path.join(work, 'state', 'runs', first.runId, 'incarnations',
+      String(first.incarnation), 'logs', 'engine.log');
+    if (!fs.existsSync(log)) return null;
+    const text = fs.readFileSync(log, 'utf8');
+    return text.includes('Failed to acquire index root lock') ? text : null;
+  });
+  const refusalCount = firstIncarnationLog.split('Failed to acquire index root lock').length - 1;
+  requireThat(refusalCount >= 2,
+    `exhaustion arc did not record two root-lock refusals: ${refusalCount}`);
+  const successor = await waitFor('successor manifest after escalated restart', 120000, () => {
+    const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+    const next = readJson(path.join(runtime, 'manifest.json'));
+    return supervisor?.runId === first.runId && supervisor?.incarnation === first.incarnation + 1
+      && next?.instanceId && next.instanceId !== manifest.instanceId
+      && next.pid === supervisor.pid ? { supervisor, manifest: next } : null;
+  });
+  const ready = await waitFor('successor index READY after escalated restart', 120000,
+    async () => {
+      try {
+        const response = await request(successor.manifest.head.apiPort, '/api/status', {}, 15000);
+        if (response.status !== 200) return null;
+        const status = JSON.parse(response.text);
+        return status.components?.api?.state === 'READY'
+          && status.components?.index?.state === 'READY' ? status : null;
+      } catch { return null; }
+    });
+  const vectorDoc = path.join(work, 'index-lock-exhaustion-vector.txt');
+  const marker = 'index-lock-exhaustion-unique-vector-marker';
+  fs.writeFileSync(vectorDoc, `${marker} standard model successor proof\n`);
+  const operationKey = createOperationKey();
+  const receiptResponse = await waitFor('exhaustion-arc vector document acceptance', 90000,
+    async () => {
+      try {
+        const response = await post(successor.manifest.head.apiPort, '/api/knowledge/ingest', {
+          paths: [vectorDoc], idempotencyKey: operationKey,
+        });
+        return response.status >= 200 && response.status < 300 ? response : null;
+      } catch { return null; }
+    });
+  const receipt = requireOperationSuccess(receiptResponse, 'exhaustion-arc vector ingest');
+  const vector = await waitFor('exhaustion-arc real standard-model VECTOR query', 120000,
+    async () => {
+      try {
+        const response = await post(successor.manifest.head.apiPort, '/api/knowledge/search',
+          { query: marker, limit: 10, mode: 'vector' }, 30000);
+        if (response.status !== 200) return null;
+        const body = JSON.parse(response.text);
+        return body.searchTrace?.effectiveMode === 'VECTOR'
+          && matchingHit(response, vectorDoc, marker) ? body : null;
+      } catch { return null; }
+    });
+  const settings = readJson(settingsPath);
+  requireThat(JSON.stringify(settings) === JSON.stringify(settingsBefore),
+    'exhaustion arc changed the settings witness across escalation');
+  console.log('INDEX_LOCK_EXHAUSTION_PASS', JSON.stringify({ first, manifest, initial,
+    deadlineStatus, recovery, escalated, refusalCount, successor, ready, settings, settingsBefore,
+    receipt, vector, vectorDoc }));
+}
 function jobStateFor(filename) {
   const database = new DatabaseSync(path.join(data, 'jobs.db'), { readOnly: true });
   try {
@@ -469,12 +645,21 @@ try {
   ownedRunId = first.runId;
   const manifest = initial.manifest;
   const apiPort = manifest.head.apiPort;
-  const healthBefore = await waitFor('initial healthy Engine', 60000, async () => {
-    try {
-      const response = await request(apiPort, '/api/health');
-      return response.status === 200 ? response : null;
-    } catch { return null; }
-  });
+  const healthBefore = indexLockScenario
+    ? await waitFor('initial API-ready status while index barrier is held', 60000, async () => {
+      try {
+        const response = await request(apiPort, '/api/status', {}, 15000);
+        if (response.status !== 200) return null;
+        const status = JSON.parse(response.text);
+        return status.components?.api?.state === 'READY' ? status : null;
+      } catch { return null; }
+    })
+    : await waitFor('initial healthy Engine', 60000, async () => {
+      try {
+        const response = await request(apiPort, '/api/health');
+        return response.status === 200 ? response : null;
+      } catch { return null; }
+    });
   if (scenario === 'route-capture') {
     const captured = await captureFromLive(`http://127.0.0.1:${apiPort}`);
     requireThat(captured.routes.every((route) => ![
@@ -578,6 +763,10 @@ try {
   } else if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'processing') {
     await exerciseProcessingReplay({ work, data, first, manifest, apiPort, readJson, waitFor,
       request, post, requireThat, requireOperationSuccess, createOperationKey, matchingHit, jobStateFor });
+  } else if (indexLockScenario) {
+    await exerciseIndexLockRecovery({ scenario, work, data, indexBase, first, manifest, apiPort,
+      readJson, waitFor, request, post, requireThat, requireOperationSuccess,
+      createOperationKey, matchingHit });
   } else if (lockScenario) {
     await exerciseHostileLocks({ work, data, first, readJson, waitFor, request, post,
       requireThat, requireOperationSuccess, createOperationKey });

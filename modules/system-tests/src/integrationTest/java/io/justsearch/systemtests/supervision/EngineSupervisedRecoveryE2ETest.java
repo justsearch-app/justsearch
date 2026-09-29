@@ -543,7 +543,8 @@ final class EngineSupervisedRecoveryE2ETest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"writer", "migration", "lock-ingest", "processing"})
+  @ValueSource(strings = {"writer", "migration", "lock-ingest", "processing",
+      "lock-index-release", "lock-index-exhaustion"})
   void supervisedRecoveryUsesTheCorrectExitAndReopensDurableState(String scenario) throws Exception {
     runScenario(scenario);
   }
@@ -557,7 +558,9 @@ final class EngineSupervisedRecoveryE2ETest {
     boolean processingFamily = "processing".equals(scenario) || "operation".equals(scenario);
     boolean operationFault = scenario.startsWith("ingest-") || scenario.startsWith("settings-")
         || scenario.startsWith("bulk-");
-    if ("lock-boot".equals(scenario)) {
+    boolean indexLockScenario = "lock-index-release".equals(scenario)
+        || "lock-index-exhaustion".equals(scenario);
+    if ("lock-boot".equals(scenario) || indexLockScenario) {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "mandatory file-locking contention at boot is a Windows property");
     }
@@ -598,6 +601,11 @@ final class EngineSupervisedRecoveryE2ETest {
       builder.environment().put("JUSTSEARCH_PROCESSING_TEST_ENTERED", work.resolve("processing-entered").toString());
     }
     FileIntruder intruder = scenario.startsWith("lock-") ? new FileIntruder(work.resolve("data")) : null;
+    FileIntruder.ExclusiveHold indexLock = null;
+    boolean initialBarrierReleased = false;
+    boolean recoveryBarrierReleased = false;
+    boolean indexLockReleased = false;
+    long initialBarrierSeenAt = 0L;
     boolean intruderStarted = false;
     if ("lock-boot".equals(scenario)) {
       Files.createDirectories(work.resolve("data"));
@@ -612,6 +620,61 @@ final class EngineSupervisedRecoveryE2ETest {
       process = builder.start();
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(330);
       while (!process.waitFor(100, TimeUnit.MILLISECONDS)) {
+        if (indexLockScenario) {
+          Path runtime = work.resolve("data/runtime");
+          Path initialReached = runtime.resolve("index-start-initial-reached.json");
+          Path initialRelease = runtime.resolve("index-start-initial-release");
+          Path recoveryReached = runtime.resolve("index-start-recovery-1-reached.json");
+          Path recoveryRelease = runtime.resolve("index-start-recovery-1-release");
+          if (!initialBarrierReleased && indexLock == null
+              && Files.isRegularFile(initialReached)) {
+            JsonNode marker = MAPPER.readTree(Files.readString(initialReached));
+            assertEquals("index-start", marker.path("point").asText(), marker.toString());
+            assertEquals("initial", marker.path("attempt").asText(), marker.toString());
+            assertEquals(0, marker.path("recoveryAttempts").asInt(), marker.toString());
+            Path indexBase = Path.of(marker.path("indexBase").asText());
+            Path lockFile = indexBase.resolveSibling(indexBase.getFileName() + ".index.lock");
+            indexLock = intruder.holdExclusive(lockFile);
+            initialBarrierSeenAt = System.nanoTime();
+          }
+          if (indexLock != null && !initialBarrierReleased) {
+            Path deadlineProof = work.resolve("index-start-deadline-proved");
+            boolean proofPublished = Files.isRegularFile(deadlineProof);
+            boolean safetyRelease = initialBarrierSeenAt != 0L
+                && System.nanoTime() - initialBarrierSeenAt > TimeUnit.SECONDS.toNanos(150);
+            if (proofPublished || safetyRelease) {
+              Files.writeString(initialRelease, proofPublished ? "deadline-proved" : "safety-release");
+              initialBarrierReleased = true;
+            }
+          }
+          if (initialBarrierReleased && !recoveryBarrierReleased
+              && Files.isRegularFile(recoveryReached)) {
+            JsonNode marker = MAPPER.readTree(Files.readString(recoveryReached));
+            assertEquals("index-start", marker.path("point").asText(), marker.toString());
+            assertEquals("recovery-1", marker.path("attempt").asText(), marker.toString());
+            assertEquals(1, marker.path("recoveryAttempts").asInt(), marker.toString());
+            if ("lock-index-release".equals(scenario)) {
+              indexLock.close();
+              indexLockReleased = true;
+            }
+            Files.writeString(recoveryRelease,
+                indexLockReleased ? "released-before-retry" : "held-for-exhaustion");
+            recoveryBarrierReleased = true;
+          }
+          if ("lock-index-exhaustion".equals(scenario) && recoveryBarrierReleased
+              && !indexLockReleased && indexLock != null) {
+            Path supervisor = runtime.resolve("supervisor.v1.json");
+            JsonNode state = Files.isRegularFile(supervisor)
+                ? MAPPER.readTree(Files.readString(supervisor)) : null;
+            JsonNode lastExit = state == null ? null : state.path("lastExit");
+            if (lastExit != null && lastExit.path("code").asInt(-1) == 5
+                && lastExit.path("counted").asBoolean(false)) {
+              indexLock.close();
+              indexLockReleased = true;
+              Files.writeString(work.resolve("index-lock-exit-observed"), lastExit.toString());
+            }
+          }
+        }
         if (intruder != null) {
           if (!intruderStarted && Files.exists(work.resolve("intruder-start"))) {
             intruder.start(3, 50);
@@ -637,6 +700,7 @@ final class EngineSupervisedRecoveryE2ETest {
       primaryFailure = failure;
       throw failure;
     } finally {
+      if (indexLock != null) indexLock.close();
       if (intruder != null) intruder.close();
       if (process != null && process.isAlive()) {
         process.destroyForcibly();
@@ -713,6 +777,12 @@ final class EngineSupervisedRecoveryE2ETest {
         assertTrue(output.contains("OPERATION_ROW_AFTER_DEATH"), output);
         assertTrue(output.contains("OPERATION_ROW_AFTER_RESTART"), output);
       }
+    } else if ("lock-index-release".equals(scenario)) {
+      assertTrue(output.contains("INDEX_LOCK_RELEASE_PASS"), output);
+      assertTrue(indexLockReleased, "the exact index lock was not released before retry");
+    } else if ("lock-index-exhaustion".equals(scenario)) {
+      assertTrue(output.contains("INDEX_LOCK_EXHAUSTION_PASS"), output);
+      assertTrue(indexLockReleased, "the exact index lock was not released after escalation");
     } else {
       assertTrue(output.contains("LOCK_SURVIVAL_PASS"), output);
       assertTrue(intruder.acquiredLockCount() > 0, "the attack must acquire real filesystem locks");

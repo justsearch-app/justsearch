@@ -4,6 +4,7 @@ package io.justsearch.systemtests.supervision;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -72,6 +73,67 @@ final class FileIntruder implements AutoCloseable {
 
   long acquiredLockCount() {
     return acquiredLocks.get();
+  }
+
+  /**
+   * Takes an exclusive operating-system lock on one exact index-root lock file.
+   *
+   * <p>This is deliberately separate from the random intruder workload, whose {@code .lock}
+   * exclusion remains load-bearing. The installed recovery proof uses this method at a worker
+   * startup barrier so contention is deterministic. {@link FileChannel#tryLock()} makes an
+   * already-held lock an immediate fixture failure instead of accidentally adding the worker's
+   * 60-second acquisition timeout to the test setup.
+   */
+  ExclusiveHold holdExclusive(Path exactLockFile) throws IOException {
+    Objects.requireNonNull(exactLockFile, "exactLockFile");
+    Path lockFile = exactLockFile.toAbsolutePath().normalize();
+    Path target = targetDir.toAbsolutePath().normalize();
+    if (!lockFile.startsWith(target)
+        || !lockFile.getFileName().toString().endsWith(".index.lock")) {
+      throw new IllegalArgumentException(
+          "deterministic hold must target an exact .index.lock below " + target);
+    }
+    Files.createDirectories(lockFile.getParent());
+    FileChannel channel = FileChannel.open(lockFile, StandardOpenOption.CREATE,
+        StandardOpenOption.READ, StandardOpenOption.WRITE);
+    FileLock lock;
+    try {
+      lock = channel.tryLock();
+    } catch (OverlappingFileLockException alreadyHeld) {
+      channel.close();
+      throw new IOException("Exact index lock is already held: " + lockFile, alreadyHeld);
+    }
+    if (lock == null) {
+      channel.close();
+      throw new IOException("Exact index lock is already held: " + lockFile);
+    }
+    activeChannels.add(channel);
+    activeLocks.add(lock);
+    recordAcquisition(lockFile, true);
+    return new ExclusiveHold(lock, channel);
+  }
+
+  final class ExclusiveHold implements AutoCloseable {
+    private final FileLock lock;
+    private final FileChannel channel;
+    private final AtomicBoolean closed = new AtomicBoolean();
+
+    private ExclusiveHold(FileLock lock, FileChannel channel) {
+      this.lock = lock;
+      this.channel = channel;
+    }
+
+    @Override
+    public void close() throws IOException {
+      if (!closed.compareAndSet(false, true)) return;
+      activeLocks.remove(lock);
+      activeChannels.remove(channel);
+      try {
+        lock.release();
+      } finally {
+        channel.close();
+      }
+    }
   }
 
   /**
@@ -186,32 +248,7 @@ final class FileIntruder implements AutoCloseable {
       try {
         FileLock lock = channel.tryLock(0, Long.MAX_VALUE, !exclusive);
         if (lock != null) {
-          String relativePath = relativePath(file);
-          synchronized (evidenceMonitor) {
-            acquiredLocks.incrementAndGet();
-            if (exclusive) {
-              exclusiveAcquisitions++;
-            } else {
-              sharedAcquisitions++;
-            }
-            LockEvidence evidence = evidenceByPath.get(relativePath);
-            if (evidence == null) {
-              if (evidenceByPath.size() < MAX_EVIDENCE_PATHS) {
-                evidence = new LockEvidence();
-                evidenceByPath.put(relativePath, evidence);
-              } else {
-                omittedAcquisitions++;
-              }
-            }
-            if (evidence != null) {
-              evidence.total++;
-              if (exclusive) {
-                evidence.exclusive++;
-              } else {
-                evidence.shared++;
-              }
-            }
-          }
+          recordAcquisition(file, exclusive);
           activeLocks.add(lock);
           Thread.sleep(random.nextInt(durationMs) + 1);
           lock.release();
@@ -225,6 +262,35 @@ final class FileIntruder implements AutoCloseable {
       Thread.currentThread().interrupt();
     } catch (Exception e) {
       // The lock failed (the file is already locked by the index half?). Expected.
+    }
+  }
+
+  private void recordAcquisition(Path file, boolean exclusive) {
+    String relativePath = relativePath(file);
+    synchronized (evidenceMonitor) {
+      acquiredLocks.incrementAndGet();
+      if (exclusive) {
+        exclusiveAcquisitions++;
+      } else {
+        sharedAcquisitions++;
+      }
+      LockEvidence evidence = evidenceByPath.get(relativePath);
+      if (evidence == null) {
+        if (evidenceByPath.size() < MAX_EVIDENCE_PATHS) {
+          evidence = new LockEvidence();
+          evidenceByPath.put(relativePath, evidence);
+        } else {
+          omittedAcquisitions++;
+        }
+      }
+      if (evidence != null) {
+        evidence.total++;
+        if (exclusive) {
+          evidence.exclusive++;
+        } else {
+          evidence.shared++;
+        }
+      }
     }
   }
 
