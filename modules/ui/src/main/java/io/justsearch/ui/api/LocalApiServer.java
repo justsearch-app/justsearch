@@ -661,7 +661,7 @@ public class LocalApiServer {
         inferenceHandlers::handleGpuCapabilities,
         inferenceHandlers::handleSetInferenceMode,
         inferenceHandlers::handleDetachExternalInferenceServer,
-        inferenceHandlers::handleRestartWorker,
+        inferenceHandlers::handleRetiredWorkerRestartTombstone,
         inferenceHandlers::handleRecoverComponent,
         core.encoderRuntimeController()::handle,
         inferenceHandlers::handleInferenceFailures,
@@ -882,8 +882,9 @@ public class LocalApiServer {
     core.encoderRuntimeController().setClient(ks != null ? ks.client() : null);
     // Tempdoc 374 alpha.17 R3: late-bind for /api/ai/install. Pre-alpha.17 the
     // AiInstallController was constructed with the builder's null knowledgeServer
-    // and never updated. tryRestartWorkerBestEffort silently no-op'd, leaving the
-    // post-Install-AI worker on its boot-time ORT init (no native_path) until the
+    // and never updated. The former best-effort worker reinitialization silently
+    // no-op'd, leaving the post-Install-AI worker on its boot-time ORT init
+    // (no native_path) until the
     // user manually relaunched. Now the worker reference reaches AiInstallService
     // before the user can click "Install AI" (UI doesn't render the dialog until
     // /api/health reports the worker online).

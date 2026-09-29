@@ -19,7 +19,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /** The legacy route remains for one release solely to describe its replacement. */
-final class InferenceHandlersWorkerRestartTest {
+final class RetiredWorkerRestartRouteTest {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void retiredRouteNeverDispatchesRecoveryRegardlessOfBootstrapPresence(boolean bound) {
@@ -32,7 +32,7 @@ final class InferenceHandlersWorkerRestartTest {
     when(ctx.json(any())).thenReturn(ctx);
     when(ctx.endpointHandlerPath()).thenReturn("/api/worker/restart");
 
-    handler.handleRestartWorker(ctx);
+    handler.handleRetiredWorkerRestartTombstone(ctx);
 
     verify(ctx).status(410);
     var captured = ArgumentCaptor.forClass(Object.class);

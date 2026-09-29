@@ -13,7 +13,7 @@ public final class InferenceRoutes {
       Handler gpuCapabilitiesHandler,
       Handler setInferenceModeHandler,
       Handler detachExternalInferenceServerHandler,
-      Handler restartWorkerHandler,
+      Handler retiredWorkerRestartTombstoneHandler,
       Handler recoverComponentHandler,
       Handler encoderRuntimeHandler,
       Handler inferenceFailuresHandler,
@@ -22,7 +22,7 @@ public final class InferenceRoutes {
     app.get("/api/gpu/capabilities", gpuCapabilitiesHandler);
     app.post("/api/inference/mode", setInferenceModeHandler);
     app.post("/api/inference/detach", detachExternalInferenceServerHandler);
-    app.post("/api/worker/restart", restartWorkerHandler);
+    app.post("/api/worker/restart", retiredWorkerRestartTombstoneHandler);
     app.post("/api/engine/components/{name}/recover", recoverComponentHandler);
     // Tempdoc 422: per-encoder runtime accelerator explainer.
     app.get("/api/inference/encoders", encoderRuntimeHandler);

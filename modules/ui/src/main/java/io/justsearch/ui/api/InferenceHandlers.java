@@ -681,8 +681,8 @@ final class InferenceHandlers {
     }
   }
 
-  /** One-release retirement response for the former Worker restart endpoint. */
-  void handleRestartWorker(Context ctx) {
+  /** One-release tombstone response for the retired Worker restart endpoint. */
+  void handleRetiredWorkerRestartTombstone(Context ctx) {
     ctx.status(410).json(ApiErrorHandler.toResponse(ApiErrorCode.ENDPOINT_RETIRED,
         "This endpoint is retired; use POST /api/engine/components/index/recover",
         telemetry, ApiErrorHandler.routeOf(ctx)));
