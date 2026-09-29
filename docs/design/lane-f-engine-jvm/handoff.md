@@ -24,6 +24,13 @@ record frontend typecheck and 491 files/6,631 tests green. The readiness-code
 gate (61 producer-backed, 57 worded), consequence gate, supervisor semantic
 7/7, UI coverage, docs regeneration checks and `git diff --check` pass.
 The independent D1-15 reviewer reported no actionable defect on this diff.
+The first exact-SHA hosted run on `bcfc5323c80a4b85adec184099a8bbc98d6c45de`
+exposed one frontend ESLint `no-case-declarations` finding in `verdict.ts`.
+It is corrected by scoping the degraded switch arm; full frontend lint,
+typecheck and 6,631 tests pass again in `tmp/d1-15-ui-lint-correction.log`,
+`tmp/d1-15-ui-typecheck-correction.log` and
+`tmp/d1-15-ui-unit-correction.log`. The new exact-SHA hosted run is required;
+the first run is diagnostic, not a green acceptance result.
 
 **Live-proof limitation.** This chat's `justsearch-dev` MCP process was launched
 from the older main checkout. Its preflight still requires the retired

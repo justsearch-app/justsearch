@@ -525,7 +525,7 @@ export function verdictBody(v: SystemHealthVerdict): string {
               return 'The index is being rebuilt; document counts and results will settle when it finishes.';
           }
       }
-    case 'degraded':
+    case 'degraded': {
       if (v.reasons.some(isReindexCause)) {
         return 'A reindex is required to restore full search quality.';
       }
@@ -552,6 +552,7 @@ export function verdictBody(v: SystemHealthVerdict): string {
       return v.severity === 'info'
         ? 'An optional capability is unavailable; search still works.'
         : 'Retrieval is degraded. See recent events for detail.';
+    }
     case 'operational':
       return 'No recoverable conditions active.';
   }
