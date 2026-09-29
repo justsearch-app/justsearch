@@ -839,6 +839,38 @@ final class JobQueueTest {
     assertEquals(afterScanB.collection(), global.collection(), "both listings project the same row");
   }
 
+  @Test
+  void exactCollectionReenqueueClearsCollectionButPreservesScanAndProvenance() throws Exception {
+    Path file = Path.of("/exact-collection/rebind.txt");
+    var provenance = new JobQueue.EnqueueProvenance("agent", "MCP");
+
+    jobQueue.enqueueEntries(
+        List.of(new JobQueue.EnqueueEntry(file, 12L, provenance)), "docs", "scan-A");
+    jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+    assertJobMetadata(file, "docs", "scan-A", "agent", "MCP");
+
+    jobQueue.enqueueEntriesWithExactCollection(
+        List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+    assertJobMetadata(file, null, "scan-A", "agent", "MCP");
+  }
+
+  private void assertJobMetadata(
+      Path file, String collection, String scanId, String originator, String transport)
+      throws SQLException {
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath.toAbsolutePath());
+        PreparedStatement stmt = conn.prepareStatement(
+            "SELECT collection, scan_id, originator, transport FROM jobs WHERE path = ?")) {
+      stmt.setString(1, PathNormalizer.normalizePath(file.toAbsolutePath().toString()));
+      try (ResultSet rs = stmt.executeQuery()) {
+        assertTrue(rs.next());
+        assertEquals(collection, rs.getString("collection"));
+        assertEquals(scanId, rs.getString("scan_id"));
+        assertEquals(originator, rs.getString("originator"));
+        assertEquals(transport, rs.getString("transport"));
+      }
+    }
+  }
+
   /** Drives one path through the retry ladder until it reaches a terminal failed state. */
   private void driveToFailed(Path path) {
     for (int i = 0; i < 6; i++) {

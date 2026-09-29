@@ -850,7 +850,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    */
   @Override
   public int enqueueEntries(List<JobQueue.EnqueueEntry> entries, String collection) {
-    return enqueueEntries(entries, collection, null);
+    return enqueueEntries(entries, collection, null, false);
+  }
+
+  /**
+   * Committed boot root rebinding path. The declared collection is authoritative, including a
+   * deliberate null that clears a collection carried by the replaced row. Scan ownership and
+   * provenance still use the ordinary maintenance carry-forward rules.
+   */
+  @Override
+  public int enqueueEntriesWithExactCollection(
+      List<JobQueue.EnqueueEntry> entries, String collection) {
+    return enqueueEntries(entries, collection, null, true);
   }
 
   /**
@@ -864,6 +875,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public int enqueueEntries(
       List<JobQueue.EnqueueEntry> entries, String collection, String scanId) {
+    return enqueueEntries(entries, collection, scanId, false);
+  }
+
+  private int enqueueEntries(
+      List<JobQueue.EnqueueEntry> entries, String collection, String scanId,
+      boolean exactCollection) {
     if (entries == null || entries.isEmpty()) {
       return 0;
     }
@@ -902,7 +919,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       // per-document terminal outcomes into one durable scan-completion audit record.
       String scan = (scanId != null && !scanId.isBlank()) ? scanId : null;
 
-      int count = inTransaction(() -> enqueueEntriesInTransaction(entries, col, scan, now));
+      int count = inTransaction(
+          () -> enqueueEntriesInTransaction(entries, col, scan, now, exactCollection));
 
       meters.recordEnqueued(count);
       log.debug("Enqueued {} jobs (collection={}, scanId={})", count, col, scan);
@@ -916,14 +934,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private int enqueueEntriesInTransaction(
-      List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now)
+      List<JobQueue.EnqueueEntry> entries, String collection, String scanId, long now,
+      boolean exactCollection)
       throws SQLException {
     String sql = """
         INSERT OR REPLACE INTO jobs
           (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256)
         VALUES (
           ?, 'PENDING', 0, ?,
-          COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)),
+          CASE WHEN ? = 1 THEN ? ELSE COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)) END,
           ?,
           ?,
           COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
@@ -943,21 +962,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scanId);
         stmt.setString(1, normalizedPath);
         stmt.setLong(2, now);
-        stmt.setString(3, collection);
-        stmt.setString(4, normalizedPath); // carry-forward lookup for collection
+        stmt.setInt(3, exactCollection ? 1 : 0);
+        stmt.setString(4, collection);
+        stmt.setString(5, collection);
+        stmt.setString(6, normalizedPath); // carry-forward lookup for collection
         if (entry.sizeBytes() >= 0) {
-          stmt.setLong(5, entry.sizeBytes());
+          stmt.setLong(7, entry.sizeBytes());
         } else {
-          stmt.setNull(5, java.sql.Types.INTEGER);
+          stmt.setNull(7, java.sql.Types.INTEGER);
         }
-        stmt.setString(6, membership.key());
-        stmt.setString(7, entry.provenance() == null ? null : entry.provenance().originator());
-        stmt.setString(8, normalizedPath);
-        stmt.setString(9, entry.provenance() == null ? null : entry.provenance().transport());
+        stmt.setString(8, membership.key());
+        stmt.setString(9, entry.provenance() == null ? null : entry.provenance().originator());
         stmt.setString(10, normalizedPath);
-        if (membership.epoch() == null) stmt.setNull(11, java.sql.Types.BIGINT);
-        else stmt.setLong(11, membership.epoch());
-        stmt.setString(12, membership.plannedSourceSha256() == null
+        stmt.setString(11, entry.provenance() == null ? null : entry.provenance().transport());
+        stmt.setString(12, normalizedPath);
+        if (membership.epoch() == null) stmt.setNull(13, java.sql.Types.BIGINT);
+        else stmt.setLong(13, membership.epoch());
+        stmt.setString(14, membership.plannedSourceSha256() == null
             ? entry.plannedSourceSha256() : membership.plannedSourceSha256());
         stmt.executeUpdate();
         if (membership.epoch() != null) {
@@ -1046,7 +1067,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         int accepted = enqueueEntriesInTransaction(
-            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis());
+            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), false);
         if (accepted != admitted.size()) {
           throw new SQLException("Atomic file batch did not accept every entry");
         }

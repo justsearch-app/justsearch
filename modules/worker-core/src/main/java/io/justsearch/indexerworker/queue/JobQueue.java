@@ -429,6 +429,22 @@ public interface JobQueue extends Closeable {
   }
 
   /**
+   * Enqueues sized entries with an exact collection assignment.
+   *
+   * <p>This narrow path is reserved for committed boot root rebinding, where a root's declared
+   * collection is authoritative: a {@code null} collection clears any collection already carried
+   * by a replaced row. Implementations without an exact collection write path fail closed rather
+   * than silently applying ordinary enqueue carry-forward semantics.
+   *
+   * @param entries paths plus their sizes ({@link #UNKNOWN_SIZE_BYTES} where unknown)
+   * @param collection collection tag for the indexed documents, or null to clear the tag
+   * @return number of jobs accepted
+   */
+  default int enqueueEntriesWithExactCollection(List<EnqueueEntry> entries, String collection) {
+    throw new UnsupportedOperationException("Exact collection enqueue is unavailable");
+  }
+
+  /**
    * Enqueues sized entries tagged with the directory scan that admitted them (tempdoc 812 D2).
    *
    * <p>The scan id is the same {@code ScanRootProgress.scan_id} the Head reads to subscribe to live
