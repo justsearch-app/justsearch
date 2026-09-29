@@ -707,7 +707,7 @@ public class HeadlessApp {
 
   /**
    * Tempdoc 825: ONE monitor authority, constructed regardless of the bootstrap outcome. It is also
-   * the {@code WorkerRecoveryAuthority} behind {@code POST /api/worker/restart}, so the operator's
+   * the component-recovery authority for HTTP and operations, so the operator's
    * manual path and the automatic loop share one budget and one set of vetoes.
    */
   private static KnowledgeServerHealthMonitor startHealthMonitor(
@@ -758,8 +758,7 @@ public class HeadlessApp {
       }
     }
       monitor.start();
-      apiServer.bindWorkerRecovery(monitor);
-      apiServer.bindComponentRecovery(monitor);
+      bootstrap.lateBindings().setComponentRecoveryAuthority(monitor);
       return monitor;
     } catch (RuntimeException | Error failure) {
       try {

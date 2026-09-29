@@ -38,7 +38,7 @@ import io.justsearch.app.services.registry.operations.handlers.RemoveWatchedRoot
 import io.justsearch.app.services.registry.operations.handlers.RepairAiInstallHandler;
 import io.justsearch.app.services.registry.operations.handlers.ResetSettingsHandler;
 import io.justsearch.app.services.registry.operations.handlers.ResolvePathHashHandler;
-import io.justsearch.app.services.registry.operations.handlers.RestartWorkerHandler;
+import io.justsearch.app.services.registry.operations.handlers.RecoverComponentHandler;
 import io.justsearch.app.services.registry.operations.handlers.RetryIndexingJobHandler;
 import io.justsearch.app.services.registry.operations.handlers.SetChatEnabledHandler;
 import io.justsearch.app.services.registry.operations.handlers.SettleIndexHandler;
@@ -47,8 +47,7 @@ import io.justsearch.app.services.registry.operations.handlers.SwitchInferenceMo
 import io.justsearch.app.services.registry.operations.handlers.TriggerOfflineProcessingHandler;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
-import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.WorkerServiceImpl;
+import io.justsearch.app.services.bootstrap.BootstrapLateBindings;
 import java.util.function.Supplier;
 
 /**
@@ -66,9 +65,9 @@ public final class OperationHandlerRegistrations {
 
   private OperationHandlerRegistrations() {}
 
-  public static WorkerServiceImpl registerWorker(
+  public static void registerWorker(
       HandlerRegistry handlers,
-      Supplier<KnowledgeServerBootstrap> knowledgeServerBootstrapSupplier,
+      BootstrapLateBindings lateBindings,
       Supplier<IndexingService> indexingServiceSupplier,
       Supplier<ExcludesService> excludesServiceSupplier,
       Supplier<SettingsService> settingsServiceSupplier,
@@ -86,9 +85,9 @@ public final class OperationHandlerRegistrations {
       // Tempdoc 542 Phase 3 — long-op handlers register op-leases via this SPI.
       io.justsearch.app.api.OperationLeaseService operationLeaseService,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots) {
-    final WorkerServiceImpl workerService = new WorkerServiceImpl(knowledgeServerBootstrapSupplier);
     handlers.register(
-        CoreOperationCatalog.RESTART_WORKER, new RestartWorkerHandler(() -> workerService));
+        CoreOperationCatalog.RECOVER_COMPONENT,
+        new RecoverComponentHandler(lateBindings::componentRecoveryAuthority));
     handlers.register(
         CoreOperationCatalog.BULK_REINDEX,
         new BulkReindexHandler(io.justsearch.app.api.operations.RecordedBulkPlan.Profile.USER_BULK,
@@ -194,6 +193,5 @@ public final class OperationHandlerRegistrations {
         CoreOperationCatalog.RESET_SETTINGS, new ResetSettingsHandler(settingsServiceSupplier));
     handlers.register(
         CoreOperationCatalog.RECONFIGURE, new ReconfigureHandler(settingsServiceSupplier));
-    return workerService;
   }
 }

@@ -179,7 +179,7 @@ final class WorkflowOperationProjectionTest {
   @Test
   void workflowRefForReturnsEmptyOnANonWorkflowOperation() {
     assertTrue(
-        WorkflowOperationProjection.workflowRefFor(new OperationRef("core.restart-worker")).isEmpty(),
+        WorkflowOperationProjection.workflowRefFor(new OperationRef("core.recover-component")).isEmpty(),
         "a normal operation ref is not a projected workflow");
   }
 

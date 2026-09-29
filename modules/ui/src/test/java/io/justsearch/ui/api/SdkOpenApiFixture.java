@@ -21,6 +21,9 @@ final class SdkOpenApiFixture {
     when(publisher.manifestPath()).thenReturn(Path.of("build", "sdk-openapi-fixture", "manifest.json"));
     new RuntimeApiRoutes(new io.justsearch.core.execution.TestEngineExecutors(), publisher).register(app);
     StatusRoutes.registerLifecycleRoutes(app, ctx -> {}, ctx -> {});
+    io.javalin.http.Handler noOp = ctx -> {};
+    io.justsearch.ui.api.routes.InferenceRoutes.register(app, noOp, noOp, noOp, noOp,
+        noOp, noOp, noOp, noOp, noOp);
     return app;
   }
 

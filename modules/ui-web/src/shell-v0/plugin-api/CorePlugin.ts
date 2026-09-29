@@ -179,7 +179,7 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
     // Tempdoc 571 — altitude (DIAGNOSTIC) flows from the single authority (the wire / Java catalog) and
     // is preserved through mergePluginSurfaceContributions; not re-declared here (no second authority).
     consumes: {
-      operations: ['core.reindex', 'core.restart-worker', 'core.clear-failed-jobs', 'core.export-diagnostics', 'core.bulk-reindex'],
+      operations: ['core.reindex', 'core.recover-component', 'core.clear-failed-jobs', 'core.export-diagnostics', 'core.bulk-reindex'],
     },
   },
   // Tempdoc 575 §17 Face B (the System Self-View / "Now") was a RAIL surface here; RETIRED by tempdoc

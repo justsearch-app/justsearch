@@ -296,8 +296,8 @@ final class HeadlessAppShutdownWiringTest {
       health.onRecoveryConnected(ignored -> handedOver.set(true));
       var api = mock(LocalApiServer.class);
       doAnswer(ignored -> {
-        assertEquals(io.justsearch.app.services.worker.WorkerRecoveryAuthority.Verdict.NOT_APPLICABLE,
-            health.requestRecoveryNow(), "recovery must already be revoked when API teardown starts");
+        assertEquals(io.justsearch.app.services.worker.ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE,
+            health.requestComponentRecovery("index"), "recovery must already be revoked when API teardown starts");
         release.countDown();
         health.close(); // Join the late task before checking its external effects.
         assertTrue(bound.get(), "the physical start really finished after shutdown began");
@@ -307,8 +307,8 @@ final class HeadlessAppShutdownWiringTest {
         return null;
       }).when(api).stop();
       try {
-        assertEquals(io.justsearch.app.services.worker.WorkerRecoveryAuthority.Verdict.ACCEPTED,
-            health.requestRecoveryNow());
+        assertEquals(io.justsearch.app.services.worker.ComponentRecoveryAuthority.Outcome.ACCEPTED,
+            health.requestComponentRecovery("index"));
         assertTrue(entered.await(5, TimeUnit.SECONDS));
         if (fatalCleanup) {
           HeadlessApp.stopRecoveryAndApi(health, api);

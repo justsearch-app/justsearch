@@ -1562,7 +1562,7 @@ export class SettingsSurface extends JfElement {
    *
    * USER (default): hide operator and developer ops; show only
    * user-facing surfaces and operations.
-   * OPERATOR: also show operator-only ops (restart-worker,
+   * OPERATOR: also show operator-only ops (recover-component,
    * bulk-reindex, etc.) — useful for system administration tasks.
    * DEVELOPER: show everything, including developer-only debug
    * surfaces and operations.

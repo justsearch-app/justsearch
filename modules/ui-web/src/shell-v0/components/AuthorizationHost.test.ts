@@ -95,7 +95,7 @@ describe('<jf-authorization-host> (tempdoc 550 C3)', () => {
   it('registers as the broker presenter and resolves true on Approve (INLINE)', async () => {
     const decision = requestAuthorization({
       pendingId: 'pa-1',
-      operationId: 'core.restart-worker',
+      operationId: 'core.recover-component',
       gateBehavior: 'INLINE_CONFIRM',
     });
     await settle();

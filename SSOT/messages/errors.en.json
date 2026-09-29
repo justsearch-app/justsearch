@@ -20,6 +20,7 @@
     "errors.DOWNLOADS_DISABLED" : "Downloads are disabled by administrator policy.",
     "errors.DOWNLOAD_FAILED" : "AI model download failed. Check your network connection and try again.",
     "errors.EMPTY_RESPONSE" : "The agent returned an empty response. Try rephrasing your request.",
+    "errors.ENDPOINT_RETIRED" : "This endpoint has been retired. Use the replacement endpoint named in the response.",
     "errors.FETCH_FAILED" : "Network request failed. Check your connection and try again.",
     "errors.GPU_CAPABILITIES_FAILED" : "Failed to detect GPU capabilities.",
     "errors.HANDOFF_CYCLE_DETECTED" : "The agents entered a handoff loop and were stopped automatically.",
@@ -145,8 +146,7 @@
     "errors.USER_POLICY_WRITE_FAILED" : "Failed to write user policy.",
     "errors.VARIANT_ID_REQUIRED" : "AI runtime variant is required.",
     "errors.VERIFY_FAILED" : "AI model verification failed. The download may be corrupted.",
-    "errors.WORKER_RECOVERY_EXHAUSTED" : "The knowledge server could not be started and automatic recovery has stopped. Restart the application to try again.",
-    "errors.WORKER_RESTART_FAILED" : "Failed to restart worker process."
+    "errors.WORKER_RECOVERY_EXHAUSTED" : "The knowledge server could not be started and automatic recovery has stopped. Restart the application to try again."
   },
   "namespace" : "errors",
   "schemaVersion" : "1.0"

@@ -424,8 +424,8 @@ public enum ApiErrorCode {
 
     // ── Worker / infrastructure ────────────────────────────────────────────
 
-    /** Failed to restart the worker process. */
-    WORKER_RESTART_FAILED(ErrorClass.PERMANENT),
+    /** The endpoint is retained only to explain its replacement contract. */
+    ENDPOINT_RETIRED(ErrorClass.PERMANENT),
 
     /**
      * The worker's bounded boot-recovery budget is spent, so a restart request was declined

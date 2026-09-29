@@ -282,7 +282,7 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
   private static final ResourceRef RES_ACTION_LEDGER = new ResourceRef("core.action-ledger");
 
   // Health surface Operations
-  private static final OperationRef OP_RESTART_WORKER = new OperationRef("core.restart-worker");
+  private static final OperationRef OP_RECOVER_COMPONENT = new OperationRef("core.recover-component");
   private static final OperationRef OP_BULK_REINDEX = new OperationRef("core.bulk-reindex");
   private static final OperationRef OP_CLEAR_FAILED_JOBS = new OperationRef("core.clear-failed-jobs");
   /**
@@ -660,7 +660,7 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
                       RES_FAILED_INDEXING_JOBS),
                   /* operations */ Set.of(
                       OP_REINDEX,
-                      OP_RESTART_WORKER,
+                      OP_RECOVER_COMPONENT,
                       OP_BULK_REINDEX,
                       OP_CLEAR_FAILED_JOBS,
                       OP_EXPORT_DIAGNOSTICS,

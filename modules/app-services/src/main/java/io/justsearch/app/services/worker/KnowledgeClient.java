@@ -407,8 +407,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     // worse than a missing one: it answers "yes, handled" to a question nobody is entitled to ask
     // any more. Reconnecting is not a thing an in-process client can do — there is no connection
     // to lose, no port to rediscover, no process whose identity could change underneath it — and
-    // the circuit breaker was a property of the channel (stage A §2). Restart-as-reload is a
-    // "restart required" answer now; see RestartRequiredException.
+    // the circuit breaker was a property of the channel (stage A §2). The in-process index half
+    // has no independently restartable transport.
 
     /** Handle on a live {@code SubscribeIndexingJobs} flow. */
     public interface IndexingJobsStream extends AutoCloseable {

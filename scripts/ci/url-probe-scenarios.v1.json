@@ -70,10 +70,10 @@
       "expectedURL": "justsearch://op/core.ping-backend"
     },
     {
-      "id": "op-002-restart-worker",
+      "id": "op-002-recover-component",
       "category": "op",
-      "prompt": "Restart the worker process.",
-      "expectedURL": "justsearch://op/core.restart-worker"
+      "prompt": "Recover the index component.",
+      "expectedURL": "justsearch://op/core.recover-component?name=index"
     },
     {
       "id": "op-003-rebuild-index",
@@ -143,12 +143,12 @@
     },
 
     {
-      "id": "multi-001-nav-then-restart",
+      "id": "multi-001-nav-then-recover",
       "category": "multi",
-      "prompt": "Take me to system health, then restart the worker.",
+      "prompt": "Take me to system health, then recover the index component.",
       "expectedURLs": [
         "justsearch://surface/core.health-surface",
-        "justsearch://op/core.restart-worker"
+        "justsearch://op/core.recover-component?name=index"
       ]
     },
     {
@@ -191,8 +191,8 @@
     {
       "id": "phrasing-004-conversational",
       "category": "phrasing",
-      "prompt": "Hey, can we restart the worker? Something's stuck.",
-      "expectedURL": "justsearch://op/core.restart-worker"
+      "prompt": "Hey, can we recover the index component? Something's stuck.",
+      "expectedURL": "justsearch://op/core.recover-component?name=index"
     },
     {
       "id": "phrasing-005-elaborated",

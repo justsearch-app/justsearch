@@ -342,7 +342,7 @@ final class McpTierEquivalenceTest {
 
     DocumentService documents = mock(DocumentService.class);
     when(documents.retrieveContext(any(), any(EngineContext.class))).thenReturn(CompletableFuture.completedFuture(result));
-    WorkerServices workers = new WorkerServices(null, documents, null, null, null);
+    WorkerServices workers = new WorkerServices(null, documents, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
     McpAnswerCaptureFixture.bind(facade, documents);
@@ -401,7 +401,7 @@ final class McpTierEquivalenceTest {
 
     DocumentService documents = mock(DocumentService.class);
     when(documents.retrieveContext(any(), any(EngineContext.class))).thenReturn(CompletableFuture.completedFuture(zeroResult));
-    WorkerServices workers = new WorkerServices(null, documents, null, null, null);
+    WorkerServices workers = new WorkerServices(null, documents, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
     McpAnswerCaptureFixture.bind(facade, documents);

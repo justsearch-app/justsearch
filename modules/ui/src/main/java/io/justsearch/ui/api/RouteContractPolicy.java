@@ -152,6 +152,17 @@ final class RouteContractPolicy {
 
   static final List<Contract> CONTRACTS =
       List.of(
+          contract("POST", "/api/engine/components/{name}/recover", Stability.REFERENCE_CLIENT,
+              null, Map.of(202, "component-recovery-response.v1.json",
+                  404, "api-error-response.v1.json", 409, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json", 503, "api-error-response.v1.json")),
+          new Contract("POST", "/api/worker/restart", Stability.REFERENCE_CLIENT, null,
+              null, List.of(), Map.of(410, "api-error-response.v1.json"),
+              ApiSecurityFilters.contractSecurity("POST", "/api/worker/restart"),
+              new Lifecycle(Instant.parse("2026-09-29T00:00:00Z"), null,
+                  "POST /api/engine/components/index/recover",
+                  URI.create("https://github.com/justsearch-app/justsearch/blob/main/docs/reference/api-contract-map.md")),
+              null),
           referenceClient("GET", "/api/knowledge/search", "knowledge-search-response.v1.json"),
           referenceClient("POST", "/api/knowledge/search", "knowledge-search-response.v1.json"),
           referenceClient("GET", "/api/ai/runtime/status", "ai-runtime-status-response.v1.json"),

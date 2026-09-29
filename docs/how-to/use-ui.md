@@ -297,8 +297,10 @@ Invoke-RestMethod -Method Post -Uri http://localhost:33221/api/inference/detach
 #   "mode": "ONLINE"
 # }
 
-# Restart the Knowledge Worker (useful after changing embedding model path)
-Invoke-RestMethod -Method Post -Uri http://localhost:33221/api/worker/restart
+# Recover a failed index component with its current configuration.
+# Supply the current per-boot mutation token in $mutationHeaders.
+$mutationHeaders = @{ 'X-JustSearch-Session' = $sessionToken }
+Invoke-RestMethod -Method Post -Uri http://localhost:33221/api/engine/components/index/recover -Headers $mutationHeaders
 
 # Preview (paged extracted text)
 Invoke-RestMethod -Uri "http://localhost:33221/api/preview?docId=d:\path\to\file.txt&offsetChars=0&maxChars=8000"

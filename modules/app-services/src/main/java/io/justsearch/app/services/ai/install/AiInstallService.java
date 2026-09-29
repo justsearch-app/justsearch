@@ -2498,9 +2498,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     if (knowledgeServer == null || !knowledgeServer.hasClient()) {
       return false;
     }
-    log.info(
-        "AI install complete; an Engine restart is required to load the new model ({})",
-        io.justsearch.app.services.worker.RestartRequiredException.CODE);
+    log.info("AI install complete; the new model will load after the next ordered Engine restart");
     return false;
   }
 

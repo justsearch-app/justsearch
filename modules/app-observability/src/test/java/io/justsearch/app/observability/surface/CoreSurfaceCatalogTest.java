@@ -275,7 +275,7 @@ final class CoreSurfaceCatalogTest {
     for (String id :
         new String[] {
           "core.reindex",
-          "core.restart-worker",
+          "core.recover-component",
           "core.bulk-reindex",
           "core.clear-failed-jobs",
           "core.export-diagnostics",

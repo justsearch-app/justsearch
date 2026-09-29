@@ -846,32 +846,6 @@ public class LocalApiServer {
   }
 
   /**
-   * Late-binds the Knowledge Server after async Worker startup completes.
-   *
-   * <p>Updates controllers that need the Worker reference and registers the
-   * knowledge search routes that were skipped during initial construction.
-   *
-   * @param ks the started KnowledgeServerBootstrap (non-null)
-   * @param startError the start error string, or null if startup succeeded
-   */
-  /**
-   * Tempdoc 825: binds the ONE worker-recovery authority (the health monitor) into the API surface,
-   * so {@code POST /api/worker/restart} shares the automatic loop's budget and vetoes instead of
-   * 503-ing in exactly the state it exists for. Independent of
-   * {@link #lateBindKnowledgeServer}: the authority exists whether or not a worker is bound.
-   */
-  public void bindWorkerRecovery(
-      io.justsearch.app.services.worker.WorkerRecoveryAuthority workerRecovery) {
-    core.inferenceHandlers().setWorkerRecovery(workerRecovery);
-  }
-
-  /** Binds the monitor that owns the component recovery slot. */
-  public void bindComponentRecovery(
-      io.justsearch.app.services.worker.ComponentRecoveryAuthority componentRecovery) {
-    core.inferenceHandlers().setComponentRecovery(componentRecovery);
-  }
-
-  /**
    * Tempdoc 885 item 6: the delay the Worker-status sampler wants before its next observation —
    * 2 s while indexing/backfill/AI activation is in flight, 10 s otherwise. Read by
    * {@code KnowledgeServerHealthMonitor} to set its next tick, so the sampler rides the monitor's

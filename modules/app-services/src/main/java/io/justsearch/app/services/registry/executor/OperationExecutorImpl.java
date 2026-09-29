@@ -773,7 +773,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     return switch (missingCap) {
       case "worker-online" ->
           "Required capability unavailable: worker-online. The knowledge worker is not "
-              + "reachable; it restarts automatically — retry shortly, or run core.restart-worker.";
+              + "reachable; retry shortly, or run core.recover-component for the affected component.";
       case "inference-online" ->
           "Required capability unavailable: inference-online. Inference is not running; call "
               + "core.set-chat-enabled {\"enabled\":true} (or core.activate-runtime-variant "

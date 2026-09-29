@@ -50,8 +50,8 @@ final class ValueClassWireFormatTest {
   @Test
   @DisplayName("OperationRef deserializes from bare JSON string")
   void operationIdDeserializesFromBareString() throws Exception {
-    OperationRef id = MAPPER.readValue("\"core.restart-worker\"", OperationRef.class);
-    assertEquals("core.restart-worker", id.value());
+    OperationRef id = MAPPER.readValue("\"core.recover-component\"", OperationRef.class);
+    assertEquals("core.recover-component", id.value());
   }
 
   @Test
@@ -65,9 +65,9 @@ final class ValueClassWireFormatTest {
   @Test
   @DisplayName("I18nKey serializes as bare JSON string")
   void i18nKeySerializesAsBareString() throws Exception {
-    I18nKey key = new I18nKey("ops.restart-worker.label");
+    I18nKey key = new I18nKey("ops.recover-component.label");
     String json = MAPPER.writeValueAsString(key);
-    assertEquals("\"ops.restart-worker.label\"", json);
+    assertEquals("\"ops.recover-component.label\"", json);
   }
 
   @Test

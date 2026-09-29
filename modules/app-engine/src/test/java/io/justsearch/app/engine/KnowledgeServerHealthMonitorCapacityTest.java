@@ -9,11 +9,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.EngineAdmissionException;
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.services.worker.ComponentRecoveryAuthority.Outcome;
+import io.justsearch.app.services.worker.ComponentRecoveryBinding;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
-import io.justsearch.app.services.worker.WorkerRecoveryAuthority.Verdict;
-import io.justsearch.app.services.worker.ComponentRecoveryBinding;
-import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.core.component.ComponentRecoveryAction;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.TestEngineComponents;
@@ -23,9 +23,9 @@ import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.core.execution.EngineExecutorSpec.Kind;
 import io.justsearch.core.execution.EngineExecutorSpec.Mode;
 import java.time.Duration;
-import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
@@ -240,7 +240,8 @@ final class KnowledgeServerHealthMonitorCapacityTest {
         for (int i = 0; i < registry.limits(Kind.BACKGROUND).maxQueue(); i++) {
           queued.add(recovery.submit(() -> {}));
         }
-        var refusal = assertThrows(EngineAdmissionException.class, monitor::requestRecoveryNow);
+        var refusal = assertThrows(
+            EngineAdmissionException.class, () -> monitor.requestComponentRecovery("index"));
         assertEquals(EngineAdmissionException.Reason.ENGINE_LIMIT, refusal.reason());
         assertEquals(1, refusal.retryAfterSeconds());
         assertEquals(EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
@@ -250,7 +251,10 @@ final class KnowledgeServerHealthMonitorCapacityTest {
         held.get(2, TimeUnit.SECONDS);
         for (var task : queued) task.get(2, TimeUnit.SECONDS);
       }
-      assertEquals(Verdict.ACCEPTED, monitor.requestRecoveryNow(), "failed handoff must release attempt slot");
+      assertEquals(
+          Outcome.ACCEPTED,
+          monitor.requestComponentRecovery("index"),
+          "failed handoff must release attempt slot");
       assertTrue(attempted.await(2, TimeUnit.SECONDS));
     }
   }
@@ -263,7 +267,7 @@ final class KnowledgeServerHealthMonitorCapacityTest {
       registry.close();
       assertEquals(EngineExecutorRejectedException.Reason.CLOSED,
           assertThrows(EngineExecutorRejectedException.class, monitor::start).reason());
-      assertEquals(Verdict.NOT_APPLICABLE, monitor.requestRecoveryNow());
+      assertEquals(Outcome.NOT_APPLICABLE, monitor.requestComponentRecovery("index"));
     }
   }
 

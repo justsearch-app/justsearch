@@ -191,16 +191,16 @@ class ConsentCapsuleRecoveryE2ETest {
   @DisplayName("C2 step 3: a TRUSTED (BUTTON) HIGH op with a nominal token is rejected live")
   void trustedButtonHighNominalTokenIsRejected() throws Exception {
     // Tempdoc 550 C2 step 3 closes the nominal-token weakness for ALL tiers, not just
-    // UNTRUSTED. core.restart-worker is HIGH-risk; with no X-JustSearch-Transport header the
+    // UNTRUSTED. core.apply-excludes is HIGH-risk; with no X-JustSearch-Transport header the
     // backend defaults to BUTTON => TRUSTED (OperationsController.resolveProvenance), and
     // TRUSTED × HIGH = TYPED_CONFIRM. The V1 nominal (op-id) token no longer satisfies the
-    // gate, so this 428s and the handler never runs (the worker is NOT restarted — the gate
+    // gate, so this 428s and the handler never runs (excludes are NOT applied — the gate
     // precedes dispatch). Pre-C2-step-3 the op-id stand-in passed here; this pins the flip
     // end-to-end against a real HeadlessApp.
     HttpResponse<String> resp =
         post(
-            "/api/operations/core.restart-worker/invoke",
-            "{\"args\":{},\"confirmationToken\":\"core.restart-worker\"}",
+            "/api/operations/core.apply-excludes/invoke",
+            "{\"args\":{},\"confirmationToken\":\"core.apply-excludes\"}",
             null);
     assertEquals(
         428,

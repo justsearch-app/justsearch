@@ -60,6 +60,7 @@ public final class SchemaController {
       List.of(
           "health-event.v1.json",
           "condition-recovery-index.v1.json",
+          "component-recovery-response.v1.json",
           "indexing-job-view.v1.json",
           "operation-history-entry.v1.json",
           "operation-outcome-view.v1.json",

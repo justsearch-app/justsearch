@@ -37,19 +37,17 @@ describe('OperationClient', () => {
       .mockResolvedValue(
         fakeResponse({
           success: true,
-          message: 'restarted',
+          message: 'recovered',
           executionId: 'uuid-123',
-          structuredData: { port: 9001 },
         }),
       );
 
     const client = new OperationClient({ apiBase: 'http://localhost:33221', fetchImpl });
-    const result = await client.invoke('core.restart-worker');
+    const result = await client.invoke('core.recover-component', { args: { name: 'index' } });
 
     expect(result.success).toBe(true);
-    expect(result.message).toBe('restarted');
+    expect(result.message).toBe('recovered');
     expect(result.executionId).toBe('uuid-123');
-    expect(result.structuredData).toEqual({ port: 9001 });
   });
 
   it('throws OperationError with errorClass on handler failure', async () => {
@@ -67,7 +65,7 @@ describe('OperationClient', () => {
 
     const client = new OperationClient({ apiBase: 'http://localhost:33221', fetchImpl });
     try {
-      await client.invoke('core.restart-worker');
+      await client.invoke('core.recover-component', { args: { name: 'index' } });
       throw new Error('expected throw');
     } catch (err) {
       expect(err).toBeInstanceOf(OperationError);
@@ -194,14 +192,15 @@ describe('OperationClient', () => {
       .mockResolvedValue(fakeResponse({ success: true, message: 'ok' }));
 
     const client = new OperationClient({ apiBase: 'http://localhost:33221', fetchImpl });
-    await client.invoke('core.restart-worker', {
+    await client.invoke('core.recover-component', {
       idempotencyKey: 'uuid-key',
-      confirmationToken: 'restart',
+      confirmationToken: 'recover-index',
+      args: { name: 'index' },
     });
 
     const body = JSON.parse(fetchImpl.mock.calls[0]![1]?.body as string);
     expect(body.idempotencyKey).toBe('uuid-key');
-    expect(body.confirmationToken).toBe('restart');
+    expect(body.confirmationToken).toBe('recover-index');
   });
 
   it('strips trailing slash from apiBase', async () => {

@@ -82,7 +82,7 @@ The two axes can combine in any pairing. Examples:
 - `audience=USER, executors={UI, AGENT}` — a user-facing Operation
   (search-index, reindex) the LLM can invoke on the user's behalf.
 - `audience=OPERATOR, executors={UI}` — an admin action only the operator
-  can invoke from the chrome (restart-worker, clear-failed-jobs,
+  can invoke from the chrome (recover-component, clear-failed-jobs,
   export-diagnostics).
 - `audience=OPERATOR, executors={UI, AGENT}` — an admin action *also*
   exposed to the LLM. Pre-slice-481 this combination shipped on

@@ -27,19 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Catalog of core Operation entries shipped in slice 1.2.
- *
- * <p>Per tempdoc 429 §"Initial entries": three seeds exercise all three confirm
- * strategies (NONE / INLINE / TYPED), all three risk tiers (LOW / HIGH × 2),
- * and the multi-executor benefit (UI / AGENT / CLI).
- *
- * <ul>
- *   <li>{@code core.restart-worker} — HIGH risk, TYPED confirm ("restart"),
- *       UI executor only
- *   <li>{@code core.bulk-reindex} — HIGH risk, INLINE confirm, UI + AGENT
- *       (NOT_IMPLEMENTED handler)
- *   <li>{@code core.ping-backend} — LOW risk, NONE confirm, UI + AGENT + CLI
- * </ul>
+ * Catalog of core Operation entries shipped in slice 1.2 and extended by later stages.
  *
  * <p>Provenance is {@code Provenance.core("1.0")} for all entries. Bindings use
  * the convenience {@link Binding#of(OperationRef)} (handlerId == op id by default).
@@ -70,7 +58,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
     return catalogMatcher;
   }
 
-  public static final OperationRef RESTART_WORKER = new OperationRef("core.restart-worker");
+  public static final OperationRef RECOVER_COMPONENT = new OperationRef("core.recover-component");
   public static final OperationRef BULK_REINDEX = new OperationRef("core.bulk-reindex");
   public static final OperationRef ACCEPT_GAPS = new OperationRef("core.accept-gaps");
   public static final OperationRef CANCEL_REINDEX = new OperationRef("core.cancel-reindex");
@@ -182,8 +170,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
   /**
    * Slice 3a-2-c LibraryView Apply Excludes button. HIGH risk (destructive:
    * deletes already-indexed documents whose paths match the configured globs).
-   * No args. Returns the full ExcludesService.ExcludesResult in
-   * structuredData. Typed-confirm policy mirrors restart-worker's pattern.
+   * No args. Returns the full ExcludesService.ExcludesResult in structuredData. Typed confirmation
+   * preserves this operation's HIGH-risk consent boundary.
    */
   public static final OperationRef APPLY_EXCLUDES =
       new OperationRef("core.apply-excludes");
@@ -351,7 +339,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
       new OperationRef("core.navigate-to-surface");
 
   private final List<Operation> definitions = List.of(
-      restartWorker(),
+      recoverComponent(),
       bulkReindex(),
       acceptGaps(),
       rebuildIndex(),
@@ -397,24 +385,25 @@ public final class CoreOperationCatalog implements OperationCatalog {
     return definitions;
   }
 
-  private static Operation restartWorker() {
+  private static Operation recoverComponent() {
     return new Operation(
-        RESTART_WORKER,
-        Presentation.forId(RESTART_WORKER, Optional.of("warning"), Optional.of("destructive")),
-        Interface.inputsOnly("{\"type\":\"object\",\"properties\":{}}"),
+        RECOVER_COMPONENT,
+        Presentation.forId(RECOVER_COMPONENT, Optional.of("warning"), Optional.of("destructive")),
+        Interface.inputsOnly(
+            "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"minLength\":1}},"
+                + "\"required\":[\"name\"],\"additionalProperties\":false}"),
         new OperationPolicy(
-            RiskTier.HIGH,
-            ConfirmStrategy.typedForId(RESTART_WORKER),
+            RiskTier.MEDIUM,
+            ConfirmStrategy.Inline.INSTANCE,
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
-            Set.of(RequiredCapability.WorkerOnline.INSTANCE),
+            Set.of(),
             false),
         OperationAvailability.empty(),
         OperationLineage.empty(),
-        Binding.of(RESTART_WORKER),
+        Binding.of(RECOVER_COMPONENT),
         Provenance.core("1.0"),
         Set.of(ExecutorTag.UI),
-        // Slice 481 §7 step 2: admin restart action; not user-self-service.
         Audience.OPERATOR);
   }
 
@@ -782,7 +771,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Set.of(ExecutorTag.UI),
         // Tempdoc 689 decision: read-only, privacy-redacted, local-only export; a
         // user self-service support flow, not an admin action. The state-mutating
-        // siblings (clear-failed-jobs, index-gc, restart-worker) deliberately
+        // siblings (clear-failed-jobs, index-gc, recover-component) deliberately
         // remain Audience.OPERATOR.
         Audience.USER);
   }

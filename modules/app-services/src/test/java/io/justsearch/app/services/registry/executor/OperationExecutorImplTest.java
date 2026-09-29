@@ -1287,7 +1287,7 @@ final class OperationExecutorImplTest {
   /**
    * Empty schema (Interface.of with `{"type":"object"}`) → no validation; handler
    * receives whatever args were sent. This is the existing behavior for
-   * no-arg Operations like restart-worker.
+   * no-arg Operations such as ping-backend.
    */
   @Test
   void schemaValidationSkippedForEmptySchema() {

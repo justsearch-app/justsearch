@@ -116,6 +116,23 @@ describe('HealthSurface — recommendedActions panel', () => {
     }
   });
 
+  it('D1-6: quick action targets the index component with strict recovery args', async () => {
+    feedReady();
+    const el = await mount();
+    try {
+      const action = el.shadowRoot?.querySelector(
+        'jf-operation[operation-id="core.recover-component"]',
+      ) as unknown as { args?: Record<string, unknown> } | null;
+      expect(action).not.toBeNull();
+      expect(action?.args).toEqual({ name: 'index' });
+      expect(
+        (action as HTMLElement | null)?.getAttribute('title'),
+      ).toBe('Recover the index component');
+    } finally {
+      teardown(el);
+    }
+  });
+
   it('shows a fatal indexing loop explicitly as Indexing failed', async () => {
     feedReady({
       worker: { core: { indexedDocuments: 5, indexState: 'FAILED', indexHealthy: false } },

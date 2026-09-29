@@ -31,6 +31,25 @@ The projection currently contains exactly six read-only operations: runtime mani
 readiness, liveness, health, and status. See [Runtime Contract](runtime-contract.md#generated-node-client)
 for package scope and regeneration commands.
 
+### Component recovery and retired Worker restart
+
+`POST /api/engine/components/{name}/recover` and the UI operation
+`core.recover-component` resolve the same monitor authority at invocation time.
+The operation requires a nonempty string `name`, rejects additional arguments,
+uses inline confirmation, and does not require an already-online index. Recovery
+uses the component's current configuration and bounded attempt budget.
+
+The HTTP route returns 202 when accepted, 429 when an attempt is already running,
+409 when recovery is not applicable, 404 for an unknown component, and 503 when
+the owner is unavailable or the budget is exhausted. The normal error envelope
+distinguishes these outcomes. The mutation token and local API trust checks apply.
+
+The former `POST /api/worker/restart` route is retained for one release solely to
+return 410 with permanent `ENDPOINT_RETIRED` and the replacement route in its
+message. Its route lifecycle metadata declares deprecation on 2026-09-29 and the
+replacement, without a calendar sunset. The former `core.restart-worker` operation
+is removed from the operation catalog.
+
 ### Pending tool approval display
 
 `GET /api/chat/approval?sessionId=<run>&callId=<call>` reads an existing live agent or

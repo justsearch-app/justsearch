@@ -15,7 +15,7 @@ import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.operations.handlers.BulkReindexHandler;
 import io.justsearch.app.services.registry.operations.handlers.ClearFailedJobsHandler;
 import io.justsearch.app.services.registry.operations.handlers.PingBackendHandler;
-import io.justsearch.app.services.registry.operations.handlers.RestartWorkerHandler;
+import io.justsearch.app.services.registry.operations.handlers.RecoverComponentHandler;
 import io.justsearch.app.services.registry.snapshot.RegistrySnapshotExporter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,7 +57,8 @@ final class ValidatorRunnerTest {
   @BeforeAll
   static void loadFixture() {
     HandlerRegistry handlers = new HandlerRegistry();
-    handlers.register(CoreOperationCatalog.RESTART_WORKER, new RestartWorkerHandler());
+    handlers.register(CoreOperationCatalog.RECOVER_COMPONENT,
+        new RecoverComponentHandler(() -> null));
     // Validator tests inspect registrations without invoking them; both durable bulk profiles
     // share the prepared recorded handler.
     handlers.register(

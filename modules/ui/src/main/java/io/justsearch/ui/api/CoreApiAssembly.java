@@ -157,7 +157,10 @@ final class CoreApiAssembly {
             // Null for legacy test seams (HeadAssembly absent) — those keep the raw fallback path.
             b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null
                 ? b.HeadAssembly.serviceOut().brainRuntime()
-                : null);
+                : null,
+            b.HeadAssembly != null
+                ? b.HeadAssembly.lateBindings()::componentRecoveryAuthority
+                : () -> null);
     Supplier<String> diskPressureSupplier = null;
     if (telemetry instanceof io.justsearch.telemetry.LocalTelemetry lt) {
       diskPressureSupplier = () -> lt.getHealthState().getDiskPressureLevel().name();

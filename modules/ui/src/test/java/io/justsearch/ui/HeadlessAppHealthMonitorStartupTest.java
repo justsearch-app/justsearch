@@ -12,6 +12,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.services.bootstrap.BootstrapLateBindings;
 import io.justsearch.app.services.bootstrap.SubstrateGraph;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
@@ -25,22 +26,24 @@ final class HeadlessAppHealthMonitorStartupTest {
   @Test
   void bindingFailureRetiresAllocatedMonitorBeforeTimerInstallation() throws Exception {
     var api = mock(LocalApiServer.class);
+    var lateBindings = mock(BootstrapLateBindings.class);
     var failure = new IllegalArgumentException("incomplete physical owner bindings");
     try (var construction = mockConstruction(KnowledgeServerHealthMonitor.class, (monitor, context) -> {
       doThrow(failure).when(monitor).componentRecoveryBindings(any(), any());
     })) {
-      var thrown = assertThrows(InvocationTargetException.class, () -> start(api));
+      var thrown = assertThrows(InvocationTargetException.class, () -> start(api, lateBindings));
       assertSame(failure, thrown.getCause());
       var monitor = construction.constructed().getFirst();
       verify(monitor).close();
       verify(monitor, never()).start();
-      verify(api, never()).bindComponentRecovery(any());
+      verify(lateBindings, never()).setComponentRecoveryAuthority(any());
     }
   }
 
   @Test
   void startupFailureRetiresMonitorWithoutPublishingRecoveryAuthority() throws Exception {
     var api = mock(LocalApiServer.class);
+    var lateBindings = mock(BootstrapLateBindings.class);
     var failure = new EngineExecutorRejectedException(
         EngineExecutorRejectedException.Reason.TIMER_LIMIT, "health", 2);
     var cleanup = new IllegalStateException("cleanup failure");
@@ -48,27 +51,26 @@ final class HeadlessAppHealthMonitorStartupTest {
       doThrow(failure).when(monitor).start();
       doThrow(cleanup).when(monitor).close();
     })) {
-      var thrown = assertThrows(InvocationTargetException.class, () -> start(api));
+      var thrown = assertThrows(InvocationTargetException.class, () -> start(api, lateBindings));
       assertSame(failure, thrown.getCause());
       assertSame(cleanup, failure.getSuppressed()[0]);
       verify(construction.constructed().getFirst()).close();
-      verify(api, never()).bindWorkerRecovery(any());
-      verify(api, never()).bindComponentRecovery(any());
+      verify(lateBindings, never()).setComponentRecoveryAuthority(any());
     }
   }
 
   @Test
   void recoveryAuthorityIsPublishedOnlyAfterTimerInstallation() throws Exception {
     var api = mock(LocalApiServer.class);
+    var lateBindings = mock(BootstrapLateBindings.class);
     try (var construction = mockConstruction(KnowledgeServerHealthMonitor.class)) {
-      var result = start(api);
+      var result = start(api, lateBindings);
       var monitor = construction.constructed().getFirst();
       assertSame(monitor, result);
-      var order = inOrder(monitor, api);
+      var order = inOrder(monitor, lateBindings);
       order.verify(monitor).componentRecoveryBindings(any(), any());
       order.verify(monitor).start();
-      order.verify(api).bindWorkerRecovery(monitor);
-      order.verify(api).bindComponentRecovery(monitor);
+      order.verify(lateBindings).setComponentRecoveryAuthority(monitor);
       verify(monitor, never()).close();
     }
   }
@@ -82,10 +84,12 @@ final class HeadlessAppHealthMonitorStartupTest {
     var health = mock(SubstrateGraph.HealthSubstrate.class);
     var readiness = mock(
         io.justsearch.app.services.observability.health.ReadinessReconciliationTrigger.class);
+    var lateBindings = mock(BootstrapLateBindings.class);
     var knowledgeServer = mock(KnowledgeServerBootstrap.class);
     var index = mock(io.justsearch.core.component.ComponentHandle.class);
     var encoders = mock(io.justsearch.core.component.ComponentHandle.class);
     org.mockito.Mockito.when(head.substrate()).thenReturn(substrate);
+    org.mockito.Mockito.when(head.lateBindings()).thenReturn(lateBindings);
     org.mockito.Mockito.when(substrate.health()).thenReturn(health);
     org.mockito.Mockito.when(health.readinessReconciliationTrigger()).thenReturn(readiness);
     org.mockito.Mockito.when(head.generativeComponent())
@@ -212,11 +216,13 @@ final class HeadlessAppHealthMonitorStartupTest {
     }
   }
 
-  private static Object start(LocalApiServer api) throws Exception {
+  private static Object start(LocalApiServer api, BootstrapLateBindings lateBindings)
+      throws Exception {
     var bootstrap = mock(HeadAssembly.class);
     var substrate = mock(SubstrateGraph.class);
     var health = mock(SubstrateGraph.HealthSubstrate.class);
     org.mockito.Mockito.when(bootstrap.substrate()).thenReturn(substrate);
+    org.mockito.Mockito.when(bootstrap.lateBindings()).thenReturn(lateBindings);
     org.mockito.Mockito.when(substrate.health()).thenReturn(health);
     org.mockito.Mockito.when(bootstrap.generativeComponent())
         .thenReturn(mock(io.justsearch.core.component.ComponentHandle.class));

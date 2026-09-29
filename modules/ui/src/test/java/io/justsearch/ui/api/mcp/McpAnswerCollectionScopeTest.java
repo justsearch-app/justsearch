@@ -45,7 +45,7 @@ final class McpAnswerCollectionScopeTest {
             List.of());
     DocumentService documents = mock(DocumentService.class);
     when(documents.retrieveContext(any(), any(EngineContext.class))).thenReturn(CompletableFuture.completedFuture(result));
-    WorkerServices workers = new WorkerServices(null, documents, null, null, null);
+    WorkerServices workers = new WorkerServices(null, documents, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
     McpAnswerCaptureFixture.bind(facade, documents);
@@ -81,7 +81,7 @@ final class McpAnswerCollectionScopeTest {
   @DisplayName("a bare-string scope is rejected at the boundary, not silently coerced")
   void bareStringScopeIsRejectedAtTheBoundary() {
     DocumentService documents = mock(DocumentService.class);
-    WorkerServices workers = new WorkerServices(null, documents, null, null, null);
+    WorkerServices workers = new WorkerServices(null, documents, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
     McpAnswerCaptureFixture.bind(facade, documents);

@@ -277,9 +277,9 @@ const CAUSE_ROWS: ReadonlyArray<{
   // worst failure mode a readiness notice has, because it reads as reassuring.
   //
   // The remedy has to ride in the wording: `NoticeRemedy` can only be an operation id or a surface
-  // navigation, and "restart the application" is neither. `core.restart-worker` still exists but
-  // its handler answers `restart required` (stage A §5), so pointing at it would be a button that
-  // tells you to do the thing it was supposed to do. Open Health stays the fallback remedy.
+  // navigation, and "restart the application" is neither. `core.recover-component` only recovers
+  // a named Engine component, so it cannot replace an application restart. Open Health stays the
+  // fallback remedy.
   {
     code: 'worker.lost',
     wording:

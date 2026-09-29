@@ -228,11 +228,11 @@ final class OperationCatalogCompositionTest {
     // A representative core op stays in the core partition.
     assertTrue(
         composed.operationCatalog().definitions().stream()
-            .anyMatch(op -> op.id().equals(CoreOperationCatalog.RESTART_WORKER)),
+            .anyMatch(op -> op.id().equals(CoreOperationCatalog.RECOVER_COMPONENT)),
         "core ops partition to the core catalog");
     assertFalse(
         composed.agentToolsCatalog().definitions().stream()
-            .anyMatch(op -> op.id().equals(CoreOperationCatalog.RESTART_WORKER)),
+            .anyMatch(op -> op.id().equals(CoreOperationCatalog.RECOVER_COMPONENT)),
         "core ops must not leak into the agent-tools partition");
   }
 
@@ -263,7 +263,7 @@ final class OperationCatalogCompositionTest {
         "the tooling facade must not offer ingest without its recorded-ingestion owner");
     assertTrue(
         availableCore.definitions().stream()
-            .anyMatch(op -> op.id().equals(CoreOperationCatalog.RESTART_WORKER)),
+            .anyMatch(op -> op.id().equals(CoreOperationCatalog.RECOVER_COMPONENT)),
         "unrelated core operations remain offered");
 
     Workflow reindexWorkflow =

@@ -729,8 +729,12 @@ export const API_CALL_ALLOWLIST = [
   // Inference
   { path: '/api/inference/status', methods: ['GET'] },
   { path: '/api/inference/mode', methods: ['POST'] },
-  // Worker
-  { path: '/api/worker/restart', methods: ['POST'] },
+  // Component recovery
+  {
+    path: '/api/engine/components/{name}/recover',
+    pattern: /^\/api\/engine\/components\/[A-Za-z0-9._-]+\/recover$/,
+    methods: ['POST'],
+  },
   // AI install
   { path: '/api/ai/install/status', methods: ['GET'] },
   { path: '/api/ai/install/manifest', methods: ['GET'] },

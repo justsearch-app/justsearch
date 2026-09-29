@@ -109,7 +109,7 @@ final class ConfigurationStage {
             new Step(ORT_NATIVE_PATH, null, null, false, ortNativePath),
             // Lane F stage A: the copy used to say "Restarting worker...", which was true when a
             // child process could be replaced under a running Head. Nothing restarts a worker now
-            // (RestartRequiredException) — the settings are applied and the change takes effect on
+            // — the settings are applied and the change takes effect on
             // the next Engine start, so the message says that instead of narrating an act that no
             // longer happens. The phase ID stays `restart_worker`: it is the machine key a caller
             // reads, and renaming it would be a contract change rather than a copy fix.

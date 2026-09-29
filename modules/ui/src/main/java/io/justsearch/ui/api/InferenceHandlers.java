@@ -19,7 +19,6 @@ import io.justsearch.app.api.status.InferenceGpuView;
 import io.justsearch.app.api.status.InferenceStatusResponseBuilder;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.ComponentRecoveryAuthority;
-import io.justsearch.app.services.worker.RestartRequiredException;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.telemetry.Telemetry;
@@ -28,6 +27,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,9 +43,7 @@ final class InferenceHandlers {
 
   private final OnlineAiService onlineAiService;
   private volatile KnowledgeServerBootstrap knowledgeServer;
-  // Tempdoc 825: the recovery authority behind POST /api/worker/restart when no worker is bound.
-  private volatile io.justsearch.app.services.worker.WorkerRecoveryAuthority workerRecovery;
-  private volatile ComponentRecoveryAuthority componentRecovery;
+  private final Supplier<ComponentRecoveryAuthority> componentRecovery;
   // Tempdoc 374 alpha.27: VramDetector dependency removed; nvidia-smi availability
   // is read from gpuCapabilitiesService.snapshot().nvidiaSmi().available().
   private final GpuCapabilitiesService gpuCapabilitiesService;
@@ -70,7 +69,8 @@ final class InferenceHandlers {
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
       Telemetry telemetry,
       ComponentHandle generativeComponent,
-      BrainRuntimeService brainRuntimeService) {
+      BrainRuntimeService brainRuntimeService,
+      Supplier<ComponentRecoveryAuthority> componentRecovery) {
     this.onlineAiService = onlineAiService;
     this.knowledgeServer = knowledgeServer;
     this.gpuCapabilitiesService = gpuCapabilitiesService;
@@ -79,6 +79,7 @@ final class InferenceHandlers {
     this.telemetry = telemetry;
     this.generativeComponent = generativeComponent;
     this.brainRuntimeService = brainRuntimeService;
+    this.componentRecovery = Objects.requireNonNull(componentRecovery, "componentRecovery");
   }
 
   /** Late-binds the Knowledge Server after async Worker startup. */
@@ -86,24 +87,9 @@ final class InferenceHandlers {
     this.knowledgeServer = ks;
   }
 
-  /**
-   * Tempdoc 825 §D5 decision 4: binds the ONE worker-recovery authority (the health monitor), so
-   * {@code POST /api/worker/restart} has an answer in the state where it used to 503 — the index
-   * half never came up, so there is nothing bound to ask. Nullable: test seams and standalone
-   * launchers that build the API without a monitor keep the old 503 behaviour.
-   */
-  void setWorkerRecovery(
-      io.justsearch.app.services.worker.WorkerRecoveryAuthority workerRecovery) {
-    this.workerRecovery = workerRecovery;
-  }
-
-  void setComponentRecovery(ComponentRecoveryAuthority componentRecovery) {
-    this.componentRecovery = componentRecovery;
-  }
-
   /** Schedules one same-configuration component recovery through the registered owner. */
   void handleRecoverComponent(Context ctx) {
-    ComponentRecoveryAuthority authority = componentRecovery;
+    ComponentRecoveryAuthority authority = componentRecovery.get();
     if (authority == null) {
       ctx.status(503).json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE,
           "Component recovery is still initializing", telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -695,111 +681,11 @@ final class InferenceHandlers {
     }
   }
 
-  /**
-   * Handles POST /api/worker/restart.
-   *
-   * <p><b>Lane F stage A item A11 / design §10 "restart-as-reload".</b> There is no Worker process
-   * any more: the index half is composed inside this JVM by {@code EngineRoot}, so "restart the
-   * worker" has no referent that is smaller than the application. The route and the operation stay
-   * registered — a client that asks must get a real answer — but the answer is now a 409 carrying
-   * {@link RestartRequiredException#CODE}: the state is a genuine conflict (the request is
-   * well-formed and the service is healthy; it simply cannot be served in-process) and the one
-   * remedy is restarting JustSearch. The "apply embedding config without restarting the backend"
-   * flow this endpoint was written for died with the process boundary it depended on.
-   */
+  /** One-release retirement response for the former Worker restart endpoint. */
   void handleRestartWorker(Context ctx) {
-    // Tempdoc 825 §D5 decision 4, still live: the state an operator actually reaches for this
-    // endpoint is "the index half never came up". That is the boot-recovery authority's business —
-    // an in-process re-composition is something the product CAN still do — so it keeps first
-    // refusal. A11 only changes the predicate: "is there a spawner?" becomes "is a client bound?",
-    // which is the same question ("is there an index half at all?") now that the half has no
-    // process of its own.
-    if (knowledgeServer == null || !knowledgeServer.hasClient()) {
-      if (routeToRecoveryAuthority(ctx)) {
-        return;
-      }
-    }
-    if (knowledgeServer == null) {
-      // Live leg (run 3): a POST landing in the milliseconds between the bootstrap narrating its
-      // failure (inside tryStartKnowledgeServer) and connectWorker binding the recovery authority
-      // got "Knowledge Server not configured" — untruthful during startup, and the one message an
-      // operator watching /api/health flip to worker.spawn.failed is most likely to see. The state
-      // is genuinely "not wired up YET" and retrying does resolve it, so the class stays TRANSIENT
-      // and the sentence says which of the two it is.
-      ctx.status(503)
-          .json(
-              ApiErrorHandler.toResponse(
-                  ApiErrorCode.SERVICE_UNAVAILABLE,
-                  "Worker recovery is still initializing — retry shortly",
-                  telemetry,
-                  ApiErrorHandler.routeOf(ctx)));
-      return;
-    }
-    // A11: the spawn/reconnect path is gone — there is no process to re-spawn, no port to reconnect
-    // to and no channel whose circuit breaker could need resetting. What is left is the honest
-    // answer, in the file's error-envelope idiom so the errorClass/retryable/i18nKey contract the
-    // frontend renders is unchanged: PERMANENT and not retryable, because no number of retries
-    // reloads an in-process index half. `code` carries the machine-readable handle a caller keys
-    // off; the message carries the one remedy that works.
-    Map<String, Object> body =
-        new java.util.LinkedHashMap<>(
-            ApiErrorHandler.toResponse(
-                ApiErrorCode.INVALID_STATE,
-                "The index half now runs inside JustSearch itself, so it cannot be restarted on"
-                    + " its own — restart JustSearch to apply the change",
-                telemetry,
-                ApiErrorHandler.routeOf(ctx)));
-    body.put("code", RestartRequiredException.CODE);
-    ctx.status(409).json(body);
-  }
-
-  /**
-   * Tempdoc 825: answers a restart request from the boot-recovery authority when no worker is bound.
-   * Returns true when it has written a response.
-   *
-   * <p>An accepted request is 202 with the verdict, not 200: the attempt is SCHEDULED (a worker boot
-   * takes tens of seconds — spawn, port discovery, health budget), and claiming 200/"restarted"
-   * would be the same over-claim this tempdoc exists to remove. An exhausted request keeps
-   * 503, because it names a state that will not change by itself.
-   */
-  private boolean routeToRecoveryAuthority(Context ctx) {
-    var authority = this.workerRecovery;
-    if (authority == null) {
-      return false;
-    }
-    var verdict = authority.requestRecoveryNow();
-    switch (verdict) {
-      case ACCEPTED, ALREADY_RUNNING -> {
-        ctx.status(202).json(Map.of("success", true, "recovery", verdict.name()));
-        return true;
-      }
-      // Terminal: the local recovery budget is spent. The live leg (run 2) caught
-      // this answering `errorClass: TRANSIENT, retryable: true` for a state where the very next
-      // request provably returns the same thing until the application restarts — a retry hint the
-      // client cannot act on. PERMANENT (hence retryable=false, derived from the class) plus the
-      // one honest remedy. The HTTP status stays 503: the service genuinely is not serving, which a
-      // 500 would misreport as an internal fault.
-      case EXHAUSTED -> {
-        ctx.status(503)
-            .json(
-                ApiErrorHandler.toResponse(
-                    ApiErrorCode.WORKER_RECOVERY_EXHAUSTED,
-                    "Worker recovery declined: "
-                        + verdict.name()
-                        + " — the recovery budget is spent; restart the application to retry",
-                    telemetry,
-                    ApiErrorHandler.routeOf(ctx)));
-        return true;
-      }
-      // An index half IS bound after all (it came up between the checks) — fall through to the
-      // ordinary answer rather than answering from the recovery authority. Post-A11 that answer is
-      // the 409 restart_required, because a bound in-process half has no smaller restart than the
-      // application's.
-      case NOT_APPLICABLE -> {
-        return false;
-      }
-    }
-    return false;
+    ctx.status(410).json(ApiErrorHandler.toResponse(ApiErrorCode.ENDPOINT_RETIRED,
+        "This endpoint is retired; use POST /api/engine/components/index/recover",
+        telemetry, ApiErrorHandler.routeOf(ctx)));
   }
 
   /**

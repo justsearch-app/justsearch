@@ -72,7 +72,7 @@ export class JfHealthEvent extends JfElement {
 
   private handleConditionClick = (e: MouseEvent): void => {
     if (!this.event) return;
-    // Skip clicks on action buttons (recovery operations like restart-worker)
+    // Skip clicks on action buttons (recovery operations like recover-component)
     // — those have their own handlers and should not double as selection.
     const target = e.target as HTMLElement | null;
     if (target && target.closest('button')) return;

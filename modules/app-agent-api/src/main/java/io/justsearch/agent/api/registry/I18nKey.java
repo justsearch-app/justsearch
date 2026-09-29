@@ -9,7 +9,7 @@ import java.util.Objects;
  * Reference to an i18n message catalog entry.
  *
  * <p>Per tempdoc 429 §C.E + §E.16: keys are dotted-path strings such as
- * {@code "ops.restart-worker.label"}, resolved via the per-primitive message catalog
+ * {@code "ops.recover-component.label"}, resolved via the per-primitive message catalog
  * (e.g., {@code /api/messages/registry-operation/{locale}}). The
  * {@link io.justsearch.agent.api.registry.validator.RegistryShapeValidator}
  * pipeline (Phase 3) verifies every key in a catalog resolves against the loaded

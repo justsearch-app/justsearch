@@ -4,7 +4,7 @@
  *
  * Self-mounting Surface with operational parity to React HealthView:
  * stats grid (files/size/memory/queue), connection panel, GPU panel,
- * Quick Actions (reindex / restart-worker / clear-failed-jobs /
+ * Quick Actions (reindex / recover-component / clear-failed-jobs /
  * export-diagnostics / bulk-reindex), failed-files panel, recent
  * events stream (consumes /api/health/events/stream via SSE).
  *
@@ -1441,7 +1441,7 @@ export class HealthSurface extends JfElement {
     // audience gate (`viewerAudienceState`): USER-tier ops
     // (core.reindex, core.rebuild-index, core.export-diagnostics —
     // USER-tier as of tempdoc 689) are always visible; OPERATOR-tier
-    // ops (core.restart-worker, core.clear-failed-jobs, core.index-gc)
+    // ops (core.recover-component, core.clear-failed-jobs, core.index-gc)
     // only appear when the viewer is in operator viewing mode.
     //
     // Pre-migration UX: confirmAsync modal for bulk-reindex.
@@ -1458,9 +1458,11 @@ export class HealthSurface extends JfElement {
             api-base=${this.apiBase}
           ></jf-operation>
           <jf-operation
-            operation-id="core.restart-worker"
+            operation-id="core.recover-component"
             context="button"
             api-base=${this.apiBase}
+            title="Recover the index component"
+            .args=${{ name: 'index' }}
           ></jf-operation>
           <jf-operation
             operation-id="core.rebuild-index"

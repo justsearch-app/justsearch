@@ -194,7 +194,7 @@ Both `fetch_api_json` and `api_call` accept `jsonPath`, sharing one implementati
 | `/api/indexing/settle` | POST |
 | `/api/inference/status` | GET |
 | `/api/inference/mode` | POST |
-| `/api/worker/restart` | POST |
+| `/api/engine/components/{name}/recover` | POST |
 | `/api/ai/install/status` | GET |
 | `/api/ai/install/manifest` | GET |
 | `/api/ai/install/plan-preview` | GET |

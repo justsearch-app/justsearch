@@ -128,7 +128,7 @@ final class McpErrorLegibilityTest {
   void answerGenericFailureMessage() {
     DocumentService documents = mock(DocumentService.class);
     when(documents.retrieveContext(any(), any(EngineContext.class))).thenThrow(new IllegalStateException("boom"));
-    WorkerServices workers = new WorkerServices(null, documents, null, null, null);
+    WorkerServices workers = new WorkerServices(null, documents, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
     McpAnswerCaptureFixture.bind(facade, documents);
@@ -273,7 +273,7 @@ final class McpErrorLegibilityTest {
       when(documents.retrieveContext(any(), any(EngineContext.class)))
           .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(asyncFailure));
       HeadAssembly facade = mock(HeadAssembly.class);
-      when(facade.workers()).thenReturn(new WorkerServices(null, documents, null, null, null));
+      when(facade.workers()).thenReturn(new WorkerServices(null, documents, null, null));
       McpAnswerCaptureFixture.bind(facade, documents);
       McpToolSurface surface = new McpToolSurface(
           List.of(OperationCatalog.of("core", List.of())), mock(OperationDispatcher.class),

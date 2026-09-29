@@ -7,14 +7,65 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 
 ## Current state (2026-09-29)
 
+**Paused at the user's request.** The user requested a clean stop and written handoff on
+2026-09-29. Resume only on their next instruction. This checkpoint preserves incomplete
+D1-6 work; it is not D1 completion. D1-15 has only a read-only implementation map.
+
 **Authorization and scope.** Continue D1/D2/E/F autonomously in this chat, including
 checkpoint publication to existing draft [PR727](https://github.com/justsearch-app/justsearch/pull/727).
 Do not merge before Stage F acceptance. The worktree hold has review-by date 2026-10-04.
 
-**Revision.** Latest pushed `54b92132d243287af94c6a9358199520a3ec08db` passed exact-SHA
-[CI run 36490652907](https://github.com/justsearch-app/justsearch/actions/runs/36490652907).
-Local `codex/lane-f-pr1` is based on `f19e93a3d` with uncommitted D1-7 changes;
-no hosted completion or publication checkpoint is claimed.
+**Revision.** Recovery checkpoint `ac22fff8e10661087a1d77ef59cd076328a614e9` is pushed to
+`codex/lane-f-pr1`. Exact-SHA [CI run 36526921771](https://github.com/justsearch-app/justsearch/actions/runs/36526921771)
+has a Public claims failure: ESLint rejects throws inside the Sandbox fixture's `finally`.
+The local correction preserves cleanup ordering and moves error propagation after `finally`;
+focused ESLint and both host-only Sandbox regressions pass. Hosted integration remains in progress.
+D1-6 API/operation migration is saved in the pause checkpoint described below;
+its remaining verification prevents stage completion.
+
+**Pause checkpoint contents.** The commit containing this handoff adds `core.recover-component`
+with strict `{name}` arguments, one invocation-time `BootstrapLateBindings` authority, Health's
+index recovery action, permanent HTTP410 retirement of the old restart route, and response
+schema/route metadata. It removes `WorkerService`, `WorkerServiceImpl`, `RestartWorkerHandler`,
+`RestartRequiredException`, and the compatibility `WorkerRecoveryAuthority`. Source examples,
+MCP allowlist, HIGH-risk consent fixtures, and canonical docs are migrated. No D1-15 code was
+changed. This is a compiling WIP checkpoint for the existing draft PR, not a release.
+
+**Pause verification.** `tmp/5560-test-counts.json` and `tmp/5560-results/` retain 5,924 Java
+tests across six modules, zero failures/errors and five skips. The Engine suite finished
+naturally; no test process was killed. After the final recovery response schema addition,
+`build -x test` plus integration-test compilation passes at 5564 (1m07s), and focused
+route/retirement/schema tests pass at 5566 (13s). Frontend typecheck and 6,613 unit tests pass
+at 5561. Surface-altitude passes at 5559, dev-MCP honesty at 5558, and final regeneration
+comparison at 5567. The latter only compares committed snapshot sources; it does not prove
+those sources match the new live route surface. Diff/new-source secret scans pass at 5565.
+Two host-only Sandbox regressions and focused fixture ESLint also pass after the CI fix.
+
+**Exact next steps.**
+1. Read D1-6's current acceptance block. Start the owned worktree's current backend under the
+   normal lease, capture `node scripts/codegen/gen-api-client.mjs --from-live=http://127.0.0.1:<port>`,
+   and regenerate/check derived clients. Existing route snapshots are deliberately still stale.
+2. Verify new operation/HTTP recovery and old410 through the real trust boundary; run the
+   changed `ConsentCapsuleRecoveryE2ETest` and relevant standard-model recovery query. Compile
+   proof is not live proof. Check the next checkpoint's hosted CI and refresh the PR review record.
+3. Classify the serious color-contrast finding in dark/light health captures at
+   `tmp/5562-health-ui/`; completion/recovery captures have zero axe findings. All four have
+   zero console errors and no overflow. Do not call this a clean a11y pass.
+4. Continue D1-15 atomically across reason producers, retention, lifecycle projections and UI;
+   its contract is in D1's owning section. Preserve sticky fatal causes and lost-contact
+   precedence; remove aliases rather than adding compatibility spellings. Then D1-16/17,
+   D2, all seven paired Stage E groups, and Stage F remain binding.
+5. D1-4 needs the signed Sandbox candidate and a current signing-provider allocation. Do not
+   rerun the unsafe host-profile fixture, bypass Application Control, or invent signing capacity.
+
+**Paused resources.** No dev stack or Sandbox is running. Sweep5563 confirmed cleanup of this
+chat's two UI-shot processes (24208/5177 and32588/5178), after repairing their missing session
+attribution using verified creation identity and this chat's launch evidence. Three foreign or
+unattributed UI helpers and the ownerless OTLP sink were left alone. Pass
+`JUSTSEARCH_AGENT_SESSION_ID=01a0e9c4-2c65-7bf3-87c3-4e433a266259` to future jseval captures so
+their owner is recorded. The worktree is held through2026-10-04. Unrelated untracked
+`modules/app-inference/logs/` is preserved and excluded from the checkpoint. Main's foreign
+changes remain untouched. Evidence stays in the retained worktree through lane acceptance+30days.
 
 **Implemented.** Generic component deadlines and two-attempt recovery now own index,
 encoder and generative recovery; only essential index/API failure escalates with counted
@@ -73,7 +124,7 @@ gone. Successful D1-4 execution requires a signed candidate. The signing workflo
 the provider's current remaining-signature allocation; none has been supplied for this run.
 Keep this item open for the signed-candidate round rather than bypassing application control.
 
-**Next.** Publish the verified recovery checkpoint, then continue D1-6 and the remaining lane.
+**Next on resume.** Finish D1-6 verification and generated route capture, then continue D1-15 and the remaining lane.
 Standard generative recovery passes at 5541 (40s), now requiring
 COMPLETED, the requested exact word, and positive token usage. CUDA replay 5542 passes in
 4m23s, including restored vector queries and 9.49 GB private-cache cleanup. Optional

@@ -13,7 +13,7 @@ import io.justsearch.agent.api.registry.RequiredCapability;
 import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.services.observability.rules.RuleRunner;
 import io.justsearch.app.services.registry.preview.CapabilityAvailability;
-import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.bootstrap.BootstrapLateBindings;
 import io.justsearch.app.services.worker.RemoteIndexingJobsBridge;
 import io.justsearch.app.services.mcphost.McpHostService;
 import io.justsearch.app.services.mcphost.McpServerConfig;
@@ -32,8 +32,7 @@ import java.util.function.Supplier;
  *
  * <p>Returns an {@link Output} record bundling all results — bootstrap holds it as one field.
  *
- * <p>Three lazy suppliers handle Worker late-binding: {@code knowledgeServerSupplier},
- * {@code knowledgeClientSupplier}, and {@code indexingServiceSupplier} are invoked at
+ * <p>Worker suppliers and {@link BootstrapLateBindings} are read at
  * handler-dispatch time after {@code prepareKnowledgeServerBinding} populates the bootstrap's Worker
  * fields. The substrate phase itself only stores the suppliers; it doesn't invoke them.
  */
@@ -79,7 +78,7 @@ public final class SubstratePhase {
       io.justsearch.app.api.EngineAdmissionService admission,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
-      Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
+      BootstrapLateBindings lateBindings,
       Supplier<KnowledgeClient> knowledgeClientSupplier,
       Supplier<IndexingService> indexingServiceSupplier,
       Supplier<io.justsearch.app.api.ExcludesService> excludesServiceSupplier,
@@ -103,7 +102,7 @@ public final class SubstratePhase {
           runInternal(
               operations, attempts, admission, executors,
               telemetry,
-              knowledgeServerSupplier,
+              lateBindings,
               knowledgeClientSupplier,
               indexingServiceSupplier,
               excludesServiceSupplier,
@@ -135,7 +134,7 @@ public final class SubstratePhase {
       io.justsearch.app.api.EngineAdmissionService admission,
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       Telemetry telemetry,
-      Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
+      BootstrapLateBindings lateBindings,
       Supplier<KnowledgeClient> knowledgeClientSupplier,
       Supplier<IndexingService> indexingServiceSupplier,
       Supplier<io.justsearch.app.api.ExcludesService> excludesServiceSupplier,
@@ -158,7 +157,7 @@ public final class SubstratePhase {
     HandlerRegistry operationHandlers = new HandlerRegistry();
     OperationHandlerRegistrations.registerWorker(
         operationHandlers,
-        knowledgeServerSupplier,
+        lateBindings,
         indexingServiceSupplier,
         excludesServiceSupplier,
         settingsServiceSupplier,

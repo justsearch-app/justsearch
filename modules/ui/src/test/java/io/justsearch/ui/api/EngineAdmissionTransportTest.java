@@ -262,11 +262,10 @@ final class EngineAdmissionTransportTest {
         var handlers = new InferenceHandlers(mock(io.justsearch.app.api.OnlineAiService.class),
             null, mock(io.justsearch.gpu.GpuCapabilitiesService.class),
             mock(io.justsearch.app.api.EnterprisePolicyService.class),
-            mock(io.justsearch.app.services.settings.UiSettingsStore.class), null, null, null);
-        handlers.setWorkerRecovery(monitor);
-        fixture.app.post("/api/worker/restart", handlers::handleRestartWorker);
+            mock(io.justsearch.app.services.settings.UiSettingsStore.class), null, null, null, () -> monitor);
+        fixture.app.post("/api/engine/components/{name}/recover", handlers::handleRecoverComponent);
         var request = HttpRequest.newBuilder(URI.create(
-            "http://127.0.0.1:" + fixture.app.port() + "/api/worker/restart"))
+            "http://127.0.0.1:" + fixture.app.port() + "/api/engine/components/index/recover"))
             .timeout(Duration.ofSeconds(5)).POST(HttpRequest.BodyPublishers.ofString("{}")).build();
         var response = fixture.client.send(request, HttpResponse.BodyHandlers.ofString());
         assertEquals(429, response.statusCode(), response.body());
@@ -280,8 +279,8 @@ final class EngineAdmissionTransportTest {
         held.get(2, TimeUnit.SECONDS);
         for (var task : queued) task.get(2, TimeUnit.SECONDS);
       }
-      assertEquals(io.justsearch.app.services.worker.WorkerRecoveryAuthority.Verdict.ACCEPTED,
-          monitor.requestRecoveryNow(), "failed handoff must release attempt slot");
+      assertEquals(io.justsearch.app.services.worker.ComponentRecoveryAuthority.Outcome.ACCEPTED,
+          monitor.requestComponentRecovery("index"), "failed handoff must release attempt slot");
       assertTrue(attempted.await(2, TimeUnit.SECONDS));
       assertTrue(attemptFinished.await(2, TimeUnit.SECONDS));
     }

@@ -127,13 +127,13 @@ describe('wireActionButton', () => {
   it('recovers a HIGH-risk gate via approve-by-pendingId, then re-invokes with the capsule (tempdoc 550 C3)', async () => {
     const fetchImpl = routedFetch('capsule-abc', 'pa-77');
     const client = new OperationClient({ apiBase: 'http://localhost', fetchImpl });
-    const button = createButton('core.restart-worker', 'HIGH');
+    const button = createButton('core.apply-excludes', 'HIGH');
 
     const unwire = wireActionButton(button, client);
 
     button.dispatchEvent(
       new CustomEvent('action-invoke', {
-        detail: { operationId: 'core.restart-worker', risk: 'HIGH' },
+        detail: { operationId: 'core.apply-excludes', risk: 'HIGH' },
         bubbles: true,
       }),
     );

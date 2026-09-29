@@ -347,6 +347,7 @@ const shell = spawn(installedExe, [], {
 let shellError = '';
 shell.stderr?.on('data', (bytes) => { shellError += bytes.toString(); });
 let primaryFailure;
+let cleanupFailure;
 try {
   const initial = await waitFor('initial installed Tauri binding', 120_000, () => {
     if (shell.exitCode !== null || shell.signalCode !== null) {
@@ -372,7 +373,6 @@ try {
 } catch (error) {
   primaryFailure = error;
 } finally {
-  let cleanupFailure;
   try {
     const binding = currentBinding();
     if (binding) {
@@ -397,9 +397,9 @@ try {
       cleanupFailure = error;
     }
   }
-  if (primaryFailure && cleanupFailure) {
-    throw new AggregateError([primaryFailure, cleanupFailure], 'installed API-port proof and cleanup failed');
-  }
-  if (primaryFailure) throw primaryFailure;
-  if (cleanupFailure) throw cleanupFailure;
 }
+if (primaryFailure && cleanupFailure) {
+  throw new AggregateError([primaryFailure, cleanupFailure], 'installed API-port proof and cleanup failed');
+}
+if (primaryFailure) throw primaryFailure;
+if (cleanupFailure) throw cleanupFailure;

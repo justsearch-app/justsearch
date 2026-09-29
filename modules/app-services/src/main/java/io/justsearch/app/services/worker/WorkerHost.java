@@ -94,8 +94,8 @@ public interface WorkerHost extends Closeable {
    * <p>Item A11 made the host required rather than optional: before it, a null host meant "spawn a
    * Worker process", and that fallback is gone. A null is a construction error now, but
    * "constructed and never started" is still a legitimate shape, so it gets an explicit Null
-   * Object (the repo idiom — see {@code IndexingService.unavailable()} and
-   * {@code WorkerService.unavailable()}) rather than a null every caller has to remember about.
+   * Object (the repo idiom — see {@code IndexingService.unavailable()}) rather than a null every
+   * caller has to remember about.
    * Starting it fails loudly instead of silently composing nothing.
    */
   static WorkerHost unavailable() {

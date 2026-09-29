@@ -58,7 +58,7 @@ final class McpAnswerLegibilityTest {
         ArgumentCaptor.forClass(RetrieveContextParams.class);
     when(documents.retrieveContext(captor.capture(), any(EngineContext.class)))
         .thenReturn(CompletableFuture.completedFuture(canned));
-    WorkerServices workers = new WorkerServices(null, documents, null, null, null);
+    WorkerServices workers = new WorkerServices(null, documents, null, null);
     HeadAssembly facade = mock(HeadAssembly.class);
     when(facade.workers()).thenReturn(workers);
     McpAnswerCaptureFixture.bind(facade, documents);

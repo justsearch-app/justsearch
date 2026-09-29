@@ -624,7 +624,7 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
     // Record installed pack AFTER successful settings application (matches original ordering).
     packInstallOps.recordPack(result.pack());
 
-    // Lane F stage A: nothing restarts a worker (RestartRequiredException). The import is done;
+    // Lane F stage A: nothing restarts a worker. The import is done;
     // the user restarts JustSearch to pick it up. The phase ID is the machine key and stays.
     updateState(
         "running", "restart_worker", "Applied — restart JustSearch to use the new model", null);
@@ -664,15 +664,13 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
   /**
    * Lane F stage A item A11: there is no worker process to restart. The import used to replace the
    * Worker child process so the imported pack was picked up immediately; the index half runs in
-   * this process now, so the equivalent is an Engine restart — the user's action. Logged with the
-   * stable code rather than dropped silently, so the import's own log says why the pack is not
-   * live yet. Stage A §10, "restart-as-reload".
+   * this process now, so the equivalent is an Engine restart — the user's action. The ordinary log
+   * message says why the pack is not live yet without preserving an obsolete exception code.
    */
   private void tryRestartWorkerBestEffort() {
     if (knowledgeServer != null && knowledgeServer.hasClient()) {
       log.info(
-          "Pack import complete; an Engine restart is required to load it ({})",
-          io.justsearch.app.services.worker.RestartRequiredException.CODE);
+          "Pack import complete; the imported pack will load after the next ordered Engine restart");
     }
   }
 

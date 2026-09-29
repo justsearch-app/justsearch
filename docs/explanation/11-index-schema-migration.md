@@ -205,36 +205,36 @@ Override sources:
 - YAML: `index.schema_mismatch.policy`
 - Env/sysprop: `JUSTSEARCH_INDEX_SCHEMA_MISMATCH_POLICY` / `-Dindex.schema_mismatch.policy=...`
 
-### A `FAIL_CLOSED` refusal is a verdict, not a crash (tempdoc 915 R1)
+### A `FAIL_CLOSED` refusal is a verdict, not a crash
 
-`FAIL_CLOSED` refusing to open the index is a **deliberate, deterministic** outcome, and the Head
-reports it as such:
+`FAIL_CLOSED` leaves the existing index bytes untouched and the index component's `start()` refuses to open
+the incompatible index. Before startup fails, it records a fatal reason in
+`<dataDir>/worker-fatal-reason`: `index_schema_mismatch` for a schema refusal or `index_corrupt` for
+an unrecoverable corruption. `KnowledgeServerBootstrap.transitionWorkerDown` consumes that one-shot
+marker, maps it to the current lifecycle reasons `worker.index_schema_mismatch` or
+`worker.index_corrupt`, and latches the verdict until a direct healthy observation. The latch keeps
+the specific reason and remedy available while failed start attempts suppress intermediate
+worker-down narration; `knowledgeServerStartError` receives the remedy detail instead of a generic
+spawn symptom.
 
-- The refusing Worker writes `<dataDir>/worker-fatal-reason` = `index_schema_mismatch` before it
-  exits, the same way an unrecoverable corruption writes `index_corrupt`.
-- `KnowledgeServerBootstrap` **latches** the verdict when it reads that marker. The marker is deleted
-  as it is read and the read happens before `narrationSuppressed()` decides whether the verdict is
-  applied — so without the latch, the three
-  suppressed `startWithRetry` attempts each consumed a freshly-rewritten marker and the one call
-  allowed to narrate found nothing and reported the generic `worker.spawn.failed`. The latch is
-  cleared when the capability reaches READY, and by nothing else.
-- Head readiness therefore carries `worker.index_schema_mismatch` (a `STICKY` reason code, so the
-  boot-recovery ladder's own narration cannot overwrite it) with the policy remedy as its detail, and
-  `knowledgeServerStartError` carries that remedy rather than the spawn symptom.
+Initial opening uses the bounded `KnowledgeServerBootstrap.startWithRetry` loop: three `start()`
+attempts with a 500 ms backoff by default. Intermediate failures remain suppressed while another
+attempt is pending. When the budget is exhausted, the final fallback reason is `worker.spawn.failed`,
+unless the latched fatal marker supplies one of the two specific index reasons above. There is no
+separate boot-recovery ladder or supervisor subprocess involved in this decision.
 
-**The boot-recovery ladder does not re-attempt.** A fatal index reason vetoes it
-(`BootRecoveryDecision.Veto.INDEX_FATAL` ⇒ `GIVE_UP`): the refusal is a function of the bytes in the
-index directory, so every attempt would read the same bytes and refuse the same way — the budget buys
-delay and nothing else. This is a **915 decision, not an inherited one**: before it, neither fatal
-index cause short-circuited the ladder, and 915 R1 unified the two axes rather than forking them. The
-veto is ranked above the local attempt budget and its specific cause is narrated. The external host
-supervises the whole Engine process; a predecessor's supervisor state is not an input to this local
-recovery ladder.
+The health monitor treats an essential index in either fatal state as an immediate escalation. Its
+`immediateEscalation` predicate prevents automatic physical recovery admission and dispatches the
+escalation callback on the first observation. Non-fatal eligible components continue through the
+component recovery policy, whose shipped maximum is two physical attempts per unavailable episode.
 
-An **operator** request (`POST /api/worker/restart` → `WorkerRecoveryAuthority`) is exempt from this
-veto and re-opens that one terminal state, because the documented remedy for both fatal index causes
-is a settings or filesystem change the next attempt will read. The local attempt budget is unchanged:
-an operator asking is a reason to try again, never a reason to try more times.
+Manual recovery is explicit and uses that same component budget. The `core.recover-component`
+operation with `{ "name": "index" }` and `POST /api/engine/components/index/recover` both call the
+monitor's `ComponentRecoveryAuthority`; an operator request bypasses the automatic fatal-state
+escalation veto but does not reset or enlarge the per-component attempt budget. A failed physical
+recovery publishes the current `component.recovery_failed` reason unless the recovery body retains a
+specific fatal index reason and remedy. Once escalation has been dispatched, new recovery requests
+are no longer accepted by that monitor.
 
 ### Repeat-rebuild brake
 

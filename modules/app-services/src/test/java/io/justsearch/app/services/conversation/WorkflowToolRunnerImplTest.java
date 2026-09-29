@@ -32,7 +32,7 @@ final class WorkflowToolRunnerImplTest {
     WorkflowToolRunnerImpl runner = runnerWith((body, audience, sink, engineContext, background) -> {});
     assertTrue(runner.handles(DEMO_OP), "a projected workflow op is handled");
     assertFalse(
-        runner.handles(new OperationRef("core.restart-worker")), "a normal op is not handled");
+        runner.handles(new OperationRef("core.recover-component")), "a normal op is not handled");
     assertFalse(
         runner.handles(new OperationRef("core.workflow-does-not-exist")),
         "a workflow ref with no catalog entry is not handled");

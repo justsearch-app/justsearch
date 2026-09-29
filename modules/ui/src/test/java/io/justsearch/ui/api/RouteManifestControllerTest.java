@@ -36,6 +36,9 @@ class RouteManifestControllerTest {
     app.post("/api/chat/agent", ctx -> {});
     app.get("/api/status", ctx -> {});
     app.get("/api/registry/operations", ctx -> {});
+    io.javalin.http.Handler noOp = ctx -> {};
+    io.justsearch.ui.api.routes.InferenceRoutes.register(app, noOp, noOp, noOp, noOp,
+        noOp, noOp, noOp, noOp, noOp);
 
     // A module that claims ownership of the knowledge search route (owning-module dimension, §D.3a).
     ApiModule knowledgeModule =

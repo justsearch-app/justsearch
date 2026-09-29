@@ -61,8 +61,7 @@ import tools.jackson.databind.ObjectMapper;
  * and one admission slot; the component registry owns attempt counts, deadlines, and terminal
  * observations.
  */
-public final class KnowledgeServerHealthMonitor implements Closeable, WorkerRecoveryAuthority,
-    ComponentRecoveryAuthority {
+public final class KnowledgeServerHealthMonitor implements Closeable, ComponentRecoveryAuthority {
   private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
       "engine-health-monitor", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServerHealthMonitor.class);
@@ -790,17 +789,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   /** Whether an attempt holds the single attempt slot right now. Visible for tests. */
   boolean recoveryAttemptRunningForTest() {
     return recoveryAttemptRunning.get();
-  }
-
-  /** Compatibility route: the generic index component action owns the physical attempt. */
-  @Override
-  public Verdict requestRecoveryNow() {
-    return switch (requestComponentRecovery("index")) {
-      case ACCEPTED -> Verdict.ACCEPTED;
-      case ALREADY_RUNNING -> Verdict.ALREADY_RUNNING;
-      case EXHAUSTED -> Verdict.EXHAUSTED;
-      case NOT_APPLICABLE, UNKNOWN_COMPONENT, OWNER_UNAVAILABLE -> Verdict.NOT_APPLICABLE;
-    };
   }
 
   /**

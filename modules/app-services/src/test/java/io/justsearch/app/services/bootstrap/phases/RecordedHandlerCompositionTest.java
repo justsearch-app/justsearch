@@ -83,7 +83,7 @@ final class RecordedHandlerCompositionTest {
           mock(DocumentService.class), ingestion, roots, current::get));
       handler = registry.resolve(AgentToolsOperationCatalog.INGEST_FILES).orElseThrow();
     } else {
-      OperationHandlerRegistrations.registerWorker(registry, () -> server, current::get,
+      OperationHandlerRegistrations.registerWorker(registry, new io.justsearch.app.services.bootstrap.BootstrapLateBindings(), current::get,
           () -> null, () -> null, () -> null, () -> null, () -> null, () -> null, () -> null,
           () -> null, () -> null, () -> null, mock(OperationLeaseService.class), ingestion, roots);
       handler = registry.resolve(CoreOperationCatalog.REINDEX).orElseThrow();

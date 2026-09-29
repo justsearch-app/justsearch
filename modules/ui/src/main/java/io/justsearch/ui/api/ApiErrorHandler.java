@@ -460,6 +460,7 @@ public final class ApiErrorHandler {
             case SERVICE_UNAVAILABLE, INDEX_UNAVAILABLE, AI_STARTING,
                  LLM_OVERLOADED, MANIFEST_UNAVAILABLE, SETTINGS_UNAVAILABLE -> 503;
             case NOT_FOUND -> 404;
+            case ENDPOINT_RETIRED -> 410;
             case SETTINGS_READ_ONLY -> 409;
             // Tempdoc 806 W1: an encrypted store with a locked key is 423 Locked — the status the
             // tempdoc-629 KeyLockedException mapping already emits and the shell already reads.

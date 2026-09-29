@@ -687,7 +687,7 @@ public final class HeadAssembly implements AutoCloseable {
                     io.justsearch.app.services.bootstrap.phases.SubstratePhase.runWithOutcome(
                         operations, attempts, engineAdmission, executors,
             telemetry,
-            () -> this.knowledgeServerBootstrap,
+            this.lateBindings,
             () -> this.knowledgeClient,
             () -> this.services.worker().indexing(),
             () -> this.excludes,

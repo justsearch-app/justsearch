@@ -42,8 +42,8 @@ public sealed interface ConfirmStrategy
 
   /**
    * Typed confirmation — the user must type the configured phrase before the operation
-   * proceeds. Used for high-risk destructive operations (e.g., restart-worker requires
-   * typing "restart").
+   * proceeds. Used for high-risk destructive operations (e.g., apply-excludes requires
+   * typing "apply").
    */
   record Typed(I18nKey confirmTextKey) implements ConfirmStrategy {
     public Typed {

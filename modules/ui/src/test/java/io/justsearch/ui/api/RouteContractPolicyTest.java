@@ -2,6 +2,8 @@
 package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.net.URI;
@@ -14,6 +16,19 @@ import org.junit.jupiter.api.Test;
 class RouteContractPolicyTest {
   private static final Instant DEPRECATED = Instant.parse("2026-01-01T00:00:00Z");
   private static final URI DOCS = URI.create("https://docs.justsearch.example/deprecations/fake");
+
+  @Test
+  void retiredWorkerRouteNamesReplacementWithoutInventingCalendarSunset() {
+    var contract = RouteContractPolicy.forRoute("POST", "/api/worker/restart");
+    assertEquals(Map.of(410, "api-error-response.v1.json"), contract.responseSchemas());
+    var lifecycle = contract.lifecycle();
+    assertEquals(Instant.parse("2026-09-29T00:00:00Z"), lifecycle.deprecatedSince());
+    assertNull(lifecycle.sunsetAt());
+    assertEquals("POST /api/engine/components/index/recover", lifecycle.replacement());
+    assertEquals(URI.create("https://github.com/justsearch-app/justsearch/blob/main/docs/reference/api-contract-map.md"),
+        lifecycle.documentationUri());
+    assertEquals(410, ApiErrorHandler.httpStatusFor(io.justsearch.app.api.ApiErrorCode.ENDPOINT_RETIRED));
+  }
 
   @Test
   void validatesChronologyAndPublicContractFloor() {

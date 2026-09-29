@@ -51,7 +51,7 @@ final class CoreOperationCatalogTest {
     // one irreducible per-op authoring (adding/removing an op updates this single place; count follows).
     Set<String> expectedIds =
         Set.of(
-            "core.restart-worker",
+            "core.recover-component",
             "core.bulk-reindex",
             "core.cancel-reindex",
             "core.ping-backend",
@@ -95,15 +95,20 @@ final class CoreOperationCatalogTest {
   }
 
   @Test
-  void restartWorkerHasHighRiskTypedConfirmAndUiOnlyExecutor() {
-    Operation op = catalog.findById(CoreOperationCatalog.RESTART_WORKER).orElseThrow();
-    assertEquals(RiskTier.HIGH, op.policy().risk());
-    assertInstanceOf(ConfirmStrategy.Typed.class, op.policy().confirm());
-    ConfirmStrategy.Typed typed = (ConfirmStrategy.Typed) op.policy().confirm();
-    assertEquals("ops.restart-worker.confirm", typed.confirmTextKey().value());
+  void recoverComponentHasStrictArgumentsAndOperatorPolicy() {
+    Operation op = catalog.findById(CoreOperationCatalog.RECOVER_COMPONENT).orElseThrow();
+    assertEquals(RiskTier.MEDIUM, op.policy().risk());
+    assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
     assertEquals(AuditPolicy.METADATA_ONLY, op.policy().audit());
     assertEquals(Set.of(ExecutorTag.UI), op.executors());
     assertFalse(op.policy().undoSupported());
+    assertFalse(op.policy().retry().allowAutoRetry());
+    assertTrue(op.policy().requiredCapabilities().isEmpty());
+    assertEquals(Audience.OPERATOR, op.audience());
+    assertEquals(
+        "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"minLength\":1}},"
+            + "\"required\":[\"name\"],\"additionalProperties\":false}",
+        op.intf().inputs());
     assertEquals(TrustTier.CORE, op.provenance().tier());
   }
 
@@ -145,7 +150,7 @@ final class CoreOperationCatalogTest {
 
   @Test
   void findByIdValueResolvesEachEntry() {
-    assertTrue(catalog.findByIdValue("core.restart-worker").isPresent());
+    assertTrue(catalog.findByIdValue("core.recover-component").isPresent());
     assertTrue(catalog.findByIdValue("core.bulk-reindex").isPresent());
     assertTrue(catalog.findByIdValue("core.ping-backend").isPresent());
     assertFalse(catalog.findByIdValue("core.nonexistent").isPresent());
@@ -228,7 +233,7 @@ final class CoreOperationCatalogTest {
     // Tempdoc 689 decision: core.export-diagnostics is a read-only, privacy-redacted,
     // local-only export — a user self-service support flow, not an admin action. Pin
     // this deliberately asymmetric to its state-mutating siblings (clear-failed-jobs,
-    // index-gc, restart-worker), which remain Audience.OPERATOR, so a future blanket
+    // index-gc, recover-component), which remain Audience.OPERATOR, so a future blanket
     // audience change fails loudly instead of silently widening operator-only actions
     // to end users.
     Operation exportDiagnostics =
@@ -236,12 +241,13 @@ final class CoreOperationCatalogTest {
     Operation clearFailedJobs =
         catalog.findById(CoreOperationCatalog.CLEAR_FAILED_JOBS).orElseThrow();
     Operation indexGc = catalog.findById(CoreOperationCatalog.INDEX_GC).orElseThrow();
-    Operation restartWorker = catalog.findById(CoreOperationCatalog.RESTART_WORKER).orElseThrow();
+    Operation recoverComponent =
+        catalog.findById(CoreOperationCatalog.RECOVER_COMPONENT).orElseThrow();
 
     assertEquals(Audience.USER, exportDiagnostics.audience());
     assertEquals(Audience.OPERATOR, clearFailedJobs.audience());
     assertEquals(Audience.OPERATOR, indexGc.audience());
-    assertEquals(Audience.OPERATOR, restartWorker.audience());
+    assertEquals(Audience.OPERATOR, recoverComponent.audience());
   }
 
   @Test
@@ -271,9 +277,8 @@ final class CoreOperationCatalogTest {
   }
 
   /**
-   * apply-excludes is the second HIGH-risk + Typed-confirm Operation in the
-   * substrate (after restart-worker). Pinning ensures the typed-confirm
-   * isn't accidentally weakened.
+   * apply-excludes remains a real HIGH-risk + Typed-confirm Operation after the obsolete worker
+   * restart operation is retired. Pinning ensures the typed-confirm isn't accidentally weakened.
    */
   @Test
   void applyExcludesHasHighRiskTypedConfirm() {

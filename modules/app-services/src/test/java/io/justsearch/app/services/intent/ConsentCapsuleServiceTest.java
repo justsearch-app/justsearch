@@ -17,13 +17,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import io.justsearch.agent.api.registry.ConsentCapsuleAuthority;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.observability.ledger.ActionEvent;
+import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import org.junit.jupiter.api.Test;
 
 /** Security-critical unit coverage for {@link ConsentCapsuleService} (tempdoc 550 A1). */
 final class ConsentCapsuleServiceTest {
 
-  private static final String OP = "core.restart-worker";
-  private static final String ARGS = "{\"force\":true}";
+  private static final String OP = CoreOperationCatalog.APPLY_EXCLUDES.value();
+  private static final String ARGS = "{}";
 
   private static ConsentCapsuleService svc() {
     return new ConsentCapsuleService(Clock.systemUTC(), Duration.ofMinutes(5));

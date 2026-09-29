@@ -98,7 +98,7 @@ The `LocalApiServer` exposes REST endpoints that map to controllers:
 *   **Settings:** `GET/POST /api/settings/v2`
 *   **UI Ready:** `POST /api/ui/ready`, `GET /api/ui/ready`
 *   **Diagnostics:** `POST /api/diagnostics/export`
-*   **Worker Control:** `POST /api/worker/restart` (restarts the Knowledge Worker for embedding/apply scenarios)
+*   **Component Recovery:** `POST /api/engine/components/{name}/recover` requests bounded recovery with the component's current configuration. The Health action invokes `core.recover-component` with `name: "index"`. Settings changes use the reconfiguration path.
 *   **Debug:** `GET /api/debug/state`, `GET /api/debug/events`, `GET /api/debug/engine-log`, `GET /api/debug/dashboard`, `GET /api/debug/chunks`, `GET /api/debug/effective-config`
 
 ## REST contract boundaries (DTO direction)

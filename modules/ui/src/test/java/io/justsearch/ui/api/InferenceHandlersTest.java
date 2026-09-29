@@ -147,7 +147,7 @@ final class InferenceHandlersTest {
 
       InferenceHandlers handlers =
           new InferenceHandlers(
-              null, null, null, null, null, null, null, new StubBrainRuntime(liveMode));
+              null, null, null, null, null, null, null, new StubBrainRuntime(liveMode), () -> null);
       handlers.handleSetInferenceMode(ctx);
 
       ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
@@ -170,7 +170,7 @@ final class InferenceHandlersTest {
     when(ctx.json(any())).thenReturn(ctx);
     when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(context);
     when(ctx.bodyAsClass(Map.class)).thenReturn(Map.of("mode", "online", "idempotencyKey", key));
-    new InferenceHandlers(null, null, null, null, null, null, null, service).handleSetInferenceMode(ctx);
+    new InferenceHandlers(null, null, null, null, null, null, null, service, () -> null).handleSetInferenceMode(ctx);
     var captor = ArgumentCaptor.forClass(Map.class);
     verify(ctx).json(captor.capture());
     assertEquals(key, captor.getValue().get("operationKey"));
@@ -235,7 +235,7 @@ final class InferenceHandlersTest {
       when(ctx.status(any(int.class))).thenReturn(ctx);
       when(ctx.json(any())).thenReturn(ctx);
       when(ctx.bodyAsClass(Map.class)).thenReturn(Map.of("mode", "online"));
-      new InferenceHandlers(online, null, null, null, settings, null, handle, null)
+      new InferenceHandlers(online, null, null, null, settings, null, handle, null, () -> null)
           .handleSetInferenceMode(ctx);
       verify(ctx).status(500);
       var payload = ArgumentCaptor.forClass(Map.class);
@@ -293,7 +293,7 @@ final class InferenceHandlersTest {
       when(ctx.bodyAsClass(Map.class)).thenReturn(Map.of("mode", "online"));
 
       new InferenceHandlers(
-          online, null, null, null, settings, null, handle, null).handleSetInferenceMode(ctx);
+          online, null, null, null, settings, null, handle, null, () -> null).handleSetInferenceMode(ctx);
 
       assertEquals(2L, settings.inspect().witness().acceptedRevision());
       assertEquals(ComponentState.STARTING, handle.snapshot().state());
@@ -327,7 +327,7 @@ final class InferenceHandlersTest {
     when(ctx.status(any(int.class))).thenReturn(ctx);
     when(ctx.json(any())).thenReturn(ctx);
     when(ctx.bodyAsClass(Map.class)).thenReturn(Map.of("mode", "online"));
-    new InferenceHandlers(null, null, null, null, null, null, null, service).handleSetInferenceMode(ctx);
+    new InferenceHandlers(null, null, null, null, null, null, null, service, () -> null).handleSetInferenceMode(ctx);
     verify(ctx).status(status);
     var captor = ArgumentCaptor.forClass(Map.class);
     verify(ctx).json(captor.capture());

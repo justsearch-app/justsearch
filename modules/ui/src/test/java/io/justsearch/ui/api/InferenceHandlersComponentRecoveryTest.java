@@ -10,13 +10,14 @@ import static org.mockito.Mockito.when;
 
 import io.javalin.http.Context;
 import io.justsearch.app.services.worker.ComponentRecoveryAuthority;
+import io.justsearch.app.services.bootstrap.BootstrapLateBindings;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 final class InferenceHandlersComponentRecoveryTest {
   @Test
-  void acceptedRequestNamesTheComponentAndSchedulesOneAttempt() {
+  void acceptedRequestNamesTheComponentAndSchedulesOneAttempt() throws Exception {
     var authority = new StubAuthority(ComponentRecoveryAuthority.Outcome.ACCEPTED);
     var handler = handler(authority);
     var ctx = context();
@@ -27,6 +28,8 @@ final class InferenceHandlersComponentRecoveryTest {
     assertEquals("index", authority.requestedName);
     assertEquals("index", body(ctx).get("component"));
     assertEquals("ACCEPTED", body(ctx).get("recovery"));
+    ContractSchemaAssertions.assertConforms("accepted recovery", "component-recovery-response.v1.json",
+        new tools.jackson.databind.ObjectMapper().writeValueAsString(body(ctx)));
   }
 
   @Test
@@ -56,6 +59,22 @@ final class InferenceHandlersComponentRecoveryTest {
     assertEquals("SERVICE_UNAVAILABLE", body(ctx).get("errorCode"));
   }
 
+  @Test
+  void existingHandlerObservesAuthorityPublishedAfterConstruction() {
+    var bindings = new BootstrapLateBindings();
+    var handler = new InferenceHandlers(null, null, null, null, null, null, null, null,
+        bindings::componentRecoveryAuthority);
+    var before = context();
+    handler.handleRecoverComponent(before);
+    verify(before).status(503);
+    var authority = new StubAuthority(ComponentRecoveryAuthority.Outcome.ACCEPTED);
+    bindings.setComponentRecoveryAuthority(authority);
+    var after = context();
+    handler.handleRecoverComponent(after);
+    verify(after).status(202);
+    assertEquals("index", authority.requestedName);
+  }
+
   private static void assertStatus(ComponentRecoveryAuthority.Outcome verdict, int status) {
     var ctx = context();
     handler(new StubAuthority(verdict)).handleRecoverComponent(ctx);
@@ -63,13 +82,12 @@ final class InferenceHandlersComponentRecoveryTest {
   }
 
   private static InferenceHandlers handler(ComponentRecoveryAuthority authority) {
-    var handler = new InferenceHandlers(
+    return new InferenceHandlers(
         mock(io.justsearch.app.api.OnlineAiService.class), null,
         mock(io.justsearch.gpu.GpuCapabilitiesService.class),
         mock(io.justsearch.app.api.EnterprisePolicyService.class),
-        mock(io.justsearch.app.services.settings.UiSettingsStore.class), null, null, null);
-    if (authority != null) handler.setComponentRecovery(authority);
-    return handler;
+        mock(io.justsearch.app.services.settings.UiSettingsStore.class), null, null, null,
+        () -> authority);
   }
 
   private static Context context() {
