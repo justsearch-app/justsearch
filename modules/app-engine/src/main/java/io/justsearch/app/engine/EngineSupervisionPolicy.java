@@ -78,7 +78,7 @@ public final class EngineSupervisionPolicy {
   /**
    * How long {@code starting} may last before the supervisor stops waiting. Hang detection is
    * suspended in {@code starting}, so without this deadline a boot that never publishes a port is a
-   * supervisor that waits forever. The per-component start deadlines design 7.6 describes are D1's.
+   * supervisor that waits forever.
    */
   public static final long START_DEADLINE_MS = 120_000L;
 

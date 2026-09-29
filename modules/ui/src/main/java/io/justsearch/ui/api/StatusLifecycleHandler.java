@@ -1194,7 +1194,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   /** Handles GET /api/health - stable, machine-oriented lifecycle surface (schema 2). */
   void handleHealth(Context ctx) {
-    LifecycleSnapshotV2 snapshot = computeLifecycleSnapshot();
+    workerSample(false);
+    LifecycleSnapshotV2 snapshot = projectCurrentComponents().lifecycle();
     int httpStatus = healthHttpStatus(snapshot.lifecycle().state());
     ctx.status(httpStatus).json(snapshot);
   }
@@ -1300,12 +1301,6 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           "");
     }
     return inferenceSnapshotSupplier.get();
-  }
-
-  /** Samples through the same cached/fresh path before projecting the health response. */
-  LifecycleSnapshotV2 computeLifecycleSnapshot() {
-    workerSample(false);
-    return projectCurrentComponents().lifecycle();
   }
 
   private LifecycleProjection.Projection projectCurrentComponents() {

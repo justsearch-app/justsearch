@@ -798,12 +798,11 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * the index is corrupt — rebuild to recover" instead of a generic/silent restart-loop. The dying
      * worker stamps {@link io.justsearch.ipc.WorkerFatalReasonMarker}; this reads + clears it.
      *
-     * <p>Tempdoc 837 §3.1: corruption is an orthogonal AXIS, not a call site. Each of the four callers
-     * passes the axis-1 code it already knows to be true — {@code WORKER_SPAWN_FAILED} where the worker
-     * never started, {@code WORKER_LOST} where it was READY and stopped answering — and this helper
-     * overrides it only when the marker says the index is corrupt. The remedy paragraph that used to BE
-     * the reason is now the detail, so it still reaches the Health-event message and the 503 body while
-     * the reason slot stays a code.
+     * <p>Tempdoc 837 §3.1: fatal index evidence is an orthogonal axis, not a call-site code. Callers
+     * provide the generic lifecycle reason for the failed start or health check, and this helper
+     * overrides it only when the marker says the index is corrupt or schema opening was refused. The
+     * remedy paragraph remains the detail, so it still reaches the health-event message and 503 body
+     * while the reason slot stays a code.
      *
      * <p>{@code readAndClear} deletes the marker, so this observation is unrepeatable — see
      * {@link io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle} for the latch that keeps

@@ -17,10 +17,6 @@ final class EngineLifecycleE2ETest {
   private record PendingScenario(String name, String owner, boolean requiresAi, String proof) {}
 
   private static final List<PendingScenario> PENDING = List.of(
-      new PendingScenario("stuck-index-local-recovery", "D1-7", false,
-          "actual text and semantic readiness after local recovery"),
-      new PendingScenario("stuck-index-exit-5", "D1-7", false,
-          "unreleasable escalation with counted Engine exit 5"),
       new PendingScenario("generation-mutation-gap-cuts", "D1-8/D1-9", false,
           "edit, removal, addition, supersession, gap decision and both pointer cuts"),
       new PendingScenario("reconfigure-beside-in-place", "D1-4/D1-12/D1-14", true,
@@ -32,6 +28,19 @@ final class EngineLifecycleE2ETest {
   void migrationStartsLiveInTheInstalledEngine() throws Exception {
     EngineSupervisedRecoveryE2ETest.runScenario("migration");
     System.out.println("LIFECYCLE_HARNESS_BASELINE_PASS §16 live generation transition");
+  }
+
+  @Tag("ai")
+  @Test
+  void stuckIndexRecoversLocallyWithoutRestart() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runScenario("lock-index-release");
+    System.out.println("LIFECYCLE_STUCK_INDEX_LOCAL_RECOVERY_PASS §16 stuck component");
+  }
+
+  @Test
+  void stuckIndexExhaustionEscalatesOnceWithoutModels() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runScenario("lock-index-exhaustion-no-ai");
+    System.out.println("LIFECYCLE_STUCK_INDEX_EXIT_5_PASS §16 stuck component");
   }
 
   @Test
@@ -98,6 +107,6 @@ final class EngineLifecycleE2ETest {
           + " ai=" + scenario.requiresAi() + " proof=" + scenario.proof());
     }
     // Reduce this count only when an actual exercise*(c) scenario replaces a pending entry.
-    assertEquals(5, names.size());
+    assertEquals(3, names.size());
   }
 }

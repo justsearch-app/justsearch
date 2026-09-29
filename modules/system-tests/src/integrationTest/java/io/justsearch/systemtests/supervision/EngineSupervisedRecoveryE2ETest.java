@@ -722,8 +722,11 @@ final class EngineSupervisedRecoveryE2ETest {
     boolean processingFamily = "processing".equals(scenario) || "operation".equals(scenario);
     boolean operationFault = scenario.startsWith("ingest-") || scenario.startsWith("settings-")
         || scenario.startsWith("bulk-");
-    boolean indexLockScenario = "lock-index-release".equals(scenario)
+    boolean semanticIndexLockScenario = "lock-index-release".equals(scenario)
         || "lock-index-exhaustion".equals(scenario);
+    boolean indexLockExhaustionScenario = "lock-index-exhaustion".equals(scenario)
+        || "lock-index-exhaustion-no-ai".equals(scenario);
+    boolean indexLockScenario = semanticIndexLockScenario || indexLockExhaustionScenario;
     if ("lock-boot".equals(scenario) || indexLockScenario) {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "mandatory file-locking contention at boot is a Windows property");
@@ -733,7 +736,7 @@ final class EngineSupervisedRecoveryE2ETest {
           "the repository's process identity collector currently supports Windows only");
     }
     Path repo = repositoryRoot();
-    if (indexLockScenario) {
+    if (semanticIndexLockScenario) {
       assumeTrue(hasRetainedStandardEmbedding(repo),
           "installed index recovery requires retained standard embedding model bytes");
     }
@@ -858,7 +861,7 @@ final class EngineSupervisedRecoveryE2ETest {
                 indexLockReleased ? "released-before-retry" : "held-for-exhaustion");
             recoveryBarrierReleased = true;
           }
-          if ("lock-index-exhaustion".equals(scenario) && recoveryBarrierReleased
+          if (indexLockExhaustionScenario && recoveryBarrierReleased
               && !indexLockReleased && indexLock != null) {
             Path supervisor = runtime.resolve("supervisor.v1.json");
             JsonNode state = Files.isRegularFile(supervisor)
@@ -985,8 +988,10 @@ final class EngineSupervisedRecoveryE2ETest {
       String engineLog = Files.readString(work.resolve("data/logs/engine.log"));
       assertFalse(engineLog.contains("Recovery/API cleanup failed"), engineLog);
       assertFalse(engineLog.contains("Head cleanup incomplete"), engineLog);
-    } else if ("lock-index-exhaustion".equals(scenario)) {
-      assertTrue(output.contains("INDEX_LOCK_EXHAUSTION_PASS"), output);
+    } else if (indexLockExhaustionScenario) {
+      String marker = "lock-index-exhaustion-no-ai".equals(scenario)
+          ? "INDEX_LOCK_EXHAUSTION_NO_AI_PASS" : "INDEX_LOCK_EXHAUSTION_PASS";
+      assertTrue(output.contains(marker), output);
       assertTrue(indexLockReleased, "the exact index lock was not released after escalation");
     } else {
       assertTrue(output.contains("LOCK_SURVIVAL_PASS"), output);
@@ -994,7 +999,9 @@ final class EngineSupervisedRecoveryE2ETest {
     }
     if (indexLockScenario) {
       String marker = "lock-index-release".equals(scenario)
-          ? "INDEX_LOCK_RELEASE_PASS" : "INDEX_LOCK_EXHAUSTION_PASS";
+          ? "INDEX_LOCK_RELEASE_PASS"
+          : "lock-index-exhaustion-no-ai".equals(scenario)
+              ? "INDEX_LOCK_EXHAUSTION_NO_AI_PASS" : "INDEX_LOCK_EXHAUSTION_PASS";
       var result = markerPayload(output, marker);
       assertEquals(429, result.path("busyRecovery").path("status").asInt(), output);
       assertEquals("ADMISSION_ENGINE_LIMIT",
