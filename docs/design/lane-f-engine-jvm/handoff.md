@@ -29,8 +29,16 @@ exposed one frontend ESLint `no-case-declarations` finding in `verdict.ts`.
 It is corrected by scoping the degraded switch arm; full frontend lint,
 typecheck and 6,631 tests pass again in `tmp/d1-15-ui-lint-correction.log`,
 `tmp/d1-15-ui-typecheck-correction.log` and
-`tmp/d1-15-ui-unit-correction.log`. The new exact-SHA hosted run is required;
-the first run is diagnostic, not a green acceptance result.
+`tmp/d1-15-ui-unit-correction.log`. The first run is diagnostic, not a green
+acceptance result.
+
+**Hosted proof.** The corrected implementation revision
+`bfd0e8b00f4770f03197fcaa72f1781e15d699ca` passed every job in exact-SHA
+[CI run 36551003636](https://github.com/justsearch-app/justsearch/actions/runs/36551003636),
+including Public claims, app-UI, Windows-native and system integration. The
+preceding run was automatically superseded after the lint correction. Inspect
+PR727 for CI on any later handoff-only revision; that does not replace the
+still-missing installed D1-15 proof.
 
 **Live-proof limitation.** This chat's `justsearch-dev` MCP process was launched
 from the older main checkout. Its preflight still requires the retired
@@ -42,10 +50,10 @@ server, then run owned live `/api/debug/state`, `/api/health`, status and a
 standard-profile real-model query on the D1-15 revision. Do not claim those
 checks from the static/local suite.
 
-**Next owner actions.** Confirm the pushed checkpoint and its exact-SHA hosted
-CI, repair the MCP client binding and finish D1-15 live proof, then continue
-D1-16/17, D2, all seven paired E groups and F. D1-4's signed Windows Sandbox
-candidate and current signing-provider allocation remain external dependencies.
+**Next owner actions.** Repair the MCP client binding and finish D1-15 live
+proof, then continue D1-16/17, D2, all seven paired E groups and F.
+D1-4's signed Windows Sandbox candidate and current signing-provider allocation
+remain external dependencies.
 Do not merge PR727 before Stage F acceptance. The held worktree is
 `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify` on
 `codex/lane-f-pr1`; preserve the unrelated untracked
