@@ -885,10 +885,16 @@ def fixture_body(url: str, variant: str = "default") -> str:
 
 
 class _SettingsFixtureState:
-    """One browser context's witnessed settings document and keyed receipts."""
+    """One browser context's witnessed settings document and keyed receipts.
 
-    def __init__(self, variant: str):
+    ``color_scheme`` projects the browser context's initial appearance into the
+    settings GET without changing the captured canonical fixture. Subsequent
+    POSTs continue to mutate and witness this context-local document.
+    """
+
+    def __init__(self, variant: str, color_scheme: str = "dark"):
         self._settings = json.loads(_settings_body(variant))
+        self._settings["ui"]["theme"] = color_scheme
         self._receipts: dict[str, tuple[str, dict]] = {}
 
     def get_body(self) -> str:
@@ -934,18 +940,20 @@ class _SettingsFixtureState:
         return 200, json.dumps(receipt)
 
 
-async def install_fixtures(ctx, variant: str = "default") -> None:
+async def install_fixtures(ctx, variant: str = "default", color_scheme: str = "dark") -> None:
     """Make a browser context deterministic: seed the dismissed walkthrough and
     serve fixtures for every `/api/*` call (so the no-backend 502 storm can't occur).
     ``variant`` selects a per-route transform: `_search_body` (GENERATE data-extreme,
     'empty') and `_status_body` (readiness state, 'degraded' — tempdoc 697) both key off
-    the same ``variant`` string. Call once on a fresh context, before `new_page`."""
+    the same ``variant`` string. ``color_scheme`` selects the initial theme returned by
+    `/api/settings/v2` for this context and defaults to dark. Call once on a fresh
+    context, before `new_page`."""
     await ctx.add_init_script(WALKTHROUGH_SEED)
     # Variant-gated: only the record-bearing variants want a cold chat surface to auto-restore
     # the fixture conversation (`_thread_body`), so no other step's boot changes.
     if variant in _THREAD_RECORD_VARIANTS:
         await ctx.add_init_script(THREAD_POINTER_SEED)
-    settings = _SettingsFixtureState(variant)
+    settings = _SettingsFixtureState(variant, color_scheme=color_scheme)
 
     async def _handler(route):
         req = route.request

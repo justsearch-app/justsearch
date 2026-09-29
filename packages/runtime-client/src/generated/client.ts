@@ -12,6 +12,7 @@ export interface ApiErrorResponse {
   errorCode: string;
   i18nKey?: string;
   requestId?: string;
+  retrySafe?: boolean;
   retryable?: boolean;
 }
 

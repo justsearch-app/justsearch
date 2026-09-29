@@ -217,6 +217,7 @@ export const API_ROUTES = {
   "POST /api/debug/trip-condition": { method: "POST", path: "/api/debug/trip-condition", cohort: "debug", requiredCapabilities: [] },
   "POST /api/diagnostics/export": { method: "POST", path: "/api/diagnostics/export", cohort: "observability", requiredCapabilities: [] },
   "POST /api/document/{id}/resolve-address": { method: "POST", path: "/api/document/{id}/resolve-address", cohort: "knowledge", requiredCapabilities: [] },
+  "POST /api/engine/components/{name}/recover": { method: "POST", path: "/api/engine/components/{name}/recover", cohort: "other", requiredCapabilities: [] },
   "POST /api/feedback/capture": { method: "POST", path: "/api/feedback/capture", cohort: "interaction", requiredCapabilities: [] },
   "POST /api/indexing-roots/preview": { method: "POST", path: "/api/indexing-roots/preview", cohort: "indexing", requiredCapabilities: [] },
   "POST /api/indexing/excludes/apply": { method: "POST", path: "/api/indexing/excludes/apply", cohort: "indexing", requiredCapabilities: ["WORKER"] },

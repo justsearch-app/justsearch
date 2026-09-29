@@ -13,11 +13,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.justsearch.telemetry.Telemetry;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 @DisplayName("SchemaController")
 final class SchemaControllerTest {
@@ -58,9 +64,41 @@ final class SchemaControllerTest {
     var body = org.mockito.ArgumentCaptor.forClass(byte[].class);
     verify(ctx).result(body.capture());
     verify(ctx, never()).status(404);
-    var schema = new tools.jackson.databind.ObjectMapper().readTree(body.getValue());
+    var schema = new ObjectMapper().readTree(body.getValue());
     assertEquals("string", schema.at(
         "/properties/entries/items/properties/conditions/items/properties/defaultArgsJson/type").asString());
+  }
+
+  @Test
+  @DisplayName("every declared route schema is served over HTTP as JSON, including version 2")
+  void everyDeclaredRouteSchemaIsServedOverHttp() throws Exception {
+    Javalin app = Javalin.create(cfg -> cfg.showJavalinBanner = false);
+    app.get("/api/schemas/{name}", controller::handle);
+    app.start("127.0.0.1", 0);
+    try {
+      HttpClient client = HttpClient.newHttpClient();
+      ObjectMapper mapper = new ObjectMapper();
+      var declared = RouteContractPolicy.declaredSchemaFiles();
+      assertTrue(declared.contains("lifecycle-snapshot.v2.json"));
+      for (String name : declared) {
+        HttpResponse<byte[]> response =
+            client.send(
+                HttpRequest.newBuilder()
+                    .uri(URI.create("http://127.0.0.1:" + app.port() + "/api/schemas/" + name))
+                    .GET()
+                    .build(),
+                HttpResponse.BodyHandlers.ofByteArray());
+
+        assertEquals(200, response.statusCode(), name);
+        assertEquals(
+            "application/schema+json",
+            response.headers().firstValue("Content-Type").orElse(""),
+            name);
+        assertTrue(mapper.readTree(response.body()).isObject(), name);
+      }
+    } finally {
+      app.stop();
+    }
   }
 
   @Test
@@ -81,7 +119,7 @@ final class SchemaControllerTest {
   @DisplayName("invalid name format returns 404 (not 400)")
   void invalidNameReturns404() {
     Context ctx = mock(Context.class);
-    // Pattern requires [a-z0-9-]+\.v1\.json — underscores and uppercase rejected.
+    // Pattern requires [a-z0-9-]+\.v<digits>\.json — underscores and uppercase rejected.
     when(ctx.pathParam("name")).thenReturn("BadName_v2.json");
     when(ctx.status(anyInt())).thenReturn(ctx);
 
@@ -149,7 +187,8 @@ final class SchemaControllerTest {
     assertTrue(names.contains("runtime-ready-response.v1.json"));
     assertTrue(names.contains("operation-outcome-view.v1.json"));
     assertTrue(names.contains("condition-recovery-index.v1.json"));
-    assertEquals(19, names.size());
+    assertTrue(names.contains("component-recovery-response.v1.json"));
+    assertEquals(20, names.size());
     assertFalse(names.contains("nonexistent.v1.json"));
   }
 }

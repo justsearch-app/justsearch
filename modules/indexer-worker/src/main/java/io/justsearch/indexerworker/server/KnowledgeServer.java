@@ -1101,6 +1101,11 @@ public final class KnowledgeServer implements Closeable {
       this.recordedCandidate = candidate.orElse(null);
 
       IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
+      genManager.reconcileActiveRecoveryOwnership(activeGenerationPath -> {
+        if (!IndexRecoveryMarker.exists(activeGenerationPath)) {
+          IndexRecoveryMarker.write(activeGenerationPath, "interrupted_backup_first");
+        }
+      });
       IndexGenerationManager.BootLayout boot;
       if (recoveryStartContext != null && recoveryStartContext.generationState() != null) {
         var inspected = genManager.inspectCurrentLayoutForBoot().orElseThrow(
@@ -1292,6 +1297,7 @@ public final class KnowledgeServer implements Closeable {
               buildIndexRuntime(activeIndexPath)
                   .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE);
           publishIngestLifecycle(useDeferredWriter ? builder.openDeferred() : builder.open());
+          genManager.reconcileActiveRecoveryOwnership();
           this.searchLifecycle = this.ingestLifecycle;
 
           // tempdoc 628 Stage B (G3): if the adapter recovered this index to empty on open it dropped

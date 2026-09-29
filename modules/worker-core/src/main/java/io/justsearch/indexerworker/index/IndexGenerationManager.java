@@ -236,6 +236,11 @@ public final class IndexGenerationManager {
     void afterMove(State state) throws IOException;
   }
 
+  @FunctionalInterface
+  public interface OwnershipRecoveryPreparation {
+    void prepare(Path activeGenerationPath) throws IOException;
+  }
+
   // Read-cache for readStateBestEffort(): avoids re-parsing state.json on every RPC when nothing has
   // changed. The cached State is published atomically through ONE volatile reference, so a reader on
   // a gRPC handler thread can never observe a torn version/state pair while a migration thread writes;
@@ -572,6 +577,147 @@ public final class IndexGenerationManager {
     }
     return manifest;
   }
+
+  /**
+   * Reconciles ownership after an interrupted adapter backup-first rebuild.
+   *
+   * <p>The authoritative state pointer and the adapter's exact encoded backup name establish the
+   * owner. Every matching backup must contain the same valid metadata. Complete active metadata is
+   * validated without writing; absent or partial metadata is restored idempotently from that exact
+   * backup authority. Any ambiguity fails closed.
+   */
+  public boolean reconcileActiveRecoveryOwnership() throws IOException {
+    return reconcileActiveRecoveryOwnership(activeGenerationPath -> {});
+  }
+
+  /**
+   * Reconciles ownership and invokes {@code preparation} before restored metadata can make the
+   * active generation complete.
+   */
+  public boolean reconcileActiveRecoveryOwnership(OwnershipRecoveryPreparation preparation)
+      throws IOException {
+    Objects.requireNonNull(preparation, "preparation");
+    try (var ignored = stateControl()) {
+      if (Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        return false;
+      }
+      State state = readRecordedState();
+      if (state.format_version() == 1) {
+        // Ownership-aware boot decides whether v1 is a native layout that may be normalized or a
+        // recorded/fenced layout that must remain read-only and fail strict validation.
+        return false;
+      }
+      if (state.format_version() != STATE_FORMAT_VERSION) {
+        throw new IOException("Recovery reconciliation requires current generation state format");
+      }
+      String generationId =
+          requireSafeGenerationId(state.active_generation(), "state.json active_generation");
+      try {
+        MigrationState.valueOf(state.migration_state());
+      } catch (IllegalArgumentException | NullPointerException invalid) {
+        throw new IOException("Authoritative generation phase is invalid", invalid);
+      }
+      if (generationId.equals(state.building_generation())) {
+        throw new IOException("Serving and building generation identities must be distinct");
+      }
+      if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException("Authoritative generation root is unavailable");
+      }
+      Path exact = resolveGenerationPathReadOnly(generationId);
+
+      Path sentinelPath = exact.resolve(GENERATION_SENTINEL);
+      Path manifestPath = exact.resolve(GENERATION_MANIFEST);
+      boolean sentinelExists = Files.exists(sentinelPath, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+      boolean manifestExists = Files.exists(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+      if (sentinelExists && manifestExists) {
+        requireRetirementSentinel(sentinelPath, generationId, exact);
+        requireRetirementManifest(manifestPath, generationId, exact);
+        return false;
+      }
+      List<Path> backups = recoveryBackups(exact);
+      if (backups.isEmpty()) {
+        throw new IOException("Active generation ownership is unavailable without a recovery backup");
+      }
+
+      OwnershipBytes authority = null;
+      for (Path backup : backups) {
+        OwnershipBytes candidate = readRecoveryOwnership(backup, generationId);
+        if (authority == null) {
+          authority = candidate;
+        } else if (!authority.equals(candidate)) {
+          throw new IOException("Recovery backups disagree on generation ownership");
+        }
+      }
+
+      if (sentinelExists) {
+        requireRetirementSentinel(sentinelPath, generationId, exact);
+        String activeSentinel = new String(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinelPath),
+            StandardCharsets.UTF_8);
+        if (!authority.sentinel().equals(activeSentinel)) {
+          throw new IOException("Active generation sentinel disagrees with recovery backup");
+        }
+      }
+      if (manifestExists) {
+        requireRetirementManifest(manifestPath, generationId, exact);
+        String activeManifest = new String(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath),
+            StandardCharsets.UTF_8);
+        if (!authority.manifest().equals(activeManifest)) {
+          throw new IOException("Active generation manifest disagrees with recovery backup");
+        }
+      }
+      if (Files.notExists(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        Files.createDirectory(exact);
+      } else if (!Files.isDirectory(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException("Authoritative active generation path is not a directory");
+      }
+      preparation.prepare(exact);
+      if (!sentinelExists) {
+        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+            sentinelPath, authority.sentinel().getBytes(StandardCharsets.UTF_8));
+      }
+      if (!manifestExists) {
+        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
+            manifestPath, authority.manifest().getBytes(StandardCharsets.UTF_8));
+      }
+      return true;
+    }
+  }
+
+  private List<Path> recoveryBackups(Path generation) throws IOException {
+    String prefix = generation.getFileName().toString() + ".bak-";
+    try (var entries = Files.list(indicesDir)) {
+      return entries
+          .filter(path -> {
+            String name = path.getFileName().toString();
+            return name.startsWith(prefix)
+                && name.substring(prefix.length()).matches("[0-9]{8}-[0-9]{6}");
+          })
+          .sorted(Comparator.comparing(Path::toString))
+          .toList();
+    }
+  }
+
+  private static OwnershipBytes readRecoveryOwnership(Path backup, String generationId)
+      throws IOException {
+    if (!Files.isDirectory(backup, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Recovery backup is not a directory: " + backup);
+    }
+    Path sentinel = backup.resolve(GENERATION_SENTINEL);
+    Path manifest = backup.resolve(GENERATION_MANIFEST);
+    requireRetirementSentinel(sentinel, generationId, backup);
+    requireRetirementManifest(manifest, generationId, backup);
+    return new OwnershipBytes(
+        new String(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinel),
+            StandardCharsets.UTF_8),
+        new String(
+            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifest),
+            StandardCharsets.UTF_8));
+  }
+
+  private record OwnershipBytes(String sentinel, String manifest) {}
 
   /**
    * Builds a generation id guaranteed unique on disk (tempdoc 628 G4 / obs #484).

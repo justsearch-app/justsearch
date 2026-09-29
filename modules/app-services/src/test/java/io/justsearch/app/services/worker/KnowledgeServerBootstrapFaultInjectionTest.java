@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +24,7 @@ final class KnowledgeServerBootstrapFaultInjectionTest {
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(config(dir, false), host)) {
       var bootstrap = fixture.bootstrap();
       assertThrows(IOException.class, () -> bootstrap.startWithRetry(3, 0));
+      verify(host, times(3)).prepareStart();
       verify(host, never()).start(any(), any());
       IOException next = assertThrows(IOException.class, bootstrap::start);
       assertEquals("host reached", next.getMessage());

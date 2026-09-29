@@ -34,8 +34,10 @@ Frontend and backend are co-shipped in the Tauri bundle. There is no version ske
 `modules/ui/src/main/java/io/justsearch/ui/api/RouteContractPolicy.java` is the single authority for
 per-route stability, schemas, SDK exposure, and lifecycle metadata. Lifecycle rows are immutable,
 validated at startup/tests, and must resolve to exactly one registered `METHOD + route pattern`.
-The production lifecycle catalog is currently empty: no live HTTP route is deprecated merely to
-demonstrate the mechanism.
+The active lifecycle row is `POST /api/worker/restart`, a reference-client route retained as an
+HTTP 410 response for one release. Its replacement is
+`POST /api/engine/components/index/recover`; the row records `deprecatedSince` as
+`2026-09-29T00:00:00Z` and has no calendar `sunsetAt`. No other live HTTP route is deprecated.
 
 For a deprecated route, every response—including an exception-mapped response—carries:
 

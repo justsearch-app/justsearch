@@ -78,6 +78,28 @@ class TestFixtureBodies:
 class TestWitnessedSettingsFixture:
     KEY = "01994b86-2c00-7000-8000-000000000001"
 
+    def test_initial_theme_follows_context_scheme_and_post_still_commits(self):
+        dark = ui_fixtures._SettingsFixtureState("default")
+        light = ui_fixtures._SettingsFixtureState("default", color_scheme="light")
+
+        assert json.loads(dark.get_body())["ui"]["theme"] == "dark"
+        observed = json.loads(light.get_body())
+        assert observed["ui"]["theme"] == "light"
+        # The captured canonical fixture remains dark; only this context's initial
+        # settings projection follows the requested browser color scheme.
+        canonical = json.loads(ui_fixtures.fixture_body("http://x/api/settings"))
+        assert canonical["ui"]["theme"] == "dark"
+
+        request = {
+            "ui": {"theme": "dark"},
+            "witness": observed["witness"],
+            "operationKey": self.KEY,
+        }
+        status, raw_receipt = light.post(json.dumps(request))
+        assert status == 200
+        assert json.loads(raw_receipt)["ui"]["theme"] == "dark"
+        assert json.loads(light.get_body())["ui"]["theme"] == "dark"
+
     def test_get_post_get_retains_the_committed_projection(self):
         state = ui_fixtures._SettingsFixtureState("default")
         observed = json.loads(state.get_body())

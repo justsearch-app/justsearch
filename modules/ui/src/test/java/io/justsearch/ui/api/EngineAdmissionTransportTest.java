@@ -272,6 +272,8 @@ final class EngineAdmissionTransportTest {
         assertEquals(String.valueOf(registry.retryAfterSeconds()),
             response.headers().firstValue("Retry-After").orElseThrow());
         var body = JsonMapper.builder().build().readTree(response.body());
+        ContractSchemaAssertions.assertConforms(
+            "component recovery capacity refusal", "api-error-response.v1.json", response.body());
         assertEquals("ADMISSION_ENGINE_LIMIT", body.get("errorCode").asText());
         assertFalse(body.get("retrySafe").asBoolean(), "handler entered before refusal");
       } finally {

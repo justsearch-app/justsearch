@@ -2480,7 +2480,9 @@ async def _run_isolated_step(
                 color_scheme=step.color_scheme,
             )
             if fixtures:
-                await ui_fixtures.install_fixtures(ctx, variant=step.fixtures_variant)
+                await ui_fixtures.install_fixtures(
+                    ctx, variant=step.fixtures_variant, color_scheme=step.color_scheme,
+                )
             for script in step.init_scripts:
                 await ctx.add_init_script(script)
             page = await ctx.new_page()
@@ -2504,6 +2506,15 @@ async def _run_isolated_step(
                 except Exception:
                     pass
             await step.setup(page)
+            if step.color_scheme == "light":
+                active_theme = await page.evaluate(
+                    "() => document.documentElement.getAttribute('data-theme')"
+                )
+                if active_theme != "light":
+                    raise RuntimeError(
+                        "post-setup color scheme mismatch: requested light, "
+                        f"document data-theme is {active_theme!r}"
+                    )
             r = await _capture_shot(
                 page, step.name, output_dir, cooldown_ms=cooldown_ms,
                 console_sink=console_sink, measure=measure, theme=step.color_scheme,

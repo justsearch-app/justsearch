@@ -20,29 +20,29 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Boot recovery CONVERGENCE against a real Engine with its index half (tempdoc 825, top rung of the §D4
  * ladder below the live dev-stack leg).
  *
  * <p>The pure decision test pins the law and the component test pins the arc; neither can prove the
- * half that matters most to the acceptance criterion — that a boot which exhausts the #439 retries
- * <em>comes back</em>, in the same process, without a restart. That needs a worker which fails a
- * bounded number of times and then succeeds, which is exactly what the countdown fault injector
+ * half that matters most to the acceptance criterion — that a failed initial opening can spend its
+ * generic recovery budget and <em>come back</em>, in the same process, without a restart. That needs
+ * a worker which fails a bounded number of times and then succeeds, which is exactly what the
+ * countdown fault injector
  * ({@code justsearch.worker.boot.faultInjectAttempts}) provides: the first N index-composition attempts fail, then the injector stops. The pre-825 knob
  * ({@code pid_validation_timeout_ms}) fails EVERY attempt and so can only ever prove the pin.
  *
- * <p>N=3 consumes the ENTIRE boot-time retry budget
- * ({@code KnowledgeServerBootstrap.DEFAULT_START_ATTEMPTS}), so the process genuinely reaches the
- * 821 §O.4 state — capability pinned, no client bound, no monitor before this tempdoc — and only the
- * recovery arm can get it out.
+ * <p>N=2 fails the one initial opening and the first generic recovery. The second and final generic
+ * recovery must reuse the unresolved start context captured before fault injection and reach READY.
  *
  * <p><b>Oracle.</b> Deliberately the health-event OCCURRENCE stream, not the log: occurrences are
  * the user-visible narration, so the same assertion proves convergence happened, that it happened
  * for the right REASON (a recovery attempt, not a lucky first boot), and that the arc did not FLAP —
- * exactly one {@code worker.restart-attempted} for a recovery of three failed boot attempts.
+ * exactly one attempted/recovered occurrence pair for two physical generic recovery attempts.
  */
-@DisplayName("Worker boot recovery converges after an exhausted boot retry (tempdoc 825)")
+@DisplayName("Worker boot recovery converges through generic index recovery")
 @Timeout(value = 8, unit = TimeUnit.MINUTES)
 class WorkerBootRecoveryE2ETest {
 
@@ -50,8 +50,8 @@ class WorkerBootRecoveryE2ETest {
   private static final HttpClient CLIENT =
       HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
-  /** Consumes all three boot attempts, so recovery — not the boot retry — is what saves the run. */
-  private static final String INJECTED_BOOT_FAULTS = "3";
+  /** Fails the initial opening and first generic recovery; the second recovery must succeed. */
+  private static final String INJECTED_BOOT_FAULTS = "2";
 
   @AfterAll
   static void tearDown() {
@@ -59,7 +59,7 @@ class WorkerBootRecoveryE2ETest {
   }
 
   @Test
-  @DisplayName("a boot that exhausts its retries recovers to a READY worker in the same process")
+  @DisplayName("a failed initial opening recovers to READY on the final generic attempt")
   void bootRecoveryConvergesWithoutAProcessRestart() throws Exception {
     // start() is itself the primary assertion: awaitWorkerReady blocks on components.index.state =
     // READY inside the fixture's 90s worker gate, and (tempdoc 825) fails FAST if the Head narrates
@@ -68,7 +68,7 @@ class WorkerBootRecoveryE2ETest {
     BACKEND.start();
 
     String health = get("/api/health");
-    var healthBody = new tools.jackson.databind.ObjectMapper().readTree(health);
+    var healthBody = new ObjectMapper().readTree(health);
     assertEquals(2, healthBody.path("schema_version").asInt(), "health must use schema 2");
     assertEquals(
         "READY",
@@ -78,6 +78,18 @@ class WorkerBootRecoveryE2ETest {
         health.contains("worker.spawn_recovery_exhausted"),
         "the recovery budget must not have been spent; body: " + health);
 
+    String status = get("/api/status");
+    var statusBody = new ObjectMapper().readTree(status);
+    var recoveryAttempts = statusBody.path("readiness").path("engineComponents").path("index")
+        .path("recoveryAttempts");
+    assertTrue(
+        recoveryAttempts.isInt(),
+        "status readiness must expose the index recovery count as an integer; body: " + status);
+    assertEquals(
+        2,
+        recoveryAttempts.intValue(),
+        "READY must follow two admitted physical recoveries; body: " + status);
+
     String snapshot = healthEventSnapshot();
     assertTrue(
         snapshot.contains("worker.restart-attempted"),
@@ -85,20 +97,21 @@ class WorkerBootRecoveryE2ETest {
             + " injector fails attempts before index composition, so a missing occurrence means the injected"
             + " failures never happened and this run proves nothing. Snapshot: "
             + snapshot);
+    assertEquals(
+        1,
+        countOccurrences(snapshot, "\"id\":\"worker.recovered\""),
+        "the positive milestone closes the recovery arc exactly once. Snapshot: " + snapshot);
     assertTrue(
-        snapshot.contains("\"id\":\"worker.recovered\""),
-        "the positive milestone closes the arc (RECOVERING → READY). Snapshot: " + snapshot);
-    assertTrue(
-        snapshot.contains("\"faultKind\":\"boot\""),
-        "the occurrence must carry the BOOT recovery context, not a supervised-restart one —"
-            + " otherwise READY came from some other path. Snapshot: "
+        snapshot.contains("\"faultKind\":\"index\""),
+        "the occurrence must carry the generic index recovery context — otherwise READY came from"
+            + " some other path. Snapshot: "
             + snapshot);
     assertEquals(
         1,
         // The id field, not a bare substring: every occurrence also names itself in its i18nKey
         // ("health-events.worker.restart-attempted.message"), which would double every count.
         countOccurrences(snapshot, "\"id\":\"worker.restart-attempted\""),
-        "no flapping: three failed boot attempts inside ONE recovery arc narrate ONE"
+        "no flapping: two physical recovery attempts inside ONE recovery arc narrate ONE"
             + " restart-attempted, not one per cycle. Snapshot: "
             + snapshot);
 

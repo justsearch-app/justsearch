@@ -36,7 +36,8 @@ import org.slf4j.LoggerFactory;
  * </ul>
  *
  * <p>Schema name validation: the {@code {filename}} path-param must match
- * {@code [a-z0-9-]+\.v1\.json}. Mismatching values get 404 with a "schema-not-found"
+ * {@code [a-z0-9-]+\.v<digits>\.json}; the explicit allowlist above remains the authority over
+ * which versioned files are actually served. Mismatching values get 404 with a "schema-not-found"
  * envelope, NOT a 400 — the controller treats unknown names as a normal not-found case
  * (mirrors the FE's expectation of a single status code regardless of path malformation).
  */
@@ -44,7 +45,7 @@ public final class SchemaController {
 
   private static final Logger log = LoggerFactory.getLogger(SchemaController.class);
   private static final String CACHE_CONTROL = "public, max-age=3600";
-  private static final Pattern SCHEMA_NAME_RE = Pattern.compile("^[a-z0-9-]+\\.v1\\.json$");
+  private static final Pattern SCHEMA_NAME_RE = Pattern.compile("^[a-z0-9-]+\\.v[0-9]+\\.json$");
 
   /**
    * Hardcoded list of schema names served by this controller. Each name is the literal

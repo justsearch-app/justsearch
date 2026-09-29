@@ -474,6 +474,17 @@ public final class EngineRoot implements WorkerHost {
   }
 
   @Override
+  public synchronized void prepareStart() {
+    if (retainedIndexStartContext != null) return;
+    io.justsearch.configuration.resolved.ResolvedConfig exactConfiguration =
+        serverFactory.captureConfiguration();
+    if (exactConfiguration != null) {
+      retainedIndexStartContext = KnowledgeServer.IndexStartContext.unresolved(
+          exactConfiguration, queryRoleBootSelection.get());
+    }
+  }
+
+  @Override
   public synchronized KnowledgeClient start(GpuSchedulingGauge gpuScheduling, IpcTelemetry telemetry)
       throws IOException {
     Objects.requireNonNull(gpuScheduling, "gpuScheduling");
@@ -485,16 +496,12 @@ public final class EngineRoot implements WorkerHost {
       throw new IOException("EngineRoot cannot start while its previous server close is incomplete");
     }
     liveMigrationStartAttempt = null;
+    prepareStart();
     KnowledgeServer.IndexStartContext startContext = retainedIndexStartContext;
     io.justsearch.configuration.resolved.ResolvedConfig exactConfiguration = startContext == null
         ? serverFactory.captureConfiguration() : startContext.configuration();
     io.justsearch.app.api.settings.QueryRoleSelection exactBootQuery = startContext == null
         ? queryRoleBootSelection.get() : startContext.bootQuerySelection();
-    if (startContext == null && exactConfiguration != null) {
-      startContext = KnowledgeServer.IndexStartContext.unresolved(
-          exactConfiguration, exactBootQuery);
-      retainedIndexStartContext = startContext;
-    }
     KnowledgeServer started;
     try {
       started = serverFactory.create(gpuScheduling, executors, recordedIngestion,

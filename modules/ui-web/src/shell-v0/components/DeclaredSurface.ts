@@ -174,7 +174,7 @@ export class DeclaredSurface extends JfElement {
     /* 594 §11.3 #3 — an UNKNOWN fact (not polled / reconnecting) renders muted, never a fabricated
        or stale-confident value; distinct from ABSENT (the chip is omitted entirely). */
     .adaptive-strip .item[data-presence='unknown'] {
-      opacity: 0.45;
+      opacity: 0.65;
     }
     /* 594 §11.3 #4 — a diagnostic "<name> off" chip reads as a deliberately-disabled capability:
        muted, not asserting. (Only rendered on a DIAGNOSTIC-altitude surface; ambient surfaces omit.) */

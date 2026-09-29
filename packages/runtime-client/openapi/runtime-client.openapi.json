@@ -19,6 +19,9 @@
           "requestId" : {
             "type" : "string"
           },
+          "retrySafe" : {
+            "type" : "boolean"
+          },
           "retryable" : {
             "type" : "boolean"
           }

@@ -486,7 +486,7 @@
   --text-warning: rgb(122, 65, 0);
   /* Text-grade role tokens (tempdoc 576 §6 rung-1) — light theme: dark shades, AA on the light
      surface (verified by check-contrast-matrix). */
-  --text-success: rgb(26, 122, 58);
+  --text-success: rgb(26, 108, 58);
   --text-danger: rgb(139, 50, 50);
   --text-command: rgb(73, 35, 140);
   --text-chat: rgb(0, 80, 120);
@@ -1040,4 +1040,3 @@ select {
   color: oklch(20% 0.02 200);
   box-shadow: 0 0 0 1px oklch(60% 0.12 200 / 0.25);
 }
-

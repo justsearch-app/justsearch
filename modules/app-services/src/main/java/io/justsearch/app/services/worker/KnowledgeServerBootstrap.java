@@ -258,6 +258,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
         log.info("Starting Knowledge Server integration...");
 
         try {
+            // Capture the physical start inputs before the test-only injector can fail this attempt.
+            // Generic recovery then reopens the same unresolved context instead of refusing because
+            // WorkerHost.start() never ran.
+            workerHost.prepareStart();
             // The old injector lived in deleted Worker PID validation. Fail before composition
             // instead; KnowledgeServerConfig forces this countdown to zero in production.
             if (bootFaultsRemaining.getAndUpdate(remaining -> Math.max(0, remaining - 1)) > 0) {

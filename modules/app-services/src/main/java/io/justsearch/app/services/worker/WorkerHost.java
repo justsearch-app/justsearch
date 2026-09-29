@@ -31,6 +31,15 @@ public interface WorkerHost extends Closeable {
   }
 
   /**
+   * Captures the exact inputs for the next start before Bootstrap can fail that attempt.
+   *
+   * <p>The production host retains these inputs so a generic recovery can reopen the same physical
+   * index even when a test-only boot fault fires before {@link #start}. Fixtures without a retained
+   * start context do not need to implement this hook.
+   */
+  default void prepareStart() {}
+
+  /**
    * Starts the index half and returns the client for it.
    *
    * @param gpuScheduling the Engine's one GPU-scheduling gauge (item A5). The host must give the

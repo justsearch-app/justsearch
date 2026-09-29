@@ -1,8 +1,8 @@
 {
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
-  "count": 244,
+  "count": 245,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:c153c1e7f03f9ead391e957100a350d243cdbd0ed328aac0b2602ed4a91c7c6a",
+  "routeDigest": "sha256:5159d9dc9277aeaf546da78b6bb04a2d7ca161d906a4d3158742c0c48969a469",
   "routes": [
     {
       "method": "GET",
@@ -1838,12 +1838,19 @@
       "owningModule": null,
       "requiredCapabilities": [],
       "responseSchema": null,
-      "stability": null,
+      "stability": "reference-client",
       "sdkOperationId": null,
       "requestSchema": null,
-      "queryParameters": null,
-      "responseSchemas": null,
-      "lifecycle": null
+      "queryParameters": [],
+      "responseSchemas": {
+        "410": "api-error-response.v1.json"
+      },
+      "lifecycle": {
+        "deprecatedSince": "2026-09-29T00:00:00Z",
+        "sunsetAt": null,
+        "replacement": "POST /api/engine/components/index/recover",
+        "documentationUri": "https://github.com/justsearch-app/justsearch/blob/main/docs/reference/api-contract-map.md"
+      }
     },
     {
       "method": "GET",
@@ -2652,6 +2659,26 @@
       "requestSchema": null,
       "queryParameters": null,
       "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/engine/components/{name}/recover",
+      "cohort": "other",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": "reference-client",
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": [],
+      "responseSchemas": {
+        "202": "component-recovery-response.v1.json",
+        "404": "api-error-response.v1.json",
+        "409": "api-error-response.v1.json",
+        "429": "api-error-response.v1.json",
+        "503": "api-error-response.v1.json"
+      },
       "lifecycle": null
     },
     {

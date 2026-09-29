@@ -8,6 +8,7 @@
     "errorCode": { "type": "string" },
     "errorClass": { "type": "string" },
     "retryable": { "type": "boolean" },
+    "retrySafe": { "type": "boolean" },
     "i18nKey": { "type": "string" },
     "requestId": { "type": "string" }
   },

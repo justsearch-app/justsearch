@@ -162,6 +162,175 @@ final class PreOpenSchemaMismatchBootTest {
         3, docCount(backup), "and the backup holds Blue as it was, so the copy was taken first");
     assertEquals(
         0, docCount(layout.activePath()), "while the active generation was rebuilt empty");
+    assertEquals(
+        java.nio.file.Files.readString(backup.resolve(".justsearch-index-generation.json")),
+        java.nio.file.Files.readString(
+            layout.activePath().resolve(".justsearch-index-generation.json")),
+        "the rebuilt directory retains the exact manifest from the validated backup");
+
+    server.close();
+    server = new KnowledgeServer(
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()));
+    server.start();
+    assertNotNull(
+        server.appServices(),
+        "the rebuilt generation must remain owned and reopen successfully on the next boot");
+    assertEquals(0, docCount(layout.activePath()), "reopening must not restore the old documents");
+  }
+
+  @Test
+  void interruptedBackupWithAbsentActiveReconcilesAndStartsSourceRebuild(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    WorkerBootFixture.seed(layout.activePath(), null, 3);
+    Path backup = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), backup);
+    WorkerBootFixture.publishConfig(
+        layout.dataDir(),
+        layout.indexBase(),
+        "BLUE_GREEN_MIGRATE",
+        java.util.Map.of("index.auto_recovery", "true"));
+
+    server = new KnowledgeServer(
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()));
+    server.start();
+
+    IndexGenerationManager.State state = stateAfterBoot(layout);
+    assertEquals(IndexGenerationManager.MigrationState.MIGRATING.name(), state.migration_state());
+    assertEquals(
+        "corrupt_index_rebuild",
+        layout.genManager().readGenerationSourceBestEffort(state.building_generation()),
+        "boot reconciliation must join the existing marker-driven source rebuild path");
+    assertEquals(3, docCount(backup), "the interrupted backup remains the old document authority");
+    assertEquals(0, docCount(layout.activePath()), "the reconciled active generation starts empty");
+  }
+
+  @Test
+  void interruptedBackupWithEmptyActiveRestoresBothOwnershipFiles(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path backup = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), backup);
+    java.nio.file.Files.createDirectory(layout.activePath());
+
+    Path preparationEvidence = layout.activePath().resolve("recovery-prepared");
+    assertTrue(layout.genManager().reconcileActiveRecoveryOwnership(activeGenerationPath -> {
+      assertEquals(layout.activePath(), activeGenerationPath);
+      assertFalse(
+          java.nio.file.Files.exists(
+              activeGenerationPath.resolve(".justsearch-generation.sentinel")));
+      assertFalse(
+          java.nio.file.Files.exists(
+              activeGenerationPath.resolve(".justsearch-index-generation.json")));
+      java.nio.file.Files.writeString(preparationEvidence, "prepared-before-ownership");
+    }));
+    assertTrue(java.nio.file.Files.exists(preparationEvidence));
+    assertOwnershipEquals(backup, layout.activePath());
+    assertFalse(
+        layout.genManager().reconcileActiveRecoveryOwnership(),
+        "a complete reconciled pair is an idempotent no-op");
+  }
+
+  @Test
+  void interruptedBackupAfterFirstMetadataWriteRestoresOnlyTheMissingFile(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path backup = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), backup);
+    java.nio.file.Files.createDirectory(layout.activePath());
+    java.nio.file.Files.copy(
+        backup.resolve(".justsearch-generation.sentinel"),
+        layout.activePath().resolve(".justsearch-generation.sentinel"));
+
+    assertTrue(layout.genManager().reconcileActiveRecoveryOwnership());
+    assertOwnershipEquals(backup, layout.activePath());
+  }
+
+  @Test
+  void recoveryOwnershipRefusesInvalidBackupManifest(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path backup = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), backup);
+    java.nio.file.Files.createDirectory(layout.activePath());
+    java.nio.file.Files.writeString(
+        backup.resolve(".justsearch-index-generation.json"), "{not valid json");
+
+    IOException mismatch = assertThrows(
+        IOException.class,
+        () -> layout.genManager().reconcileActiveRecoveryOwnership());
+    assertTrue(mismatch.getMessage().contains("manifest is invalid"));
+    assertFalse(
+        java.nio.file.Files.exists(
+            layout.activePath().resolve(".justsearch-index-generation.json")),
+        "a mismatched backup must not authorize replacement ownership metadata");
+  }
+
+  @Test
+  void recoveryOwnershipRefusesConflictingBackups(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path first = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), first);
+    java.nio.file.Files.createDirectory(layout.activePath());
+    Path second = recoveryBackup(layout, "20000101-000001");
+    java.nio.file.Files.createDirectory(second);
+    java.nio.file.Files.copy(
+        first.resolve(".justsearch-generation.sentinel"),
+        second.resolve(".justsearch-generation.sentinel"));
+    java.nio.file.Files.writeString(
+        second.resolve(".justsearch-index-generation.json"),
+        java.nio.file.Files.readString(first.resolve(".justsearch-index-generation.json"))
+            + System.lineSeparator());
+
+    IOException conflict = assertThrows(
+        IOException.class,
+        () -> layout.genManager().reconcileActiveRecoveryOwnership());
+    assertTrue(conflict.getMessage().contains("disagree"));
+  }
+
+  @Test
+  void completeActiveOwnershipIgnoresHistoricalBackupBytes(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path historical = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.createDirectory(historical);
+    java.nio.file.Files.copy(
+        layout.activePath().resolve(".justsearch-generation.sentinel"),
+        historical.resolve(".justsearch-generation.sentinel"));
+    java.nio.file.Files.writeString(
+        historical.resolve(".justsearch-index-generation.json"),
+        java.nio.file.Files.readString(
+                layout.activePath().resolve(".justsearch-index-generation.json"))
+            + System.lineSeparator());
+
+    assertFalse(
+        layout.genManager().reconcileActiveRecoveryOwnership(),
+        "complete active ownership is authoritative without consulting historical backups");
+  }
+
+  @Test
+  void nativeV1StateStillReachesBootNormalization(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path statePath = layout.indexBase().resolve("state.json");
+    tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
+    tools.jackson.databind.node.ObjectNode v1 =
+        (tools.jackson.databind.node.ObjectNode) mapper.readTree(statePath.toFile());
+    v1.put("format_version", 1);
+    v1.remove("migration_state");
+    mapper.writeValue(statePath.toFile(), v1);
+    WorkerBootFixture.publishConfig(
+        layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
+
+    server = new KnowledgeServer(
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()));
+    server.start();
+
+    tools.jackson.databind.JsonNode upgraded = mapper.readTree(statePath.toFile());
+    assertEquals(2, upgraded.path("format_version").asInt());
+    assertEquals("IDLE", upgraded.path("migration_state").asText());
+    assertNotNull(server.appServices(), "native v1 state remains bootable through reconciliation");
   }
 
   /**
@@ -227,10 +396,23 @@ final class PreOpenSchemaMismatchBootTest {
               + " could not read - and say it ONCE: the pre-open check and the open-time guard ask"
               + " the same question of the same bytes, and both used to answer in the log; got: "
               + messages);
+      assertTrue(
+          messages.stream().anyMatch(m -> m.contains("reason=corrupt_index")),
+          "the generation reconciliation must not overwrite the adapter's exact corruption marker");
       assertNotNull(
           soleSiblingWithSuffix(layout.activePath(), ".bak-"),
           "and the open path's corruption recovery must have run — the damaged index is backed up,"
               + " never deleted");
+      assertEquals(0, docCount(layout.activePath()), "the corrupt active generation was rebuilt empty");
+
+      server.close();
+      server = new KnowledgeServer(
+          new io.justsearch.core.execution.TestEngineExecutors(),
+          WorkerBootFixture.workerConfig(layout.dataDir()));
+      server.start();
+      assertNotNull(
+          server.appServices(),
+          "corruption recovery must retain generation ownership across close and reopen");
     } finally {
       root.detachAppender(appender);
       appender.stop();
@@ -247,6 +429,20 @@ final class PreOpenSchemaMismatchBootTest {
               .orElseThrow();
       java.nio.file.Files.write(segments, new byte[] {0, 1, 2, 3, 4, 5, 6, 7});
     }
+  }
+
+  private static Path recoveryBackup(WorkerBootFixture.Layout layout, String timestamp) {
+    return layout.activePath().resolveSibling(
+        layout.activePath().getFileName() + ".bak-" + timestamp);
+  }
+
+  private static void assertOwnershipEquals(Path expected, Path actual) throws IOException {
+    assertEquals(
+        java.nio.file.Files.readString(expected.resolve(".justsearch-generation.sentinel")),
+        java.nio.file.Files.readString(actual.resolve(".justsearch-generation.sentinel")));
+    assertEquals(
+        java.nio.file.Files.readString(expected.resolve(".justsearch-index-generation.json")),
+        java.nio.file.Files.readString(actual.resolve(".justsearch-index-generation.json")));
   }
 
   /** The one sibling directory whose name adds {@code suffix} to {@code dir}'s, or null. */

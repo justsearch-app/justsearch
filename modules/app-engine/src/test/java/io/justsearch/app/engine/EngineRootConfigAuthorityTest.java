@@ -28,7 +28,7 @@ final class EngineRootConfigAuthorityTest {
   @TempDir Path directory;
 
   @Test
-  void constructorFailureRetainsExactConfigurationAndNullBootQueryInput() throws Exception {
+  void preparedStartRetainsExactConfigurationAndNullBootQueryInput() throws Exception {
     var configA = store(90).get();
     var configB = store(directory.resolve("desired-b"), 5).get();
     var desired = new AtomicReference<>(configA);
@@ -59,14 +59,15 @@ final class EngineRootConfigAuthorityTest {
     var root = new EngineRoot(mock(OperationStore.class), mock(OperationAttemptRunner.class),
         factory, 1_000, 100);
     try {
+      root.prepareStart();
+      desired.set(configB);
       assertThrows(IllegalStateException.class,
           () -> root.start(new GpuSchedulingGauge(), IpcTelemetry.noop()));
-      desired.set(configB);
       assertThrows(IllegalStateException.class,
           () -> root.start(new GpuSchedulingGauge(), IpcTelemetry.noop()));
 
       assertEquals(java.util.List.of(configA, configA), constructedWith,
-          "a constructor failure retains the pre-construction A snapshot");
+          "preparation retains the pre-construction A snapshot across start failures");
       var retained = EngineRoot.class.getDeclaredField("retainedIndexStartContext");
       retained.setAccessible(true);
       var context = (KnowledgeServer.IndexStartContext) retained.get(root);
