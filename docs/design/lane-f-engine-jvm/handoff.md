@@ -5,15 +5,60 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 the current queue, revision, lease, and blocking decisions; D1 owns design and
 acceptance evidence. The brief does not narrow the remaining lane scope.
 
-## Current state (2026-09-29, active D1-16)
+## Pause checkpoint (2026-09-29, D1-16 committed boot barrier)
+
+The user requested a pause at a clean handoff point. Lane F remains incomplete;
+resume in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify` on
+`codex/lane-f-pr1`. The main checkout and the unrelated untracked
+`modules/app-inference/logs/` were not touched. The shared dev stack is ABSENT
+with no foreign run after the installed fixture stopped. The existing draft
+[PR727](https://github.com/justsearch-app/justsearch/pull/727) is not a merge
+authorization. Check the branch's publication state before further work.
+
+The tested implementation checkpoint is `a77472595` (local branch commit;
+the handoff itself is documentation-only). The current slice repairs the
+committed B boot after a pointer-before-publication cut. Head binds persisted
+watched roots before Worker starts; missing declared
+roots now fail closed. B reattaches watchers and reconciles disk additions,
+same-path byte changes, confirmed deletions, collection labels, and delayed
+same-root queue rows before publication and A retirement. Native scoped UPSERT
+receipts require their exact accepted queue revision and B hash; scoped DELETE
+receipts replay and commit on B. The producer pauses and mutation admission is
+fenced for native settlement, which completes before root reconciliation can
+replace queue revisions. Broader unproved native switch-buffer kinds remain
+fenced rather than being treated as completed. D1's boot paragraph records the
+contract and evidence limits.
+
+Focused boot/queue/replay tests passed at `tmp/d1-boot-root-crashcut-r5.log`.
+The four affected Java module suites passed in 8m07s at
+`tmp/d1-boot-affected-modules-r3.log`; `build -x test spotlessCheck pmdAll`
+passed at `tmp/d1-boot-static-r3.log`. The installed real-model low-memory
+pointer-before-settings scenario passed in 4m40s at
+`tmp/d1-boot-installed-pointer-r2.log` with one counted restart, terminal B,
+real text/VECTOR queries, and the changed captured unit. Independent refute-first
+review found no remaining P1 in the corrected native settlement/root proof.
+These logs are local proof; they are not hosted proof or a full repository test.
+
+Next, extend the installed crash-cut harness to retain an actual watched root
+and prove add/delete/label convergence across restart; also exercise the
+persisted-store-to-EngineRoot binding and recorded `PROMOTED` boot branch.
+Native non-file receipts and prefix/collection deletes need exact ordered
+replay/certification before their fence can lift. An unresolved scoped UPSERT
+whose old accepted source cannot be proved before root replay remains a recovery
+case to design explicitly. The producer pause is covered by its primitive test
+and caller review, but a deterministic held-writer boot regression is still
+desirable. Then resume the other D1-16 rows, D1-4, D1-17, and D2/E/F; consult
+the acceptance checklist in D1 rather than treating this slice as stage close.
+
+## Earlier state (2026-09-29, active D1-16 before boot barrier)
 
 Lane F is active on `codex/lane-f-pr1` in
 `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`; the main checkout
 and unrelated untracked `modules/app-inference/logs/` remain untouched. The
 existing draft [PR727](https://github.com/justsearch-app/justsearch/pull/727)
 may receive authorized checkpoints, but merge is not authorized before Stage F
-acceptance. The last pushed revision `a4392af9811ec2ce10692a379a30d28a93780ba7`
-passed every exact-SHA job in [CI run 36563926716](https://github.com/justsearch-app/justsearch/actions/runs/36563926716).
+acceptance. The last pushed revision `abeed753ffc5ce48d73ff948b683891cc838a65f`
+passed every exact-SHA job in [CI run 36576992733](https://github.com/justsearch-app/justsearch/actions/runs/36576992733).
 Subsequent local edits are not yet hosted proof.
 
 D1-16 now has local installed proof for both low-memory combined-maintenance
@@ -35,6 +80,10 @@ The current local tree passed `build -x test spotlessCheck pmdAll` at
 `tmp/d1-16-full-test.log` (11m48s). The first static attempt found and led to
 correction of one PMD unnecessary-qualified-name finding; its red log is
 preserved as `tmp/d1-16-integrated-static.log`.
+The checkpoint `abeed753ffc5ce48d73ff948b683891cc838a65f` was pushed
+to the existing draft PR and passed every job in exact-SHA
+[CI run 36576992733](https://github.com/justsearch-app/justsearch/actions/runs/36576992733).
+The newer watcher and reconfigure work is not covered by that run.
 
 The two D1-16 pending rows are the broader generation edit/removal/addition,
 gap decision and pointer-cut matrix, and the connected two-component
