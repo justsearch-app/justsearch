@@ -5,7 +5,73 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 the current queue, revision, lease, and blocking decisions; D1 owns design and
 acceptance evidence. The brief does not narrow the remaining lane scope.
 
-## Pause checkpoint (2026-09-29, D1-16 committed boot barrier)
+## Active resume (2026-09-30)
+
+The user resumed autonomous execution of all remaining D1/D2/E/F, requested
+Luna/Sol subagents, and directed that routine work require no input. Continue
+in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`, branch
+`codex/lane-f-pr1`, base/head `9cb3e120777a5aa6f3e57c886496d423165b4a61`.
+Checkpoint commits and pushes to draft PR727 remain authorized; merge remains
+separate at F. The worktree is HELD through 2026-10-04. Preserve main and the
+foreign untracked `modules/app-inference/logs/`.
+
+Current frozen module/script code-diff hash is
+`262547a9dbd0b9de715483941c509bf3fd78c7f1`. Root owns integration, the single
+Gradle build and shared stack. Luna owns bounded exploration/tests; Sol independently
+refutes frozen sources. Both root and Sol confirmed the hash. Freeze compiled
+sources throughout the build and keep one writer per assigned file.
+
+The committed-pointer retained-root slice now has connected local installed proof.
+The final run passed in 5m59s at `tmp/lane-f-certificate-installed-r2.log`,
+XML at `tmp/lane-f-certificate-installed-final-xml/`, private fixture
+`tmp/lane-f-takeover/lifecycle-low-memory-b697a163-bc2d-4fca-9a23-a9e9a03061c2/`.
+It proves unique recorded PROMOTED root settlement before publication, two persisted
+roots and 83 exact survivor paths with current content/labels; add/delete/change/stale
+queries; the original H1→H2 captured unit through its exact sealed ledger association;
+an accepted write during B; real text/VECTOR queries with B's model identity; terminal
+COMPLETE/settings 1→2; one counted restart/incarnation 1→2; and A's exact deletion
+with the previous pointer cleared. The existing two-minute retirement owner is awaited
+only after the single-observation publication/content checks. The fixture stopped
+cleanly; refresh official quick-health before taking another lease.
+
+Root corrected the mtime-only skip to include the strict collection claim and supplied
+the existing planned hash for preserved-size/mtime boot edits. The existing queue read
+certificate now distinguishes planned H1 from indexed H2 only with exact complete
+captured-plan/ledger evidence, retaining strict streaming controls. All three consumers
+refresh before reading. Hosted CI's watcher dead-code/config-funnel failures were also
+fixed without audit exemptions. The 299-test focused gate passed in 1m01s
+(`tmp/lane-f-certificate-focused.log`, XML/counts at `tmp/lane-f-certificate-focused-xml/`);
+42 replay tests passed again after an invocation-equivalent PMD cleanup. Compile,
+distribution, Spotless and PMD passed at `tmp/lane-f-certificate-static-r2.log`.
+Script semantic tests/lint, regeneration (eight sets), store recoverability and runtime
+manifest closure passed at `tmp/lane-f-certificate-{node,eslint,regen,store,manifest}.log`.
+D1 owns the counterexamples, correction rounds, review and evidence limits.
+
+The stress-enabled default-parallel repository gate passed in 9m49s at
+`tmp/lane-f-sept30-full-suite.log`, including Spotless/PMD. XML/counts and exact
+skip names are at `tmp/lane-f-sept30-full-suite-xml/`: 12,284 tests recorded,
+zero failures/errors, 33 existing skips. Those model/corpus, filesystem/permission,
+contention, collector and deferred composition checks are not newly proved;
+the affected focused and installed scenarios have no skips. Luna independently
+reread the receipt/ledger, unique PROMOTED-before-READY log, pointer, persisted roots,
+supervisor and A deletion. The final settings file independently binds revision 2
+to B, while its SQL accepted revision is 1.
+
+Required next action: commit explicit owned paths, push the authorized draft
+checkpoint and inspect exact-head hosted CI, then continue the next endpoint.
+Hosted proof has not yet passed. A checkpoint does not complete D1 or the lane.
+
+Next product endpoint is broader native committed-pointer effects and old accepted-source
+recovery. The file-only fence is retained today. A bounded Luna/Sol map found accepted-order
+projection/delete dominance and active-B source-completion proof need care; root must
+settle the minimal design against the existing pre-pointer replay/commit/fence before
+implementation. Do not blindly reuse generic drain or add queue writes where committed
+B already owns the final effect. Remaining D1-4/16/17, D2, WP2 safety, the seven paired E
+groups and F remain binding. Signed Sandbox is externally blocked by unsigned installer
+policy and unavailable signing-provider allocation; do not bypass it or let it block
+independent work. No routine owner decision is pending.
+
+## Historical pause checkpoint (2026-09-29, D1-16 committed boot barrier)
 
 The user requested a pause at a clean handoff point. Lane F remains incomplete;
 resume in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify` on

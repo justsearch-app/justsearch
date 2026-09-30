@@ -732,18 +732,21 @@ public final class KnowledgeServerMigrationOps {
       // Refuse unsupported kinds before applying any partial replay on this boot attempt.
       if (selected.stream().anyMatch(op -> !"UPSERT".equals(op.op())
           && !"DELETE".equals(op.op()))) return false;
+      if (selected.stream().anyMatch(op -> "UPSERT".equals(op.op()))) {
+        active.commitOps().maybeRefreshBlocking();
+      }
       // Validate every receipt before touching B. A later unresolved UPSERT must not leave an
       // earlier DELETE half-applied while the boot attempt waits for its exact queue revision.
       for (var op : selected) {
         if (op.payload() == null || op.payload().isBlank()) return false;
         if ("UPSERT".equals(op.op())) {
           var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload());
+          String indexed = active.documentFieldOps()
+              .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256);
           if (!op.key().equals("path:" + upsert.path())
               || upsert.sourceSha256() == null
               || !scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
-                  upsert.sourceSha256())
-              || !upsert.sourceSha256().equals(active.documentFieldOps()
-                  .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256))) return false;
+                  upsert.sourceSha256(), indexed)) return false;
         } else if (!op.key().equals("path:" + op.payload())) {
           return false;
         }
@@ -1347,20 +1350,26 @@ public final class KnowledgeServerMigrationOps {
       List<io.justsearch.indexerworker.queue.SwitchBufferUpsert> upserts) {
     if (context.ingestLifecycle() == null
         || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
+    try {
+      context.ingestLifecycle().commitOps().maybeRefreshBlocking();
+    } catch (RuntimeException unavailable) {
+      context.log().warn("Buffered UPSERT reader could not refresh", unavailable);
+      return false;
+    }
     for (var upsert : upserts) {
       if (upsert.sourceSha256() == null) continue; // Historical unscoped cutover payload.
       boolean settled;
       String indexed;
       try {
-        settled = queue.matchesAcceptedFileProjection(
-            upsert.path(), upsert.unitRevision(), upsert.sourceSha256());
         indexed = context.ingestLifecycle().documentFieldOps()
             .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256);
+        settled = queue.matchesAcceptedFileProjection(
+            upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
       } catch (RuntimeException unavailable) {
         context.log().warn("Buffered UPSERT projection evidence is unreadable", unavailable);
         return false;
       }
-      if (!settled || !upsert.sourceSha256().equals(indexed)) {
+      if (!settled) {
         context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
         return false;
       }

@@ -507,6 +507,11 @@ final class EngineSupervisedRecoveryE2ETest {
 
   static void runSeededInPlaceCombinedMaintenance(String scenario, String expectedBoundary)
       throws Exception {
+    runSeededInPlaceCombinedMaintenance(scenario, expectedBoundary, false);
+  }
+
+  static void runSeededInPlaceCombinedMaintenance(String scenario, String expectedBoundary,
+      boolean bootRootChanges) throws Exception {
     Path repo = repositoryRoot();
     assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
         "D1-16 combined maintenance requires retained CPU A and CUDA B model bytes");
@@ -516,6 +521,7 @@ final class EngineSupervisedRecoveryE2ETest {
           "INSTALLER_ACTIVATION_FAULT_PASS");
       var environment = new java.util.HashMap<>(inPlaceModelEnvironment());
       environment.put("JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE", "1");
+      if (bootRootChanges) environment.put("JUSTSEARCH_WRITER_RECOVERY_BOOT_ROOT_CHANGES", "1");
       String output = runInstalledModelScenario(repo, work, scenario, environment,
           "MODEL_LIVE_AB_LOW_MEMORY_CRASH_PASS");
       var result = markerPayload(output, "MODEL_LIVE_AB_LOW_MEMORY_CRASH_PASS");
@@ -552,6 +558,16 @@ final class EngineSupervisedRecoveryE2ETest {
           capturedReplay.path("committed").asText(), output);
       assertFalse(capturedReplay.path("unitRevision").asText().isBlank(), output);
       assertEquals(1, capturedReplay.path("supersededEvents").asInt(), output);
+      if (bootRootChanges) {
+        var roots = result.path("bootRoots");
+        assertEquals("PROMOTED", roots.path("disposition").asText(), output);
+        assertEquals(2, roots.path("persistedRoots").asInt(), output);
+        assertTrue(roots.path("survivorCount").asInt() > 80, output);
+        for (String proof : List.of("added", "deleted", "changedBytes", "staleAbsent",
+            "labelsCurrent", "predecessorRetired")) {
+          assertBooleanTrue(roots.path(proof), output);
+        }
+      }
       System.out.println("LIFECYCLE_LOW_MEMORY_COMBINED_PASS §16 " + result);
     });
   }

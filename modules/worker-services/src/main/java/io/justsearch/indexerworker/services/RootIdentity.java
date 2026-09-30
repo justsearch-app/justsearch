@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.configuration.PlatformPaths;
 import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -14,7 +15,6 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Locale;
 
 /** Stable directory identity, independent of mutable timestamps and path spelling. */
 record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
@@ -28,7 +28,7 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
   static RootIdentity capture(Path root) throws IOException {
     Path normalized = normalize(root);
     validateDirectory(normalized);
-    if (isWindows()) {
+    if (PlatformPaths.isWindows()) {
       return WindowsRootIdentityLease.capture(normalized);
     }
     try (RootIdentityLease lease = PortableRootIdentityLease.open(normalized)) {
@@ -41,7 +41,7 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
   static RootIdentityLease hold(Path root) throws IOException {
     Path normalized = normalize(root);
     validateDirectory(normalized);
-    return isWindows()
+    return PlatformPaths.isWindows()
         ? WindowsRootIdentityLease.open(normalized)
         : PortableRootIdentityLease.open(normalized);
   }
@@ -93,10 +93,6 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
       throw new IOException("Reconciliation root has no stable file identity: " + root);
     }
     return new RootIdentity(realPath(root), new ProviderFileIdentity(fileKey));
-  }
-
-  private static boolean isWindows() {
-    return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows");
   }
 
   sealed interface StableFileIdentity permits ProviderFileIdentity, WindowsFileIdentity {}

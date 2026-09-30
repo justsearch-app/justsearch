@@ -601,7 +601,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
     Class<? extends Enum> kindType = (Class<? extends Enum>) Class.forName(
         "io.justsearch.indexerworker.services.WorkerMethvinWatcher$Kind");
     Method method = watcher.getClass().getDeclaredMethod(
-        "handleEvent", subscriptionType, kindType, Path.class);
+        "dispatchEvent", subscriptionType, kindType, Path.class);
     method.setAccessible(true);
     method.invoke(watcher, subscription, Enum.valueOf(kindType, kindName), path);
   }

@@ -67,8 +67,11 @@ final class KnowledgeServerRecordedIngestionTest {
         reopened.resolveGenerationPathStrict(state.building_generation()));
     setField(server, "jobQueue", queue);
     RunningRuntime green = org.mockito.Mockito.mock(RunningRuntime.class);
+    var commits = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.CommitOps.class);
     var fields = org.mockito.Mockito.mock(
         io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    org.mockito.Mockito.when(green.commitOps()).thenReturn(commits);
     org.mockito.Mockito.when(green.documentFieldOps()).thenReturn(fields);
     setField(server, "ingestLifecycle", green);
     try {
@@ -173,6 +176,9 @@ final class KnowledgeServerRecordedIngestionTest {
     setField(server, "indexGenerationManager", manager);
     setField(server, "jobQueue", queue);
     RunningRuntime green = org.mockito.Mockito.mock(RunningRuntime.class);
+    var commits = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.CommitOps.class);
+    org.mockito.Mockito.when(green.commitOps()).thenReturn(commits);
     org.mockito.Mockito.when(green.documentFieldOps()).thenReturn(org.mockito.Mockito.mock(
         io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class));
     setField(server, "ingestLifecycle", green);
@@ -412,8 +418,11 @@ final class KnowledgeServerRecordedIngestionTest {
     var queue = org.mockito.Mockito.mock(
         io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.class);
     var green = org.mockito.Mockito.mock(RunningRuntime.class);
+    var commits = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.CommitOps.class);
     var fields = org.mockito.Mockito.mock(
         io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    org.mockito.Mockito.when(green.commitOps()).thenReturn(commits);
     org.mockito.Mockito.when(green.documentFieldOps()).thenReturn(fields);
     Path path = tempDir.resolve("later.txt").toAbsolutePath();
     String hash = "a".repeat(64);
@@ -444,7 +453,7 @@ final class KnowledgeServerRecordedIngestionTest {
           "a replaced row with the same visible gap must require a new approval");
 
       org.mockito.Mockito.when(queue.matchesAcceptedFileProjection(
-          path.toString(), "accepted-revision", hash)).thenReturn(true);
+          path.toString(), "accepted-revision", hash, hash)).thenReturn(true);
       org.mockito.Mockito.when(fields.getDocumentField(path.toString(),
           io.justsearch.indexing.SchemaFields.SOURCE_SHA256)).thenReturn(hash);
       var settled = server.candidateJournalWitness();
@@ -630,6 +639,9 @@ final class KnowledgeServerRecordedIngestionTest {
     org.mockito.Mockito.when(queue.listSwitchBufferOpsStrictForGeneration("g-candidate"))
         .thenReturn(List.of());
     var green = org.mockito.Mockito.mock(RunningRuntime.class);
+    var commits = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.CommitOps.class);
+    org.mockito.Mockito.when(green.commitOps()).thenReturn(commits);
     var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
     Object owner = new Object();
     org.mockito.Mockito.when(producer.mutationOwnerToken()).thenReturn(owner);
@@ -682,8 +694,12 @@ final class KnowledgeServerRecordedIngestionTest {
     org.mockito.Mockito.when(lifecycle.recordedPrecommitRefused(operation)).thenReturn(true);
     var source = org.mockito.Mockito.mock(RunningRuntime.class);
     var green = org.mockito.Mockito.mock(RunningRuntime.class);
-    org.mockito.Mockito.when(source.documentFieldOps()).thenReturn(
-        org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class));
+    var sourceFields = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    var sourceCommits = org.mockito.Mockito.mock(
+        io.justsearch.adapters.lucene.runtime.CommitOps.class);
+    org.mockito.Mockito.when(source.documentFieldOps()).thenReturn(sourceFields);
+    org.mockito.Mockito.when(source.commitOps()).thenReturn(sourceCommits);
     var owner = new Object();
     var producer = org.mockito.Mockito.mock(DefaultWorkerAppServices.class);
     org.mockito.Mockito.when(producer.mutationAdmission()).thenReturn(
@@ -693,17 +709,18 @@ final class KnowledgeServerRecordedIngestionTest {
     var queue = org.mockito.Mockito.mock(
         io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.class);
     var file = Files.writeString(tempDir.resolve("accepted.txt"), "accepted").toAbsolutePath();
+    String hash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
     var payload = new io.justsearch.indexerworker.queue.SwitchBufferUpsert(
-        file.toString(), null, null, "accepted-revision",
-        io.justsearch.indexerworker.loop.SourceContentHash.sha256(file)).encode();
+        file.toString(), null, null, "accepted-revision", hash).encode();
     org.mockito.Mockito.when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(
         new io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp(
             building, "path:" + file, "UPSERT", payload, 1, "v1")));
     org.mockito.Mockito.when(queue.jobStateCountsStrict()).thenReturn(
         new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    org.mockito.Mockito.when(sourceFields.getDocumentField(file.toString(),
+        io.justsearch.indexing.SchemaFields.SOURCE_SHA256)).thenReturn(null);
     org.mockito.Mockito.when(queue.matchesAcceptedFileProjection(
-        org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
-        org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
+        file.toString(), "accepted-revision", hash, null)).thenReturn(false);
     server.appServices = producer;
     setField(server, "generationBootOwnership", new IndexGenerationManager.BootOwnership.Recorded(
         operation, active, "recorded-test", "a".repeat(64), true));
@@ -768,7 +785,7 @@ final class KnowledgeServerRecordedIngestionTest {
     org.mockito.Mockito.when(queue.jobStateCountsStrict()).thenReturn(
         new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
     org.mockito.Mockito.when(queue.matchesAcceptedFileProjection(
-        file.toString(), "accepted-revision", hash)).thenReturn(true);
+        file.toString(), "accepted-revision", hash, hash)).thenReturn(true);
     org.mockito.Mockito.when(fields.getDocumentField(file.toString(),
         io.justsearch.indexing.SchemaFields.SOURCE_SHA256)).thenReturn(hash);
     org.mockito.Mockito.when(queue.removeReplayedSwitchBufferOps(List.of(version))).thenReturn(1);
@@ -789,7 +806,8 @@ final class KnowledgeServerRecordedIngestionTest {
 
     var order = org.mockito.Mockito.inOrder(producer, queue, green, manager);
     order.verify(producer).commitActiveLexicalProjectionForCutover();
-    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash);
+    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash,
+        hash);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(version));
     order.verify(producer).close();
     order.verify(green).close();

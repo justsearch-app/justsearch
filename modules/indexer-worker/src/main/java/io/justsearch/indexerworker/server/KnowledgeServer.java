@@ -1646,6 +1646,8 @@ public final class KnowledgeServer implements Closeable {
 
       if (committedPredecessorAtBoot) {
         settleCommittedBootRoots(state.active_generation());
+        log.info("Committed boot roots settled before publication: disposition={}, active={}, roots={}",
+            generationBootDisposition, state.active_generation(), bootRootBindings.size());
       }
 
       publishServingView(appServices);
@@ -6698,6 +6700,7 @@ public final class KnowledgeServer implements Closeable {
       throw new IllegalStateException("Candidate source-set witness is unavailable", unavailable);
     }
     Set<String> markedSources = new LinkedHashSet<>();
+    ingestLifecycle.commitOps().maybeRefreshBlocking();
     for (var op : journal.listSwitchBufferOpsStrictForGeneration(state.building_generation())) {
       if ("UPSERT".equals(op.op())) {
         SwitchBufferUpsert upsert = SwitchBufferUpsert.decode(op.payload());
@@ -6705,8 +6708,8 @@ public final class KnowledgeServer implements Closeable {
         if (upsert.sourceSha256() == null) {
           addCandidateGap(gaps, rowGaps, op, unit, "PROJECTION_WITNESS_MISSING");
         } else if (!journal.matchesAcceptedFileProjection(
-            upsert.path(), upsert.unitRevision(), upsert.sourceSha256())
-            || !upsert.sourceSha256().equals(ingestLifecycle.documentFieldOps()
+            upsert.path(), upsert.unitRevision(), upsert.sourceSha256(),
+            ingestLifecycle.documentFieldOps()
                 .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256))) {
           addCandidateGap(gaps, rowGaps, op, unit, "CANDIDATE_PROJECTION_MISSING");
         } else {

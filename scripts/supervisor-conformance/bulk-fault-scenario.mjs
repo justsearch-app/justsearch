@@ -706,7 +706,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
   watcherDeleteDuringBuild = false, gapApproval = false, gapCancellation = false,
   gapRecomposeFailure = false, cancelBeforePointer = false,
-  issuedSearch = false, extraBuildFiles = 0, engineLogWindow = null, crashBoundary = null }) {
+  issuedSearch = false, extraBuildFiles = 0, engineLogWindow = null, crashBoundary = null,
+  bootRootChanges = false }) {
   const runtime = path.join(data, 'runtime');
   const { reachedFile, releaseFile } = barrierFiles(data);
   const migrationBarrier = barrierFiles(data, 'migration-barrier');
@@ -734,6 +735,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   if (crashBoundary) requireThat(acceptedWriteDuringBuild && distinctModelB && inPlaceModelB
       && ['installer-before-pointer', 'installer-pointer-before-settings'].includes(crashBoundary),
     `combined maintenance requires a supported forced in-place crash boundary: ${crashBoundary}`);
+  if (bootRootChanges) requireThat(crashBoundary === 'installer-pointer-before-settings',
+    'committed boot root changes require the recorded post-pointer crash cut');
   const file = path.join(work, 'installer-root-a', 'installer-0.txt');
   const marker = fs.readFileSync(file, 'utf8').split(/\s+/)[0];
   const removedFile = watcherDeleteDuringBuild
@@ -1154,7 +1157,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
         capturedSourceHashes,
         acceptedFile, acceptedMarker, first, manifest, data, runtime,
         indexBase, operationPath, jobsPath, operationKey, sourceGeneration, sourceManifest,
-        beforeSettings, bRoot, readJson, waitFor, request, post, requireThat, matchingHit });
+        beforeSettings, bRoot, readJson, waitFor, request, post, requireThat, matchingHit,
+        work, bootRootChanges, engineLogWindow });
       return;
     }
     const aState = readJson(path.join(indexBase, 'state.json'));
@@ -1530,7 +1534,7 @@ async function exerciseLowMemoryCrashRecovery({ crashBoundary, reached, combined
   capturedSourceHashes,
   first, manifest, data, runtime, indexBase, operationPath, jobsPath, operationKey,
   sourceGeneration, sourceManifest, beforeSettings, bRoot, readJson, waitFor, request, post,
-  requireThat, matchingHit }) {
+  requireThat, matchingHit, work, bootRootChanges, engineLogWindow }) {
   const targetGeneration = `g-${operationKey}`;
   const faultedSupervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
   const faultedManifest = readJson(path.join(runtime, 'manifest.json'));
@@ -1567,6 +1571,9 @@ async function exerciseLowMemoryCrashRecovery({ crashBoundary, reached, combined
 
   const cooldown = await killOwnedEngineAndObserveCooldown({ engine: faultedSupervisor, data,
     readJson, waitFor, requireThat });
+  const bootRootMutation = bootRootChanges
+    ? mutateCommittedBootRoots({ work, data, runtime, engine: faultedSupervisor,
+      operationKey, readJson, requireThat }) : null;
   await dispatched.settled;
   const successor = await waitFor('combined maintenance exact successor identity', 180000, () => {
     const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
@@ -1589,9 +1596,12 @@ async function exerciseLowMemoryCrashRecovery({ crashBoundary, reached, combined
       && observed.settings.witness.lastCommittedOperationKey === operationKey
       ? observed : null;
   });
-  const capturedTerminalEvidence = requireCapturedH2Settlement({ observed: terminal,
-    file: changedCapturedFile, hashes: capturedSourceHashes, requireThat,
-    label: 'after recovery', expectedUnitRevision: capturedSourceHashes.unitRevisionAtCut });
+  const capturedTerminalEvidence = bootRootMutation
+    ? requireRetainedCapturedH2Settlement({ observed: terminal, jobsPath, operationKey,
+      hashes: capturedSourceHashes, requireThat })
+    : requireCapturedH2Settlement({ observed: terminal,
+      file: changedCapturedFile, hashes: capturedSourceHashes, requireThat,
+      label: 'after recovery', expectedUnitRevision: capturedSourceHashes.unitRevisionAtCut });
   const sealedReceipt = parseStoredJson(terminal.walk?.receipt_json,
     'combined maintenance captured receipt');
   requireThat(terminal.walk?.sealed_at != null && sealedReceipt.supersededEvents === 1
@@ -1619,6 +1629,9 @@ async function exerciseLowMemoryCrashRecovery({ crashBoundary, reached, combined
         && status.components?.encoders?.state === 'READY' ? { live, status } : null;
     } catch { return null; }
   });
+  const bootRoots = bootRootMutation ? await assertCommittedBootRoots({ mutation: bootRootMutation,
+    data, indexBase, sourceGeneration, targetGeneration, engineLogWindow,
+    apiPort: converged.live.head.apiPort, post, readJson, requireThat, matchingHit, waitFor }) : null;
   const latestText = await waitFor('combined maintenance latest text', 60000, async () => {
     try {
       const response = await post(converged.live.head.apiPort, '/api/knowledge/search',
@@ -1685,7 +1698,108 @@ async function exerciseLowMemoryCrashRecovery({ crashBoundary, reached, combined
       incarnation: faultedSupervisor.incarnation },
     successor: { pid: successor.supervisor.pid, instanceId: successor.supervisor.instanceId,
       incarnation: successor.supervisor.incarnation }, countedExit: cooldown.lastExit,
-    bFingerprint }));
+    bFingerprint, bootRoots }));
+}
+
+function mutateCommittedBootRoots({ work, data, runtime, engine, operationKey,
+  readJson, requireThat }) {
+  const registryFile = path.join(data, 'watched_roots.json');
+  const registry = readJson(registryFile);
+  const roots = ['installer-root-a', 'installer-root-b'].map(name => path.join(work, name));
+  requireThat(registry?.schemaVersion === 1 && registry.roots?.length === roots.length
+      && registry.roots.every((root, i) => samePath(root.path, roots[i])),
+    'committed boot must retain both actual watched roots');
+  const deleted = path.join(roots[1], 'installer-1.txt');
+  const changed = path.join(roots[0], 'build-load-0.txt');
+  const added = path.join(roots[1], `boot-add-${operationKey}.txt`);
+  const deletedMarker = fs.readFileSync(deleted, 'utf8').split(/\s+/)[0];
+  const staleMarker = fs.readFileSync(changed, 'utf8').split(/\s+/)[0];
+  const addedMarker = 'committedbootadditionquokka';
+  const changedMarker = 'committedbootchangedquokka';
+  const collection = 'committed-boot-roots';
+  requireThat(!fs.existsSync(added), 'boot addition must be new after the Engine died');
+  fs.writeFileSync(added, `${addedMarker} capybara\n`);
+  fs.writeFileSync(changed, `${changedMarker} capybara\n`);
+  fs.unlinkSync(deleted);
+  for (const root of registry.roots) root.collection = collection;
+  const staging = `${registryFile}.boot-fixture-tmp`;
+  fs.writeFileSync(staging, JSON.stringify(registry));
+  fs.renameSync(staging, registryFile);
+  const held = readJson(path.join(runtime, 'supervisor.v1.json'));
+  const heldManifest = readJson(path.join(runtime, 'manifest.json'));
+  requireThat(held?.state === 'restarting' && held.runId === engine.runId
+      && held.incarnation === engine.incarnation && held.restartCount === 1
+      && held.pid === engine.pid && held.instanceId === engine.instanceId
+      && held.lastExit?.counted === true
+      && heldManifest?.pid === engine.pid && heldManifest.instanceId === engine.instanceId,
+    `successor raced the dead-Engine root mutations: ${JSON.stringify({ held, heldManifest })}`);
+  const survivors = roots.flatMap(root => fs.readdirSync(root)
+    .filter(name => name.endsWith('.txt')).map(name => path.join(root, name)));
+  return { roots, collection, added, addedMarker, deleted, deletedMarker,
+    changed, changedMarker, staleMarker, survivors };
+}
+
+async function assertCommittedBootRoots({ mutation, data, indexBase, sourceGeneration,
+  targetGeneration, engineLogWindow, apiPort, post, readJson, requireThat, matchingHit, waitFor }) {
+  const contents = readEngineLogWindow(engineLogWindow, requireThat);
+  const marker = 'Committed boot roots settled before publication: '
+    + `disposition=PROMOTED, active=${targetGeneration}, roots=${mutation.roots.length}`;
+  requireThat(contents.split('\n').filter(line => line.includes(marker)).length === 1,
+    'installed successor did not observe recorded PROMOTED root convergence before publication');
+  // These are single observations. A later watcher repair must not turn a failed
+  // first available B view into a successful boot proof.
+  for (const root of mutation.roots) {
+    const response = await post(apiPort, '/api/knowledge/folder-files',
+      { folderPath: root, limit: 1000, projection: ['path', 'collection', 'content_preview'] }, 30000);
+    requireThat(response.status === 200, `committed root browse failed: ${response.text}`);
+    const listing = JSON.parse(response.text);
+    const expected = mutation.survivors.filter(file => samePath(path.dirname(file), root));
+    requireThat(listing.totalCount === expected.length && listing.files?.length === expected.length
+        && expected.every(file => listing.files.some(hit => samePath(hit?.fields?.path, file))),
+      `committed boot did not enumerate the exact surviving root files: ${response.text}`);
+    requireThat(listing.files.every(hit => hit?.fields?.collection === mutation.collection),
+      `committed boot lost the persisted root label: ${response.text}`);
+    for (const file of expected) {
+      const hits = listing.files.filter(hit => samePath(hit?.fields?.path, file));
+      const contentMarker = fs.readFileSync(file, 'utf8').split(/\s+/)[0];
+      requireThat(hits.length === 1 && String(hits[0]?.fields?.content_preview ?? '')
+        .includes(contentMarker),
+      `committed boot has stale or missing survivor content: ${file}: ${response.text}`);
+    }
+  }
+  for (const [file, marker] of [[mutation.added, mutation.addedMarker],
+    [mutation.changed, mutation.changedMarker]]) {
+    const response = await post(apiPort, '/api/knowledge/search',
+      { query: marker, limit: 10, mode: 'text',
+        projection: ['path', 'collection', 'content_preview'] }, 30000);
+    requireThat(response.status === 200 && matchingHit(response, file, marker),
+      `committed boot omitted a surviving root file: ${file}: ${response.text}`);
+    const hit = JSON.parse(response.text).results.find(result => samePath(result?.fields?.path, file));
+    requireThat(hit?.fields?.collection === mutation.collection,
+      `committed boot lost the persisted root label: ${JSON.stringify(hit)}`);
+  }
+  for (const [file, marker] of [[mutation.deleted, mutation.deletedMarker],
+    [mutation.changed, mutation.staleMarker]]) {
+    const response = await post(apiPort, '/api/knowledge/search',
+      { query: marker, limit: 10, mode: 'text' }, 30000);
+    requireThat(response.status === 200 && !matchingHit(response, file, marker),
+      `committed boot resurrected deleted or stale root content: ${response.text}`);
+  }
+  const registry = readJson(path.join(data, 'watched_roots.json'));
+  requireThat(registry?.roots?.length === mutation.roots.length
+      && registry.roots.every((root, i) => samePath(root.path, mutation.roots[i])
+        && root.collection === mutation.collection),
+    'successor changed the persisted root authority');
+  // Recorded completion can persist after boot's first retirement attempt. The existing
+  // owner retries every two minutes; content above must already match at first publication.
+  await waitFor('committed boot predecessor retirement', 180000, async () => {
+    const state = readJson(path.join(indexBase, 'state.json'));
+    return state?.active_generation === targetGeneration && state.previous_generation == null
+      && !fs.existsSync(path.join(indexBase, 'indices', sourceGeneration));
+  });
+  return { disposition: 'PROMOTED', persistedRoots: mutation.roots.length,
+    survivorCount: mutation.survivors.length, added: true, deleted: true,
+    changedBytes: true, staleAbsent: true, labelsCurrent: true, predecessorRetired: true };
 }
 
 function requireCapturedH2Settlement({ observed, file, hashes, requireThat, label,
@@ -1706,6 +1820,30 @@ function requireCapturedH2Settlement({ observed, file, hashes, requireThat, labe
       member, terminal, expectedUnitRevision, hashes,
     })}`);
   return { unitRevision: member.unit_revision };
+}
+
+function requireRetainedCapturedH2Settlement({ observed, jobsPath, operationKey, hashes, requireThat }) {
+  // Root maintenance can replace a sealed walk's mutable jobs row. Its original
+  // accepted unit remains certified by the exact sealed-unit/ledger association.
+  const selected = readRows(jobsPath, `SELECT s.unit_revision AS selected_unit,
+    s.path_hash AS selected_path, s.sealed_revision, l.operation_key, l.path_hash,
+    l.unit_revision, l.terminal_coverage, l.planned_source_sha256, l.content_hash
+    FROM ingestion_walk_sealed_units s LEFT JOIN ingestion_ledger l ON l.id = s.ledger_id
+    WHERE s.operation_key = ? ORDER BY s.path_hash`, operationKey);
+  const captured = selected.filter(unit => unit.unit_revision === hashes.unitRevisionAtCut
+    && unit.terminal_coverage === 'INDEXED'
+    && unit.planned_source_sha256 === hashes.planned && unit.content_hash === hashes.committed);
+  requireThat(observed.walk?.captured_plan === 1
+      && observed.walk.enumeration_outcome === 'COMPLETE' && observed.walk.sealed_at != null
+      && selected.length === observed.walk.planned_units
+      && selected.every(unit => unit.operation_key === operationKey
+        && unit.selected_unit === unit.unit_revision && unit.selected_path === unit.path_hash
+        && unit.sealed_revision === observed.walk.revision)
+      && captured.length === 1,
+    `committed boot lost the original sealed H1→H2 unit: ${JSON.stringify({
+      walk: observed.walk, selected, hashes,
+    })}`);
+  return { unitRevision: captured[0].unit_revision };
 }
 
 function assertCombinedBModelSettings({ bManifest, sourceManifest, sourceSettings, settings, bRoot,

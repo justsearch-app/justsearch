@@ -11,7 +11,6 @@ import io.methvin.watcher.DirectoryChangeListener;
 import io.methvin.watcher.DirectoryWatcher;
 import io.methvin.watcher.hashing.FileHasher;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,8 +34,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Replaces the Head-side {@code MethvinWatcherStrategy} (modules/app-indexing) with a watcher
  * that lives in the same process as {@link JobQueue} — events feed straight into the queue with
- * no IPC hop and no per-event gRPC submitBatch. The watcher is registered per root via
- * {@link #registerRoot(Path, String, Object)}; deregistration via {@link #unregisterRoot(Path)} closes
+ * no IPC hop and no per-event gRPC submitBatch. The watcher is registered per root via an immutable
+ * {@link RootWatcherRegistry.Subscription}; deregistration via {@link #unregisterRoot(Path)} closes
  * the underlying Methvin {@code DirectoryWatcher} for that root.
  *
  * <p>Event handling:
@@ -72,10 +71,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   static final int BURST_RECONCILE_DELAY_SECONDS = 5;
   static final int STARTUP_EVENT_BUFFER_LIMIT = 4_096;
 
-  private final BiConsumer<String, Path> upsertPathSink;
   private final Consumer<RuntimeException> routingFailureSink;
   private final EventRouter eventRouter;
-  private final Consumer<String> deletePathSink;
   private final BiConsumer<RootWatcherRegistry.Subscription, String> witnessedDeletePathSink;
   private final WitnessedUpsertSink witnessedUpsertPathSink;
   private final WorkerWatcherMetricCatalog watcherCatalog;
@@ -182,10 +179,10 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       BiConsumer<RootWatcherRegistry.Subscription, String> witnessedDeletePathSink,
       WitnessedUpsertSink witnessedUpsertPathSink) {
     Objects.requireNonNull(jobQueue, "jobQueue");
-    this.upsertPathSink = Objects.requireNonNull(upsertPathSink, "upsertPathSink");
+    Objects.requireNonNull(upsertPathSink, "upsertPathSink");
+    Objects.requireNonNull(deletePathSink, "deletePathSink");
     this.routingFailureSink = Objects.requireNonNull(routingFailureSink, "routingFailureSink");
     this.eventRouter = Objects.requireNonNull(eventRouter, "eventRouter");
-    this.deletePathSink = Objects.requireNonNull(deletePathSink, "deletePathSink");
     this.witnessedDeletePathSink =
         Objects.requireNonNull(witnessedDeletePathSink, "witnessedDeletePathSink");
     this.witnessedUpsertPathSink =
@@ -215,30 +212,10 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   }
 
   /**
-   * Registers a watch subscription for {@code root}. Idempotent: if the root is already being
-   * watched, the prior subscription is closed and replaced (so the collection tag can be
-   * updated). Returns true if the watcher started successfully, false on inotify exhaustion or
-   * other soft failure.
+   * Registers a root using the registry-owned immutable witness. Idempotent: if the root is
+   * already being watched, the prior subscription is closed and replaced. Callers must publish
+   * the registry subscription and then invoke {@link #activateRoot} after registration succeeds.
    */
-  /** Registers a root under the caller's opaque registration incarnation. */
-  synchronized boolean registerRoot(Path root, String collection, Object watcherEpoch) {
-    try {
-      RootWatcherRegistry.Subscription registration =
-          new RootWatcherRegistry.Subscription(
-              root.toAbsolutePath().normalize(),
-              collection == null || collection.isBlank() ? null : collection,
-              watcherEpoch,
-              RootIdentity.capture(root));
-      boolean registered = registerRoot(registration);
-      return registered && activateRoot(registration);
-    } catch (IOException failure) {
-      routingFailureSink.accept(
-          new IllegalStateException("Failed to capture worker watcher root identity", failure));
-      return false;
-    }
-  }
-
-  /** Registers a root using the registry-owned immutable witness. */
   synchronized boolean registerRoot(RootWatcherRegistry.Subscription registration) {
     Objects.requireNonNull(registration, "registration");
     Path normalized = registration.root();
@@ -460,7 +437,11 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   private void handleEvent(RootWatcherRegistry.Subscription witness, DirectoryChangeEvent event) {
     Kind kind = mapEventKind(event.eventType());
     if (kind == null) return;
-    Path path = event.path();
+    dispatchEvent(witness, kind, event.path());
+  }
+
+  /** Routes one witnessed event through the production event path. */
+  void dispatchEvent(RootWatcherRegistry.Subscription witness, Kind kind, Path path) {
     eventRouter.route(
         witness,
         () -> {
@@ -475,39 +456,6 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
             case OVERFLOW -> handleOverflow(witness.root(), path);
           }
         });
-  }
-
-  /** Deterministic callback entry used by ownership tests without an OS watcher race. */
-  void handleEvent(RootWatcherRegistry.Subscription witness, Kind kind, Path path) {
-    eventRouter.route(
-        witness,
-        () -> {
-          switch (kind) {
-            case CREATE, MODIFY -> handleUpsert(witness, path);
-            case DELETE -> {
-              handleDelete(witness, path);
-              maybeScheduleBurstReconcile(witness.root());
-            }
-            case OVERFLOW -> handleOverflow(witness.root(), path);
-          }
-        });
-  }
-
-  /**
-   * CREATE/MODIFY: enqueue the path with the byte size observed at event time (813 Slice B).
-   *
-   * <p>Package-private so the size-at-event-time behaviour is deterministically unit-testable
-   * without racing a live {@code DirectoryWatcher} (same reason as {@link #handleDelete} and
-   * {@link #handleOverflow}).
-   */
-  void handleUpsert(Path root, String collection, Path path) {
-    try {
-      upsertPathSink.accept(collection, path);
-    } catch (RuntimeException e) {
-      routingFailureSink.accept(e);
-      log.warn("Worker watcher enqueue failed for {}: {}", path, e.getMessage());
-    }
-    maybeScheduleBurstReconcile(root);
   }
 
   private void handleUpsert(RootWatcherRegistry.Subscription witness, Path path) {
@@ -652,37 +600,6 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       if (pendingReconciliations.remove(pending.getKey(), pending.getValue())) {
         submitReconcile(pending.getKey(), pending.getValue(), 0);
       }
-    }
-  }
-
-  /**
-   * Routes a DELETE event to the delete sink, guarded by the tempdoc-599 unmount-cascade check
-   * (tempdoc 626 §I.3-A). When a watched root goes unavailable (unmount / UNC disconnect / drive
-   * unplug) the OS fires a cascade of child-DELETE events; forwarding them would silently wipe the
-   * folder's index. The Head-side {@code WatcherEventOps.handleDelete} already guards against this;
-   * before tempdoc 626 the Worker-side path did NOT, reopening the 599 data-loss class through the
-   * parallel watcher. A later sync/rewalk reconciles real deletions once the root is back.
-   *
-   * <p>Package-private so the guard is deterministically unit-testable without a live
-   * {@code DirectoryWatcher} (real unmount events are OS-timing-dependent and flaky to reproduce).
-   */
-  void handleDelete(Path root, Path path) {
-    if (root != null && !Files.exists(root)) {
-      routingFailureSink.accept(
-          new IllegalStateException("Watched root became unavailable during delete routing"));
-      log.warn(
-          "Worker watcher: watched root {} is unavailable (likely unmounted); skipping delete of {}"
-              + " to avoid wiping the folder's index",
-          root,
-          path);
-      return;
-    }
-    try {
-      String normalizedPath = PathNormalizer.normalizePath(path.toAbsolutePath().toString());
-      deletePathSink.accept(normalizedPath);
-    } catch (RuntimeException e) {
-      routingFailureSink.accept(e);
-      log.debug("Worker watcher delete sink failed for {}: {}", path, e.getMessage());
     }
   }
 

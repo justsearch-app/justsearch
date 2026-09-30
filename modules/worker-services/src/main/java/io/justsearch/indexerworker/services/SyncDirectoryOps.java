@@ -225,15 +225,6 @@ final class SyncDirectoryOps {
     }
   }
 
-  /** Immutable capture for watcher registration; it does not retain an operating-system handle. */
-  static RootIdentity captureRootIdentity(Path root) throws IOException {
-    return RootIdentity.capture(root);
-  }
-
-  static void requireSameRootIdentity(Path root, RootIdentity expected) throws IOException {
-    expected.requireCurrent(root);
-  }
-
   private static List<String> confirmedAbsentPaths(Set<String> indexedPaths) throws IOException {
     List<String> absent = new ArrayList<>();
     for (String indexedPath : indexedPaths) {

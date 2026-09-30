@@ -590,6 +590,7 @@ try {
       gapCancellation: modelLiveABCancel || modelLiveABRecomposeFailure,
       gapRecomposeFailure: modelLiveABRecomposeFailure,
       cancelBeforePointer: modelLiveABAcceptedCancel, engineLogWindow,
+      bootRootChanges: env.JUSTSEARCH_WRITER_RECOVERY_BOOT_ROOT_CHANGES === '1',
        issuedSearch: modelLiveABIssuedSearch });
   } else if (generativeRecovery) {
     await exerciseGenerativeRecovery({ scenario, work, data, first, manifest, apiPort,

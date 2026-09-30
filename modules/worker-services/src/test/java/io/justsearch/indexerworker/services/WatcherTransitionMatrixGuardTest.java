@@ -56,18 +56,23 @@ final class WatcherTransitionMatrixGuardTest {
     // A root that vanishes (unmount/unplug): the OS would fire a child-DELETE cascade.
     Path goneRoot = Files.createDirectory(tempDir.resolve("removable"));
     Path goneChild = goneRoot.resolve("photo.jpg");
-    Files.delete(goneRoot);
-
     try (WorkerMethvinWatcher watcher =
         new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), mock(JobQueue.class), null, delete, reconcile)) {
+      RootWatcherRegistry.Subscription presentRegistration =
+          new RootWatcherRegistry.Subscription(
+              presentRoot, null, new Object(), RootIdentity.capture(presentRoot));
+      RootWatcherRegistry.Subscription goneRegistration =
+          new RootWatcherRegistry.Subscription(
+              goneRoot, null, new Object(), RootIdentity.capture(goneRoot));
+      Files.delete(goneRoot);
 
       // Cell: DELETE while watched root is PRESENT → forwarded to the delete sink.
-      watcher.handleDelete(presentRoot, child);
+      watcher.dispatchEvent(presentRegistration, WorkerMethvinWatcher.Kind.DELETE, child);
       assertEquals(1, delete.deleted.size(), "delete under a present root must forward");
       assertTrue(delete.deleted.get(0).endsWith("doc.txt"));
 
       // Cell: DELETE cascade while watched root is GONE (unmount) → SKIPPED (599 data-loss guard).
-      watcher.handleDelete(goneRoot, goneChild);
+      watcher.dispatchEvent(goneRegistration, WorkerMethvinWatcher.Kind.DELETE, goneChild);
       assertEquals(
           1, delete.deleted.size(), "delete under a gone root must be skipped (no new sink call)");
 

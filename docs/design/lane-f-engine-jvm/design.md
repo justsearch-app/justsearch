@@ -3,7 +3,7 @@ title: "Lane F: one Engine JVM, with process boundaries that follow runtime and 
 type: design
 status: "LOCKED with dated amendments; A/B/C1/C2 accepted; D1 in progress, D2/E/F open. Remaining solvable design resolved 2026-09-23; implementation and production proof remain. Draft PR727, merge at F."
 created: 2026-09-06
-updated: 2026-09-27
+updated: 2026-09-30
 lane: F (decision re-examination programme, wave 4)
 model: Sol continuation; Astra design resolution 2026-09-23
 category: engine / process-boundary
@@ -28,6 +28,15 @@ This document is the lane's contract: the design and the considerations that sha
 is in 17; the per-stage implementation checklist is written at each stage's start.
 
 ## 0. Provenance
+
+- 2026-09-30: Committed-root boot must extract content differences even when
+  size, timestamp and collection are unchanged; its admission carries the
+  existing planned-source witness. Replay distinguishes a captured plan's
+  original H1 identity from its permitted stable H2 effect, certified through
+  the exact queue-owned INDEXED ledger and sealed selection when present.
+  Ordinary and streaming admissions retain strict source equality. No new
+  journal payload, force flag or persistent authority is introduced.
+  [D1-16 design and proof limits](stages/D1.md#d1-16--the-harness-for-es-lifecycle-rows).
 
 - 2026-09-28: Batch 5's independently leased reranker/citation owner needs its exact query-file and supporting-asset selection in the existing atomic settings envelope. An absent v5 selection retains legacy manifest behavior; a present selection distinguishes each explicit disabled role from a verified model. Prepare the physical owner before final settings serialization, carry the committed selection through boot, and replace it from the accepted plan on recorded promotion. The install contract and generation manifest remain their existing authorities rather than becoming parallel query-only writers. [D1 durable-witness protocol](stages/D1.md#d1-18--live-migration-start-added-2026-09-27-owner-decision).
 

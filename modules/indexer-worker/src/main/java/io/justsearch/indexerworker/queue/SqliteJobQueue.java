@@ -1197,20 +1197,33 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public boolean matchesAcceptedFileProjection(
       String path, String unitRevision, String sourceSha256) {
-    if (path == null || unitRevision == null || sourceSha256 == null) return false;
+    return matchesAcceptedFileProjection(path, unitRevision, sourceSha256, sourceSha256);
+  }
+
+  @Override
+  public boolean matchesAcceptedFileProjection(
+      String path, String unitRevision, String sourceSha256, String indexedSourceSha256) {
+    if (path == null || unitRevision == null
+        || !JobQueue.IngestionLedgerTransition.isSha256(sourceSha256)
+        || !JobQueue.IngestionLedgerTransition.isSha256(indexedSourceSha256)) return false;
     lock.lock();
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
-          "SELECT state, unit_revision, planned_source_sha256, content_hash "
+          "SELECT state, unit_revision, planned_source_sha256, content_hash, scan_id, walk_seen_epoch "
               + "FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (ResultSet row = query.executeQuery()) {
-          return row.next() && STATE_DONE.equals(row.getString("state"))
-              && unitRevision.equals(row.getString("unit_revision"))
-              && sourceSha256.equals(row.getString("planned_source_sha256"))
-              && (row.getString("content_hash") == null
-                  || sourceSha256.equals(row.getString("content_hash")));
+          if (!row.next() || !STATE_DONE.equals(row.getString("state"))
+              || !unitRevision.equals(row.getString("unit_revision"))
+              || !sourceSha256.equals(row.getString("planned_source_sha256"))) return false;
+          String committed = row.getString("content_hash");
+          if (sourceSha256.equals(indexedSourceSha256)) {
+            return committed == null || sourceSha256.equals(committed);
+          }
+          return indexedSourceSha256.equals(committed)
+              && matchesCapturedFileProjection(row, path, unitRevision,
+                  sourceSha256, indexedSourceSha256);
         }
       }
     } catch (SQLException unavailable) {
@@ -1218,6 +1231,43 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw new IllegalStateException("Accepted file projection evidence is unreadable", unavailable);
     } finally {
       lock.unlock();
+    }
+  }
+
+  /** The existing captured ledger owns H1-to-H2 settlement; streaming claims cannot use it. */
+  private boolean matchesCapturedFileProjection(ResultSet job, String path, String unitRevision,
+      String plannedSourceSha256, String indexedSourceSha256) throws SQLException {
+    long epoch = job.getLong("walk_seen_epoch");
+    if (job.wasNull() || job.getString("scan_id") == null) return false;
+    var progress = SqliteIngestionWalkOps.find(connection, job.getString("scan_id")).orElse(null);
+    if (progress == null || !progress.capturedPlan()
+        || progress.enumerationEpoch() != epoch
+        || progress.enumerationOutcome() != JobQueue.WalkEnumerationOutcome.COMPLETE
+        || progress.manifestSha256() == null) return false;
+    String sql = """
+        SELECT COUNT(*) FROM ingestion_ledger l
+        WHERE l.operation_key = ? AND l.path_hash = ? AND l.unit_revision = ?
+          AND l.planned_source_sha256 = ? AND l.content_hash = ?
+          AND l.terminal_coverage = 'INDEXED'
+          AND l.outcome_class IN ('SUCCESS_FULL', 'SUCCESS_PARTIAL', 'SUCCESS_EMPTY')
+          AND l.retry_policy = 'NONE'
+          AND (? = 0 OR EXISTS (
+            SELECT 1 FROM ingestion_walk_sealed_units s
+            WHERE s.operation_key = l.operation_key AND s.path_hash = l.path_hash
+              AND s.unit_revision = l.unit_revision AND s.ledger_id = l.id
+              AND s.sealed_revision = ?))
+        """;
+    try (var query = connection.prepareStatement(sql)) {
+      query.setString(1, progress.operationKey());
+      query.setString(2, sha256(path));
+      query.setString(3, unitRevision);
+      query.setString(4, plannedSourceSha256);
+      query.setString(5, indexedSourceSha256);
+      query.setInt(6, progress.sealedAt() == null ? 0 : 1);
+      query.setLong(7, progress.revision());
+      try (var row = query.executeQuery()) {
+        return row.next() && row.getLong(1) == 1;
+      }
     }
   }
 

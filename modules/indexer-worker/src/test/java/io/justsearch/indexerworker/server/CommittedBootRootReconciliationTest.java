@@ -98,6 +98,9 @@ final class CommittedBootRootReconciliationTest {
     Files.writeString(relabeled, "unchanged bytes with an obsolete B collection");
     Path changed = root.resolve("changed.txt");
     Files.writeString(changed, "B had these old bytes");
+    Path preservedTime = root.resolve("preserved-time.txt");
+    Files.writeString(preservedTime, "old bytes");
+    var originalTime = Files.getLastModifiedTime(preservedTime);
     Path delayedCollection = root.resolve("delayed-collection.txt");
     Files.writeString(delayedCollection, "B already has the right bytes and label");
     Path stale = root.resolve("stale.txt");
@@ -109,9 +112,12 @@ final class CommittedBootRootReconciliationTest {
     WorkerBootFixture.seedDocument(green, null, staleDocId, "stale#0", "stale B document");
     seedFileWithCollection(green, relabeled, "obsolete");
     seedFileWithCollection(green, changed, "obsolete");
+    seedFileWithCollection(green, preservedTime, null);
     seedFileWithCollection(green, delayedCollection, null);
     IndexGenerationManager.State committed = layout.genManager().promoteBuildingGenerationToActive();
     Files.writeString(changed, "disk changed at the same path after B was built");
+    Files.writeString(preservedTime, "new bytes");
+    Files.setLastModifiedTime(preservedTime, originalTime);
 
     Path unrelatedPending = tempDir.resolve("unrelated-pending.txt");
     Files.writeString(unrelatedPending, "unrelated durable backlog");
@@ -154,6 +160,9 @@ final class CommittedBootRootReconciliationTest {
         "the persisted default root label must clear B's obsolete collection");
     assertEquals(SourceContentHash.sha256(changed), fields.getDocumentField(
         PathNormalizer.normalizeKey(changed), SchemaFields.SOURCE_SHA256));
+    assertEquals(SourceContentHash.sha256(preservedTime), fields.getDocumentField(
+        PathNormalizer.normalizeKey(preservedTime), SchemaFields.SOURCE_SHA256),
+        "changed bytes must converge even with unchanged collection, size and mtime");
     assertNull(fields.getDocumentField(
         PathNormalizer.normalizeKey(delayedCollection), SchemaFields.COLLECTION));
 
@@ -185,6 +194,8 @@ final class CommittedBootRootReconciliationTest {
           SchemaFields.PATH, id,
           SchemaFields.DOC_UID, "relabeled#0",
           SchemaFields.CONTENT, Files.readString(file),
+          SchemaFields.MODIFIED_AT, Files.getLastModifiedTime(file).toMillis(),
+          SchemaFields.SIZE_BYTES, Files.size(file),
           SchemaFields.SOURCE_SHA256, SourceContentHash.sha256(file)));
       if (collection != null) indexed.put(SchemaFields.COLLECTION, collection);
       runtime.indexingCoordinator().indexSingle(new IndexDocument(indexed));

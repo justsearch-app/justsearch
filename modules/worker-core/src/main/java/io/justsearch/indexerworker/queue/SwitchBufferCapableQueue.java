@@ -131,6 +131,13 @@ public interface SwitchBufferCapableQueue extends JobQueue {
         "Exact accepted file projection evidence is unavailable");
   }
 
+  /** A captured finite plan may retain H1 while its exact terminal ledger proves indexed H2. */
+  default boolean matchesAcceptedFileProjection(
+      String path, String unitRevision, String sourceSha256, String indexedSourceSha256) {
+    return sourceSha256 != null && sourceSha256.equals(indexedSourceSha256)
+        && matchesAcceptedFileProjection(path, unitRevision, sourceSha256);
+  }
+
   /** Atomically buffers sync; maintenance preserves an earlier admission's attribution. */
   boolean putSyncRoot(String key, SwitchBufferSyncRoot payload);
 

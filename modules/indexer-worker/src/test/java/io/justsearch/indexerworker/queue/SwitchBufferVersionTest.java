@@ -443,9 +443,178 @@ final class SwitchBufferVersionTest {
     }
   }
 
+  @Test
+  void completedCapturedPlanMatchesItsH1ClaimToTheIndexedH2Ledger() throws Exception {
+    Path db = tempDir.resolve("captured-h1-h2.db");
+    Path file = Files.writeString(tempDir.resolve("captured-h1-h2.txt"), "first").toAbsolutePath();
+    String h1 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    String operationKey = "captured-h1-h2";
+    try (var queue = new SqliteJobQueue(
+        db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginCapturedWalk(operationKey, "a".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", operationKey, walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), "docs"));
+      queue.closeRecordedWalkEnumeration(
+          operationKey, walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var claim = queue.pollPending(1).getFirst();
+      assertEquals(h1, claim.plannedSourceSha256());
+      var buffered = SwitchBufferUpsert.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload());
+      assertEquals(claim.unitRevision(), buffered.unitRevision());
+      assertEquals(h1, buffered.sourceSha256());
+
+      Files.writeString(file, "second");
+      String h2 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+      queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, h2)),
+          successFull());
+
+      assertTrue(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), claim.unitRevision(), h1, h2));
+      assertFalse(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), claim.unitRevision(), h1),
+          "the legacy projection predicate must not certify H1 when the committed content is H2");
+      assertFalse(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), "wrong-unit", h1, h2));
+      assertFalse(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), claim.unitRevision(), "b".repeat(64), h2));
+      assertFalse(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), claim.unitRevision(), h1, "c".repeat(64)));
+
+      var sealed = queue.trySealRecordedWalk(operationKey);
+      assertNotNull(sealed.sealedAt());
+      assertTrue(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), claim.unitRevision(), h1, h2));
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "UPDATE ingestion_walk_sealed_units SET unit_revision = ? WHERE operation_key = ?")) {
+        statement.setString(1, "wrong-sealed-unit-revision");
+        statement.setString(2, operationKey);
+        assertEquals(1, statement.executeUpdate());
+      }
+      boolean refusedAfterSealedJoinMutation;
+      try {
+        refusedAfterSealedJoinMutation = !queue.matchesAcceptedFileProjection(
+            PathNormalizer.normalizeKey(file), claim.unitRevision(), h1, h2);
+      } catch (JobQueue.RecordedWalkGapException expected) {
+        refusedAfterSealedJoinMutation = true;
+      }
+      assertTrue(refusedAfterSealedJoinMutation,
+          "a changed sealed-unit join must not certify the intact indexed ledger");
+
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "SELECT planned_source_sha256, content_hash, terminal_coverage "
+                  + "FROM ingestion_ledger WHERE operation_key = ?")) {
+        statement.setString(1, operationKey);
+        try (var row = statement.executeQuery()) {
+          assertTrue(row.next());
+          assertEquals(h1, row.getString("planned_source_sha256"));
+          assertEquals(h2, row.getString("content_hash"));
+          assertEquals("INDEXED", row.getString("terminal_coverage"));
+          assertFalse(row.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  void capturedH1H2MatchRequiresTheExactIndexedLedgerReceipt() throws Exception {
+    Path db = tempDir.resolve("captured-h1-h2-missing-ledger.db");
+    Path file = Files.writeString(
+        tempDir.resolve("captured-h1-h2-missing-ledger.txt"), "first").toAbsolutePath();
+    String h1 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    String operationKey = "captured-h1-h2-missing-ledger";
+    try (var queue = new SqliteJobQueue(
+        db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginCapturedWalk(operationKey, "b".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", operationKey, walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), null));
+      queue.closeRecordedWalkEnumeration(
+          operationKey, walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var claim = queue.pollPending(1).getFirst();
+      Files.writeString(file, "second");
+      String h2 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+      queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, h2)),
+          successFull());
+      assertTrue(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), claim.unitRevision(), h1, h2));
+
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "DELETE FROM ingestion_ledger WHERE operation_key = ? "
+                  + "AND unit_revision = ? AND terminal_coverage = 'INDEXED'")) {
+        statement.setString(1, operationKey);
+        statement.setString(2, claim.unitRevision());
+        assertEquals(1, statement.executeUpdate());
+      }
+      assertFalse(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), claim.unitRevision(), h1, h2));
+    }
+  }
+
+  @Test
+  void streamingH1H2TransitionCannotUseCapturedProjectionEvidence() throws Exception {
+    Path db = tempDir.resolve("streaming-h1-h2.db");
+    Path file = Files.writeString(tempDir.resolve("streaming-h1-h2.txt"), "first").toAbsolutePath();
+    String h1 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    String operationKey = "streaming-h1-h2";
+    try (var queue = new SqliteJobQueue(
+        db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginRecordedWalk(operationKey, "c".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", operationKey, walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), "docs"));
+      queue.closeRecordedWalkEnumeration(
+          operationKey, walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var claim = queue.pollPending(1).getFirst();
+      Files.writeString(file, "second");
+      String h2 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+      queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, h2)),
+          successFull());
+
+      assertFalse(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), claim.unitRevision(), h1, h2));
+    }
+  }
+
+  @Test
+  void unclosedCapturedEnumerationCannotCertifyH1H2Projection() throws Exception {
+    Path db = tempDir.resolve("captured-h1-h2-open.db");
+    Path file = Files.writeString(tempDir.resolve("captured-h1-h2-open.txt"), "first").toAbsolutePath();
+    String h1 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    String operationKey = "captured-h1-h2-open";
+    try (var queue = new SqliteJobQueue(
+        db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginCapturedWalk(operationKey, "d".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", operationKey, walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), "docs"));
+      assertTrue(queue.pollPending(1).isEmpty(),
+          "a captured plan cannot issue a claim before enumeration is complete");
+      var buffered = SwitchBufferUpsert.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload());
+      Files.writeString(file, "second");
+      String h2 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+
+      assertFalse(queue.matchesAcceptedFileProjection(
+          PathNormalizer.normalizeKey(file), buffered.unitRevision(), h1, h2));
+    }
+  }
+
   private static IngestionOutcome staleSource() {
     return IngestionOutcome.of(IngestionOutcomeClass.STALE_SOURCE, "CONTENT_CHANGED",
         IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT);
+  }
+
+  private static IngestionOutcome successFull() {
+    return IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+        IngestionRetryPolicy.NONE);
   }
 
   @Test

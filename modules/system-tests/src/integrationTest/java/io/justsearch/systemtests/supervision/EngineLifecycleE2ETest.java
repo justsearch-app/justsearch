@@ -128,6 +128,14 @@ final class EngineLifecycleE2ETest {
     EngineSupervisedRecoveryE2ETest.runQueryAndGenerativeActualOwnerRollback();
   }
 
+  @Tag("ai")
+  @Test
+  @Timeout(14 * 60)
+  void committedPointerBootReconcilesPersistedRootChangesBeforePublication() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededInPlaceCombinedMaintenance(
+        "model-live-a-b-low-memory-pointer-before-settings", "installer-pointer-before-settings", true);
+  }
+
   @Test
   void pendingFeatureScenariosAreNamedAndReported() {
     var names = new HashSet<String>();

@@ -1540,9 +1540,15 @@ public final class WorkerIngestService {
           difference.requireCurrentRootIdentity();
           if (!committedBootFileMatches(path, subscription.collection())
               || !jobQueue.matchesExpectedCollection(path, subscription.collection())) {
+            var liveEntry = WorkerMethvinWatcher.entryForLiveEvent(path);
+            // Root convergence is content-bound even when size and mtime were preserved.
+            // Reuse the queue's captured source witness so extraction cannot skip this claim.
+            var capturedEntry = new JobQueue.EnqueueEntry(
+                liveEntry.path(), liveEntry.sizeBytes(), liveEntry.provenance(),
+                io.justsearch.indexerworker.loop.SourceContentHash.sha256(path));
             if (switchBufferOps.buildingGenerationForFileAdmission() != null
                 || jobQueue.enqueueEntriesWithExactCollection(
-                    List.of(WorkerMethvinWatcher.entryForLiveEvent(path)),
+                    List.of(capturedEntry),
                     subscription.collection()) != 1) {
               throw new IOException("Committed boot root admission failed");
             }

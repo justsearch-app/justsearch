@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,6 +38,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
@@ -45,6 +47,11 @@ final class SwitchBufferStrictReplayTest {
   @TempDir Path tempDir;
   private final SwitchBufferCapableQueue queue = mock(SwitchBufferCapableQueue.class);
   private final RunningRuntime runtime = mock(RunningRuntime.class);
+
+  @BeforeEach
+  void bindRequiredCommitOwner() {
+    when(runtime.commitOps()).thenReturn(mock(CommitOps.class));
+  }
 
   @Test
   void emptySnapshotCertifiesAndUnknownOperationRefusesPromotion() {
@@ -201,7 +208,7 @@ final class SwitchBufferStrictReplayTest {
     var commits = mock(CommitOps.class);
     var fields = mock(DocumentFieldOps.class);
     var written = new AtomicBoolean();
-    org.mockito.Mockito.doAnswer(ignored -> { written.set(true); return null; })
+    doAnswer(ignored -> { written.set(true); return null; })
         .when(indexing).indexSingle(any(IndexDocument.class));
     when(runtime.indexingCoordinator()).thenReturn(indexing);
     when(runtime.commitOps()).thenReturn(commits);
@@ -415,8 +422,8 @@ final class SwitchBufferStrictReplayTest {
         "green", "path:" + file, "UPSERT", payload, 1, "v1");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected));
     when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
-    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
-        .thenReturn(true);
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString(), anyString()))
+        .thenAnswer(invocation -> invocation.getArgument(2).equals(invocation.getArgument(3)));
     when(runtime.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
 
     assertFalse(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(
@@ -436,7 +443,7 @@ final class SwitchBufferStrictReplayTest {
         "other", "path:foreign", "DELETE", "foreign", 2, "v2");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected, foreign));
     when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
-    when(queue.matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash))
+    when(queue.matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash, hash))
         .thenReturn(true);
     var fields = mock(DocumentFieldOps.class);
     when(fields.getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256)).thenReturn(hash);
@@ -447,9 +454,69 @@ final class SwitchBufferStrictReplayTest {
         scopedContext("green")));
     verify(queue, never()).enqueueEntries(anyList(), isNull());
     var order = inOrder(queue);
-    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash);
+    order.verify(queue).matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash, hash);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
     verify(queue, never()).removeReplayedSwitchBufferOps(List.of(foreign));
+  }
+
+  @Test
+  void capturedReplayRefreshesBeforeCertifyingPlannedH1AndIndexedH2() throws Exception {
+    String h1 = "a".repeat(64);
+    String h2 = "b".repeat(64);
+    String path = tempDir.resolve("captured-replay.txt").toAbsolutePath().toString();
+    var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + path, "UPSERT",
+        new SwitchBufferUpsert(path, null, null, "captured-unit", h1).encode(), 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected));
+    when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
+    when(queue.matchesAcceptedFileProjection(path, "captured-unit", h1, h2)).thenReturn(true);
+    when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
+    var fields = mock(DocumentFieldOps.class);
+    var commits = mock(CommitOps.class);
+    var refreshed = new AtomicBoolean();
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    when(runtime.commitOps()).thenReturn(commits);
+    when(fields.getDocumentField(path, SchemaFields.SOURCE_SHA256))
+        .thenAnswer(ignored -> refreshed.get() ? h2 : h1);
+    doAnswer(ignored -> { refreshed.set(true); return null; })
+        .when(commits).maybeRefreshBlocking();
+
+    assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(scopedContext("green")));
+    var order = inOrder(commits, fields, queue);
+    order.verify(commits).maybeRefreshBlocking();
+    order.verify(fields).getDocumentField(path, SchemaFields.SOURCE_SHA256);
+    order.verify(queue).matchesAcceptedFileProjection(path, "captured-unit", h1, h2);
+    order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
+  }
+
+  @Test
+  void committedNativePointerCertifiesCapturedH2WithoutRewritingPlannedH1() {
+    String h1 = "a".repeat(64);
+    String h2 = "b".repeat(64);
+    String path = tempDir.resolve("captured-native.txt").toAbsolutePath().toString();
+    var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "path:" + path, "UPSERT",
+        new SwitchBufferUpsert(path, null, null, "captured-unit", h1).encode(), 1, "v1");
+    when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected), List.of());
+    when(queue.matchesAcceptedFileProjection(path, "captured-unit", h1, h2)).thenReturn(true);
+    when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
+    var fields = mock(DocumentFieldOps.class);
+    var commits = mock(CommitOps.class);
+    var refreshed = new AtomicBoolean();
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    when(runtime.commitOps()).thenReturn(commits);
+    when(fields.getDocumentField(path, SchemaFields.SOURCE_SHA256))
+        .thenAnswer(ignored -> refreshed.get() ? h2 : h1);
+    doAnswer(ignored -> { refreshed.set(true); return null; })
+        .when(commits).maybeRefreshBlocking();
+
+    assertTrue(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
+        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+    var order = inOrder(commits, fields, queue);
+    order.verify(commits).maybeRefreshBlocking();
+    order.verify(fields).getDocumentField(path, SchemaFields.SOURCE_SHA256);
+    order.verify(queue).matchesAcceptedFileProjection(path, "captured-unit", h1, h2);
+    order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
   }
 
   @Test
@@ -461,7 +528,7 @@ final class SwitchBufferStrictReplayTest {
     var selected = new SwitchBufferCapableQueue.SwitchBufferOp(
         "green", "path:" + path, "UPSERT", upsert.encode(), 1, "v1");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected), List.of());
-    when(queue.matchesAcceptedFileProjection(path, "issued-revision", hash))
+    when(queue.matchesAcceptedFileProjection(path, "issued-revision", hash, hash))
         .thenReturn(true);
     var fields = mock(DocumentFieldOps.class);
     when(runtime.documentFieldOps()).thenReturn(fields);
@@ -538,8 +605,8 @@ final class SwitchBufferStrictReplayTest {
         "green", "path:" + file, "UPSERT", payload, 1, "v1");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
     when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
-    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
-        .thenReturn(true);
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString(), anyString()))
+        .thenAnswer(invocation -> invocation.getArgument(2).equals(invocation.getArgument(3)));
     var fields = mock(DocumentFieldOps.class);
     when(runtime.documentFieldOps()).thenReturn(fields);
     Files.writeString(file, "later unaccepted bytes");
@@ -561,8 +628,8 @@ final class SwitchBufferStrictReplayTest {
         "green", "path:" + file, "UPSERT", payload, 1, "v1");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
     when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
-    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
-        .thenReturn(true);
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString(), anyString()))
+        .thenAnswer(invocation -> invocation.getArgument(2).equals(invocation.getArgument(3)));
     when(queue.removeReplayedSwitchBufferOps(List.of(version))).thenReturn(1);
     var fields = mock(DocumentFieldOps.class);
     when(runtime.documentFieldOps()).thenReturn(fields);
@@ -584,8 +651,8 @@ final class SwitchBufferStrictReplayTest {
         "green", "path:" + file, "UPSERT", payload, 1, "v1");
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
     when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
-    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
-        .thenReturn(true);
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString(), anyString()))
+        .thenAnswer(invocation -> invocation.getArgument(2).equals(invocation.getArgument(3)));
     var fields = mock(DocumentFieldOps.class);
     when(runtime.documentFieldOps()).thenReturn(fields);
     Files.delete(file);
@@ -606,8 +673,8 @@ final class SwitchBufferStrictReplayTest {
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(version));
     when(queue.enqueueEntries(anyList(), isNull())).thenReturn(1);
     when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
-    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString()))
-        .thenReturn(true);
+    when(queue.matchesAcceptedFileProjection(anyString(), anyString(), anyString(), anyString()))
+        .thenAnswer(invocation -> invocation.getArgument(2).equals(invocation.getArgument(3)));
     when(runtime.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
 
     assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
@@ -630,7 +697,7 @@ final class SwitchBufferStrictReplayTest {
     when(fields.getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256)).thenReturn(hash);
 
     assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
-    verify(queue).matchesAcceptedFileProjection(file.toString(), "new-revision", hash);
+    verify(queue).matchesAcceptedFileProjection(file.toString(), "new-revision", hash, hash);
     verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
   }
 

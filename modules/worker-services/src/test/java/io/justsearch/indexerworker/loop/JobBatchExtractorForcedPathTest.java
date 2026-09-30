@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.inOrder;
@@ -17,6 +18,7 @@ import static org.mockito.Mockito.when;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.indexerworker.extract.ContentExtractor;
+import io.justsearch.indexerworker.extract.TikaExtractionPolicy;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.loop.ops.BatchStats;
@@ -25,6 +27,8 @@ import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.path.PathResolutionStore;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.util.PathNormalizer;
+import io.justsearch.indexing.SchemaFields;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -65,7 +69,8 @@ final class JobBatchExtractorForcedPathTest {
       TimeboxedContentExtractor contentExtractor,
       IngestionOutcomeJournal journal,
       BatchStats batchStats,
-      DocumentIdentityStore identityStore) {}
+      DocumentIdentityStore identityStore,
+      JobQueue jobQueue) {}
 
   private Harness newHarness(Set<String> forcedPaths) throws Exception {
     DocumentIdentityStore identityStore = mock(DocumentIdentityStore.class);
@@ -88,6 +93,7 @@ final class JobBatchExtractorForcedPathTest {
     when(indexCountOps.docCount()).thenReturn(7L);
 
     TimeboxedContentExtractor contentExtractor = mock(TimeboxedContentExtractor.class);
+    when(contentExtractor.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
     // Fail extraction deliberately: reaching extraction at all is the signal these tests read,
     // and a terminal ExtractionException is a branch the extractor already handles cleanly.
     when(contentExtractor.extractArtifact(any()))
@@ -96,12 +102,13 @@ final class JobBatchExtractorForcedPathTest {
     IngestionOutcomeJournal journal = mock(IngestionOutcomeJournal.class);
     BatchStats batchStats = mock(BatchStats.class);
     StaleSnapshotResolver staleResolver = mock(StaleSnapshotResolver.class);
+    JobQueue jobQueue = mock(JobQueue.class);
 
     JobBatchExtractor extractor =
         new JobBatchExtractor(
             new WorkerIngestionAuthority(), // REAL: the envelope's normalizedPath is production's
             journal,
-            mock(JobQueue.class),
+            jobQueue,
             contentExtractor,
             documentFieldOps,
             indexCountOps,
@@ -117,7 +124,19 @@ final class JobBatchExtractorForcedPathTest {
             () -> false,
             delta -> {});
     return new Harness(
-        extractor, documentFieldOps, contentExtractor, journal, batchStats, identityStore);
+        extractor,
+        documentFieldOps,
+        contentExtractor,
+        journal,
+        batchStats,
+        identityStore,
+        jobQueue);
+  }
+
+  private static void indexedCollection(Harness harness, String collection) throws IOException {
+    when(harness.documentFieldOps().getDocumentFieldOrThrow(
+            anyString(), eq(SchemaFields.COLLECTION)))
+        .thenReturn(collection);
   }
 
   /** The key every marker writes for an admitted path — production's own derivation. */
@@ -192,6 +211,121 @@ final class JobBatchExtractorForcedPathTest {
     verify(h.contentExtractor(), never()).extractArtifact(any());
     verify(h.journal()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
     verify(h.batchStats()).recordSkipped();
+  }
+
+  @Test
+  @DisplayName("unchanged bytes with a changed collection tag are re-extracted")
+  void changedCollectionTagReextractsAnOtherwiseUnchangedFile() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("changed-collection.txt"), "unchanged content");
+    Harness h = newHarness(ConcurrentHashMap.newKeySet());
+    indexedCollection(h, "old");
+    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "new");
+
+    h.extractor().extractAll(List.of(claim));
+
+    verify(h.documentFieldOps())
+        .getDocumentFieldOrThrow(eq(forcedKey(file)), eq(SchemaFields.COLLECTION));
+    verify(h.contentExtractor()).extractArtifact(file);
+    verify(h.journal(), never()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+  }
+
+  @Test
+  @DisplayName("an indexed default collection is re-extracted when the claim names a collection")
+  void defaultCollectionReextractsWhenClaimNamesCollection() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("default-to-named.txt"), "unchanged content");
+    Harness h = newHarness(ConcurrentHashMap.newKeySet());
+    indexedCollection(h, null);
+    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "docs");
+
+    h.extractor().extractAll(List.of(claim));
+
+    verify(h.documentFieldOps())
+        .getDocumentFieldOrThrow(eq(forcedKey(file)), eq(SchemaFields.COLLECTION));
+    verify(h.contentExtractor()).extractArtifact(file);
+    verify(h.journal(), never()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+  }
+
+  @Test
+  @DisplayName("an old collection tag is re-extracted when the claim returns to default")
+  void oldCollectionTagReextractsWhenClaimUsesDefaultCollection() throws Exception {
+    Path file =
+        Files.writeString(tempDir.resolve("default-collection.txt"), "unchanged content");
+    Harness h = newHarness(ConcurrentHashMap.newKeySet());
+    indexedCollection(h, "old");
+    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, null);
+
+    h.extractor().extractAll(List.of(claim));
+
+    verify(h.contentExtractor()).extractArtifact(file);
+    verify(h.journal(), never()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+  }
+
+  @Test
+  @DisplayName("unchanged bytes with the same non-default collection tag remain UNCHANGED")
+  void sameCollectionTagStillTakesTheUnchangedBranch() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("same-collection.txt"), "unchanged content");
+    Harness h = newHarness(ConcurrentHashMap.newKeySet());
+    indexedCollection(h, "docs");
+    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "docs");
+    doAnswer(invocation -> {
+          ((Runnable) invocation.getArgument(2)).run();
+          return null;
+        })
+        .when(h.journal())
+        .recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+
+    List<ExtractedJob> extracted = h.extractor().extractAll(List.of(claim));
+
+    assertEquals(
+        List.of(), extracted, "same collection and unchanged bytes should skip extraction");
+    verify(h.contentExtractor(), never()).extractArtifact(any());
+    verify(h.journal()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+    verify(h.jobQueue()).markClaimDone(eq(claim), any(), any());
+  }
+
+  @Test
+  @DisplayName("blank and null default collection tags compare as the same collection")
+  void blankClaimCollectionMatchesIndexedDefaultCollection() throws Exception {
+    Path file =
+        Files.writeString(
+            tempDir.resolve("blank-default-collection.txt"), "unchanged content");
+    Harness h = newHarness(ConcurrentHashMap.newKeySet());
+    indexedCollection(h, null);
+    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "");
+
+    List<ExtractedJob> extracted = h.extractor().extractAll(List.of(claim));
+
+    assertEquals(
+        List.of(), extracted, "blank and null default collection tags should skip extraction");
+    verify(h.contentExtractor(), never()).extractArtifact(any());
+    verify(h.journal()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+  }
+
+  @Test
+  @DisplayName("an unreadable indexed collection fails the claim instead of acknowledging it")
+  void unreadableIndexedCollectionRecordsIoFailureWithoutAFalseSkip() throws Exception {
+    Path file =
+        Files.writeString(tempDir.resolve("unreadable-collection.txt"), "unchanged content");
+    Harness h = newHarness(ConcurrentHashMap.newKeySet());
+    when(h.documentFieldOps().getDocumentFieldOrThrow(
+            anyString(), eq(SchemaFields.COLLECTION)))
+        .thenThrow(new IOException("collection field unavailable"));
+    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "docs");
+    doAnswer(invocation -> {
+          ((Runnable) invocation.getArgument(2)).run();
+          return null;
+        })
+        .when(h.journal())
+        .recordOutcomeSafely(eq(file), eq("IO_FAILED"), any());
+
+    h.extractor().extractAll(List.of(claim));
+
+    verify(h.contentExtractor(), never()).extractArtifact(any());
+    verify(h.journal()).recordOutcomeSafely(eq(file), eq("IO_FAILED"), any());
+    verify(h.journal(), never()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+    verify(h.jobQueue()).markClaimFailed(eq(claim), any(), any());
+    verify(h.jobQueue(), never()).markClaimDone(any(), any(), any());
+    verify(h.batchStats()).recordFailed();
   }
 
   @Test

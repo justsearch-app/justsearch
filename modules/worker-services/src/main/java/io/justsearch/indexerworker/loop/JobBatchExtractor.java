@@ -19,6 +19,7 @@ import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.loop.ops.IndexingDocumentOps;
 import io.justsearch.indexerworker.path.PathResolutionStore;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexing.SchemaFields;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
@@ -26,6 +27,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
@@ -230,7 +232,9 @@ public final class JobBatchExtractor {
                 ? claim.recordedForce() : forcedPaths.remove(normalizedPath));
         // Skip isUnmodified() on empty index — every doc is new (312 item 10).
         if (!forceReindex && !indexEmptyForBatch) {
-          if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs())) {
+          if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs())
+              && Objects.equals(collection == null || collection.isBlank() ? null : collection,
+                  documentFieldOps.getDocumentFieldOrThrow(normalizedPath, SchemaFields.COLLECTION))) {
             log.debug("File unchanged, skipping: {}", filePath);
             FileEnvelope envelopeForLedger = envelope;
             journal.recordOutcomeSafely(
