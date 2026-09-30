@@ -22,7 +22,12 @@ artifact re-reads). Sol is `gpt-6.1-sol` (near-root quality, much cheaper than
 root: design refutation, reviews, non-trivial implementation). Owner-specified
 2026-09-30; always pass `-m` explicitly, because the repository role files
 still pin the older `gpt-5.6-*` slugs. Each call carries about 20k tokens of
-repository instructions. Root keeps Gradle, the dev stack, integration and commits.
+repository instructions. A Codex worker survives the death of the shell that
+launched it; a killed wrapper (30-minute auto-background cap, or Claude Code's
+memory-pressure reaper, now disabled in user settings from the next Claude Code
+start) does not stop the work. Resume with `codex exec resume <session id>` only
+after its log has stopped growing, never while the original process still writes.
+Serialize Gradle across workers with grant files under `tmp/grants/`. Root keeps Gradle, the dev stack, integration and commits.
 
 ## Current state (2026-09-30)
 

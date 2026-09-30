@@ -318,8 +318,8 @@ before code changes. Record the failed number, cause and rerun in decision.md.
 
 ## 11. Open questions
 
-- **Owner-duration soak:** E4's duration must be supplied before the run. The
-  exact workload and windows are recorded in values.json.
+- **Owner-duration soak:** decided 2026-09-30: two hours as two separately recorded
+  one-hour windows, not continuous ([values.json](../evidence/E/values.json)).
 - **Conditional claims:** D1/D2 and F must state whether minimum-spec hardware,
   other-OS recovery or lower coordination cost is claimed. Run the matching
   conditional exercise only for a claim; otherwise bound the report explicitly.
