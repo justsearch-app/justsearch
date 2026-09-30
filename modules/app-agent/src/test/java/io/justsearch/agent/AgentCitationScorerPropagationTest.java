@@ -8,6 +8,7 @@ import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.AgentEventPayloads;
 import io.justsearch.agent.api.interaction.InteractionEvent;
 import io.justsearch.app.api.DocumentService;
+import io.justsearch.core.context.EngineContext;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -44,7 +45,7 @@ final class AgentCitationScorerPropagationTest {
             List.of());
     return new DocumentService() {
       @Override
-      public CompletionStage<DocumentRecord> fetch(String docId) {
+      public CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
         return CompletableFuture.completedFuture(null);
       }
 
@@ -53,7 +54,10 @@ final class AgentCitationScorerPropagationTest {
       // `matchCitations` overload here would leave this fake silently unreached.
       @Override
       public CompletionStage<CitationMatchResult> matchCitationsAgainst(
-          String answerText, List<VerificationSource> sources, double threshold) {
+          String answerText,
+          List<VerificationSource> sources,
+          double threshold,
+          EngineContext engineContext) {
         return CompletableFuture.completedFuture(result);
       }
     };
@@ -69,7 +73,7 @@ final class AgentCitationScorerPropagationTest {
   void resolverCarriesTheScorer() {
     var crossEncoder =
         new AgentCitationResolver(docsScoredBy(DocumentService.ScorerKind.CROSS_ENCODER))
-            .resolve("A sentence.", oneSource());
+            .resolve("A sentence.", oneSource(), EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(DocumentService.ScorerKind.CROSS_ENCODER, crossEncoder.scorer());
     assertEquals(1, crossEncoder.cites().size(), "the cites still arrive beside the scorer");
 
@@ -78,14 +82,14 @@ final class AgentCitationScorerPropagationTest {
     // into a cross-encoder-calibrated tier.
     var cosine =
         new AgentCitationResolver(docsScoredBy(DocumentService.ScorerKind.EMBEDDING_COSINE))
-            .resolve("A sentence.", oneSource());
+            .resolve("A sentence.", oneSource(), EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(DocumentService.ScorerKind.EMBEDDING_COSINE, cosine.scorer());
   }
 
   @Test
   @DisplayName("hop 1 — no matcher at all resolves to NONE, never to an absent stamp")
   void noMatcherResolvesToNone() {
-    var resolved = new AgentCitationResolver(null).resolve("A sentence.", oneSource());
+    var resolved = new AgentCitationResolver(null).resolve("A sentence.", oneSource(), EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(DocumentService.ScorerKind.NONE, resolved.scorer());
     assertTrue(resolved.cites().isEmpty());
   }

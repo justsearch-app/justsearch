@@ -4,13 +4,12 @@ This module is the **shared home for Protobuf contracts** that define process bo
 
 ## Surfaces in this repo
 
-### Knowledge Server gRPC surface (UI/Head ↔ Worker)
+### Knowledge Server message surface (application half ↔ index half)
 
 - **Proto**: `src/main/proto/indexing.proto`
 - **Package**: `io.justsearch.ipc`
-- **What it is**: The live, versioned-by-repo contract used by:
-  - Head (HTTP API in `modules/ui`) → gRPC client
-  - Worker (gRPC server in `modules/indexer-worker`)
+- **What it is**: The live, versioned-by-repo **message** contract — the DTO vocabulary at the Engine's in-process ports. There is no transport under it any more: lane F stage A deleted the gRPC client (`RemoteKnowledgeClient`, item A10), the gRPC server and its interceptors (item A9), the worker process (item A11), and finally the `service` blocks themselves plus the `protoc-gen-grpc-java` generator (item A14). **protoc generates messages and nothing else here.** Adding a `service` block back is not a way to add an API; it is a way to resurrect a deleted transport — a new capability belongs on the REST API or on a port interface (`governance/engine-ports.v1.json`, [ADR-0049](../../docs/decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)).
+- **Who uses it**: `KnowledgeClient` (`modules/app-services`) and its live binding `EngineKnowledgeClient` (`modules/app-engine`) on one side; `WorkerAppServices` and the services behind it (`modules/worker-services`, `modules/indexer-worker`) on the other.
 
 ### Versioned “v1” messages (in-process / tooling / infra)
 

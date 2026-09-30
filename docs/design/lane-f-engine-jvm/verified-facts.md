@@ -4,6 +4,27 @@ Base `b96cd999` (#687). Each fact was read in the source by the orchestrator or 
 reviewer and spot-checked; the implementation checklist written after the lock inherits them.
 Section numbers refer to `design.md` beside this file.
 
+## Runtime writer failure (2026-09-08, checked at 4349b28f5)
+
+The integrated stress failure is recorded in `evidence/B/integrated-verification.md`.
+`modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerHealthMonitor.java`:237-246
+only selects boot recovery without a client. With a client it calls `checkHealth`.
+`modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerHealthService.java`:200-225
+checks SQLite queue access and Lucene reader count, not writer usability.
+`modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java`:81-87
+returns zero on reader IO failure. Consequently, B14's boot-retry re-cut alone
+does not supply runtime recovery from the closed writer observed in the stress log.
+
+`modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java`:100-105
+starts `EngineRoot` directly; the failing test does not construct
+`KnowledgeServerHealthMonitor`, whose production construction and start are in
+`modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java`:597-617.
+`modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java`:191-207
+records write failures, and
+`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java`:997-1025
+persists retry state. These sources do not prove automatic recovery or replay after
+this particular failure; that is the next bounded experiment.
+
 ## Wire and launch
 
 - `indexing.proto` has **49** RPCs on this base (10 Search + 38 Ingest + 1 Health): #664 added
@@ -142,7 +163,11 @@ Three read-only audits; every citation below was re-read by the orchestrator.
   58 executor construction sites (`Executors.new*` / `new ThreadPoolExecutor`) with no registry
   and no queue bound (8).
 - `ModelSessionPolicy.java:104` sizes the ORT arena from GPU VRAM; it bounds device memory,
-  not commit charge (8). NVML is read only in `gpu-bridge` (`GpuCapabilitiesService`), which
+  not commit charge (8). *(Corrected 2026-09-10, inference-host audit 2: the cap is a static
+  per-role config default, `ResolvedConfigBuilder.java:1179,1201,1273,1293,1305` at `4229f1091`;
+  `ModelSessionPolicyResolver.java:61-64` never reads the `HardwareProfile`; the `Gpu` record is
+  `ModelSessionPolicy.java:111-112`. "From GPU VRAM" describes what the cap bounds, not where
+  its value comes from.)* NVML is read only in `gpu-bridge` (`GpuCapabilitiesService`), which
   `indexer-worker` does not depend on today (7.4).
 - `OperationInvocationRequest.idempotencyKey` (`OperationInvocationRequest.java:15-17`) is on
   the wire and read by nothing (7.5).
@@ -232,3 +257,243 @@ dimensions of `ReadinessEnvelopeView`.
   enum. Several `WORKER_*` members are referenced only from classes stage A deletes, so stage A owes
   a holding action (A17) until the D1 re-cut.
 - `main_gpu_active` / `energy_reduced` have 7 read sites, not 6 (`BgeM3BackfillOps.java:346` added).
+
+**Writer-recovery correction (2026-09-08, candidate above `6f38df7e5`):**
+
+- `RuntimeSession.java:255` owns terminal-writer notification and retirement;
+  `:283` routes the initial and resumed NRT thread's known closed-writer failures.
+  `KnowledgeServer.publishIngestLifecycle` (`:346`) binds before publishing each
+  writable runtime, including boot replay before app-services construction.
+- `HeadlessApp.java:925,1159,1462` binds the fatal action through the complete
+  shutdown sequence. `EngineShutdownSequence.java:183,198,237` arbitrates fatal
+  exit with cooperative shutdown and finalizes the code before the upgrade receipt.
+- `KnowledgeServer.close` (`:2202`) awaits the existing deferred-init future's
+  completion; the former five-second abandonment was not native quiescence.
+  These are source facts. Execution evidence and remaining limitations are in
+  `evidence/B/writer-recovery-investigation.md`.
+
+## Stage C re-grounding (2026-09-09, at `be47faa40`)
+
+Corrections to the bullets above found by the code-verified pass that re-grounded `stages/C1.md`
+and `stages/C2.md` at the stage-B head. Each replaces the earlier sentence it names; the earlier
+text is left in place as history.
+
+- **Common-pool sites (Stage C bullet): twelve, not ten, and a different set.** Bare
+  `CompletableFuture.supplyAsync/runAsync` (no executor argument) in `modules/*/src/main`:
+  `DocumentService.java:85`, `LlamaServerOps.java:1276`, `OnlineModeOps.java:214`,
+  `GplJobCoordinator.java:209`, `RemoteDocumentService.java:89,137,181,232,296,552`,
+  `KnowledgeServer.java:1070`, `HeadlessApp.java:59`. `OnlineModeOps.java:251,395,712` pass
+  `vduExecutor` and are not bare. `ForkJoinPool.commonPool()`, `parallelStream()`, `.parallel()`,
+  `delayedExecutor` and every executor-less `*Async` combinator have zero occurrences, so a rule
+  keyed on the symbol passes vacuously (C1-6 keys on arity).
+- **Executors: 56 construction sites, not 58**, all through `Executors.new*`: 41
+  `newSingleThreadScheduledExecutor`, 8 `newSingleThreadExecutor`, 4 virtual-thread, 2 cached
+  (`OnlineModeOps.java:96`, `PersistentExtractionSandbox.java:172`), 1 fixed (`PdfOcrEngine.java:221`).
+  Forty-nine already have a thread count of one; none has a bounded queue (8).
+- **`ForegroundLoad`'s one producer** is `ForegroundLoadGate` (`app-engine`) at
+  `EngineKnowledgeClient.executeSearchRpc` (`:340-354`, wrap `:351`), built at `EngineRoot.java:210`,
+  keyed on a ten-label set (`ForegroundLoadGate.java:85-96`); the gauge is owned by
+  `KnowledgeServer.java:166-167`; rule 6b (`LayeringEnforcementTest.java:227-247`) lets only
+  `io.justsearch.app.engine..`, `io.justsearch.indexerworker..` and `io.justsearch.adapters..`
+  name the type. The single-wrap guard (`:48-53`) is prose (8, C1-10).
+- **The admission filter sees the search family.** `POST /api/knowledge/search` and the chat,
+  retrieve-context, match-citations, folders, folder-files and ingest routes
+  (`KnowledgeRoutes.java:27,32-46`) and `POST /mcp` (`LocalApiServer.java:649`) pass
+  `ApiSecurityFilters.setupOperationAdmission` (`:158-190`); it exempts GET/OPTIONS (`:163`) and
+  `/api/upgrade/*` (`:164`, B6). The foreground family's only GET is `/api/knowledge/suggest`
+  (`:33`). An earlier draft said searches were GETs; they are not (8).
+- **No "child's module" exists for the parser confinement**: child, router, in-process sandbox
+  and Tika parsers share `modules/worker-services/.../indexerworker/extract/`, and
+  `app-services/vdu/PdfImageRenderer.java:5-8` (`VduProcessor.java:201`) parses PDF in the Engine
+  with a first-class `pdfbox` dependency (`app-services/build.gradle.kts:41`) (6).
+- **The in-process fallback is three things**: the operator mode `Mode.IN_PROCESS`
+  (`ExtractionSandboxFactory.java:24-28,126`, env at `modules/worker-services/.../server/DefaultWorkerAppServices.java:513,518`),
+  the silent startup-probe fallback (`:539-556`, probe `ExtractionSandboxFactory.java:180-220`),
+  and the `IndexingLoop` constructor default (`:350-352`, a test seam). Only the probe fallback is
+  what 6 deletes (6, C1-14).
+- **`DurableGrantStore` has no provenance field**; its keys carry `SourceTier` (`:71,74`).
+  `InvocationProvenance` (`app-agent-api/.../registry/InvocationProvenance.java:54-60`) is a live
+  invocation-side provenance record with 25 referencing files (3.4, C1-1).
+- **`IndexingService`**: 33 instance methods (4 abstract, 29 `default` throwing), the Null Object
+  at `:527-609`, one implementor (`KnowledgeClient.java:100`), 40 referencing files.
+  `SearchPort.search(Query)` is single-argument (`SearchPort.java:13`); `Query.context`
+  (`Query.java:20`) and `SearchRequest.Context` (`SearchRequest.java:76`) are both translator
+  metadata with one reader (`SearchServiceImpl.java:68`) (3.4, C1-2/C1-3).
+- **`ApiErrorCode` parity exists under another name**: `ErrorMessagePropertiesContractTest.java:24-31`
+  and `ErrorCatalogJsonArtifactTest.java:28-38`; the enum has 130 members; the doc at
+  `ApiErrorCode.java:12-17` cites a renamed test and a deleted file (C1-8).
+- **The only `wal_checkpoint` is now `SqliteJobQueue.checkpointWal()` (`:2224`, pragma `:2229`),
+  called from `close()` at `:2137` and by the upgrade barrier** (B5 renamed `checkpointForUpgrade`;
+  the two earlier bullets naming it are history) (7.3 step 7).
+- **The journal has no commit sequence number.** `CommitOps.commit()` discards
+  `IndexWriter.commit()`'s `long` (`:110`), commit user data is a random UUID (`:89-90`),
+  `commitAndTrack` returns void (`:166`); the only sequence number is the in-memory NRT watermark
+  (`NrtReopenStats.java:34`), reset per session. `IndexingLoop`'s three commit-then-`drainPending()`
+  sites (`:655/:660`, `:713/:723`, `:812/:816`) are effect-before-record; the fail-closed
+  precedent is `SqliteJobQueue.putSwitchBuffer` (`:330-333`). The earlier bullet calling the
+  sequence number "the precedent for the completion-order stamp" is withdrawn (7.5, C2-2).
+- **`OperationInvocationRequest.idempotencyKey`** (`:28`, javadoc `:15-17`) is an HTTP body field,
+  not a proto field, dropped at `OperationsController.java:136` before dispatch (`:177`); zero
+  `.idempotencyKey()` call sites in code (7.6, C2-3).
+- **`jobs.db` in the recoverability register**: row `:601-657`, `owner: WORKER` `:609`,
+  `recoverability: DERIVED` `:617`, `currentVersion: 12` `:620` while `SqliteSchema.TARGET_VERSION`
+  is 13 (`:37`) — a drift no gate compares (C1-4 corrects it). The register already carries
+  `MIXED` (`entity-clusters`, `:747`) and six `EPHEMERAL` rows; only the six `catalogDirName` rows
+  are bound to the two-value Java enum (`check-store-recoverability.mjs:29,94-103`).
+- **The installed updater's closed-set rule** (`updater.rs:1003-1059`, register embedded at
+  `:31-32`): all 44 rows compared, count equality (`:1031-1033`), identity equality of
+  `owner`/`role`/`reconciliationStrategy` (`:1041-1049`), installed `currentVersion` must be
+  readable (`:1050-1058`); one Rust test (`:2281-2300`). The release table is emitted by
+  `scripts/release/app-release-assets.mjs:77-102`. Consequence recorded in design section 0
+  (2026-09-09): no store identity changes in lane F (C2-1).
+- **The cutover restarts the Engine, not the Worker** (B15): `CutoverContext.requestedRestartAction`
+  (`KnowledgeServerMigrationOps.java:74`, fired `:274-276`) → `EngineRoot.requestRestart`
+  `:219-224` → `HeadlessApp.localRestartAction` `:1486-1531` → exit 4. The Stage D bullet
+  "restarts the Worker" is history (7.4, C2-10).
+- **`OperationHistoryStore`** (`app-observability/.../operations/OperationHistoryStore.java:28`,
+  cap 200 `:31`, swap javadoc `:23-26`), routes `ResourceApiModule.java:475-476`, resource
+  `core.operation-history` (`OperationHistoryResourceCatalog.java:50-90`), proto
+  `contracts/wire/operation_history.proto` whose `OperationOutcome` lacks `UNDONE` (`:85-89`);
+  no row in `governance/operation-surfaces.v1.json` covers it (7.6, C2-4).
+- **`POST /api/settings/v2`** has a failure error-code channel (`SettingsController.java:106-109,133,150`)
+  and no revision on success (`:146`; `SettingsV2.java:11-16`); `UiModeIntent(clientId, sequence)`
+  (`:261`) orders `ui.mode` only (7.4, C2-6).
+- **Shutdown has ten ordered steps** (`HeadlessApp.orderedShutdownSteps` `:1332-1333`, names at
+  `:1347,1353,1359,1367,1373,1379,1390,1396,1402,1408`); step 1 is `"operation-admission"`
+  (`:1352-1357`, `freezeAdmission` `:1355`); `INDEX_HALF_STEP` at `:1390` closes the queue; no
+  checkpoint step exists (7.3, C2-7).
+- **`WORKER_RESTART_EXHAUSTED` was retired by B14** (`03c4e513b`); `engine.restart_exhausted` is
+  host-derived (`readiness-reason-codes.v1.json:55-57`, `readinessNotice.ts:77`) (7.6).
+- **`EngineExit`** (`app-engine/.../EngineExit.java`): 0 OK, 1 fatal-or-uncaught (transient),
+  2 data-dir locked, 3 OOM, 4 `REQUESTED_RESTART`; drift tests `EngineSupervisionPolicyTest.exitTableMatchesEngineExit`
+  `:168`, `contract.mjs:88-124`, `EngineExitTest.everyExitSiteUsesTheTable` `:78`; runtime
+  readers `supervisor.rs:33,195,262-263` and `engine-supervisor.cjs:95,115,125` (7.1).
+- **Stage E instruments (2026-09-09 inventory):** `analyze-head-run.cjs` filters roles `head`/`worker` (`:67,71,74`) while `head-rss-sampler.ps1` emits `engine` (`:18`), so its working-set section is blank for a merged run; `head-flag-run.sh:76` pins `JUSTSEARCH_HEAD_HEAP=512m` while the packaged Engine runs `-Xmx2g` (`lib.rs:784`) and the dev-runner sets no `-Xmx`; the safepoint extractor at `analyze-head-run.cjs:46-48` is the only one in `scripts/`; `encoder-latency-probe.sh` records no `ms` for `query-understanding` and `dense-retrieval`; the `engine` supervision policy (`supervision-contract.v1.json:162-172`) is read by both supervisors from the file (`engine-supervisor.cjs:82-111`, `supervisor.rs:239-291`) and its hang fields are declared placeholders for E; `head-rss-sampler.ps1:13-18` samples only `java.exe` with `HeadlessApp`; `scifact/perf-gate.json` pins no perf baseline; `sandbox-coverage.v1.json:65` registers `upgrade-dead-engine-recovery` (16).
+- **Stage D1 facts (2026-09-09 inventory):** `IndexGenerationManager` (`worker-core/.../index/IndexGenerationManager.java`) keeps the active/building/previous pointers as strings in `state.json` v2 (`:86-98`); promote `:508-538`, rollback `:551-579`, atomic `writeState` `:923-953`; deletion only through `pruneMarkedForDeletionBestEffort` `:1004-1040`, whose sole caller is the `index_gc` operation (`MigrationControlOps.java:211`). The cutover (`KnowledgeServerMigrationOps.java:119-291`) promotes at `:268`, preserves evidence at `:273` and fires the requested restart at `:274-276` (B15); the failed-unit gate `:195-214` is disabled at the shipped `-1` (`ResolvedConfigBuilder.java:1503`, second hard-coded default `KnowledgeServer.java:202`) and proceeds with 0 on an unreadable count (`:198-202`). `swapRuntime` is `KnowledgeServer.java:1290-1313` (close-then-open; sole caller the admin reload); the same-directory handle-leak comment is at `:722-728` in `start()`. `IndexStatusOps.servingSearchGenerationId` `:608-611` reads the pointer. The switch buffer is written only in `SWITCHING` (`IngestSwitchBufferOps.java:63-76,96-107`) and drained by `drainSwitchBufferBestEffort` `:427-839`. No applied revision, no per-key apply attribute, no `governance/config-surface*.json` (the gate reads `config-lifecycle.v1.json`, 29 entries, plus a generated 303-row matrix). `ConfigStoreRebuilder.rebuild` swallows a failure and returns 200 (`:82-84`). `RestartRequiredException` has one throw site (`WorkerServiceImpl.java:57`). `model-registry.v2.json` declares `minVramBytes` only (install gate); `NvmlService` reads free VRAM in `gpu-bridge`, which the worker modules and `ort-common` cannot depend on. `LifecycleSnapshotV1` has three slots (`:56`); `ReadinessDimension` has ten (`:15-36`) and three composites (`StatusLifecycleHandler.java:1416-1427`); "essential ready" is implemented twice (`dev-runner.cjs:1343-1348`, `lib.rs:1175-1179`); no per-component start deadline exists (`EngineSupervisionPolicy.java:81`). `LifecycleReasonCode` has 55 members, 16 `WORKER_*`; the register's `:4` still says 44 (7.4, 7.6).
+- **Stage D2 facts (2026-09-09 inventory):** no component map or profile exists; `EngineRoot` separates embedded (`:84`) from process (`forProcess` `:89,95,103`); `NativeSessionHandle.java:116` is an unfair `Semaphore(1)`; `BackfillScheduler.runIdleCycle()` runs on the `indexing-loop` thread (`IndexingLoop.java:572,669,731`) so there is one producer thread; the submit surface is `KnowledgeClient.submitBatch` `:488-524` and Lucene's sequence numbers are dropped at `WritePathOps.java:89,98-103,124-131` and `CommitOps.java:110`; `searchAfter` is `ReadPathOps.java:426`; readers are per call (`SearcherBridge.withSearcher` `:141-156`); `SearcherLifetimeManager` is absent; `CURSOR_INVALID` says "expired" (`errors.en.properties:43`); four SQLite stores take a file path (`SqliteJobQueue`, `SqliteDocumentIdentityStore`, `SqlitePathResolutionStore`, `EntityClusterStore`); `IndexSchema.ephemeral()` `:101` has no production caller; `InferenceSurface` (`:39,50-58`) and `SessionHandle.releaseGpu` (`:95`) are two types; `InferenceLifecycleManager.close()` is conditional on the reason since B5 (`:1379-1390`) (4, 10).
+- **Stage F facts (2026-09-09 grep, excluding tempdocs and the design directory):** the ADRs, `01-system-overview.md`, `CLAUDE.md`/`AGENTS.md` invariant 1 and the ADR probes are already rewritten; the unlabelled residue is a live wire vocabulary (`LifecycleSnapshotV1.Components(head, worker, inference)` `:55`, `ReadinessDimension.WORKER_CONTROL_PLANE` `:15-21`, the 16 `WORKER_*` codes, `api-contract-map.md:53-54,65,94-165,200,241`, `duplicate_prevalence_production.py:446-451`, `runtime-state.v1.json:21`, 21 generated `requiredCapabilities: ["WORKER"]`) plus the module names; `02-process-coordination.md:29-394` is the largest remaining rewrite; `24-worker-inference-composition.md` is omitted from the design's list; `scripts/agent-analytics` has no Worker-log parser; `.claude/skills` are regenerated by `skills-sync.mjs` while `.agents/skills` are hand copies whose parity check proves only that they are committed; `00-program-overview.md` does not exist in the repo (17.3 row F, 19).
+
+## C1 implementation re-verification (2026-09-08, continuation at 395078f04)
+
+The continuation integrated main's agent-policy change as `315afda5b` and the three newer
+lane-design commits as `f463b540d`, `1304a854d`, `395078f04`. B's final hosted evidence remains
+intact. The main-policy review verified the generated shared instructions carry the approved
+index-half invariant and do not restore the split-JVM instruction.
+
+- The executor construction census is **58**, including two fully qualified bounded
+  `ThreadPoolExecutor` constructors in `EngineKnowledgeClient`; 41 scheduled plus 8 single
+  factories use default queues. Scheduled delayed registrations need timer bounds, not a
+  `LinkedBlockingQueue` substitution. The 12 bare async calls remain the C1-6 migration set.
+- None of the five retained kinds has a C1 lifetime owner. The attempted-configuration candidate
+  does not exist; `InferenceLifecycleManager.applyConfig` has invocation-local old/new values,
+  and its pre-VDU configuration is a restore snapshot. `IndexGenerationManager` can protect
+  active, building and previous: three distinct generations. Targets stay visibly awaiting D1/D2.
+- `governance/retained-state.v1.json` is packaged directly into app-engine and loaded by
+  `EngineRoot`; future counts are null. The generic aggregate permit mechanism has a concurrent
+  cap regression. Cursor per-context metadata is preserved; D2 must connect its enforcement.
+- `EngineContext` carries canonical transport/source-tier identifiers without introducing a
+  core dependency on the agent registry. `EngineProvenance` uses the existing intent-gate
+  resolver, including UNTRUSTED for valid anticipated transports without a core entry; a
+  contradictory tier is rejected. Neither client label nor grant reference grants authority.
+- Aggregate admission comparison requires the per-context fairness cap to be non-binding in
+  both arms. The capture oracle validates actual synthetic client identities, balanced many-client
+  distribution, search/chat coverage and equal offered operation mix. Its synthetic PASS is not
+  live admission proof; batch 3 supplies captures and batch 4 repeats after executor changes.
+- C1 direct memory starts at 256 MiB in both launchers. E must measure this cut; it does not bound
+  ORT host allocations, mapped pages, metaspace or child processes. See `evidence/C1/memory-budget.md`.
+- C1 provenance is schema 14 on jobs.db; C2 content hash is 15 and operations use a separate
+  operations.db. Existing store identities and recoverability classes do not change.
+- The original session imposed a one-hour maximum per run. E's drift observation is three
+  forty-minute observations (120 minutes total), explicitly not a continuous two-hour soak.
+
+## C1 batch-2 corrections (2026-09-09, working tree above dd11e372d)
+
+- Required EngineContext parameters now reach search/indexing ports, document helpers,
+  agent sessions/tools, conversation runners, HTTP/MCP ingress and stored pending approvals.
+  The engine-port catalogue includes typed callers and composition carriers. Explicit contexts
+  replace the abandoned bound-view proposal; no ThreadLocal carries provenance.
+- jobs.db V14 adds nullable originator/transport on both jobs and ingestion_ledger. The Engine
+  bridge uses the existing ActionLedgerProjection authority; WORKFLOW is agent-originated.
+  Atomic queue claims retain provenance through extraction, stale resolution and terminal writes.
+  Later same-path admission cannot overwrite a claim's attribution, including legacy-null claims.
+- A real EngineRoot MCP ingest reaches an agent/MCP SQLite outcome in the focused test run
+  tmp/c1-batch2-claim-tests-2.txt. The concurrent re-admission regression fails with the old SQL
+  lookup restored (expected agent, observed user), proving it detects the reviewed defect.
+  The mutation was reverted. Raw evidence is retained under tmp/c1-batch2-xml.
+- Explicit syncDirectory admission/replay provenance and request-span projection/export are
+  implemented and verified. Typed SYNC_ROOT coalescing retains prior attribution on maintenance
+  under the existing queue lock; malformed prior work is retained and refused, never acknowledged
+  as replaced. A shared versioned codec governs writer, coalescing and replay.
+- Batch 2 is complete locally: full-build-6 and full-suite-3 pass; 9503 tests, zero failures/errors,
+  25 skipped. Final service count is 2534 (3 skipped), UI 1071 (1 skipped). Tests migrated all
+  integration/system source sets too. Final XML is tmp/c1-batch2-xml/full-suite-green; the final
+  evidence map and live compact-model plumbing proof are in evidence/C1/batch-2.md. This does not
+  establish standard-model quality or C1 admission/executor behavior, which later batches own.
+
+## D1 re-grounding (2026-09-10, at 4229f1091 plus the C2 design commit 90843f475)
+
+Every Stage D citation above, and every citation in the 2026-09-09 draft of `stages/D1.md`, was
+re-resolved by content in four read-only audits; the complete tables with file:line at
+`4229f1091` are in `evidence/D1/regrounding-2026-09-10.md` and `stages/D1.md` section 0 lists the
+findings that change an item. The facts that supersede entries in this file:
+
+- `KnowledgeServer.swapRuntime` is now `:1336-1366`, still close-then-open, under the C1
+  `runtimeSwapLock` (`:137`) with `closeStarted` refusals (`:1343`, `:1346`); `close()` takes the
+  lock with a five-second `tryLock` (`:2240-2247`) and retains the server on timeout. The
+  same-directory handle-leak comment is `:724-729`; the resumed Blue/Green open is `:731-741`.
+  `RunningRuntime.drainAndClose` no longer closes on timeout: it retains and throws
+  (`RunningRuntime.java:215-221`).
+- The cutover's restart is `KnowledgeServerMigrationOps.java:276` (promote `:267-268`, evidence
+  `:273`); the failed-unit gate `:203-214`; the unreadable-count swallow `:195-202`;
+  `abandonBuildingGeneration` is never called there.
+- `switch_buffer` DDL is `SqliteSchema.java:107-114`; `IngestSwitchBufferOps.isSwitching` is
+  `:62-75` and opens for `SWITCHING` only; payloads are versioned for UPSERT and SYNC_ROOT, raw
+  strings for DELETE; the primary key coalesces per path.
+- `IndexGenerationManager` protects three generations (`:1126-1131`); `abandonBuildingGeneration`
+  `:302-341` has one caller (`KnowledgeServer.java:875`); `pruneMarkedForDeletionBestEffort`
+  `:1004-1040` is reached only through `gcBestEffort` from `MigrationControlOps.java:211`.
+- `max_failed_jobs`: `ResolvedConfigBuilder.java:1503` (-1), `KnowledgeServer.java:210` (-1).
+- `InferenceLifecycleManager.applyConfig` is `:684-851`; the server stops at `:783-787`, `config`
+  is assigned at `:789` (restart) and `:750` (no restart) before the VRAM gate `:791-811` and the
+  health check `:817-818`; `applyConfigRollback` `:865-919`. `setStopServerOnClose` exists
+  (`:1462-1464`, driven from `HeadlessApp.java:1436`). `applyConfig` is reachable only from
+  `OnlineAiServiceImpl:100,163` (`core.reload-inference`, `AdminInferenceReloadHandlers`,
+  `RuntimeActivationService.java:1130`), never from the settings path.
+- `NativeSessionHandle.close()` `:552-577` takes no permit; `closed` `:135` is write-only;
+  `acquireCpu` `:511-514` releases nothing; `getCpuSession` `:596-616` closes a shared session at
+  `:606`; GPU acquisition is interruptible at `:289-308`.
+- `IndexFingerprint.Inputs` `:213-224` has eleven fields; `MODEL_INPUT_KEYS` `:118-119` has three
+  (no BGE-M3); the providers are statics installed at `KnowledgeServer.java:657-667`; chunking
+  is `ChunkSplitter` constants via `SsotCommitMetadataSource.java:191-195`.
+- `gpu-bridge` is on `app-engine`'s compile classpath through `app-services`' `api` edge
+  (`app-services/build.gradle.kts:31`, `app-engine/build.gradle.kts:9`); the worker and ort modules
+  cannot see it. There is no model-registry schema test; `ModelPackage.minVramBytes` is `:63`.
+- `ReadinessDimension` names one composite per dimension (`:14-22,29,36`); there is no `api`
+  dimension; the snapshot's `head` slot is hardcoded ready (`StatusLifecycleHandler.java:1289-1290`);
+  `computeLifecycleSnapshot` `:1285-1356` prefers the manifest lifecycle (`:1345-1350`), the third
+  representation, derived by `LifecycleProjection.derive` (`:31`).
+- `LifecycleReasonCode` has 55 members, 16 `WORKER_*` (`:19-63`); the gate honours
+  `noWordingExempt` (10 entries) besides `feDerived`; no MCP tool exposes the codes.
+- Essential-ready is `dev-runner.cjs:1373-1378` and `engine_probe.rs:61-77`, four fields each;
+  `engine-supervisor.cjs` has none. `EngineExit` constants `:41,58,66,78,81`; no code 5.
+- `KnowledgeServerHealthMonitor` is a registered single-timer owner (`:91`, `:81`, `:204-238`,
+  `:251-273`, rollback at `HeadlessApp.java:634-643`); the boot arm is `:356-613`.
+- `POST /api/worker/restart` (`InferenceHandlers.java:643-687`) routes to the recovery authority
+  (`:698-734`) when no client is bound; `structuredData.port` has no production consumer;
+  `core.restart-worker` is also declared at `CoreSurfaceCatalog.java:285`.
+- The `config-surface` gate ratchets three scalars from a gitignored JSON (`enforcer.mjs:113`,
+  `:110,248,56`); the matrix has 304 rows; `LifecycleStage` is `EnvRegistry.java:1458-1462`.
+- `operation-surfaces.v1.json` is a projection register over `IndexingJobLifecycle` and
+  `ActionEvent` (41 rows, lineage rule at `enforcer.mjs:99-116`); `OperationExecutorImpl.dispatch`
+  `:316-393` has no admission step; `OperationOutcome` is `SUCCESS, FAILURE, UNDONE`.
+- `EngineRoot` constructs `resources`, `admission`, `executors` at `:52-55` and hands `executors`
+  to both halves (`:224`, `:250`); `GpuSchedulingGauge` is created in
+  `KnowledgeServerBootstrap.java:102-103`. `RetainedStateBudget.tryAcquire` returns
+  `Optional<Permit>`; no production producer exists for any kind; `EngineResourcePolicyTest:25-38`
+  is the drift check. `EngineAdmissionController.cancelInteractive` filters `INTERACTIVE` only
+  (`:167-168`); `freezeAdmission` lives on `OperationLeaseService.java:70`.
+- `modules/system-tests` `integrationTest` is capped at 30 minutes (`build.gradle.kts:220-226`)
+  and lists the scenario modules as inputs (`:180-183`); `EngineLifecycleE2ETest` does not exist.
+- `LuceneRuntimeTypes.BuildState` is `{BUILDING, COMPLETE}` and is a commit marker set by
+  `CommitOps.commitWithBuildState` (`:152-155`), already used at cutover
+  (`KnowledgeServerMigrationOps.java:241-246`); no reopen is needed to make a generation active.

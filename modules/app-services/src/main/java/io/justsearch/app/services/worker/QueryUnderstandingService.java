@@ -122,7 +122,8 @@ public final class QueryUnderstandingService {
    *     or empty to skip grounding
    * @return a future containing the boost filters, or null if extraction failed or was skipped
    */
-  public CompletableFuture<QuResult> extract(String query, String indexSnapshot) {
+  public CompletableFuture<QuResult> extract(String query, String indexSnapshot,
+      io.justsearch.core.context.EngineContext engineContext) {
     if (!isAvailable()) {
       return CompletableFuture.completedFuture(null);
     }
@@ -135,7 +136,7 @@ public final class QueryUnderstandingService {
 
     long startNs = System.nanoTime();
     return aiService
-        .chatCompletion(messages, QU_MAX_TOKENS, QU_SAMPLING)
+        .chatCompletion(messages, QU_MAX_TOKENS, QU_SAMPLING, engineContext)
         .orTimeout(QU_DEADLINE_MS, TimeUnit.MILLISECONDS)
         .thenApply(
             json -> {
@@ -145,6 +146,7 @@ public final class QueryUnderstandingService {
             })
         .exceptionally(
             ex -> {
+              io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(ex);
               long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
               log.debug("QU extraction failed after {}ms: {}", elapsedMs, ex.getMessage());
               return null;

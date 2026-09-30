@@ -130,7 +130,7 @@ public final class JobBatchExtractor {
     for (JobQueue.IndexJob job : jobs) {
       if (!running.get()) break;
 
-      ExtractedJob ex = extractJob(job.path(), job.collection());
+      ExtractedJob ex = extractJob(job);
       if (ex != null) {
         extracted.add(ex);
       }
@@ -148,7 +148,10 @@ public final class JobBatchExtractor {
   }
 
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  private ExtractedJob extractJob(Path filePath, String collection) {
+  private ExtractedJob extractJob(JobQueue.IndexJob claim) {
+    Path filePath = claim.path();
+    String collection = claim.collection();
+    JobQueue.EnqueueProvenance provenance = claim.provenance();
     log.debug("Processing: {}", filePath);
 
     long startTime = System.currentTimeMillis();
@@ -162,7 +165,7 @@ public final class JobBatchExtractor {
         journal.recordOutcomeSafely(
             filePath,
             "STALE_DONE",
-            () -> jobQueue.markDone(filePath, admission.outcome(), ledgerEntry(filePath, collection)));
+            () -> jobQueue.markClaimDone(claim, admission.outcome(), ledgerEntry(filePath, collection, provenance)));
         batchStats.recordSkipped();
         return null;
       }
@@ -172,7 +175,7 @@ public final class JobBatchExtractor {
         journal.recordOutcomeSafely(
             filePath,
             admission.outcome().outcomeClass().name(),
-            () -> jobQueue.markFailed(filePath, admission.outcome(), ledgerEntry(filePath, collection)));
+            () -> jobQueue.markClaimFailed(claim, admission.outcome(), ledgerEntry(filePath, collection, provenance)));
         journal.recordFailedMetric(filePath, null);
         batchStats.recordFailed();
         return null;
@@ -181,12 +184,12 @@ public final class JobBatchExtractor {
       if (admission.action() == SourceAdmissionAction.SKIP_DONE) {
         JobQueue.IngestionLedgerEntry entry =
             admission.envelope() != null
-                ? ledgerEntry(admission.envelope(), collection, null)
-                : ledgerEntry(filePath, collection);
+                ? ledgerEntry(filePath, admission.envelope(), collection, null, provenance)
+                : ledgerEntry(filePath, collection, provenance);
         journal.recordOutcomeSafely(
             filePath,
             admission.outcome().outcomeClass().name(),
-            () -> jobQueue.markDone(filePath, admission.outcome(), entry));
+            () -> jobQueue.markClaimDone(claim, admission.outcome(), entry));
         batchStats.recordSkipped();
         return null;
       }
@@ -209,14 +212,13 @@ public final class JobBatchExtractor {
             filePath,
             "WRITE_FAILED(document_identity)",
             () ->
-                jobQueue.markFailed(
-                    filePath,
+                jobQueue.markClaimFailed(claim,
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_FAILED,
                         IngestionReasonCodes.WRITE_FAILED,
                         IngestionRetryPolicy.RETRY_WITH_BACKOFF,
                         failureDetail(identityError)),
-                    ledgerEntry(admittedEnvelope, collection, null)));
+                    ledgerEntry(filePath, admittedEnvelope, collection, null, provenance)));
         journal.recordFailedMetric(filePath, null);
         batchStats.recordFailed();
         return null;
@@ -233,10 +235,9 @@ public final class JobBatchExtractor {
                 filePath,
                 "UNCHANGED",
                 () ->
-                    jobQueue.markDone(
-                        filePath,
+                    jobQueue.markClaimDone(claim,
                         journal.skipped(IngestionReasonCodes.UNCHANGED),
-                        ledgerEntry(envelopeForLedger, collection, null)));
+                        ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
             batchStats.recordSkipped();
             return null;
           }
@@ -267,7 +268,7 @@ public final class JobBatchExtractor {
         sourceSha256AfterExtraction = SourceContentHash.sha256(filePath);
       } catch (IOException changedDuringExtraction) {
         if (staleResolver.tryHandleStale(
-            filePath, envelope, collection, artifact, "after extraction")) {
+            filePath, envelope, collection, artifact, "after extraction", provenance, claim)) {
           batchStats.recordSkipped();
           return null;
         }
@@ -275,7 +276,7 @@ public final class JobBatchExtractor {
       }
       if (!sourceSha256.equals(sourceSha256AfterExtraction)) {
         if (staleResolver.tryHandleStale(
-            filePath, envelope, collection, artifact, "after extraction")) {
+            filePath, envelope, collection, artifact, "after extraction", provenance, claim)) {
           batchStats.recordSkipped();
           return null;
         }
@@ -285,18 +286,18 @@ public final class JobBatchExtractor {
             collection,
             artifact,
             "during extraction",
-            FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED);
+            FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED, provenance, claim);
         batchStats.recordSkipped();
         return null;
       }
 
-      if (staleResolver.tryHandleStale(filePath, envelope, collection, artifact, "after extraction")) {
+      if (staleResolver.tryHandleStale(filePath, envelope, collection, artifact, "after extraction", provenance, claim)) {
         batchStats.recordSkipped();
         return null;
       }
 
       return new ExtractedJob(
-          filePath, collection, artifact, startTime, envelope, sourceSha256, docUid);
+          claim, artifact, startTime, envelope, sourceSha256, docUid);
 
     } catch (BudgetExceededException e) {
       log.warn("Extraction budget exceeded for: {} - {}", filePath, e.getMessage());
@@ -305,14 +306,13 @@ public final class JobBatchExtractor {
           filePath,
           "BUDGET_EXCEEDED",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.BUDGET_EXCEEDED,
                       e.reasonCode(),
                       IngestionRetryPolicy.NONE,
                       failureDetail(e)),
-                  ledgerEntry(envelopeForLedger, collection, null)));
+                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
@@ -323,14 +323,13 @@ public final class JobBatchExtractor {
           filePath,
           "PARSER_TIMEOUT",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.PARSER_TIMEOUT,
                       IngestionReasonCodes.PARSER_TIMEOUT,
                       IngestionRetryPolicy.RETRY_WITH_BACKOFF,
                       failureDetail(e)),
-                  ledgerEntry(envelopeForLedger, collection, null)));
+                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
@@ -341,14 +340,13 @@ public final class JobBatchExtractor {
           filePath,
           "SANDBOX_FAILED",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.SANDBOX_FAILED,
                       IngestionReasonCodes.SANDBOX_FAILED,
                       IngestionRetryPolicy.RETRY_WITH_BACKOFF,
                       failureDetail(e)),
-                  ledgerEntry(envelopeForLedger, collection, null)));
+                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
@@ -359,14 +357,13 @@ public final class JobBatchExtractor {
           filePath,
           "PARSER_FAILED(terminal)",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.PARSER_FAILED,
                       IngestionReasonCodes.PARSER_FAILED,
                       IngestionRetryPolicy.NONE,
                       failureDetail(e)),
-                  ledgerEntry(envelopeForLedger, collection, null)));
+                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
@@ -377,14 +374,13 @@ public final class JobBatchExtractor {
           filePath,
           "IO_FAILED",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.IO_FAILED,
                       IngestionReasonCodes.IO_ERROR,
                       IngestionRetryPolicy.RETRY_WITH_BACKOFF,
                       failureDetail(e)),
-                  ledgerEntry(envelopeForLedger, collection, null)));
+                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
@@ -395,14 +391,13 @@ public final class JobBatchExtractor {
           filePath,
           "PARSER_FAILED(retryable)",
           () ->
-              jobQueue.markFailed(
-                  filePath,
+              jobQueue.markClaimFailed(claim,
                   journal.outcome(
                       IngestionOutcomeClass.PARSER_FAILED,
                       IngestionReasonCodes.PARSER_FAILED,
                       IngestionRetryPolicy.RETRY_WITH_BACKOFF,
                       failureDetail(e)),
-                  ledgerEntry(envelopeForLedger, collection, null)));
+                  ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
       return null;
@@ -432,14 +427,16 @@ public final class JobBatchExtractor {
     return e.getClass().getSimpleName() + ": " + message;
   }
 
-  private JobQueue.IngestionLedgerEntry ledgerEntry(Path filePath, String collection) {
-    return LedgerEntryFactory.forPathOnly(filePath, collection);
+  private JobQueue.IngestionLedgerEntry ledgerEntry(Path filePath, String collection, JobQueue.EnqueueProvenance provenance) {
+    return LedgerEntryFactory.forPathOnly(filePath, collection, provenance);
   }
 
   private JobQueue.IngestionLedgerEntry ledgerEntry(
-      FileEnvelope envelope, String collection, ValidatedExtractionArtifact artifact) {
+      Path filePath, FileEnvelope envelope, String collection, ValidatedExtractionArtifact artifact,
+      JobQueue.EnqueueProvenance provenance) {
+    if (envelope == null) return LedgerEntryFactory.forPathOnly(filePath, collection, provenance);
     return LedgerEntryFactory.forEnvelope(
-        envelope, collection, artifact, contentExtractor.extractionPolicy());
+        envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance);
   }
 
   private void bestEffortDeleteMissingSource(Path filePath) {

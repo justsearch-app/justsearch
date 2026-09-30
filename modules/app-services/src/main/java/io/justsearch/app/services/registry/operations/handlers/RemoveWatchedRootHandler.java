@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -35,7 +37,7 @@ public final class RemoveWatchedRootHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     String pathArg;
     String collection;
     try {
@@ -69,7 +71,7 @@ public final class RemoveWatchedRootHandler implements OperationHandler {
 
     try {
       Path p = Paths.get(pathArg);
-      int deletedJobs = indexing.removeWatchedRoot(collection, p);
+      int deletedJobs = indexing.removeWatchedRoot(collection, p, engineContext);
       return OperationResult.success(
           "Removed watched root " + p + " (" + deletedJobs + " jobs deleted)",
           Map.of(

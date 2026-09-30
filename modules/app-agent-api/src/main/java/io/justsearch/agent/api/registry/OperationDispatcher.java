@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api.registry;
 
+import io.justsearch.core.context.EngineContext;
+
 /**
  * SPI for trust-tier-aware Operation dispatch.
  *
@@ -22,20 +24,29 @@ package io.justsearch.agent.api.registry;
  *       iframe sandbox dispatch.
  * </ul>
  *
- * <p>Per §E.3: {@link #undo(Operation, String)} checks
+ * <p>Per §E.3: {@link #undo(Operation, String, EngineContext)} checks
  * {@code op.policy().undoSupported()} before delegating; operations without undo
  * support fail fast with a typed denial, never reaching the handler.
  */
 public interface OperationDispatcher {
 
   /**
-   * Execute the operation against the parsed argument JSON. Legacy overload — supplies
-   * {@link InvocationProvenance#systemInternal} provenance using the implementation's
-   * clock. Prefer {@link #dispatch(Operation, String, InvocationProvenance)} from new
-   * callsites so the resulting {@code OperationHistoryEntry} carries typed transport /
-   * executor / initiator metadata. Per slice 490 §4.B.
+   * Validate current authority and public key identity, then freeze unknown input without accepting
+   * or executing work or consuming consent. Orchestrators use this before their stricter issuance
+   * gate (for example WATCH on a LOW operation). Only an unknown key prepares; a retained row
+   * returns its receipt. Request display only when a prompt needs the frozen target.
    */
-  OperationResult dispatch(Operation op, String argumentsJson);
+  default OperationDispatchPlan prepare(Operation op, String argumentsJson,
+      InvocationProvenance provenance, EngineContext engineContext, String operationKey,
+      boolean includeApprovalPreview) {
+    throw new UnsupportedOperationException("Preparation-only dispatch is unavailable");
+  }
+
+  /**
+   * Execute with provenance projected from the required context and the implementation's clock.
+   * Callers with an explicit executor or signed intent use the provenance overload.
+   */
+  OperationResult dispatch(Operation op, String argumentsJson, EngineContext engineContext);
 
   /**
    * Execute the operation against the parsed argument JSON, recording the supplied
@@ -47,12 +58,11 @@ public interface OperationDispatcher {
    * so audit / replay / chat-receipt consumers can answer "who triggered this?" via a
    * typed record rather than an opaque string.
    *
-   * <p>Default implementation delegates to the legacy 2-arg overload to keep test wiring
-   * and historical callsites compiling unchanged; concrete implementations override.
+   * <p>The default supplies only an empty confirmation token; it preserves both attribution records.
    */
   default OperationResult dispatch(
-      Operation op, String argumentsJson, InvocationProvenance provenance) {
-    return dispatch(op, argumentsJson);
+      Operation op, String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
+    return dispatch(op, argumentsJson, provenance, java.util.Optional.empty(), engineContext);
   }
 
   /**
@@ -62,34 +72,43 @@ public interface OperationDispatcher {
    * <p>The implementation runs the {@code TrustEvaluator} lattice between
    * {@code validateProvenance} and {@code inputValidator.validate}. When the
    * lattice computes a non-AUTO {@link GateBehavior}, the caller must supply a
-   * confirmation token (any non-empty string in V1; richer token validation is a
-   * follow-up slice). Absent the token on a non-AUTO gate, the dispatcher throws
+   * validated consent capsule or an applicable live durable grant. Without either, the dispatcher throws
    * {@link ConfirmationRequiredException} carrying the gate behavior + the
    * destination's declared {@link ConfirmStrategy} so the caller can render the
    * trust-aware elicitation UX. On {@link GateBehavior#DENY} the dispatcher
    * throws {@link TrustGateDeniedException}.
    *
-   * <p>Default implementation delegates to the 3-arg overload to preserve
-   * back-compat. Concrete implementations override.
+   * <p>Implementations validate that provenance agrees with the Engine context before dispatch.
    */
-  default OperationResult dispatch(
+  OperationResult dispatch(
       Operation op,
       String argumentsJson,
       InvocationProvenance provenance,
-      java.util.Optional<String> confirmationToken) {
-    return dispatch(op, argumentsJson, provenance);
+      java.util.Optional<String> confirmationToken, EngineContext engineContext);
+
+  /** Canonical keyed ingress. Implementations must never silently discard a supplied key. */
+  default OperationResult dispatch(Operation op, String argumentsJson, InvocationProvenance provenance,
+      java.util.Optional<String> confirmationToken, EngineContext engineContext, String operationKey) {
+    if (operationKey != null) throw new UnsupportedOperationException("Keyed dispatch is unavailable");
+    return dispatch(op, argumentsJson, provenance, confirmationToken, engineContext);
+  }
+
+  /** Server-approved reference: a missing/stale nonce must refuse before preparing a replacement. */
+  default OperationResult dispatch(Operation op, String argumentsJson, InvocationProvenance provenance,
+      java.util.Optional<String> confirmationToken, EngineContext engineContext, String operationKey,
+      java.util.UUID preparationNonce) {
+    if (preparationNonce != null) throw new UnsupportedOperationException("Prepared dispatch is unavailable");
+    return dispatch(op, argumentsJson, provenance, confirmationToken, engineContext, operationKey);
   }
 
   /**
    * Undo a previous execution identified by {@code executionId}. Returns a typed
    * failure (not throwing) when the operation's policy does not support undo.
    *
-   * <p>Legacy overload — supplies {@link InvocationProvenance#systemInternal} provenance
-   * and no confirmation token, exactly as the 2-arg {@link #dispatch(Operation, String)}
-   * does. Prefer the 4-arg overload from any callsite that knows its transport, so the
-   * trust gate sees the real source tier.
+   * <p>Projects the required context with no confirmation token. Explicit provenance and consent
+   * travel through the canonical overload below.
    */
-  OperationResult undo(Operation op, String executionId);
+  OperationResult undo(Operation op, String executionId, EngineContext engineContext);
 
   /**
    * Undo a previous execution, carrying the invocation-side provenance and an optional
@@ -105,15 +124,27 @@ public interface OperationDispatcher {
    * {@link ConfirmationRequiredException} the forward dispatch throws; on
    * {@link GateBehavior#DENY}, the same {@link TrustGateDeniedException}.
    *
-   * <p>Default implementation delegates to the 2-arg overload to keep test wiring and
-   * historical callsites compiling unchanged; concrete implementations override.
+   * <p>Implementations preserve both attribution records and evaluate current grant state.
    */
-  default OperationResult undo(
+  OperationResult undo(
       Operation op,
       String executionId,
       InvocationProvenance provenance,
-      java.util.Optional<String> confirmationToken) {
-    return undo(op, executionId);
+      java.util.Optional<String> confirmationToken, EngineContext engineContext);
+
+  /** Undo uses the same key contract; its canonical identity includes the target execution id. */
+  default OperationResult undo(Operation op, String executionId, InvocationProvenance provenance,
+      java.util.Optional<String> confirmationToken, EngineContext engineContext, String operationKey) {
+    if (operationKey != null) throw new UnsupportedOperationException("Keyed undo is unavailable");
+    return undo(op, executionId, provenance, confirmationToken, engineContext);
+  }
+
+  /** Undo preserves the same server preparation reference and cannot downgrade to raw dispatch. */
+  default OperationResult undo(Operation op, String executionId, InvocationProvenance provenance,
+      java.util.Optional<String> confirmationToken, EngineContext engineContext, String operationKey,
+      java.util.UUID preparationNonce) {
+    if (preparationNonce != null) throw new UnsupportedOperationException("Prepared undo is unavailable");
+    return undo(op, executionId, provenance, confirmationToken, engineContext, operationKey);
   }
 
   /**

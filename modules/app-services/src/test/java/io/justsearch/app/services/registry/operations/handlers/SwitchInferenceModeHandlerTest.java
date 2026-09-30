@@ -44,7 +44,7 @@ final class SwitchInferenceModeHandlerTest {
     r.addSpecChangeListener(nudges::incrementAndGet);
 
     OperationResult result =
-        new SwitchInferenceModeHandler(() -> spec, () -> r).execute("{\"mode\":\"online\"}");
+        new SwitchInferenceModeHandler(() -> spec, () -> r).execute("{\"mode\":\"online\"}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertTrue(spec.load().chatEnabled(), "online → chatEnabled true");
@@ -59,7 +59,7 @@ final class SwitchInferenceModeHandlerTest {
     RuntimeReconciler r = reconciler(spec);
 
     OperationResult result =
-        new SwitchInferenceModeHandler(() -> spec, () -> r).execute("{\"mode\":\"indexing\"}");
+        new SwitchInferenceModeHandler(() -> spec, () -> r).execute("{\"mode\":\"indexing\"}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertFalse(spec.load().chatEnabled(), "indexing → chatEnabled false");
@@ -71,7 +71,7 @@ final class SwitchInferenceModeHandlerTest {
     RuntimeSpecStore spec = specStore();
     OperationResult result =
         new SwitchInferenceModeHandler(() -> spec, () -> reconciler(spec))
-            .execute("{\"mode\":\"bananas\"}");
+            .execute("{\"mode\":\"bananas\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Invalid mode"));
   }
@@ -80,7 +80,7 @@ final class SwitchInferenceModeHandlerTest {
   void missingModeFails() {
     RuntimeSpecStore spec = specStore();
     OperationResult result =
-        new SwitchInferenceModeHandler(() -> spec, () -> reconciler(spec)).execute("{}");
+        new SwitchInferenceModeHandler(() -> spec, () -> reconciler(spec)).execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("mode"));
   }

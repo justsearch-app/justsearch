@@ -37,7 +37,7 @@ SSE event name is constant `"frame"`. Consumers route by
   "seq": 42,
   "ts": "2026-05-05T12:34:56.789Z",
   "payload": { /* frame-specific shape */ },
-  "resumeToken": "c3VyZmFjZTpoZWFsdGgtZXZlbnRzOjQy"
+  "resumeToken": "<opaque-source-checkpoint>"
 }
 ```
 
@@ -46,9 +46,8 @@ Field semantics:
 - `streamId` — kind-prefixed slug identifying the stream. Stable
   across reconnects.
 - `frameKind` — top-level discriminator (see below).
-- `seq` — monotonic per-stream sequence number. Starts at 1 on the
-  first frame after stream registration. Gaps may occur across
-  server restarts (consumers detect via the `reset` lifecycle).
+- `seq` — source-allocated sequence, starting at 1. Replayed updates retain their original
+  sequence and can follow a newer control-frame sequence; this is not a delivery checkpoint.
 - `ts` — server-side wall-clock timestamp of frame emission, ISO-8601
   UTC.
 - `payload` — frame-specific data. UPDATE frames carry the
@@ -75,7 +74,7 @@ Field semantics:
   - `heartbeat` — emitted on the heartbeat scheduler tick.
   - `reset` — signals the consumer should discard cached state.
     Emitted when a resume attempt falls outside the window. Always
-    followed by a fresh `snapshot`.
+    followed by a fresh `snapshot` on stateful streams; event-only streams resume live delivery.
   - `closing` — emitted once during graceful shutdown.
 
 ## StreamId
@@ -107,34 +106,40 @@ Validation lives in `StreamId.PATTERN`
 A consumer may include `?since=<resumeToken>` on reconnect. The
 controller decodes the token and either:
 
-1. **Replays in-window UPDATE frames**: when the token's `streamId`
-   matches and its `seq` lies within the channel's ring-buffer
-   window (`oldest <= sinceSeq <= currentSeq`), the controller
-   forwards each retained UPDATE frame with `seq > sinceSeq`. The
-   consumer is brought up to date; no fresh snapshot is emitted.
-2. **Emits `reset` + fresh `snapshot`**: when the token is malformed,
-   from a different stream, from a future / different server
-   lifetime (`sinceSeq > currentSeq`), or predates the ring buffer
-   (`sinceSeq < oldest`, including the empty-buffer-with-positive-
-   sinceSeq case).
+1. **Replays covered UPDATE frames** when the token matches the stream and its channel
+   incarnation, its sequence is no greater than the current source sequence, and it covers
+   the channel's highest discarded-update sequence. Forward retained updates after that
+   checkpoint, without a new snapshot.
+2. **Emits reset and a fresh snapshot** when decoding, incarnation or coverage validation fails.
+   Legacy tokens lack an incarnation and reset. A positive cursor with an empty UPDATE ring
+   is valid for its own incarnation when no update was discarded. Event-only streams reset
+   without a snapshot.
 
-Per slice 436 §B.B Fix B, the empty-buffer guard is essential: a
-client whose token references seq from a previous server lifetime
-must not receive a false-positive "you're up to date" response when
-the new server's buffer is empty.
+Both standalone and multiplexed attachment validate the cursor, capture replay and register
+buffered delivery under one short source lock. Source queries, transport ownership callbacks
+and socket writes run outside that lock. A listener keeps its bounded serial queue after replay;
+overflow retires it and closes its physical connection, releasing sibling subscriptions and
+heartbeat. Ownership is installed before initial replay can block.
 
-Case 1 is **atomic** as of tempdoc 834 S3a: the window check, the
-replay snapshot and the listener registration happen under one
-channel write lock (`SseStreamChannel.subscribeAndReplay`), which
-`publish` excludes via the read lock, so a frame broadcast mid-attach
-reaches the client either through the replay or through the live
-fan-out — never both, never neither. The replay itself is written
-**outside** the lock (two-phase handoff: buffer while draining, flip
-to pass-through under the lock with the buffer empty), so a
-slow-but-alive reattacher cannot stall publishers behind its socket.
+Lifecycle resume tokens describe successfully delivered state. Connected retains a valid
+requested checkpoint; reset clears it. Snapshot acknowledges the source boundary captured
+before its query. Heartbeat and closing retain the last delivered update/snapshot checkpoint,
+even if other clients have since allocated newer control sequences. Consumers must treat tokens
+as opaque acknowledgements rather than deriving one from a frame's sequence.
+
+Frontend reducers acknowledge a frame's resume token only after applying the frame.
+If a reducer throws, EnvelopeStream preserves the prior payload, clears its checkpoint,
+marks the connection disconnected and detaches the source before notifying listeners.
+Its existing reconnect/backoff owner opens a fresh connection without that token;
+late frames from the detached source cannot advance it. If a listener reopens the stream
+during notification, a later failure
+still detaches that replacement source while reusing the single pending reconnect timer.
+The observed sequence remains available for diagnostics and is not a delivery acknowledgement. On a multiplexed
+connection, only the failed logical stream loses its token; unaffected streams retain
+their checkpoints in the reconnect bundle.
 
 `resumeToken` is opaque on the wire (base64-URL-encoded
-`(streamId, seq)` tuple internally; consumers MUST NOT parse it).
+`(streamId, seq, incarnation)` tuple internally; consumers MUST NOT parse it).
 The opacity is contractual so the encoding can change without a
 protocol break.
 
@@ -157,11 +162,9 @@ process (one per change-registry). The channel owns:
 
 - A `StreamSequenceTracker` (atomic monotonic counter, starts at 1).
 - A `FrameHistoryRingBuffer` (default capacity 9000 frames).
-- A listener set (`Set<Consumer<SseEnvelope>>`).
-- A `ReentrantReadWriteLock` guarding the publish-vs-subscribe
-  boundary only (the ring keeps its own monitor). `publish` takes the
-  read lock once per frame; `subscribeAndReplay` takes the write lock
-  once per connection.
+- A listener set with one bounded serial delivery queue per listener.
+- A short publication lock covering sequence allocation, ring append,
+  enqueue and replay registration. Queries and callbacks run outside it.
 
 ### Retention bounds
 
@@ -180,7 +183,8 @@ the run channels in S3b):
   held in a latest-wins map under their own `maxEvidenceBytes`
   budget instead of the narrative ring, so one large replace-only
   frame cannot evict thousands of narrative frames. Replay returns
-  evidence first in seq order, then the narrative tail.
+  evidence first in seq order, then the narrative tail for numeric run replay.
+  Strong envelope replay sorts both tiers by source sequence before advancing checkpoints.
   `oldestSeqOrZero()` answers from the narrative ring whenever it
   holds anything: a stale evidence frame surviving in the slot does
   not make the narrative gap back to its seq replayable.
@@ -222,18 +226,15 @@ public void handle(SseClient sseClient) {
 
 The `attach` orchestrator sequences:
 
-1. Emit `connected` lifecycle.
-2. Read `?since=<token>` from `client.ctx()` (null-safe).
-3. `attemptResumeAndSubscribe(token)` — replays AND subscribes
-   atomically; on miss (nothing replayed, no listener registered)
-   emit `reset`.
-4. If not replayed, build snapshot via the supplied supplier and
-   emit `snapshot` lifecycle.
-5. Subscribe to channel for live UPDATE forwarding — only when step 3
-   did not already do so.
-6. Schedule heartbeat at the supplied cadence.
-7. Register `onClose` to unsubscribe + cancel heartbeat.
-8. Call `client.keepAlive()`.
+1. Install connection cleanup and a pre-created request-completion future.
+2. Read `?since=<token>` and attempt a strong atomic resume. A valid attachment acquires
+   transport ownership before emitting connected and replaying updates.
+3. On a fresh attachment or resume miss, capture a source boundary, query the snapshot outside
+   source locks, then validate/register before sending connected, optional reset, and snapshot.
+   Retry an expired boundary at most three times; never send an invalid snapshot candidate.
+4. Drain buffered live updates after replay and schedule the shared connection heartbeat.
+5. On close, delivery retirement or setup failure, release all owned subscriptions, cancel
+   heartbeat and complete the request future. Acquisitions racing close are released immediately.
 
 A controller's `handle()` method shrinks to ~5 lines of
 delegation; the writer encapsulates the contract uniformly.
@@ -255,25 +256,17 @@ endpoint shape). FE consumers feature-detect to fall back gracefully.
 A version bump signals a wire-incompatible envelope change; field
 additions within v1 are non-breaking per the LSP soft-fail discipline.
 
-## Known limitation: snapshot-vs-subscribe race (no-cursor path only)
+## Snapshot and numeric run attachment
 
-On a **fresh connect with no `?since=`** — 17 of the 18 production
-routes' normal case — the snapshot is built from a caller-supplied
-supplier and only then is `channel.subscribe()` called, so a
-broadcast in between can be missed. The window is small
-(single-thread function call) but real.
+Fresh stateful attachment uses the same source-boundary registration path as multiplexed
+attachment; an update published during the snapshot read is replayed afterward. The snapshot
+may already include that update, so keyed state consumers converge by their declared identity.
+Event-only fresh attachment starts at its captured boundary and does not invent a state snapshot.
 
-This window stays open deliberately (tempdoc 834 §1.3.1): closing it
-means invoking `snapshotExtras.get()` under the channel monitor —
-lock inversion across 18 controllers, each free to take its own locks
-inside that supplier. A catalog self-corrects at its next snapshot,
-so the cost of the race is bounded there.
-
-The **resume path is no longer affected** — see "Resume semantics"
-case 1. A stream that cannot tolerate a dropped frame (a run stream,
-whose lost `chunk` yields a permanently corrupted answer) therefore
-makes "absent cursor ⇒ replay from 0" a protocol requirement and
-never takes the no-cursor path.
+Run streams retain their separate numeric `sinceSeq` contract: zero attaches to the retained
+tail even after eviction, and positive cursors use the run's numeric window checks. The existing
+run snapshot primer precedes replay. Strong opaque envelope cursors never use this permissive
+numeric-zero fallback.
 
 ## Cross-references
 

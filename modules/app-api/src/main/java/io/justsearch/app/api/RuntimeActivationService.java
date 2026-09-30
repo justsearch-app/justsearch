@@ -6,12 +6,16 @@ package io.justsearch.app.api;
  * Composed by {@link RuntimeVariantService} implementations.
  *
  * <p>Interface added as part of tempdoc 519 §9 Block B2. The concrete implementation lives in
- * {@code modules/ui/.../ai/runtime/} with the same simple name; consumers in {@code app-services}
+ * {@code modules/app-services/.../ai/runtime/} with the same simple name; consumers in {@code app-services}
  * import this interface from {@code app-api}.
  *
  * <p>Stability: stable (API contract).
  */
 public interface RuntimeActivationService {
+
+  /** Owner-frozen started status and terminal completion belong to this exact attempt. */
+  record Attempt(AiRuntimeActivationStatus started,
+      java.util.concurrent.CompletionStage<AiRuntimeActivationStatus> completion) {}
 
   /** Return the current activation-flow status (idle / running / completed / failed). */
   AiRuntimeActivationStatus getActivationStatus();
@@ -19,11 +23,12 @@ public interface RuntimeActivationService {
   /** Return the broader runtime status including installed variants and ONNX feature health. */
   AiRuntimeStatusResponse getStatus();
 
-  /** Begin activating the named variant. Idempotent if already activating that variant. */
-  void startActivate(String variantId);
+  /** Begin activating the named variant; refuse if another attempt is running.
+   * The stage resolves after terminal status and owner lease cleanup. */
+  Attempt startActivate(String variantId);
 
-  /** Begin deactivating the currently-active variant (return to default). */
-  void startDeactivate();
+  /** Begin deactivating the currently-active variant; resolve after terminal status and cleanup. */
+  Attempt startDeactivate();
 
   /**
    * Tempdoc 737 (task 3): the ONE authoritative admin-policy check for runtime activation

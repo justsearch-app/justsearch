@@ -6,16 +6,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Opaque server-side codec for SSE envelope resume tokens.
  *
- * <p>Per slice 436 §B.4: the simplest correct implementation is base64-encoded
- * {@code (streamId, seq)} tuple. Documented as opaque so the format can change without
- * a protocol break.
+ * <p>New tokens bind the stream and sequence to one channel incarnation. Legacy tokens
+ * still decode for multiplex routing, but their absent incarnation cannot validate a resume.
  *
  * <p>Token format (intentionally undocumented at the wire boundary): the colon-separated
- * pair {@code "<streamId>:<seq>"}, base64-URL-encoded. {@link #encode} produces the
+ * tuple {@code "<streamId>:<seq>:<incarnation>"}, base64-URL-encoded. {@link #encode} produces the
  * token; {@link #decode} parses it. Decoding rejects malformed tokens by returning
  * {@link Optional#empty()} — the controller treats this identically to "token outside
  * the resume window" (emits {@code reset + snapshot}).
@@ -27,19 +27,17 @@ public final class ResumeTokenCodec {
 
   private ResumeTokenCodec() {}
 
-  /**
-   * Encodes {@code (streamId, seq)} into an opaque base64-URL token.
-   *
-   * <p>Rejects {@code seq < 0} symmetrically with {@link #decode} (which returns empty on a negative
-   * seq) and with {@link Decoded}'s invariant, so {@code decode(encode(streamId, seq))} round-trips
-   * for every valid input.
-   */
-  public static String encode(StreamId streamId, long seq) {
+  /** Encodes a checkpoint owned by one channel incarnation. */
+  public static String encode(StreamId streamId, long seq, UUID incarnation) {
+    return encodeRaw(streamId, seq, ":" + Objects.requireNonNull(incarnation, "incarnation"));
+  }
+
+  private static String encodeRaw(StreamId streamId, long seq, String suffix) {
     Objects.requireNonNull(streamId, "streamId");
     if (seq < 0) {
       throw new IllegalArgumentException("seq must be >= 0");
     }
-    String raw = streamId.value() + ":" + seq;
+    String raw = streamId.value() + ":" + seq + suffix;
     return Base64.getUrlEncoder()
         .withoutPadding()
         .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
@@ -58,26 +56,24 @@ public final class ResumeTokenCodec {
     try {
       byte[] decoded = Base64.getUrlDecoder().decode(token);
       String raw = new String(decoded, StandardCharsets.UTF_8);
-      // streamId itself contains a colon, so split on the LAST colon to separate seq.
-      int lastColon = raw.lastIndexOf(':');
-      if (lastColon < 0) {
+      String[] parts = raw.split(":", -1);
+      if (parts.length != 3 && parts.length != 4) {
         return Optional.empty();
       }
-      String streamIdRaw = raw.substring(0, lastColon);
-      String seqRaw = raw.substring(lastColon + 1);
-      long seq = Long.parseLong(seqRaw);
+      long seq = Long.parseLong(parts[2]);
       if (seq < 0) {
         return Optional.empty();
       }
-      StreamId streamId = new StreamId(streamIdRaw);
-      return Optional.of(new Decoded(streamId, seq));
+      StreamId streamId = new StreamId(parts[0] + ":" + parts[1]);
+      UUID incarnation = parts.length == 4 ? UUID.fromString(parts[3]) : null;
+      return Optional.of(new Decoded(streamId, seq, incarnation));
     } catch (IllegalArgumentException e) {
       return Optional.empty();
     }
   }
 
   /** Decoded resume-token contents. */
-  public record Decoded(StreamId streamId, long seq) {
+  public record Decoded(StreamId streamId, long seq, UUID incarnation) {
     public Decoded {
       Objects.requireNonNull(streamId, "streamId");
       if (seq < 0) {

@@ -232,7 +232,8 @@ final class ValidatorRunnerTest {
     OperationHandler stubHandler =
         new OperationHandler() {
           @Override
-          public OperationResult execute(String argumentsJson) {
+          public OperationResult execute(
+              String argumentsJson, io.justsearch.core.context.EngineContext engineContext) {
             return OperationResult.success("stub");
           }
         };

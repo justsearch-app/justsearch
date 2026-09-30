@@ -21,6 +21,7 @@ import type { Operation, OperationCatalog } from '../../api/types/registry';
 import {
   recordEffect,
   listJournal,
+  journalEventId,
   markUndoableOperation,
   __resetJournalForTest,
   type JournalEntry,
@@ -137,7 +138,7 @@ describe('unifiedActivity (pure projection)', () => {
     );
     const backend: BackendLedgerEntry[] = [
       backendEntry({
-        id: `fe-effect:${entry.id}`,
+        id: journalEventId(entry),
         kind: 'effect',
         effectKind: 'navigate',
         subject: 'justsearch://surface/core.unified-chat-surface',
@@ -449,6 +450,23 @@ describe('openActionLedgerStream (tempdoc 550 G3/G4/G5 — live read-view)', () 
 });
 
 describe('startEffectIngest (tempdoc 550 thesis I — FE effects into the ONE log)', () => {
+  it('distinct fresh journals cannot alias effects that share local numeric id 1', () => {
+    const posted: Array<Record<string, unknown>> = [];
+    const fetchImpl = vi.fn<typeof fetch>((_url, init) => {
+      posted.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return Promise.resolve(new Response('{}', { status: 202 }));
+    });
+    const first = recordEffect({ kind: 'navigate', to: '#first-client' }, CORE_PROVENANCE);
+    startEffectIngest({ fetchImpl })();
+    __resetJournalForTest();
+    const second = recordEffect({ kind: 'navigate', to: '#second-client' }, CORE_PROVENANCE);
+    startEffectIngest({ fetchImpl })();
+    expect(first.id).toBe(1);
+    expect(second.id).toBe(1);
+    expect(posted).toHaveLength(2);
+    expect(posted[0]!.id).not.toBe(posted[1]!.id);
+  });
+
   it('posts FE-local effects to the ingest endpoint but NOT invoke-operation effects', () => {
     const posted: Array<Record<string, unknown>> = [];
     const fetchImpl = vi.fn<typeof fetch>((_url, init) => {

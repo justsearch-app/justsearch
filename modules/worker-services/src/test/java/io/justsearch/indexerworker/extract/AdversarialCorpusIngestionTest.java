@@ -63,7 +63,7 @@ final class AdversarialCorpusIngestionTest {
     queue = new RecordingQueue();
     queue.indexingCoordinator = mock(IndexingCoordinator.class);
     loop =
-        new IndexingLoop(
+        new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             queue,
             queue.indexingCoordinator,
             mock(CommitOps.class),
@@ -76,8 +76,8 @@ final class AdversarialCorpusIngestionTest {
             null,
             null,
             null,
-            new TimeboxedContentExtractor(
-                new PolicyDrivenTikaExtractor(),
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+                new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory()),
                 Duration.ofSeconds(10),
                 (ExtractionMetricCatalog) null),
             null,
@@ -236,7 +236,7 @@ final class AdversarialCorpusIngestionTest {
           }
         };
     IndexingLoop mutatingLoop =
-        new IndexingLoop(
+        new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             queue,
             queue.indexingCoordinator,
             mock(CommitOps.class),
@@ -249,7 +249,7 @@ final class AdversarialCorpusIngestionTest {
             null,
             null,
             null,
-            new TimeboxedContentExtractor(
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                 mutatingExtractor,
                 Duration.ofSeconds(10),
                 (ExtractionMetricCatalog) null),
@@ -295,7 +295,7 @@ final class AdversarialCorpusIngestionTest {
           }
         };
     IndexingLoop mutatingLoop =
-        new IndexingLoop(
+        new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             queue,
             queue.indexingCoordinator,
             mock(CommitOps.class),
@@ -308,7 +308,7 @@ final class AdversarialCorpusIngestionTest {
             null,
             null,
             null,
-            new TimeboxedContentExtractor(
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                 mutatingExtractor,
                 Duration.ofSeconds(10),
                 (ExtractionMetricCatalog) null),
@@ -369,9 +369,9 @@ final class AdversarialCorpusIngestionTest {
             true,
             java.util.Set.of(),
             java.util.Set.of());
-    PolicyDrivenTikaExtractor tightExtractor = new PolicyDrivenTikaExtractor(tightPolicy);
+    PolicyDrivenTikaExtractor tightExtractor = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), tightPolicy);
     IndexingLoop tightLoop =
-        new IndexingLoop(
+        new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             queue,
             queue.indexingCoordinator,
             mock(CommitOps.class),
@@ -384,7 +384,7 @@ final class AdversarialCorpusIngestionTest {
             null,
             null,
             null,
-            new TimeboxedContentExtractor(
+            new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
                 tightExtractor,
                 Duration.ofSeconds(10),
                 (ExtractionMetricCatalog) null),
@@ -449,9 +449,9 @@ final class AdversarialCorpusIngestionTest {
     getExtractor.setAccessible(true);
     Object extractor = getExtractor.invoke(loop);
     Method extractJob =
-        extractor.getClass().getDeclaredMethod("extractJob", Path.class, String.class);
+        extractor.getClass().getDeclaredMethod("extractJob", JobQueue.IndexJob.class);
     extractJob.setAccessible(true);
-    return extractJob.invoke(extractor, file, null);
+    return extractJob.invoke(extractor, new JobQueue.IndexJob(file, null));
   }
 
   private void invokeExtractAndDrain(Path file) throws Exception {

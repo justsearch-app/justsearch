@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Reads the OS energy-intent (Windows) via the Java Foreign Function &amp; Memory (FFM) API,
- * mirroring {@link WindowsJobObject} (Win32 kernel32 via {@link Linker}, no external deps,
+ * in the shape the former {@code WindowsJobObject} used (Win32 kernel32 via {@link Linker}, no external deps,
  * best-effort, null/UNKNOWN off-Windows or on failure). Tempdoc 630.
  *
  * <p>Calls {@code GetSystemPowerStatus}, whose {@code SYSTEM_POWER_STATUS.SystemStatusFlag} byte is

@@ -1,0 +1,110 @@
+{
+  "base": "35ec28055 + owner entry correction",
+  "environment": "Windows / Java25 / PowerShell",
+  "sources": {
+    "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java": "8303985445cf72d52726df749dfe8bb2e8cb698cf17af80957e76869a2be2625",
+    "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java": "714ebd0ff9f9294359a74cad050246212954f3d74440ea1144c60314975f05a5"
+  },
+  "artifacts": [
+    {
+      "path": "tmp/c2-full-build1338.txt",
+      "sha256": "1569faeff511393ed1d01a515d9fcf20fb3ad380173aebc8342c9d95cbf8042d",
+      "bytes": 76527
+    },
+    {
+      "path": "tmp/c2-full-build1338-counts.json",
+      "sha256": "8ecb02180302dfa1b567af27f5abe7c7f7ebf8c1d24b460b15a0fe48d41378be",
+      "bytes": 1057
+    },
+    {
+      "path": "tmp/c2-full-build1338-xml.zip",
+      "sha256": "21d43fe65098870af30a256a1e78099fc493653de75b3cb1d6a74ce3dc9ea00b",
+      "bytes": 8754
+    },
+    {
+      "path": "tmp/c2-full-test1340.txt",
+      "sha256": "2429dd4bfdbd68d84f140064f50fc8b92cc3b7077fa26428fe7cf51465a47d19",
+      "bytes": 51343
+    },
+    {
+      "path": "tmp/c2-full-test1340-counts.json",
+      "sha256": "74d5e4aaa98e73ea8f5a502e3ac2d1c00b6700676a19a76f747f127652a1a442",
+      "bytes": 2727
+    },
+    {
+      "path": "tmp/c2-full-test1340-xml.zip",
+      "sha256": "d5f32db104c9885766f049b7306e4dfe9665742df73e9b467659ab396699250d",
+      "bytes": 1160368
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1341.txt",
+      "sha256": "a75f092af7e110897ad6a8bc71f589c0f89950abcae5b35cff6df80c0624a450",
+      "bytes": 41277
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1341-counts.json",
+      "sha256": "993f551b80f3aa73f6af083db0b46c87f4e9b8bad9aaa55c84e512ff4536e75d",
+      "bytes": 676
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1341-xml.zip",
+      "sha256": "2f87a313d026af5bee0fc1163b343c4484b1e335e03a2f449eb29fda17dc56bd",
+      "bytes": 276554
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1342.txt",
+      "sha256": "ba7ebcfa42be4f0d77429e06693b47088703ec14ae9896f04da6a26ecabbbb0a",
+      "bytes": 40105
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1342-counts.json",
+      "sha256": "c884cd5c0d700b165e33801bf9d159274963981f4c112015007ad322d1524e7a",
+      "bytes": 1027
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1342-xml.zip",
+      "sha256": "836414faba5690f8060313db84efef8529900039d8465005ece57c7cf0636b66",
+      "bytes": 276554
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1343.txt",
+      "sha256": "a408e283296f0c26f3de0ef983c316d5401f7840f03e223caff16a1a3fbf3686",
+      "bytes": 38663
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1343-counts.json",
+      "sha256": "05d65c9cdc76dd11d7cd1abdf46203d638f0dbbc51d5f41206b5539cb076ce36",
+      "bytes": 580
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1343-xml.zip",
+      "sha256": "a9446e3b7ef8ac5c84c1b0500b574f31405cb4bdd50f599ead8009a70f46861d",
+      "bytes": 8750
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1344.txt",
+      "sha256": "4be57e51a514ab1255abf073e9a5584535310a4ba5acb5fe3c3fe1a17740bd98",
+      "bytes": 39822
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1344-counts.json",
+      "sha256": "d9e2bce6801bd2937064391a3a50045baeb17655bbfc36b9e533a68ae03b50c7",
+      "bytes": 978
+    },
+    {
+      "path": "tmp/c2-6-owner-entry1344-xml.zip",
+      "sha256": "bd5c27a24ff4c0679ff6aa64e7a22ca599fc69d3fccd9706bb4bf09b61607089",
+      "bytes": 276554
+    },
+    {
+      "path": "tmp/c2-owner-entry1342-sources.json",
+      "sha256": "388e0d9efb924245892999147bbc49cfdea07ed7477d7505ef5c61736e298414",
+      "bytes": 351
+    },
+    {
+      "path": "tmp/c2-owner-entry1344-restoration.json",
+      "sha256": "388e0d9efb924245892999147bbc49cfdea07ed7477d7505ef5c61736e298414",
+      "bytes": 351
+    }
+  ]
+}

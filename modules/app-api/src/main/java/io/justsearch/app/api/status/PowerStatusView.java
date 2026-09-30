@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 /**
  * OS energy-intent snapshot for the /api/status endpoint (tempdoc 630).
  *
- * <p>Populated from the Head-side {@code WorkerSpawner.energyState()} poll. When {@code
+ * <p>Populated from the {@code EnergyStatePoller.energyState()} poll. When {@code
  * energyReduced} is true the OS has asked apps to reduce background activity (e.g. Windows Energy
  * Saver) and the Worker is deferring GPU/CPU-heavy bulk backfill — the Health Queue card renders
  * this as the calm "Paused — saving energy" state. {@code source} ({@code AC}/{@code BATTERY}/{@code

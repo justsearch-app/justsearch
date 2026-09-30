@@ -1,4 +1,9 @@
 {
+  "shell-v0/components/EngineRecovery.ts": ["engine-recovery"],
+  "boot/desktopRecovery.ts": ["engine-recovery"],
+  "shell-v0/state/admissionWaitNotice.ts": ["engine-admission-wait"],
+  "api/admissionFetch.ts": ["engine-admission-wait"],
+  "shell-v0/api/authorizedFetch.ts": ["engine-admission-wait"],
   "shell-v0/components/searchResults/ResultsCard.ts": [
     "search-results", "command-mode", "zero-results", "input-focus",
     "filters-chips", "search-simple-mode", "search-advanced-mode",

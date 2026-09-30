@@ -4,59 +4,53 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.grpc.ManagedChannel;
-import io.grpc.Server;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.stub.StreamObserver;
-import io.justsearch.app.api.indexing.IndexingJobView;
-import io.justsearch.ipc.IngestServiceGrpc;
 import io.justsearch.ipc.IndexingJobsDelta;
 import io.justsearch.ipc.IndexingJobsFrame;
 import io.justsearch.ipc.IndexingJobsSnapshot;
-import io.justsearch.ipc.SubscribeIndexingJobsRequest;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Slice 445: end-to-end head-side bridge ↔ in-process gRPC stub. Confirms the
- * frame translation logic and listener fan-out without needing a live worker.
+ * Slice 445: head-side bridge ↔ a directly-supplied {@link IndexingJobsSource}. Confirms the frame
+ * translation logic and listener fan-out without needing a live worker.
+ *
+ * <p>The frames are still real {@code io.justsearch.ipc} protos ({@code IndexingJobsFrame} /
+ * {@code IndexingJobsSnapshot} / {@code IndexingJobsDelta} survive at
+ * {@code modules/ipc-common/src/main/proto/indexing.proto:1425/1412/1417}); what changed is how
+ * they reach the bridge. Lane F stage A item A14 deleted the {@code IngestService} service block
+ * from that proto, so {@code IngestServiceGrpc} is no longer generated and the in-process gRPC
+ * server this test used to stand up cannot be built at all. It was never the subject: the bridge
+ * takes a {@code Supplier<IndexingJobsSource>} ({@link RemoteIndexingJobsBridge}:107) and asks it
+ * for frames ({@link IndexingJobsSource}:26), so handing the queued frames straight to
+ * {@code onFrame} exercises exactly the same seam the gRPC round-trip did — with the transport
+ * ceremony removed.
  */
 @DisplayName("RemoteIndexingJobsBridge")
 final class RemoteIndexingJobsBridgeTest {
 
-  private Server server;
-  private ManagedChannel channel;
-  private StubIndexingJobsService stub;
+  private StubIndexingJobsSource stub;
   private RemoteIndexingJobsBridge bridge;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
-  void setUp() throws Exception {
-    String name = InProcessServerBuilder.generateName();
-    stub = new StubIndexingJobsService();
-    server =
-        InProcessServerBuilder.forName(name).directExecutor().addService(stub).build().start();
-    channel = InProcessChannelBuilder.forName(name).directExecutor().build();
-    var stubInstance = IngestServiceGrpc.newStub(channel);
-    bridge = new RemoteIndexingJobsBridge(() -> stubInstance);
+  void setUp() {
+    stub = new StubIndexingJobsSource();
+    processExecutors = new TestEngineExecutors();
+    bridge = new RemoteIndexingJobsBridge(processExecutors, () -> stub);
   }
 
   @AfterEach
-  void tearDown() throws InterruptedException {
+  void tearDown() {
     if (bridge != null) bridge.stop();
-    if (channel != null) {
-      channel.shutdownNow();
-      channel.awaitTermination(2, TimeUnit.SECONDS);
-    }
-    if (server != null) {
-      server.shutdownNow();
-      server.awaitTermination(2, TimeUnit.SECONDS);
-    }
+    if (processExecutors != null) processExecutors.close();
   }
 
   @Test
@@ -260,30 +254,46 @@ final class RemoteIndexingJobsBridgeTest {
   }
 
   /**
-   * In-process gRPC stub: buffers frames queued before subscribe, flushes them
-   * on subscribe, and forwards subsequent frames live.
+   * Direct {@link IndexingJobsSource} fake: buffers frames queued before subscribe, flushes them
+   * on subscribe, and forwards subsequent frames live — the same buffering the gRPC stub service
+   * did before item A14 removed the service that made it expressible.
+   *
+   * <p><b>Delivery is deliberately synchronous on the subscribing/queuing thread.</b> That
+   * replaces the {@code directExecutor()} the in-process gRPC server and channel were both built
+   * with, and it is load-bearing: {@code bridge.start().get(2, SECONDS)} is followed immediately
+   * by {@code assertEquals(1, deliveries.size())}, which only holds if the buffered snapshot
+   * reaches the bridge before {@code subscribe} returns.
    */
-  private static final class StubIndexingJobsService
-      extends IngestServiceGrpc.IngestServiceImplBase {
+  private static final class StubIndexingJobsSource implements IndexingJobsSource {
 
     private final List<IndexingJobsFrame> pre = new java.util.ArrayList<>();
-    private volatile StreamObserver<IndexingJobsFrame> active;
+    private volatile Consumer<IndexingJobsFrame> active;
+    /**
+     * Per-subscription "producer stopped" flag, set by the returned handle's {@code close()} —
+     * which {@link RemoteIndexingJobsBridge#stop()} calls (RemoteIndexingJobsBridge.java:170..181).
+     * Frames queued after a stop are still offered to the live sink and dropped here, exactly as
+     * the gRPC StreamObserver adapter dropped them.
+     */
+    private volatile AtomicBoolean stopped;
 
     @Override
-    public synchronized void subscribeIndexingJobs(
-        SubscribeIndexingJobsRequest request, StreamObserver<IndexingJobsFrame> obs) {
-      active = obs;
+    public synchronized KnowledgeClient.IndexingJobsStream subscribe(
+        Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted) {
+      AtomicBoolean flag = new AtomicBoolean(false);
+      stopped = flag;
+      active = onFrame;
       for (var frame : pre) {
-        obs.onNext(frame);
+        deliver(frame);
       }
       pre.clear();
+      return () -> flag.set(true);
     }
 
     synchronized void queueSnapshot(long seq, List<io.justsearch.ipc.IndexingJobView> items) {
       var snap = IndexingJobsSnapshot.newBuilder().addAllItems(items).build();
       var frame = IndexingJobsFrame.newBuilder().setSnapshot(snap).setSeq(seq).build();
       if (active != null) {
-        active.onNext(frame);
+        deliver(frame);
       } else {
         pre.add(frame);
       }
@@ -292,10 +302,18 @@ final class RemoteIndexingJobsBridgeTest {
     synchronized void queueDelta(long seq, IndexingJobsDelta delta) {
       var frame = IndexingJobsFrame.newBuilder().setDelta(delta).setSeq(seq).build();
       if (active != null) {
-        active.onNext(frame);
+        deliver(frame);
       } else {
         pre.add(frame);
       }
+    }
+
+    private void deliver(IndexingJobsFrame frame) {
+      AtomicBoolean flag = stopped;
+      if (flag == null || flag.get()) {
+        return;
+      }
+      active.accept(frame);
     }
   }
 }

@@ -14,11 +14,12 @@ import org.slf4j.LoggerFactory;
  * may be late-bound in {@code HeadAssembly} after async Worker startup,
  * so eager capture would freeze a null reference.
  *
- * <p>Replicates the restart logic previously inlined in
- * {@code InferenceHandlers.handleRestartWorker}: spawner.restart() →
- * client.reconnect(expectedPid) → client.resetCircuitBreaker(). Reconnect
- * failure is logged at WARN (best-effort; client retries on next call) but
- * doesn't fail the restart itself, matching the pre-existing UX.
+ * <p>Lane F stage A item A11: {@link #restart()} used to be
+ * spawner.restart() → client.reconnect(expectedPid) → client.resetCircuitBreaker(). All three
+ * steps were process- and channel-shaped and all three are gone; the operation now answers
+ * {@link RestartRequiredException} (§10 'restart-as-reload'). It stays registered and reachable
+ * on purpose — retiring the operation is D1's, and an operation that 404s is a worse answer than
+ * one that says what the user must do.
  */
 public final class WorkerServiceImpl implements WorkerService {
 
@@ -32,41 +33,28 @@ public final class WorkerServiceImpl implements WorkerService {
 
   @Override
   public boolean available() {
+    // The worker is 'available' when the index half is composed and answering, which is what the
+    // caller actually wants to know. Before item A11 this asked whether a spawner reference was
+    // held — a proxy for the same question that stopped being answerable when the process went.
     KnowledgeServerBootstrap ks = safeGet();
-    return ks != null && ks.spawner() != null;
+    return ks != null && ks.hasClient();
   }
 
   @Override
   public long workerPid() {
+    // The index half runs in this process since item A6, so its pid is this pid. Reporting 0 (the
+    // 'not running' sentinel) would be a lie whenever it IS running, and reporting a child pid is
+    // impossible.
     KnowledgeServerBootstrap ks = safeGet();
-    if (ks == null || ks.spawner() == null) {
-      return 0L;
-    }
-    return ks.spawner().getWorkerPid();
+    return ks != null && ks.hasClient() ? ProcessHandle.current().pid() : 0L;
   }
 
   @Override
-  public int restart() throws Exception {
-    KnowledgeServerBootstrap ks = safeGet();
-    if (ks == null) {
-      throw new IllegalStateException("Knowledge Server not configured");
-    }
-    if (ks.spawner() == null) {
-      throw new IllegalStateException("Worker spawner unavailable");
-    }
-    int port = ks.spawner().restart();
-    long expectedPid = ks.spawner().getWorkerPid();
-    try {
-      ks.client().reconnect(expectedPid);
-      ks.client().resetCircuitBreaker();
-    } catch (Exception e) {
-      // Best-effort: client has its own reconnect logic. Surface as WARN but
-      // keep the restart "success" — matches the prior bespoke endpoint UX.
-      log.warn(
-          "Worker restarted, but client reconnect failed (will retry on next call): {}",
-          e.getMessage());
-    }
-    return port;
+  public int restart() {
+    // core.restart-worker stays registered and reachable (stage A §9); what changed is the answer.
+    // Item A11 deleted the spawner, so there is no child process to replace — restarting the index
+    // half means restarting the Engine, which is the user's action.
+    throw new RestartRequiredException("Restarting the index half");
   }
 
   private KnowledgeServerBootstrap safeGet() {

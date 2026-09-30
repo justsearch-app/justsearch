@@ -120,7 +120,8 @@ public final class FilterNormalizationService {
    * @return a future containing the normalization result, never null
    */
   public CompletableFuture<NormResult> normalize(
-      KnowledgeSearchRequest.Filters filters, String facetSnapshot) {
+      KnowledgeSearchRequest.Filters filters, String facetSnapshot,
+      io.justsearch.core.context.EngineContext engineContext) {
     if (filters == null) {
       return CompletableFuture.completedFuture(null);
     }
@@ -198,7 +199,7 @@ public final class FilterNormalizationService {
 
     long startNs = System.nanoTime();
     return aiService
-        .chatCompletion(messages, NORM_MAX_TOKENS, NORM_SAMPLING)
+        .chatCompletion(messages, NORM_MAX_TOKENS, NORM_SAMPLING, engineContext)
         .orTimeout(NORM_DEADLINE_MS, TimeUnit.MILLISECONDS)
         .thenApply(
             response -> {
@@ -209,6 +210,7 @@ public final class FilterNormalizationService {
             })
         .exceptionally(
             ex -> {
+              io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(ex);
               long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
               log.debug("Filter normalization LLM failed/timeout after {}ms: {}", elapsedMs, ex.getMessage());
               // Fallback: use deterministic results + lowercased originals for unresolved

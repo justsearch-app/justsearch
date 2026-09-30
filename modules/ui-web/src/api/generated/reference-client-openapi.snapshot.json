@@ -19,6 +19,9 @@
       "operation-history-entry": {
         "$ref": "/api/schemas/operation-history-entry.v1.json"
       },
+      "operation-outcome-view": {
+        "$ref": "/api/schemas/operation-outcome-view.v1.json"
+      },
       "resource": {
         "$ref": "/api/schemas/resource.v1.json"
       },
@@ -29,7 +32,7 @@
         "$ref": "/api/schemas/runtime-live-response.v1.json"
       },
       "runtime-manifest-public": {
-        "$ref": "/api/schemas/runtime-manifest-public.v1.json"
+        "$ref": "/api/schemas/runtime-manifest-public.v2.json"
       },
       "runtime-ready-response": {
         "$ref": "/api/schemas/runtime-ready-response.v1.json"
@@ -775,6 +778,19 @@
         "summary": "POST /api/chat/agent/{sessionId}/attach",
         "tags": [
           "agent"
+        ]
+      }
+    },
+    "/api/chat/approval": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "GET /api/chat/approval",
+        "tags": [
+          "conversation"
         ]
       }
     },
@@ -1613,6 +1629,32 @@
         ]
       }
     },
+    "/api/debug/engine-log": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "GET /api/debug/engine-log",
+        "tags": [
+          "debug"
+        ]
+      }
+    },
+    "/api/debug/eval/document-ids": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/debug/eval/document-ids",
+        "tags": [
+          "debug"
+        ]
+      }
+    },
     "/api/debug/events": {
       "get": {
         "responses": {
@@ -1729,27 +1771,14 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
-    "/api/debug/worker-log": {
+    "/api/diagnostic-channels/engine-log/stream": {
       "get": {
         "responses": {
           "200": {
             "description": "Successful response."
           }
         },
-        "summary": "GET /api/debug/worker-log",
-        "tags": [
-          "debug"
-        ]
-      }
-    },
-    "/api/diagnostic-channels/head-log/stream": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "GET /api/diagnostic-channels/head-log/stream",
+        "summary": "GET /api/diagnostic-channels/engine-log/stream",
         "tags": [
           "resource"
         ],
@@ -2972,6 +3001,38 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
+    "/api/operation-history/{operationKey}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operationKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/operation-outcome-view"
+                }
+              }
+            },
+            "description": "Successful response."
+          }
+        },
+        "summary": "GET /api/operation-history/{operationKey}",
+        "tags": [
+          "resource"
+        ],
+        "x-justsearch-stability": "reference-client",
+        "x-owning-module": "ResourceApiModule"
+      }
+    },
     "/api/operations/{id}/invoke": {
       "post": {
         "parameters": [
@@ -3880,8 +3941,8 @@
     }
   },
   "x-justsearch-route-source": {
-    "routeCount": 243,
-    "routeDigest": "sha256:d282c68bf759eccfa48d472b5fcd6dfde1fca4be6dbcb00606213985fd1dcde8"
+    "routeCount": 246,
+    "routeDigest": "sha256:808aac191a9383af58d242bda38631fc35d709c1a912c38401ece242b95c1d75"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

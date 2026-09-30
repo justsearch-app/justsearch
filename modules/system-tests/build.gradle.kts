@@ -27,7 +27,6 @@ fun intOverride(gradleProp: String, envVar: String, defaultValue: Int): Int {
 }
 
 val includeSystemTests = flagEnabled("includeSystemTests", "JUSTSEARCH_INCLUDE_SYSTEM_TESTS")
-val includeSoakTests = flagEnabled("includeSoakTests", "JUSTSEARCH_INCLUDE_SOAK_TESTS")
 val includeAiTests = flagEnabled("includeAiTests", "JUSTSEARCH_INCLUDE_AI_TESTS")
 val includeAgentTests = flagEnabled("includeAgentTests", "JUSTSEARCH_INCLUDE_AGENT_TESTS")
 val ragEvalTimeoutMinutes = intOverride(
@@ -44,10 +43,6 @@ dependencies {
   api(project(":modules:ipc-common"))
   runtimeOnly(project(":modules:adapters-lucene"))
   api(project(":modules:ai-backend"))
-
-  // gRPC for IPC
-  implementation(libs.grpc.stub)
-  runtimeOnly(libs.grpc.netty.shaded)
 
   // Jackson for JSON manifests
   api(libs.jackson.databind)
@@ -118,14 +113,6 @@ sourceSets {
     compileClasspath += sourceSets.main.get().output + sourceSets.test.get().output
     runtimeClasspath += sourceSets.main.get().output + sourceSets.test.get().output
   }
-
-  // Soak tests (long-running, memory leak detection)
-  create("soakTest") {
-    java.srcDir("src/soakTest/java")
-    resources.srcDir("src/soakTest/resources")
-    compileClasspath += sourceSets.main.get().output + sourceSets.test.get().output
-    runtimeClasspath += sourceSets.main.get().output + sourceSets.test.get().output
-  }
 }
 
 // Configuration for test tiers
@@ -145,15 +132,6 @@ val systemTestRuntimeOnly by configurations.getting {
   extendsFrom(configurations.testRuntimeOnly.get())
 }
 
-val soakTestImplementation by configurations.getting {
-  extendsFrom(configurations.testImplementation.get())
-  extendsFrom(configurations.implementation.get())
-}
-val soakTestRuntimeOnly by configurations.getting {
-  extendsFrom(configurations.testRuntimeOnly.get())
-  extendsFrom(configurations.runtimeOnly.get())
-}
-
 dependencies {
   add("integrationTestImplementation", project(":modules:adapters-lucene"))
   add("integrationTestImplementation", libs.lucene.core)
@@ -163,6 +141,7 @@ dependencies {
   // Tempdoc 847 S5 — the RAG faithfulness metric scores the answer's SENTENCES, so it uses the
   // production splitter (`AnswerSegmentation`) rather than a copy that drifts from it.
   add("integrationTestImplementation", project(":modules:worker-services"))
+  add("integrationTestImplementation", testFixtures(project(":modules:core")))
   add("integrationTestImplementation", testFixtures(project(":modules:ort-common"))) // §14.28 U1 helper
   add("integrationTestImplementation", project(":modules:app-agent"))
   add("integrationTestImplementation", project(":modules:app-agent-api"))
@@ -171,9 +150,20 @@ dependencies {
   // JVM's own java.class.path, so the Head must be ON that classpath. Without this the whole
   // fixture-based tier dies at @BeforeAll with ClassNotFoundException: HeadlessApp.
   add("integrationTestRuntimeOnly", project(":modules:ui"))
+  // Lane F stage A item A12 closure: ExtractionSandboxOrphanE2ETest points the production
+  // JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND override at ChaosExtractionSandboxChild, which has to be
+  // on THIS JVM's classpath because that is the classpath IsolatedBackendFixture hands the Head it
+  // spawns. The fixture moved into worker-services' test fixtures so both it and the in-process
+  // sibling (:modules:app-engine's EngineExtractionSandboxChaosTest) can reach one copy.
+  add("integrationTestImplementation", testFixtures(project(":modules:worker-services")))
   add("integrationTestImplementation", "org.junit.jupiter:junit-jupiter-params:5.14.3")
   add("systemTestImplementation", project(":modules:indexing"))
   add("systemTestImplementation", project(":modules:gpu-bridge"))
+  // Lane F stage A item A12 — the surviving system tests compose the Engine's index half
+  // IN PROCESS (EngineRoot) instead of spawning a Worker and dialling a port. `configuration`
+  // is what publishes the resolved config EngineRoot reads through WorkerConfig.load().
+  add("systemTestImplementation", project(":modules:app-engine"))
+  add("systemTestImplementation", project(":modules:configuration"))
   add("systemTestImplementation", testFixtures(project(":modules:worker-services")))
   add("systemTestImplementation", "org.junit.jupiter:junit-jupiter-params:5.14.3")
 }
@@ -183,12 +173,21 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   description = "Runs integration tests (Golden Corpus, Relevance)."
   group = "verification"
 
-  // Tempdoc 419 / T6.2 — IsolatedBackendFixture spawns HeadlessApp, which spawns the Worker
-  // subprocess from modules/indexer-worker/build/install/indexer-worker. Without this,
-  // fresh-checkout runs see Head boot fine while Worker spawn silently fails (the fixture
-  // would then time out in awaitDocumentSearchable instead of failing fast). Mirrors the
-  // same dependency on :modules:ui:runHeadless (modules/ui/build.gradle.kts:1844).
-  dependsOn(":modules:indexer-worker:installDist")
+  // The terminal-writer supervisor regression launches the normal installed Head distribution.
+  // Build that exact artifact before the test; spawning Gradle from inside the test would violate
+  // the repository's single-build ownership rule and could deadlock on Gradle's own locks.
+  dependsOn(":modules:ui:installDist")
+  inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/hostile-lock-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/processing-replay-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/operation-resume-scenario.mjs"))
+
+  // Tempdoc 419 / T6.2 wired :modules:indexer-worker:installDist here because
+  // IsolatedBackendFixture spawned a HeadlessApp that in turn spawned a Worker subprocess from
+  // that distribution. Lane F stage A item A13 deleted it: the fixture spawns ONE child JVM off
+  // the test JVM's own java.class.path (IsolatedBackendFixture#writeArgfile), which already
+  // carries the index half, so there is no artifact to pre-build.
 
   testClassesDirs = sourceSets["integrationTest"].output.classesDirs
   classpath = sourceSets["integrationTest"].runtimeClasspath
@@ -278,15 +277,9 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   // Forward RAG eval context format for agent-style context experiments (tempdoc 213)
   System.getProperty("rag.eval.context.format")?.let { systemProperty("rag.eval.context.format", it) }
 
-  // Tempdoc 419 / T6.2 — IsolatedBackendFixture spawns HeadlessApp in a child JVM whose
-  // working directory is this module, not the repo root. Pass the absolute worker lib
-  // path through so KnowledgeServerConfig.resolveWorkerLibDir doesn't need to walk
-  // relative paths to find the installDist output. Mirrors the pattern systemTest uses
-  // for justsearch.worker.dist.dir.
-  systemProperty(
-      "justsearch.worker.lib.dir",
-      project(":modules:indexer-worker").layout.buildDirectory
-          .dir("install/indexer-worker/lib").get().asFile.absolutePath)
+  // Item A13 removed the justsearch.worker.lib.dir system property that used to be forwarded
+  // here (tempdoc 419 / T6.2). It pointed KnowledgeServerConfig.resolveWorkerLibDir at the Worker
+  // installDist output; both the resolver and the distribution are gone.
 
   // Tempdoc 829 R3 — this lane is advisory (ci.yml `continue-on-error: true`) and absent
   // from `required_status_checks.contexts`, so a self-recovered flake here cannot change
@@ -300,7 +293,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   // action is registered after the convention plugin's project-wide
   // `tasks.withType<Test>().configureEach { ... }`, so it applies last and wins — the same
   // ordering this file already relies on for other Test-wide convention overrides (e.g.
-  // `maxHeapSize` below for systemTest/soakTest vs. the convention's 384m default).
+  // `maxHeapSize` below for systemTest vs. the convention's 384m default).
   // Flake VISIBILITY does not disappear: it moves to the flaky-test extraction in
   // unit-test attribution (tempdoc 829 R5, same PR). Revisit when this lane joins required
   // contexts (tempdoc 825 §3 is that path).
@@ -366,42 +359,8 @@ val systemTest = tasks.register<Test>("systemTest") {
     showStandardStreams = true
   }
 
-  // Pass system property for worker distribution directory location
-  systemProperty("justsearch.worker.dist.dir", project(":modules:indexer-worker").layout.buildDirectory
-      .dir("install/indexer-worker").get().asFile.absolutePath)
-}
-
-// Soak test task (Memory Leak Detection, Nightly)
-val soakTest = tasks.register<Test>("soakTest") {
-  description = "Runs soak tests (memory leak detection, long-running)."
-  group = "verification"
-
-  // Soak tests are intentionally opt-in; they can take hours.
-  // Enable with `-PincludeSoakTests=true` or `JUSTSEARCH_INCLUDE_SOAK_TESTS=true`.
-  enabled = includeSoakTests
-
-  testClassesDirs = sourceSets["soakTest"].output.classesDirs
-  classpath = sourceSets["soakTest"].runtimeClasspath
-
-  useJUnitPlatform()
-
-  // Time limit: 4 hours (Nightly)
-  timeout.set(Duration.ofHours(4))
-
-  // Soak tests need more heap
-  maxHeapSize = "2g"
-
-  // Enable NMT for the test JVM (for self-tracking if needed)
-  jvmArgs("-XX:NativeMemoryTracking=summary")
-
-  testLogging {
-    events("passed", "skipped", "failed")
-    showStandardStreams = true
-  }
-
-  // Pass system property for worker distribution directory location
-  systemProperty("justsearch.worker.dist.dir", project(":modules:indexer-worker").layout.buildDirectory
-      .dir("install/indexer-worker").get().asFile.absolutePath)
+  // Item A13 removed the justsearch.worker.dist.dir system property: there is no Worker
+  // distribution for a system test to point at.
 }
 
 // Make check depend on unit tests
@@ -417,7 +376,7 @@ tasks.withType<JacocoCoverageVerification>().configureEach {
 // The blanket `pmd { isIgnoreFailures = true }` that used to sit here is gone (tempdoc 930
 // §22.2 follow-up 10). It was the same dormancy hole `modules/benchmarks` carried until
 // follow-up 2 removed it: every PMD task in this module reported and then passed. `pmdMain`
-// was already clean; the 84 violations it was hiding in `systemTest`/`soakTest`/`integrationTest`
+// was already clean; the 84 violations it was hiding in `systemTest`/`integrationTest`
 // were cleared, and `config/pmd/ruleset-tests.xml` drops the two rules that a system test
 // genuinely disproves (`SystemPrintln`, `NonThreadSafeSingleton`) instead of ignoring all of them.
 
@@ -444,11 +403,4 @@ tasks.register("fullTestSuite") {
   description = "Runs all test tiers: unit, integration, and system tests."
   group = "verification"
   dependsOn(tasks.named("test"), integrationTest, systemTest)
-}
-
-// Custom task for nightly test suite (includes soak tests)
-tasks.register("nightlyTestSuite") {
-  description = "Runs all test tiers including soak tests (nightly)."
-  group = "verification"
-  dependsOn(tasks.named("test"), integrationTest, systemTest, soakTest)
 }

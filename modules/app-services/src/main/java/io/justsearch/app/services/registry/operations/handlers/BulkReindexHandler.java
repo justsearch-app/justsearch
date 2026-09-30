@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -21,7 +23,7 @@ import org.slf4j.LoggerFactory;
  * <p>Delegates to {@link IndexingService#startMigration(String)} via a lazy supplier —
  * the IndexingService isn't available until after AppFacade construction, which
  * happens later in {@code HeadAssembly} than handler registration. The supplier
- * closure resolves the live service on each {@link #execute(String)} invocation.
+ * closure resolves the live service on each {@link #execute(String, EngineContext)} invocation.
  *
  * <p>V1 ignores the {@code corpusIds} arg from the Operation declaration — the
  * underlying {@code startMigration} only takes a reason string. Future expansion can
@@ -46,7 +48,7 @@ public final class BulkReindexHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     IndexingService indexing;
     try {
       indexing = indexingSupplier.get();
@@ -69,13 +71,14 @@ public final class BulkReindexHandler implements OperationHandler {
         1800L,
         Map.of("source", "core.bulk-reindex"));
     try {
-      boolean started = indexing.startMigration(MigrationSource.USER_REQUESTED_BULK_REINDEX.wire());
-      if (!started) {
+      var outcome = indexing.startMigration(MigrationSource.USER_REQUESTED_BULK_REINDEX.wire(), engineContext);
+      if (!outcome.accepted()) {
         handle.release(OpLeaseOutcome.FAILURE);
         return OperationResult.failure("Bulk reindex could not be started; see worker logs");
       }
       handle.release(OpLeaseOutcome.SUCCESS);
-      return OperationResult.success("Bulk reindex (migration) started");
+      return OperationResult.success("Bulk reindex (migration) started",
+          Map.of("restartRequired", outcome.restartRequired()));
     } catch (RuntimeException e) {
       handle.release(OpLeaseOutcome.FAILURE);
       log.error("BulkReindexHandler: startMigration threw", e);

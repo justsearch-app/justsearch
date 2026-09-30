@@ -55,11 +55,24 @@ public final class BootstrapInferenceFactory {
    *     fails
    */
   public static InferenceLifecycleManager createInferenceManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       boolean aiEnabled,
       ResolvedConfig resolvedConfig,
       String userDir,
       Telemetry telemetry,
       Logger log) {
+    return createInferenceManager(executors, aiEnabled, resolvedConfig, userDir, telemetry, log,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public static InferenceLifecycleManager createInferenceManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      boolean aiEnabled,
+      ResolvedConfig resolvedConfig,
+      String userDir,
+      Telemetry telemetry,
+      Logger log,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     if (!aiEnabled) {
       log.info("AI features disabled via configuration");
       return null;
@@ -96,9 +109,10 @@ public final class BootstrapInferenceFactory {
       InferenceTelemetryEvents events = buildEvents(telemetry);
       // Note: the persistent InferenceTransitionLog is installed downstream in the
       // composition root (AppFacadeBootstrap) where the head's dataDir is known.
-      return new InferenceLifecycleManager(config, events);
+      return new InferenceLifecycleManager(executors, config, events, childRegistry);
 
     } catch (Exception e) {
+      if (e instanceof io.justsearch.core.execution.EngineExecutorRejectedException refusal) throw refusal;
       log.warn("Failed to create InferenceLifecycleManager; AI features unavailable", e);
       return null;
     }
@@ -109,8 +123,9 @@ public final class BootstrapInferenceFactory {
    * yet. Falls through to the new overload with a noop events sink.
    */
   public static InferenceLifecycleManager createInferenceManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       boolean aiEnabled, ResolvedConfig resolvedConfig, String userDir, Logger log) {
-    return createInferenceManager(aiEnabled, resolvedConfig, userDir, null, log);
+    return createInferenceManager(executors, aiEnabled, resolvedConfig, userDir, null, log);
   }
 
   /**

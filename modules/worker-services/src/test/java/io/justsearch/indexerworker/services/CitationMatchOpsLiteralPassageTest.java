@@ -45,7 +45,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  * hands the scorer, which is what these tests assert about.
  */
 @DisplayName("CitationMatchOps — verification against supplied passage text")
-class CitationMatchOpsLiteralPassageTest {
+class CitationMatchOpsLiteralPassageTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private enum Producer {
     CROSS_ENCODER,
@@ -81,7 +81,7 @@ class CitationMatchOpsLiteralPassageTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     indexChunk(DOC_A, 0, CHUNK_ZERO_TEXT);
     indexChunk(DOC_A, 8, SUPPLIED_PASSAGE);
     indexChunk(DOC_B, 0, "Sourdough starters need a warm kitchen and a patient baker.");

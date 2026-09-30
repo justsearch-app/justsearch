@@ -21,7 +21,6 @@ import io.justsearch.app.api.stream.SseEnvelope;
 import io.justsearch.app.api.stream.SseFrameKind;
 import io.justsearch.app.api.stream.StreamId;
 import io.justsearch.app.observability.stream.FrameHistoryRingBuffer;
-import io.justsearch.app.observability.stream.ResumeTokenCodec;
 import io.justsearch.app.observability.stream.SseStreamChannel;
 import io.justsearch.app.observability.stream.StreamSequenceTracker;
 import java.time.Clock;
@@ -30,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -77,6 +77,10 @@ final class MultiplexedSseWriterTest {
     return sent;
   }
 
+  private static String firstUpdateToken(SseStreamChannel source) {
+    return source.framesSince(0).getFirst().resumeToken();
+  }
+
   // ============================================================
   // attachAll — fan-in (connected / snapshot / event-only)
   // ============================================================
@@ -119,7 +123,8 @@ final class MultiplexedSseWriterTest {
         "event-only channel B must never get a snapshot frame: " + sent);
 
     verify(client).onClose(any());
-    verify(client).keepAlive();
+    verify(client.ctx()).future(any());
+    verify(client, never()).keepAlive();
   }
 
   @Test
@@ -152,16 +157,17 @@ final class MultiplexedSseWriterTest {
     SseStreamChannel chA = new SseStreamChannel(STREAM_A);
     chA.publish(SseFrameKind.UPDATE, Map.of("a", 1));
     chA.publish(SseFrameKind.UPDATE, Map.of("a", 2));
-    String tokenAInWindow = ResumeTokenCodec.encode(STREAM_A, 1L);
+    String tokenAInWindow = firstUpdateToken(chA);
 
     // Channel B: capacity-2 ring buffer, 5 UPDATEs pushed — token at seq=1 predates the buffer.
     SseStreamChannel chB =
         new SseStreamChannel(
             STREAM_B, new StreamSequenceTracker(), new FrameHistoryRingBuffer(2), Clock.systemUTC());
-    for (int i = 0; i < 5; i++) {
+    chB.publish(SseFrameKind.UPDATE, Map.of("i", 0));
+    String tokenBOutOfWindow = firstUpdateToken(chB);
+    for (int i = 1; i < 5; i++) {
       chB.publish(SseFrameKind.UPDATE, Map.of("i", i));
     }
-    String tokenBOutOfWindow = ResumeTokenCodec.encode(STREAM_B, 1L);
 
     // Channel C: no token supplied in the bundle at all.
     SseStreamChannel chC = new SseStreamChannel(STREAM_C);
@@ -180,7 +186,14 @@ final class MultiplexedSseWriterTest {
     MultiplexedSseWriter.attachAll(
         client, sources, heartbeatChannel, Clock.systemUTC(), heartbeatScheduler, 15L);
 
+    verify(client.ctx()).future(any());
+    verify(client, never()).keepAlive();
+
     // Channel A: resumed — replayed seq 2 only, no fresh snapshot, no reset.
+    assertEquals(
+        2,
+        sent.stream().filter(s -> s.contains("\"streamId\":\"system:test-a\"")).count(),
+        "channel A gets connected plus its one replayed UPDATE: " + sent);
     assertFalse(
         sent.stream().anyMatch(s -> s.contains("\"streamId\":\"system:test-a\"") && s.contains("\"kind\":\"snapshot\"")),
         "channel A must not get a fresh snapshot when resume succeeds: " + sent);
@@ -247,6 +260,8 @@ final class MultiplexedSseWriterTest {
 
     verify(mockScheduler, times(1))
         .scheduleAtFixedRate(any(), anyLong(), anyLong(), eq(java.util.concurrent.TimeUnit.SECONDS));
+    verify(client.ctx()).future(any());
+    verify(client, never()).keepAlive();
 
     int beforeTick = sent.size();
     taskCaptor.getValue().run(); // manually fire the scheduled heartbeat tick
@@ -332,9 +347,9 @@ final class MultiplexedSseWriterTest {
                     client, sources, heartbeatChannel, Clock.systemUTC(), heartbeatScheduler, 15L));
     assertEquals(boom, thrown, "the original exception propagates, not a wrapped/swallowed one");
 
-    // onClose was never reached (the exception propagated before it could be registered) — so
-    // without the fix, chA's subscription from the failed attempt would otherwise dangle.
-    verify(client, never()).onClose(any());
+    // The connection owns cleanup from the start of the attach attempt, including when a later
+    // source fails before the method returns.
+    verify(client).onClose(any());
 
     int beforeChAPublish = sent.size();
     chA.publish(SseFrameKind.UPDATE, Map.of("a", "after-failed-attach"));
@@ -358,6 +373,22 @@ final class MultiplexedSseWriterTest {
     // @DisplayName's claim requires but a one-channel setup wouldn't verify.
     SseStreamChannel chA = mock(SseStreamChannel.class);
     when(chA.streamId()).thenReturn(STREAM_A);
+    SseStreamChannel.SnapshotBoundary boundaryA =
+        new SseStreamChannel(STREAM_A).captureSnapshotBoundary();
+    when(chA.captureSnapshotBoundary()).thenReturn(boundaryA);
+    RuntimeException unsubscribeFailureA = new RuntimeException("chA unsubscribe boom");
+    AtomicBoolean chAUnsubscribeAttempted = new AtomicBoolean(false);
+    SseStreamChannel.Subscription subscriptionA =
+        new SseStreamChannel.Subscription() {
+          @Override
+          public void unsubscribe() {
+            chAUnsubscribeAttempted.set(true);
+            throw unsubscribeFailureA;
+          }
+
+          @Override
+          public void onRetire(Runnable listener) {}
+        };
     when(chA.nextEnvelope(any(), any()))
         .thenReturn(
             new SseEnvelope(
@@ -366,18 +397,37 @@ final class MultiplexedSseWriterTest {
                 1L,
                 Instant.now(),
                 Map.of("kind", "connected"),
-                ResumeTokenCodec.encode(STREAM_A, 1L)));
-    RuntimeException unsubscribeFailureA = new RuntimeException("chA unsubscribe boom");
-    AtomicBoolean chAUnsubscribeAttempted = new AtomicBoolean(false);
-    when(chA.subscribe(any()))
-        .thenReturn(
-            () -> {
-              chAUnsubscribeAttempted.set(true);
-              throw unsubscribeFailureA;
+                new SseStreamChannel(STREAM_A)
+                    .nextEnvelope(SseFrameKind.LIFECYCLE, Map.of("kind", "connected"))
+                    .resumeToken()));
+    when(chA.subscribeAndReplay(any(), eq(boundaryA), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              java.util.function.Consumer<SseStreamChannel.Subscription> onRegistered =
+                  invocation.getArgument(3);
+              onRegistered.accept(subscriptionA);
+              invocation.<Runnable>getArgument(2).run();
+              return Optional.of(subscriptionA);
             });
 
     SseStreamChannel chC = mock(SseStreamChannel.class);
     when(chC.streamId()).thenReturn(STREAM_C);
+    SseStreamChannel.SnapshotBoundary boundaryC =
+        new SseStreamChannel(STREAM_C).captureSnapshotBoundary();
+    when(chC.captureSnapshotBoundary()).thenReturn(boundaryC);
+    RuntimeException unsubscribeFailureC = new RuntimeException("chC unsubscribe boom");
+    AtomicBoolean chCUnsubscribeAttempted = new AtomicBoolean(false);
+    SseStreamChannel.Subscription subscriptionC =
+        new SseStreamChannel.Subscription() {
+          @Override
+          public void unsubscribe() {
+            chCUnsubscribeAttempted.set(true);
+            throw unsubscribeFailureC;
+          }
+
+          @Override
+          public void onRetire(Runnable listener) {}
+        };
     when(chC.nextEnvelope(any(), any()))
         .thenReturn(
             new SseEnvelope(
@@ -386,14 +436,17 @@ final class MultiplexedSseWriterTest {
                 1L,
                 Instant.now(),
                 Map.of("kind", "connected"),
-                ResumeTokenCodec.encode(STREAM_C, 1L)));
-    RuntimeException unsubscribeFailureC = new RuntimeException("chC unsubscribe boom");
-    AtomicBoolean chCUnsubscribeAttempted = new AtomicBoolean(false);
-    when(chC.subscribe(any()))
-        .thenReturn(
-            () -> {
-              chCUnsubscribeAttempted.set(true);
-              throw unsubscribeFailureC;
+                new SseStreamChannel(STREAM_C)
+                    .nextEnvelope(SseFrameKind.LIFECYCLE, Map.of("kind", "connected"))
+                    .resumeToken()));
+    when(chC.subscribeAndReplay(any(), eq(boundaryC), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              java.util.function.Consumer<SseStreamChannel.Subscription> onRegistered =
+                  invocation.getArgument(3);
+              onRegistered.accept(subscriptionC);
+              invocation.<Runnable>getArgument(2).run();
+              return Optional.of(subscriptionC);
             });
 
     SseStreamChannel heartbeatChannel = new SseStreamChannel(HEARTBEAT_STREAM);
@@ -455,8 +508,12 @@ final class MultiplexedSseWriterTest {
   @Test
   @DisplayName("parseTokenBundle: splits + decodes a comma-joined bundle, keyed by streamId")
   void parseTokenBundleValid() {
-    String tokenA = ResumeTokenCodec.encode(STREAM_A, 5L);
-    String tokenB = ResumeTokenCodec.encode(STREAM_B, 9L);
+    SseStreamChannel sourceA = new SseStreamChannel(STREAM_A);
+    sourceA.publish(SseFrameKind.UPDATE, Map.of("a", 1));
+    SseStreamChannel sourceB = new SseStreamChannel(STREAM_B);
+    sourceB.publish(SseFrameKind.UPDATE, Map.of("b", 1));
+    String tokenA = firstUpdateToken(sourceA);
+    String tokenB = firstUpdateToken(sourceB);
 
     Map<String, String> parsed = MultiplexedSseWriter.parseTokenBundle(tokenA + "," + tokenB);
 
@@ -468,7 +525,9 @@ final class MultiplexedSseWriterTest {
   @Test
   @DisplayName("parseTokenBundle: malformed entries are dropped silently, valid ones survive")
   void parseTokenBundleMalformedDropped() {
-    String tokenA = ResumeTokenCodec.encode(STREAM_A, 1L);
+    SseStreamChannel sourceA = new SseStreamChannel(STREAM_A);
+    sourceA.publish(SseFrameKind.UPDATE, Map.of("a", 1));
+    String tokenA = firstUpdateToken(sourceA);
 
     Map<String, String> parsed =
         MultiplexedSseWriter.parseTokenBundle("not-a-valid-token," + tokenA + ",,  ");

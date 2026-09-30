@@ -82,7 +82,7 @@ final class UiModeIntentHttpContractTest {
   }
 
   private static LocalApiServer start(Path settingsPath, Path indexPath) {
-    return LocalApiServer.builder(
+    return LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath), indexPath)
         .build();
   }

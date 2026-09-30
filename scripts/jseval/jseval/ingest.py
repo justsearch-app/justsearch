@@ -78,14 +78,12 @@ def ingest_and_wait(
     )
 
     if not watcher_active and expected_min > initial_count:
-        # Watcher didn't start — corpus is likely already indexed.
-        # Don't use the additive floor or we'll block forever.
+        # A slow/temporarily unobservable watcher does not prove that a new root was indexed.
+        # Already-watched roots have their union floor computed above; retain that authority.
         log.info(
-            "Watcher didn't queue new jobs; corpus may already be indexed. "
-            "Relaxing doc-count floor from %d to %d.",
-            expected_min, initial_count,
+            "No watcher activity observed yet; retaining required doc-count floor %d.",
+            expected_min,
         )
-        expected_min = initial_count
 
     # Timeline recording (item 5).
     from . import timeline as tl_mod

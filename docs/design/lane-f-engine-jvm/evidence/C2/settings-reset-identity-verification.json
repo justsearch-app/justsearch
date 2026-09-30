@@ -1,0 +1,108 @@
+{
+  "base": "001f7e20f + four-file canonical accepted identity correction",
+  "environment": "Windows / Java25 / PowerShell",
+  "sources": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationDescriptor.java",
+      "sha256": "039415b783434a97852fc689720fb9e52f8f6bacb1379b108717d1d88e6decb8",
+      "bytes": 1952
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/PreparedInvocationCodec.java",
+      "sha256": "37797e9d208c5a82a0a078edc81e2f6f694a843c0a2553475bcbe3f3db7c1c33",
+      "bytes": 6400
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsResetPreparation.java",
+      "sha256": "edb9bf49a68652bd71e4b65db82ada9b7673d67fc17a7391669e4d762493d8e8",
+      "bytes": 5840
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/SettingsResetPreparationTest.java",
+      "sha256": "9a18f2a1d4e91f58a410d01bedc8a6dce6f6f78fe913fcba01002244409953d7",
+      "bytes": 9232
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-6-reset-owner1329-counts.json",
+      "sha256": "6e21f05652db8cd6cc7e04504d7c7c60679a9d597a6909c92bc6bbb08cbc996d",
+      "bytes": 1180
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1329-xml.zip",
+      "sha256": "869499fe9afbc38794939751faa04c36e504447319953d5eee63bec659f41e75",
+      "bytes": 239959
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1329.txt",
+      "sha256": "c586b4d4523b86bb457f74a2d78ec13567732867e6a2e81fc256561c36efd0a2",
+      "bytes": 49101
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1330-counts.json",
+      "sha256": "0792c029a1df4dd55d81ff711dfa65ac3a5839ad3b8b6717f9d4570e828bbd68",
+      "bytes": 1251
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1330-source.json",
+      "sha256": "b2025934e5dfe0d31ed887a54e42b4f81e41705303b7393a2be79de82a008cd7",
+      "bytes": 2989
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1330-xml.zip",
+      "sha256": "610966b3c3c2fe131b4beb9cde646e5f2d34ccc5ea49fe90b11373510cb0e3e8",
+      "bytes": 270097
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1330.txt",
+      "sha256": "42eb958b734b347dbb405d2da365954980339ee6df507cfaddd940e4036bb380",
+      "bytes": 46934
+    },
+    {
+      "path": "tmp/c2-6-reset-identity-negative1331-counts.json",
+      "sha256": "91d714ddb01f4c752fa3f835433c304cd6bab338a8a19681dba7bd83f5b1789e",
+      "bytes": 589
+    },
+    {
+      "path": "tmp/c2-6-reset-identity-negative1331-PreparedInvocationCodec.java.original",
+      "sha256": "37797e9d208c5a82a0a078edc81e2f6f694a843c0a2553475bcbe3f3db7c1c33",
+      "bytes": 6400
+    },
+    {
+      "path": "tmp/c2-6-reset-identity-negative1331-SettingsResetPreparation.java.original",
+      "sha256": "edb9bf49a68652bd71e4b65db82ada9b7673d67fc17a7391669e4d762493d8e8",
+      "bytes": 5840
+    },
+    {
+      "path": "tmp/c2-6-reset-identity-negative1331-xml.zip",
+      "sha256": "e8f72b08009356d1b5aabf0871df6acbf8f24740962517465aebbf85e223d22f",
+      "bytes": 38046
+    },
+    {
+      "path": "tmp/c2-6-reset-identity-negative1331.txt",
+      "sha256": "9668d98e399296da91191f5ac0b0ab166d033dc455a339436ccde80cbe897944",
+      "bytes": 38361
+    },
+    {
+      "path": "tmp/c2-6-reset-identity1332-counts.json",
+      "sha256": "98c1a2210dc5bc7f3cb0493cf5c9abf4cd364c93a384adc82f5e1452ee8bbec4",
+      "bytes": 918
+    },
+    {
+      "path": "tmp/c2-6-reset-identity1332-source.json",
+      "sha256": "b2025934e5dfe0d31ed887a54e42b4f81e41705303b7393a2be79de82a008cd7",
+      "bytes": 2989
+    },
+    {
+      "path": "tmp/c2-6-reset-identity1332-xml.zip",
+      "sha256": "f8737bacbd92109b1f47d7105ddbaa5f5926cad4d7f3bf353568eb919d7f0831",
+      "bytes": 40670
+    },
+    {
+      "path": "tmp/c2-6-reset-identity1332.txt",
+      "sha256": "a73cd1ad4d57efb6f90215557c944c04c3e52e299f7124ed91be0a69c7474b17",
+      "bytes": 40414
+    }
+  ]
+}

@@ -35,14 +35,14 @@ import org.junit.jupiter.api.io.TempDir;
  * compares correctly would each pass their own unit test while every chunk RMW in production failed
  * closed.
  */
-final class ChunkParentRevisionGuardTest {
+final class ChunkParentRevisionGuardTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime runtime;
 
   @BeforeEach
   void setUp() {
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach

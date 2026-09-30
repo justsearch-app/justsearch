@@ -505,7 +505,9 @@ const registerTests = [
         'dir',              // cleanDataDir — a data dir
         'dir',              // authoredStoreTopLevelNames — a data dir
         'libDir',           // computeHeadDistStamp — modules/ui/build/install/ui/lib
-        'libDir',           // assessHotReloadClasspath — the indexer-worker dist lib dir (M3)
+        // Lane F stage A item A13: this was the indexer-worker dist lib dir; that distribution is
+        // gone, so both sites now read the one Engine dist lib.
+        'libDir',           // assessHotReloadClasspath — modules/ui/build/install/ui/lib (M3)
         'runsDirectory',    // pruneHistoricRuns — <stateRoot>/runs, the one dir it globs
         'srcDir',           // stageSharedCuda12 — the shared cuda12 staging source
       ].sort(),

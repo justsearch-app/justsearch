@@ -59,7 +59,7 @@ import org.junit.jupiter.api.Test;
  * survived the arrival of documents, so a fresh profile with a broken embedding runtime stamped an
  * attestation over vector-less documents and closed its own recovery path forever.
  */
-class EmbeddingCompatibilityBootOrderingTest {
+class EmbeddingCompatibilityBootOrderingTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String FP = "boot-ordering-embed-fp-sha256";
   private static final String SIBLING_FP = "boot-ordering-splade-fp-sha256";
@@ -98,7 +98,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(
@@ -167,7 +167,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var reopened =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       assertEquals(
           HELP_DOC_COUNT,
@@ -204,7 +204,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(
@@ -257,7 +257,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var reopened =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       assertEquals(HELP_DOC_COUNT, (int) docCountOrThrow(reopened), "sanity: documents on disk");
       var freshEcc =
@@ -293,7 +293,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       // The indexing loop started first (KnowledgeServer.java:702, synchronous) and the Head's
       // help batch landed while initDeferredModels was still composing ONNX sessions on the

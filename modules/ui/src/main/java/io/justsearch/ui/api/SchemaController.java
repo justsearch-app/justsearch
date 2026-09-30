@@ -61,6 +61,7 @@ public final class SchemaController {
           "health-event.v1.json",
           "indexing-job-view.v1.json",
           "operation-history-entry.v1.json",
+          "operation-outcome-view.v1.json",
           "operation.v1.json",
           "prompt.v1.json",
           "resource.v1.json",
@@ -82,7 +83,7 @@ public final class SchemaController {
           // RouteContractPolicy for both /api/indexing-jobs/failed routes.
           "failed-indexing-jobs-response.v1.json",
           // Tempdoc 899 D6: canonical schemas for the six-operation runtime client projection.
-          "runtime-manifest-public.v1.json",
+          "runtime-manifest-public.v2.json",
           "runtime-ready-response.v1.json",
           "runtime-live-response.v1.json",
           "lifecycle-snapshot.v1.json",

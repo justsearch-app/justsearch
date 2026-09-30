@@ -12,8 +12,10 @@ package io.justsearch.app.api;
  * <p>Adding a new error code requires:
  * <ol>
  *   <li>Add the enum value here with its {@code ErrorClass}</li>
- *   <li>Add a corresponding entry in {@code errorMessages.ts} (frontend catalog)</li>
- *   <li>The contract test ({@code ApiErrorCodeContractTest}) enforces (2)</li>
+ *   <li>Add its key in {@code messages/errors.en.properties}; the webview loads that catalog
+ *       through {@code i18n/errorCatalog.ts}</li>
+ *   <li>{@code ErrorMessagePropertiesContractTest} and {@code ErrorCatalogJsonArtifactTest}
+ *       enforce catalog completeness and the generated JSON projection</li>
  * </ol>
  *
  * <p>This enum covers API-layer errors only. Agent-domain errors use
@@ -284,6 +286,12 @@ public enum ApiErrorCode {
 
     /** LLM server is overloaded — retry later. */
     LLM_OVERLOADED(ErrorClass.TRANSIENT),
+
+    /** The declared caller already has its allowed concurrent work in flight. */
+    ADMISSION_CONTEXT_LIMIT(ErrorClass.TRANSIENT),
+
+    /** The Engine's aggregate work or executor capacity is occupied. */
+    ADMISSION_ENGINE_LIMIT(ErrorClass.TRANSIENT),
 
     /** Summary generation failed. */
     SUMMARIZE_FAILED(ErrorClass.PERMANENT),

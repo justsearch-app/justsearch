@@ -90,7 +90,7 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
     return op;
   }
@@ -148,7 +148,7 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -167,7 +167,7 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -195,7 +195,7 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -218,7 +218,7 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -346,7 +346,7 @@ public final class IndexingCoordinator {
         session.queueDepth.decrementAndGet();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -412,7 +412,7 @@ public final class IndexingCoordinator {
         session.queueDepth.addAndGet(-documents.size());
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -431,7 +431,7 @@ public final class IndexingCoordinator {
         session.queueDepth.decrementAndGet();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -450,7 +450,7 @@ public final class IndexingCoordinator {
         session.queueDepth.decrementAndGet();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -469,12 +469,19 @@ public final class IndexingCoordinator {
         session.queueDepth.decrementAndGet();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
   void guardBackpressure() {
     guardBackpressure(1);
+  }
+
+  private void releaseWriteBarrierAndReport() {
+    session.writeBarrier.readLock().unlock();
+    if (session.writeBarrier.getReadHoldCount() == 0) {
+      session.reportTerminalWriterFailureIfPresent();
+    }
   }
 
   private void guardBackpressure(int delta) {

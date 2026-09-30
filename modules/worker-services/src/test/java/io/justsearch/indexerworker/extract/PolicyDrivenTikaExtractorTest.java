@@ -34,6 +34,31 @@ final class PolicyDrivenTikaExtractorTest {
   @TempDir Path tempDir;
 
   @Test
+  void ocrCapacityRefusalPreservesRealStructuredPdfText() throws Exception {
+    Path pdf = tempDir.resolve("mixed-refused.pdf");
+    writeMixedTextAndImagePdf(pdf);
+    var config = new OcrRoutingConfig(true, List.of("eng"), 20_000, 5, 4096, 40_000_000, null, null);
+    var metrics = new TestMetricRegistry(OcrMetricCatalog.DEFINITIONS);
+    var opens = new java.util.concurrent.atomic.AtomicInteger();
+    try (var runtime = org.mockito.Mockito.mockStatic(TikaOcrRuntime.class);
+        var extractor = new PolicyDrivenTikaExtractor(workers -> {
+          opens.incrementAndGet();
+          throw new io.justsearch.core.execution.EngineExecutorRejectedException(
+              io.justsearch.core.execution.EngineExecutorRejectedException.Reason.INSTANCE_LIMIT,
+              "index.pdf-ocr", 1);
+        }, TikaExtractionPolicy.defaults(), config, new OcrMetricCatalog(metrics))) {
+      runtime.when(() -> TikaOcrRuntime.blockedReason(config)).thenReturn("");
+      ExtractionArtifact result = extractor.extractArtifact(pdf);
+      assertEquals(1, opens.get(), "real mixed-PDF routing must reach the refusing OCR pool");
+      assertTrue(result.result().content().contains("readable digital text"));
+      assertTrue(result.parserId().contains("structured"));
+      assertFalse(result.visualExtractionEvidenceJson().contains("PARSER_FAILED"));
+      assertEquals(1, metrics.counterValue(OcrMetricCatalog.FAILED_TOTAL,
+          OcrTags.OcrFailureTags.of(OcrRoutingConfig.ENGINE, "INSTANCE_LIMIT")));
+    }
+  }
+
+  @Test
   @Timeout(10)
   void outputLimitProducesValidatedPartialArtifact() throws Exception {
     Path file = tempDir.resolve("long.txt");
@@ -42,7 +67,7 @@ final class PolicyDrivenTikaExtractorTest {
         new TikaExtractionPolicy(
             "tiny-policy", 5, 1024, 1024, 128, 128, 4096, 0, 0, 100.0d, true, Set.of(), Set.of());
 
-    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(policy).extractArtifact(file);
+    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), policy).extractArtifact(file);
 
     assertEquals("tiny-policy", artifact.policyId());
     assertTrue(artifact.truncated());
@@ -90,7 +115,7 @@ final class PolicyDrivenTikaExtractorTest {
             Set.of(),
             Set.of());
 
-    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(policy).extractArtifact(file);
+    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), policy).extractArtifact(file);
 
     assertEquals(maxChars, artifact.result().content().length());
     assertTrue(artifact.truncated());
@@ -154,7 +179,7 @@ final class PolicyDrivenTikaExtractorTest {
         new TikaExtractionPolicy(
             "policy-b", 1024, 1024, 1024, 128, 128, 4096, 0, 0, 100.0d, true, Set.of(), Set.of());
 
-    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(policyA).extractArtifact(file);
+    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), policyA).extractArtifact(file);
     assertEquals("policy-a", artifact.policyId());
 
     ExtractionException thrown =
@@ -168,7 +193,7 @@ final class PolicyDrivenTikaExtractorTest {
     Path html = tempDir.resolve("structured.html");
     Files.writeString(html, "<html><body><h1>Heading</h1><p>Paragraph</p></body></html>");
 
-    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor().extractArtifact(html);
+    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory()).extractArtifact(html);
 
     assertTrue(artifact.result().content().contains("Heading"));
     assertTrue(
@@ -197,7 +222,7 @@ final class PolicyDrivenTikaExtractorTest {
             Set.of(),
             Set.of("text/plain"));
 
-    assertThrows(ExtractionException.class, () -> new PolicyDrivenTikaExtractor(policy).extract(file));
+    assertThrows(ExtractionException.class, () -> new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), policy).extract(file));
   }
 
   /**
@@ -225,7 +250,7 @@ final class PolicyDrivenTikaExtractorTest {
       }
     }
 
-    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor().extractArtifact(file);
+    ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory()).extractArtifact(file);
 
     assertTrue(
         artifact.truncated(),
@@ -257,7 +282,7 @@ final class PolicyDrivenTikaExtractorTest {
             .formatted(uri));
 
     try {
-      ExtractionArtifact artifact = new PolicyDrivenTikaExtractor().extractArtifact(xml);
+      ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory()).extractArtifact(xml);
       assertFalse(artifact.result().content().contains("SECRET-XXE-CONTENT"));
     } catch (ExtractionException e) {
       assertFalse(e.getMessage().contains("SECRET-XXE-CONTENT"));
@@ -273,7 +298,7 @@ final class PolicyDrivenTikaExtractorTest {
     OcrMetricCatalog catalog = new OcrMetricCatalog(registry);
 
     ExtractionArtifact artifact =
-        new PolicyDrivenTikaExtractor(
+        new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(),
                 TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled(), catalog)
             .extractArtifact(image);
 
@@ -300,7 +325,7 @@ final class PolicyDrivenTikaExtractorTest {
         new OcrRoutingConfig(true, List.of("eng"), 10_000, 1, 10, 40_000_000, null, null);
 
     ExtractionArtifact artifact =
-        new PolicyDrivenTikaExtractor(TikaExtractionPolicy.defaults(), guarded, catalog)
+        new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), TikaExtractionPolicy.defaults(), guarded, catalog)
             .extractArtifact(image);
 
     assertFalse(OcrRoutingConfig.PARSER_ID.equals(artifact.parserId()));
@@ -321,12 +346,12 @@ final class PolicyDrivenTikaExtractorTest {
     Path image = tempDir.resolve("ocr-alpha.png");
     writeTextImage(image, "ALPHA DOCUMENT");
     PolicyDrivenTikaExtractor admissionProbe =
-        new PolicyDrivenTikaExtractor(TikaExtractionPolicy.defaults(), ocrConfig);
+        new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), TikaExtractionPolicy.defaults(), ocrConfig);
     assertTrue(
         admissionProbe.shouldAttemptOcrForTesting(
             image, "image/png", "", StructuredDocumentSummary.empty()),
         "empty raster image should be OCR-admitted");
-    String directText = PdfOcrEngine.create(ocrConfig, null).ocrImage(image, Integer.MAX_VALUE).text();
+    String directText = PdfOcrEngine.create(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), ocrConfig, null).ocrImage(image, Integer.MAX_VALUE).text();
     TikaOcrRuntime.RuntimePaths runtimePaths = TikaOcrRuntime.resolve();
     assertTrue(
         directText.toLowerCase(java.util.Locale.ROOT).contains("alpha"),
@@ -339,7 +364,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, catalog)) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, catalog)) {
       artifact = extractor.extractArtifact(image);
     }
 
@@ -402,7 +427,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, catalog)) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, catalog)) {
       artifact = extractor.extractArtifact(image);
     }
 
@@ -440,7 +465,7 @@ final class PolicyDrivenTikaExtractorTest {
     Path pdf = tempDir.resolve("mixed-image.pdf");
     writeMixedTextAndImagePdf(pdf);
     PolicyDrivenTikaExtractor admissionProbe =
-        new PolicyDrivenTikaExtractor(TikaExtractionPolicy.defaults(), ocrConfig);
+        new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), TikaExtractionPolicy.defaults(), ocrConfig);
     assertTrue(
         admissionProbe.shouldAttemptOcrForTesting(
             pdf,
@@ -451,7 +476,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, OcrMetricCatalog.noop())) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, OcrMetricCatalog.noop())) {
       artifact = extractor.extractArtifact(pdf);
     }
 
@@ -485,7 +510,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, OcrMetricCatalog.noop())) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, OcrMetricCatalog.noop())) {
       artifact = extractor.extractArtifact(pdf);
     }
 
@@ -519,7 +544,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, OcrMetricCatalog.noop())) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, OcrMetricCatalog.noop())) {
       artifact = extractor.extractArtifact(pdf);
     }
 
@@ -572,7 +597,7 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact;
     try (TimeboxedContentExtractor extractor =
-        ExtractionSandboxFactory.inProcessStructured(null, ocrConfig, OcrMetricCatalog.noop())) {
+        ExtractionSandboxFactory.inProcessStructured(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), null, ocrConfig, OcrMetricCatalog.noop())) {
       artifact = extractor.extractArtifact(pdf);
     }
 

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "owner": "EngineRoot",
+  "note": "Target policy for execution and retained state. awaitingProducer is an unimplemented measurement/enforcement path, never a zero live count or passing bound. C1 declares targets; the named stages connect each retained owner.",
+  "policy": {
+    "perContextLimit": 16,
+    "aggregateLimit": 64,
+    "retryAfterSeconds": 1,
+    "foregroundThreads": 16,
+    "foregroundQueue": 48,
+    "backgroundThreads": 4,
+    "backgroundQueue": 64,
+    "timerRegistrations": 256,
+    "directMemoryMiB": 256
+  },
+  "retained": [
+    {
+      "kind": "search-cursors",
+      "cap": 32,
+      "perContextCap": 4,
+      "awaitingProducer": "D2",
+      "response": "CURSOR_EXPIRED",
+      "note": "The cursor owner evicts its context's oldest cursor and releases the reader before admitting a replacement."
+    },
+    {
+      "kind": "pinned-readers",
+      "cap": 34,
+      "awaitingProducer": "D2",
+      "note": "Aggregate cursor cap plus at most one reader per protected target generation."
+    },
+    {
+      "kind": "representation-generations",
+      "cap": 2,
+      "awaitingProducer": "D1",
+      "note": "Target active plus candidate. Current IndexGenerationManager can protect active, building and previous: three distinct generations. D1 must reconcile rollback retention with this target before claiming enforcement."
+    },
+    {
+      "kind": "co-resident-encoders",
+      "cap": 2,
+      "awaitingProducer": "D1",
+      "note": "Count ceiling only. D1 additionally checks each generation's declared footprint against free device memory; this count does not prove device-memory fit."
+    },
+    {
+      "kind": "attempted-configurations",
+      "cap": 1,
+      "awaitingProducer": "D1",
+      "note": "There is no retained attempted configuration at C1. The existing synchronized applyConfig invocation and pre-VDU restore snapshot are different lifetimes."
+    }
+  ]
+}

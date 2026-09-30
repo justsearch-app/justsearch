@@ -102,7 +102,7 @@ class UnreferencedCodeTest {
           // wrappers had no production callers; production uses EmbeddingBackfillOps statics.
           Map.entry("HeadAssembly.chooseFirstNonBlank", "reflection shim for HeadAssemblyTest"),
           // worker-services module not on app-launcher classpath — callers invisible
-          Map.entry("RagContextOps.executeRetrieval", "called from GrpcSearchService (worker-services)"),
+          Map.entry("RagContextOps.executeRetrieval", "called from WorkerSearchService (worker-services)"),
           Map.entry("RagContextOps.searchChunksWithMeta", "called from executeRetrieval overload (same class)"),
           Map.entry("ChunkRerankResult.wasReranked", "called from RagContextOps (worker-services)"),
           // Tempdoc 517 — static delegates called from SearchOrchestratorPipelineDispatchTest

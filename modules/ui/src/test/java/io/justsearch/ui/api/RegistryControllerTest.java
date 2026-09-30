@@ -23,7 +23,7 @@ import io.justsearch.agent.api.registry.OperationCatalog;
 import io.justsearch.agent.api.registry.PromptCatalog;
 import io.justsearch.agent.api.registry.ResourceCatalog;
 import io.justsearch.app.observability.ledger.ActionLedgerResourceCatalog;
-import io.justsearch.app.observability.diagnostic.HeadLogDiagnosticChannelCatalog;
+import io.justsearch.app.observability.diagnostic.EngineLogDiagnosticChannelCatalog;
 import io.justsearch.app.observability.CapabilitiesChangeRegistry;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.telemetry.Telemetry;
@@ -127,21 +127,21 @@ final class RegistryControllerTest {
   }
 
   @Test
-  @DisplayName("/api/registry/diagnostic-channels returns head-log entry envelope")
+  @DisplayName("/api/registry/diagnostic-channels returns engine-log entry envelope")
   void diagnosticChannelsEnvelope() throws Exception {
-    // Slice 448 phase 2: register the head-log catalog explicitly via the multi-catalog
+    // Slice 448 phase 2: register the engine-log catalog explicitly via the multi-catalog
     // constructor. The setUp() controller uses the convenience constructor which
     // defaults diagnostic channels to empty.
     OperationCatalog operations = new CoreOperationCatalog();
     ResourceCatalog resources = ResourceCatalog.of("core", List.of());
     PromptCatalog prompts = PromptCatalog.of("core", List.of());
-    DiagnosticChannelCatalog headLog = new HeadLogDiagnosticChannelCatalog();
+    DiagnosticChannelCatalog engineLog = new EngineLogDiagnosticChannelCatalog();
     Telemetry telemetry = mock(Telemetry.class);
     RegistryController withDiagnostic =
         new RegistryController(
             List.of(operations),
             List.of(resources),
-            List.of(headLog),
+            List.of(engineLog),
             List.of(),
             prompts,
             changeRegistry,
@@ -160,7 +160,7 @@ final class RegistryControllerTest {
     assertTrue(envelope.get("entries").isArray());
     assertEquals(1, envelope.get("entries").size());
     JsonNode entry = envelope.get("entries").get(0);
-    assertEquals("core.head-log", entry.get("id").asText());
+    assertEquals("core.engine-log", entry.get("id").asText());
     assertEquals("IN_PROCESS_LOGBACK", entry.get("producer").asText());
     assertEquals("OPERATOR_OVERRIDE", entry.get("consumerPermission").asText());
   }
@@ -168,8 +168,8 @@ final class RegistryControllerTest {
   @Test
   @DisplayName("/api/registry/diagnostic-channels includes plugin-composed channels (tempdoc 560 §10.4)")
   void diagnosticChannelsEnvelopeIncludesPluginChannels() throws Exception {
-    // Tempdoc 560 §10.4: the controller now receives core head-log + the composed plugin catalog (the
-    // Part B bridge's output). A plugin-contributed vendor.* channel must surface alongside core.head-log.
+    // Tempdoc 560 §10.4: the controller now receives core engine-log + the composed plugin catalog (the
+    // Part B bridge's output). A plugin-contributed vendor.* channel must surface alongside core.engine-log.
     DiagnosticChannel vendorChannel =
         new DiagnosticChannel(
             new DiagnosticChannelRef("vendor.example.demo-log"),
@@ -188,9 +188,9 @@ final class RegistryControllerTest {
         new RegistryController(
             List.of(new CoreOperationCatalog()),
             List.of(ResourceCatalog.of("core", List.of())),
-            // The Part B shape: core head-log catalog + the composed plugin-channel catalog.
+            // The Part B shape: core engine-log catalog + the composed plugin-channel catalog.
             List.of(
-                new HeadLogDiagnosticChannelCatalog(),
+                new EngineLogDiagnosticChannelCatalog(),
                 DiagnosticChannelCatalog.of("composed", List.of(vendorChannel))),
             List.of(),
             PromptCatalog.of("core", List.of()),
@@ -207,7 +207,7 @@ final class RegistryControllerTest {
     assertEquals(2, envelope.get("entries").size());
     List<String> ids = new java.util.ArrayList<>();
     envelope.get("entries").forEach(e -> ids.add(e.get("id").asText()));
-    assertTrue(ids.contains("core.head-log"));
+    assertTrue(ids.contains("core.engine-log"));
     assertTrue(ids.contains("vendor.example.demo-log"), "the plugin-composed channel must surface");
   }
 

@@ -72,7 +72,11 @@ permitted).
    to enforce that.
 
 2. **`LookupPathByHash` RPC.** A new RPC on the existing `IngestService`
-   gRPC service. Returns `Optional<Path>` semantics:
+   gRPC service. *(Since lane F stage A this is `IngestServiceCalls#lookupPathByHash`,
+   an in-process port call — the RPC and the gRPC service it sat on are deleted, item A14. The
+   single-caller property this ADR decides is unchanged and is still pinned by
+   `adr-0028-one-http-resolver-caller` plus `LibraryResolveHashOnlyCallerPin`.)*
+   Returns `Optional<Path>` semantics:
    - `found=true, path=<...>` if the hash maps to a file currently
      under a watched root, not marked removed, and within retention.
    - `found=false` otherwise (path was removed and retention expired,

@@ -2,169 +2,166 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.app.api.scan.ScanProgressEvent;
-import java.util.ArrayList;
-import java.util.HashMap;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
+import java.util.ArrayDeque;
+import java.util.LinkedHashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Tempdoc 419 / T4 — bridges the in-process producer (the gRPC progress consumer running on
- * whichever thread fired the scan) and one or more SSE consumers
- * ({@code GET /api/scans/{scanId}/progress} subscribers).
- *
- * <p>A subscriber that arrives while the scan is in flight sees every event from the moment
- * the buffer was created. A subscriber that arrives <em>after</em> the scan completes still
- * sees the full event sequence as long as the buffer is still in memory (default retention
- * window: 30s after completion). Subscribers that arrive past retention see a synthetic
- * terminal event ({@code UNKNOWN_SCAN_OR_RETENTION_EXPIRED}) signaling that the scan has
- * already completed and its progression is no longer available.
- *
- * <p>The registry uses domain-level {@link ScanProgressEvent} records, not proto types,
- * because {@code ui.api} cannot depend on {@code ipc} message types per the architecture
- * rule. The conversion happens at the producer boundary
- * ({@link KnowledgeHttpApiAdapter#scanRoot}).
- *
- * <p>Cancellation: when {@link #register} is called with a {@link CancelToken}, the registry
- * holds the token. {@link #cancel} fires it; the underlying gRPC scan terminates with
- * {@code CLIENT_CANCELLED}. This closes the loop noted in T3 (HTTP SSE close → registry
- * cancel → gRPC cancel propagation).
- *
- * <p>Memory: in-memory only, per-Head-process. A periodic prune (1-min interval) removes
- * completed buffers older than the retention window. Caller must invoke {@link #close} to
- * stop the prune thread on Head shutdown.
+ * Bounded in-process scan observation and replay. Subscribers read one shared ring per scan.
+ * A slow subscriber overtaken by the ring receives UNKNOWN_SCAN_OR_RETENTION_EXPIRED.
+ * New subscribers replay the retained suffix; completed buffers expire after 30 seconds or
+ * oldest-first when a new scan needs capacity. Callers close their subscription on disconnect.
  */
 public final class ScanProgressRegistry implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(ScanProgressRegistry.class);
 
-  /** Sentinel pushed into per-subscriber queues to signal "no more events". */
-  private static final ScanProgressEvent END_OF_STREAM =
-      ScanProgressEvent.terminal("", "END_OF_STREAM");
-
   private final long retentionMs;
-  private final Map<String, ScanBuffer> buffers = new HashMap<>();
+  private final long subscriberIdleMs;
+  private final int eventLimit;
+  private final int bufferLimit;
+  private final int subscriberLimit;
+  private final int retryAfterSeconds;
+  private final Map<String, ScanBuffer> buffers = new LinkedHashMap<>();
+  private int subscribers;
+  private boolean closed;
+  private final EngineExecutorRegistry.Registration pruneRegistration;
   private final java.util.concurrent.ScheduledExecutorService pruneExecutor;
 
-  public ScanProgressRegistry() {
-    this(30_000L);
+  public ScanProgressRegistry(EngineExecutorRegistry processExecutors) {
+    this(processExecutors, 30_000L);
   }
 
   /** Visible for tests so retention can be made tight without long sleeps. */
-  ScanProgressRegistry(long retentionMs) {
+  ScanProgressRegistry(EngineExecutorRegistry processExecutors, long retentionMs) {
+    this(processExecutors, retentionMs, 60_000L);
+  }
+
+  /** Test timing seam; production keeps the existing sixty-second subscriber idle window. */
+  ScanProgressRegistry(EngineExecutorRegistry processExecutors, long retentionMs, long subscriberIdleMs) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
     this.retentionMs = retentionMs;
-    this.pruneExecutor =
-        java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "scan-progress-prune");
-              t.setDaemon(true);
-              return t;
-            });
-    this.pruneExecutor.scheduleAtFixedRate(this::pruneStale, 60, 60, TimeUnit.SECONDS);
+    if (subscriberIdleMs <= 0) throw new IllegalArgumentException("subscriberIdleMs must be positive");
+    this.subscriberIdleMs = subscriberIdleMs;
+    this.eventLimit = Math.max(1, processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND).maxQueue());
+    this.bufferLimit = processExecutors.maxConcurrentWork();
+    this.subscriberLimit = Math.max(1, processExecutors.limits(EngineExecutorSpec.Kind.FOREGROUND).maxQueue());
+    this.retryAfterSeconds = processExecutors.retryAfterSeconds();
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.scan-progress-prune",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      this.pruneRegistration = registration;
+      this.pruneExecutor =
+          registration.openScheduled(
+              r -> {
+                Thread t = new Thread(r, "scan-progress-prune");
+                t.setDaemon(true);
+                return t;
+              });
+      this.pruneExecutor.scheduleAtFixedRate(this::pruneStale, 60, 60, TimeUnit.SECONDS);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
-  /** Registers a scan with its cancel handle. Idempotent; second call replaces the token. */
+  /** Registers the cancellation owner before publishing the first observation. */
   public synchronized void register(String scanId, CancelToken cancelToken) {
-    if (scanId == null || scanId.isBlank()) {
-      return;
-    }
-    buffers.computeIfAbsent(scanId, id -> new ScanBuffer()).cancelToken = cancelToken;
+    if (scanId == null || scanId.isBlank()) return;
+    bufferFor(scanId).cancelToken = cancelToken;
   }
 
-  /**
-   * Records a progress event. Auto-creates a buffer if {@link #register} was not called first
-   * (defensive UPSERT semantics — happens when the worker emits the first event before the
-   * Head-side wiring sees the scanId).
-   */
+  private ScanBuffer bufferFor(String scanId) {
+    if (closed) throw refusal(EngineExecutorRejectedException.Reason.CLOSED);
+    ScanBuffer existing = buffers.get(scanId);
+    if (existing != null) return existing;
+    pruneStale();
+    if (buffers.size() >= bufferLimit) {
+      var entries = buffers.entrySet().iterator();
+      while (entries.hasNext()) {
+        if (entries.next().getValue().complete) {
+          entries.remove();
+          break;
+        }
+      }
+    }
+    if (buffers.size() >= bufferLimit) throw refusal(EngineExecutorRejectedException.Reason.QUEUE_LIMIT);
+    ScanBuffer created = new ScanBuffer();
+    buffers.put(scanId, created);
+    return created;
+  }
+
+  private EngineExecutorRejectedException refusal(EngineExecutorRejectedException.Reason reason) {
+    return new EngineExecutorRejectedException(reason, "head.scan-progress", retryAfterSeconds);
+  }
+
+  /** Records one observation, retaining only the policy-sized suffix. */
   public synchronized void record(String scanId, ScanProgressEvent event) {
-    if (scanId == null || scanId.isBlank() || event == null) {
-      return;
+    if (scanId == null || scanId.isBlank() || event == null) return;
+    ScanBuffer buffer = bufferFor(scanId);
+    if (buffer.complete) return;
+    if (buffer.history.size() == eventLimit) {
+      buffer.history.removeFirst();
+      buffer.firstSequence++;
     }
-    ScanBuffer buffer = buffers.computeIfAbsent(scanId, id -> new ScanBuffer());
-    buffer.history.add(event);
-    for (BlockingQueue<ScanProgressEvent> q : buffer.subscribers) {
-      q.offer(event);
-    }
+    buffer.history.addLast(event);
     if (event.complete()) {
       buffer.complete = true;
       buffer.completedAtMs = System.currentTimeMillis();
-      for (BlockingQueue<ScanProgressEvent> q : buffer.subscribers) {
-        q.offer(END_OF_STREAM);
-      }
+      buffer.cancelToken = null;
     }
+    notifyAll();
   }
 
-  /**
-   * Synthesizes a terminal completion for cases where the scan ended without emitting a final
-   * event (e.g., immediate I/O failure caught by the caller). No-op if the buffer is already
-   * complete (so calling this defensively after the iterator drain is safe).
-   */
+  /** Completes an existing observation after a producer failure; never allocates on cleanup. */
   public synchronized void markComplete(String scanId, ScanProgressEvent terminalEvent) {
-    if (scanId == null || scanId.isBlank()) {
-      return;
-    }
-    ScanBuffer buffer = buffers.computeIfAbsent(scanId, id -> new ScanBuffer());
-    if (buffer.complete) {
-      return;
-    }
+    ScanBuffer buffer = buffers.get(scanId);
+    if (buffer == null || buffer.complete || closed) return;
+    if (terminalEvent != null) record(scanId, terminalEvent);
     buffer.complete = true;
     buffer.completedAtMs = System.currentTimeMillis();
-    if (terminalEvent != null) {
-      buffer.history.add(terminalEvent);
-      for (BlockingQueue<ScanProgressEvent> q : buffer.subscribers) {
-        q.offer(terminalEvent);
-      }
-    }
-    for (BlockingQueue<ScanProgressEvent> q : buffer.subscribers) {
-      q.offer(END_OF_STREAM);
-    }
+    buffer.cancelToken = null;
+    notifyAll();
   }
 
-  /**
-   * Subscribes to progress events for the given scan. The returned iterable yields all
-   * historical events first, then blocks for new events until the scan completes. Returns a
-   * synthetic terminal-only event for unknown scans (never registered or pruned past
-   * retention).
-   */
-  public Iterable<ScanProgressEvent> subscribe(String scanId) {
-    final List<ScanProgressEvent> historicalSnapshot;
-    final BlockingQueue<ScanProgressEvent> queue;
-    final boolean alreadyComplete;
+  /** Opens one bounded cursor. The caller must close it if iteration stops early. */
+  public synchronized Subscription subscribe(String scanId) {
+    if (closed) throw refusal(EngineExecutorRejectedException.Reason.CLOSED);
+    if (subscribers >= subscriberLimit) throw refusal(EngineExecutorRejectedException.Reason.QUEUE_LIMIT);
+    subscribers++;
+    ScanBuffer buffer = buffers.get(scanId);
+    return new Subscription(scanId == null ? "" : scanId, buffer);
+  }
+
+  /** Cancels an active scan without invoking arbitrary cancellation callbacks under our monitor. */
+  public boolean cancel(String scanId) {
+    final CancelToken token;
     synchronized (this) {
       ScanBuffer buffer = buffers.get(scanId);
-      if (buffer == null) {
-        return List.of(
-            ScanProgressEvent.terminal(
-                scanId == null ? "" : scanId, "UNKNOWN_SCAN_OR_RETENTION_EXPIRED"));
-      }
-      historicalSnapshot = new ArrayList<>(buffer.history);
-      alreadyComplete = buffer.complete;
-      if (alreadyComplete) {
-        queue = null;
-      } else {
-        queue = new LinkedBlockingQueue<>();
-        buffer.subscribers.add(queue);
-      }
+      token = buffer == null ? null : buffer.cancelToken;
     }
-    return () -> new SubscriberIterator(historicalSnapshot, queue);
-  }
-
-  /**
-   * Cancels the underlying scan if a cancel token was registered. Returns {@code true} if a
-   * token was found and {@code cancel} was invoked. Safe to call on already-complete or
-   * unknown scans (no-op).
-   */
-  public synchronized boolean cancel(String scanId) {
-    ScanBuffer buffer = buffers.get(scanId);
-    if (buffer == null || buffer.cancelToken == null) {
-      return false;
-    }
-    buffer.cancelToken.cancel("client closed scan progress subscription");
+    if (token == null) return false;
+    token.cancel("client closed scan progress subscription");
     return true;
   }
 
@@ -194,65 +191,110 @@ public final class ScanProgressRegistry implements AutoCloseable {
 
   @Override
   public void close() {
+    synchronized (this) {
+      closed = true;
+      buffers.clear();
+      notifyAll();
+    }
     pruneExecutor.shutdownNow();
+    pruneRegistration.close();
   }
-
-  // ===================================================================================
 
   private static final class ScanBuffer {
-    final List<ScanProgressEvent> history = new ArrayList<>();
-    final List<BlockingQueue<ScanProgressEvent>> subscribers = new CopyOnWriteArrayList<>();
-    volatile CancelToken cancelToken;
-    volatile boolean complete;
-    volatile long completedAtMs;
+    final ArrayDeque<ScanProgressEvent> history = new ArrayDeque<>();
+    long firstSequence;
+    CancelToken cancelToken;
+    boolean complete;
+    long completedAtMs;
   }
 
-  private static final class SubscriberIterator implements Iterator<ScanProgressEvent> {
-    private final Iterator<ScanProgressEvent> historyIter;
-    private final BlockingQueue<ScanProgressEvent> liveQueue;
+  /** One cursor into shared replay storage; no per-subscriber event queue or history copy. */
+  public final class Subscription implements Iterable<ScanProgressEvent>, Iterator<ScanProgressEvent>, AutoCloseable {
+    private final String scanId;
+    private ScanBuffer buffer;
+    private long sequence;
     private ScanProgressEvent next;
-    private boolean exhausted;
+    private boolean released;
+    private boolean iterated;
 
-    SubscriberIterator(List<ScanProgressEvent> history, BlockingQueue<ScanProgressEvent> liveQueue) {
-      this.historyIter = history.iterator();
-      this.liveQueue = liveQueue;
-      advance();
+    private Subscription(String scanId, ScanBuffer buffer) {
+      this.scanId = scanId;
+      this.buffer = buffer;
+      this.sequence = buffer == null ? 0 : buffer.firstSequence;
+    }
+
+    @Override
+    public Iterator<ScanProgressEvent> iterator() {
+      if (iterated) throw new IllegalStateException("Scan subscription is single-use");
+      iterated = true;
+      return this;
     }
 
     @Override
     public boolean hasNext() {
-      return !exhausted;
+      synchronized (ScanProgressRegistry.this) {
+        if (next != null) return true;
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(subscriberIdleMs);
+        while (!released) {
+          if (closed || buffer == null || sequence < buffer.firstSequence) {
+            next = ScanProgressEvent.terminal(scanId, "UNKNOWN_SCAN_OR_RETENTION_EXPIRED");
+            buffer = null;
+            return true;
+          }
+          long offset = sequence - buffer.firstSequence;
+          if (offset < buffer.history.size()) {
+            var events = buffer.history.iterator();
+            for (long i = 0; i < offset; i++) events.next();
+            next = events.next();
+            sequence++;
+            if (next.complete()) buffer = null;
+            return true;
+          }
+          if (buffer.complete) {
+            release();
+            return false;
+          }
+          long remaining = deadline - System.nanoTime();
+          if (remaining <= 0) {
+            release();
+            return false;
+          }
+          try {
+            TimeUnit.NANOSECONDS.timedWait(ScanProgressRegistry.this, remaining);
+          } catch (InterruptedException interrupted) {
+            release();
+            Thread.currentThread().interrupt();
+          }
+        }
+        return false;
+      }
     }
 
     @Override
     public ScanProgressEvent next() {
-      if (exhausted) {
-        throw new java.util.NoSuchElementException();
+      synchronized (ScanProgressRegistry.this) {
+        if (!hasNext()) throw new java.util.NoSuchElementException();
+        ScanProgressEvent result = next;
+        next = null;
+        if (result.complete()) release();
+        return result;
       }
-      ScanProgressEvent current = next;
-      advance();
-      return current;
     }
 
-    private void advance() {
-      if (historyIter.hasNext()) {
-        next = historyIter.next();
-        return;
+    private void release() {
+      if (!released) {
+        released = true;
+        buffer = null;
+        subscribers--;
       }
-      if (liveQueue == null) {
-        exhausted = true;
-        return;
-      }
-      try {
-        ScanProgressEvent event = liveQueue.poll(60, TimeUnit.SECONDS);
-        if (event == null || event == END_OF_STREAM) {
-          exhausted = true;
-        } else {
-          next = event;
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        exhausted = true;
+    }
+
+    @Override
+    public void close() {
+      synchronized (ScanProgressRegistry.this) {
+        next = null;
+        release();
+        ScanProgressRegistry.this.notifyAll();
       }
     }
   }

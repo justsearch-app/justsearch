@@ -2,14 +2,12 @@
 package io.justsearch.app.services.bootstrap.phases;
 
 import com.sun.net.httpserver.HttpHandler;
-import io.grpc.Server;
 import io.justsearch.app.config.ConfigManagerBootstrap;
 import io.justsearch.app.config.ConfigSnapshot;
 import io.justsearch.app.observability.CapabilitiesController;
 import io.justsearch.app.observability.CapabilitiesService;
 import io.justsearch.app.observability.InfraDiagnosticsService;
 import io.justsearch.app.observability.InfraHealthBootstrap;
-import io.justsearch.app.observability.InfraHealthGrpcService;
 import io.justsearch.app.services.bootstrap.BootstrapCapabilitiesFactory;
 import io.justsearch.app.services.bootstrap.PhaseOutcome;
 import io.justsearch.app.util.RepoPaths;
@@ -18,11 +16,19 @@ import java.util.Map;
 import java.util.function.LongSupplier;
 
 /**
- * Tempdoc 519 §4 Phase 1 — infrastructure setup. Constructs the diagnostics service, infra
- * health bootstrap, gRPC health service / server, and the {@code /infra/capabilities} HTTP
- * handler. Returns the closeable + projectable handles the bootstrap needs to hold; transient
- * collaborators (diagnostics service, grpcService, healthBootstrap) are constructed for their
- * side effects only.
+ * Tempdoc 519 §4 Phase 1 — infrastructure setup. Constructs the diagnostics service, the infra
+ * health bootstrap, and the {@code /infra/capabilities} HTTP handler. Returns the projectable
+ * handle the bootstrap needs to hold; the transient collaborators (diagnostics service, health
+ * bootstrap) are constructed for their side effects only.
+ *
+ * <p><b>Lane F stage A item A14 removed the second thing this phase used to start</b> — an
+ * {@code InfraHealthGrpcService} on its own Netty server at {@code justsearch.infra.health.port}.
+ * It went with the rest of gRPC. Checked before deleting, not assumed: no script under
+ * {@code scripts/}, no Rust in {@code modules/shell/}, no dev-MCP tool and no {@code docs/}
+ * reference dialled either of its two RPCs ({@code CurrentSnapshot}, {@code StreamSnapshots}), and
+ * the same {@code InfraDiagnosticsService} payload already has an HTTP shape in
+ * {@code InfraHealthController}. A second transport nobody called is a second wire to keep alive,
+ * not a capability.
  *
  * <p>The capabilities handler reads {@code catalogVersionSupplier} on each request so the bootstrap
  * can wire it to the late-bound CapabilitiesChangeRegistry.currentSeq() without circular
@@ -32,14 +38,14 @@ public final class InfraPhase {
 
   private InfraPhase() {}
 
-  /** Held output — the closeable grpcServer + the capabilities HTTP handler. */
-  public record Output(Server infraHealthGrpcServer, HttpHandler capabilitiesHandler) {}
+  /** Held output — the capabilities HTTP handler. */
+  public record Output(HttpHandler capabilitiesHandler) {}
 
   /**
-   * Tempdoc 541 §5.3 + fix-pass Tier 5 + §12.F: sealed-sum entry. Failure modes (gRPC bind
-   * error, capabilities-handler factory exception) are caught and reported as
+   * Tempdoc 541 §5.3 + fix-pass Tier 5 + §12.F: sealed-sum entry. The one remaining failure
+   * mode (capabilities-handler factory exception) is caught and reported as
    * {@link PhaseOutcome.Failed}. No Degraded scenarios today — InfraPhase is binary
-   * (gRPC + handler bind or fail). §12.F: legacy {@code run()} delegated target inlined
+   * (the handler binds or it fails). §12.F: legacy {@code run()} delegated target inlined
    * here; there are no external callers (HeadAssembly uses {@code runWithOutcome} since the
    * Tier 5 sealed-sum migration).
    */
@@ -62,9 +68,6 @@ public final class InfraPhase {
               diagnostics.setMetadataSupplier(
                   () -> Map.of("config_loaded_at", snap.loadedAt().toString())),
           false);
-      InfraHealthGrpcService grpcService = new InfraHealthGrpcService(diagnostics);
-      ResolvedConfig.InfraGrpc grpcCfg = rc.infraGrpc();
-      Server grpcServer = BootstrapHelpers.startInfraHealthGrpcServer(grpcService, grpcCfg);
       boolean allowFakeCapabilities = !rc.policy().prodMode();
       HttpHandler capabilitiesHandler =
           BootstrapCapabilitiesFactory.createCapabilitiesHandler(
@@ -75,7 +78,7 @@ public final class InfraPhase {
                   new CapabilitiesController(
                       new CapabilitiesService(
                           RepoPaths.findRepoRoot(), catalogVersionSupplier)));
-      return new PhaseOutcome.Ready<>(new Output(grpcServer, capabilitiesHandler));
+      return new PhaseOutcome.Ready<>(new Output(capabilitiesHandler));
     } catch (RuntimeException e) {
       return PhaseOutcome.Failed.of(e);
     }

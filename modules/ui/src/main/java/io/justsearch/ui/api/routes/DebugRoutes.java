@@ -29,7 +29,7 @@ public final class DebugRoutes {
     app.get("/api/debug/commit-metadata", debugStateController::handleGetCommitMetadata);
     app.get("/api/debug/effective-config", effectiveConfigController::handleGetEffectiveConfig);
     app.get("/api/debug/events", debugStateController::handleGetEvents);
-    app.get("/api/debug/worker-log", debugStateController::handleGetWorkerLog);
+    app.get("/api/debug/engine-log", debugStateController::handleGetEngineLog);
     app.get("/api/debug/dashboard", debugDashboardHandler);
     app.get("/api/debug/chunks", chunkInfoController::handleGetChunkInfo);
     app.get("/api/debug/logging", logLevelController::handleGetLogLevels);

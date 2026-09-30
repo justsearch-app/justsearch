@@ -3,7 +3,11 @@ package io.justsearch.indexerworker.rag;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -61,6 +65,38 @@ final class ChunkThresholdCharacterizationTest {
 
     verify(indexingCoordinator, times(1)).deleteChunksForParentDocId("below");
     verify(indexingCoordinator, times(1)).deleteChunksForParentDocId("one-chunk");
+    verify(indexingCoordinator, never()).indexSingle(any(IndexDocument.class));
+  }
+
+  @Test
+  @DisplayName("failed old-chunk deletion propagates before replacement writes")
+  void failedOldChunkDeletionPropagatesBeforeReplacementWrites() {
+    DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
+    IndexingCoordinator indexingCoordinator = mock(IndexingCoordinator.class);
+    RuntimeException deletionFailure = new RuntimeException("delete failed");
+    String parentDocId = "parent-with-stale-chunks";
+    String content = "chunk regeneration failure ".repeat(500);
+    assertTrue(ChunkSplitter.splitWithMetadata(content).size() > 1);
+
+    doThrow(deletionFailure)
+        .when(indexingCoordinator)
+        .deleteChunksForParentDocId(parentDocId);
+
+    RuntimeException observed =
+        assertThrows(
+            RuntimeException.class,
+            () ->
+                ChunkDocumentWriter.regenerateChunks(
+                    documentFieldOps,
+                    indexingCoordinator,
+                    parentDocId,
+                    content,
+                    new ChunkDocumentWriter.ParentChunkMetadata(
+                        "text/plain", "text/plain", "text", "en", null, null, "parent-uid"),
+                    false));
+
+    assertSame(deletionFailure, observed);
+    verify(indexingCoordinator, times(1)).deleteChunksForParentDocId(parentDocId);
     verify(indexingCoordinator, never()).indexSingle(any(IndexDocument.class));
   }
 }

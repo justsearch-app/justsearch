@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Message;
 import io.opentelemetry.api.GlobalOpenTelemetry;
@@ -528,6 +530,7 @@ final class KnowledgeSearchEngine {
   }
 
   private final KnowledgeServerBootstrap knowledgeServer;
+  private final SearchPerSourceExecutor perSourceSearch;
   private final RerankerConfig rerankConfig;
   private final OnlineAiService onlineAiService;
   private final RerankerService lambdaMartReranker;
@@ -535,20 +538,21 @@ final class KnowledgeSearchEngine {
   private final FilterNormalizationService normService;
   private final WorkerStatusCache statusCache;
 
-  KnowledgeSearchEngine(KnowledgeServerBootstrap knowledgeServer) {
-    this(knowledgeServer, OnlineAiService.unavailable(), null);
+  KnowledgeSearchEngine(KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch) {
+    this(knowledgeServer, perSourceSearch, OnlineAiService.unavailable(), null);
   }
 
   KnowledgeSearchEngine(
-      KnowledgeServerBootstrap knowledgeServer, OnlineAiService onlineAiService) {
-    this(knowledgeServer, onlineAiService, null);
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch, OnlineAiService onlineAiService) {
+    this(knowledgeServer, perSourceSearch, onlineAiService, null);
   }
 
   KnowledgeSearchEngine(
-      KnowledgeServerBootstrap knowledgeServer,
+      KnowledgeServerBootstrap knowledgeServer, SearchPerSourceExecutor perSourceSearch,
       OnlineAiService onlineAiService,
       RerankerService lambdaMartReranker) {
     this.knowledgeServer = Objects.requireNonNull(knowledgeServer, "knowledgeServer");
+    this.perSourceSearch = Objects.requireNonNull(perSourceSearch, "perSourceSearch");
     this.onlineAiService = Objects.requireNonNull(onlineAiService, "onlineAiService");
     this.lambdaMartReranker = lambdaMartReranker; // nullable
     this.rerankConfig = RerankerConfig.fromEnv();
@@ -562,8 +566,8 @@ final class KnowledgeSearchEngine {
   }
 
   // Tempdoc 556: status + facet-snapshot cache live in WorkerStatusCache; delegate.
-  public KnowledgeStatus status() {
-    return statusCache.status();
+  public KnowledgeStatus status(EngineContext engineContext) {
+    return statusCache.status(engineContext);
   }
 
   public String getCachedFacetSnapshot() {
@@ -585,7 +589,7 @@ final class KnowledgeSearchEngine {
 
 
 
-  public KnowledgeSearchResponse search(KnowledgeSearchRequest req) {
+  public KnowledgeSearchResponse search(KnowledgeSearchRequest req, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
 
     // 250 Phase 5c: Root span for the entire search pipeline
@@ -598,7 +602,7 @@ final class KnowledgeSearchEngine {
             .startSpan();
     Scope searchScope = searchSpan.makeCurrent();
     try {
-      KnowledgeSearchResponse resp = doSearch(req, searchSpan);
+      KnowledgeSearchResponse resp = doSearch(req, searchSpan, engineContext);
       // 553 Phase 4a: project the canonical trace onto the root span (telemetry = a projection).
       searchSpan.setAllAttributes(SearchTraceSpanProjection.attributesOf(resp.searchTrace()));
       return resp;
@@ -613,14 +617,14 @@ final class KnowledgeSearchEngine {
   }
 
   private KnowledgeSearchResponse doSearch(
-      KnowledgeSearchRequest req, Span searchSpan) {
+      KnowledgeSearchRequest req, Span searchSpan, EngineContext engineContext) {
     long doSearchStartNs = System.nanoTime();
     RerankerConfig rerankConfig = RerankerConfig.fromEnv();
 
     // 363: Refresh facet snapshot for QU grounding (non-blocking, cached with TTL)
-    statusCache.refreshFacetSnapshotIfStale();
+    statusCache.refreshFacetSnapshotIfStale(engineContext);
 
-    RemoteKnowledgeClient client = knowledgeServer.client();
+    KnowledgeClient client = knowledgeServer.client();
 
     int requestedLimit = req.limit() == null ? 10 : Math.max(1, req.limit());
     // When reranking is enabled, fetch more candidates to improve reranking quality
@@ -684,7 +688,7 @@ final class KnowledgeSearchEngine {
     if (isExpansionEligible(
         pipelineConfig, querySyntax, queryText, req.cursor(), onlineAiService.isAvailable(),
         effectiveQueryType)) {
-      expansionFuture = startExpansionAsync(queryText);
+      expansionFuture = startExpansionAsync(queryText, engineContext);
     } else if (effectiveQueryType == QueryType.NAVIGATIONAL || effectiveQueryType == QueryType.EXACT_MATCH) {
       expansionSkipReason = "QUERY_TYPE_" + effectiveQueryType.name();
     } else if (!pipelineConfig.expansionEnabled()) {
@@ -710,13 +714,13 @@ final class KnowledgeSearchEngine {
         && effectiveQueryType != QueryType.NAVIGATIONAL
         && effectiveQueryType != QueryType.EXACT_MATCH
         && quService.isAvailable()) {
-      quFuture = quService.extract(queryText, statusCache.getCachedFacetSnapshot());
+      quFuture = quService.extract(queryText, statusCache.getCachedFacetSnapshot(), engineContext);
     }
 
     // 366: Fire filter normalization async when explicit filters are present (mutually exclusive with QU)
     CompletableFuture<FilterNormalizationService.NormResult> normFuture = null;
     if (hasExplicitFilters && normService.isAvailable()) {
-      normFuture = normService.normalize(req.filters(), statusCache.getCachedFacetSnapshot());
+      normFuture = normService.normalize(req.filters(), statusCache.getCachedFacetSnapshot(), engineContext);
     }
 
     // 256-G3: PipelineConfig is the sole pipeline control on wire. Deprecated mode field no longer set.
@@ -757,6 +761,7 @@ final class KnowledgeSearchEngine {
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       } catch (ExecutionException e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
         log.debug("Filter normalization failed: {}", e.getCause().getMessage());
       }
     }
@@ -784,6 +789,7 @@ final class KnowledgeSearchEngine {
         Thread.currentThread().interrupt();
         log.debug("QU interrupted");
       } catch (ExecutionException e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
         log.debug("QU extraction failed: {}", e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
       }
     }
@@ -809,8 +815,8 @@ final class KnowledgeSearchEngine {
     SearchResponse resp;
     boolean perSourceRetrieval = false;
     if (structuredAnalysis.detectedSources().size() >= 2) {
-      resp = SearchPerSourceExecutor.execute(
-          client, baseReq, structuredAnalysis.detectedSources(), searchLimit);
+      resp = perSourceSearch.execute(
+          client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext);
       perSourceRetrieval = true;
     } else {
       // Single-source: inject detected sources as boost if no boost already set
@@ -819,9 +825,9 @@ final class KnowledgeSearchEngine {
         for (String src : structuredAnalysis.detectedSources()) {
           srcBoost.addMetaSource(src.toLowerCase(Locale.ROOT));
         }
-        resp = client.search(baseReq.toBuilder().setBoostFilters(srcBoost.build()).build());
+        resp = client.search(baseReq.toBuilder().setBoostFilters(srcBoost.build()).build(), engineContext);
       } else {
-        resp = client.search(baseReq);
+        resp = client.search(baseReq, engineContext);
       }
     }
 
@@ -844,7 +850,7 @@ final class KnowledgeSearchEngine {
                     .setQuery(expandedQuery)
                     .setQuerySyntax(SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE)
                     .build();
-            resp = client.search(expandedReq);
+            resp = client.search(expandedReq, engineContext);
             expansionApplied = true;
             log.debug("LLM expansion applied to query");
           }
@@ -857,9 +863,11 @@ final class KnowledgeSearchEngine {
           Thread.currentThread().interrupt();
           expansionSkipReason = "FAILED";
         } catch (ExecutionException e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
           expansionSkipReason = "FAILED";
           log.debug("LLM expansion failed: {}", e.getCause().getMessage());
         } catch (RuntimeException e) {
+          io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
           // The expansion re-search is an OPTIONAL enhancement over an answer we already hold, and
           // this block's contract (line 779) is "falls back to base results on timeout or error".
           // Only the checked failures were caught, so a failing re-search took the whole search
@@ -991,7 +999,7 @@ final class KnowledgeSearchEngine {
             tracer.spanBuilder("search/cross_encoder").setParent(Context.current()).startSpan();
         try (Scope ceScope = ceSpan.makeCurrent()) { // NOPMD - scope used for auto-close
           reranked = knowledgeServer.client().rerank(
-              req.query(), docTexts, rerankConfig.deadlineBudgetMs());
+              req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext);
           // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored
           // output — the reranked docs (id + CE score + content), in the cross-encoder's chosen
           // order.
@@ -1271,21 +1279,13 @@ final class KnowledgeSearchEngine {
    * <p>Uses {@link SamplingParams#DETERMINISTIC} to minimize hallucination risk. The caller
    * must wait on the returned future within {@link #EXPANSION_BUDGET_MS} and cancel on timeout.
    */
-  private CompletableFuture<String> startExpansionAsync(String query) {
-    CompletableFuture<String> future = new CompletableFuture<>();
+  private CompletableFuture<String> startExpansionAsync(String query, EngineContext engineContext) {
     List<Map<String, Object>> messages =
         List.of(
             Map.of("role", "system", "content", EXPANSION_SYSTEM_PROMPT),
             Map.of("role", "user", "content", query));
-    StringBuilder buf = new StringBuilder();
-    onlineAiService.streamChat(
-        messages,
-        EXPANSION_MAX_TOKENS,
-        buf::append,
-        fr -> future.complete(buf.toString().strip()),
-        future::completeExceptionally,
-        SamplingParams.DETERMINISTIC);
-    return future;
+    return onlineAiService.chatCompletion(
+        messages, EXPANSION_MAX_TOKENS, SamplingParams.DETERMINISTIC, engineContext);
   }
 
   /**

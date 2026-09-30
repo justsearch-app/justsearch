@@ -1,0 +1,686 @@
+{
+  "date": "2026-09-13",
+  "revision": "868ca9f854076e4ba81a65ca29aa17b08519e7cb + listed UI correction; subsequent9534c3330 is SQL marker, outside these browser binaries",
+  "status": "LOCAL_UI_CORRECTION_PASS_WITH_INHERITED_UNIT_LOG_WARNINGS",
+  "retention": "Through lane acceptance plus30days; export before worktree release",
+  "browsers": [
+    {
+      "run": "1266",
+      "command": "node tmp/c2-4-browser1266-managed.mjs",
+      "result": "PASS",
+      "checks": 9,
+      "theme": "light",
+      "axeViolations": [],
+      "consoleErrors": [],
+      "document": {
+        "scrollWidth": 1568,
+        "clientWidth": 1568,
+        "scrollHeight": 900,
+        "clientHeight": 900,
+        "overflowX": false,
+        "overflowY": false
+      },
+      "runtimeHashes": [
+        {
+          "module": "app-api",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-api-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-api/build/libs/app-api-0.3.0.jar",
+          "sha256": "9c4fcce7c8adb7749f4ab7854d05151211ecdc06e166530817493c5dfeb75eeb"
+        },
+        {
+          "module": "app-observability",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-observability-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-observability/build/libs/app-observability-0.3.0.jar",
+          "sha256": "96cde87002a819ea8c94c19b98743467e5545d7273b9788d630b0b3a5ef46ad2"
+        },
+        {
+          "module": "app-services",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-services-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-services/build/libs/app-services-0.3.0.jar",
+          "sha256": "5226546497b5f356035bde49a8460b7789ea679847c1de7acf08b4be0980564c"
+        },
+        {
+          "module": "configuration",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/configuration-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/configuration/build/libs/configuration-0.3.0.jar",
+          "sha256": "37cc432a1f8c52900d495efdb8489ff84f9f4baf0fb1fe4e23ed78462d2314c4"
+        },
+        {
+          "module": "ui",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/ui-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/libs/ui-0.3.0.jar",
+          "sha256": "4990a8b51932b7c2295477c810f3cd2b2924e1c2355669094cd87d01c153c626"
+        }
+      ]
+    },
+    {
+      "run": "1267",
+      "command": "node tmp/c2-4-browser1267-managed.mjs",
+      "result": "PASS",
+      "checks": 9,
+      "theme": "dark",
+      "axeViolations": [],
+      "consoleErrors": [],
+      "document": {
+        "scrollWidth": 1568,
+        "clientWidth": 1568,
+        "scrollHeight": 900,
+        "clientHeight": 900,
+        "overflowX": false,
+        "overflowY": false
+      },
+      "runtimeHashes": [
+        {
+          "module": "app-api",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-api-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-api/build/libs/app-api-0.3.0.jar",
+          "sha256": "9c4fcce7c8adb7749f4ab7854d05151211ecdc06e166530817493c5dfeb75eeb"
+        },
+        {
+          "module": "app-observability",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-observability-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-observability/build/libs/app-observability-0.3.0.jar",
+          "sha256": "96cde87002a819ea8c94c19b98743467e5545d7273b9788d630b0b3a5ef46ad2"
+        },
+        {
+          "module": "app-services",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/app-services-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/app-services/build/libs/app-services-0.3.0.jar",
+          "sha256": "5226546497b5f356035bde49a8460b7789ea679847c1de7acf08b4be0980564c"
+        },
+        {
+          "module": "configuration",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/configuration-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/configuration/build/libs/configuration-0.3.0.jar",
+          "sha256": "37cc432a1f8c52900d495efdb8489ff84f9f4baf0fb1fe4e23ed78462d2314c4"
+        },
+        {
+          "module": "ui",
+          "installed": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/install/ui/lib/ui-0.3.0.jar",
+          "built": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A/modules/ui/build/libs/ui-0.3.0.jar",
+          "sha256": "4990a8b51932b7c2295477c810f3cd2b2924e1c2355669094cd87d01c153c626"
+        }
+      ]
+    }
+  ],
+  "unit": {
+    "command": "npm run test:unit:run -- --maxWorkers=4",
+    "run": "1276",
+    "tests": 6521,
+    "files": 485,
+    "exitCode": 0,
+    "seconds": 89.93,
+    "typecheck": "1273 exit0; same source",
+    "failedRuns": [
+      "1269 typecheck tuple cast error; unit6521pass",
+      "1273 default-parallel import timeout;6520pass1fail"
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
+      "sha256": "22cc3bf1fe2b1784a115d7a1a1a510fcf9eaf28c5586b3ff575aae32e707e490",
+      "bytes": 7893
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "sha256": "937ca9e3fb445861a5ec3edc9f2bac9115679cc8e1cc40117e928ec17ac95584",
+      "bytes": 32705
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/chrome/ShellRail.test.ts",
+      "sha256": "2edd90015344226f043183e91b1cde22887dc4de7000d8d5766c0f7fdb4b13f7",
+      "bytes": 11144
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts",
+      "sha256": "f5fefab84e56e72f4a50c9dce49a85392f33e4471710ec01863bb582d4cbf4ad",
+      "bytes": 34539
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/ActionLedgerView.ts",
+      "sha256": "e1297b39ec23250afa9750396df695371c2ce437ce50f41b6027a13c06f6dfe7",
+      "bytes": 26324
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/atoms.test.ts",
+      "sha256": "324ea3f91e7b3bcff99e66845888cb0f91edafd5c655dc730fc5e43622ccc094",
+      "bytes": 7184
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/eventRow.ts",
+      "sha256": "1966cb76dad01ed1ff10371f80adae1f7dfc0b18f4cee577adaa160889a310e9",
+      "bytes": 6067
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/StatusBadge.ts",
+      "sha256": "c25a801f77c055a4db01101db32fb57eb3693988e987418c48be00212308fe3d",
+      "bytes": 3531
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/Table.render.test.ts",
+      "sha256": "ab4efeb9cf2d3c258427923f4cd20c6fe74c8a3a8dc91de960f960ee7b2afdcb",
+      "bytes": 13490
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/components/Table.ts",
+      "sha256": "258f1b19b39916d40bfe292f5cebc29bb06f333226bf9aa9828ed19ed19fdbde",
+      "bytes": 17274
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/themes/highContrastTextRoles.test.ts",
+      "sha256": "13a26b6d83219fd51dea476d5c3fccd1c540db4631fe3a176bd64d121e13daa7",
+      "bytes": 6722
+    },
+    {
+      "path": "modules/ui-web/src/styles/tokens.css",
+      "sha256": "c6f2aa371893b9371138b614dccbdf581f068b41b9c0ff81e3053aa4b7ee8657",
+      "bytes": 43099
+    },
+    {
+      "path": "tmp/c2-4-a11y-exits1257.json",
+      "sha256": "e5c260b18c26ba4af3dd0f0743468c1b1e07cb7286d4327b8c3f350ab1f8e4e7",
+      "bytes": 46
+    },
+    {
+      "path": "tmp/c2-4-a11y-exits1269.json",
+      "sha256": "f40737792b042779b597f47796bca15a16eb8dd23b658a76b4495d346553faa9",
+      "bytes": 46
+    },
+    {
+      "path": "tmp/c2-4-a11y-exits1273.json",
+      "sha256": "aa94cfcf9347d2be3288ab1b2d86c7941174f018682ab0aecea8eafe4a6676cd",
+      "bytes": 46
+    },
+    {
+      "path": "tmp/c2-4-a11y-typecheck1257.txt",
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100",
+      "bytes": 63
+    },
+    {
+      "path": "tmp/c2-4-a11y-typecheck1269.txt",
+      "sha256": "9d42c9dbddcd0c1b7f11f50fe2d5ba09ae42c1d8f0e7b8600a7fa9069f20a16d",
+      "bytes": 384
+    },
+    {
+      "path": "tmp/c2-4-a11y-typecheck1273.txt",
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100",
+      "bytes": 63
+    },
+    {
+      "path": "tmp/c2-4-a11y-unit1257.txt",
+      "sha256": "bbcacbf456669a90e0d7ea386334b272f9d73a05ce8361efe2b3e815f511e084",
+      "bytes": 685206
+    },
+    {
+      "path": "tmp/c2-4-a11y-unit1269.txt",
+      "sha256": "ecefc5c4d65f8444bdd5ec4ee0e22c42f8c7dbd353c16cf152bea38151f3586e",
+      "bytes": 716185
+    },
+    {
+      "path": "tmp/c2-4-a11y-unit1273.txt",
+      "sha256": "ba064e884c5eb52ac37ba62ffd5c21d71d560eb374fca76e5bb886d7f374c322",
+      "bytes": 717550
+    },
+    {
+      "path": "tmp/c2-4-a11y-unit1276-exit.json",
+      "sha256": "ea61d7736f0b7ecb9b35158f03de77013db6b100cf1d36c957e78e6c8817c5b6",
+      "bytes": 23
+    },
+    {
+      "path": "tmp/c2-4-a11y-unit1276.txt",
+      "sha256": "77d47607eba013b7654c414f5dfc84c25e2294500f4f64d8a564523fc812bc4d",
+      "bytes": 649597
+    },
+    {
+      "path": "tmp/c2-4-affected1270.txt",
+      "sha256": "8d39fdaff9a6374e4fc0db370afc09115a8da5af1541462ad50fac8c52dc5fa4",
+      "bytes": 218
+    },
+    {
+      "path": "tmp/c2-4-affected1272-badge.txt",
+      "sha256": "1bb45e40aa4309f6a1fdad9b20b02d6c4a0e6802f4ef5585bed3532732eca35e",
+      "bytes": 179
+    },
+    {
+      "path": "tmp/c2-4-affected1272-ledger.txt",
+      "sha256": "4150c571fefb4f91cda838caf3f7d727d98bfe57d742af164c3c1f9eb703b4b3",
+      "bytes": 179
+    },
+    {
+      "path": "tmp/c2-4-affected1272-table.txt",
+      "sha256": "ceb37add0ef8817f4b1e216ca58a759c3702294f19b1fe95544c6d6c4277d49d",
+      "bytes": 183
+    },
+    {
+      "path": "tmp/c2-4-affected1272-tokens.txt",
+      "sha256": "1787ea9e5b27d0777d950f34813f077403e2bf33e763ebb5dcfd1aa01711cd0b",
+      "bytes": 179
+    },
+    {
+      "path": "tmp/c2-4-browser1260/activity.measure.json",
+      "sha256": "5a0bb06645bbaefeea8c300b72037afaad38f85c3145981cabf88a51136cdbb6",
+      "bytes": 20048
+    },
+    {
+      "path": "tmp/c2-4-browser1260/activity.png",
+      "sha256": "500de0da9fcae39eda0ec6662cdec31cb6b089c950fbe9b35951d3ea916a3050",
+      "bytes": 68380
+    },
+    {
+      "path": "tmp/c2-4-browser1260/before-reload-streams.json",
+      "sha256": "9f5d103b330a8fd3ac4954bd9e0edd46db11e43be90457bca6f8faaba1d2d2b9",
+      "bytes": 18148
+    },
+    {
+      "path": "tmp/c2-4-browser1260/checks.json",
+      "sha256": "55ea2859c3ba5c30d64dd44a847ce50d7706e3c2f1ada85fcb11f8424231f267",
+      "bytes": 1604
+    },
+    {
+      "path": "tmp/c2-4-browser1260/failure.png",
+      "sha256": "500de0da9fcae39eda0ec6662cdec31cb6b089c950fbe9b35951d3ea916a3050",
+      "bytes": 68380
+    },
+    {
+      "path": "tmp/c2-4-browser1260/result.json",
+      "sha256": "538b69f8cf22b7028ff2dcadb66ca3ffda067865d2a262e97888b1eb2dd0f99a",
+      "bytes": 1949
+    },
+    {
+      "path": "tmp/c2-4-browser1260/stop-report.json",
+      "sha256": "4712f60511446aabdc35343b5d3657b7bcac2cd7c2210873b55ee795dd2ee5b3",
+      "bytes": 1162
+    },
+    {
+      "path": "tmp/c2-4-browser1260-managed-FAILED-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1260-managed-FAILED-stop.json",
+      "sha256": "72b24b487c5423445d2c545530cc8ff9a132ecf3eebfc3f796e4d32a7be5ba0c",
+      "bytes": 291
+    },
+    {
+      "path": "tmp/c2-4-browser1260-managed-initial-preflight.json",
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851",
+      "bytes": 902
+    },
+    {
+      "path": "tmp/c2-4-browser1260-managed-initial-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1260-managed-initial-start.json",
+      "sha256": "ae3690f8169f2559cba49e2477fa64fe16183c576746735ae7dcbaa899dfd808",
+      "bytes": 427
+    },
+    {
+      "path": "tmp/c2-4-browser1260-managed-result.json",
+      "sha256": "a92b66dce99bdce96b2823081740df21742279af56fb4245869dc88f53c4993a",
+      "bytes": 3001
+    },
+    {
+      "path": "tmp/c2-4-browser1260-managed.mjs",
+      "sha256": "3ec63ed01a56c5d0dcdd69f9bd895feb2e8e5a32c637f4a0a4bf1dea47f61c9b",
+      "bytes": 4948
+    },
+    {
+      "path": "tmp/c2-4-browser1260-managed.txt",
+      "sha256": "bf74640471f87d49802046d999f6036ea1c62886eefd91429c89e2f26e62a4e1",
+      "bytes": 3359
+    },
+    {
+      "path": "tmp/c2-4-browser1260.py",
+      "sha256": "37fe8f7c7c84df4a4adc24d216a8ac1dceabe79e346235529fc5cda8ec222c41",
+      "bytes": 6132
+    },
+    {
+      "path": "tmp/c2-4-browser1261/activity.measure.json",
+      "sha256": "89013328cb412c29f27c31fd62f58a3f9977e18910312e4d5bed8b522ea62510",
+      "bytes": 17883
+    },
+    {
+      "path": "tmp/c2-4-browser1261/activity.png",
+      "sha256": "9e4c8fa0da42cf383ef59efa5a70319dbeae9c63889fb5cdb49788f7e3e6c81b",
+      "bytes": 65667
+    },
+    {
+      "path": "tmp/c2-4-browser1261/after-reload-streams.json",
+      "sha256": "947a6da98c59b8672582720e476edbd229dac92e747e2ccbd7baa96f2b335e67",
+      "bytes": 17062
+    },
+    {
+      "path": "tmp/c2-4-browser1261/before-reload-streams.json",
+      "sha256": "37199eb159b93ce87866c04fc4c1d4d20d2a3f831aab5bfac8d17851cb9db1f0",
+      "bytes": 18151
+    },
+    {
+      "path": "tmp/c2-4-browser1261/checks.json",
+      "sha256": "447dcf59f5f7b820171665771c1012c786fe8ba5be688fa44caa747e0896f1ca",
+      "bytes": 1648
+    },
+    {
+      "path": "tmp/c2-4-browser1261/result.json",
+      "sha256": "9160ea452fa3011530c2947cdb2b0e9354e55698650d6628d2d4e80e93e1f745",
+      "bytes": 64
+    },
+    {
+      "path": "tmp/c2-4-browser1261/stop-report.json",
+      "sha256": "d112befaeb8cdeab2e04d038b64d6bd54279154a3da258bbeab073c13059fb82",
+      "bytes": 1160
+    },
+    {
+      "path": "tmp/c2-4-browser1261-managed-initial-preflight.json",
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851",
+      "bytes": 902
+    },
+    {
+      "path": "tmp/c2-4-browser1261-managed-initial-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1261-managed-initial-start.json",
+      "sha256": "dc8138578421a770d7c898de27143a49387b9eaf4c0fa796db39b880aeccce68",
+      "bytes": 426
+    },
+    {
+      "path": "tmp/c2-4-browser1261-managed-initial-stop.json",
+      "sha256": "a915ad153b3aebab9e5531323303536dde9fb67999586e8c5f98e23e21a07561",
+      "bytes": 290
+    },
+    {
+      "path": "tmp/c2-4-browser1261-managed-PASS-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1261-managed-result.json",
+      "sha256": "eb2bb0d90e97ff6a641af000925ea1ad1af291c65d3814c724f2bb1ceeb25554",
+      "bytes": 2743
+    },
+    {
+      "path": "tmp/c2-4-browser1261-managed.mjs",
+      "sha256": "26d824bb581ab9cac83a686e83aad48a7517de39d316e7417a5cf1ec83014525",
+      "bytes": 4948
+    },
+    {
+      "path": "tmp/c2-4-browser1261-managed.txt",
+      "sha256": "d545d943ea04a0141b70526b29dfe2182aadca70f5c37088c01f304eafd89047",
+      "bytes": 677
+    },
+    {
+      "path": "tmp/c2-4-browser1261.py",
+      "sha256": "caa036d5cff05c1683ff64c0a7cead480c939e140ad625dc282a4a34d61215fb",
+      "bytes": 6129
+    },
+    {
+      "path": "tmp/c2-4-browser1264/activity.measure.json",
+      "sha256": "55f0af773f17c3c6894a706e380073ca1cfa21a87cadf8880ed78a0efe7fdd87",
+      "bytes": 18760
+    },
+    {
+      "path": "tmp/c2-4-browser1264/activity.png",
+      "sha256": "7773aba06a3456dec22add3356bbe31161a9c9ef72e91cc0846ffc4d58a3cdd0",
+      "bytes": 68159
+    },
+    {
+      "path": "tmp/c2-4-browser1264/before-reload-streams.json",
+      "sha256": "828f6fcc1933754c76e8cedbc2bf459dbba12e31ff30ab15965328ff5cb2fa81",
+      "bytes": 14945
+    },
+    {
+      "path": "tmp/c2-4-browser1264/checks.json",
+      "sha256": "e287a03caa91ffa8e093773cec3d977b31890df20e9141b8c8c53b683de38164",
+      "bytes": 1604
+    },
+    {
+      "path": "tmp/c2-4-browser1264/failure.png",
+      "sha256": "7773aba06a3456dec22add3356bbe31161a9c9ef72e91cc0846ffc4d58a3cdd0",
+      "bytes": 68159
+    },
+    {
+      "path": "tmp/c2-4-browser1264/result.json",
+      "sha256": "9b0643e92409183e475b5c8d961e4b21c4aa5f8fece5bc2e68613e44c15b3db0",
+      "bytes": 808
+    },
+    {
+      "path": "tmp/c2-4-browser1264/stop-report.json",
+      "sha256": "21b610b57fe208446737933f24df5c07e08e256e925e15249dde408fcc315605",
+      "bytes": 1158
+    },
+    {
+      "path": "tmp/c2-4-browser1264-managed-FAILED-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1264-managed-FAILED-stop.json",
+      "sha256": "c398b1302c6d960760accc986a05f0fa84bce198effb1b6666f0f5cec72cf03b",
+      "bytes": 289
+    },
+    {
+      "path": "tmp/c2-4-browser1264-managed-initial-preflight.json",
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851",
+      "bytes": 902
+    },
+    {
+      "path": "tmp/c2-4-browser1264-managed-initial-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1264-managed-initial-start.json",
+      "sha256": "40fd8dd736697fd4b8f5903a23cbef3c862b0381ac033617b8783fe60be59048",
+      "bytes": 426
+    },
+    {
+      "path": "tmp/c2-4-browser1264-managed-result.json",
+      "sha256": "f690c6a48250b60860088b3a7082f2f131546950d4e690aebe7d9faf3b3f6b1f",
+      "bytes": 2999
+    },
+    {
+      "path": "tmp/c2-4-browser1264-managed.mjs",
+      "sha256": "8173bdd7cbe8120ae4ad50931b8c2282d20f3aef7a6f05bfb61d16dbb101de86",
+      "bytes": 4948
+    },
+    {
+      "path": "tmp/c2-4-browser1264-managed.txt",
+      "sha256": "ac46fac3e6add68d0eaa3591db376251e4c7afa22d8966d3bb70bf19a18caf43",
+      "bytes": 2237
+    },
+    {
+      "path": "tmp/c2-4-browser1264.py",
+      "sha256": "f0d1b49e6de91176ae787acb396e9bb0cc1772a6d3066b6dbefb9eba4491f341",
+      "bytes": 6132
+    },
+    {
+      "path": "tmp/c2-4-browser1266/activity.measure.json",
+      "sha256": "8685f8ab2be3bc7c7fa518cd12b26180a639850ba5f685d01b01e8e15f4d813f",
+      "bytes": 17884
+    },
+    {
+      "path": "tmp/c2-4-browser1266/activity.png",
+      "sha256": "db4b05a2f17f8a31fb146b8baef655f135131948b62e6b196fc0b3f0a9209db1",
+      "bytes": 68127
+    },
+    {
+      "path": "tmp/c2-4-browser1266/after-reload-streams.json",
+      "sha256": "c5ead09e4a29bdae4b9dff93f34e4e67f8db8eaf46d8cefac790e1bf6b683576",
+      "bytes": 17056
+    },
+    {
+      "path": "tmp/c2-4-browser1266/before-reload-streams.json",
+      "sha256": "bb5dab51a69ad0edc5ef5aaa6d32d0d7514fdc596bbd4fb53676e36abb9e40ba",
+      "bytes": 14951
+    },
+    {
+      "path": "tmp/c2-4-browser1266/checks.json",
+      "sha256": "aa5878f6c0852bef798f926f0063272dcb9df62ef3086368a6eef56950a52d1a",
+      "bytes": 1649
+    },
+    {
+      "path": "tmp/c2-4-browser1266/result.json",
+      "sha256": "9160ea452fa3011530c2947cdb2b0e9354e55698650d6628d2d4e80e93e1f745",
+      "bytes": 64
+    },
+    {
+      "path": "tmp/c2-4-browser1266/stop-report.json",
+      "sha256": "a3ae5d46d193ec8ae166379037b7de808d381405319d888d947362e2f9e7fc4c",
+      "bytes": 1162
+    },
+    {
+      "path": "tmp/c2-4-browser1266-managed-initial-preflight.json",
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851",
+      "bytes": 902
+    },
+    {
+      "path": "tmp/c2-4-browser1266-managed-initial-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1266-managed-initial-start.json",
+      "sha256": "e738e263fc3b18557eb12d05599cacc1d2c7bf4fde62cf0b5cd235f6f458485d",
+      "bytes": 427
+    },
+    {
+      "path": "tmp/c2-4-browser1266-managed-initial-stop.json",
+      "sha256": "e512eb0af8eefd3f44eb05d5d9799c57d70eece925fb20c9c9d2352fc8908be7",
+      "bytes": 291
+    },
+    {
+      "path": "tmp/c2-4-browser1266-managed-PASS-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1266-managed-result.json",
+      "sha256": "f2ba3fbc5f1359f3e0909ac779f9de24f7c91fe30c56cedca0451b64488a2b51",
+      "bytes": 2744
+    },
+    {
+      "path": "tmp/c2-4-browser1266-managed.mjs",
+      "sha256": "fd94e39c9034b35d6f3ad6a7a7e3446124d14bcfdca787ba64637b51d1b7cd15",
+      "bytes": 4948
+    },
+    {
+      "path": "tmp/c2-4-browser1266-managed.txt",
+      "sha256": "f674e205f046e4f15bb59e0b65d5208f5f85ac234c8aaf0b789464fe4dbe6367",
+      "bytes": 677
+    },
+    {
+      "path": "tmp/c2-4-browser1266.py",
+      "sha256": "10c60642223d01a53cc457365c6f90b6cb07f44616970fef9f6f8c28850b4ac1",
+      "bytes": 6132
+    },
+    {
+      "path": "tmp/c2-4-browser1267/activity.measure.json",
+      "sha256": "af2b0eb5f2fc0519c4a0c92f281e9c3260331be97be7771914502ccacaba7c03",
+      "bytes": 18174
+    },
+    {
+      "path": "tmp/c2-4-browser1267/activity.png",
+      "sha256": "9788b96442971a7b6c952fd36cafe43efca1b8342b0de77b82e864103e15a601",
+      "bytes": 73319
+    },
+    {
+      "path": "tmp/c2-4-browser1267/after-reload-streams.json",
+      "sha256": "9b09e80fc7bea05e1c3972b348da631b63fd3250cfd4369f76a1d296da834eb1",
+      "bytes": 13851
+    },
+    {
+      "path": "tmp/c2-4-browser1267/before-reload-streams.json",
+      "sha256": "45fe52f256b33293611d315265c452a7775b3b6e69e38650001b32322d25a045",
+      "bytes": 14807
+    },
+    {
+      "path": "tmp/c2-4-browser1267/checks.json",
+      "sha256": "abb2c756423d5f60b4b31e9239bc71a5fbd9e495527fea2695c7c2d9635bd1e4",
+      "bytes": 1648
+    },
+    {
+      "path": "tmp/c2-4-browser1267/result.json",
+      "sha256": "9160ea452fa3011530c2947cdb2b0e9354e55698650d6628d2d4e80e93e1f745",
+      "bytes": 64
+    },
+    {
+      "path": "tmp/c2-4-browser1267/stop-report.json",
+      "sha256": "bc4de60153d73389c98dcd5eb5f916f2a8ca30e40bed0e2e1e5273d91bce2f5c",
+      "bytes": 1160
+    },
+    {
+      "path": "tmp/c2-4-browser1267-managed-initial-preflight.json",
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851",
+      "bytes": 902
+    },
+    {
+      "path": "tmp/c2-4-browser1267-managed-initial-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1267-managed-initial-start.json",
+      "sha256": "8974d045c736ba78ab765e6390ced366ff2eee292fae38aeadec2e59f2324228",
+      "bytes": 426
+    },
+    {
+      "path": "tmp/c2-4-browser1267-managed-initial-stop.json",
+      "sha256": "1e9f8f2e86982749e50e7efcf6abd9d8100e440ad86c590dbb3470b2d18891b8",
+      "bytes": 290
+    },
+    {
+      "path": "tmp/c2-4-browser1267-managed-PASS-quick_health.json",
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba",
+      "bytes": 282
+    },
+    {
+      "path": "tmp/c2-4-browser1267-managed-result.json",
+      "sha256": "66ba71ffa0f77210ab20e8619916e6189e6847f543c305a10661883834ca9cef",
+      "bytes": 2743
+    },
+    {
+      "path": "tmp/c2-4-browser1267-managed.mjs",
+      "sha256": "a1adc80f8b59cf4e3ac326a86e2a4ca120e2a12c05fef05c5a2735c98876024f",
+      "bytes": 4948
+    },
+    {
+      "path": "tmp/c2-4-browser1267-managed.txt",
+      "sha256": "f4874a012c344755bb44e064f134d25a84b813f1e313cedfa68651767ed6157f",
+      "bytes": 677
+    },
+    {
+      "path": "tmp/c2-4-browser1267.py",
+      "sha256": "0c280a75e7d68325a86f68ee813c530c215c564ffbe6cf8b8c7e62933a8f827e",
+      "bytes": 6129
+    },
+    {
+      "path": "tmp/c2-4-coverage1270.txt",
+      "sha256": "37ab0713d91bbaeef27c95a93fdd6ab89781859fac214352447faba36a5c239c",
+      "bytes": 430
+    },
+    {
+      "path": "tmp/c2-4-resource-registry1275-exit.json",
+      "sha256": "ea61d7736f0b7ecb9b35158f03de77013db6b100cf1d36c957e78e6c8817c5b6",
+      "bytes": 23
+    },
+    {
+      "path": "tmp/c2-4-resource-registry1275.txt",
+      "sha256": "0faf2a42cf4b9fee209e5b89e2993674f0faec77c34caaaaf5ef8c03bfa6b11c",
+      "bytes": 257
+    },
+    {
+      "path": "tmp/c2-4-shell-cleanup1271-exit.json",
+      "sha256": "ea61d7736f0b7ecb9b35158f03de77013db6b100cf1d36c957e78e6c8817c5b6",
+      "bytes": 23
+    },
+    {
+      "path": "tmp/c2-4-shell-cleanup1271.txt",
+      "sha256": "49e4dbabdfeec1391366a243fe505ecf3b8e1864d466647ac4fa0879d05611c4",
+      "bytes": 13904
+    }
+  ]
+}

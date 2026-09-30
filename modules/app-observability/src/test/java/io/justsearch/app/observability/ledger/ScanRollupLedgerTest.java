@@ -6,10 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -21,10 +23,16 @@ final class ScanRollupLedgerTest {
 
   /** Test clock — the ledger reads it for start/quiescence timing. */
   private final AtomicLong now = new AtomicLong(1_000L);
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   private ScanRollupLedger ledger(ActionLedgerChangeRegistry registry, long quiesceMs) {
     // Synchronous emit + no sweeper thread: the test drives quiescence itself.
-    return new ScanRollupLedger(registry, Runnable::run, null, now::get, quiesceMs);
+    return new ScanRollupLedger(processExecutors, registry, Runnable::run, null, now::get, quiesceMs);
   }
 
   private static void terminal(

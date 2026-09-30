@@ -934,7 +934,7 @@ backend does not publish it.
 # Check backend health, models, GPU before running eval
 python -m jseval preflight
 
-# Discover worker.log path from running backend
+# Discover engine.log path from running backend
 python -m jseval log-path
 
 # List available datasets and modes
@@ -951,8 +951,8 @@ python -m jseval dev [--clean]
 # Send a single search and show full pipeline execution (CE status, timing)
 python -m jseval search --query "vitamin D" [--mode hybrid] [--ce] [--json]
 
-# Tail Worker/Head logs with structured filtering
-python -m jseval logs [--source worker|head] [--filter rerank] [--tail] [--level WARN]
+# Tail the Engine log with structured filtering (one JVM, one log: <dataDir>/logs/engine.log)
+python -m jseval logs [--filter rerank] [--tail] [--level WARN]
 ```
 
 ### Long detached runs (Windows)

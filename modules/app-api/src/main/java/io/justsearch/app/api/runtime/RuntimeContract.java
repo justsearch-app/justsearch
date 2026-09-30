@@ -40,7 +40,7 @@ public record RuntimeContract(String version, Constituents constituents) {
    * public-contract constituent — where {@code 0.2.0}-{@code 0.4.0} had been purely additive.
    * See the changelog in {@code docs/reference/runtime-contract.md}.
    */
-  public static final String CURRENT_VERSION = "0.2.0";
+  public static final String CURRENT_VERSION = "0.3.0";
 
   public RuntimeContract {
     if (version == null || version.isBlank()) {

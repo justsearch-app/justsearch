@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -22,7 +21,6 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,8 +30,8 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Tempdoc 821 §3-C2 (review fix 2) — collection scoping under {@code useHybrid=true}.
  *
- * <p>Why this class exists separately from {@link GrpcSearchServiceRetrieveContextTest}: that class
- * builds {@code new GrpcSearchService(lifecycle)}, which wires {@code NoOpEmbeddingProvider}, whose
+ * <p>Why this class exists separately from {@link WorkerSearchServiceRetrieveContextTest}: that class
+ * builds {@code new WorkerSearchService(lifecycle)}, which wires {@code NoOpEmbeddingProvider}, whose
  * {@code isAvailable()} is false — so every one of its cases runs the BM25 leg, where
  * {@code ChunkSearchOps#searchChunksFiltered} treats an empty {@code docIds} as UNSCOPED. Under
  * hybrid the same request behaves differently: both {@code searchChunksHybrid} overloads
@@ -42,14 +40,14 @@ import org.junit.jupiter.api.io.TempDir;
  * BM25-only test can see. This class makes it visible and regression-guarded.
  */
 @DisplayName("RAG collection scope under hybrid retrieval (821 §3-C2)")
-final class RagContextOpsHybridCollectionScopeTest {
+final class RagContextOpsHybridCollectionScopeTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String IN_SCOPE = "d:/agent/session-7.md";
   private static final String OUT_OF_SCOPE = "d:/docs/handbook.md";
 
   @TempDir Path tempDir;
   private RunningRuntime lifecycle;
-  private GrpcSearchService service;
+  private WorkerSearchService service;
 
   /** Available embedder returning a fixed unit vector — enough to make {@code useHybrid} true. */
   private static final class StubEmbeddingProvider implements EmbeddingProvider {
@@ -94,8 +92,8 @@ final class RagContextOpsHybridCollectionScopeTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).atPath(tempDir).open();
-    service = new GrpcSearchService(lifecycle, new StubEmbeddingProvider());
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
+    service = new WorkerSearchService(lifecycle, new StubEmbeddingProvider());
 
     indexDocWithChunk(IN_SCOPE, "agent-history", "Rollback checklist AGENTMARKER from the run.");
     indexDocWithChunk(OUT_OF_SCOPE, null, "Rollback checklist HANDBOOKMARKER for operators.");
@@ -200,28 +198,13 @@ final class RagContextOpsHybridCollectionScopeTest {
   }
 
   private RetrieveContextResponse call(RetrieveContextRequest request) {
-    AtomicReference<RetrieveContextResponse> responseRef = new AtomicReference<>();
-    AtomicReference<Throwable> errorRef = new AtomicReference<>();
-    service.retrieveContext(request, new StreamObserver<>() {
-      @Override
-      public void onNext(RetrieveContextResponse value) {
-        responseRef.set(value);
-      }
-
-      @Override
-      public void onError(Throwable t) {
-        errorRef.set(t);
-      }
-
-      @Override
-      public void onCompleted() {
-        // done
-      }
-    });
-    if (errorRef.get() != null) {
-      fail("RetrieveContext failed: " + errorRef.get().getMessage());
+    RetrieveContextResponse response;
+    try {
+      response = service.retrieveContext(request, CallContext.none());
+    } catch (WorkerServiceException e) {
+      return fail("RetrieveContext failed: " + e.getMessage());
     }
-    assertNotNull(responseRef.get(), "Response should not be null");
-    return responseRef.get();
+    assertNotNull(response, "Response should not be null");
+    return response;
   }
 }

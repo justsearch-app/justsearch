@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,7 +41,7 @@ final class McpSearchResponseFormatTest {
   private static Map<String, Object> invokeSearch(
       KnowledgeSearchResponse canned, Map<String, Object> args) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(canned);
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -49,7 +51,7 @@ final class McpSearchResponseFormatTest {
             () -> ctrl,
             () -> null,
             FIXED_CLOCK);
-    return surface.callTool("justsearch_search", args, "s1");
+    return surface.callTool("justsearch_search", args, "s1", TestRequestContexts.mcp("s1"));
   }
 
   private static String textOf(Map<String, Object> result) {

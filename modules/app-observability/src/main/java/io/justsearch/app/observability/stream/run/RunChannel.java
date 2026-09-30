@@ -88,6 +88,14 @@ public sealed interface RunChannel permits SteppedRunChannel, OneShotRunChannel 
    */
   Optional<SseStreamChannel.Subscription> observe(Consumer<SseEnvelope> listener, long sinceSeq);
 
+  /** Acquires observer ownership before replay delivery can block. */
+  Optional<SseStreamChannel.Subscription> observe(Consumer<SseEnvelope> listener, long sinceSeq,
+      Consumer<SseStreamChannel.Subscription> onRegistered);
+
+  /** Sends the run primer after ownership acquisition and before replay, outside source locks. */
+  Optional<SseStreamChannel.Subscription> observe(Consumer<SseEnvelope> listener, long sinceSeq,
+      Runnable beforeReplay, Consumer<SseStreamChannel.Subscription> onRegistered);
+
   /** True once the run is terminal and the registry has retired it. */
   boolean retired();
 

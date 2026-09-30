@@ -24,18 +24,18 @@ final class DiagnosticChannelStreamRegistryTest {
   @DisplayName("registers one SseStreamChannel per declared DiagnosticChannelRef")
   void registersOnePerCatalogEntry() {
     DiagnosticChannelStreamRegistry registry =
-        new DiagnosticChannelStreamRegistry(new HeadLogDiagnosticChannelCatalog());
+        new DiagnosticChannelStreamRegistry(new EngineLogDiagnosticChannelCatalog());
     assertEquals(1, registry.registeredIds().size());
-    assertTrue(registry.registeredIds().contains(HeadLogDiagnosticChannelCatalog.HEAD_LOG_ID));
+    assertTrue(registry.registeredIds().contains(EngineLogDiagnosticChannelCatalog.ENGINE_LOG_ID));
   }
 
   @Test
   @DisplayName("publish forwards an UPDATE envelope to subscribers")
   void publishForwardsToSubscribers() {
     DiagnosticChannelStreamRegistry registry =
-        new DiagnosticChannelStreamRegistry(new HeadLogDiagnosticChannelCatalog());
+        new DiagnosticChannelStreamRegistry(new EngineLogDiagnosticChannelCatalog());
     List<SseEnvelope> received = new ArrayList<>();
-    registry.channel(HeadLogDiagnosticChannelCatalog.HEAD_LOG_ID).subscribe(received::add);
+    registry.channel(EngineLogDiagnosticChannelCatalog.ENGINE_LOG_ID).subscribe(received::add);
 
     DiagnosticEvent event =
         new DiagnosticEvent(
@@ -50,7 +50,7 @@ final class DiagnosticChannelStreamRegistryTest {
             SubCategory.CORE_DIAGNOSTIC);
     DiagnosticEventEnvelope envelope = DiagnosticEventEnvelope.ofLogEvent(event);
 
-    registry.publish(HeadLogDiagnosticChannelCatalog.HEAD_LOG_ID, envelope);
+    registry.publish(EngineLogDiagnosticChannelCatalog.ENGINE_LOG_ID, envelope);
 
     assertEquals(1, received.size());
     assertSame(SseFrameKind.UPDATE, received.get(0).frameKind());
@@ -61,7 +61,7 @@ final class DiagnosticChannelStreamRegistryTest {
   @DisplayName("channel(unknown id) throws IllegalArgumentException")
   void unknownChannelThrows() {
     DiagnosticChannelStreamRegistry registry =
-        new DiagnosticChannelStreamRegistry(new HeadLogDiagnosticChannelCatalog());
+        new DiagnosticChannelStreamRegistry(new EngineLogDiagnosticChannelCatalog());
     assertThrows(
         IllegalArgumentException.class,
         () -> registry.channel(new DiagnosticChannelRef("core.unknown-channel")));

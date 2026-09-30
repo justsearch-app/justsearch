@@ -9,20 +9,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.status.MigrationSource;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.ipc.MigrationStartRequest;
 import io.justsearch.ipc.MigrationStartResponse;
 import io.justsearch.ipc.StatusRequest;
 import io.justsearch.ipc.StatusResponse;
-import io.justsearch.ipc.IngestServiceGrpc;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
-import io.justsearch.ipc.SearchServiceGrpc;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -32,13 +28,13 @@ import org.junit.jupiter.api.io.TempDir;
  * Tempdoc 915 §C.8 — what a Worker does after it has spent its automatic-rebuild budget.
  *
  * <p>The first cut of the brake returned early from {@code KnowledgeServer.start()}. That skipped
- * gRPC bind, the port write, the indexing loop and the whole {@code appServices} construction, so
- * the Worker exited with no port and no fatal-reason marker: the reason code this change added was
+ * the indexing loop and the whole {@code appServices} construction, so the Worker exited with no
+ * service surface and no fatal-reason marker: the reason code this change added was
  * unreachable, and so was the read-only serving it promised. A constant existing in
  * {@code LifecycleReasonCode} says nothing about whether anything can emit it — this test drives
- * the real server into the exhausted state and reads the answer off the wire.
+ * the real server into the exhausted state and reads the answer off its own service surface.
  *
- * <p>Deliberately an emit-chain test, not a constant test: it asserts the Worker still binds and
+ * <p>Deliberately an emit-chain test, not a constant test: it asserts the Worker still comes up and
  * serves (a, c) AND that the status payload carries the pair the Head maps to
  * {@code index.rebuild_brake_exhausted} (b), AND that the operator's recovery path is reachable
  * from that state and clears the brake (d).
@@ -50,13 +46,9 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
   private static final String FOREIGN_SHAPE = "f".repeat(64);
 
   private KnowledgeServer server;
-  private ManagedChannel channel;
 
   @AfterEach
   void tearDown() {
-    if (channel != null) {
-      channel.shutdownNow();
-    }
     if (server != null) {
       try {
         server.close();
@@ -95,27 +87,26 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
     // 3. Boot a real Worker over that data directory, under the production policy.
     WorkerBootFixture.publishConfig(
         layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     // (a) the Worker took the exhausted-brake path AND finished starting. The first assertion is
-    //     what makes the rest mean anything: a bound port and a served search are equally true of an
-    //     ordinary boot, so without it this test passes whether or not the branch ever ran.
+    //     what makes the rest mean anything: a running Worker and a served search are equally true
+    //     of an ordinary boot, so without it this test passes whether or not the branch ever ran.
     assertTrue(
         server.rebuildBrakeExhaustedForTest(),
         "precondition: the boot actually took the exhausted-brake path");
-    assertTrue(server.isRunning(), "the Worker must not treat an exhausted brake as a fatal start");
-    assertTrue(server.getPort() > 0, "gRPC must be bound: a Worker with no port is a Worker gone");
-
-    channel =
-        ManagedChannelBuilder.forAddress("127.0.0.1", server.getPort()).usePlaintext().build();
+    assertNotNull(
+        server.appServices(),
+        "start() must have run to completion: a Worker with no service surface is a Worker gone");
 
     // (b) the status payload says WHY ingestion stopped, in the vocabulary the Head maps to
     //     index.rebuild_brake_exhausted.
     StatusResponse status =
-        IngestServiceGrpc.newBlockingStub(channel)
-            .withDeadlineAfter(30, TimeUnit.SECONDS)
-            .indexStatus(StatusRequest.newBuilder().build());
+        server
+            .appServices()
+            .ingestService()
+            .indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
     assertEquals(
         "BLOCKED_REBUILD_BRAKE",
         status.getCompatibility().getSchemaCompatState(),
@@ -151,28 +142,33 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
             + " BLOCKED_LEGACY the moment the brake check stops shadowing it");
 
     // (c) Blue still serves. This is the promise the read-only fall-through makes; a Worker that
-    //     binds but cannot answer a query has kept the letter of it and none of the substance.
+    //     comes up but cannot answer a query has kept the letter of it and none of the substance.
     SearchResponse search =
-        SearchServiceGrpc.newBlockingStub(channel)
-            .withDeadlineAfter(30, TimeUnit.SECONDS)
-            .search(SearchRequest.newBuilder().setQuery("*").setLimit(10).build());
+        server
+            .appServices()
+            .searchService()
+            .search(
+                SearchRequest.newBuilder().setQuery("*").setLimit(10).build(), CallContext.none());
     assertNotNull(search, "search must answer while the brake is exhausted");
 
-    // (d) the recovery path out of the state, driven over the wire rather than by calling the
-    //     generation manager directly. core.rebuild-index (RebuildIndexHandler) resolves to
-    //     IndexingService.startMigration(USER_REQUESTED_REBUILD) → MigrationOps → this exact RPC,
-    //     so this is the Worker half of the chain the readiness notice's remedy promises. The Head
-    //     half (handler → op-lease → RemoteKnowledgeClient) is app-services' and is covered there;
-    //     what could not be asserted from a fixture call is that the RPC is even reachable in the
-    //     braked state, which is where appServices is built from a read-only runtime.
+    // (d) the recovery path out of the state, driven through the Worker's own ingest service
+    //     rather than by calling the generation manager directly. core.rebuild-index
+    //     (RebuildIndexHandler) resolves to IndexingService.startMigration(USER_REQUESTED_REBUILD)
+    //     → MigrationOps → this exact call, so this is the Worker half of the chain the readiness
+    //     notice's remedy promises. The Head half (handler → op-lease → the knowledge client) is
+    //     app-services' and is covered there; what could not be asserted from a fixture call is
+    //     that the operation is even reachable in the braked state, which is where appServices is
+    //     built from a read-only runtime.
     MigrationStartResponse rebuild =
-        IngestServiceGrpc.newBlockingStub(channel)
-            .withDeadlineAfter(30, TimeUnit.SECONDS)
+        server
+            .appServices()
+            .ingestService()
             .startMigration(
                 MigrationStartRequest.newBuilder()
                     .setReason(MigrationSource.USER_REQUESTED_REBUILD.wire())
                     .setRestartWorker(false)
-                    .build());
+                    .build(),
+                CallContext.none());
     assertTrue(rebuild.getAccepted(), "the operator rebuild is reachable from here: "
         + rebuild.getError());
     assertNotNull(rebuild.getBuildingGenerationId(), "and it allocates a Green beside Blue");
@@ -215,27 +211,25 @@ final class BrakeExhaustedWorkerServesReadOnlyTest {
     }
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     assertTrue(server.rebuildBrakeExhaustedForTest(), "precondition: the brake is spent");
 
-    channel = ManagedChannelBuilder.forAddress("127.0.0.1", server.getPort()).usePlaintext().build();
     StatusResponse braked =
-        IngestServiceGrpc.newBlockingStub(channel)
-            .withDeadlineAfter(30, TimeUnit.SECONDS)
-            .indexStatus(StatusRequest.newBuilder().build());
+        server
+            .appServices()
+            .ingestService()
+            .indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
     assertEquals(
         FOREIGN_SHAPE,
         braked.getCompatibility().getSchemaFpStored(),
         "the braked worker reports the shape Blue actually carries");
     server.close();
     server = null;
-    channel.shutdownNow();
-    channel = null;
 
     clearAutoRebuildFieldsByHand(layout.indexBase());
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
     assertFalse(
         server.rebuildBrakeExhaustedForTest(),

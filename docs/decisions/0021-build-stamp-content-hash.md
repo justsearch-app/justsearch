@@ -11,7 +11,7 @@ last_reviewed: 2026-09-02
 # ADR-0021: Build-Stamp Content-Hash Design
 
 ## Status
-Accepted
+Accepted — amended by lane F stage A item A13 (2026-09-07). The decision (SHA-256 content hash over a distribution's `lib/`, 16 hex chars, SNAPSHOT-content vs third-party-name+size) is unchanged; the *subject* moved. There is one JVM and one distribution now, so `generateBuildStamp` was re-homed from `modules/indexer-worker` (`build/install/indexer-worker/build-stamp.txt`) to `modules/ui` (`build/install/ui/build-stamp.txt`), still `finalizedBy` its module's `installDist`. Two consequences below are also resolved by A13: the `WorkerSpawner` injection step (item 3) is gone with that class, and the "Head process staleness is not detected" negative no longer holds — the stamp now describes the Engine's own distribution, which is what the dev-runner launches. The body below is left as written on 2026-04-06; read it against this note.
 
 ## Context
 

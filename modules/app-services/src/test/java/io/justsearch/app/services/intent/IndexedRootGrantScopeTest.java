@@ -44,7 +44,7 @@ class IndexedRootGrantScopeTest {
 
   private static IndexedRootGrantScope scopeBoundTo(Path... roots) {
     IndexedRootGrantScope scope = new IndexedRootGrantScope(Set.of(GOVERNED));
-    scope.bindIndexedRoots(() -> List.of(roots));
+    scope.bindIndexedRoots(engineContext -> List.of(roots));
     return scope;
   }
 
@@ -64,7 +64,7 @@ class IndexedRootGrantScopeTest {
   void ungovernedOperationIsAlwaysCovered() {
     IndexedRootGrantScope scope = new IndexedRootGrantScope(Set.of(GOVERNED));
     assertTrue(
-        scope.coversArguments(op(UNGOVERNED), "{\"query\":\"anything\"}"),
+        scope.coversArguments(op(UNGOVERNED), "{\"query\":\"anything\"}", io.justsearch.app.services.TestEngineContexts.agent()),
         "containment is not a defined concept for a non-filesystem operation");
   }
 
@@ -75,7 +75,7 @@ class IndexedRootGrantScopeTest {
     Path b = Files.createDirectory(root.resolve("sub"));
     IndexedRootGrantScope scope = scopeBoundTo(root);
 
-    assertTrue(scope.coversArguments(op(GOVERNED), argsFor(a, b)));
+    assertTrue(scope.coversArguments(op(GOVERNED), argsFor(a, b), io.justsearch.app.services.TestEngineContexts.agent()));
   }
 
   @Test
@@ -87,9 +87,9 @@ class IndexedRootGrantScopeTest {
     Path escape = Files.createFile(outside.resolve("secret.txt"));
     IndexedRootGrantScope scope = scopeBoundTo(root);
 
-    assertFalse(scope.coversArguments(op(GOVERNED), argsFor(escape)), "a wholly out-of-root ingest");
+    assertFalse(scope.coversArguments(op(GOVERNED), argsFor(escape), io.justsearch.app.services.TestEngineContexts.agent()), "a wholly out-of-root ingest");
     assertFalse(
-        scope.coversArguments(op(GOVERNED), argsFor(inside, escape)),
+        scope.coversArguments(op(GOVERNED), argsFor(inside, escape), io.justsearch.app.services.TestEngineContexts.agent()),
         "one out-of-root entry is enough — containment must hold for EVERY path");
   }
 
@@ -102,7 +102,7 @@ class IndexedRootGrantScopeTest {
     IndexedRootGrantScope scope = new IndexedRootGrantScope(Set.of(GOVERNED));
 
     assertFalse(
-        scope.coversArguments(op(GOVERNED), argsFor(file)),
+        scope.coversArguments(op(GOVERNED), argsFor(file), io.justsearch.app.services.TestEngineContexts.agent()),
         "unbound ⇒ containment unprovable ⇒ a wiring regression costs a prompt, not a silent grant");
   }
 
@@ -112,11 +112,11 @@ class IndexedRootGrantScopeTest {
     Path file = Files.createFile(root.resolve("a.txt"));
     IndexedRootGrantScope scope = new IndexedRootGrantScope(Set.of(GOVERNED));
     scope.bindIndexedRoots(
-        () -> {
+        engineContext -> {
           throw new IllegalStateException("Worker unavailable");
         });
 
-    assertFalse(scope.coversArguments(op(GOVERNED), argsFor(file)));
+    assertFalse(scope.coversArguments(op(GOVERNED), argsFor(file), io.justsearch.app.services.TestEngineContexts.agent()));
   }
 
   @Test
@@ -124,12 +124,12 @@ class IndexedRootGrantScopeTest {
   void emptyRootsAreNotCovered(@TempDir Path root) throws Exception {
     Path file = Files.createFile(root.resolve("a.txt"));
     IndexedRootGrantScope empty = new IndexedRootGrantScope(Set.of(GOVERNED));
-    empty.bindIndexedRoots(List::of);
+    empty.bindIndexedRoots(engineContext -> List.of());
     IndexedRootGrantScope nullish = new IndexedRootGrantScope(Set.of(GOVERNED));
-    nullish.bindIndexedRoots(() -> null);
+    nullish.bindIndexedRoots(engineContext -> null);
 
-    assertFalse(empty.coversArguments(op(GOVERNED), argsFor(file)), "no roots ⇒ nothing is contained");
-    assertFalse(nullish.coversArguments(op(GOVERNED), argsFor(file)), "a null root list too");
+    assertFalse(empty.coversArguments(op(GOVERNED), argsFor(file), io.justsearch.app.services.TestEngineContexts.agent()), "no roots ⇒ nothing is contained");
+    assertFalse(nullish.coversArguments(op(GOVERNED), argsFor(file), io.justsearch.app.services.TestEngineContexts.agent()), "a null root list too");
   }
 
   @Test
@@ -138,15 +138,15 @@ class IndexedRootGrantScopeTest {
     IndexedRootGrantScope scope = scopeBoundTo(root);
     Operation op = op(GOVERNED);
 
-    assertFalse(scope.coversArguments(op, null), "null args");
-    assertFalse(scope.coversArguments(op, "   "), "blank args");
-    assertFalse(scope.coversArguments(op, "{not-json"), "unparseable args");
-    assertFalse(scope.coversArguments(op, "[1,2,3]"), "args that are not an object");
-    assertFalse(scope.coversArguments(op, "{\"collection\":\"x\"}"), "no paths key");
-    assertFalse(scope.coversArguments(op, "{\"paths\":\"a\"}"), "paths is not an array");
-    assertFalse(scope.coversArguments(op, "{\"paths\":[]}"), "an empty paths array proves nothing");
-    assertFalse(scope.coversArguments(op, "{\"paths\":[123]}"), "a non-string entry");
-    assertFalse(scope.coversArguments(op, "{\"paths\":[\"  \"]}"), "a blank entry");
+    assertFalse(scope.coversArguments(op, null, io.justsearch.app.services.TestEngineContexts.agent()), "null args");
+    assertFalse(scope.coversArguments(op, "   ", io.justsearch.app.services.TestEngineContexts.agent()), "blank args");
+    assertFalse(scope.coversArguments(op, "{not-json", io.justsearch.app.services.TestEngineContexts.agent()), "unparseable args");
+    assertFalse(scope.coversArguments(op, "[1,2,3]", io.justsearch.app.services.TestEngineContexts.agent()), "args that are not an object");
+    assertFalse(scope.coversArguments(op, "{\"collection\":\"x\"}", io.justsearch.app.services.TestEngineContexts.agent()), "no paths key");
+    assertFalse(scope.coversArguments(op, "{\"paths\":\"a\"}", io.justsearch.app.services.TestEngineContexts.agent()), "paths is not an array");
+    assertFalse(scope.coversArguments(op, "{\"paths\":[]}", io.justsearch.app.services.TestEngineContexts.agent()), "an empty paths array proves nothing");
+    assertFalse(scope.coversArguments(op, "{\"paths\":[123]}", io.justsearch.app.services.TestEngineContexts.agent()), "a non-string entry");
+    assertFalse(scope.coversArguments(op, "{\"paths\":[\"  \"]}", io.justsearch.app.services.TestEngineContexts.agent()), "a blank entry");
   }
 
   @Test
@@ -158,7 +158,7 @@ class IndexedRootGrantScopeTest {
     IndexedRootGrantScope scope = scopeBoundTo(root);
 
     assertFalse(
-        scope.coversArguments(op(GOVERNED), argsFor(secret)),
+        scope.coversArguments(op(GOVERNED), argsFor(secret), io.justsearch.app.services.TestEngineContexts.agent()),
         "startsWith is path-element-wise after realpath, not a string prefix");
   }
 
@@ -185,7 +185,7 @@ class IndexedRootGrantScopeTest {
     IndexedRootGrantScope scope = scopeBoundTo(root);
 
     assertFalse(
-        scope.coversArguments(op(GOVERNED), argsFor(escaping)),
+        scope.coversArguments(op(GOVERNED), argsFor(escaping), io.justsearch.app.services.TestEngineContexts.agent()),
         "A link cannot straddle a root boundary into a durable grant: " + secret);
   }
 
@@ -229,10 +229,10 @@ class IndexedRootGrantScopeTest {
     IndexedRootGrantScope scope = scopeBoundTo(root);
 
     assertTrue(
-        scope.coversArguments(op(GOVERNED), argsFor(root.resolve("not").resolve("there.txt"))),
+        scope.coversArguments(op(GOVERNED), argsFor(root.resolve("not").resolve("there.txt")), io.justsearch.app.services.TestEngineContexts.agent()),
         "in-root but absent ⇒ still provably inside via the ancestor's real path");
     assertFalse(
-        scope.coversArguments(op(GOVERNED), argsFor(outside.resolve("not").resolve("there.txt"))),
+        scope.coversArguments(op(GOVERNED), argsFor(outside.resolve("not").resolve("there.txt")), io.justsearch.app.services.TestEngineContexts.agent()),
         "out-of-root and absent ⇒ still outside");
   }
 

@@ -12,15 +12,7 @@ import io.justsearch.app.services.worker.BootRecoveryDecision.Veto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * The boot-recovery law (tempdoc 825 §D2 mechanism 2), pinned with no process, no clock and no IO —
- * the same posture as {@link SupervisionDecisionTest} for its sibling authority.
- *
- * <p>The two vetoes are the load-bearing rows: they are what keeps ONE restart authority in a system
- * that now has two recovery loops. A regression in either is silent in production (the second loop
- * just quietly doubles the declared restart intensity, or overwrites a terminal verdict with a
- * cheerier one), which is exactly the class of defect the tempdoc-627 review named.
- */
+/** Pins the local recovery budget, backoff and fatal-index boundary without process I/O. */
 @DisplayName("boot recovery: the decision law")
 final class BootRecoveryDecisionTest {
 
@@ -28,7 +20,7 @@ final class BootRecoveryDecisionTest {
 
   /** A failed boot with nothing else going on: no client, no vetoes, no attempts yet. */
   private static Input freshlyBricked() {
-    return new Input(false, false, false, false, 0, false, Long.MAX_VALUE);
+    return new Input(false, false, 0, false, Long.MAX_VALUE);
   }
 
   @Test
@@ -36,7 +28,7 @@ final class BootRecoveryDecisionTest {
   void boundClientYieldsNone() {
     Decision d =
         BootRecoveryDecision.decide(
-            new Input(true, false, false, false, 0, false, Long.MAX_VALUE), POLICY);
+            new Input(true, false, 0, false, Long.MAX_VALUE), POLICY);
 
     assertEquals(Action.NONE, d.action());
   }
@@ -45,7 +37,7 @@ final class BootRecoveryDecisionTest {
   @DisplayName("a bound client wins even over a stale give-up/attempt count")
   void boundClientWinsOverStaleState() {
     Decision d =
-        BootRecoveryDecision.decide(new Input(true, true, true, false, 99, true, 0), POLICY);
+        BootRecoveryDecision.decide(new Input(true, false, 99, true, 0), POLICY);
 
     assertEquals(Action.NONE, d.action(), "a live worker must never be re-spawned by this arm");
   }
@@ -55,7 +47,7 @@ final class BootRecoveryDecisionTest {
   void firstAttemptWaitsOutTheBaseBackoff() {
     Decision waiting =
         BootRecoveryDecision.decide(
-            new Input(false, false, false, false, 0, false, POLICY.baseBackoffMs() - 1), POLICY);
+            new Input(false, false, 0, false, POLICY.baseBackoffMs() - 1), POLICY);
     assertEquals(Action.WAIT, waiting.action());
     assertEquals(1, waiting.nextAttempt());
     assertEquals(1, waiting.waitMs());
@@ -83,64 +75,22 @@ final class BootRecoveryDecisionTest {
   void budgetIsBoundedAndTerminal() {
     for (int made = 0; made < POLICY.maxAttempts(); made++) {
       Decision d =
-          BootRecoveryDecision.decide(new Input(false, false, false, false, made, false, 999_999), POLICY);
+          BootRecoveryDecision.decide(new Input(false, false, made, false, 999_999), POLICY);
       assertEquals(Action.ATTEMPT, d.action(), "attempt " + (made + 1) + " is within budget");
       assertEquals(made + 1, d.nextAttempt());
     }
 
     Decision spent =
         BootRecoveryDecision.decide(
-            new Input(false, false, false, false, POLICY.maxAttempts(), false, 999_999), POLICY);
+            new Input(false, false, POLICY.maxAttempts(), false, 999_999), POLICY);
     assertEquals(Action.GIVE_UP, spent.action());
     assertEquals(Veto.NONE, spent.veto(), "our own budget being spent is not a veto");
 
     // ...and once narrated, the arc goes quiet: the terminal code is emitted exactly once.
     Decision afterGiveUp =
         BootRecoveryDecision.decide(
-            new Input(false, false, false, false, POLICY.maxAttempts(), true, 999_999), POLICY);
+            new Input(false, false, POLICY.maxAttempts(), true, 999_999), POLICY);
     assertEquals(Action.NONE, afterGiveUp.action());
-  }
-
-  @Test
-  @DisplayName("VETO: a LIVE supervisor yields the cycle — it does not end the arc")
-  void liveSupervisorStandsDownForThisCycleOnly() {
-    Decision standing =
-        BootRecoveryDecision.decide(
-            new Input(false, true, false, false, 0, false, Long.MAX_VALUE), POLICY);
-
-    assertEquals(
-        Action.STAND_DOWN,
-        standing.action(),
-        "a second restart authority must not emerge while a supervisor holds the budget");
-    assertEquals(Veto.SUPERVISION_ENGAGED, standing.veto());
-    assertEquals(0, standing.nextAttempt(), "standing down consumes no budget");
-
-    // Review F2(a) — THE regression: making this permanent handed a supervised-then-abandoned boot
-    // zero attempts, no terminal code and a dead operator hatch. Once the supervisor is gone (the
-    // failed start's close() dropped the spawner), the very next decision must attempt.
-    Decision afterSupervisorGone =
-        BootRecoveryDecision.decide(
-            new Input(false, false, false, false, 0, false, Long.MAX_VALUE), POLICY);
-    assertEquals(
-        Action.ATTEMPT,
-        afterSupervisorGone.action(),
-        "standing down must not latch: recovery resumes when supervision's arc ends");
-    assertEquals(1, afterSupervisorGone.nextAttempt(), "with its budget untouched");
-  }
-
-  @Test
-  @DisplayName("VETO: worker.restart_exhausted stays terminal — boot recovery never supersedes it")
-  void restartExhaustedIsNeverSuperseded() {
-    Decision d =
-        BootRecoveryDecision.decide(
-            new Input(false, false, true, false, 0, false, Long.MAX_VALUE), POLICY);
-
-    assertEquals(Action.GIVE_UP, d.action());
-    assertEquals(
-        Veto.RESTART_EXHAUSTED,
-        d.veto(),
-        "the veto is what tells the monitor to stay SILENT rather than narrate its own terminal"
-            + " code over supervision's");
   }
 
   @Test
@@ -148,7 +98,7 @@ final class BootRecoveryDecisionTest {
   void indexFatalShortCircuitsTheLadder() {
     Decision d =
         BootRecoveryDecision.decide(
-            new Input(false, false, false, true, 0, false, Long.MAX_VALUE), POLICY);
+            new Input(false, true, 0, false, Long.MAX_VALUE), POLICY);
 
     assertEquals(
         Action.GIVE_UP,
@@ -160,65 +110,14 @@ final class BootRecoveryDecisionTest {
   }
 
   @Test
-  @DisplayName("supervision's terminal verdict still outranks the index veto (it is already on the wire)")
-  void restartExhaustedOutranksIndexFatal() {
-    Decision d =
-        BootRecoveryDecision.decide(
-            new Input(false, false, true, true, 0, false, Long.MAX_VALUE), POLICY);
-
-    assertEquals(
-        Veto.RESTART_EXHAUSTED,
-        d.veto(),
-        "ranking matters: RESTART_EXHAUSTED is silent by contract, INDEX_FATAL narrates — swapping"
-            + " them would let boot recovery write over supervision's verdict");
-  }
-
-  @Test
-  @DisplayName("a live supervisor still yields the temporary stand-down, not the permanent index veto")
-  void liveSupervisorIsNotOutrankedIntoPermanence() {
-    Decision d =
-        BootRecoveryDecision.decide(
-            new Input(false, true, false, true, 0, false, Long.MAX_VALUE), POLICY);
-
-    // INDEX_FATAL sits ABOVE supervisionActive deliberately: a supervisor cannot fix an index
-    // either. What must not happen is the reverse reading — that this test would pass by the
-    // decision falling through to STAND_DOWN and merely looking terminal enough.
-    assertEquals(Action.GIVE_UP, d.action());
-    assertEquals(Veto.INDEX_FATAL, d.veto());
-  }
-
-  @Test
   @DisplayName("a bound client still outranks everything: never touch a live worker")
   void clientBoundOutranksIndexFatal() {
     Decision d =
         BootRecoveryDecision.decide(
-            new Input(true, false, false, true, 0, false, Long.MAX_VALUE), POLICY);
+            new Input(true, true, 0, false, Long.MAX_VALUE), POLICY);
 
     assertEquals(Action.NONE, d.action());
     assertEquals(Veto.NONE, d.veto());
-  }
-
-  @Test
-  @DisplayName("the restart_exhausted veto outranks a spent budget (so the reason is the honest one)")
-  void restartExhaustedVetoOutranksBudgetExhaustion() {
-    Decision d =
-        BootRecoveryDecision.decide(
-            new Input(false, false, true, false, POLICY.maxAttempts(), false, 999_999), POLICY);
-
-    assertEquals(Veto.RESTART_EXHAUSTED, d.veto());
-  }
-
-  @Test
-  @DisplayName("the TERMINAL supervision verdict outranks a merely-live supervisor")
-  void restartExhaustedOutranksStandDown() {
-    Decision d =
-        BootRecoveryDecision.decide(new Input(false, true, true, false, 0, false, 999_999), POLICY);
-
-    assertEquals(
-        Action.GIVE_UP,
-        d.action(),
-        "gave-up is permanent; still-supervising is not — the pair must not collapse");
-    assertEquals(Veto.RESTART_EXHAUSTED, d.veto());
   }
 
   @Test
@@ -228,28 +127,37 @@ final class BootRecoveryDecisionTest {
     // something the executor-side re-decide will NOT treat as an attempt.
     assertEquals(
         Action.NONE,
-        BootRecoveryDecision.decide(new Input(true, false, false, false, 1, false, 999_999), POLICY)
+        BootRecoveryDecision.decide(new Input(true, false, 1, false, 999_999), POLICY)
             .action(),
         "a worker came up in the meantime (handover already ran)");
     assertEquals(
         Action.GIVE_UP,
         BootRecoveryDecision.decide(
-                new Input(false, false, false, false, POLICY.maxAttempts(), false, 999_999), POLICY)
+                new Input(false, false, POLICY.maxAttempts(), false, 999_999), POLICY)
             .action(),
         "the budget was spent by the requests ahead of this one");
     assertEquals(
         Action.NONE,
         BootRecoveryDecision.decide(
-                new Input(false, false, false, false, POLICY.maxAttempts(), true, 999_999), POLICY)
+                new Input(false, false, POLICY.maxAttempts(), true, 999_999), POLICY)
             .action(),
         "the arc already gave up");
+  }
+
+  @Test
+  @DisplayName("a fatal index cause outranks an exhausted budget and keeps its specific remedy")
+  void fatalIndexOutranksSpentBudget() {
+    Decision decision = BootRecoveryDecision.decide(
+        new Input(false, true, POLICY.maxAttempts(), false, Long.MAX_VALUE), POLICY);
+    assertEquals(Action.GIVE_UP, decision.action());
+    assertEquals(Veto.INDEX_FATAL, decision.veto());
+    assertEquals(0, decision.nextAttempt());
   }
 
   @Test
   @DisplayName("a zero-attempt policy gives up immediately rather than attempting once")
   void zeroBudgetGivesUpImmediately() {
     Decision d = BootRecoveryDecision.decide(freshlyBricked(), new BootRecoveryPolicy(0, 0, 0));
-
     assertEquals(Action.GIVE_UP, d.action());
   }
 

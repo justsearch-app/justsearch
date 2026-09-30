@@ -23,12 +23,14 @@ class ExportDiagnosticsHandlerFeTelemetryTest {
     final AtomicReference<String> received = new AtomicReference<>("UNSET");
 
     @Override
-    public Path exportDiagnostics() throws Exception {
-      return exportDiagnostics(null);
+    public Path exportDiagnostics(io.justsearch.core.context.EngineContext engineContext)
+        throws Exception {
+      return exportDiagnostics(null, engineContext);
     }
 
     @Override
-    public Path exportDiagnostics(String feTelemetryJson) {
+    public Path exportDiagnostics(
+        String feTelemetryJson, io.justsearch.core.context.EngineContext engineContext) {
       received.set(feTelemetryJson);
       return Path.of("out.zip");
     }
@@ -40,7 +42,7 @@ class ExportDiagnosticsHandlerFeTelemetryTest {
     ExportDiagnosticsHandler handler = new ExportDiagnosticsHandler(() -> diagnostics);
 
     OperationResult result =
-        handler.execute("{\"feTelemetry\":{\"wireDrift\":{\"total\":2}}}");
+        handler.execute("{\"feTelemetry\":{\"wireDrift\":{\"total\":2}}}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success(), "export must succeed");
     String forwarded = diagnostics.received.get();
@@ -54,16 +56,16 @@ class ExportDiagnosticsHandlerFeTelemetryTest {
     RecordingDiagnostics diagnostics = new RecordingDiagnostics();
     ExportDiagnosticsHandler handler = new ExportDiagnosticsHandler(() -> diagnostics);
 
-    assertTrue(handler.execute("{}").success());
+    assertTrue(handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal()).success());
     assertNull(diagnostics.received.get(), "absent arg forwards null");
 
-    assertTrue(handler.execute("{\"feTelemetry\":\"not-an-object\"}").success());
+    assertTrue(handler.execute("{\"feTelemetry\":\"not-an-object\"}", io.justsearch.app.services.TestEngineContexts.internal()).success());
     assertNull(diagnostics.received.get(), "non-object arg forwards null");
 
-    assertTrue(handler.execute("not json").success());
+    assertTrue(handler.execute("not json", io.justsearch.app.services.TestEngineContexts.internal()).success());
     assertNull(diagnostics.received.get(), "malformed args forward null");
 
-    OperationResult viaNull = handler.execute(null);
+    OperationResult viaNull = handler.execute(null, io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(viaNull.success());
     assertNull(diagnostics.received.get(), "null args forward null");
     assertEquals("out.zip", Path.of("out.zip").toString());

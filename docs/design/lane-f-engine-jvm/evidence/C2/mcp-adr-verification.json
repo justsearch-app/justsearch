@@ -1,0 +1,81 @@
+{
+  "base": "15bac5f90",
+  "environment": "Windows PowerShell",
+  "artifacts": [
+    {
+      "path": "tmp/c2-adr-docs1294.txt",
+      "sha256": "c710c59d19078856927ca8b707be422f02b361204b68aa67f2ce2bfc4023dbe4",
+      "bytes": 205
+    },
+    {
+      "path": "tmp/c2-adr-docs1299.txt",
+      "sha256": "c24751c3e8088fe39d7f294cc5043caa6db1f3e3629b3aa7ebddfec8b94242e4",
+      "bytes": 205
+    },
+    {
+      "path": "tmp/c2-adr-negative1295-source.json",
+      "sha256": "b74b7de0e37402dc8db92213d37402bbbedf51738966d94ac89015d096464f2c",
+      "bytes": 177
+    },
+    {
+      "path": "tmp/c2-adr-negative1295.original",
+      "sha256": "e8c43767670e9728de160f58b3178cd9f2548b00cefb2d7c01299ee8f1e23727",
+      "bytes": 111079
+    },
+    {
+      "path": "tmp/c2-adr-negative1295.sarif",
+      "sha256": "0ecc118f33eca735c41d64c91ecc3e04459b4d6f5056412ad5e99880d5f32434",
+      "bytes": 30874
+    },
+    {
+      "path": "tmp/c2-adr-negative1295.txt",
+      "sha256": "c1433aa8bb25e36c7322bf56b4f52e8b03404c3b8fec79a4bb4b6ce2fbf0fc40",
+      "bytes": 109
+    },
+    {
+      "path": "tmp/c2-adr-repro1291.sarif",
+      "sha256": "ad6a3315db0f77d07a40146fdd6ef227e669c57c23d4dd72058e6150ae49c323",
+      "bytes": 30784
+    },
+    {
+      "path": "tmp/c2-adr-repro1291.txt",
+      "sha256": "c1433aa8bb25e36c7322bf56b4f52e8b03404c3b8fec79a4bb4b6ce2fbf0fc40",
+      "bytes": 109
+    },
+    {
+      "path": "tmp/c2-adr-repro1294.sarif",
+      "sha256": "fc020daee6d0b500b3862abde9420f4a9a1f72f1a1363c8717e5ef170b178b62",
+      "bytes": 29200
+    },
+    {
+      "path": "tmp/c2-adr-repro1294.txt",
+      "sha256": "f8ffd209ccf407193c407ff6d354a4e2a20c6ceb3d17fcf0b28c7844485f4ca4",
+      "bytes": 109
+    },
+    {
+      "path": "tmp/c2-adr-repro1296.sarif",
+      "sha256": "fc020daee6d0b500b3862abde9420f4a9a1f72f1a1363c8717e5ef170b178b62",
+      "bytes": 29200
+    },
+    {
+      "path": "tmp/c2-adr-repro1296.txt",
+      "sha256": "f8ffd209ccf407193c407ff6d354a4e2a20c6ceb3d17fcf0b28c7844485f4ca4",
+      "bytes": 109
+    },
+    {
+      "path": "tmp/c2-adr-repro1300.txt",
+      "sha256": "f8ffd209ccf407193c407ff6d354a4e2a20c6ceb3d17fcf0b28c7844485f4ca4",
+      "bytes": 109
+    },
+    {
+      "path": "tmp/c2-hosted34775117498-failed.txt",
+      "sha256": "f2dc760f6a7f49c15304f5ecfc6ff71c4bc53db928e889c518d029cc5d5bf225",
+      "bytes": 2097
+    },
+    {
+      "path": "tmp/c2-hosted34775117498-jobs.json",
+      "sha256": "5d20ce33741224cf8485822053c586295cda93985a87568c52973e6213ef4bdb",
+      "bytes": 799
+    }
+  ]
+}

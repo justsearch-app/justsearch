@@ -56,7 +56,8 @@ final class LazyDocumentServiceCitationForwardTest {
             .matchCitationsAgainst(
                 "A sentence.",
                 List.of(new VerificationSource(CITATION, "the literal passage")),
-                0.5)
+                0.5,
+                io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture()
             .join();
 
@@ -78,7 +79,9 @@ final class LazyDocumentServiceCitationForwardTest {
         new RecordingDocs(seen, new CitationMatchResult(List.of(), 1, 0, 1L, 1, ScorerKind.NONE, List.of()));
 
     new LazyDocumentService(() -> delegate)
-        .matchCitations("A sentence.", List.of(CITATION), 0.5)
+        .matchCitations(
+            "A sentence.", List.of(CITATION), 0.5,
+            io.justsearch.app.services.TestEngineContexts.internal())
         .toCompletableFuture()
         .join();
 
@@ -95,7 +98,8 @@ final class LazyDocumentServiceCitationForwardTest {
     var future =
         new LazyDocumentService(() -> null)
             .matchCitationsAgainst(
-                "A sentence.", List.of(new VerificationSource(CITATION, "text")), 0.5)
+                "A sentence.", List.of(new VerificationSource(CITATION, "text")), 0.5,
+                io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture();
 
     assertTrue(future.isCompletedExceptionally(), "an absent Worker must not read as 'no matches'");
@@ -107,12 +111,12 @@ final class LazyDocumentServiceCitationForwardTest {
     DocumentService delegate =
         new DocumentService() {
           @Override
-          public CompletionStage<DocumentRecord> fetch(String docId) {
+          public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
             return CompletableFuture.completedFuture(null);
           }
 
           @Override
-          public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit) {
+          public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit, io.justsearch.core.context.EngineContext engineContext) {
             return CompletableFuture.completedFuture(
                 new DocumentIdPage(List.of("C:/root/nested/a.txt"), 1, 4));
           }
@@ -120,7 +124,7 @@ final class LazyDocumentServiceCitationForwardTest {
 
     var page =
         new LazyDocumentService(() -> delegate)
-            .listAllDocumentIds(0, 50_000)
+            .listAllDocumentIds(0, 50_000, io.justsearch.app.services.TestEngineContexts.internal())
             .toCompletableFuture()
             .join();
 
@@ -133,13 +137,14 @@ final class LazyDocumentServiceCitationForwardTest {
       implements DocumentService {
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletionStage<CitationMatchResult> matchCitationsAgainst(
-        String answerText, List<VerificationSource> sources, double threshold) {
+        String answerText, List<VerificationSource> sources, double threshold,
+        io.justsearch.core.context.EngineContext engineContext) {
       seen.set(sources);
       return CompletableFuture.completedFuture(result);
     }

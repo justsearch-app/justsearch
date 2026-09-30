@@ -1,0 +1,58 @@
+{
+  "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "type" : "object",
+  "properties" : {
+    "acceptedAt" : {
+      "type" : "integer"
+    },
+    "completedAt" : {
+      "type" : "integer"
+    },
+    "historySince" : {
+      "type" : "integer"
+    },
+    "phase" : {
+      "type" : "string"
+    },
+    "reason" : {
+      "type" : "string"
+    },
+    "result" : {
+      "type" : "object",
+      "properties" : {
+        "code" : {
+          "type" : "string"
+        },
+        "executionId" : {
+          "type" : "string"
+        },
+        "gaps" : {
+          "type" : "array",
+          "items" : {
+            "type" : "object",
+            "properties" : {
+              "reason" : {
+                "type" : "string"
+              },
+              "unitId" : {
+                "type" : "string"
+              }
+            },
+            "required" : [ "reason", "unitId" ]
+          }
+        }
+      }
+    },
+    "state" : {
+      "type" : "string",
+      "enum" : [ "accepted", "running", "complete", "failed", "unknown", "expired" ]
+    },
+    "unitsCompleted" : {
+      "type" : "integer"
+    },
+    "unitsFailed" : {
+      "type" : "integer"
+    }
+  },
+  "required" : [ "historySince", "state" ]
+}

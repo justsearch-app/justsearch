@@ -1,7 +1,7 @@
 # Phase 9 smoke profile for launcher --smoke runs.
 app:
   package_base: io.justsearch
-  data_dir: ${JUSTSEARCH_DATA_DIR:${user.home}/.justsearch-smoke}
+  # LauncherEnvironment contributes the isolated smoke default; DATA_DIR overrides use EnvRegistry.
   timezone: UTC
 
 egress:

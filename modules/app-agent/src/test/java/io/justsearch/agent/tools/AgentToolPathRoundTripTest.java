@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -49,7 +51,7 @@ final class AgentToolPathRoundTripTest {
     target = root.resolve("explanation").resolve("overview.md");
     rootsView =
         AgentToolPaths.RootsView.of(
-            () -> List.of(new BrowseTool.RootInfo(root.toString(), root.getFileName().toString())));
+            context -> List.of(new BrowseTool.RootInfo(root.toString(), root.getFileName().toString())));
   }
 
   @Test
@@ -69,9 +71,9 @@ final class AgentToolPathRoundTripTest {
 
   /** What the model actually reads off a {@code core_browse_folders} file listing. */
   private String pathAsBrowseEmitsIt() {
-    BrowseTool.BrowseCallback browse = req -> null;
+    BrowseTool.BrowseCallback browse = (req, context) -> null;
     BrowseTool.FilesCallback files =
-        req ->
+        (req, context) ->
             new FolderFilesResponse(
                 List.of(
                     new FolderFilesResponse.FileEntry(
@@ -85,7 +87,7 @@ final class AgentToolPathRoundTripTest {
         tool.execute(
             "{\"parent_path\":\""
                 + root.resolve("explanation").toString().replace("\\", "\\\\")
-                + "\",\"list_files\":true}");
+                + "\",\"list_files\":true}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
 
     for (String line : result.message().split("\\R")) {
@@ -101,13 +103,13 @@ final class AgentToolPathRoundTripTest {
     var captured = new AtomicReference<KnowledgeSearchRequest>();
     KnowledgeSearchResponse response = KnowledgeSearchResponseBuilder.builder().tookMs(1).build();
     SearchTool.SearchCallback search =
-        req -> {
+        (req, context) -> {
           captured.set(req);
           return response;
         };
     OperationResult result =
         new SearchTool(search, rootsView)
-            .execute("{\"query\":\"anything\",\"path_prefix\":\"" + emitted + "\"}");
+            .execute("{\"query\":\"anything\",\"path_prefix\":\"" + emitted + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertNotNull(captured.get(), "search must have been dispatched");
@@ -118,14 +120,14 @@ final class AgentToolPathRoundTripTest {
   private String readDocumentResolves(String emitted) {
     var seen = new AtomicReference<String>();
     ReadDocumentTool.SliceFetcher fetch =
-        (docId, offset, max) -> {
+        (docId, offset, max, context) -> {
           seen.set(docId);
           return CompletableFuture.completedFuture(
               new DocumentService.DocumentSlice(
                   docId, "page text", Map.of(), true, false, 9, 9, null));
         };
     OperationResult result =
-        new ReadDocumentTool(fetch, rootsView).execute("{\"path\":\"" + emitted + "\"}");
+        new ReadDocumentTool(fetch, rootsView).execute("{\"path\":\"" + emitted + "\"}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     return seen.get();
@@ -138,8 +140,8 @@ final class AgentToolPathRoundTripTest {
 
     FileOperationsTool tool =
         new FileOperationsTool(
-            () -> List.of(root),
-            mappings -> mappings.size(),
+            context -> List.of(root),
+            (mappings, context) -> mappings.size(),
             new FileOperationLog(tempDir.resolve("data").resolve("file-operations")),
             rootsView);
 
@@ -149,7 +151,7 @@ final class AgentToolPathRoundTripTest {
                 + scratch.toString().replace("\\", "\\\\")
                 + "\",\"destination\":\""
                 + emitted
-                + "\"}]}");
+                + "\"}]}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(
         result.success(),
@@ -174,21 +176,21 @@ final class AgentToolPathRoundTripTest {
 
     var accepted = new java.util.ArrayList<Path>();
     IngestTool.IngestCallback ingest =
-        (files, collection) -> {
+        (files, collection, context) -> {
           accepted.addAll(files);
           return new io.justsearch.app.api.knowledge.KnowledgeIngestResponse(files.size(), null);
         };
     IngestTool tool =
         new IngestTool(
             ingest,
-            (rootPath, collection, excludeGlobs) ->
+            (rootPath, collection, excludeGlobs, context) ->
                 new io.justsearch.app.api.knowledge.KnowledgeIngestResponse(0, "no scan expected"),
-            () ->
+            context ->
                 List.of(
                     new BrowseTool.RootInfo(emptyDocsRoot.toString(), "docs"),
                     new BrowseTool.RootInfo(otherRoot.toString(), "B")));
 
-    OperationResult result = tool.execute("{\"paths\":[\"docs/x.md\"]}");
+    OperationResult result = tool.execute("{\"paths\":[\"docs/x.md\"]}", EngineContextTestFixtures.AGENT_LOOP);
 
     assertTrue(result.success(), result.message());
     assertFalse(

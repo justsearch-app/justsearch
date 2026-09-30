@@ -26,22 +26,28 @@ _LLM_HEALTH_TIMEOUT_SEC = 240.0  # 369: LLM model loading adds significant time
 
 # Tempdoc 711 item 4: fail-closed --clean.
 #
-# The Worker JVM is spawned by the Head's ProcessBuilder (WorkerSpawner.java) as a
-# grandchild of the `gradlew.bat runHeadlessEval` process jseval starts. `taskkill
-# /PID <head-pid> /T /F` kills the Gradle process tree, but the Worker JVM has been
-# observed to survive it (orphaned rather than reparented into the killed tree),
-# holding the Lucene index open and able to silently rewrite watched_roots.json —
-# which then makes the *next* run's ingest an idempotent no-op while stale docs
-# serve. `--clean` must therefore fail CLOSED: if a wipe cannot be verified
+# History: at the time this was written, the Worker JVM was spawned by the Head's
+# ProcessBuilder (WorkerSpawner.java) as a grandchild of the `gradlew.bat runHeadlessEval`
+# process jseval starts. `taskkill /PID <head-pid> /T /F` kills the Gradle process tree, but
+# the Worker JVM had been observed to survive it (orphaned rather than reparented into the
+# killed tree), holding the Lucene index open and able to silently rewrite watched_roots.json —
+# which then made the *next* run's ingest an idempotent no-op while stale docs serve.
+# Since lane F item A6, index execution runs inside the Head JVM rather than a separate Worker
+# JVM, so the grandchild-process/orphaning mechanism described above no longer applies as
+# written; whether an equivalent stale-lock risk still exists for the merged process has not
+# been verified here. `--clean` must therefore fail CLOSED: if a wipe cannot be verified
 # complete, raise rather than let the run proceed on a dirty dir.
 _LOCK_FILE_REL = Path("index") / "default.index.lock"
-_WORKER_LOG_REL = Path("logs") / "worker.log"
+# Lane F stage A: the Worker's own log (worker.log, via its now-deleted
+# logback.xml) no longer exists — index execution runs inside the merged
+# Engine JVM, which writes logs/engine.log instead.
+_ENGINE_LOG_REL = Path("logs") / "engine.log"
 # IndexRootLock.writeOwnerMetadataBestEffort() (Java side) stamps started_at from
 # Instant.now(); ProcessHandle.info().startInstant() and psutil's create_time() can
 # each be off by OS scheduling/clock-resolution noise, so allow a generous skew
 # before treating a PID match as a coincidental reuse.
 _LOCK_PID_SKEW_SEC = 120.0
-_WORKER_LOG_TAIL_LINES = 50
+_ENGINE_LOG_TAIL_LINES = 50
 
 # Tempdoc 782 §I: `llm=True` cannot work through this entry point, and used to
 # discover that only after burning the full inference deadline (~240s) and failing
@@ -569,7 +575,7 @@ def _clean_data_dir(resolved_data: Path) -> None:
     """
     # Capture forensics for a lock-file-identified orphan BEFORE any deletion
     # is attempted: a partially-successful first-pass rmtree can delete the
-    # very lock file / worker.log this identification depends on (rmtree
+    # very lock file / engine.log this identification depends on (rmtree
     # aborts on the first unhandled OSError, but earlier siblings in the
     # same directory may already be gone by then) — "the wipe destroys the
     # forensics" (711 item 4 brief). The catch-all cmdline scan inside
@@ -807,17 +813,17 @@ def _scan_orphan_worker_processes(data_dir: Path) -> list[tuple[int, list[str]]]
 
 
 def _log_worker_forensics(pid: int, cmdline: list[str], data_dir: Path) -> None:
-    """Log the discovered orphan + the worker.log tail BEFORE any wipe/kill,
+    """Log the discovered orphan + the engine.log tail BEFORE any wipe/kill,
     since the wipe destroys the forensics."""
     log.warning("Orphan Worker detected: PID=%d cmdline=%s", pid, " ".join(cmdline))
-    log_file = data_dir / _WORKER_LOG_REL
+    log_file = data_dir / _ENGINE_LOG_REL
     try:
         text = log_file.read_text(encoding="utf-8", errors="replace")
     except OSError:
-        log.debug("No worker.log at %s to capture before sweep", log_file)
+        log.debug("No engine.log at %s to capture before sweep", log_file)
         return
-    tail = text.splitlines()[-_WORKER_LOG_TAIL_LINES:]
-    log.warning("worker.log tail (%d lines) before sweep:\n%s", len(tail), "\n".join(tail))
+    tail = text.splitlines()[-_ENGINE_LOG_TAIL_LINES:]
+    log.warning("engine.log tail (%d lines) before sweep:\n%s", len(tail), "\n".join(tail))
 
 
 def _kill_pid(pid: int) -> None:
@@ -841,7 +847,7 @@ def _sweep_orphan_worker(data_dir: Path) -> list[tuple[int, list[str]]]:
     """Find and kill any Worker JVM still holding data_dir's index open.
 
     Combines the lock-file-keyed lookup with the cmdline catch-all scan,
-    de-duplicated by PID. Logs forensics (PID/cmdline + worker.log tail)
+    de-duplicated by PID. Logs forensics (PID/cmdline + engine.log tail)
     before killing, since the caller's wipe will otherwise destroy them.
     Returns the list of (pid, cmdline) this swept (whether or not the kill
     is later confirmed) — used by ``_clean_data_dir`` to name a likely

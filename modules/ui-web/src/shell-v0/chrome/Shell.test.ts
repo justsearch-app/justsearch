@@ -33,6 +33,7 @@ import {
 } from '../router/storeRegistry.js';
 import { __resetBootstrapForTest } from '../router/bootstrap.js';
 import { __resetUserConfigForTest } from '../state/userConfigState.js';
+import { __resetAiStateForTest } from '../state/aiStateStore.js';
 import {
   enqueueUiModePersistence,
   UI_MODE_INTENT_HEADER,
@@ -149,6 +150,7 @@ describe('Shell — slice 492 substrate integration', () => {
 
   afterEach(() => {
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
+    __resetAiStateForTest();
     resetSurfaceCatalog();
     __resetUserConfigForTest();
     __resetStoreRegistryForTest();
@@ -407,6 +409,7 @@ describe('Shell — Search Thread S6 citation-select rework', () => {
 
   afterEach(() => {
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
+    __resetAiStateForTest();
     resetSurfaceCatalog();
     __resetUserConfigForTest();
     __resetStoreRegistryForTest();
@@ -493,6 +496,7 @@ describe('Shell — settings window vs. stage navigation (tempdoc 855)', () => {
 
   afterEach(() => {
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
+    __resetAiStateForTest();
     resetSurfaceCatalog();
     __resetUserConfigForTest();
     __resetStoreRegistryForTest();
@@ -615,6 +619,7 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
 
   afterEach(() => {
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
+    __resetAiStateForTest();
     resetSurfaceCatalog();
     __resetUserConfigForTest();
     __resetStoreRegistryForTest();
@@ -797,6 +802,7 @@ describe('Shell — appearance listener seam (tempdoc 855 fix round F2)', () => 
 
   afterEach(() => {
     document.querySelectorAll('jf-shell').forEach((el) => el.remove());
+    __resetAiStateForTest();
     resetSurfaceCatalog();
     __resetUserConfigForTest();
     __resetStoreRegistryForTest();

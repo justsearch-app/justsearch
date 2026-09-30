@@ -3,13 +3,12 @@ package io.justsearch.app.services.config;
 
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.configuration.PlatformPaths;
+import io.justsearch.configuration.resolved.ConfigChangedEvent;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -28,7 +27,6 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public final class ConfigStoreRebuilder {
 
-  private static final Logger log = LoggerFactory.getLogger(ConfigStoreRebuilder.class);
   private static final ObjectMapper JSON = JsonMapper.builder().build();
 
   /**
@@ -60,28 +58,42 @@ public final class ConfigStoreRebuilder {
   }
 
   /**
-   * Rebuilds the ResolvedConfig from all sources and swaps it into the given ConfigStore.
+   * Prepares an immutable ResolvedConfig from all sources without publishing it.
+   *
+   * <p>All fallible preparation, including settings serialization, occurs before a ConfigStore
+   * snapshot can be swapped. Preparation failures propagate to the caller.
    *
    * <p>Re-reads env vars, system properties, YAML, and UI settings, and re-contributes the
-   * remembered startup hardware probe at ordinal 150 (see {@link #rememberAutoDetected}). Notifies
-   * ConfigStore listeners of any changes.
+   * remembered startup hardware probe at ordinal 150 (see {@link #rememberAutoDetected}).
+   *
+   * @param settings current UI settings (if null, UI settings contribution is skipped)
+   * @return the prepared immutable configuration snapshot
+   */
+  public static ResolvedConfig prepare(UiSettings settings) {
+    ResolvedConfigBuilder builder = ResolvedConfig.builder();
+    builder.contributeAutoDetected(autoDetected);
+    builder.contributeBaseSources();
+    if (settings != null) {
+      contributeUiSettings(builder, settings);
+    }
+    return builder.build();
+  }
+
+  /**
+   * Prepares and publishes a new snapshot, preserving the historical null-store no-op behavior.
+   *
+   * <p>The snapshot swap and listener notification are separate so callers that need stronger
+   * ownership can perform the notification outside their publication lock. This convenience
+   * method has no such lock and therefore performs both operations directly.
    *
    * @param store the ConfigStore to update (if null, this is a no-op)
    * @param settings current UI settings (if null, UI settings contribution is skipped)
    */
   public static void rebuild(ConfigStore store, UiSettings settings) {
     if (store == null) return;
-    try {
-      ResolvedConfigBuilder builder = ResolvedConfig.builder();
-      builder.contributeAutoDetected(autoDetected);
-      builder.contributeBaseSources();
-      if (settings != null) {
-        contributeUiSettings(builder, settings);
-      }
-      store.update(builder.build());
-    } catch (RuntimeException e) {
-      log.warn("Failed to rebuild ConfigStore", e);
-    }
+    ResolvedConfig prepared = prepare(settings);
+    ConfigChangedEvent event = store.swap(prepared);
+    store.notifyListeners(event);
   }
 
   /**
@@ -126,8 +138,8 @@ public final class ConfigStoreRebuilder {
       try {
         builder.putSettings(
             "justsearch.ui.exclude_patterns", JSON.writeValueAsString(excludePatterns));
-      } catch (Exception ignored) {
-        // Best-effort — exclude patterns serialization failure is non-fatal
+      } catch (Exception failure) {
+        throw new IllegalStateException("Failed to serialize UI exclude patterns", failure);
       }
     }
   }

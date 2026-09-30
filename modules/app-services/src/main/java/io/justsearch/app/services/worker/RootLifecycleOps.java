@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.ipc.DeleteByIdResponse;
@@ -18,7 +20,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * Watched-root lifecycle operations: add, remove, reindex, exclude matcher, and watcher
  * coordination.
  *
- * <p>Manages the IndexingService contract methods. Extracted from {@link RemoteKnowledgeClient}.
+ * <p>Manages the IndexingService contract methods. Extracted from {@link KnowledgeClient}.
  */
 final class RootLifecycleOps {
     private static final Logger log = LoggerFactory.getLogger(RootLifecycleOps.class);
@@ -37,10 +38,11 @@ final class RootLifecycleOps {
     private final Supplier<ExcludeMatcher> excludeMatcherSupplier;
     private final ScanRootFn scanRootFn;
     private final WorkerWatchFn workerWatchFn;
-    private final Function<Path, DeleteByPathResponse> deleteByPathFn;
-    private final Function<String, DeleteByIdResponse> deleteByIdFn;
+    private final java.util.function.BiFunction<Path, EngineContext, DeleteByPathResponse> deleteByPathFn;
+    private final java.util.function.BiFunction<String, EngineContext, DeleteByIdResponse> deleteByIdFn;
     private final SyncOps syncOps;
     private final ExecutorService walkExecutor;
+    private final java.util.function.BiConsumer<java.util.function.Consumer<EngineContext>, EngineContext> submitWalk;
 
     // ===== Tempdoc 599 §16/A1 — non-blocking folder-availability cache =====
     // U4 (the design's verified constraint) forbids a per-poll Files.isDirectory on the Head REQUEST
@@ -64,10 +66,11 @@ final class RootLifecycleOps {
             Supplier<ExcludeMatcher> excludeMatcherSupplier,
             ScanRootFn scanRootFn,
             WorkerWatchFn workerWatchFn,
-            Function<Path, DeleteByPathResponse> deleteByPathFn,
-            Function<String, DeleteByIdResponse> deleteByIdFn,
+            java.util.function.BiFunction<Path, EngineContext, DeleteByPathResponse> deleteByPathFn,
+            java.util.function.BiFunction<String, EngineContext, DeleteByIdResponse> deleteByIdFn,
             SyncOps syncOps,
-            ExecutorService walkExecutor) {
+            ExecutorService walkExecutor,
+            java.util.function.BiConsumer<java.util.function.Consumer<EngineContext>, EngineContext> submitWalk) {
         this.watchedRoots = Objects.requireNonNull(watchedRoots, "watchedRoots");
         this.watchedRootsState = Objects.requireNonNull(watchedRootsState, "watchedRootsState");
         this.excludeMatcherSupplier =
@@ -78,25 +81,26 @@ final class RootLifecycleOps {
         this.deleteByIdFn = Objects.requireNonNull(deleteByIdFn, "deleteByIdFn");
         this.syncOps = Objects.requireNonNull(syncOps, "syncOps");
         this.walkExecutor = Objects.requireNonNull(walkExecutor, "walkExecutor");
+        this.submitWalk = Objects.requireNonNull(submitWalk, "submitWalk");
     }
 
     /**
      * Tempdoc 418 Phase B — registers/unregisters Worker-side watch subscriptions.
-     * Implementations forward to {@code RemoteKnowledgeClient.watchRoot/unwatchRoot}. The
+     * Implementations forward to {@code KnowledgeClient.watchRoot/unwatchRoot}. The
      * Worker-side watcher runs alongside the Head-side watcher during the Phase B soak window;
      * the SQLite jobs table uses {@code INSERT OR REPLACE} so duplicate enqueues from both
      * watchers coalesce automatically (no Head-side dedup required).
      */
     interface WorkerWatchFn {
-        void watch(String rootPath, String collection);
+        void watch(String rootPath, String collection, EngineContext engineContext);
 
-        void unwatch(String rootPath);
+        void unwatch(String rootPath, EngineContext engineContext);
     }
 
     /**
      * Tempdoc 418 Phase B — dispatch a Worker-side ScanRoot RPC. Implementations forward each
      * {@link ScanRootProgress} to {@code progressConsumer} and return the terminal event.
-     * Production wiring uses {@code RemoteKnowledgeClient.scanRoot}.
+     * Production wiring uses {@code KnowledgeClient.scanRoot}.
      *
      * <p>Tempdoc 821 §3-C2 — {@code collection} is the label the scan's admitted documents carry,
      * mirroring the watcher arm's {@link WorkerWatchFn#watch(String, String)}. A {@code null} or
@@ -116,16 +120,16 @@ final class RootLifecycleOps {
                 String collection,
                 io.justsearch.ipc.ScanMode mode,
                 List<String> excludeGlobs,
-                java.util.function.Consumer<ScanRootProgress> progressConsumer);
+                java.util.function.Consumer<ScanRootProgress> progressConsumer, EngineContext engineContext);
     }
 
     // ========== Watched Root Accessors ==========
 
-    List<Path> getWatchedPaths() {
+    List<Path> getWatchedPaths(EngineContext engineContext) {
         return List.copyOf(watchedRoots.keySet());
     }
 
-    List<IndexingService.WatchedRoot> getWatchedRoots() {
+    List<IndexingService.WatchedRoot> getWatchedRoots(EngineContext engineContext) {
         List<IndexingService.WatchedRoot> result = new ArrayList<>();
         for (var entry : watchedRoots.entrySet()) {
             Path root = entry.getKey();
@@ -189,23 +193,22 @@ final class RootLifecycleOps {
 
     // ========== Root Add/Remove ==========
 
-    void addWatchedPath(Path path) {
+    void addWatchedPath(Path path, EngineContext engineContext) {
         if (path == null || !Files.exists(path)) {
             return;
         }
         Path normalized = path.toAbsolutePath().normalize();
         // Register root so walkAndSubmit()'s cancellation check doesn't abort the walk.
-        watchedRootsState.markNeverIndexed(normalized);
         // No label reaches this entry point — the contract calls it "primary collection"
         // (IndexingService#addWatchedPath), which is DEFAULT_COLLECTION. One root must carry ONE
         // label across every arm and every restart, so this records the same literal the add path
         // normalizes to and the reindex paths now read back.
-        recordCollection(normalized, IngestCollectionPolicy.DEFAULT_COLLECTION);
-        walkExecutor.execute(
-                () -> walkAndSubmit(
+        watchedRootsState.register(normalized, null, false);
+        submitWalk.accept(
+                ownedContext -> walkAndSubmit(
                         normalized,
                         IngestCollectionPolicy.DEFAULT_COLLECTION,
-                        io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL));
+                        io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, ownedContext), engineContext);
     }
 
     /**
@@ -223,7 +226,7 @@ final class RootLifecycleOps {
      * passes {@code SCAN_MODE_FORCE_REINDEX}; every other walk is an ordinary initial scan.
      */
     private void walkAndSubmit(
-            Path normalized, String collection, io.justsearch.ipc.ScanMode mode) {
+            Path normalized, String collection, io.justsearch.ipc.ScanMode mode, EngineContext engineContext) {
         if (!watchedRoots.containsKey(normalized)) {
             log.debug("Walk cancelled before start: root {} removed", normalized);
             return;
@@ -238,34 +241,32 @@ final class RootLifecycleOps {
                             collection,
                             mode,
                             excludeGlobs,
-                            progress -> admittedTotal[0] = progress.getFilesAdmitted());
+                            progress -> admittedTotal[0] = progress.getFilesAdmitted(), engineContext);
 
-            if (!watchedRoots.containsKey(normalized)) {
-                log.debug(
-                        "Walk completed but root {} was removed mid-scan; skipping state update",
-                        normalized);
-                return;
-            }
-            String reason = terminal == null ? "EMPTY_STREAM" : terminal.getTerminalReasonCode();
-            if (reason == null || reason.isEmpty()) {
-                if (admittedTotal[0] > 0) {
-                    watchedRootsState.markIndexed(normalized);
-                } else {
-                    // Walk terminated cleanly but admitted zero files (empty / all-excluded).
-                    // Mark walk-completed so the wire can render "empty", not a perpetual
-                    // "scanning" (tempdoc 599 Fix 1).
-                    watchedRootsState.markWalkedEmpty(normalized);
+            synchronized (watchedRootsState) {
+                if (!watchedRoots.containsKey(normalized)) {
+                    log.debug("Walk completed but root {} was removed mid-scan; skipping state update", normalized);
+                    return;
                 }
-            } else {
-                watchedRootsState.markWalkFailed(normalized, reason);
+                String reason = terminal == null ? "EMPTY_STREAM" : terminal.getTerminalReasonCode();
+                if (reason == null || reason.isEmpty()) {
+                    if (admittedTotal[0] > 0) {
+                        watchedRootsState.markIndexed(normalized);
+                    } else {
+                        // Empty/all-excluded is completed, distinct from a walk still in progress.
+                        watchedRootsState.markWalkedEmpty(normalized);
+                    }
+                } else {
+                    watchedRootsState.markWalkFailed(normalized, reason);
+                }
+                watchedRootsState.persist();
             }
-            watchedRootsState.persist();
         } catch (RuntimeException e) {
             log.error("Walk aborted for root {} after submission failure", normalized, e);
-            if (!watchedRoots.containsKey(normalized)) {
-                return;
-            }
-            if (admittedTotal[0] == 0) {
+            synchronized (watchedRootsState) {
+                if (!watchedRoots.containsKey(normalized)) {
+                    return;
+                }
                 watchedRootsState.markWalkFailed(normalized, e.getMessage());
                 watchedRootsState.persist();
             }
@@ -282,7 +283,7 @@ final class RootLifecycleOps {
      * @param collection the collection name (for watcher tagging)
      * @param path the root path to watch
      */
-    void addWatchedRoot(String collection, Path path) {
+    void addWatchedRoot(String collection, Path path, EngineContext engineContext) {
         if (path == null || !Files.exists(path)) {
             return;
         }
@@ -300,7 +301,8 @@ final class RootLifecycleOps {
         // "Scanning" and re-queuing a redundant full walk. This guards EVERY caller (UI op + agent tool),
         // including ones the FE busy-overlay guard can't reach. Reindex is unaffected: it takes a different
         // path (reindexWatchedRoots/markIndexed) and never reaches this method.
-        if (watchedRoots.containsKey(normalized)) {
+        if (!watchedRootsState.register(normalized,
+                IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collectionName) ? null : collectionName, true)) {
             log.debug("addWatchedRoot: {} already watched — no-op (idempotent re-add)", normalized);
             return;
         }
@@ -311,29 +313,27 @@ final class RootLifecycleOps {
         //    this the caller's collection was unreadable the moment this method returned —
         //    GET /api/indexing/roots reported "default" for a labelled root (885 §UL.6) and every
         //    re-walk after a restart re-tagged its documents as the default (821 §L.3).
-        watchedRootsState.markNeverIndexed(normalized);
-        recordCollection(normalized, collectionName);
         watchedRootsState.persist();
 
         // 2. Start file watcher (does not depend on walk completion)
-        startWatcherIfAvailable(collectionName, normalized);
+        startWatcherIfAvailable(collectionName, normalized, engineContext);
 
         // 3. Queue async walk â€” batching, backpressure, and state persistence
         //    are handled by walkAndSubmit() on the walk-bg thread. Tempdoc 821 §3-C2 — the scan arm
         //    carries the SAME label the watcher arm just got, so the root's own initial scan admits
         //    documents under its collection instead of dropping the tag.
-        walkExecutor.execute(
-                () -> walkAndSubmit(
-                        normalized, collectionName, io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL));
+        submitWalk.accept(
+                ownedContext -> walkAndSubmit(
+                        normalized, collectionName, io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, ownedContext), engineContext);
     }
 
-    int deleteDocsByPathPrefix(Path pathPrefix) {
+    int deleteDocsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
         if (pathPrefix == null) {
             return 0;
         }
         Path normalized = pathPrefix.toAbsolutePath().normalize();
         try {
-            DeleteByPathResponse response = deleteByPathFn.apply(normalized);
+            DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
             if (!response.getError().isEmpty()) {
                 log.warn(
                         "deleteByPath RPC returned error for {}: {}",
@@ -351,12 +351,12 @@ final class RootLifecycleOps {
         }
     }
 
-    boolean deleteDocById(String docId) {
+    boolean deleteDocById(String docId, EngineContext engineContext) {
         if (docId == null || docId.isBlank()) {
             return false;
         }
         try {
-            DeleteByIdResponse response = deleteByIdFn.apply(docId);
+            DeleteByIdResponse response = deleteByIdFn.apply(docId, engineContext);
             return response != null && response.getSuccess();
         } catch (CircuitBreakerOpenException e) {
             log.debug("deleteDocById rejected by circuit breaker for {}", docId);
@@ -367,7 +367,7 @@ final class RootLifecycleOps {
         }
     }
 
-    int removeWatchedPath(Path path) {
+    int removeWatchedPath(Path path, EngineContext engineContext) {
         if (path == null) {
             return 0;
         }
@@ -377,7 +377,7 @@ final class RootLifecycleOps {
 
         // Tempdoc 626 §Axis-A — unregister the Worker-side watcher (the sole event source).
         try {
-            workerWatchFn.unwatch(normalized.toString());
+            workerWatchFn.unwatch(normalized.toString(), engineContext);
         } catch (RuntimeException e) {
             log.debug("Worker unwatch failed for {}: {}", normalized, e.getMessage());
         }
@@ -385,7 +385,7 @@ final class RootLifecycleOps {
         // 2. Call gRPC to delete from worker
         int deletedJobs = 0;
         try {
-            DeleteByPathResponse response = deleteByPathFn.apply(normalized);
+            DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
 
             if (!response.getError().isEmpty()) {
                 log.error("deleteByPath RPC returned error: {}", response.getError());
@@ -409,7 +409,7 @@ final class RootLifecycleOps {
         return deletedJobs;
     }
 
-    void flush() {
+    void flush(EngineContext engineContext) {
         // No-op
     }
 
@@ -417,7 +417,7 @@ final class RootLifecycleOps {
      * Clears all watched roots — stops watchers, clears state, persists empty. Used by profiling
      * reset. Does NOT issue per-root gRPC deletion (the Worker deleteAll handles that).
      */
-    void clearAllRoots() {
+    void clearAllRoots(EngineContext engineContext) {
         log.info("clearAllRoots: clearing root state");
         // Tempdoc 626 §Axis-A — no Head-side watcher to stop; the Worker watcher is unregistered
         // per-root via removeWatchedPath, and a profiling reset clears Worker state via deleteAll.
@@ -427,7 +427,7 @@ final class RootLifecycleOps {
 
     // ========== Reindexing ==========
 
-    void reindexWatchedRoots(boolean force) {
+    void reindexWatchedRoots(boolean force, EngineContext engineContext) {
         if (watchedRoots.isEmpty()) {
             log.info("No watched roots to reindex");
             return;
@@ -457,17 +457,19 @@ final class RootLifecycleOps {
             // force=false without excludes: prefer Worker-side syncDirectory which streams
             // the disk walk and enqueues in batches internally.
             if (!force && !hasExcludes) {
-                SyncDirectoryResponse r = syncOps.syncDirectory(root.toString(), true);
+                SyncDirectoryResponse r = syncOps.syncDirectory(root.toString(), true, engineContext);
                 if (r != null && r.getError().isEmpty()) {
-                    watchedRootsState.markIndexed(root);
+                    synchronized (watchedRootsState) {
+                        if (watchedRoots.containsKey(root)) watchedRootsState.markIndexed(root);
+                    }
                 }
                 continue;
             }
 
             // force=true OR has excludes: prune orphans then walk asynchronously with
             // backpressure. walkAndSubmit() handles batching, state marking, and persistence.
-            walkExecutor.execute(() -> {
-                syncOps.pruneMissing(root.toString());
+            submitWalk.accept(ownedContext -> {
+                syncOps.pruneMissing(root.toString(), ownedContext);
                 // The root's own persisted label (885 §UD open item 4), falling back to the
                 // default for a root persisted before the label was recorded. Re-sending the label
                 // the add path wrote is what stops one root's documents oscillating between
@@ -475,8 +477,8 @@ final class RootLifecycleOps {
                 // Tempdoc 821 §3-C3 — THIS is what makes the user's force-reindex real. The
                 // scan used to go out as SCAN_MODE_INITIAL regardless, so the Worker admitted the
                 // same paths and the batch extractor skipped every one of them as UNCHANGED.
-                walkAndSubmit(root, collectionOf(root), scanMode);
-            });
+                walkAndSubmit(root, collectionOf(root), scanMode, ownedContext);
+            }, engineContext);
         }
         watchedRootsState.persist();
     }
@@ -489,7 +491,7 @@ final class RootLifecycleOps {
      * walkExecutor}. Walks stream files in batches with backpressure and update root state on
      * completion. Returns immediately â€” indexing continues asynchronously.
      */
-    void reindexPersistedRoots() {
+    void reindexPersistedRoots(EngineContext engineContext) {
         if (watchedRoots.isEmpty()) {
             return;
         }
@@ -503,12 +505,12 @@ final class RootLifecycleOps {
             // persisted before the field existed has none and falls back to the default, which is
             // what every arm sent before.
             String collection = collectionOf(normalized);
-            startWatcherIfAvailable(collection, normalized);
-            walkExecutor.execute(
-                () -> walkAndSubmit(
+            startWatcherIfAvailable(collection, normalized, engineContext);
+            submitWalk.accept(
+                ownedContext -> walkAndSubmit(
                     normalized,
                     collection,
-                    io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL));
+                    io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, ownedContext), engineContext);
         }
         // Runs after all walks complete (single-thread executor serializes tasks).
         int count = rootsToReindex.size();
@@ -516,23 +518,6 @@ final class RootLifecycleOps {
     }
 
     // ========== Helpers ==========
-
-    /**
-     * Records the label a root is watched under, storing NOTHING for the default bucket.
-     *
-     * <p>{@code "default"} is what an unlabeled root already normalizes to on both write arms, so a
-     * root that carries it is indistinguishable from one that carries no label — and NOT storing it
-     * keeps two pre-existing behaviours exactly as they were: {@code getWatchedRoots()} reports
-     * {@code null} for an unlabeled root (which every consumer already reads as "the index
-     * default", including {@code IngestCollectionPolicy.RootBinding}), and a root persisted before
-     * this field existed is treated identically to one added after it. Only a REAL label — the
-     * thing 885 §UL.6 saw dropped — is written down.
-     */
-    private void recordCollection(Path root, String collection) {
-        watchedRootsState.setCollection(
-                root,
-                IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collection) ? null : collection);
-    }
 
     /**
      * The persisted collection label for {@code root}, or {@link IngestCollectionPolicy#DEFAULT_COLLECTION}
@@ -546,12 +531,12 @@ final class RootLifecycleOps {
                 : collection;
     }
 
-    private void startWatcherIfAvailable(String collection, Path normalized) {
+    private void startWatcherIfAvailable(String collection, Path normalized, EngineContext engineContext) {
         // Tempdoc 626 §Axis-A (the 418 Phase-C cutover) — the Worker-side watcher is now the SOLE
         // file-event source; the redundant Head-side watcher stack was deleted. The reconciler
         // (periodic syncDirectory + reindexPersistedRoots) remains the source-of-truth backstop.
         try {
-            workerWatchFn.watch(normalized.toString(), collection);
+            workerWatchFn.watch(normalized.toString(), collection, engineContext);
         } catch (RuntimeException e) {
             log.debug(
                     "Worker watch registration failed for {}: {}", normalized, e.getMessage());

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.javalin.http.sse.SseClient;
 import io.justsearch.app.api.stream.StreamId;
 import io.justsearch.app.observability.intent.IntentEnvelopeChangeRegistry;
@@ -9,7 +11,6 @@ import io.justsearch.app.observability.stream.SseStreamChannel;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
@@ -51,10 +52,12 @@ public final class ShellEventsStreamController {
   private final IndexingJobsStreamController indexingJobs;
   private final PendingAuthorizationChangeRegistry pendingAuthorizationChanges;
   private final SseStreamChannel heartbeatChannel;
+  private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledExecutorService heartbeatScheduler;
   private final Clock clock;
 
   public ShellEventsStreamController(
+      EngineExecutorRegistry processExecutors,
       IntentEnvelopeChangeRegistry intentChanges,
       AdvisoryStreamController operationCompletedAdvisory,
       AdvisoryStreamController healthRecoverableAdvisory,
@@ -62,8 +65,7 @@ public final class ShellEventsStreamController {
       ActionLedgerController actionLedger,
       IndexingJobsStreamController indexingJobs,
       PendingAuthorizationChangeRegistry pendingAuthorizationChanges) {
-    this(
-        intentChanges,
+    this(processExecutors, intentChanges,
         operationCompletedAdvisory,
         healthRecoverableAdvisory,
         authorizationPendingAdvisory,
@@ -74,6 +76,7 @@ public final class ShellEventsStreamController {
   }
 
   public ShellEventsStreamController(
+      EngineExecutorRegistry processExecutors,
       IntentEnvelopeChangeRegistry intentChanges,
       AdvisoryStreamController operationCompletedAdvisory,
       AdvisoryStreamController healthRecoverableAdvisory,
@@ -95,13 +98,13 @@ public final class ShellEventsStreamController {
         Objects.requireNonNull(pendingAuthorizationChanges, "pendingAuthorizationChanges");
     this.clock = Objects.requireNonNull(clock, "clock");
     this.heartbeatChannel = new SseStreamChannel(HEARTBEAT_STREAM_ID);
-    this.heartbeatScheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "shell-events-stream-heartbeat");
-              t.setDaemon(true);
-              return t;
-            });
+    SchedulerResources resources =
+        openHeartbeatScheduler(
+            processExecutors,
+            "head.shell-events-stream-heartbeat",
+            "shell-events-stream-heartbeat");
+    this.heartbeatRegistration = resources.registration();
+    this.heartbeatScheduler = resources.scheduler();
   }
 
   public void handle(SseClient sseClient) {
@@ -124,5 +127,42 @@ public final class ShellEventsStreamController {
   /** Stops the heartbeat scheduler. Call on shutdown. */
   public void shutdown() {
     heartbeatScheduler.shutdownNow();
+    heartbeatRegistration.close();
   }
+
+  private static SchedulerResources openHeartbeatScheduler(
+      EngineExecutorRegistry processExecutors, String name, String threadName) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                name,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, threadName);
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 }

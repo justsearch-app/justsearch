@@ -1,5 +1,7 @@
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,7 +28,7 @@ import org.junit.jupiter.api.Test;
 final class AgentSessionGroundingTest {
 
   private static AgentSession session() {
-    return new AgentSession(List.of(Map.of("role", "user", "content", "q")), 8000);
+    return new AgentSession(List.of(Map.of("role", "user", "content", "q")), 8000, EngineContextTestFixtures.AGENT_LOOP);
   }
 
   private static ToolCallRequest searchCall(String id) {
@@ -261,7 +263,7 @@ final class AgentSessionGroundingTest {
   @DisplayName("868 §B.3: paths differing only in case are ONE document — the index folds case before every fetch")
   void readOfACaseVariantPath_doesNotReMint() {
     var session = session();
-    // The Worker lowercases a docId before looking it up (GrpcSearchService.fetchDocumentSlice →
+    // The Worker lowercases a docId before looking it up (WorkerSearchService.fetchDocumentSlice →
     // PathNormalizer.normalizePath), so `/A.md` and `/a.md` cannot name two documents as far as any
     // fetch is concerned. Keying them apart here would mint a second source for a document the index
     // itself cannot distinguish — a duplicate row with no fact behind it.

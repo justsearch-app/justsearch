@@ -113,10 +113,10 @@ public final class SubstrateGraphAssembler {
             ruleRunner,
             healthOut.readinessReconciliationTrigger()),
         new SubstrateGraph.ChannelSubstrate(
-            resourceOut.headLogDiagnosticChannelCatalog(),
+            resourceOut.engineLogDiagnosticChannelCatalog(),
             // Tempdoc 560 §10.4: the composed plugin-contributed channels as one catalog. Empty unless
             // a plugin (e.g. the dev-gated example) contributed a channel; the channel ids carry their
-            // own vendor namespace, so the "composed" grouping label never collides with core.head-log.
+            // own vendor namespace, so the "composed" grouping label never collides with core.engine-log.
             DiagnosticChannelCatalog.of("composed", pluginDiagnosticChannels),
             resourceOut.diagnosticChannelStreamRegistry()),
         new SubstrateGraph.ContextSubstrate(

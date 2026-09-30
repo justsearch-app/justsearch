@@ -17,6 +17,7 @@ import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,6 +54,8 @@ import org.junit.jupiter.api.io.TempDir;
  */
 final class RuntimeActivationServiceChatProfileTest {
 
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
   private static final String CHAT_PROFILE_PROP = "justsearch.chat.profile";
   private static final String MODELS_DIR_PROP = "justsearch.models.dir";
 
@@ -73,6 +76,7 @@ final class RuntimeActivationServiceChatProfileTest {
     prevProps.clear();
     TestResolvedConfigHelper.restoreGlobal(prevStore);
     prevStore = null;
+    processExecutors.close();
   }
 
   // ---------------------------------------------------------------- resolution + remedy
@@ -337,7 +341,7 @@ final class RuntimeActivationServiceChatProfileTest {
   }
 
   private RuntimeActivationService newService(OnlineAiService onlineAi, UiSettingsStore store) {
-    return new RuntimeActivationService(onlineAi, store, null, null);
+    return new RuntimeActivationService(processExecutors, onlineAi, store, null, null);
   }
 
   private static RuntimeActivationService.SelfTestResult passingSelfTest() {

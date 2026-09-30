@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ExcludesService;
 import java.util.ArrayList;
@@ -23,7 +25,7 @@ final class ExcludesHandlerSupport {
   private ExcludesHandlerSupport() {}
 
   static OperationResult run(
-      Supplier<ExcludesService> supplier, boolean dryRun, Logger log, String handlerLabel) {
+      Supplier<ExcludesService> supplier, boolean dryRun, Logger log, String handlerLabel, EngineContext engineContext) {
     ExcludesService excludes;
     try {
       excludes = supplier.get();
@@ -37,7 +39,7 @@ final class ExcludesHandlerSupport {
 
     ExcludesService.ExcludesResult result;
     try {
-      result = excludes.applyExcludes(dryRun);
+      result = excludes.applyExcludes(dryRun, engineContext);
     } catch (Exception e) {
       log.error("{}: applyExcludes threw (dryRun={})", handlerLabel, dryRun, e);
       return OperationResult.failure(

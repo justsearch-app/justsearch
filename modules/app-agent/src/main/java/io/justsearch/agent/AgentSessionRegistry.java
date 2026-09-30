@@ -69,6 +69,12 @@ final class AgentSessionRegistry {
     return session != null && session.approve(callId);
   }
 
+  java.util.Optional<io.justsearch.agent.api.PendingToolApproval> pendingToolApproval(String sessionId, String callId) {
+    if (sessionId == null || sessionId.isBlank()) return java.util.Optional.empty();
+    var session = sessions.get(sessionId);
+    return session == null ? java.util.Optional.empty() : session.pendingToolApproval(callId);
+  }
+
   boolean tryRejectToolCall(String sessionId, String callId, String reason) {
     if (sessionId == null || sessionId.isBlank()) {
       return false;
@@ -200,11 +206,11 @@ final class AgentSessionRegistry {
     // here, and cannot miss a run that ends without one.
     session.observation().onRetire(done::countDown);
     java.util.Optional<Runnable> unsubscribe =
-        session.observation().observe(sinceSeq, observer);
+        session.observation().observe(sinceSeq, observer, done::countDown);
     if (unsubscribe.isEmpty()) {
       // The cursor fell outside the retained window and NOTHING was registered. Falling back to a
       // full replay is the guaranteed path; silently returning an empty stream is the failure mode.
-      unsubscribe = session.observation().observe(0L, observer);
+      unsubscribe = session.observation().observe(0L, observer, done::countDown);
       if (unsubscribe.isEmpty()) {
         return false;
       }

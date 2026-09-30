@@ -52,13 +52,24 @@ document with these fields:
   Projection of `LifecycleProjection.derive(WorkerCapability,
   InferenceCapability)`. Updated whenever either capability transitions.
 - `head` — `apiPort`, `apiBaseUrl`, `sessionToken` (filesystem only;
-  see below), `readyAt`. Always present.
+  see below), `readyAt`. Always present. The pre-bind ownership seed has
+  these binding fields absent; the API-bind publication fills all three together.
 - `worker` — `state` (`"pending"` | `"ready"` | `"failed"`),
-  `grpcPort`, `indexBasePath`, `readyAt`, `spawnError`. Null until
+  `indexBasePath`, `readyAt`, `spawnError`. Null until
   the first worker-state publish; the `state` discriminator is the
   authoritative tri-state surface (state=`failed` carries
   `spawnError` with the upstream reason). Updates on every
   `WorkerCapability` transition.
+- `children` — filesystem-only managed child records containing child id,
+  kind, PID, process start instant, executable identity, endpoint, and
+  declared/realized configuration hashes. The successor carries predecessor
+  records forward before child-capable bootstrap and reconciles them by all
+  three OS identity axes before adoption or termination.
+- `shutdownHandoff` — filesystem-only `pending`, `ready`, or `incomplete`
+  disposition. The ordered shutdown marks pending early and completes the
+  handoff only after all close outcomes are known. Restart/hang retains live
+  ownership; quit/upgrade deletes the canonical manifest only after registered
+  children are confirmed gone and the index reports `GRACEFUL`.
 - `ai` — `phase` (`CapabilityHealth.name()` — `PENDING` / `READY` /
   `DEGRADED` / `OFFLINE` / `RECOVERING`), `required` (boolean —
   is inference configured?), `pendingReason` (string), `readyAt`
@@ -77,7 +88,7 @@ document with these fields:
   manifest-schema / lifecycle-schema / MCP-protocol / MCP-tool-surface
   versions. A projection over existing version single-sources
   (`RuntimeContract.current()` in `app-api`), nullable and `NON_NULL`, so it
-  is additive at schema v1. This is the field an external agent reads to learn
+  is carried at schema v2. This is the field an external agent reads to learn
   "what is promised, at what version." Full definition, compatibility matrix,
   stability policy, and surface classification:
   [The Runtime Contract](28-runtime-contract.md) +
@@ -168,14 +179,21 @@ site, not at a single static helper.
 ### Multi-instance enforcement
 
 `<dataDir>/app.lock` — OS-level `FileChannel.tryLock` with PID +
-start-timestamp metadata and stale recovery. Held by HeadlessApp for
+actual process-start metadata (when available). Metadata is diagnostic only; OS
+locks release on process exit and refusal never deletes the lock file. Same-JVM
+contenders are refused before a second channel can disturb the native lock. Held by HeadlessApp for
 the life of the process; a second Head against the same dataDir exits
 with a structured diagnostic and code 2.
 
 ## What stays unchanged
 
-- **MMF** (`MmfWorkerSignalLayoutV1`) — intra-JVM Head ↔ Worker IPC.
-  Different domain. The manifest does not replace it.
+- **MMF** (`MmfWorkerSignalLayoutV1`) — this no longer exists. Lane F stage A
+  (item A10) deleted the memory-mapped Head ↔ Worker signal bus along with
+  the Worker process itself (item A11); the scheduling signals it carried
+  now live in the in-process `GpuSchedulingGauge`
+  (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`).
+  Different domain from this manifest either way — this bullet is retained
+  only to record that the mechanism it once named is gone, not replaced.
 - **`/api/status`** — cheap readiness probe. Kept for sandboxes and
   remote callers where PID inspection is awkward.
 - **`JUSTSEARCH_API_PORT` env var as configuration** — "try to bind

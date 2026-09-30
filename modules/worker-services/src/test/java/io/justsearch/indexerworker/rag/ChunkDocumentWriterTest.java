@@ -33,14 +33,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 @DisplayName("ChunkDocumentWriter (Tier 2)")
-final class ChunkDocumentWriterTest {
+final class ChunkDocumentWriterTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime lifecycle;
 
   @BeforeEach
   void setUp() throws Exception {
-    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach
@@ -323,7 +323,7 @@ final class ChunkDocumentWriterTest {
     String content = repeat("chunk splade flag coverage ", 500);
     try (RunningRuntime runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(catalog)
-            .atPath(tempDir.resolve("splade-status"))
+            .atPath(tempDir.resolve("splade-status")).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
 
       // Flag OFF: no splade_status at all. PENDING would claim outstanding work for a stage every

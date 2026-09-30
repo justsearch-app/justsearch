@@ -109,6 +109,7 @@ def test_summarize_shape_and_values():
     assert block["queries_issued"] == 6  # 4 ok + 2 errors
     assert block["queries_ok"] == 4
     assert block["errors"] == 2
+    assert block["request_timeout_sec"] == search_load.REQUEST_TIMEOUT_SEC
     assert block["query_pool_size"] == 300
     assert block["duration_s"] == 60.0
     assert block["started_at"] == "2026-09-02T00:00:00+00:00"
@@ -174,6 +175,8 @@ def test_runner_issues_queries_and_reports_block(monkeypatch):
     runner = search_load.SearchLoadRunner("http://127.0.0.1:1", ["alpha", "beta"], spec)
     runner_ref["r"] = runner
     runner.start()
+    runner._thread.join(timeout=5.0)
+    assert not runner._thread.is_alive(), "fixture must finish its finite request sequence"
     block = runner.stop()
 
     assert [i["path"] for i in issued] == ["/api/knowledge/search"] * 3
@@ -201,9 +204,52 @@ def test_runner_counts_failed_requests_as_errors(monkeypatch):
     runner = search_load.SearchLoadRunner("http://127.0.0.1:1", ["alpha"], spec)
     runner_ref["r"] = runner
     runner.start()
+    runner._thread.join(timeout=5.0)
+    assert not runner._thread.is_alive(), "fixture must finish its finite request sequence"
     block = runner.stop()
 
     assert block["queries_issued"] == 2
     assert block["queries_ok"] == 0
     assert block["errors"] == 2
     assert block["latency_ms"] is None
+
+
+def test_load_client_covers_the_existing_retrieval_budget(monkeypatch):
+    """A CPU response within the normal retriever budget must not become overlapping load."""
+    import inspect
+    import httpx
+    from jseval import retriever
+
+    original_client = httpx.Client
+    attempts = []
+
+    def response(request):
+        attempts.append(request)
+        # Recorded primary423 response: 45.941s, inside the existing CPU RPC allowance.
+        if request.extensions["timeout"]["read"] < 45.941:
+            raise httpx.ReadTimeout("response still executing at the client deadline", request=request)
+        return httpx.Response(200, json={})
+
+    def client_with_transport(**kwargs):
+        return original_client(transport=httpx.MockTransport(response), **kwargs)
+
+    monkeypatch.setattr(search_load.httpx, "Client", client_with_transport)
+    with search_load.open_client("http://test") as client:
+        assert search_load.issue_search(client, search_load.search_body("query")) is not None
+    assert len(attempts) == 1, "load traffic must never retry a sample"
+    assert search_load.REQUEST_TIMEOUT_SEC == inspect.signature(retriever.retrieve).parameters["timeout"].default
+
+
+def test_load_timeout_is_still_a_failure_with_a_visible_type(caplog):
+    import httpx
+
+    attempts = []
+
+    def response(request):
+        attempts.append(request)
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    with httpx.Client(base_url="http://test", transport=httpx.MockTransport(response)) as client:
+        assert search_load.issue_search(client, search_load.search_body("query")) is None
+    assert len(attempts) == 1
+    assert "ReadTimeout" in caplog.text

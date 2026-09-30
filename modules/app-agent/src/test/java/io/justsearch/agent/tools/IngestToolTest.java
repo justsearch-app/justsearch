@@ -3,6 +3,8 @@ package io.justsearch.agent.tools;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.agent.EngineContextTestFixtures;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.app.api.knowledge.KnowledgeIngestResponse;
 import java.io.IOException;
@@ -11,7 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,20 +29,20 @@ class IngestToolTest {
    * scan path still need a callback that expands directories so the existing assertions hold.
    */
   private static IngestTool toolWithLocalScan(IngestTool.IngestCallback ingestCallback) {
-    return toolWithLocalScan(ingestCallback, List::of);
+    return toolWithLocalScan(ingestCallback, context -> List.of());
   }
 
   private static IngestTool toolWithLocalScan(
       IngestTool.IngestCallback ingestCallback,
-      Supplier<List<BrowseTool.RootInfo>> rootsSupplier) {
+      Function<EngineContext, List<BrowseTool.RootInfo>> rootsSupplier) {
     return new IngestTool(ingestCallback, localScan(ingestCallback), rootsSupplier);
   }
 
   /** Tempdoc 811 (C-2a): variant that also supplies the watched-root collection bindings. */
   private static IngestTool toolWithLocalScan(
       IngestTool.IngestCallback ingestCallback,
-      Supplier<List<BrowseTool.RootInfo>> rootsSupplier,
-      Supplier<List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier) {
+      Function<EngineContext, List<BrowseTool.RootInfo>> rootsSupplier,
+      Function<EngineContext, List<IngestCollectionPolicy.RootBinding>> rootBindingsSupplier) {
     return new IngestTool(
         ingestCallback, localScan(ingestCallback), rootsSupplier, rootBindingsSupplier);
   }
@@ -54,7 +56,7 @@ class IngestToolTest {
   private static final int STUB_SCAN_CAP = 10_000;
 
   private static IngestTool.ScanRootCallback localScan(IngestTool.IngestCallback ingest) {
-    return (rootPath, collection, excludeGlobs) -> {
+    return (rootPath, collection, excludeGlobs, engineContext) -> {
       List<Path> expanded = new ArrayList<>();
       try (Stream<Path> stream = Files.walk(Path.of(rootPath))) {
         stream
@@ -72,7 +74,7 @@ class IngestToolTest {
       if (expanded.isEmpty()) {
         return new KnowledgeIngestResponse(0, "");
       }
-      return ingest.ingest(expanded, collection);
+      return ingest.ingest(expanded, collection, engineContext);
     };
   }
 
@@ -84,7 +86,7 @@ class IngestToolTest {
     var capturedFiles = new AtomicReference<List<Path>>();
     var tool =
         toolWithLocalScan(
-            (files, collection) -> {
+            (files, collection, context) -> {
               capturedFiles.set(files);
               return new KnowledgeIngestResponse(files.size(), "");
             });
@@ -93,7 +95,7 @@ class IngestToolTest {
         "{\"paths\": [\"%s\"]}"
             .formatted(file.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertNotNull(capturedFiles.get());
     assertEquals(1, capturedFiles.get().size());
@@ -102,16 +104,16 @@ class IngestToolTest {
 
   @Test
   void executeWithEmptyPaths() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
-    OperationResult result = tool.execute("{\"paths\": []}");
+    var tool = toolWithLocalScan((files, collection, context) -> new KnowledgeIngestResponse(0, ""));
+    OperationResult result = tool.execute("{\"paths\": []}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("required"));
   }
 
   @Test
   void executeWithMissingPathsField() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
-    OperationResult result = tool.execute("{}");
+    var tool = toolWithLocalScan((files, collection, context) -> new KnowledgeIngestResponse(0, ""));
+    OperationResult result = tool.execute("{}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("required"));
   }
@@ -128,7 +130,7 @@ class IngestToolTest {
     var capturedFiles = new AtomicReference<List<Path>>();
     var tool =
         toolWithLocalScan(
-            (files, collection) -> {
+            (files, collection, context) -> {
               capturedFiles.set(files);
               return new KnowledgeIngestResponse(files.size(), "");
             });
@@ -137,7 +139,7 @@ class IngestToolTest {
         "{\"paths\": [\"%s\"]}"
             .formatted(dir.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertEquals(3, capturedFiles.get().size(), "Should expand dir to 3 files");
     assertTrue(result.message().contains("3 files"));
@@ -151,7 +153,7 @@ class IngestToolTest {
 
     var tool =
         toolWithLocalScan(
-            (files, collection) -> new KnowledgeIngestResponse(files.size(), ""));
+            (files, collection, context) -> new KnowledgeIngestResponse(files.size(), ""));
 
     String json =
         "{\"paths\": [\"%s\", \"%s\"]}"
@@ -159,7 +161,7 @@ class IngestToolTest {
                 existing.toString().replace("\\", "\\\\"),
                 missing.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("1 files"), "Should ingest only existing file: " + result.message());
     assertTrue(result.message().contains("skipped"), "Should mention skipped: " + result.message());
@@ -167,10 +169,10 @@ class IngestToolTest {
 
   @Test
   void executeAllPathsMissing() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
+    var tool = toolWithLocalScan((files, collection, context) -> new KnowledgeIngestResponse(0, ""));
 
     String json = "{\"paths\": [\"/no/such/file.txt\"]}";
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("No readable files"));
   }
@@ -182,28 +184,28 @@ class IngestToolTest {
 
     var tool =
         toolWithLocalScan(
-            (files, collection) -> new KnowledgeIngestResponse(0, "Worker connection lost"));
+            (files, collection, context) -> new KnowledgeIngestResponse(0, "Worker connection lost"));
 
     String json =
         "{\"paths\": [\"%s\"]}"
             .formatted(file.toString().replace("\\", "\\\\"));
 
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), "Should succeed even with error (accepted=0 is valid response)");
     assertTrue(result.message().contains("Worker connection lost"), result.message());
   }
 
   @Test
   void executeInvalidJson() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
-    OperationResult result = tool.execute("not json");
+    var tool = toolWithLocalScan((files, collection, context) -> new KnowledgeIngestResponse(0, ""));
+    OperationResult result = tool.execute("not json", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("error"));
   }
 
   @Test
   void executeBatchLimitExceeded() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
+    var tool = toolWithLocalScan((files, collection, context) -> new KnowledgeIngestResponse(0, ""));
 
     var sb = new StringBuilder("{\"paths\": [");
     for (int i = 0; i <= IngestTool.MAX_PATHS; i++) {
@@ -212,7 +214,7 @@ class IngestToolTest {
     }
     sb.append("]}");
 
-    OperationResult result = tool.execute(sb.toString());
+    OperationResult result = tool.execute(sb.toString(), EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("exceeds limit"), result.message());
     assertTrue(result.message().contains(String.valueOf(IngestTool.MAX_PATHS)));
@@ -220,8 +222,8 @@ class IngestToolTest {
 
   @Test
   void executeNoArgs() {
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(0, ""));
-    OperationResult result = tool.execute("");
+    var tool = toolWithLocalScan((files, collection, context) -> new KnowledgeIngestResponse(0, ""));
+    OperationResult result = tool.execute("", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
   }
 
@@ -236,15 +238,15 @@ class IngestToolTest {
     var roots = List.of(new BrowseTool.RootInfo(tempDir.toString(), "root"));
     var tool =
         toolWithLocalScan(
-            (files, collection) -> {
+            (files, collection, context) -> {
               capturedFiles.set(files);
               return new KnowledgeIngestResponse(files.size(), "");
             },
-            () -> roots);
+            context -> roots);
 
     // Pass a relative path — should resolve against the root
     String json = "{\"paths\": [\"docs/readme.md\"]}";
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertEquals(1, capturedFiles.get().size());
     assertEquals(
@@ -265,15 +267,15 @@ class IngestToolTest {
     var roots = List.of(new BrowseTool.RootInfo(docsRoot.toString(), "docs"));
     var tool =
         toolWithLocalScan(
-            (files, collection) -> {
+            (files, collection, context) -> {
               capturedFiles.set(files);
               return new KnowledgeIngestResponse(files.size(), "");
             },
-            () -> roots);
+            context -> roots);
 
     // Path includes the root folder name as a prefix — IngestTool should strip it
     String json = "{\"paths\": [\"docs/explanation/file.md\"]}";
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertEquals(1, capturedFiles.get().size());
     assertEquals(
@@ -286,12 +288,12 @@ class IngestToolTest {
     var roots = List.of(new BrowseTool.RootInfo(tempDir.toString(), "root"));
     var tool =
         toolWithLocalScan(
-            (files, collection) -> new KnowledgeIngestResponse(0, ""),
-            () -> roots);
+            (files, collection, context) -> new KnowledgeIngestResponse(0, ""),
+            context -> roots);
 
     // Relative path that doesn't exist under any root
     String json = "{\"paths\": [\"nonexistent/file.txt\"]}";
-    OperationResult result = tool.execute(json);
+    OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("No readable files"));
   }
@@ -310,15 +312,15 @@ class IngestToolTest {
     var capturedCollection = new AtomicReference<String>("<never called>");
     var tool =
         toolWithLocalScan(
-            (files, collection) -> {
+            (files, collection, context) -> {
               capturedCollection.set(collection);
               return new KnowledgeIngestResponse(files.size(), "");
             },
-            List::of,
-            List::of); // no watched roots → every path is out-of-root
+            context -> List.of(),
+            context -> List.of()); // no watched roots → every path is out-of-root
 
     OperationResult result =
-        tool.execute("{\"paths\": [\"%s\"]}".formatted(file.toString().replace("\\", "\\\\")));
+        tool.execute("{\"paths\": [\"%s\"]}".formatted(file.toString().replace("\\", "\\\\")), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertEquals(
         IngestCollectionPolicy.OUT_OF_ROOT,
@@ -336,15 +338,15 @@ class IngestToolTest {
     var capturedCollection = new AtomicReference<String>("<never called>");
     var tool =
         toolWithLocalScan(
-            (files, collection) -> {
+            (files, collection, context) -> {
               capturedCollection.set(collection);
               return new KnowledgeIngestResponse(files.size(), "");
             },
-            List::of,
-            () -> List.of(new IngestCollectionPolicy.RootBinding(rootDir, "work-notes")));
+            context -> List.of(),
+            context -> List.of(new IngestCollectionPolicy.RootBinding(rootDir, "work-notes")));
 
     OperationResult result =
-        tool.execute("{\"paths\": [\"%s\"]}".formatted(file.toString().replace("\\", "\\\\")));
+        tool.execute("{\"paths\": [\"%s\"]}".formatted(file.toString().replace("\\", "\\\\")), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertEquals(
         "work-notes",
@@ -360,17 +362,17 @@ class IngestToolTest {
     var capturedCollection = new AtomicReference<String>("<never called>");
     var tool =
         toolWithLocalScan(
-            (files, collection) -> {
+            (files, collection, context) -> {
               capturedCollection.set(collection);
               return new KnowledgeIngestResponse(files.size(), "");
             },
-            List::of,
-            () -> List.of(new IngestCollectionPolicy.RootBinding(tempDir, "root-collection")));
+            context -> List.of(),
+            context -> List.of(new IngestCollectionPolicy.RootBinding(tempDir, "root-collection")));
 
     OperationResult result =
         tool.execute(
             "{\"paths\": [\"%s\"], \"collection\": \"  research  \"}"
-                .formatted(file.toString().replace("\\", "\\\\")));
+                .formatted(file.toString().replace("\\", "\\\\")), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertEquals(
         "research",
@@ -386,7 +388,7 @@ class IngestToolTest {
     var called = new AtomicReference<Boolean>(false);
     var tool =
         toolWithLocalScan(
-            (files, collection) -> {
+            (files, collection, context) -> {
               called.set(true);
               return new KnowledgeIngestResponse(files.size(), "");
             });
@@ -395,7 +397,7 @@ class IngestToolTest {
       OperationResult result =
           tool.execute(
               "{\"paths\": [\"%s\"], \"collection\": \"%s\"}"
-                  .formatted(file.toString().replace("\\", "\\\\"), reserved));
+                  .formatted(file.toString().replace("\\", "\\\\"), reserved), EngineContextTestFixtures.AGENT_LOOP);
       assertFalse(result.success(), "reserved collection " + reserved + " must be rejected");
       assertTrue(result.message().contains("reserved"), result.message());
     }
@@ -407,11 +409,11 @@ class IngestToolTest {
     Path file = tempDir.resolve("blank.txt");
     Files.writeString(file, "content");
 
-    var tool = toolWithLocalScan((files, collection) -> new KnowledgeIngestResponse(1, ""));
+    var tool = toolWithLocalScan((files, collection, context) -> new KnowledgeIngestResponse(1, ""));
     OperationResult result =
         tool.execute(
             "{\"paths\": [\"%s\"], \"collection\": \"   \"}"
-                .formatted(file.toString().replace("\\", "\\\\")));
+                .formatted(file.toString().replace("\\", "\\\\")), EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("non-empty"), result.message());
   }
@@ -428,19 +430,19 @@ class IngestToolTest {
     var byCollection = new java.util.LinkedHashMap<String, List<Path>>();
     var tool =
         toolWithLocalScan(
-            (files, collection) -> {
+            (files, collection, context) -> {
               byCollection.put(String.valueOf(collection), List.copyOf(files));
               return new KnowledgeIngestResponse(files.size(), "");
             },
-            List::of,
-            () -> List.of(new IngestCollectionPolicy.RootBinding(rootDir, "watched-coll")));
+            context -> List.of(),
+            context -> List.of(new IngestCollectionPolicy.RootBinding(rootDir, "watched-coll")));
 
     OperationResult result =
         tool.execute(
             "{\"paths\": [\"%s\", \"%s\"]}"
                 .formatted(
                     inRoot.toString().replace("\\", "\\\\"),
-                    outside.toString().replace("\\", "\\\\")));
+                    outside.toString().replace("\\", "\\\\")), EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertEquals(
         java.util.Set.of("watched-coll", IngestCollectionPolicy.OUT_OF_ROOT),

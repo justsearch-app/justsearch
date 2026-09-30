@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 final class HandlerRegistryTest {
 
   private static OperationHandler stub(String marker) {
-    return argumentsJson -> OperationResult.success(marker);
+    return (argumentsJson, context) -> OperationResult.success(marker);
   }
 
   @Test

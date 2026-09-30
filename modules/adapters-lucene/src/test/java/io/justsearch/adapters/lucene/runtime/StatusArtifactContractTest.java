@@ -33,7 +33,7 @@ import tools.jackson.databind.ObjectMapper;
  * {@code is_chunk=true}, indexed-only {@code chunk_content} plus parent offsets, no {@code content},
  * no {@code embedding_status}, no {@code ner_status}, {@code splade_status=PENDING}.
  */
-class StatusArtifactContractTest {
+class StatusArtifactContractTest extends LuceneExecutorTestBase {
 
   private static final float[] VEC = {0.25f, -0.5f, 0.75f, 1.0f};
 
@@ -588,7 +588,7 @@ class StatusArtifactContractTest {
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral()
+          .ephemeral().withExecutorRegistrations(testLuceneExecutors())
           .open();
     } catch (Exception e) {
       throw new RuntimeException(e);

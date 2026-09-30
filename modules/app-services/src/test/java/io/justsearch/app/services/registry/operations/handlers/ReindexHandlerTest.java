@@ -21,20 +21,20 @@ final class ReindexHandlerTest {
    */
   private static class FakeIndexingService implements IndexingService {
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(io.justsearch.core.context.EngineContext engineContext) {
       return List.of();
     }
 
     @Override
-    public void addWatchedPath(Path path) {}
+    public void addWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {}
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       return 0;
     }
 
     @Override
-    public void flush() {}
+    public void flush(io.justsearch.core.context.EngineContext engineContext) {}
   }
 
   @Test
@@ -46,17 +46,17 @@ final class ReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public void reindexWatchedRoots(boolean force) {
+                  public void reindexWatchedRoots(boolean force, io.justsearch.core.context.EngineContext engineContext) {
                     capturedForce.set(force);
                   }
 
                   @Override
-                  public void flush() {
+                  public void flush(io.justsearch.core.context.EngineContext engineContext) {
                     flushed.set(true);
                   }
                 });
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals(Boolean.FALSE, capturedForce.get());
     assertTrue(flushed.get(), "flush() should be called after reindex");
@@ -71,12 +71,12 @@ final class ReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public void reindexWatchedRoots(boolean force) {
+                  public void reindexWatchedRoots(boolean force, io.justsearch.core.context.EngineContext engineContext) {
                     capturedForce.set(force);
                   }
                 });
 
-    OperationResult result = handler.execute("{\"force\":true}");
+    OperationResult result = handler.execute("{\"force\":true}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals(Boolean.TRUE, capturedForce.get());
     assertTrue(result.message().contains("force"));
@@ -90,12 +90,12 @@ final class ReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public void reindexWatchedRoots(boolean force) {
+                  public void reindexWatchedRoots(boolean force, io.justsearch.core.context.EngineContext engineContext) {
                     capturedForce.set(force);
                   }
                 });
 
-    OperationResult result = handler.execute("{\"force\":false}");
+    OperationResult result = handler.execute("{\"force\":false}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals(Boolean.FALSE, capturedForce.get());
   }
@@ -108,12 +108,12 @@ final class ReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public void reindexWatchedRoots(boolean force) {
+                  public void reindexWatchedRoots(boolean force, io.justsearch.core.context.EngineContext engineContext) {
                     capturedForce.set(force);
                   }
                 });
 
-    OperationResult result = handler.execute("not-json");
+    OperationResult result = handler.execute("not-json", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals(Boolean.FALSE, capturedForce.get());
   }
@@ -121,7 +121,7 @@ final class ReindexHandlerTest {
   @Test
   void executeReturnsFailureWhenServiceUnavailable() {
     ReindexHandler handler = new ReindexHandler(() -> null);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Indexing service unavailable"));
   }
@@ -129,7 +129,7 @@ final class ReindexHandlerTest {
   @Test
   void executeReturnsFailureWhenReindexThrowsUnsupported() {
     ReindexHandler handler = new ReindexHandler(IndexingService::unavailable);
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("Reindex failed"));
   }
@@ -141,12 +141,12 @@ final class ReindexHandlerTest {
             () ->
                 new FakeIndexingService() {
                   @Override
-                  public void reindexWatchedRoots(boolean force) {
+                  public void reindexWatchedRoots(boolean force, io.justsearch.core.context.EngineContext engineContext) {
                     throw new RuntimeException("boom");
                   }
                 });
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("boom"));
   }

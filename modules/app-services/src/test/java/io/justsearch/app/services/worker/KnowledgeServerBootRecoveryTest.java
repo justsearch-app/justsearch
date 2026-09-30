@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,8 +39,8 @@ final class KnowledgeServerBootRecoveryTest {
   /** Mirrors {@code KnowledgeServerBootstrapRestartabilityTest.configFor}, with a tighter budget. */
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
-        false, dir, dir, dir, dir, dir.resolve("worker_signal.lock"),
-        5_000L, 1_000L, 3, "256m", 1_000L, 1_000L, 300_000L, 100, 0L, 0);
+        false, dir, dir, dir,
+        5_000L, 1_000L, 3, 1_000L, 1_000L, 300_000L, 100, 0L, 0);
   }
 
   /** No backoff: the arc's attempt schedule is pinned by the pure decision test, not by waiting. */
@@ -47,35 +48,18 @@ final class KnowledgeServerBootRecoveryTest {
 
   private static final String SPAWN_FAILED = LifecycleReasonCode.WORKER_SPAWN_FAILED.code();
   private static final String RECOVERING = LifecycleReasonCode.WORKER_RECOVERING.code();
-  private static final String RESTART_EXHAUSTED = LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code();
   private static final String RECOVERY_EXHAUSTED =
       LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code();
 
   /** A bootstrap in the post-boot bricked state: start attempted, failed, capability pinned. */
   private static KnowledgeServerBootstrap bricked(Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     assertThrows(Exception.class, () -> bootstrap.startWithRetry(1, 0));
     assertFalse(bootstrap.hasClient(), "the fixture must leave no client bound");
     assertEquals(
         SPAWN_FAILED,
         bootstrap.workerCapability().pendingReason(),
         "precondition: the boot failure pins worker.spawn.failed (the 821 §O.4 state)");
-    return bootstrap;
-  }
-
-  /**
-   * The post-boot state after supervision gave up DURING the boot: the capability holds what
-   * {@code SupervisionEvents.onGaveUp} writes, and the start it was supervising then failed. The
-   * transition is the producer's own call, verbatim — what makes this the "real path" (review F1) is
-   * the ORDER: the verdict is in the slot before {@code startWithRetry}'s final catch runs over it.
-   */
-  private static KnowledgeServerBootstrap brickedAfterSupervisionGaveUp(Path tempDir) {
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
-    bootstrap
-        .workerCapability()
-        .transition(CapabilityHealth.DEGRADED, RESTART_EXHAUSTED, "restart budget exhausted");
-    assertThrows(Exception.class, () -> bootstrap.startWithRetry(1, 0));
-    assertFalse(bootstrap.hasClient(), "the fixture must leave no client bound");
     return bootstrap;
   }
 
@@ -92,7 +76,7 @@ final class KnowledgeServerBootRecoveryTest {
   void firstTickReAttemptsAndNarratesRecovering(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
     var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
 
     monitor.tick();
 
@@ -113,7 +97,7 @@ final class KnowledgeServerBootRecoveryTest {
   void arcGivesUpOnceAfterTheBudget(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
     var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
     List<String> seen = recordTransitions(bootstrap);
 
     for (int i = 0; i < NO_WAIT.maxAttempts(); i++) {
@@ -146,7 +130,7 @@ final class KnowledgeServerBootRecoveryTest {
   void arcDoesNotFlap(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
     var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
     List<String> seen = recordTransitions(bootstrap);
 
     for (int i = 0; i <= NO_WAIT.maxAttempts(); i++) {
@@ -172,40 +156,53 @@ final class KnowledgeServerBootRecoveryTest {
 
   @Test
   @Timeout(180)
-  @DisplayName("F1: a supervisor's give-up survives the failed start that follows it")
-  void supervisionVerdictSurvivesTheFailedStartThatFollowsIt(@TempDir Path tempDir) {
-    var bootstrap = brickedAfterSupervisionGaveUp(tempDir);
-
-    // Review F1: worker.restart_exhausted and worker.spawn.failed are BOTH FAULT, so ReasonRetention
-    // lets the incoming one win — startWithRetry's unguarded final catch therefore erased the
-    // supervisor's verdict on every real boot where supervision gave up. That is not cosmetic: the
-    // permanent veto below reads this exact slot, so the erasure silently downgraded "supervision
-    // gave up, stop for good" into "nobody knows, keep re-attempting".
-    assertEquals(
-        RESTART_EXHAUSTED,
-        bootstrap.workerCapability().pendingReason(),
-        "the generic start-failure stamp must not overwrite supervision's terminal verdict");
+  @DisplayName("a predecessor supervisor record cannot veto local recovery or change its budget")
+  void predecessorSupervisorRecordDoesNotOwnLocalRecovery(@TempDir Path tempDir) throws Exception {
+    Path record = tempDir.resolve("runtime/supervisor.v1.json");
+    Files.createDirectories(record.getParent());
+    String exhausted = """
+        {"schemaVersion":1,"kind":"engine-supervisor-state.v1","supervisor":"tauri",
+         "state":"exhausted","incarnation":8,"restartCount":3,"maxRestartAttempts":3,
+         "reason":"ENGINE_RESTART_EXHAUSTED:out_of_memory"}
+        """;
+    Files.writeString(record, exhausted);
+    var bootstrap = bricked(tempDir);
+    try (var monitor = new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(),
+        bootstrap, 10_000, System::currentTimeMillis, NO_WAIT)) {
+      List<String> seen = recordTransitions(bootstrap);
+      monitor.tick();
+      assertEquals(RECOVERING, bootstrap.workerCapability().pendingReason());
+      for (int i = 1; i <= NO_WAIT.maxAttempts(); i++) monitor.tick();
+      assertEquals(RECOVERY_EXHAUSTED, bootstrap.workerCapability().pendingReason());
+      assertEquals(1, seen.stream().filter(t -> t.contains(RECOVERY_EXHAUSTED)).count());
+      assertEquals(exhausted, Files.readString(record), "Java does not rewrite host-owned state");
+    } finally {
+      bootstrap.close();
+    }
   }
 
   @Test
   @Timeout(180)
-  @DisplayName("VETO: a held worker.restart_exhausted is never superseded — no attempt, no overwrite")
-  void restartExhaustedIsNeverSuperseded(@TempDir Path tempDir) {
-    // Produced by the REAL path (review F1): the supervisor's give-up lands during the boot, and the
-    // boot then fails — which is the only way this state occurs in production.
-    var bootstrap = brickedAfterSupervisionGaveUp(tempDir);
-    var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
-    List<String> seen = recordTransitions(bootstrap);
-
-    monitor.tick();
-    monitor.tick();
-
-    assertEquals(
-        RESTART_EXHAUSTED,
-        bootstrap.workerCapability().pendingReason(),
-        "boot recovery must not overwrite supervision's terminal verdict with its own");
-    assertTrue(seen.isEmpty(), "a vetoed arc narrates nothing at all: " + seen);
+  @DisplayName("a stale legacy reason cannot suppress this Engine's actual boot failure")
+  void staleLegacyReasonCannotSuppressCurrentBootFailure(@TempDir Path tempDir) {
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
+    try {
+      // The literal deliberately represents retired input, not a new production reason code.
+      bootstrap.workerCapability().transition(
+          CapabilityHealth.DEGRADED, "worker.restart_exhausted", "predecessor verdict");
+      // Exercise the funnel before STARTING can clear this now-unknown legacy code.
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.WORKER_SPAWN_FAILED, "current boot failed");
+      assertEquals(SPAWN_FAILED, bootstrap.workerCapability().pendingReason());
+      assertThrows(Exception.class, () -> bootstrap.startWithRetry(1, 0));
+      assertEquals(SPAWN_FAILED, bootstrap.workerCapability().pendingReason());
+      try (var monitor = new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(),
+          bootstrap, 10_000, System::currentTimeMillis, NO_WAIT)) {
+        monitor.tick();
+        assertEquals(RECOVERING, bootstrap.workerCapability().pendingReason());
+      }
+    } finally {
+      bootstrap.close();
+    }
   }
 
   @Test
@@ -214,7 +211,7 @@ final class KnowledgeServerBootRecoveryTest {
   void manualRequestSharesTheSameAuthority(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
     var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
 
     assertEquals(
         WorkerRecoveryAuthority.Verdict.ACCEPTED,
@@ -284,7 +281,7 @@ final class KnowledgeServerBootRecoveryTest {
   void closedMonitorNeverSpawns(@TempDir Path tempDir) {
     var bootstrap = bricked(tempDir);
     var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
     List<String> seen = recordTransitions(bootstrap);
 
     monitor.close();
@@ -308,7 +305,7 @@ final class KnowledgeServerBootRecoveryTest {
   void manualBurstCannotOutspendTheBudget(@TempDir Path tempDir) throws Exception {
     var bootstrap = bricked(tempDir);
     var monitor =
-        new KnowledgeServerHealthMonitor(bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
+        new KnowledgeServerHealthMonitor(new io.justsearch.core.execution.TestEngineExecutors(), bootstrap, 10_000, System::currentTimeMillis, NO_WAIT);
     try {
       // Ten operator requests, each waiting only for the executor to be free — which is how a real
       // burst behaves once the ALREADY_RUNNING short-circuit stops queueing duplicates. An ACCEPTED
@@ -373,7 +370,7 @@ final class KnowledgeServerBootRecoveryTest {
     // Read reflectively because the counter has no consumer that would justify a public accessor,
     // and asserting it through completeReadyInitialization would need a live gRPC client — the exact
     // substrate this rung of the ladder is defined to exclude.
-    var bootstrap = new KnowledgeServerBootstrap(configFor(tempDir));
+    var bootstrap = new KnowledgeServerBootstrap(new io.justsearch.core.execution.TestEngineExecutors(), configFor(tempDir));
     var field = KnowledgeServerBootstrap.class.getDeclaredField("initGeneration");
     field.setAccessible(true);
     var generation = (java.util.concurrent.atomic.AtomicLong) field.get(bootstrap);

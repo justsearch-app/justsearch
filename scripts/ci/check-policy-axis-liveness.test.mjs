@@ -46,6 +46,7 @@ const COMPONENTS = [
   { type: 'Optional<ResourceRef>', name: 'advisoryClass' },
   { type: 'Optional<OperationRef>', name: 'inverseOperationRef' },
   { type: 'Optional<String>', name: 'capabilityFamily' },
+  { type: 'OperationKind', name: 'recordKind' },
 ];
 const ADVISORY = COMPONENTS[6];
 

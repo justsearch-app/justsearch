@@ -39,7 +39,7 @@ import java.util.function.Predicate;
  * in-process extraction path through this registry is behaviorally identical to the pre-560 direct
  * {@code PolicyDrivenTikaExtractor} delegate.
  */
-public final class ExtractorContributionRegistry implements ContentExtractorProvider {
+public final class ExtractorContributionRegistry implements ContentExtractorProvider, AutoCloseable {
 
   /** Trust of an extractor contribution — the Worker-domain input to the Boundary substrate. */
   public enum ExtractorTrust {
@@ -76,6 +76,7 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
    */
   private final ContributionComposer<String, ExtractorContribution> composer =
       new ContributionComposer<>(id -> id);
+  private boolean closed;
 
   /**
    * Install a contribution through the shared composer: it rejects an id collision (Lifecycle) and a
@@ -86,6 +87,7 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
    * @throws IllegalStateException on id collision or a {@code core.*} mint by a non-core contributor
    */
   public synchronized void install(ExtractorContribution contribution) {
+    if (closed) throw new IllegalStateException("Extractor registry is closed");
     Objects.requireNonNull(contribution, "contribution");
     composer.install(
         new ContributionComposer.Installation<>(
@@ -99,6 +101,7 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
 
   /** Lifecycle substrate: revoke a contribution by id. Returns false if it was not installed. */
   public synchronized boolean uninstall(String id) {
+    if (closed) throw new IllegalStateException("Extractor registry is closed");
     return composer.uninstall(id).wasInstalled();
   }
 
@@ -109,6 +112,7 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
 
   /** Dispatch substrate: the first installed contribution (install order) whose predicate matches. */
   private synchronized ContentExtractorProvider select(Path file) {
+    if (closed) throw new IllegalStateException("Extractor registry is closed");
     for (ExtractorContribution c : composer.values()) {
       if (c.handles().test(file)) {
         return c.provider();
@@ -137,6 +141,35 @@ public final class ExtractorContributionRegistry implements ContentExtractorProv
   @Override
   public String detectMimeType(Path file) {
     return select(file).detectMimeType(file);
+  }
+
+  @Override
+  public void close() {
+    List<ExtractorContribution> installed;
+    synchronized (this) {
+      closed = true;
+      installed = List.copyOf(composer.values());
+    }
+    Throwable failure = null;
+    var visited = java.util.Collections.newSetFromMap(
+        new java.util.IdentityHashMap<ContentExtractorProvider, Boolean>());
+    for (ExtractorContribution contribution : installed) {
+      ContentExtractorProvider provider = contribution.provider();
+      if (!visited.add(provider)) continue;
+      try {
+        if (provider instanceof AutoCloseable owner) owner.close();
+        synchronized (this) {
+          for (ExtractorContribution alias : installed) {
+            if (alias.provider() == provider) composer.uninstall(alias.id());
+          }
+        }
+      } catch (Exception | Error cleanup) {
+        if (failure == null) failure = cleanup;
+        else if (failure != cleanup) failure.addSuppressed(cleanup);
+      }
+    }
+    if (failure instanceof Error fatal) throw fatal;
+    if (failure != null) throw new IllegalStateException("Extractor resources remain owned", failure);
   }
 
   /**

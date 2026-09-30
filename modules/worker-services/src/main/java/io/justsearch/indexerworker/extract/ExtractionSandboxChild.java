@@ -27,9 +27,10 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><b>Protocol channel isolation.</b> The real {@code System.out} is captured before any
  *       parser runs and {@code System.out} is redirected to stderr, so a parser that prints cannot
  *       corrupt a frame. (Shipped before this tempdoc; the serve loop preserves it.)
- *   <li><b>No orphan.</b> With {@code --parent-pid=<pid>} a daemon thread polls the parent handle
- *       and halts the JVM once it is gone — the PID-gate pattern from tempdoc 630. This is the
- *       reason no {@code WindowsJobObject} dependency has to be added to {@code worker-services}.
+ *   <li><b>Process lifetime.</b> Windows bootstrap first installs a kill-on-close Job Object
+ *       around this JVM and all its native descendants. The parent-PID watchdog halts this JVM
+ *       when the Engine dies; Windows then kills the entire job, also on forced parser recycling.
+ *       Other platforms retain only the parent watchdog, without native-descendant containment.
  * </ul>
  */
 public final class ExtractionSandboxChild {
@@ -45,17 +46,18 @@ public final class ExtractionSandboxChild {
   public static void main(String[] args) throws Exception {
     PrintStream protocolOut = System.out;
     System.setOut(new PrintStream(System.err, true, StandardCharsets.UTF_8));
-    startParentWatchdog(args);
+    initializeProcessBoundary(args);
     serve(System.in, protocolOut);
   }
 
-  private static void serve(InputStream in, OutputStream protocolOut) throws IOException {
-    ExtractorCache cache = new ExtractorCache();
+  static void serve(InputStream in, OutputStream protocolOut) throws IOException {
+    try (ExtractorCache cache = new ExtractorCache()) {
     byte[] frame;
     while ((frame = SandboxFrames.read(in, SandboxFrames.MAX_FRAME_BYTES)) != null) {
       SandboxExtractionRequest request =
           MAPPER.readValue(new String(frame, StandardCharsets.UTF_8), SandboxExtractionRequest.class);
       SandboxFrames.write(protocolOut, MAPPER.writeValueAsBytes(handle(request, cache)));
+    }
     }
   }
 
@@ -71,13 +73,13 @@ public final class ExtractionSandboxChild {
               .extractor(policy, ocrConfig)
               .extractArtifact(Path.of(request.path()))
               .validateContentBoundsOnly(policy.maxExtractedChars());
-      return SandboxExtractionResponse.fromArtifact(artifact);
+      return SandboxExtractionResponse.fromArtifact(request.requestId(), artifact);
     } catch (ContentExtractor.BudgetExceededException e) {
       return SandboxExtractionResponse.failed(
-          ExtractionStatus.BUDGET_EXCEEDED, policy, "sandbox-child", "Budget exceeded", e.reasonCode());
+          request.requestId(), ExtractionStatus.BUDGET_EXCEEDED, policy, "sandbox-child", "Budget exceeded", e.reasonCode());
     } catch (Exception e) {
       return SandboxExtractionResponse.failed(
-          ExtractionStatus.FAILED, policy, "sandbox-child", "Sandbox parser failed", "PARSER_FAILED");
+          request.requestId(), ExtractionStatus.FAILED, policy, "sandbox-child", "Sandbox parser failed", "PARSER_FAILED");
     }
   }
 
@@ -88,19 +90,37 @@ public final class ExtractionSandboxChild {
    * parent classifies a heap-exhausted child as a permanent parse failure from the exit code plus
    * the JVM's own stderr signature, and answering from a poisoned heap is not reliable.
    */
-  private static final class ExtractorCache {
+  static final class ExtractorCache implements AutoCloseable {
     private TikaExtractionPolicy policy;
     private OcrRoutingConfig ocrConfig;
     private PolicyDrivenTikaExtractor extractor;
 
     PolicyDrivenTikaExtractor extractor(TikaExtractionPolicy p, OcrRoutingConfig o) {
       if (extractor == null || !Objects.equals(policy, p) || !Objects.equals(ocrConfig, o)) {
-        extractor = new PolicyDrivenTikaExtractor(p, o);
+        close();
+        extractor = new PolicyDrivenTikaExtractor(ExtractionSandboxChild::openOcrPool, p, o);
         policy = p;
         ocrConfig = o;
       }
       return extractor;
     }
+
+    @Override public void close() {
+      if (extractor != null) {
+        extractor.close();
+        extractor = null;
+      }
+    }
+  }
+
+  /** External-process-only OCR factory; the parent projects its resolved worker limit in each frame. */
+  public static java.util.concurrent.ExecutorService openOcrPool(int workers) {
+    if (workers < 1) throw new IllegalArgumentException("OCR workers must be resolved and positive");
+    return new java.util.concurrent.ThreadPoolExecutor(
+        workers, workers, 0, java.util.concurrent.TimeUnit.MILLISECONDS,
+        new java.util.concurrent.ArrayBlockingQueue<>(workers),
+        Thread.ofPlatform().daemon().name("parser-child-ocr-", 0).factory(),
+        new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
   }
 
   static long parentPid(String[] args) {
@@ -120,7 +140,7 @@ public final class ExtractionSandboxChild {
   }
 
   /**
-   * Starts the parent-liveness gate for a child launched with {@code --parent-pid=<pid>}.
+   * Installs Windows descendant containment, then the parent-liveness gate for a child launched with {@code --parent-pid=<pid>}.
    *
    * <p>Public because the chaos harness's stub parser is a real out-of-tree child of this pool and
    * must run <b>this</b> orphan-prevention code, not a copy of it — a copied watchdog would make
@@ -129,7 +149,8 @@ public final class ExtractionSandboxChild {
   // Halting IS the contract here: a parser child whose parent died must not outlive it, and no
   // orderly shutdown is available from a watchdog thread in a doomed process.
   @SuppressWarnings("PMD.DoNotTerminateVM")
-  public static void startParentWatchdog(String[] args) {
+  public static void initializeProcessBoundary(String[] args) {
+    WindowsParserContainment.install();
     long parentPid = parentPid(args);
     if (parentPid <= 0) {
       return;

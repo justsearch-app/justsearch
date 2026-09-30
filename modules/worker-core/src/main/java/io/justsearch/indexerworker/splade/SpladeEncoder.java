@@ -96,7 +96,8 @@ public final class SpladeEncoder implements Closeable {
 
   // --- Pinned output state (accessed only from indexing-loop thread via encodeBatch) ---
   // Query-time encode(String) uses runOnnxInferenceSingle() which bypasses these fields.
-  // Do NOT access these from any method reachable by gRPC Netty threads.
+  // Do NOT access these from any method reachable by a query-serving caller thread (before lane F
+  // stage A item A9 those were the gRPC Netty threads; now they are the Head's request threads).
   private final String outputName;
   private OnnxTensor pinnedOutputTensor;
   private FloatBuffer pinnedOutputBuffer;
@@ -678,7 +679,8 @@ public final class SpladeEncoder implements Closeable {
 
   /**
    * Runs single-text ONNX inference using heap-allocated output only. Thread-safe: no pinned output
-   * state is touched. Used by {@link #encode(String)} for query-time SPLADE from gRPC Netty threads.
+   * state is touched. Used by {@link #encode(String)} for query-time SPLADE, which runs on whichever
+   * caller thread entered the search port (the gRPC Netty threads, before item A9).
    *
    * <p>This method exists to avoid the data race on pinned output fields ({@code pinnedOutputTensor},
    * {@code pinnedOutputBuffer}, etc.) which are only safe for single-threaded access from the

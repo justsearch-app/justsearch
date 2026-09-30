@@ -13,9 +13,18 @@ last_reviewed: 2026-09-02
 ## Status
 Accepted
 
+> **Current state (2026-09, lane F stage A).** The decision holds; the boundary it names does not.
+> Where this ADR says "the gRPC boundary" or "the internal gRPC contract", read "the Engine's
+> in-process port boundary": items A9-A11 deleted the Head↔Worker channel and item A14 deleted the
+> remaining gRPC (the `service` blocks, the infra-health service, the code generator), so no gRPC
+> exists anywhere in the product. Two type families, proto-aligned `core` DTOs on the inside and
+> JSON-aligned `app-api` records on the outside, with field-by-field translation in
+> `DefaultAppFacade` and `KnowledgeClient` — that is unchanged, and the reasoning below is still
+> the reasoning. See [ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md).
+
 ## Context
 
-The `core` module contains DTOs (`Query`, `Result`, `Result.Hit`) that are near-duplicates of `app-api` records (`SearchRequest`, `KnowledgeSearchResponse`). Both type families have the same fields, the same nested records (Filters, TimeRange, Clause, Cursor), and the same defensive-copy patterns. Translation code in `DefaultAppFacade` (Head-to-Worker) and `RemoteKnowledgeClient` (Worker-to-Head) maps between them field-by-field.
+The `core` module contains DTOs (`Query`, `Result`, `Result.Hit`) that are near-duplicates of `app-api` records (`SearchRequest`, `KnowledgeSearchResponse`). Both type families have the same fields, the same nested records (Filters, TimeRange, Clause, Cursor), and the same defensive-copy patterns. Translation code in `DefaultAppFacade` (Head-to-index-half) and `KnowledgeClient` (index-half-to-Head) maps between them field-by-field.
 
 This has been flagged as potential code smell multiple times. The 377 core module review investigated whether the duplication should be collapsed.
 
@@ -35,7 +44,7 @@ Maintain both type families as intentional layering:
 
 2. **`app-api` records** serve the external REST contract. They are JSON-aligned, annotated with `@RecordBuilder` for fluent construction, and include computed/aggregated fields (e.g., query understanding metadata, pipeline execution details) not present in the internal contract.
 
-3. **Translation** happens in two places: `DefaultAppFacade` (translates `app-api` request types to `core` types for the Worker call) and `RemoteKnowledgeClient` (translates `core` result types to `app-api` types for the REST response). This translation is the cost of the layering.
+3. **Translation** happens in two places: `DefaultAppFacade` (translates `app-api` request types to `core` types for the index-half call) and `KnowledgeClient` (translates `core` result types to `app-api` types for the REST response). This translation is the cost of the layering.
 
 4. **Wire-format naming** (`doc_id` snake_case) is deliberate compatibility — the JSON API, Lucene stored-field schema, and frontend all use `doc_id`. This is not a naming inconsistency but a cross-layer contract.
 
@@ -48,7 +57,7 @@ Maintain both type families as intentional layering:
 - The `core` module remains minimal and stable (9 files, 21 imports, 5-month freeze) — a clean hexagonal port.
 
 **Negative:**
-- Field-by-field translation code in `DefaultAppFacade` and `RemoteKnowledgeClient` is boilerplate that must be maintained.
+- Field-by-field translation code in `DefaultAppFacade` and `KnowledgeClient` is boilerplate that must be maintained.
 - Risk of drift if fields are added to one type family but not the other. Mitigated by integration tests that exercise the full request-response path through both translations.
 - New developers may perceive the duplication as code smell and attempt to "fix" it by collapsing the types — this ADR documents why the layering is intentional.
 

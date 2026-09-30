@@ -43,7 +43,12 @@ is the row of constituent versions below. The current build:
 
 | Runtime Contract | manifest schema | lifecycle schema | MCP protocol | MCP tool surface |
 |---|---|---|---|---|
-| `0.2.0` | `1` | `1` | `2025-11-25` | `0.7.0` |
+| `0.3.0` | `2` | `1` | `2025-11-25` | `0.9.0` |
+
+MCP tool surface `0.9.0` adds the read-only `justsearch_operation_outcome` key query.
+The preceding `0.8.0` addition provides optional `operationKey` to browse/ingest and preserves
+receipt identity through approval and failure responses. The umbrella version stays
+`0.3.0`: existing calls remain valid under the bump-only-on-break policy below.
 
 **Skew rule.** A client built for Runtime Contract vN works against a runtime
 advertising vN. Older clients degrade gracefully: the manifest is
@@ -77,7 +82,7 @@ The package deliberately excludes mutations, MCP, token bootstrap, `HEAD` probe 
 manifest SSE stream. MCP clients should use the official MCP TypeScript SDK. The async client
 factory fails closed before returning a client: it rejects non-loopback base URLs, disables HTTP
 redirects, reads the runtime manifest, and requires an advertised Runtime Contract version accepted
-by `assertRuntimeContractCompatible` (currently exactly `0.2.0`). A new runtime-contract version
+by `assertRuntimeContractCompatible` (currently exactly `0.3.0`). A new runtime-contract version
 therefore requires an explicit client compatibility decision rather than an optimistic range.
 
 Regenerate and verify from the repository root:
@@ -134,6 +139,7 @@ not per release. Mirrors the internal `contracts/wire/CHANGELOG.md` convention.
 |---|---|---|
 | `0.1.0` | 2026-07-02 | Initial contract. Names the three public-contract surfaces (runtime manifest, health/status lifecycle subset, MCP endpoint + curated tools) and pins their constituent versions (manifest schema `1`, lifecycle schema `1`, MCP protocol `2025-11-25`, MCP tool surface `0.1.0`). Pre-1.0 — the surface may still change while it settles. |
 | `0.2.0` | 2026-07-21 | **First break to a constituent** (tempdoc 770). MCP tool surface `0.4.0` → `0.5.0` removes fields from the default `structuredContent` of the curated tool set: `justsearch_search` no longer emits per-hit `trace`/`legScores` by default (recoverable by passing `detail: true`) nor a `path`-duplicating `id` (`id` now ships only when it differs from `path`), and `justsearch_answer` no longer emits `facets` at all — the second full hybrid search that sourced it was removed, and the answer path has no other facet source. **Owner decision:** the 90-day deprecation window below is *overridden here by the "Pre-1.0 by design" clause* — these fields are removed without a prior deprecation notice, which `0.x` permits and which the measured evidence supports (per-hit provenance was requested in 0 of 1,081 calls; facet affordances produced zero behavioral adoption across three campaigns). The window applies again as stated once a scoped `1.0` is declared. **Correction:** the compatibility matrix above had continued to show MCP tool surface `0.1.0` through the additive `0.2.0`/`0.3.0`/`0.3.1`/`0.4.0` bumps; the matrix is a snapshot of constituent versions, not only of breaking ones, so it was stale by four bumps and is now current. |
+| `0.3.0` | 2026-09-08 | Runtime manifest schema `1` → `2`. The private filesystem manifest gains identity-safe managed-child ownership and shutdown-handoff records, while the public projection moves to its v2 schema and omits those private fields. The obsolete worker `grpcPort` field is removed. Current readers accept v1 manifests without child records; future versions and unknown fields remain fail-closed where strict admission is required. |
 
 ## Surface classification
 
@@ -148,7 +154,7 @@ is part of the Runtime Contract.
 |---|---|---|
 | **Public-contract** | Runtime manifest + its standard transports (`GET /api/runtime/manifest`, the `/.well-known/justsearch/manifest.json` mirror, the manifest SSE stream, the `GET /api/runtime/ready`/`live` probes); the health/status **lifecycle subset** (`GET /api/health`, and the schema-v1 minimum fields of `GET /api/status`); the **MCP** endpoint (`POST /mcp`) + the curated tool set. | Versioned + deprecation-clocked (above). |
 | **Reference-client** | Surfaces the desktop shell (and the manifest's `full` audience) use but that are **not** promised to third parties: the *extended* `/api/status` fields, `/api/knowledge/*` (search/suggest/status/ingest), boot-phase traces, health-event streams, governance state, the operation/agent-action substrate, retrieve-context and chat/conversation APIs, folder-browse, the OpenAI-compatible `/v1/*` shim, and `GET /api/meta/openapi.json`. The committed `reference-client-openapi.snapshot.json` is a deterministic derivative of the captured route manifest, explicitly classified `runtimeContract: false`; only a paired live capture proves that snapshot matches the current router. | May change; not promised. Demonstrated by the reference client, not defined by it. |
-| **Internal** | Not for external callers: `/api/debug/*`, the Head↔Worker gRPC IPC and `contracts/wire` protos, the MMF signalling layer, filesystem-only manifest fields (`head.sessionToken`), and the `/infra/capabilities` FE↔Head capability handshake. | No stability, no external audience. |
+| **Internal** | Not for external callers: `/api/debug/*`, the Head↔index-half in-process ports and their `indexing.proto` DTOs, the `contracts/wire` protos, filesystem-only manifest fields (`head.sessionToken`, `children`, `shutdownHandoff`), and the `/infra/capabilities` FE↔Head capability handshake. | No stability, no external audience. |
 
 ## What the contract does not claim
 

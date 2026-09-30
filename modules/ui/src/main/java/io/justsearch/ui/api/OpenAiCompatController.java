@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * proxy responds {@code 503 AI_OFFLINE} via the project's
  * {@link ApiErrorHandler} so error shape matches the rest of the API surface.
  */
-public final class OpenAiCompatController {
+public final class OpenAiCompatController implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(OpenAiCompatController.class);
 
   /**
@@ -85,23 +85,69 @@ public final class OpenAiCompatController {
    */
   private static final Duration REQUEST_TIMEOUT = Duration.ofMinutes(30);
 
-  private final HttpClient httpClient;
+  private final HttpClient foregroundHttp;
+  private final HttpClient backgroundHttp;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration foregroundOwner;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration backgroundOwner;
   private final IntSupplier llamaServerPortSupplier;
   private final Telemetry telemetry;
 
-  public OpenAiCompatController(IntSupplier llamaServerPortSupplier, Telemetry telemetry) {
-    this(
-        HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build(),
-        llamaServerPortSupplier,
-        telemetry);
+  public OpenAiCompatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      IntSupplier llamaServerPortSupplier, Telemetry telemetry) {
+    this.llamaServerPortSupplier = java.util.Objects.requireNonNull(llamaServerPortSupplier);
+    this.telemetry = telemetry;
+    var fg = httpOwner(executors, io.justsearch.core.execution.EngineExecutorSpec.Kind.FOREGROUND);
+    io.justsearch.core.execution.EngineExecutorRegistry.Registration bg = null;
+    HttpClient foreground = null;
+    try {
+      bg = httpOwner(executors, io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+      foreground = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT)
+          .executor(fg.open(Thread.ofPlatform().daemon().name("openai-http-foreground-", 0).factory()))
+          .build();
+      backgroundHttp = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT)
+          .executor(bg.open(Thread.ofPlatform().daemon().name("openai-http-background-", 0).factory()))
+          .build();
+    } catch (RuntimeException | Error failure) {
+      if (foreground != null) foreground.shutdownNow();
+      try { fg.close(); } catch (RuntimeException closeFailure) { failure.addSuppressed(closeFailure); }
+      if (bg != null) {
+        try { bg.close(); } catch (RuntimeException closeFailure) { failure.addSuppressed(closeFailure); }
+      }
+      throw failure;
+    }
+    foregroundHttp = foreground;
+    foregroundOwner = fg;
+    backgroundOwner = bg;
   }
 
-  /** Test seam — accepts a custom HttpClient. */
+  private static io.justsearch.core.execution.EngineExecutorRegistry.Registration httpOwner(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      io.justsearch.core.execution.EngineExecutorSpec.Kind kind) {
+    var limits = executors.limits(kind);
+    return executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "head.openai.http." + kind.name().toLowerCase(java.util.Locale.ROOT), kind,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
+        limits.maxThreads(), limits.maxQueue(), 1));
+  }
+
+  /** Test seam: the supplied HTTP client is borrowed, with no hidden executor allocation. */
   OpenAiCompatController(
       HttpClient httpClient, IntSupplier llamaServerPortSupplier, Telemetry telemetry) {
-    this.httpClient = httpClient;
+    foregroundHttp = httpClient;
+    backgroundHttp = httpClient;
+    foregroundOwner = null;
+    backgroundOwner = null;
     this.llamaServerPortSupplier = llamaServerPortSupplier;
     this.telemetry = telemetry;
+  }
+
+  @Override
+  public void close() {
+    if (foregroundOwner == null) return;
+    foregroundHttp.shutdownNow();
+    backgroundHttp.shutdownNow();
+    try { foregroundOwner.close(); } finally { backgroundOwner.close(); }
   }
 
   public void handleChatCompletions(Context ctx) {
@@ -150,7 +196,10 @@ public final class OpenAiCompatController {
 
     HttpResponse<InputStream> response;
     try {
-      response = httpClient.send(rb.build(), HttpResponse.BodyHandlers.ofInputStream());
+      HttpClient client = RequestEngineContext.get(ctx).urgency()
+          == io.justsearch.core.context.EngineContext.Urgency.BACKGROUND
+          ? backgroundHttp : foregroundHttp;
+      response = client.send(rb.build(), HttpResponse.BodyHandlers.ofInputStream());
     } catch (ConnectException ce) {
       respondOffline(ctx, "llama-server connect refused on port " + port);
       return;

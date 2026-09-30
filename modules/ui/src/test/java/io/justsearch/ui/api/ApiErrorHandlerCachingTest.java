@@ -47,7 +47,7 @@ final class ApiErrorHandlerCachingTest {
     MetricCatalog catalog =
         MetricCatalog.of(HeadApiMetricCatalog.NAMESPACE, HeadApiMetricCatalog.DEFINITIONS);
     try (var telemetry =
-        new LocalTelemetry(tempDir, 5_000, "test", "0", "metrics.ndjson", List.of(catalog))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tempDir, 5_000, "test", "0", "metrics.ndjson", List.of(catalog))) {
 
       ApiErrorHandler.recordError(telemetry, ApiErrorCode.NOT_FOUND, "/api/x");
       ApiErrorHandler.recordError(telemetry, ApiErrorCode.NOT_FOUND, "/api/x");
@@ -73,7 +73,7 @@ final class ApiErrorHandlerCachingTest {
     MetricCatalog catalog =
         MetricCatalog.of(HeadApiMetricCatalog.NAMESPACE, HeadApiMetricCatalog.DEFINITIONS);
     try (var telemetry =
-        new LocalTelemetry(tempDir, 5_000, "test", "0", "metrics.ndjson", List.of(catalog))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tempDir, 5_000, "test", "0", "metrics.ndjson", List.of(catalog))) {
 
       // First call populates the cache.
       ApiErrorHandler.recordError(telemetry, ApiErrorCode.NOT_FOUND, "/api/x");
@@ -103,7 +103,7 @@ final class ApiErrorHandlerCachingTest {
     // LocalTelemetry constructed without HeadApiMetricCatalog DEFINITIONS — buildCounter
     // throws on the first lookup; the cache stores null (absent) and recordError silently
     // returns. A WARN log should fire once, but we don't assert on log output.
-    try (var telemetry = new LocalTelemetry(tempDir, 5_000, "test", "0")) {
+    try (var telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tempDir, 5_000, "test", "0")) {
       // Three calls — first triggers the buildCounter exception; subsequent calls hit the
       // cached null. None should throw.
       ApiErrorHandler.recordError(telemetry, ApiErrorCode.NOT_FOUND, "/api/x");
@@ -122,7 +122,7 @@ final class ApiErrorHandlerCachingTest {
 
   @Test
   void nullCodeIsNoOp() throws Exception {
-    try (var telemetry = new LocalTelemetry(tempDir, 5_000, "test", "0")) {
+    try (var telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tempDir, 5_000, "test", "0")) {
       ApiErrorHandler.recordError(telemetry, null, "/api/anything");
     }
   }

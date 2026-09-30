@@ -75,8 +75,9 @@ final class HeadlessAppGpuAutoPopulateTest {
     // The augmented map carries gpu.layers=99 so contributeAutoDetected propagates
     // it at ord-150 alongside gpu.enabled.
     assertEquals("99", result.get(GPU_LAYERS_KEY), "augmented map should contain gpu.layers=99");
-    // Phase E: gpu.enabled mirrored to sysprop (so it survives ConfigStoreRebuilder
-    // + propagates to worker via WORKER_FORWARDED_PROPS).
+    // Phase E: gpu.enabled mirrored to sysprop, so it survives ConfigStoreRebuilder.
+    // (The mirror's second reason — -D forwarding to the Worker child — went with the
+    // child process at lane F stage A item A11.)
     assertEquals("true", System.getProperty(GPU_ENABLED_KEY));
     // Tempdoc 883 decision 4 slice 2: this used to assert "99" here too. The mirror is DELETED.
     // A sysprop puts this derived probe number at ordinal 500, above the user's own setting at

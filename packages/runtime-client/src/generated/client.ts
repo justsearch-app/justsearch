@@ -141,14 +141,14 @@ export type RuntimeManifestPublicChat = {
 
 export type RuntimeManifestPublicHead = {
   /** @pattern ^https?://(127\.0\.0\.1|localhost|\[::1\])(?::[0-9]+)?$ */
-  apiBaseUrl: string;
+  apiBaseUrl?: string;
   /**
      * @minimum 1
      * @maximum 65535
      */
-  apiPort: number;
+  apiPort?: number;
   buildStamp?: string;
-  readyAt: string;
+  readyAt?: string;
 };
 
 export type RuntimeManifestPublicMode = {
@@ -201,11 +201,6 @@ export const RuntimeManifestPublicWorkerState = {
 } as const;
 
 export type RuntimeManifestPublicWorker = {
-  /**
-     * @minimum 1
-     * @maximum 65535
-     */
-  grpcPort?: number;
   indexBasePath?: string;
   readyAt?: string;
   spawnError?: string;
@@ -226,7 +221,7 @@ export interface RuntimeManifestPublic {
   pid: number;
   reachability?: RuntimeManifestPublicReachability;
   runtimeContract?: RuntimeManifestPublicRuntimeContract;
-  schemaVersion: 1;
+  schemaVersion: 2;
   startedAt: string;
   worker?: RuntimeManifestPublicWorker;
   [key: string]: unknown;

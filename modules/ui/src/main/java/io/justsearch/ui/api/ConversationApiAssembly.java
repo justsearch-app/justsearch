@@ -69,16 +69,18 @@ final class ConversationApiAssembly {
     // lazily through a holder (live-only: a workflow tool is never invoked before the agent runs).
     final io.justsearch.app.services.conversation.WorkflowShapeRunner[] wfShapeRunnerHolder =
         new io.justsearch.app.services.conversation.WorkflowShapeRunner[1];
+    var workflowGateRegistry =
+        new io.justsearch.app.services.conversation.WorkflowGateRegistry();
     final io.justsearch.agent.api.registry.WorkflowToolRunner wfToolRunner =
         new io.justsearch.app.services.conversation.WorkflowToolRunnerImpl(
             io.justsearch.app.services.conversation.CoreWorkflowCatalog.catalog(),
-            (body, aud, sink) -> {
+            (body, aud, sink, engineContext, background) -> {
               io.justsearch.app.services.conversation.WorkflowShapeRunner r = wfShapeRunnerHolder[0];
               if (r == null) {
                 throw new IllegalStateException("WorkflowShapeRunner not yet wired");
               }
-              r.run(body, aud, sink);
-            });
+              r.run(body, aud, sink, engineContext, background);
+            }, workflowGateRegistry);
     Supplier<io.justsearch.agent.api.AgentService> rawAgentSupplier =
         b.agentService != null
             ? () -> b.agentService
@@ -331,8 +333,6 @@ final class ConversationApiAssembly {
     // engine, which is constructed below with this runner in its list.
     final io.justsearch.app.services.conversation.ConversationEngine[] engineHolder =
         new io.justsearch.app.services.conversation.ConversationEngine[1];
-    var workflowGateRegistry =
-        new io.justsearch.app.services.conversation.WorkflowGateRegistry();
     io.justsearch.app.services.conversation.WorkflowShapeRunner workflowShapeRunner = null;
     if (b.HeadAssembly != null) {
       var gatedExecutor =
@@ -356,7 +356,7 @@ final class ConversationApiAssembly {
               () -> b.HeadAssembly.substrate().operations().operations(),
               gatedExecutor,
               workflowGateRegistry,
-              sharedRunEvents);
+              sharedRunEvents, b.HeadAssembly.substrate().conversation().intentGateEvaluator());
       // Tempdoc 560 WS5 — publish the runner into the holder the workflow-tool bridge reads lazily.
       wfShapeRunnerHolder[0] = workflowShapeRunner;
     }
@@ -365,7 +365,7 @@ final class ConversationApiAssembly {
     shapeRunners.add(toolIteratingShapeRunner);
     shapeRunners.add(
         new io.justsearch.app.services.conversation.HierarchicalShapeRunner(
-            onlineAiSupplier, docsSupplier));
+            onlineAiSupplier, docsSupplier, b.engineAdmission));
     if (workflowShapeRunner != null) {
       shapeRunners.add(workflowShapeRunner);
     }
@@ -383,7 +383,7 @@ final class ConversationApiAssembly {
             onlineAiSupplier,
             // Slice 496 §3.B: file-backed ConversationStore for PERSISTENT shapes.
             // Store conversations alongside the index data (same parent directory).
-            conversationStore);
+            conversationStore, b.engineAdmission);
     // Tempdoc 560 Phase 2 — late-bind the engine into the workflow runner (LlmStep delegation).
     engineHolder[0] = conversationEngine;
     // Tempdoc 560 WS5 — the streaming workflow-as-tool runner is late-bound through the agentSupplier
@@ -406,7 +406,7 @@ final class ConversationApiAssembly {
                 ? b.HeadAssembly.substrate().conversation().intentGateEvaluator()
                 : null);
     AgentController agentController =
-        new AgentController(agentSupplier, conversationEngine, agentSseWriter, telemetry);
+        new AgentController(b.executors, agentSupplier, conversationEngine, agentSseWriter, telemetry);
     // Tempdoc 560 Phase 2 — the workflow approve/reject endpoints complete the runner's gates.
     agentController.setWorkflowGateRegistry(workflowGateRegistry);
     // Tempdoc 584/585 — the read sub-controller depends on the NARROW AgentRunQueries surface
@@ -416,7 +416,7 @@ final class ConversationApiAssembly {
     AgentToolsController agentToolsController =
         new AgentToolsController(agentSupplier, virtualOperationStore);
     ChatController chatController =
-        new ChatController(
+        new ChatController(b.executors,
             conversationEngine,
             new SseWriter(apiCatalog),
             telemetry,
@@ -430,7 +430,7 @@ final class ConversationApiAssembly {
     // sink-taking entry point rather than around it, so a mid-run failure reaches every observer of
     // the run instead of only the socket that started it.
     RunStreamController runStreamController =
-        new RunStreamController(runChannelRegistry, chatController);
+        new RunStreamController(b.executors, runChannelRegistry, chatController);
     io.justsearch.ui.api.mcp.McpProtocolHandler mcpProtocolHandler = null;
     if (registryPresent) {
       // Tempdoc 501 Phase 15: thread the runtime-manifest publisher through so the

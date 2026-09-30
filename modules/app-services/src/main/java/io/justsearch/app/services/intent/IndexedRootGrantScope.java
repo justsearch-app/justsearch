@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.intent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationRef;
 import java.io.IOException;
@@ -50,7 +52,7 @@ public final class IndexedRootGrantScope implements DurableGrantScope {
    * indexing service does not exist at substrate-init time, so the scope is constructed unbound and
    * bound later at agent-tool registration. Unbound reads as "cannot prove containment" ⇒ a confirm.
    */
-  private volatile Supplier<List<Path>> indexedRoots;
+  private volatile java.util.function.Function<EngineContext, List<Path>> indexedRoots;
 
   /**
    * @param governedOperations the operations whose durable grants are bounded by the indexed roots;
@@ -64,16 +66,16 @@ public final class IndexedRootGrantScope implements DurableGrantScope {
    * Late-bind the live indexed-root lookup. Before this runs, every governed invocation is treated as
    * unprovable containment (a confirm), so a wiring regression costs a prompt, not a silent grant.
    */
-  public void bindIndexedRoots(Supplier<List<Path>> roots) {
+  public void bindIndexedRoots(java.util.function.Function<EngineContext, List<Path>> roots) {
     this.indexedRoots = roots;
   }
 
   @Override
-  public boolean coversArguments(Operation op, String argumentsJson) {
+  public boolean coversArguments(Operation op, String argumentsJson, EngineContext engineContext) {
     if (op == null || !governedOperations.contains(op.id())) {
       return true; // containment is not a defined concept for this operation
     }
-    List<Path> roots = currentRoots();
+    List<Path> roots = currentRoots(engineContext);
     if (roots.isEmpty()) {
       // Unbound / throwing / empty roots — the adverse precondition. Cannot prove containment.
       return false;
@@ -91,13 +93,13 @@ public final class IndexedRootGrantScope implements DurableGrantScope {
   }
 
   /** The bound roots, or an empty list for every unavailability — unbound, throwing, null, empty. */
-  private List<Path> currentRoots() {
-    Supplier<List<Path>> supplier = this.indexedRoots;
+  private List<Path> currentRoots(EngineContext engineContext) {
+    java.util.function.Function<EngineContext, List<Path>> supplier = this.indexedRoots;
     if (supplier == null) {
       return List.of();
     }
     try {
-      List<Path> roots = supplier.get();
+      List<Path> roots = supplier.apply(engineContext);
       if (roots == null) {
         return List.of();
       }

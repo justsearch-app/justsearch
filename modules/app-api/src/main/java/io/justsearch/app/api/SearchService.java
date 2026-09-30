@@ -18,5 +18,5 @@ package io.justsearch.app.api;
  * <p>Stability: stable (API contract).
  */
 public interface SearchService {
-  SearchResponse search(SearchRequest request);
+  SearchResponse search(SearchRequest request, io.justsearch.core.context.EngineContext context);
 }

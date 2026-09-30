@@ -33,14 +33,15 @@ class DefaultAppFacadeTest {
             Map.of());
 
     SearchPort port =
-        intent -> {
+        (intent, engineContext) -> {
           assertEquals(10, intent.limit());
           assertEquals("text/plain", intent.filters().mime());
           return coreResult;
         };
 
-    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(port, new NoopTelemetry());
-    SearchResponse response = facade.workers().search().search(request);
+    try (HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), port, new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
+    SearchResponse response =
+        facade.workers().search().search(request, TestEngineContexts.internal());
 
     assertEquals(
         new SearchResponse(
@@ -49,6 +50,7 @@ class DefaultAppFacadeTest {
             new SearchResponse.Cursor("pit", "p1", 123L, Map.of()),
             Map.of()),
         response);
+    }
   }
 
   @Test
@@ -56,18 +58,26 @@ class DefaultAppFacadeTest {
     SearchRequest request = new SearchRequest(5, 0, false, null, null, List.of(), null);
     Result coreResult = new Result(List.of(), Map.of(), null, Map.of());
     SearchPort port =
-        intent -> {
+        (intent, engineContext) -> {
           assertEquals(new Query(5, 0, false, null, null, List.of(), null), intent);
           return coreResult;
         };
 
-    HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(port, new NoopTelemetry());
-    SearchResponse response = facade.workers().search().search(request);
+    try (HeadAssembly facade = HeadAssembly.bootForSearchPortOnly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(), port, new NoopTelemetry(), org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class))) {
+    SearchResponse response =
+        facade.workers().search().search(request, TestEngineContexts.internal());
     assertNotNull(response);
+    }
   }
 
   private static final class NoopTelemetry implements Telemetry {
     @Override
     public void close() {}
+  }
+
+  private static io.justsearch.app.api.operations.OperationStore mockOperationStore() {
+    var store = org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class);
+    org.mockito.Mockito.when(store.subscribeCompletions(org.mockito.ArgumentMatchers.any())).thenReturn(() -> {});
+    return store;
   }
 }

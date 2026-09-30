@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -10,11 +11,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.grpc.ManagedChannel;
-import io.grpc.Server;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.stub.StreamObserver;
 import io.javalin.http.Context;
 import io.javalin.http.sse.SseClient;
 import io.justsearch.app.api.IndexingService;
@@ -25,22 +21,25 @@ import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
 import io.justsearch.app.services.registry.operations.handlers.CancelIndexingJobHandler;
 import io.justsearch.app.services.registry.operations.handlers.ResolvePathHashHandler;
 import io.justsearch.app.services.registry.operations.handlers.RetryIndexingJobHandler;
+import io.justsearch.app.services.worker.IndexingJobsSource;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.RemoteIndexingJobsBridge;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.agent.api.registry.HandlerRegistry;
 import io.justsearch.agent.api.registry.OperationDispatcher;
 import io.justsearch.agent.api.registry.OperationResult;
-import io.justsearch.ipc.IngestServiceGrpc;
 import io.justsearch.ipc.IndexingJobsDelta;
 import io.justsearch.ipc.IndexingJobsFrame;
 import io.justsearch.ipc.IndexingJobsSnapshot;
-import io.justsearch.ipc.SubscribeIndexingJobsRequest;
 import io.justsearch.telemetry.Telemetry;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,7 +50,7 @@ import org.junit.jupiter.api.Test;
  * with no live backend:
  *
  * <pre>
- * in-process gRPC server          (stand-in for worker's GrpcIngestService)
+ * StubIndexingJobsSource          (stand-in for the index half's frame producer)
  *      ↓ frames
  * RemoteIndexingJobsBridge        (head-side translator)
  *      ↓ Delta events
@@ -71,13 +70,46 @@ import org.junit.jupiter.api.Test;
  * {@code core.resolve-path-hash} through a real {@link OperationDispatcher}
  * with a stub {@link IndexingService}, mirroring the production
  * {@code OperationsController} dispatch path.
+ *
+ * <p><b>Why the top of the chain is no longer an in-process gRPC server.</b> Lane F stage A item
+ * A14 deleted the {@code IngestService} service block from
+ * {@code modules/ipc-common/src/main/proto/indexing.proto}, so {@code IngestServiceGrpc} is not
+ * generated any more and that server cannot be stood up. Nothing below the top of the chain
+ * changes: {@link RemoteIndexingJobsBridge} takes a {@code Supplier<IndexingJobsSource>}
+ * (RemoteIndexingJobsBridge.java:107) and asks it for frames (IndexingJobsSource.java:26), so the
+ * queued frames — still real {@code io.justsearch.ipc} protos, whose messages survive at
+ * {@code indexing.proto:1425/1412/1417} — are handed to {@code onFrame} directly instead of being
+ * round-tripped through a channel. The registry, controller and SSE legs are untouched.
  */
 @DisplayName("Slice 445 substrate integration")
 final class IndexingJobsSubstrateIntegrationTest {
 
-  private Server grpcServer;
-  private ManagedChannel grpcChannel;
-  private StubIndexingJobsService stubService;
+  @org.junit.jupiter.api.io.TempDir java.nio.file.Path operationDirectory;
+  private io.justsearch.app.observability.operations.SqliteOperationStore operationStore;
+  private io.justsearch.app.api.operations.OperationAttemptRunner attempts;
+
+  @BeforeEach
+  void openOperationRunner() throws Exception {
+    operationStore = new io.justsearch.app.observability.operations.SqliteOperationStore(
+        operationDirectory.resolve("operations.db"));
+    attempts = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(
+        operationStore, Clock.systemUTC(), java.util.Set.of());
+  }
+
+  @AfterEach
+  void closeOperationRunner() throws Exception {
+    if (operationStore != null) operationStore.close();
+  }
+
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
+
+  private StubIndexingJobsSource stubService;
   private RemoteIndexingJobsBridge bridge;
   private IndexingJobsChangeRegistry changeRegistry;
   private IndexingJobsStreamController controller;
@@ -85,17 +117,11 @@ final class IndexingJobsSubstrateIntegrationTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    String name = InProcessServerBuilder.generateName();
-    stubService = new StubIndexingJobsService();
-    grpcServer =
-        InProcessServerBuilder.forName(name)
-            .directExecutor()
-            .addService(stubService)
-            .build()
-            .start();
-    grpcChannel = InProcessChannelBuilder.forName(name).directExecutor().build();
-    var asyncStub = IngestServiceGrpc.newStub(grpcChannel);
-    bridge = new RemoteIndexingJobsBridge(() -> asyncStub);
+    stubService = new StubIndexingJobsSource();
+    // Lane F item A6 moved the bridge onto an IndexingJobsSource; item A14 deleted the gRPC
+    // service that used to be one. The fake IS the source, so the substrate below it is exercised
+    // end to end exactly as before.
+    bridge = new RemoteIndexingJobsBridge(processExecutors, () -> stubService);
     changeRegistry = new IndexingJobsChangeRegistry();
 
     // Wire bridge → registry forwarding (mirrors HeadAssembly line-for-line).
@@ -117,21 +143,16 @@ final class IndexingJobsSubstrateIntegrationTest {
 
     telemetry = mock(Telemetry.class);
     controller =
-        new IndexingJobsStreamController(changeRegistry, bridge, telemetry, Clock.systemUTC());
+        new IndexingJobsStreamController(
+            processExecutors,
+              changeRegistry, bridge, telemetry, Clock.systemUTC());
   }
 
   @AfterEach
-  void tearDown() throws InterruptedException {
+  void tearDown() {
     if (controller != null) controller.shutdown();
     if (bridge != null) bridge.stop();
-    if (grpcChannel != null) {
-      grpcChannel.shutdownNow();
-      grpcChannel.awaitTermination(2, TimeUnit.SECONDS);
-    }
-    if (grpcServer != null) {
-      grpcServer.shutdownNow();
-      grpcServer.awaitTermination(2, TimeUnit.SECONDS);
-    }
+    processExecutors.close();
   }
 
   @Test
@@ -250,38 +271,38 @@ final class IndexingJobsSubstrateIntegrationTest {
     IndexingService stub =
         new IndexingService() {
           @Override
-          public Map<String, Object> resolvePathHash(String pathHash) {
+          public Map<String, Object> resolvePathHash(String pathHash, EngineContext engineContext) {
             captured.put("resolve", pathHash);
             return Map.of("found", true, "path", "/abs/p.txt", "lastSeenAtMs", 42L);
           }
 
           @Override
-          public Map<String, Object> cancelIndexingJob(String pathHash) {
+          public Map<String, Object> cancelIndexingJob(String pathHash, EngineContext engineContext) {
             captured.put("cancel", pathHash);
             return Map.of("cancelled", true, "previousState", "PROCESSING");
           }
 
           @Override
-          public Map<String, Object> retryIndexingJob(String pathHash) {
+          public Map<String, Object> retryIndexingJob(String pathHash, EngineContext engineContext) {
             captured.put("retry", pathHash);
             return Map.of("retried", true, "previousState", "FAILED");
           }
 
           @Override
-          public List<java.nio.file.Path> getWatchedPaths() {
+          public List<java.nio.file.Path> getWatchedPaths(EngineContext engineContext) {
             return List.of();
           }
 
           @Override
-          public void addWatchedPath(java.nio.file.Path path) {}
+          public void addWatchedPath(java.nio.file.Path path, EngineContext engineContext) {}
 
           @Override
-          public int removeWatchedPath(java.nio.file.Path path) {
+          public int removeWatchedPath(java.nio.file.Path path, EngineContext engineContext) {
             return 0;
           }
 
           @Override
-          public void flush() {}
+          public void flush(EngineContext engineContext) {}
         };
 
     HandlerRegistry handlers = new HandlerRegistry();
@@ -290,14 +311,14 @@ final class IndexingJobsSubstrateIntegrationTest {
     handlers.register(CoreOperationCatalog.RESOLVE_PATH_HASH, new ResolvePathHashHandler(() -> stub));
 
     OperationDispatcher dispatcher =
-        new OperationExecutorImpl(handlers, entry -> {}, Clock.systemUTC());
+        new OperationExecutorImpl(attempts, new io.justsearch.app.engine.EngineAdmissionController(), handlers, entry -> {}, Clock.systemUTC());
 
     var catalog = new CoreOperationCatalog();
 
     // resolve
     var resolveOp = catalog.findById(CoreOperationCatalog.RESOLVE_PATH_HASH).orElseThrow();
     OperationResult resolveResult =
-        dispatcher.dispatch(resolveOp, "{\"pathHash\":\"hash-1\"}");
+        dispatcher.dispatch(resolveOp, "{\"pathHash\":\"hash-1\"}", TestRequestContexts.browser());
     assertTrue(resolveResult.success(), () -> "resolve: " + resolveResult.message());
     assertEquals("hash-1", captured.get("resolve"));
     assertEquals("/abs/p.txt", resolveResult.structuredData().get("path"));
@@ -305,14 +326,14 @@ final class IndexingJobsSubstrateIntegrationTest {
     // cancel
     var cancelOp = catalog.findById(CoreOperationCatalog.CANCEL_INDEXING_JOB).orElseThrow();
     OperationResult cancelResult =
-        dispatcher.dispatch(cancelOp, "{\"pathHash\":\"hash-2\"}");
+        dispatcher.dispatch(cancelOp, "{\"pathHash\":\"hash-2\"}", TestRequestContexts.browser());
     assertTrue(cancelResult.success(), () -> "cancel: " + cancelResult.message());
     assertEquals("hash-2", captured.get("cancel"));
 
     // retry
     var retryOp = catalog.findById(CoreOperationCatalog.RETRY_INDEXING_JOB).orElseThrow();
     OperationResult retryResult =
-        dispatcher.dispatch(retryOp, "{\"pathHash\":\"hash-3\"}");
+        dispatcher.dispatch(retryOp, "{\"pathHash\":\"hash-3\"}", TestRequestContexts.browser());
     assertTrue(retryResult.success(), () -> "retry: " + retryResult.message());
     assertEquals("hash-3", captured.get("retry"));
   }
@@ -348,23 +369,40 @@ final class IndexingJobsSubstrateIntegrationTest {
     assertTrue(sent.size() > beforeIdx, "no frame arrived in 2s");
   }
 
-  /** Stub gRPC service: buffers frames before subscribe, flushes on subscribe. */
-  private static final class StubIndexingJobsService
-      extends IngestServiceGrpc.IngestServiceImplBase {
+  /**
+   * Stub frame producer: buffers frames before subscribe, flushes on subscribe. Implements
+   * {@link IndexingJobsSource} directly — the seam {@link RemoteIndexingJobsBridge} actually
+   * consumes (RemoteIndexingJobsBridge.java:107) — because item A14 removed the gRPC service this
+   * used to extend.
+   *
+   * <p><b>Delivery is deliberately synchronous on the subscribing/queuing thread</b>, replacing
+   * the {@code directExecutor()} the in-process gRPC server and channel were built with. The
+   * assertions after {@code bridge.start().get(2, SECONDS)} read the bridge's cached snapshot
+   * immediately, so the buffered frames must have landed before {@code subscribe} returns.
+   */
+  private static final class StubIndexingJobsSource implements IndexingJobsSource {
 
     private final List<IndexingJobsFrame> pre = new ArrayList<>();
-    private final AtomicReference<StreamObserver<IndexingJobsFrame>> active =
-        new AtomicReference<>();
+    private final AtomicReference<Consumer<IndexingJobsFrame>> active = new AtomicReference<>();
+    /**
+     * Per-subscription "producer stopped" flag, set by the returned handle's {@code close()},
+     * which {@link RemoteIndexingJobsBridge#stop()} invokes. Frames queued after a stop are
+     * dropped here, exactly as the gRPC StreamObserver adapter dropped them.
+     */
+    private final AtomicReference<AtomicBoolean> stopped = new AtomicReference<>();
 
     @Override
-    public void subscribeIndexingJobs(
-        SubscribeIndexingJobsRequest request, StreamObserver<IndexingJobsFrame> obs) {
+    public KnowledgeClient.IndexingJobsStream subscribe(
+        Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted) {
       synchronized (this) {
-        active.set(obs);
+        AtomicBoolean flag = new AtomicBoolean(false);
+        stopped.set(flag);
+        active.set(onFrame);
         for (var f : pre) {
-          obs.onNext(f);
+          deliver(f);
         }
         pre.clear();
+        return () -> flag.set(true);
       }
     }
 
@@ -373,9 +411,8 @@ final class IndexingJobsSubstrateIntegrationTest {
         var snap = IndexingJobsSnapshot.newBuilder().addAllItems(items).build();
         var frame =
             IndexingJobsFrame.newBuilder().setSnapshot(snap).setSeq(seq).build();
-        var obs = active.get();
-        if (obs != null) {
-          obs.onNext(frame);
+        if (active.get() != null) {
+          deliver(frame);
         } else {
           pre.add(frame);
         }
@@ -385,13 +422,20 @@ final class IndexingJobsSubstrateIntegrationTest {
     void queueDelta(long seq, IndexingJobsDelta delta) {
       synchronized (this) {
         var frame = IndexingJobsFrame.newBuilder().setDelta(delta).setSeq(seq).build();
-        var obs = active.get();
-        if (obs != null) {
-          obs.onNext(frame);
+        if (active.get() != null) {
+          deliver(frame);
         } else {
           pre.add(frame);
         }
       }
+    }
+
+    private void deliver(IndexingJobsFrame frame) {
+      AtomicBoolean flag = stopped.get();
+      if (flag == null || flag.get()) {
+        return;
+      }
+      active.get().accept(frame);
     }
   }
 }

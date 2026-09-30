@@ -125,6 +125,7 @@ public final class StreamingCitationMatcher implements StreamConsumer {
 
   @Override
   public StreamConsumerResult onDone(String fullText, ConversationContext ctx) {
+    var engineContext = ctx.engineContext();
     if (fullText == null || fullText.isBlank()) {
       return StreamConsumerResult.empty();
     }
@@ -135,7 +136,7 @@ public final class StreamingCitationMatcher implements StreamConsumer {
     try {
       CitationMatchResult result =
           documents
-              .matchCitationsAgainst(fullText, sources, threshold)
+              .matchCitationsAgainst(fullText, sources, threshold, engineContext)
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       if (result == null) {

@@ -16,6 +16,7 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Semaphore;
 import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
@@ -282,21 +283,56 @@ public final class NativeSessionHandle implements SessionHandle {
         // ort.session.semaphore_wait_us is supposed to measure. Microsecond
         // resolution captures the no-contention fast path.
         long waitStartNs = System.nanoTime();
-        gpuInferenceSemaphore.acquireUninterruptibly();
-        long waitUs = (System.nanoTime() - waitStartNs) / 1_000L;
-        events.onSemaphoreWait(consumerName, waitUs);
-        // Re-check after acquiring: GPU may have been released while we waited
-        if (gpuSessionReleasing || session != gpuSession) {
-          gpuInferenceSemaphore.release();
-          OrtSession cpuFallback = getCpuSession();
-          leaseSpan.setAttribute("lease.mode", "cpu");
-          // Tempdoc 414: silent line-260 fallback now first-class.
-          events.onTransition(new TransitionReason.GpuFallbackTaken(consumerName));
-          return new Lease(cpuFallback, null, () -> {}, /* isCpu= */ true, ortRunRecorder);
+        boolean acquired = false;
+        try {
+          try {
+            gpuInferenceSemaphore.acquire();
+            acquired = true;
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            CancellationException cancellation =
+                new CancellationException("GPU lease acquisition interrupted");
+            cancellation.initCause(interrupted);
+            throw cancellation;
+          }
+          // An interrupt can race with a successful acquire. Do not construct a lease for a
+          // cancelled caller; the finally block releases this permit, while an already-issued
+          // lease remains responsible for its own permit until its native call has exited.
+          if (Thread.currentThread().isInterrupted()) {
+            throw new CancellationException("GPU lease acquisition interrupted");
+          }
+          long waitUs = (System.nanoTime() - waitStartNs) / 1_000L;
+          events.onSemaphoreWait(consumerName, waitUs);
+          if (Thread.currentThread().isInterrupted()) {
+            throw new CancellationException("GPU lease acquisition interrupted");
+          }
+          // Re-check after acquiring: GPU may have been released while we waited
+          if (gpuSessionReleasing || session != gpuSession) {
+            gpuInferenceSemaphore.release();
+            acquired = false;
+            OrtSession cpuFallback = getCpuSession();
+            leaseSpan.setAttribute("lease.mode", "cpu");
+            // Tempdoc 414: silent line-260 fallback now first-class.
+            events.onTransition(new TransitionReason.GpuFallbackTaken(consumerName));
+            return new Lease(cpuFallback, null, () -> {}, /* isCpu= */ true, ortRunRecorder);
+          }
+          leaseSpan.setAttribute("lease.mode", "gpu");
+          Lease lease =
+              new Lease(
+                  session,
+                  gpuRunOptions,
+                  gpuInferenceSemaphore::release,
+                  /* isCpu= */ false,
+                  ortRunRecorder);
+          acquired = false;
+          return lease;
+        } finally {
+          if (acquired) {
+            // No Lease owns this permit on an exceptional path. An active native lease reaches
+            // this point with acquired=false and remains responsible for its own release.
+            gpuInferenceSemaphore.release();
+          }
         }
-        leaseSpan.setAttribute("lease.mode", "gpu");
-        return new Lease(
-            session, gpuRunOptions, gpuInferenceSemaphore::release, /* isCpu= */ false, ortRunRecorder);
       }
       leaseSpan.setAttribute("lease.mode", "cpu");
       return new Lease(session, null, () -> {}, /* isCpu= */ true, ortRunRecorder);

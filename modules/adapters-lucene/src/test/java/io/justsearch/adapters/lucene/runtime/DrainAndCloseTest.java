@@ -28,7 +28,7 @@ import org.junit.jupiter.api.io.TempDir;
  * IllegalStateException); (3) close runs even if the queue does not drain in time
  * (best-effort).
  */
-class DrainAndCloseTest {
+class DrainAndCloseTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -41,7 +41,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
     // Index 5 docs without committing (so they're pending).
@@ -67,7 +67,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     try {
       reopened.commitOps().maybeRefreshBlocking();
@@ -87,7 +87,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     try {
       // Set the drain flag manually (drainAndClose does this then awaits queue → 0).
@@ -126,7 +126,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     long commitsBefore = runtime.session().commitCount.get();
     // No pending writes. drainAndClose should be a fast no-op + close (no commit, item 6).
@@ -161,7 +161,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
     // Start a writer that holds the readLock for ~200ms by simulating slow validation
@@ -209,7 +209,7 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
     try {
       reopened.commitOps().maybeRefreshBlocking();
@@ -223,12 +223,11 @@ class DrainAndCloseTest {
   }
 
   /**
-   * Item 13: drainAndClose with a timeout that expires before in-flight writes complete still
-   * closes the runtime (best-effort) and logs a warn. Asserts close runs and any post-close
-   * write attempt sees a closed-runtime ISE.
+   * C1 close correction supersedes item 13's close-anyway contract: a timed-out write keeps
+   * its writer alive and the retained runtime can be closed after actual write exit.
    */
   @Test
-  void drainAndCloseTimeoutClosesAnyway() throws Exception {
+  void drainAndCloseTimeoutRetainsWriterUntilRetry() throws Exception {
     Path indexPath = tempDir.resolve("drain-timeout");
     Files.createDirectories(indexPath);
     var runtime =
@@ -236,11 +235,11 @@ class DrainAndCloseTest {
                 FieldCatalogDef.forTesting(4),
                 new SsotCommitMetadataSource(),
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(indexPath)
+            .atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
             .open();
 
     // Acquire the readLock manually from another thread and hold it longer than the drain timeout.
-    // drainAndClose must give up waiting for the writeLock, log a warn, and still close.
+    // drainAndClose must give up waiting without invalidating the live writer.
     CountDownLatch lockHeld = new CountDownLatch(1);
     CountDownLatch releaseLock = new CountDownLatch(1);
     Thread lockHolder =
@@ -262,17 +261,34 @@ class DrainAndCloseTest {
     assertTrue(lockHeld.await(2, TimeUnit.SECONDS), "lock holder should acquire readLock");
 
     long startNanos = System.nanoTime();
-    runtime.drainAndClose(Duration.ofMillis(100));
+    var snapshot = runtime.session().snapshot;
+    var starts = new java.util.concurrent.atomic.AtomicInteger();
+    var completions = new java.util.concurrent.atomic.AtomicInteger();
+    var timeouts = new java.util.concurrent.atomic.AtomicInteger();
+    runtime.session().telemetryEvents = new LuceneRuntimeTypes.TelemetryEvents() {
+      @Override public void onSwapStart(SwapReason reason) { starts.incrementAndGet(); }
+      @Override public void onSwapComplete(long durationMs, SwapReason reason) { completions.incrementAndGet(); }
+      @Override public void onDrainTimeout(long elapsedMs, long writesStillPending) { timeouts.incrementAndGet(); }
+    };
+    assertThrows(IllegalStateException.class, () -> runtime.drainAndClose(Duration.ofMillis(100)));
     long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
 
-    // Drain returned within ~timeout (with some slack); close ran best-effort.
+    // Drain returned within its timeout, retaining ownership for the next close attempt.
     assertTrue(
         elapsedMs < 1000,
         "drainAndClose should return promptly after timeout, took: " + elapsedMs + "ms");
-    // Snapshot is now null (close ran).
-    assertNull(runtime.session().snapshot, "snapshot should be null after best-effort close");
+    assertSame(snapshot, runtime.session().snapshot);
+    assertTrue(snapshot.writer().isOpen(), "the in-flight write still owns the writer");
+    assertEquals(1, starts.get());
+    assertEquals(1, completions.get(), "a failed drain still terminates its telemetry attempt");
+    assertEquals(1, timeouts.get());
 
     releaseLock.countDown();
     lockHolder.join(2_000L);
+    runtime.drainAndClose(Duration.ofSeconds(1));
+    assertNull(runtime.session().snapshot);
+    assertFalse(snapshot.writer().isOpen());
+    assertEquals(2, starts.get());
+    assertEquals(2, completions.get());
   }
 }

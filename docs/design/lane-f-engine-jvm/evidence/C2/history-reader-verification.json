@@ -1,0 +1,827 @@
+{
+  "revision": "7b5248442 + final durable reader and invocation identity",
+  "command": "./gradlew.bat :modules:app-observability:test --tests '*OperationHistoryReadTest' --tests '*OperationHistoryStoreTest' --tests '*OperationHistoryResourceCatalogTest' --tests '*OperationHistorySchemaTest' --tests '*ActionLedgerChangeRegistryTest' :modules:app-services:test --tests '*OperationExecutorImplTest' --tests '*PreparedOperationDispatchTest' --tests '*OperationHistoryWireContractConformanceTest' --tests '*OperationSubstrateInitTest' :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' :modules:ui:test --tests '*OperationHistoryControllerTest' --tests '*OperationOutcomeTransportTest' --tests '*ActionLedgerControllerTest' :modules:app-api:pmdMain :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:app-launcher:pmdTest :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava :modules:ui:syncSsotSchemas :modules:ui:installDist :modules:app-api:spotlessCheck :modules:app-observability:spotlessCheck :modules:app-services:spotlessCheck :modules:app-launcher:spotlessCheck :modules:ui:spotlessCheck --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 213,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 33
+  },
+  "tasks": [
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 38,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 118,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 8
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 15
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    }
+  ],
+  "base": "7b5248442",
+  "sources": [
+    {
+      "path": "SSOT/schemas/operation-history-entry.v1.json",
+      "bytes": 1523,
+      "sha256": "38bb2207adc519083444e3906151c2b3441cd849dc04f62c8c00ae6a0a47b82f"
+    },
+    {
+      "path": "contracts/wire/operation_history.proto",
+      "bytes": 4742,
+      "sha256": "1c26dc76c26df5338280562d90f7ed500bca8054cf043a922712bb8d4f279e90"
+    },
+    {
+      "path": "governance/operation-surfaces.v1.json",
+      "bytes": 55807,
+      "sha256": "2c1f21ee4c3a6b6b6d6627a6487a5437778f33834fb838c0fdd8948ee800bd69"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationHistoryRow.java",
+      "bytes": 1854,
+      "sha256": "16bfd950c7ffaf7fda9f4cd68c5e16c9937d2be180ce5ac979afd55814cd9363"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+      "bytes": 5909,
+      "sha256": "eea981c63802594c97f64fb51dfbd8d2ba77de09e616577f65597a9c42689d7c"
+    },
+    {
+      "path": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
+      "bytes": 7452,
+      "sha256": "55fe73968c68cedeb44fdc95e77f9504501c480357436b2c37da5d3ee1d45df3"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerProjection.java",
+      "bytes": 17928,
+      "sha256": "564c7fd5c6355e0c4d7d957d6a6fae7c740af28e41cff9ac24f7041af400b9fd"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryEntry.java",
+      "bytes": 2299,
+      "sha256": "a323ed48c19d55f8726bbd837d8f50dfd09cd99d47607fa82f66ee4ebedb89a5"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryProjection.java",
+      "bytes": 1959,
+      "sha256": "50617691ac668926f0672e9c320961eb1cb278df922d1d37b6bafa8f806f60c8"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryResourceCatalog.java",
+      "bytes": 3254,
+      "sha256": "7b5a22f20991ae518d91facff060b5a0f8285ffd7857b8e46f5c0f9f9aae7b07"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryStore.java",
+      "bytes": 2519,
+      "sha256": "17f62e918c82f2c75ace5491fcde07ad85729ca2e20dc1d9e47dc7d021a3f824"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "bytes": 41238,
+      "sha256": "a704e1923ee87fd59712b4c4e07510d3bf538f0169237148c8fd68e3830508cc"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistryTest.java",
+      "bytes": 10769,
+      "sha256": "1b6e21058105eb007f7e3f887d51cb8e5c69ee33f8dd363bfa4f6f68ae5ea512"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryReadTest.java",
+      "bytes": 9356,
+      "sha256": "25de92ccbecc4ca62a3e979e15e67f05b9e25f30ee8b2ef532644b9a31b89d77"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryResourceCatalogTest.java",
+      "bytes": 4004,
+      "sha256": "0cf20758a0dcddf124d1a6f2826f6de07b8a4fbb4950cbd691e261b4d49d7cd1"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryStoreTest.java",
+      "bytes": 6267,
+      "sha256": "be2b2c537d023b3a699127b99ef24cbb127776b02b2b15de1067cc0d33e914fc"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+      "bytes": 94443,
+      "sha256": "11a9ab5a606979d281c2b596beda108874228f31f75e462323f5952029ebdb29"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OperationSubstrateInit.java",
+      "bytes": 21565,
+      "sha256": "801db97a0b0c8587442d752b9af7ad4346ea30a7e5bbd978d0ec47776c106dc3"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/SubstratePhase.java",
+      "bytes": 16665,
+      "sha256": "971e7a3bc4b9703b2a7f4ce23470331172de625536d736774eea648bb8a43ca3"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+      "bytes": 53716,
+      "sha256": "5fc09a002279d5c206524f92019919754fd5c7f63563bd95a1a82a70256f6dfa"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/OperationSubstrateInitTest.java",
+      "bytes": 2598,
+      "sha256": "ca3e47dea825d610df03a77353a409b93daa062b7fee0a18829aa0029bc00bf4"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/wire/OperationHistoryWireContractConformanceTest.java",
+      "bytes": 4836,
+      "sha256": "687b4b85e5848fff687b044d7b6b344bfd6ca3798e8c95a22af0a499e1aa8bcb"
+    },
+    {
+      "path": "modules/ui/src/main/resources/SSOT/schemas/operation-history-entry.v1.json",
+      "bytes": 1523,
+      "sha256": "38bb2207adc519083444e3906151c2b3441cd849dc04f62c8c00ae6a0a47b82f"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/ActionLedgerControllerTest.java",
+      "bytes": 15370,
+      "sha256": "cd878cab8fb35e6f47d187d80ec11eaef750548015b2d5cabcc79785c65dab1f"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/OperationHistoryControllerTest.java",
+      "bytes": 5022,
+      "sha256": "071a2e96522333ff89ec5ad9bec0ac84a24ef76129dbdb605bbef054e5cda39d"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/OperationOutcomeTransportTest.java",
+      "bytes": 6143,
+      "sha256": "32e1208fe991cedeeb6b6ea7d94365f3e2696ee3cf3adb52f5011b40de79882d"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-4-history-reader-gates1140.sarif",
+      "bytes": 1267,
+      "sha256": "4c955ff9ea5fe9285659e87074932ce10ac94e45ec5c78f442f9dd43e66bce21"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-gates1140.txt",
+      "bytes": 175,
+      "sha256": "98baf95eedf5002b44cdfd7f2bae442a7b4313f2154e164879df6d558bee9a55"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-negative1138-counts.json",
+      "bytes": 741,
+      "sha256": "d21669bd04f5be511ed7838566319dadf330b7dc4531218f09efad731f5a0fc0"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-negative1138-projection.java",
+      "bytes": 17928,
+      "sha256": "564c7fd5c6355e0c4d7d957d6a6fae7c740af28e41cff9ac24f7041af400b9fd"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-negative1138-store.java",
+      "bytes": 41238,
+      "sha256": "a704e1923ee87fd59712b4c4e07510d3bf538f0169237148c8fd68e3830508cc"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-negative1138-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "39402778600bf51bd24b0506d8e2dc95b6de225e3e280cf0448053279b15fda6"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-negative1138-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryReadTest.xml",
+      "bytes": 3228,
+      "sha256": "ccf64f7dc03bb42c5b69efba139365fe83cc8b6dc054f8b31441bfdfbad8a5fd"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-negative1138.txt",
+      "bytes": 35591,
+      "sha256": "a1e39164e97e748808a184a8985554d56c6aa0db4db04e1526f2a18733a95611"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-register-negative1135.sarif",
+      "bytes": 2147,
+      "sha256": "fda4d50268805820931a722f30ed317ea67c548f1a51013d8bd7d6b5b96c9e4f"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-register-negative1135.txt",
+      "bytes": 137,
+      "sha256": "354645265a95ba2ca6ccf365cbf2a4cb74c9172c2354b6969e177082ec823d79"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-schema-baseline1137.json",
+      "bytes": 1457,
+      "sha256": "a4bd1ca4e9e1854dac317dbfa57f94258feac8545a1e81d111fff4f84d44c151"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-schema-before1137.json",
+      "bytes": 1457,
+      "sha256": "a4bd1ca4e9e1854dac317dbfa57f94258feac8545a1e81d111fff4f84d44c151"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-schema1137-counts.json",
+      "bytes": 462,
+      "sha256": "d91a3d0bfad283c68e82387bbb049d0ab305710ddc7dae6777514b0600206ca9"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-schema1137-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "a8e964dcbe175d60a8af57c35da44987dd0dac1f73f5e0b197c2fa5cda75eb05"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-schema1137-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistorySchemaTest.xml",
+      "bytes": 12640,
+      "sha256": "c816b1a181ebbdf82a0ce959c3f79f2c0ba6cf448230d59c7efb531a83e0fd0e"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-schema1137.txt",
+      "bytes": 4644,
+      "sha256": "43edbaab86f068a51aa5db42df3f6502ff98dc041ef031a166bf8f9d6c059aa5"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-wire-negative1131-counts.json",
+      "bytes": 466,
+      "sha256": "1b5411ca90ddc1061a82a4d83671f861bcbeb666d0e37241bfa35fedffb32bc2"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-wire-negative1131-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22099,
+      "sha256": "db41e290c40acde22ddc300fe53e3389811eb9d8161b6f31b9333d41067602ce"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-wire-negative1131-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169419,
+      "sha256": "3d5dafec4bd03325ea272a9219630d970e64db74499c191c8899329ca9315d44"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-wire-negative1131-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141482,
+      "sha256": "745c3005805b5a6552af114610e06643a08b8a6129602707a1f6132469c6df72"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-wire-negative1131-xml/app-services/test/TEST-io.justsearch.app.services.wire.OperationHistoryWireContractConformanceTest.xml",
+      "bytes": 2396,
+      "sha256": "3d1f47a13ce72092c2814e4f898548da5a2224f73029685bde09bb0b99226b7b"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-wire-negative1131-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "b23d706acb30f5b2dd6ded11d7539fa92ee7687ea625aa29bcfd50aee5edbdb8"
+    },
+    {
+      "path": "tmp/c2-4-history-reader-wire-negative1131.txt",
+      "bytes": 42330,
+      "sha256": "ffdbf520c0431e653d2b5eb64329868fdf04255f616e2356ed42ea959121285a"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-counts.json",
+      "bytes": 677,
+      "sha256": "86d4f43ff7acd5679bcf35b613c4371af41b4a1a58efd7171528d6d77398d05c"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.AttributesUseRuleTest.xml",
+      "bytes": 477,
+      "sha256": "abe9df6d49798d6def7319d612ebf8affefc468cee9c25f76150aed346d1d7c3"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.BoundaryRulesTest.xml",
+      "bytes": 481,
+      "sha256": "7b96613ee9395d0a61995295056ca45b3d5e49ed32b9538a3e18391aed18ccf0"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ClosurePropertyTest.xml",
+      "bytes": 467,
+      "sha256": "de6c6d15775c24f2293535a54d4f519decc63b5c7c9e9bda2adb95bd2e96c8f9"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.EnvRegistryDirectReadTest.xml",
+      "bytes": 494,
+      "sha256": "580be35ae08f2938690f8ca82e41a07088b79704d4e53643fa8c13ea61fde876"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExecutorArchitectureTest.xml",
+      "bytes": 483,
+      "sha256": "849a0a4fd12c9f9f6080aaa1e2af7dff98b83918a27f7eedf71a98fc040f3dc9"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExtractionParserConfinementTest.xml",
+      "bytes": 507,
+      "sha256": "d63fe67f015d94da55c785f541896f6a2e5334fa74465cd53808c5932b313412"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.GpuProbeAccessTest.xml",
+      "bytes": 576,
+      "sha256": "66c5945b305c8a2f0322472e91b6196976a2b95b2f3bf9ab69cc50ad10af9331"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.IndexWriterOwnershipTest.xml",
+      "bytes": 620,
+      "sha256": "df0e526790a90d18704cebed0d88e8b42283ff87f5d7fec7399ed57421015dc3"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LayeringEnforcementTest.xml",
+      "bytes": 2258,
+      "sha256": "ba988aa3aac74c065fb507f15f9452de69f6ba911d896e14b55af21da34b032c"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LibraryResolveHashOnlyCallerPin.xml",
+      "bytes": 657,
+      "sha256": "7578f7ef7e15b3b82716b931ffb85b7b685a5bb955600b1de5071b0eab08a6ff"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OperationStoreArchitectureTest.xml",
+      "bytes": 1042,
+      "sha256": "e344a1a58c81f3b95d43bbf5b7aa01bf9771da1d9a2418c5a9c0a84fade2b7ed"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OrtRunChokePointTest.xml",
+      "bytes": 489,
+      "sha256": "ec27ddab151261e767ee6212e8cd7736f7531feb60b387149ea5390ba9257c89"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.Slf4jOnlyRuleTest.xml",
+      "bytes": 471,
+      "sha256": "73f75b6230420cf95b7d72dc4525dd7b3d4572830160ed6d1c516cfd25337b95"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.VramDetectorAccessTest.xml",
+      "bytes": 480,
+      "sha256": "6493a55b1cbe2c1bc661eb6826496c01f2b326f60692bd50220ea189f646a89c"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/app-launcher/test/TEST-io.justsearch.app.launcher.WireShapeMandateTest.xml",
+      "bytes": 488,
+      "sha256": "74cd353ba49952e77f58438c93346bbbcef391d8aa3e2a976d77f2f049740155"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/ui/test/TEST-io.justsearch.ui.api.ActionLedgerControllerTest.xml",
+      "bytes": 3388,
+      "sha256": "61bb305d4f56c6373a025654956377839c457cf881765861074a19307d6d7600"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/ui/test/TEST-io.justsearch.ui.api.mcp.OperationOutcomeTransportTest.xml",
+      "bytes": 699,
+      "sha256": "15aa7f3a75da43b99ec6e7f69c41594062f4db7e45cb8fe538d0394c98aa61dd"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/ui/test/TEST-io.justsearch.ui.api.OperationHistoryControllerTest.xml",
+      "bytes": 1089,
+      "sha256": "c5e4db53b725c2c1a0aa067d8fb7fe94840b5066537c66ea1318890ce508b28e"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "2d8119bf3aacc7352b725ef07e05efa0ce208fe75aed5717d498b25c1c98aff6"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1134.txt",
+      "bytes": 52586,
+      "sha256": "4b2a175e6959bb137e629d3e33a7dcb6b71412c6d2ebde8a04f7c403383ca9b0"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-counts.json",
+      "bytes": 1088,
+      "sha256": "e7732b5aa8e58cb1527d6cfc167718bd1d9a075969138d943aa39e861498d064"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.AttributesUseRuleTest.xml",
+      "bytes": 481,
+      "sha256": "16c74bf3c6ff47f56430e735d7d6744224388064e11db90ca18bb2efe417ecc7"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.BoundaryRulesTest.xml",
+      "bytes": 481,
+      "sha256": "1a94fa2c6ada7f11e8dbb93b471c96126caa933117ee35ced2a3fbdeedf1bc9c"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ClosurePropertyTest.xml",
+      "bytes": 467,
+      "sha256": "bdc87dfe5f64feb0b5b54dc821e52a240916ef9097c2589a4669f680f756db12"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.EnvRegistryDirectReadTest.xml",
+      "bytes": 494,
+      "sha256": "5f180f6b503901e3a9c4927e9baf3fd9199d9f210995e942c6a2218447836a3a"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExecutorArchitectureTest.xml",
+      "bytes": 483,
+      "sha256": "abebf9b64558fe916261e1d9142caeb655b1e2bf4c3e459c27d9cfeff4c098c1"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExtractionParserConfinementTest.xml",
+      "bytes": 508,
+      "sha256": "eebf62ad3749d14906d572343ee9408dd922f6b5fe88807be9c608d9eb7ab915"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.GpuProbeAccessTest.xml",
+      "bytes": 576,
+      "sha256": "1ec508db58e808617ddedd74fc744bdf21143f9aaa6a7057d3a4ba649bb9b833"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.IndexWriterOwnershipTest.xml",
+      "bytes": 618,
+      "sha256": "7c832ef961c074f0a57d54d2055ca4e9db2d0e8d09028daa8a40b8dba7329147"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LayeringEnforcementTest.xml",
+      "bytes": 2261,
+      "sha256": "7af72556616f484406873ae489bcb8a0ff518490c4d31951607535bbb949c531"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LibraryResolveHashOnlyCallerPin.xml",
+      "bytes": 657,
+      "sha256": "1af20c1f802470a344572dc9c5d64aabee3393a95de0ade9cf0c121daf8341e7"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OperationStoreArchitectureTest.xml",
+      "bytes": 1042,
+      "sha256": "d418845b908aeecafb46c1957e6e4cffb5fa564efe88a3df6bb4355a25df810d"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OrtRunChokePointTest.xml",
+      "bytes": 485,
+      "sha256": "514e4d345586b96324ce4d6dabd77df7629f03f03c9a68ab26a1cfdbeb3dd3d5"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.Slf4jOnlyRuleTest.xml",
+      "bytes": 473,
+      "sha256": "97683f6c1bc1dfe03846818eb9ed4d93ac279a306075656b6754166fad0294ad"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.VramDetectorAccessTest.xml",
+      "bytes": 480,
+      "sha256": "fe44c7fbb6c15ea8874ff065251069281e9d86150cdf4c3644b402934ef50b45"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-launcher/test/TEST-io.justsearch.app.launcher.WireShapeMandateTest.xml",
+      "bytes": 488,
+      "sha256": "dfed3399d0d02c2ac5f9b9debcbfa1951b44870d62629c813021ec339bf1a959"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "dcce9ff1b2d6ee854647e86122946465f353e4696abeb08e05bb176dcbfa06d8"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionLedgerChangeRegistryTest.xml",
+      "bytes": 1504,
+      "sha256": "213549a516455db4e10959b1b9361795a4320bfbc7fc95b1c9ed19b1f66edf05"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryReadTest.xml",
+      "bytes": 1321,
+      "sha256": "e72b9abba2b3c81b6c06da288758235139fb463406b5568d4a92fb13b55a5b08"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryResourceCatalogTest.xml",
+      "bytes": 2427,
+      "sha256": "8e72368b4bd5e6c94406ee7277f38336e9df852e65f98d3423684057970a33db"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistorySchemaTest.xml",
+      "bytes": 20360,
+      "sha256": "b906996a2bc9202af94fad606fab5a9ab9fce69e54550414edf9399dff5b5ba7"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryStoreTest.xml",
+      "bytes": 2028,
+      "sha256": "d9dbe73c7a89f739035159b67d0dd4332fe3650e4c4be820fd0a8b25d24c4bdd"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-services/test/TEST-io.justsearch.app.services.bootstrap.phases.OperationSubstrateInitTest.xml",
+      "bytes": 1379,
+      "sha256": "00c5a1277a3bc3e60baadc71a87bec4c722af5217172ec2cea6a9cde31693a78"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22099,
+      "sha256": "a0b8c7777065ed550b9c8dcc23e89e3b890187d1f47dc75b294caa610630bd30"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169418,
+      "sha256": "3b014d19618d486929931cbaf944470ca482c911fd68a7e2f8f24b71671a361e"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-services/test/TEST-io.justsearch.app.services.registry.executor.OperationExecutorImplTest.xml",
+      "bytes": 40859,
+      "sha256": "40dcb76e4b80684e73b8ef899d2406d284dfad9da4620bbe0e1b9ee3f2c0e333"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-services/test/TEST-io.justsearch.app.services.registry.executor.PreparedOperationDispatchTest.xml",
+      "bytes": 2973,
+      "sha256": "a98b933ab21652c666ee96c2bff5cc9444af2f5a6cec00285770bbe1dedd788e"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141483,
+      "sha256": "0af7e9e5d3a64bd072c12743900ac2fd8b9d76fc6724f3198d98d612083a21d1"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-services/test/TEST-io.justsearch.app.services.wire.OperationHistoryWireContractConformanceTest.xml",
+      "bytes": 933,
+      "sha256": "0deb1f30eb6f659262187e8c21a4e7fb50e29d4a51a9d35fbcc89340d4df95de"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "26816f6f69d1998e9d183b5b7d73ce912e1446c008ef9bbd800df0b36cf213c4"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/ui/test/TEST-io.justsearch.ui.api.ActionLedgerControllerTest.xml",
+      "bytes": 3388,
+      "sha256": "6832e071453d1787b06f868e47f9bb34a01a3f914da39b346933f526c23c2d32"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/ui/test/TEST-io.justsearch.ui.api.mcp.OperationOutcomeTransportTest.xml",
+      "bytes": 699,
+      "sha256": "e5d8d700a0ceb85966c170a3ab16a7aa8351db69643bf0a4a0bd88b3ee1d475d"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/ui/test/TEST-io.justsearch.ui.api.OperationHistoryControllerTest.xml",
+      "bytes": 1089,
+      "sha256": "0d0aac24ef075e40d39a5d014d53f1ec6fe9f44f2c3ac3ff38b409a09644a74c"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "f36b49af3f09f5e8fde6ef2dd15753ba5532d657a4eadccd977b5522408f338f"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1136.txt",
+      "bytes": 42311,
+      "sha256": "ff1df7ca4037e8ca1fbdae415c60fc134466a79b8f5c9d1c048ce20fae135563"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-counts.json",
+      "bytes": 2166,
+      "sha256": "6369ccb6d485cd5a5a6fa870f9085b01210053a7f8757636962b3424c43919a3"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.AttributesUseRuleTest.xml",
+      "bytes": 479,
+      "sha256": "2068d61745f0ed2c82d4d8563b74fd618e69254ea320aa7e9e065b30b2690c90"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.BoundaryRulesTest.xml",
+      "bytes": 481,
+      "sha256": "40d563c492781339bb5867bdf891f6989a7b951a9c3fbd6a106d5d771031e5d8"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ClosurePropertyTest.xml",
+      "bytes": 465,
+      "sha256": "dc5040ef1870ee02feeb8fab54dba92288691de804b82605f3db3b1da0cdad3b"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.EnvRegistryDirectReadTest.xml",
+      "bytes": 494,
+      "sha256": "b8beeab80d04547c22382a8b7816d5a46eea75a4e535da5cdf6d001b0ad24a3d"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExecutorArchitectureTest.xml",
+      "bytes": 483,
+      "sha256": "9278640fa7843af4236d08dd3999df13c9bb0e64535be0dd70b37b9a01b32fc3"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.ExtractionParserConfinementTest.xml",
+      "bytes": 508,
+      "sha256": "cc3c74096bb7a4b69a192eec06506d0d6d433e3ac5b8ee311ae2639356022652"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.GpuProbeAccessTest.xml",
+      "bytes": 576,
+      "sha256": "0e266eafdc11c3fee59f85cc6777c86d8b76886a3f847393351f400c51c3d11c"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.IndexWriterOwnershipTest.xml",
+      "bytes": 619,
+      "sha256": "46f57292e4e79f8eaf2657ff4b0850d8524da6d373af82648f4ed02921b609a9"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LayeringEnforcementTest.xml",
+      "bytes": 2258,
+      "sha256": "49466b46626f5e842920db1fad78ebd86a65f5296bcf95f34751787e7e32c459"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.LibraryResolveHashOnlyCallerPin.xml",
+      "bytes": 657,
+      "sha256": "e0765f3b99129c7e986a20d0b8d909ccce3e61e75ac908d6721fce898e2e58ff"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OperationStoreArchitectureTest.xml",
+      "bytes": 1039,
+      "sha256": "2a6d7ab0a72521513cadbf59ee7f808d9347d83a0bdc6327274b6c96caf012f5"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.OrtRunChokePointTest.xml",
+      "bytes": 489,
+      "sha256": "04396789231c7cc1b99f56c01223eedf7c5bd479c8c462163697d9a509ca83c9"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.Slf4jOnlyRuleTest.xml",
+      "bytes": 473,
+      "sha256": "23ce9852f262ffa4adc58be17e4d47eb77bd15371db601b79fba8f130fb17e1b"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.VramDetectorAccessTest.xml",
+      "bytes": 480,
+      "sha256": "6268fefc2364b487f0c66834dd92b772eb6b7cef5980d93e58d2e6e99914eb54"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-launcher/test/TEST-io.justsearch.app.launcher.WireShapeMandateTest.xml",
+      "bytes": 488,
+      "sha256": "9521e71ea2e18af4cb885aa59483b6e495c9a3a5d5724a81ce5d29fd7cef2ca3"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "6386ceb9ef5fb953fe0f92926910ca233fae048d16a09dd283ca08029ba2644b"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionLedgerChangeRegistryTest.xml",
+      "bytes": 1503,
+      "sha256": "933f554fb8ca68202fe2a551f2e61f989a1343e11ae00efab1dce60dc86a9639"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryReadTest.xml",
+      "bytes": 1322,
+      "sha256": "f6b7598ac383682b3d56742186faf5343f6d50b37951ce004f0701fe6a42f800"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryResourceCatalogTest.xml",
+      "bytes": 2425,
+      "sha256": "cc8f0027f1da4b25eebb649830c8daf6b2fd1d3292df5a09301e6706035b219d"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistorySchemaTest.xml",
+      "bytes": 11553,
+      "sha256": "e1827fb7859a9a3ac8f2215727813815bcd0572c26006c53b2b7e246359efcb6"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryStoreTest.xml",
+      "bytes": 2026,
+      "sha256": "bf7e26f6d8639b55396547ccd621db4e9fb25820f03cf1215083ac90bd7402eb"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-services/test/TEST-io.justsearch.app.services.bootstrap.phases.OperationSubstrateInitTest.xml",
+      "bytes": 1379,
+      "sha256": "00c5a1277a3bc3e60baadc71a87bec4c722af5217172ec2cea6a9cde31693a78"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22099,
+      "sha256": "a0b8c7777065ed550b9c8dcc23e89e3b890187d1f47dc75b294caa610630bd30"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169418,
+      "sha256": "3b014d19618d486929931cbaf944470ca482c911fd68a7e2f8f24b71671a361e"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-services/test/TEST-io.justsearch.app.services.registry.executor.OperationExecutorImplTest.xml",
+      "bytes": 40859,
+      "sha256": "40dcb76e4b80684e73b8ef899d2406d284dfad9da4620bbe0e1b9ee3f2c0e333"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-services/test/TEST-io.justsearch.app.services.registry.executor.PreparedOperationDispatchTest.xml",
+      "bytes": 2973,
+      "sha256": "a98b933ab21652c666ee96c2bff5cc9444af2f5a6cec00285770bbe1dedd788e"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141483,
+      "sha256": "0af7e9e5d3a64bd072c12743900ac2fd8b9d76fc6724f3198d98d612083a21d1"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-services/test/TEST-io.justsearch.app.services.wire.OperationHistoryWireContractConformanceTest.xml",
+      "bytes": 933,
+      "sha256": "0deb1f30eb6f659262187e8c21a4e7fb50e29d4a51a9d35fbcc89340d4df95de"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "26816f6f69d1998e9d183b5b7d73ce912e1446c008ef9bbd800df0b36cf213c4"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/ui/test/TEST-io.justsearch.ui.api.ActionLedgerControllerTest.xml",
+      "bytes": 3389,
+      "sha256": "2a9200ef464307a8ca2727a1550d0d3a7b37aa10e1238b4b02e482f95c09c2ff"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/ui/test/TEST-io.justsearch.ui.api.mcp.OperationOutcomeTransportTest.xml",
+      "bytes": 699,
+      "sha256": "eeba07417d5c7e42b9ee2919dedda4cdd68fdf193b86e3ee3ad8ca9bb704a3eb"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/ui/test/TEST-io.justsearch.ui.api.OperationHistoryControllerTest.xml",
+      "bytes": 1090,
+      "sha256": "b70dfc7facb914368a047ee5bfaaa729e8df898aa29bab55741929c8cfc618db"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "97b04bedb6a2b09b0fefeb827e3e3ffbb0f2dfdc0e254005655d6bb9492b9520"
+    },
+    {
+      "path": "tmp/c2-4-history-reader1139.txt",
+      "bytes": 42073,
+      "sha256": "7c28a9b3d5807f7e2668cb68eea706e7848675fcd9da6a5eafff2a8e051d2fef"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-FAIL-stop.json",
+      "bytes": 302,
+      "sha256": "287af354a44f02111e93f18edf981c8dc3fedf0edccd3a82fde0f55dbe3d6bb2"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-first-failure.json",
+      "bytes": 4409,
+      "sha256": "b595fa4b1a74989dc09d5b8fd0256b26941b2b02a81098e55f90bb43ec76b1d1"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-first-failure.txt",
+      "bytes": 630,
+      "sha256": "cd5c40097dd7b379c6baf30472b3821c11d41a82837eeb71939625e24a528860"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-initial-preflight.json",
+      "bytes": 902,
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-initial-quick_health.json",
+      "bytes": 282,
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-initial-start.json",
+      "bytes": 424,
+      "sha256": "b02164a944a6f5951641e1f646220a8ebd904e92b13185e0b1c3efcaa668848b"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-initial-stop.json",
+      "bytes": 302,
+      "sha256": "fbd0ed8102881d447c97c3ad3c2320b397b2a40eb8642ead29359571adadca15"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-PASS-stop.json",
+      "bytes": 301,
+      "sha256": "30d29519580d01296701155bb50421f726997bbb295e8198a13cfd0d69e52d53"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-restart-start.json",
+      "bytes": 423,
+      "sha256": "21d84ecdf1752f9a0cd2eaf8fb169bfc0a791a06c356addc38494eb1c2b7d7e1"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141-result.json",
+      "bytes": 10167,
+      "sha256": "eec823ff0fa199874586a062e3d30139104c720ec6e2ebc2707682a4f2f99224"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141.mjs",
+      "bytes": 4100,
+      "sha256": "3ec84c300ff86ae3280d1cf39290f61582c538249f5a9cabad307762cde3b1cf"
+    },
+    {
+      "path": "tmp/c2-4-history-live1141.txt",
+      "bytes": 199,
+      "sha256": "e348578a056b28f4e169ccc6e6ff0b62ced91b74b9286d61f1524a74faf10bf5"
+    },
+    {
+      "path": "tmp/c2-4-reader-checks1143.txt",
+      "bytes": 312,
+      "sha256": "c12de90aa23901a096af7ad3b3f4a075e8603e44e4820e7d63b5f4cdb4bf3834"
+    }
+  ],
+  "liveCommand": "node tmp/c2-4-history-live1141.mjs",
+  "gateCommand": "node scripts/governance/run.mjs --gate operation-surface --gate register-guard-resolution --gate wire --mode gate --out tmp/c2-4-history-reader-gates1140.sarif",
+  "retention": "Lane worktree tmp; retain until lane acceptance plus 30 days; export before worktree release.",
+  "limits": "Durable recent reader only; source acknowledgement/catch-up, atomic SSE reconnect, installed-v4, coherent full and hosted proof remain required."
+}

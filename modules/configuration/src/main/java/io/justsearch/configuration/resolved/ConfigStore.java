@@ -11,8 +11,8 @@ import java.util.function.Consumer;
  *
  * <p>Components access configuration via {@link #get()} which returns the current immutable
  * snapshot. When settings change at runtime (e.g., via the GUI), a new snapshot is built and
- * atomically swapped in via {@link #update(ResolvedConfig)}, and all registered listeners are
- * notified.
+ * atomically swapped in via {@link #swap(ResolvedConfig)}, then registered listeners are notified
+ * via {@link #notifyListeners(ConfigChangedEvent)}.
  *
  * <p>Follows the atomic snapshot replacement pattern (SEI CERT VNA01-J, Android LiveData):
  * {@link AtomicReference} provides thread-safe read access; settings changes build a new
@@ -43,8 +43,13 @@ public final class ConfigStore {
    *
    * @param store the ConfigStore to publish globally (must not be null)
    */
-  public static void setGlobal(ConfigStore store) {
+  public static synchronized void setGlobal(ConfigStore store) {
     GLOBAL = Objects.requireNonNull(store, "store");
+  }
+
+  /** Restores a scoped publisher's predecessor, including uninitialized state, if it still owns the global. */
+  public static synchronized void restoreGlobal(ConfigStore installed, ConfigStore previous) {
+    if (GLOBAL == Objects.requireNonNull(installed, "installed")) GLOBAL = previous;
   }
 
   /**
@@ -78,7 +83,7 @@ public final class ConfigStore {
    * restore the pre-test state when no ConfigStore was set before the test ran.
    */
   @SuppressWarnings("unused") // Called from TestResolvedConfigHelper (test fixtures)
-  static void clearGlobal() {
+  static synchronized void clearGlobal() {
     GLOBAL = null;
   }
 
@@ -109,17 +114,39 @@ public final class ConfigStore {
   }
 
   /**
+   * Atomically replaces the current config snapshot without invoking listeners.
+   *
+   * @param next the new config snapshot (must not be null)
+   * @return the event describing the replaced snapshot
+   */
+  public ConfigChangedEvent swap(ResolvedConfig next) {
+    Objects.requireNonNull(next, "next config");
+    ResolvedConfig prev = current.getAndSet(next);
+    return new ConfigChangedEvent(prev, next);
+  }
+
+  /**
+   * Notifies the registered listeners for a previously completed snapshot swap.
+   *
+   * <p>This method is deliberately separate from {@link #swap(ResolvedConfig)} so callers can
+   * release their publication lock before arbitrary listener code runs.
+   *
+   * @param event the event returned by {@link #swap(ResolvedConfig)} (must not be null)
+   */
+  public void notifyListeners(ConfigChangedEvent event) {
+    listeners.notifyAll(Objects.requireNonNull(event, "config change event"));
+  }
+
+  /**
    * Atomically replaces the current config snapshot and notifies listeners.
    *
-   * <p>Listeners are invoked synchronously on the calling thread. Listener exceptions are caught
-   * and logged but do not prevent other listeners from being notified.
+   * <p>Convenience API retained for callers that do not need to separate publication from
+   * notification.
    *
    * @param next the new config snapshot (must not be null)
    */
   public void update(ResolvedConfig next) {
-    Objects.requireNonNull(next, "next config");
-    ResolvedConfig prev = current.getAndSet(next);
-    listeners.notifyAll(new ConfigChangedEvent(prev, next));
+    notifyListeners(swap(next));
   }
 
   /**

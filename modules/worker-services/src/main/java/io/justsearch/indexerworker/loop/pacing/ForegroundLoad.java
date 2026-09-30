@@ -17,11 +17,13 @@ import java.util.function.LongSupplier;
  *
  * <p>This gauge is the quantity the policy is actually about: how many foreground requests are
  * executing <i>right now</i>. It is deliberately a plain {@code worker-services} type with no gRPC
- * or MMF dependency — the {@code ServerInterceptor} that feeds it is a thin adapter, so the gauge
- * survives the Head/Worker merge (lane F) that deletes both.
+ * or MMF dependency — whatever feeds it is a thin adapter, which is why the gauge survived the
+ * Head/Worker merge (lane F stage A) that deleted both. Until item A9 the producer was
+ * {@code ForegroundLoadInterceptor}, a gRPC {@code ServerInterceptor}; since A9 it is
+ * {@code ForegroundLoadGate}, wrapping the Engine's in-process port adapter.
  *
- * <p>Thread-safe: incremented and decremented from gRPC executor threads, read from the indexing
- * loop and backfill threads.
+ * <p>Thread-safe: incremented and decremented on whichever caller thread entered the search port,
+ * read from the indexing loop and backfill threads.
  */
 public final class ForegroundLoad {
 

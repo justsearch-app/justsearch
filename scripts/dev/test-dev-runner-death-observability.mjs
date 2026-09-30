@@ -4,9 +4,20 @@
  *
  * No live stack is exercised here (none is available to this test run); these are
  * unit/integration-level proofs against the pure functions and file-local logic dev-runner.cjs
- * uses to build B1 (per-run worker.log preservation), B2 (stop-report exit-code/liveness), and
+ * uses to build B1 (per-run engine.log preservation), B2 (stop-report exit-code/liveness), and
  * B3 (bounded head heap + heap-dump-on-OOM JVM args). See docs/tempdocs/730-worker-lifecycle-integrity.md
  * §PLAN Increment 4 for the acceptance criteria this test targets.
+ *
+ * Lane F stage A resolution of the open question this comment used to carry. A11 deleted
+ * WorkerSpawner and the Worker child, so nothing wrote <dataDir>/logs/worker.log; A16 renamed
+ * the Engine's own log to <dataDir>/logs/engine.log. B1's SUBJECT therefore survives and these
+ * tests follow it. What did NOT survive is the ownership guard (a readiness size/mtime stamp, a
+ * size-monotonicity check, and a worker.log.1/.2 rotation-name fallback): every one of those
+ * existed to detect WorkerSpawner's rename-rotation replacing the file under a run, and Logback
+ * appends to engine.log rather than renaming it aside. Its test
+ * (testPreserveWorkerLogOwnershipGuard) was DELETED with the guard, not weakened or skipped —
+ * keeping it would have meant keeping a guard that can no longer fail, which is a vacuous green.
+ * No other assertion in this file was weakened.
  */
 
 import assert from 'node:assert/strict';
@@ -14,6 +25,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,213 +33,111 @@ const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const devRunnerModule = require(path.join(__dirname, 'dev-runner.cjs'));
 const {
-  preserveWorkerLog,
+  preserveEngineLog,
   buildStopReport,
   buildHeadJavaOpts,
   writeSelfExitStopReport,
-  captureWorkerLogStamp,
 } = devRunnerModule.__test;
 
-// --- B1: per-run worker.log preservation -----------------------------------------------------
+// --- B1: per-run engine.log preservation -----------------------------------------------------
 
-async function testPreserveWorkerLogBasic() {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-dev-runner-workerlog-'));
+async function testPreserveEngineLogBasic() {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-dev-runner-enginelog-'));
   try {
     const dataDir = path.join(tempRoot, 'dev-data');
     const logsDir = path.join(dataDir, 'logs');
     fs.mkdirSync(logsDir, { recursive: true });
-    fs.writeFileSync(path.join(logsDir, 'worker.log'), 'boot ok\n', 'utf8');
+    fs.writeFileSync(path.join(logsDir, 'engine.log'), 'boot ok\n', 'utf8');
 
     const runDir = path.join(tempRoot, 'runs', 'run-A');
     fs.mkdirSync(runDir, { recursive: true });
     const runPath = path.join(runDir, 'run.json');
 
-    const result = await preserveWorkerLog({ dataDir: dataDir }, runPath);
-    assert.equal(result.preserved, true, 'worker.log should be preserved when present');
-    const destPath = path.join(runDir, 'logs', 'worker.log');
+    const result = await preserveEngineLog({ dataDir: dataDir }, runPath);
+    assert.equal(result.preserved, true, 'engine.log should be preserved when present');
+    const destPath = path.join(runDir, 'logs', 'engine.log');
     assert.ok(fs.existsSync(destPath), 'preserved copy should exist in the run dir');
     assert.equal(fs.readFileSync(destPath, 'utf8'), 'boot ok\n');
     // Original left in place — B1 augments, does not replace, the existing dataDir-scoped log.
-    assert.ok(fs.existsSync(path.join(logsDir, 'worker.log')), 'source worker.log must remain');
-    console.log('test-dev-runner-death-observability: preserveWorkerLog basic copy — PASS');
+    assert.ok(fs.existsSync(path.join(logsDir, 'engine.log')), 'source engine.log must remain');
+    console.log('test-dev-runner-death-observability: preserveEngineLog basic copy — PASS');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 }
 
-async function testPreserveWorkerLogMissingCases() {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-dev-runner-workerlog-missing-'));
+async function testPreserveEngineLogMissingCases() {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-dev-runner-enginelog-missing-'));
   try {
     const runDir = path.join(tempRoot, 'runs', 'run-B');
     fs.mkdirSync(runDir, { recursive: true });
     const runPath = path.join(runDir, 'run.json');
 
-    const noDataDir = await preserveWorkerLog({ dataDir: null }, runPath);
+    const noDataDir = await preserveEngineLog({ dataDir: null }, runPath);
     assert.equal(noDataDir.preserved, false);
     assert.equal(noDataDir.reason, 'no_data_dir');
 
     const dataDir = path.join(tempRoot, 'dev-data-empty');
-    fs.mkdirSync(dataDir, { recursive: true }); // logs/worker.log intentionally absent
-    const noLog = await preserveWorkerLog({ dataDir }, runPath);
+    fs.mkdirSync(dataDir, { recursive: true }); // logs/engine.log intentionally absent
+    const noLog = await preserveEngineLog({ dataDir }, runPath);
     assert.equal(noLog.preserved, false);
-    assert.equal(noLog.reason, 'no_worker_log');
-    console.log('test-dev-runner-death-observability: preserveWorkerLog missing-input cases — PASS');
+    assert.equal(noLog.reason, 'no_engine_log');
+    console.log('test-dev-runner-death-observability: preserveEngineLog missing-input cases — PASS');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 }
 
 /**
- * The exact regression tempdoc 730 §THEORIZE B reproduced: worker.log is a single file keyed to
- * the (persistent, cross-run) dataDir, rotated by WorkerSpawner.java on the NEXT worker spawn.
- * Simulate two runs against the SAME dataDir (mirroring restart-preserves-index): run A writes
- * "death run" content, is preserved at its own stop; a NEW run B then overwrites the shared
- * worker.log (simulating WorkerSpawner's rotation on the next start) and is preserved at ITS
- * stop. Assert run A's preserved copy survives run B's start UNCHANGED and distinct from run B's.
+ * The property tempdoc 730 §THEORIZE B actually needs, restated for the post-A16 world: engine.log
+ * is ONE file keyed to the (persistent, cross-run) dataDir, so without B1 a death run's evidence
+ * lives only in a file every later run keeps writing to. Two runs against the SAME dataDir must
+ * end up with two independent snapshots, and the earlier run's snapshot must not change when a
+ * later run starts.
+ *
+ * What changed at A16, and why this test's fixture changed with it: run B no longer OVERWRITES
+ * the shared log (that was WorkerSpawner's rename-rotation on the next spawn, deleted at A11).
+ * Logback APPENDS, so B's fixture appends. That makes the assertion strictly harder in one
+ * direction and honest in the other: run A's copy must still be byte-identical to what A wrote,
+ * and run B's copy must contain A's line too — the preserved file is 'the engine log as it stood
+ * at this run's stop', not a per-run extract, and this test pins that reading rather than
+ * asserting an isolation the implementation does not provide.
  */
 async function testStartStopStartTwicePreservesDistinctLogs() {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-dev-runner-workerlog-cycle-'));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-dev-runner-enginelog-cycle-'));
   try {
-    const dataDir = path.join(tempRoot, 'dev-data'); // shared across "restarts", like .dev-data
-    const sharedWorkerLog = path.join(dataDir, 'logs', 'worker.log');
-    fs.mkdirSync(path.dirname(sharedWorkerLog), { recursive: true });
+    const dataDir = path.join(tempRoot, 'dev-data'); // shared across restarts, like .dev-data
+    const sharedEngineLog = path.join(dataDir, 'logs', 'engine.log');
+    fs.mkdirSync(path.dirname(sharedEngineLog), { recursive: true });
 
-    // Run A "boots", writes to the shared worker.log, then dies/stops.
-    fs.writeFileSync(sharedWorkerLog, 'run-A: 2026-07-14T13:46:00Z boot\n', 'utf8');
+    // Run A boots, writes to the shared engine.log, then dies/stops.
+    const runALine = 'run-A: 2026-07-14T13:46:00Z boot\n';
+    fs.writeFileSync(sharedEngineLog, runALine, 'utf8');
     const runADir = path.join(tempRoot, 'runs', 'run-A');
     fs.mkdirSync(runADir, { recursive: true });
-    const runAPath = path.join(runADir, 'run.json');
-    const runAResult = await preserveWorkerLog({ dataDir }, runAPath);
+    const runAResult = await preserveEngineLog({ dataDir }, path.join(runADir, 'run.json'));
     assert.equal(runAResult.preserved, true);
 
-    // A NEW start (run B) rotates/overwrites the shared worker.log — the exact destructive
-    // event tempdoc 730 identified (WorkerSpawner.java:366-386 rotation on next spawn).
-    fs.writeFileSync(sharedWorkerLog, 'run-B: 2026-07-14T16:06:00Z boot\n', 'utf8');
+    // A NEW start (run B) APPENDS to the shared engine.log — Logback's append mode, which is
+    // what replaced WorkerSpawner's destructive rename-rotation.
+    const runBLine = 'run-B: 2026-07-14T16:06:00Z boot\n';
+    fs.appendFileSync(sharedEngineLog, runBLine, 'utf8');
     const runBDir = path.join(tempRoot, 'runs', 'run-B');
     fs.mkdirSync(runBDir, { recursive: true });
-    const runBPath = path.join(runBDir, 'run.json');
-    const runBResult = await preserveWorkerLog({ dataDir }, runBPath);
+    const runBResult = await preserveEngineLog({ dataDir }, path.join(runBDir, 'run.json'));
     assert.equal(runBResult.preserved, true);
 
     // The load-bearing assertion: run A's preserved copy is untouched by run B's start/stop.
-    const runAPreserved = fs.readFileSync(path.join(runADir, 'logs', 'worker.log'), 'utf8');
-    const runBPreserved = fs.readFileSync(path.join(runBDir, 'logs', 'worker.log'), 'utf8');
-    assert.equal(runAPreserved, 'run-A: 2026-07-14T13:46:00Z boot\n', 'run A log must survive run B starting');
-    assert.equal(runBPreserved, 'run-B: 2026-07-14T16:06:00Z boot\n');
+    const runAPreserved = fs.readFileSync(path.join(runADir, 'logs', 'engine.log'), 'utf8');
+    const runBPreserved = fs.readFileSync(path.join(runBDir, 'logs', 'engine.log'), 'utf8');
+    assert.equal(runAPreserved, runALine, 'run A log must survive run B starting');
+    assert.equal(runBPreserved, runALine + runBLine, 'run B copy is the appended shared log');
     assert.notEqual(runAPreserved, runBPreserved, 'the two runs must have distinct preserved logs');
     console.log('test-dev-runner-death-observability: start->stop->start twice preserves distinct per-run logs — PASS');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 }
-
-/**
- * Reap-after-restart ownership guard (tempdoc 730 Increment-4 review). Reproduces the exact
- * mislabel construction the review flagged: run A stamps worker.log at readiness (content A,
- * size sA at mtime mA); a NEW run B is spawned before run A's stop-time preserve() runs, and B's
- * spawn triggers WorkerSpawner's rotation of the shared path. A naive "current mtime >= stamp
- * mtime" guard would treat B's fresh content as A's own "verified" log (it always is >= — mtime
- * only advances). The implemented guard instead requires monotonic SIZE (an append-only log never
- * shrinks while a run owns it) plus name-based rotation lookup (worker.log.1/.2), so:
- *   - a same-path file that only grew since the stamp -> 'verified' (still A's file)
- *   - a same-path file that SHRANK (replaced) but the old content survives at worker.log.1
- *     (matches the stamp's monotonicity there) -> 'heuristic'/'rotated', and the copied bytes are
- *     A's original content, not B's
- *   - no surviving generation satisfies the stamp at all -> 'ownership_unverified', never a
- *     silent mislabel
- *
- * (Substitution note: the reviewed plan's first-choice guard was birthtime identity —
- * WorkerSpawner renaming worker.log -> worker.log.1 preserves birthtime while a fresh spawn's
- * file gets a new one. A live probe on this Windows/NTFS checkout disproved that: NTFS
- * file-system tunneling hands a freshly-created file at a just-vacated path the OLD file's
- * birthtime back, making the rotated and the fresh-replacement file indistinguishable by
- * birthtime alone. This test exercises the size-monotonic + rotation-name fallback actually
- * implemented in preserveWorkerLog instead.)
- */
-async function testPreserveWorkerLogOwnershipGuard() {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'justsearch-dev-runner-workerlog-ownership-'));
-  try {
-    const dataDir = path.join(tempRoot, 'dev-data');
-    const logsDir = path.join(dataDir, 'logs');
-    fs.mkdirSync(logsDir, { recursive: true });
-    const workerLog = path.join(logsDir, 'worker.log');
-    const workerLog1 = path.join(logsDir, 'worker.log.1');
-
-    // Run A boots and is stamped at readiness.
-    fs.writeFileSync(workerLog, 'run-A: boot line\n', 'utf8');
-    const stampA = captureWorkerLogStamp(dataDir);
-    assert.ok(stampA, 'stamp must capture an existing worker.log');
-
-    // --- Case 1: same-path file that only grew since the stamp -> verified -----------------
-    fs.appendFileSync(workerLog, 'run-A: more output before stop\n', 'utf8');
-    const runVerifiedDir = path.join(tempRoot, 'runs', 'run-verified');
-    fs.mkdirSync(runVerifiedDir, { recursive: true });
-    const resultVerified = await preserveWorkerLog(
-      { dataDir, workerLogStamp: stampA },
-      path.join(runVerifiedDir, 'run.json'),
-    );
-    assert.equal(resultVerified.preserved, true);
-    assert.equal(resultVerified.ownership, 'verified', 'a grown-but-same-path file must be copied as verified');
-    assert.equal(
-      fs.readFileSync(path.join(runVerifiedDir, 'logs', 'worker.log'), 'utf8'),
-      'run-A: boot line\nrun-A: more output before stop\n',
-    );
-
-    // --- Case 2: rotated away, replaced by a fresh smaller file -> heuristic/rotated -------
-    // WorkerSpawner rotates by renaming worker.log -> worker.log.1 on the NEXT spawn; the new
-    // spawn's own worker.log starts fresh and small (below A's stamped size), which is the tell
-    // that the current path stopped being A's.
-    fs.renameSync(workerLog, workerLog1);
-    fs.writeFileSync(workerLog, 'B\n', 'utf8'); // deliberately smaller than stampA.size
-    assert.ok(fs.statSync(workerLog).size < stampA.size, 'test fixture: run B\'s fresh file must be smaller than the stamp');
-
-    const runRotatedDir = path.join(tempRoot, 'runs', 'run-rotated');
-    fs.mkdirSync(runRotatedDir, { recursive: true });
-    const resultRotated = await preserveWorkerLog(
-      { dataDir, workerLogStamp: stampA },
-      path.join(runRotatedDir, 'run.json'),
-    );
-    assert.equal(resultRotated.preserved, true);
-    assert.equal(resultRotated.ownership, 'heuristic');
-    assert.equal(resultRotated.source, 'rotated', 'run A\'s content must be found at worker.log.1');
-    assert.equal(
-      fs.readFileSync(path.join(runRotatedDir, 'logs', 'worker.log'), 'utf8'),
-      'run-A: boot line\nrun-A: more output before stop\n',
-      'the rotated copy must be run A\'s original content, not run B\'s overwrite — the mislabel this guard prevents',
-    );
-
-    // --- Case 3: no surviving generation satisfies the stamp -> ownership_unverified -------
-    // worker.log.1 itself gets overwritten by an unrelated, smaller run C before A's log is ever
-    // read — no rename trail, no size match anywhere.
-    fs.writeFileSync(workerLog1, 'C\n', 'utf8');
-    assert.ok(fs.statSync(workerLog1).size < stampA.size, 'test fixture: the replacement at .log.1 must also undercut the stamp');
-
-    const runReplacedDir = path.join(tempRoot, 'runs', 'run-replaced');
-    fs.mkdirSync(runReplacedDir, { recursive: true });
-    const resultReplaced = await preserveWorkerLog(
-      { dataDir, workerLogStamp: stampA },
-      path.join(runReplacedDir, 'run.json'),
-    );
-    assert.equal(resultReplaced.preserved, false);
-    assert.equal(resultReplaced.reason, 'ownership_unverified');
-    assert.ok(
-      !fs.existsSync(path.join(runReplacedDir, 'logs', 'worker.log')),
-      'no file should be copied when ownership cannot be verified',
-    );
-
-    // --- Unstamped run.json (predates the ownership stamp) keeps prior best-effort behavior -
-    const runUnstampedDir = path.join(tempRoot, 'runs', 'run-unstamped');
-    fs.mkdirSync(runUnstampedDir, { recursive: true });
-    const resultUnstamped = await preserveWorkerLog({ dataDir }, path.join(runUnstampedDir, 'run.json'));
-    assert.equal(resultUnstamped.preserved, true);
-    assert.equal(resultUnstamped.ownership, 'unstamped', 'a run.json with no stamp must mark the copy unstamped, not verified');
-
-    console.log('test-dev-runner-death-observability: preserveWorkerLog ownership guard (verified/rotated/unverified/unstamped) — PASS');
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-}
-
 // --- B2: stop-report exit-code / liveness -----------------------------------------------------
 
 function testBuildStopReportKillPath() {
@@ -296,7 +206,7 @@ async function testWriteSelfExitStopReportWritesToDisk() {
   try {
     const dataDir = path.join(tempRoot, 'dev-data');
     fs.mkdirSync(path.join(dataDir, 'logs'), { recursive: true });
-    fs.writeFileSync(path.join(dataDir, 'logs', 'worker.log'), 'dying...\n', 'utf8');
+    fs.writeFileSync(path.join(dataDir, 'logs', 'engine.log'), 'dying...\n', 'utf8');
 
     const runDir = path.join(tempRoot, 'runs', 'run-dead');
     fs.mkdirSync(runDir, { recursive: true });
@@ -312,12 +222,12 @@ async function testWriteSelfExitStopReportWritesToDisk() {
 
     assert.equal(report.disposition, 'self_exited');
     assert.equal(report.backendExitCode, 137);
-    assert.equal(report.workerLog.preserved, true);
+    assert.equal(report.engineLog.preserved, true);
 
     const onDisk = JSON.parse(fs.readFileSync(path.join(runDir, 'stop-report.json'), 'utf8'));
     assert.equal(onDisk.backendExitCode, 137);
     assert.equal(onDisk.disposition, 'self_exited');
-    assert.ok(fs.existsSync(path.join(runDir, 'logs', 'worker.log')), 'worker.log must be preserved alongside the report');
+    assert.ok(fs.existsSync(path.join(runDir, 'logs', 'engine.log')), 'engine.log must be preserved alongside the report');
 
     const interactiveReport = await writeSelfExitStopReport({
       runId: 'run-dead',
@@ -368,16 +278,150 @@ function testBuildHeadJavaOptsOverride() {
   console.log('test-dev-runner-death-observability: buildHeadJavaOpts honors overrides — PASS');
 }
 
+// --- B9 (lane F stage B): the three assertions a supervised run has to survive ------------------
+
+/**
+ * Everything above this line is fs-local and takes milliseconds. This one is not: it starts the REAL
+ * dev-runner against the conformance harness's fake engine, lets the Engine crash once, and asserts
+ * on the artifacts a supervised restart leaves behind.
+ *
+ * Why it cannot be fs-local. The three properties lane F item B9 names — the stop report joins to
+ * run.json by run id, a restart preserves the run id and the lease's continuity, and incarnation N's
+ * engine.log is preserved before N+1 can append to it — are all properties of what the supervisor
+ * DOES, not of what its helpers return. Each one is trivially satisfiable by a fixture and only
+ * meaningful against a real restart: the run id is only interesting because a restart could have
+ * minted a new one, and the log snapshot is only interesting because a second incarnation really did
+ * write to the shared file afterwards.
+ *
+ * About 6 seconds, no Gradle, no Engine dist, no network.
+ */
+async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence() {
+  const repoRoot = path.resolve(__dirname, '..', '..');
+  const root = fs.mkdtempSync(path.join(repoRoot, 'tmp', 'dev-runner-b9-'));
+  const dataDir = path.join(root, 'data');
+  const stateRoot = path.join(root, 'state');
+  fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+  fs.mkdirSync(stateRoot, { recursive: true });
+  const planPath = path.join(root, 'plan.json');
+  fs.writeFileSync(
+    planPath,
+    JSON.stringify({
+      incarnations: [{ mode: 'crash', exitCode: 1, exitAfterMs: 1500 }, { mode: 'honour' }],
+    }),
+    'utf8',
+  );
+
+  const child = spawn(
+    process.execPath,
+    [
+      path.join(repoRoot, 'scripts', 'dev', 'dev-runner.cjs'), 'start',
+      '--json', '--skip-build', '--clean', 'none', '--api-port', '0',
+      // A real port, not 0: the runner refuses --ui-port 0 outright, and the frontend stand-in
+      // ignores it anyway. Picked high and fixed rather than probed — nothing binds it here.
+      '--ui-port', '5599',
+      '--data-dir', dataDir, '--session-id', 'test-dev-runner-death-observability',
+    ],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        JUSTSEARCH_SUPERVISOR_HARNESS: '1',
+        JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS: '600000',
+        JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS: '100',
+        JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS: '400',
+        JUSTSEARCH_SUPERVISOR_HANG_POLL_INTERVAL_MS: '2000',
+        JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot,
+        JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([
+          process.execPath,
+          path.join(repoRoot, 'scripts', 'supervisor-conformance', 'fake-engine.mjs'),
+        ]),
+        JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify([
+          process.execPath, '-e', 'setInterval(() => {}, 60000)',
+        ]),
+        JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
+        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '15000',
+        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '15000',
+        CI: '',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  let stderr = '';
+  child.stderr.on('data', (b) => { stderr += b.toString(); });
+  // The dev-runner reports a refused start as JSON on STDOUT, so a failure message that quoted only
+  // stderr would say 'no second incarnation' with nothing after it.
+  child.stdout.on('data', (b) => { stderr += b.toString(); });
+
+  try {
+    const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
+    const deadline = Date.now() + 40_000;
+    let state = null;
+    for (;;) {
+      try {
+        state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      } catch { /* not written yet */ }
+      if (state?.state === 'running' && state.incarnation === 2) break;
+      assert.ok(Date.now() < deadline, `no second incarnation reached running.\n${stderr.slice(-2000)}`);
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    assert.equal(state.restartCount, 1, 'the crash must be charged to the budget exactly once');
+
+    const runDir = path.join(stateRoot, 'runs', state.runId);
+    const runJson = JSON.parse(fs.readFileSync(path.join(runDir, 'run.json'), 'utf8'));
+
+    // (1) The stop report joins to run.json. Before item B8 the report was the runner's LAST act, so
+    //     a run with more than one death had at most one; now it is per incarnation, and the join key
+    //     is what lets a reader put the two files side by side at all.
+    const stopReport = JSON.parse(
+      fs.readFileSync(path.join(runDir, 'incarnations', '1', 'stop-report.json'), 'utf8'),
+    );
+    assert.equal(stopReport.runId, runJson.runId, 'stop-report runId must equal run.json runId');
+    assert.equal(stopReport.incarnation, 1);
+    assert.equal(stopReport.backendExitCode, 1, 'the crash exit code is recorded, not inferred');
+
+    // (2) The run id and the LEASE survive the child. This is design 7.6's dev-runner sentence, and
+    //     it is what stops another session reading a recovering stack as an abandoned one.
+    assert.equal(state.runId, runJson.runId, 'a restart must not mint a new run id');
+    const active = JSON.parse(fs.readFileSync(path.join(stateRoot, 'active.json'), 'utf8'));
+    assert.equal(active.runId, runJson.runId, 'the lease still names the same run after the restart');
+    assert.ok(active.lease.sequence >= 1, 'the lease sequence was reset by the restart');
+    assert.ok(
+      Date.parse(active.lease.expiresAt) > Date.parse(active.lease.renewedAt),
+      'the lease is not live across the restart',
+    );
+
+    // (3) Incarnation 1's engine.log is preserved BEFORE incarnation 2 can append to the shared file.
+    //     engine.log is one file keyed to the dataDir and Logback appends, so without the
+    //     per-incarnation snapshot the only surviving copy would be the one containing both.
+    const preserved = fs.readFileSync(
+      path.join(runDir, 'incarnations', '1', 'logs', 'engine.log'), 'utf8',
+    );
+    const shared = fs.readFileSync(path.join(dataDir, 'logs', 'engine.log'), 'utf8');
+    assert.ok(preserved.includes('incarnation=1'), 'incarnation 1 evidence is in its own snapshot');
+    assert.ok(
+      !preserved.includes('incarnation=2'),
+      'the snapshot was taken AFTER incarnation 2 started writing — it is not incarnation 1 evidence',
+    );
+    assert.ok(shared.includes('incarnation=2'), 'incarnation 2 really did append to the shared log');
+    console.log('test-dev-runner-death-observability: a supervised restart keeps the run id, the lease and each incarnation\'s log — PASS');
+  } finally {
+    try { child.kill(); } catch { /* already gone */ }
+    await new Promise((r) => setTimeout(r, 300));
+    try { fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
+  }
+}
+
 async function main() {
-  await testPreserveWorkerLogBasic();
-  await testPreserveWorkerLogMissingCases();
+  await testPreserveEngineLogBasic();
+  await testPreserveEngineLogMissingCases();
   await testStartStopStartTwicePreservesDistinctLogs();
-  await testPreserveWorkerLogOwnershipGuard();
   testBuildStopReportKillPath();
   testBuildStopReportSelfExitRecordsExitCode();
   await testWriteSelfExitStopReportWritesToDisk();
   testBuildHeadJavaOptsDefaults();
   testBuildHeadJavaOptsOverride();
+  await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence();
   console.log('test-dev-runner-death-observability: ALL PASS');
 }
 

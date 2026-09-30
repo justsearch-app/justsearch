@@ -1,0 +1,268 @@
+{
+  "base": "ae46f6919 + fixed reset metadata helper",
+  "environment": "Windows / Java25 / PowerShell",
+  "sources": [
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsResetPreparation.java",
+      "sha256": "b132b4a2f8d30d864d450b059e8137ddb5cab2a79866542a455942ce04c4f31c",
+      "bytes": 5831
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/SettingsResetPreparationTest.java",
+      "sha256": "1c20916e7d96149e699da2ceeb1e4c885fb5a5d2c2d9716badd0e92059f2a723",
+      "bytes": 7940
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/CoreOperationCatalog.java",
+      "sha256": "d1850b4969c643a4004bcad2ee46398d285218e4b2841de72b0ac53f303c6ab1",
+      "bytes": 49373
+    },
+    {
+      "path": "governance/operation-surfaces.v1.json",
+      "sha256": "c01203f0b8d25482b193d306f093adea43a38559429e90ebcfc9b10cf52b0b36",
+      "bytes": 57996
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-6-reset-schema-negative1320-counts.json",
+      "sha256": "2a2e341915ccbe8b04514c6ec3a09d8b484a17589674e9601801c32a95229f4e",
+      "bytes": 536
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1320-source.json",
+      "sha256": "7d30e0fdae1aca9edff39f73389198ac6b4d8750af2d3afb7680b393d793fe4e",
+      "bytes": 412
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1320-xml.zip",
+      "sha256": "0c6e538cd7410c765927576b86bc0e02f736c633e0a1bafc7660ca4f236dd972",
+      "bytes": 38558
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1320.original",
+      "sha256": "67d5c5fa3d934a894184ff8276e9df50ee941af9c4a8c3f08ffe40cac2c5d065",
+      "bytes": 5427
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1320.txt",
+      "sha256": "6df3c988fe547688f039a0a075b6ccb8a250c20150549d5ec5274a49251c5c41",
+      "bytes": 40234
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1324-counts.json",
+      "sha256": "5225f31a5a21e390c1ff4dae3f4b4253f8acf6568d119430b276ad5247e19347",
+      "bytes": 509
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1324-source.json",
+      "sha256": "4cd1a09325a060b340439327b72d1bd2007d10442b2ee5e51af3feaaa15ed6b4",
+      "bytes": 209
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1324-xml.zip",
+      "sha256": "ed875e359f9432fdb552db4d0e07963e8696ae41ce1393ecc612c203684be920",
+      "bytes": 38100
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1324.original",
+      "sha256": "b132b4a2f8d30d864d450b059e8137ddb5cab2a79866542a455942ce04c4f31c",
+      "bytes": 5831
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1324.txt",
+      "sha256": "5e4cc64343cf3cd5c7de8260205d2c1f481a1f6c5d90fd375c21b19becf4e63f",
+      "bytes": 7470
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1327-counts.json",
+      "sha256": "2837f690b17c791e928ba50d0d4347980f89536dd46b44cc502037f30c0e2cf6",
+      "bytes": 524
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1327-source.json",
+      "sha256": "efa22802b55bb296b4a9f0da9f0fa0ba59d7108a2dd27db602d07a22d4ffedb6",
+      "bytes": 209
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1327-xml.zip",
+      "sha256": "e0411bff119c6c018e0edfdb3a9880fd7fd2b149b3ad0ae596266a046369b9e1",
+      "bytes": 38414
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1327.original",
+      "sha256": "b132b4a2f8d30d864d450b059e8137ddb5cab2a79866542a455942ce04c4f31c",
+      "bytes": 5831
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-negative1327.txt",
+      "sha256": "b1957e87fd4f4cbfa3469a89959636857dc390e72726ee5abaaf45622752fb40",
+      "bytes": 8471
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-register1318.sarif",
+      "sha256": "02ac3a396d16e40b42053133de03f895e4d01903d3530265b669b8f404025ae5",
+      "bytes": 2133
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-register1318.txt",
+      "sha256": "99eb108c2426a4ed057f8b11f73aab7df657201dffe5ab22868ecc36ad040225",
+      "bytes": 113
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-register1319.sarif",
+      "sha256": "9230da4135f8a5ad6a99b6c308c833517a9d00f68829a73a1432ec065ebccbd7",
+      "bytes": 1288
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-register1319.txt",
+      "sha256": "5f0085e54e2c2f18da37ee66d4b912e6e8edeb7828f0bc9785fef4cb8bf7d5ea",
+      "bytes": 176
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-register1328.sarif",
+      "sha256": "9230da4135f8a5ad6a99b6c308c833517a9d00f68829a73a1432ec065ebccbd7",
+      "bytes": 1288
+    },
+    {
+      "path": "tmp/c2-6-reset-schema-register1328.txt",
+      "sha256": "5f0085e54e2c2f18da37ee66d4b912e6e8edeb7828f0bc9785fef4cb8bf7d5ea",
+      "bytes": 176
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1319-counts.json",
+      "sha256": "2851d97af76038f9cbf255f7a1e3a475abbd9ae468fa413bc4edb7ecd1f35f9f",
+      "bytes": 703
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1319-source.json",
+      "sha256": "e48b0c103c63f907db4375ac5a4ce0fd3ca4edc53bc23496baa6f6fa1100d07a",
+      "bytes": 646
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1319-xml.zip",
+      "sha256": "584e9a035e6e72f044964c38939b6ba4e5c220b982785042ec32826b6953bc31",
+      "bytes": 39751
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1319.txt",
+      "sha256": "db5aad339b2ca18611954a07ad60e39805450be3669447c5211f3e489142ddb3",
+      "bytes": 37992
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1321-counts.json",
+      "sha256": "650641d95a52736ed6e3f853913beb0fa2781ce5461142ba6e2780ce6a76faf5",
+      "bytes": 652
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1321-source.json",
+      "sha256": "e48b0c103c63f907db4375ac5a4ce0fd3ca4edc53bc23496baa6f6fa1100d07a",
+      "bytes": 646
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1321-xml.zip",
+      "sha256": "35a94820339ad15135c155bc4f9b4deaf964cf25887e105936991a8e705684e4",
+      "bytes": 39751
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1321.txt",
+      "sha256": "a5ae71c487325bec309785c11d68cb3462559d6b84dc9341bb09768e6bd8e519",
+      "bytes": 37599
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1322-counts.json",
+      "sha256": "5421693caee87a205c5a97fa10132173f9a7f1e65c812e7188ded4e173fc6f0f",
+      "bytes": 460
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1322-xml.zip",
+      "sha256": "3bec741eac44b2a9c19d87b86802e0a3a46f1a0539822d05a010399e86b7c434",
+      "bytes": 41017
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1322.txt",
+      "sha256": "467902674cbe893ae005bf9bc6f62dbc76d598ae780a026bfc4feec55873ff93",
+      "bytes": 38455
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1323-counts.json",
+      "sha256": "af2f62be074d6fcaa970eb1ad0a2d0267fb58a1c2d00fb5214a67c8c07b53dc2",
+      "bytes": 674
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1323-source.json",
+      "sha256": "08d662e22c44d799d4bad4dabcb3344343fbea8e508b4a0ca4d5ffe68c678ca9",
+      "bytes": 882
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1323-xml.zip",
+      "sha256": "6a3e473eced6ecb208f180673da633f5dcfd54258c599084faf6b21629c60874",
+      "bytes": 39730
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1323.txt",
+      "sha256": "257799016ce5b19fe222b4e88609a6e95e853bcaff233f087d21947442f537c3",
+      "bytes": 37819
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1325-counts.json",
+      "sha256": "a075c7d2d1ef20f964ba1ed465a20ff921070d61c8c0f40e6dcdcb9d2acac578",
+      "bytes": 638
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1325-xml.zip",
+      "sha256": "191cc0b3735a641834a839b25c6a30a76087db6f0df331a2c8fdc37afe805584",
+      "bytes": 39730
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1325.txt",
+      "sha256": "21115aed75d74220718f4fc0fd8f5c38bf0c2a1f5b8d259d13928ab4b5d84270",
+      "bytes": 37440
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1326-counts.json",
+      "sha256": "64de7d4e49029b1dddde1c8c2c43fa7b2c3e03a3fb7904e34bb83cfdc46aa805",
+      "bytes": 684
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1326-source.json",
+      "sha256": "f3b422f180831f80253ac1f3cb8508fd937af755cf4e770d014dafd51d7ae127",
+      "bytes": 882
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1326-xml.zip",
+      "sha256": "45b6ca0a5d05c532240f43257ef4b2bb992f17ab50ee1d2e5bc8147b6cccdb96",
+      "bytes": 39096
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1326.txt",
+      "sha256": "8b45dceb8462cda3a682649bb626bf8498dd512fb690f67aa023acb55512bd77",
+      "bytes": 37591
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1328-counts.json",
+      "sha256": "8af5bcd6f37bf6b7f9adfe1fa62c840059ccce21dc709b1c0adeb96b466ad016",
+      "bytes": 643
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1328-source.json",
+      "sha256": "f3b422f180831f80253ac1f3cb8508fd937af755cf4e770d014dafd51d7ae127",
+      "bytes": 882
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1328-xml.zip",
+      "sha256": "49c9da6cd2b35b04760f24dcf38feba731c3839ae73c78cf81143fe838ef2719",
+      "bytes": 39096
+    },
+    {
+      "path": "tmp/c2-6-reset-schema1328.txt",
+      "sha256": "7574c12376a2a06f034a3335f2c11b0112b1a976dcf9c221aa6667f00fd08d08",
+      "bytes": 37440
+    },
+    {
+      "path": "tmp/c2-hosted34778431996-jobs.json",
+      "sha256": "b3a9886f1ca7204c45bf5df987b8c63518a35497ee30dba7307f60d0a0d2a3db",
+      "bytes": 49253
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.agent.api.registry.OperationResult;
@@ -28,7 +30,7 @@ class BrowseToolTest {
           new BrowseTool.RootInfo("D:\\Documents", "Documents"));
 
   private static BrowseTool browseOnly(BrowseTool.BrowseCallback cb) {
-    return new BrowseTool(cb, () -> FIXTURE_ROOTS);
+    return new BrowseTool(cb, context -> FIXTURE_ROOTS);
   }
 
   @Test
@@ -36,7 +38,7 @@ class BrowseToolTest {
     var capturedParent = new AtomicReference<String>();
     var tool =
         browseOnly(
-            req -> {
+            (req, context) -> {
               capturedParent.set(req.parentPath());
               return new FolderBrowseResponse(
                   List.of(new FolderBrowseResponse.Folder("/docs/sub", "sub", 3, 512, 0)),
@@ -44,7 +46,7 @@ class BrowseToolTest {
                   false);
             });
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertEquals("D:\\data\\docs", capturedParent.get());
     assertTrue(result.message().contains("sub"));
@@ -55,12 +57,12 @@ class BrowseToolTest {
     var capturedMax = new AtomicReference<Integer>();
     var tool =
         browseOnly(
-            req -> {
+            (req, context) -> {
               capturedMax.set(req.maxFolders());
               return new FolderBrowseResponse(List.of(), 1, false);
             });
 
-    tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\", \"max_folders\": 25}");
+    tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\", \"max_folders\": 25}", EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(25, capturedMax.get());
   }
 
@@ -69,28 +71,28 @@ class BrowseToolTest {
     var capturedMax = new AtomicReference<Integer>();
     var tool =
         browseOnly(
-            req -> {
+            (req, context) -> {
               capturedMax.set(req.maxFolders());
               return new FolderBrowseResponse(List.of(), 1, false);
             });
 
-    tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\", \"max_folders\": 999}");
+    tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\", \"max_folders\": 999}", EngineContextTestFixtures.AGENT_LOOP);
     assertEquals(200, capturedMax.get(), "max_folders should be capped at 200");
   }
 
   @Test
   void executeWithNullResponse() {
-    var tool = browseOnly(req -> null);
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\"}");
+    var tool = browseOnly((req, context) -> null);
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("no response"));
   }
 
   @Test
   void executeWithEmptyFoldersUnderParent() {
-    var tool = browseOnly(req -> new FolderBrowseResponse(List.of(), 3, false));
+    var tool = browseOnly((req, context) -> new FolderBrowseResponse(List.of(), 3, false));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\empty\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\empty\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("No folders found under"));
     assertTrue(result.message().contains("/empty"));
@@ -100,21 +102,21 @@ class BrowseToolTest {
   void executeWithTruncatedResults() {
     var tool =
         browseOnly(
-            req ->
+            (req, context) ->
                 new FolderBrowseResponse(
                     List.of(new FolderBrowseResponse.Folder("/a", "a", 1, 100, 0)),
                     1,
                     true));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\root\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\root\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("truncated"), "Should mention truncation: " + result.message());
   }
 
   @Test
   void executeInvalidJson() {
-    var tool = browseOnly(req -> new FolderBrowseResponse(List.of(), 0, false));
-    OperationResult result = tool.execute("not json");
+    var tool = browseOnly((req, context) -> new FolderBrowseResponse(List.of(), 0, false));
+    OperationResult result = tool.execute("not json", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success());
     assertTrue(result.message().contains("error"));
   }
@@ -123,7 +125,7 @@ class BrowseToolTest {
   void formatsSizesReadably() {
     var tool =
         browseOnly(
-            req ->
+            (req, context) ->
                 new FolderBrowseResponse(
                     List.of(
                         new FolderBrowseResponse.Folder("/small", "small", 1, 512, 0),
@@ -132,7 +134,7 @@ class BrowseToolTest {
                     3,
                     false));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\root\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\root\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("512 B"), "Should format bytes: " + result.message());
     assertTrue(result.message().contains("MB"), "Should format megabytes: " + result.message());
@@ -145,16 +147,16 @@ class BrowseToolTest {
   void executeListsRootsWhenNoParentPath() {
     var tool =
         new BrowseTool(
-            req -> {
+            (req, context) -> {
               fail("Should not call browseCallback for roots");
               return null;
             },
-            () ->
+            context ->
                 List.of(
                     new BrowseTool.RootInfo("D:\\Documents", "Documents"),
                     new BrowseTool.RootInfo("D:\\Projects", "Projects")));
 
-    OperationResult result = tool.execute("{}");
+    OperationResult result = tool.execute("{}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("Documents"), "Should contain root name: " + result.message());
     assertTrue(result.message().contains("Projects"), "Should contain root name: " + result.message());
@@ -173,13 +175,13 @@ class BrowseToolTest {
   void executeListsRootsWhenNullArgs() {
     var tool =
         new BrowseTool(
-            req -> {
+            (req, context) -> {
               fail("Should not call browseCallback for roots");
               return null;
             },
-            () -> List.of(new BrowseTool.RootInfo("D:\\Docs", "Docs")));
+            context -> List.of(new BrowseTool.RootInfo("D:\\Docs", "Docs")));
 
-    OperationResult result = tool.execute(null);
+    OperationResult result = tool.execute(null, EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("Docs"));
   }
@@ -188,14 +190,14 @@ class BrowseToolTest {
   void rootSentinelsUseRootsSupplier() {
     var tool =
         new BrowseTool(
-            req -> {
+            (req, context) -> {
               fail("Should not call browseCallback for sentinel");
               return null;
             },
-            () -> List.of(new BrowseTool.RootInfo("D:\\Docs", "Docs")));
+            context -> List.of(new BrowseTool.RootInfo("D:\\Docs", "Docs")));
 
     for (String sentinel : List.of("/", ".", "..", "root", "roots", "top", "*")) {
-      OperationResult result = tool.execute("{\"parent_path\": \"" + sentinel + "\"}");
+      OperationResult result = tool.execute("{\"parent_path\": \"" + sentinel + "\"}", EngineContextTestFixtures.AGENT_LOOP);
       assertTrue(result.success(), "Failed for sentinel: " + sentinel);
       assertTrue(
           result.message().contains("Docs"), "Missing root for sentinel '" + sentinel + "': " + result.message());
@@ -206,13 +208,13 @@ class BrowseToolTest {
   void emptyRootsReturnsNoIndexedFolders() {
     var tool =
         new BrowseTool(
-            req -> {
+            (req, context) -> {
               fail("Should not call browseCallback");
               return null;
             },
-            List::of);
+            context -> List.of());
 
-    OperationResult result = tool.execute("{}");
+    OperationResult result = tool.execute("{}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(
         result.message().contains("No indexed folders"),
@@ -223,14 +225,14 @@ class BrowseToolTest {
   void relativePathRejected_showsRootNames() {
     var tool =
         new BrowseTool(
-            req -> new FolderBrowseResponse(List.of(), 1, false),
-            () ->
+            (req, context) -> new FolderBrowseResponse(List.of(), 1, false),
+            context ->
                 List.of(
                     new BrowseTool.RootInfo("D:\\Documents", "Documents"),
                     new BrowseTool.RootInfo("D:\\Projects", "Projects")));
 
     // "docs" doesn't match root names "Documents" or "Projects", so still rejected
-    OperationResult result = tool.execute("{\"parent_path\": \"docs/explanation\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"docs/explanation\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success(), "Unresolvable relative path should be rejected: " + result.message());
     assertTrue(
         result.message().contains("not an absolute path"),
@@ -240,9 +242,9 @@ class BrowseToolTest {
   @Test
   void absolutePathEmptyResults_noHint() {
     var tool =
-        browseOnly(req -> new FolderBrowseResponse(List.of(), 1, false));
+        browseOnly((req, context) -> new FolderBrowseResponse(List.of(), 1, false));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\Documents\\\\nonexistent\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\Documents\\\\nonexistent\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(
         result.message().contains("No folders found"), "Should report no folders: " + result.message());
@@ -255,13 +257,13 @@ class BrowseToolTest {
   void relativeParentPath_rejected_whenRootsAvailable() {
     var tool =
         new BrowseTool(
-            req -> new FolderBrowseResponse(List.of(), 1, false),
-            () ->
+            (req, context) -> new FolderBrowseResponse(List.of(), 1, false),
+            context ->
                 List.of(
                     new BrowseTool.RootInfo("D:\\Documents", "Documents"),
                     new BrowseTool.RootInfo("D:\\Projects", "Projects")));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"docs/explanation\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"docs/explanation\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success(), "Relative path should be rejected: " + result.message());
     assertTrue(result.message().contains("not an absolute path"), result.message());
     assertTrue(result.message().contains("D:\\Documents"), result.message());
@@ -271,10 +273,10 @@ class BrowseToolTest {
   void unixSlashParentPath_rejected_whenRootsAvailable() {
     var tool =
         new BrowseTool(
-            req -> new FolderBrowseResponse(List.of(), 1, false),
-            () -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
+            (req, context) -> new FolderBrowseResponse(List.of(), 1, false),
+            context -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"/how-to\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"/how-to\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success(), "Unix-style /path should be rejected: " + result.message());
     assertTrue(result.message().contains("not an absolute path"), result.message());
   }
@@ -283,11 +285,11 @@ class BrowseToolTest {
   void absoluteOutOfRootsParentPath_rejected() {
     var tool =
         new BrowseTool(
-            req -> new FolderBrowseResponse(List.of(), 1, false),
-            () -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
+            (req, context) -> new FolderBrowseResponse(List.of(), 1, false),
+            context -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
 
     OperationResult result =
-        tool.execute("{\"parent_path\": \"C:\\\\other\\\\path\"}");
+        tool.execute("{\"parent_path\": \"C:\\\\other\\\\path\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success(), "Out-of-root path should be rejected: " + result.message());
     assertTrue(result.message().contains("not under any indexed root"), result.message());
   }
@@ -297,14 +299,14 @@ class BrowseToolTest {
     var capturedParent = new AtomicReference<String>();
     var tool =
         new BrowseTool(
-            req -> {
+            (req, context) -> {
               capturedParent.set(req.parentPath());
               return new FolderBrowseResponse(List.of(), 1, false);
             },
-            () -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
+            context -> List.of(new BrowseTool.RootInfo("D:\\Documents", "Documents")));
 
     OperationResult result =
-        tool.execute("{\"parent_path\": \"D:\\\\Documents\\\\subfolder\"}");
+        tool.execute("{\"parent_path\": \"D:\\\\Documents\\\\subfolder\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), "Valid rooted path should be accepted: " + result.message());
     assertEquals("D:\\Documents\\subfolder", capturedParent.get());
   }
@@ -313,13 +315,13 @@ class BrowseToolTest {
   void rootsDoNotShowFileCountOrSize() {
     var tool =
         new BrowseTool(
-            req -> {
+            (req, context) -> {
               fail("Should not call browseCallback");
               return null;
             },
-            () -> List.of(new BrowseTool.RootInfo("D:\\Docs", "Docs")));
+            context -> List.of(new BrowseTool.RootInfo("D:\\Docs", "Docs")));
 
-    OperationResult result = tool.execute("{}");
+    OperationResult result = tool.execute("{}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertFalse(
         result.message().contains("files,"),
@@ -333,13 +335,13 @@ class BrowseToolTest {
     var capturedParent = new AtomicReference<String>();
     var tool =
         new BrowseTool(
-            req -> {
+            (req, context) -> {
               capturedParent.set(req.parentPath());
               return new FolderBrowseResponse(List.of(), 1, false);
             },
-            () -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
+            context -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"docs/explanation\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"docs/explanation\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), "Relative path matching root name should resolve: " + result.message());
     assertEquals("D:\\data\\docs\\explanation", capturedParent.get());
   }
@@ -349,13 +351,13 @@ class BrowseToolTest {
     var capturedParent = new AtomicReference<String>();
     var tool =
         new BrowseTool(
-            req -> {
+            (req, context) -> {
               capturedParent.set(req.parentPath());
               return new FolderBrowseResponse(List.of(), 1, false);
             },
-            () -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
+            context -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"docs\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"docs\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), "Root name alone should resolve: " + result.message());
     assertEquals("D:\\data\\docs", capturedParent.get());
   }
@@ -364,16 +366,16 @@ class BrowseToolTest {
   void outputShowsRelativePaths() {
     var tool =
         new BrowseTool(
-            req ->
+            (req, context) ->
                 new FolderBrowseResponse(
                     List.of(
                         new FolderBrowseResponse.Folder(
                             "D:\\data\\docs\\explanation", "explanation", 5, 1024, 0)),
                     2,
                     false),
-            () -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
+            context -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(
         result.message().contains("Path: docs/explanation"),
@@ -390,25 +392,31 @@ class BrowseToolTest {
   void toRelativePath_noRoots_returnsAbsolute() {
     // Constructs its own empty-roots tool rather than using browseOnly(): this test's subject IS
     // the no-roots case, which the shared fixture no longer represents.
-    var tool = new BrowseTool(req -> new FolderBrowseResponse(List.of(), 0, false), List::of);
-    assertEquals("D:\\data\\docs", tool.toRelativePath("D:\\data\\docs"));
+    var tool = new BrowseTool((req, context) -> new FolderBrowseResponse(List.of(), 0, false), context -> List.of());
+    assertEquals(
+        "D:\\data\\docs",
+        tool.toRelativePath("D:\\data\\docs", EngineContextTestFixtures.AGENT_LOOP));
   }
 
   @Test
   void toRelativePath_rootMatch_returnsRelative() {
     var tool =
         new BrowseTool(
-            req -> new FolderBrowseResponse(List.of(), 0, false),
-            () -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
-    assertEquals("docs", tool.toRelativePath("D:\\data\\docs"));
-    assertEquals("docs/explanation", tool.toRelativePath("D:\\data\\docs\\explanation"));
+            (req, context) -> new FolderBrowseResponse(List.of(), 0, false),
+            context -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
+    assertEquals(
+        "docs", tool.toRelativePath("D:\\data\\docs", EngineContextTestFixtures.AGENT_LOOP));
+    assertEquals(
+        "docs/explanation",
+        tool.toRelativePath(
+            "D:\\data\\docs\\explanation", EngineContextTestFixtures.AGENT_LOOP));
   }
 
   // --- File listing tests ---
 
   private static BrowseTool browseAndFiles(
       BrowseTool.BrowseCallback browseCb, BrowseTool.FilesCallback filesCb) {
-    return new BrowseTool(browseCb, filesCb, () -> FIXTURE_ROOTS);
+    return new BrowseTool(browseCb, filesCb, context -> FIXTURE_ROOTS);
   }
 
   @Test
@@ -416,8 +424,8 @@ class BrowseToolTest {
     var filesCalled = new AtomicReference<>(false);
     var tool =
         browseAndFiles(
-            req -> new FolderBrowseResponse(List.of(), 1, false),
-            req -> {
+            (req, context) -> new FolderBrowseResponse(List.of(), 1, false),
+            (req, context) -> {
               filesCalled.set(true);
               return new FolderFilesResponse(
                   List.of(
@@ -430,7 +438,7 @@ class BrowseToolTest {
             });
 
     OperationResult result =
-        tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\\\\explanation\"}");
+        tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\\\\explanation\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(filesCalled.get(), "Files callback should be called on auto-fallback");
     assertTrue(result.message().contains("overview.md"), "Should list file name: " + result.message());
@@ -443,12 +451,12 @@ class BrowseToolTest {
     var browseCalled = new AtomicReference<>(false);
     var tool =
         browseAndFiles(
-            req -> {
+            (req, context) -> {
               browseCalled.set(true);
               return new FolderBrowseResponse(
                   List.of(new FolderBrowseResponse.Folder("/sub", "sub", 5, 100, 0)), 1, false);
             },
-            req ->
+            (req, context) ->
                 new FolderFilesResponse(
                     List.of(
                         new FolderFilesResponse.FileEntry(
@@ -457,7 +465,7 @@ class BrowseToolTest {
                     2));
 
     OperationResult result =
-        tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\", \"list_files\": true}");
+        tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\", \"list_files\": true}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertFalse(browseCalled.get(), "Folder browse should NOT be called when list_files=true");
     assertTrue(result.message().contains("readme.md"), "Should list file: " + result.message());
@@ -466,9 +474,9 @@ class BrowseToolTest {
   @Test
   void autoFallback_noFilesCallback_showsNoFolders() {
     // Backward-compat: null filesCallback preserves original "No folders found" behavior
-    var tool = browseOnly(req -> new FolderBrowseResponse(List.of(), 1, false));
+    var tool = browseOnly((req, context) -> new FolderBrowseResponse(List.of(), 1, false));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\empty\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\empty\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(
         result.message().contains("No folders found"),
@@ -479,8 +487,8 @@ class BrowseToolTest {
   void fileOutput_showsRelativePaths() {
     var tool =
         new BrowseTool(
-            req -> new FolderBrowseResponse(List.of(), 1, false),
-            req ->
+            (req, context) -> new FolderBrowseResponse(List.of(), 1, false),
+            (req, context) ->
                 new FolderFilesResponse(
                     List.of(
                         new FolderFilesResponse.FileEntry(
@@ -491,9 +499,9 @@ class BrowseToolTest {
                                 "size_bytes", "1024"))),
                     1,
                     2),
-            () -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
+            context -> List.of(new BrowseTool.RootInfo("D:\\data\\docs", "docs")));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\\\\explanation\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\\\\explanation\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(
         result.message().contains("Path: docs/explanation/overview.md"),
@@ -507,8 +515,8 @@ class BrowseToolTest {
   void fileOutput_formatsSizesReadably() {
     var tool =
         browseAndFiles(
-            req -> new FolderBrowseResponse(List.of(), 1, false),
-            req ->
+            (req, context) -> new FolderBrowseResponse(List.of(), 1, false),
+            (req, context) ->
                 new FolderFilesResponse(
                     List.of(
                         new FolderFilesResponse.FileEntry(
@@ -518,7 +526,7 @@ class BrowseToolTest {
                     2,
                     3));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\docs\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(result.message().contains("256 B"), "Should format bytes: " + result.message());
     assertTrue(result.message().contains("MB"), "Should format megabytes: " + result.message());
@@ -529,10 +537,10 @@ class BrowseToolTest {
     // Both folders AND files are empty — should fall through to original "No folders found" hint
     var tool =
         browseAndFiles(
-            req -> new FolderBrowseResponse(List.of(), 1, false),
-            req -> new FolderFilesResponse(List.of(), 0, 1));
+            (req, context) -> new FolderBrowseResponse(List.of(), 1, false),
+            (req, context) -> new FolderFilesResponse(List.of(), 0, 1));
 
-    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\nonexistent\"}");
+    OperationResult result = tool.execute("{\"parent_path\": \"D:\\\\data\\\\nonexistent\"}", EngineContextTestFixtures.AGENT_LOOP);
     assertTrue(result.success(), result.message());
     assertTrue(
         result.message().contains("No folders found"),
@@ -546,10 +554,10 @@ class BrowseToolTest {
   void listFilesExplicit_withoutParentPath_returnsError() {
     var tool =
         browseAndFiles(
-            req -> new FolderBrowseResponse(List.of(), 0, false),
-            req -> new FolderFilesResponse(List.of(), 0, 0));
+            (req, context) -> new FolderBrowseResponse(List.of(), 0, false),
+            (req, context) -> new FolderFilesResponse(List.of(), 0, 0));
 
-    OperationResult result = tool.execute("{\"list_files\": true}");
+    OperationResult result = tool.execute("{\"list_files\": true}", EngineContextTestFixtures.AGENT_LOOP);
     assertFalse(result.success(), "list_files without parent_path should fail: " + result.message());
     assertTrue(
         result.message().contains("parent_path"),

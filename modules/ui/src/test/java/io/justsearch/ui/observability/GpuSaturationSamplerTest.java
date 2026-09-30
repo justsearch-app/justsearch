@@ -30,7 +30,7 @@ final class GpuSaturationSamplerTest {
     GpuCapabilitiesService svc = mock(GpuCapabilitiesService.class);
     when(svc.snapshot()).thenReturn(caps);
 
-    var sampler = new GpuSaturationSampler(() -> svc, monitor);
+    var sampler = new GpuSaturationSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> svc, monitor);
     sampler.sampleOnce();
 
     // Two samples needed for compute() to begin returning anything; record a second to confirm
@@ -54,7 +54,7 @@ final class GpuSaturationSamplerTest {
     GpuCapabilitiesService svc = mock(GpuCapabilitiesService.class);
     when(svc.snapshot()).thenReturn(caps);
 
-    var sampler = new GpuSaturationSampler(() -> svc, monitor);
+    var sampler = new GpuSaturationSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> svc, monitor);
     sampler.sampleOnce();
     sampler.sampleOnce();
 
@@ -65,7 +65,7 @@ final class GpuSaturationSamplerTest {
   @DisplayName("sampleOnce no-ops when supplier returns null")
   void noOpWhenSupplierReturnsNull() {
     var monitor = new GpuSaturationMonitor(new AtomicLong(0L)::get);
-    var sampler = new GpuSaturationSampler(() -> null, monitor);
+    var sampler = new GpuSaturationSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> null, monitor);
     sampler.sampleOnce();
     assertEquals(GpuSaturationMonitor.STATE_UNKNOWN, monitor.compute(0).state());
   }
@@ -78,7 +78,7 @@ final class GpuSaturationSamplerTest {
     GpuCapabilitiesService goodSvc = mock(GpuCapabilitiesService.class);
     when(goodSvc.snapshot()).thenReturn(new GpuCapabilities(nvmlAvailable(50), null, null));
     var sampler =
-        new GpuSaturationSampler(
+        new GpuSaturationSampler(new io.justsearch.core.execution.TestEngineExecutors(),
             () -> {
               if (callCount.incrementAndGet() == 1) {
                 throw new RuntimeException("transient nvml error");
@@ -107,7 +107,7 @@ final class GpuSaturationSamplerTest {
                     false, null, null, null, null, null, null, null, null, null, null, null, null),
                 null,
                 null));
-    var sampler = new GpuSaturationSampler(() -> svc, monitor);
+    var sampler = new GpuSaturationSampler(new io.justsearch.core.execution.TestEngineExecutors(), () -> svc, monitor);
     sampler.start();
     sampler.start(); // second call is a no-op
     sampler.stop();

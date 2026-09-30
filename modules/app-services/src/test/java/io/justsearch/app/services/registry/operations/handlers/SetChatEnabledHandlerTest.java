@@ -44,7 +44,7 @@ final class SetChatEnabledHandlerTest {
     r.addSpecChangeListener(nudges::incrementAndGet);
 
     SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> spec, () -> r);
-    OperationResult result = handler.execute("{\"enabled\":true}");
+    OperationResult result = handler.execute("{\"enabled\":true}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertTrue(spec.load().chatEnabled(), "spec bit persisted true");
@@ -63,7 +63,7 @@ final class SetChatEnabledHandlerTest {
     r.addSpecChangeListener(nudges::incrementAndGet);
 
     SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> spec, () -> r);
-    OperationResult result = handler.execute("{\"enabled\":false}");
+    OperationResult result = handler.execute("{\"enabled\":false}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertFalse(spec.load().chatEnabled(), "spec bit persisted false");
@@ -75,7 +75,7 @@ final class SetChatEnabledHandlerTest {
   void missingEnabledArgFails() {
     RuntimeSpecStore spec = specStore();
     SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> spec, () -> reconciler(spec));
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("enabled"));
   }
@@ -84,14 +84,14 @@ final class SetChatEnabledHandlerTest {
   void nonBooleanEnabledArgFails() {
     RuntimeSpecStore spec = specStore();
     SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> spec, () -> reconciler(spec));
-    OperationResult result = handler.execute("{\"enabled\":\"yes\"}");
+    OperationResult result = handler.execute("{\"enabled\":\"yes\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
   }
 
   @Test
   void unavailableRuntimeAuthorityFailsGracefully() {
     SetChatEnabledHandler handler = new SetChatEnabledHandler(() -> null, () -> null);
-    OperationResult result = handler.execute("{\"enabled\":true}");
+    OperationResult result = handler.execute("{\"enabled\":true}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(result.success());
     assertTrue(result.message().contains("unavailable"));
   }

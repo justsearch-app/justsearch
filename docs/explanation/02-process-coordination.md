@@ -2,10 +2,34 @@
 title: Process Coordination
 type: explanation
 status: stable
-description: 'MMF signaling, the "Suicide Pact", and the indexing duty cycle.'
+description: "Historical record of the Head/Worker process pair: MMF signalling, the suicide pact, and the indexing duty cycle. The duty cycle survives; the rest was deleted by ADR-0049."
 ---
 
 # Process Coordination
+
+> **Largely historical as of lane F stage A (2026-09). Do not treat this page as current.**
+>
+> The Head and the Worker are one Engine JVM. Item A9 deleted the gRPC server and its
+> interceptors, item A10 deleted the wire client stack (`RemoteKnowledgeClient`) and BOTH ends of
+> the memory-mapped signal bus (`MainSignalBus`, `MmfWorkerSignalBus`), and item A11 deleted the
+> Worker process and its spawner, and item A14 deleted the rest of gRPC — the `service` blocks in
+> `indexing.proto`, `io/justsearch/ipc/v1/infra_diagnostics.proto` and its infra-health service, and
+> the `protoc-gen-grpc-java` generator. No module declares a gRPC dependency now and nothing serves
+> a gRPC method; what survives of `indexing.proto` is its messages, used as in-process port DTOs.
+> Concretely, everything below about port discovery, the suicide
+> pact, the heartbeat, the shutdown byte and `MmfSignalBusCompatibilityTest` describes a shape that
+> no longer exists in the product. The two signals that survived — `main_gpu_active` and
+> `energy_reduced` — are fields on the in-process `GpuSchedulingGauge`
+> (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`), and the dev
+> hot-reload trigger is a request FILE under `<dataDir>/runtime/`
+> (`InProcessWorkerSignalBus.RELOAD_REQUEST_FILENAME`), not a byte.
+>
+> The page is kept, not deleted, because it is the readable record of why the coordination was
+> built this way and what the merge gave up; it is rewritten when lane F stage A closes and the
+> single spawn path (item A13) settles what the process story actually is. The MMF layout classes
+> in `ipc-common` (`MmfWorkerSignalLayoutV1`, `MmfWorkerSignalHeaderV1`) and their test are gone
+> too — item A12 converted the system tests off the Worker process, which was their last reader, so
+> every path in the offset table below is dead code as well as dead prose.
 
 In a multi-process architecture, coordination is the hardest problem. JustSearch uses a custom "Nervous System" built on **Memory-Mapped Files (MMF)** and **gRPC** to ensure sub-millisecond coordination between the Main Process ("Head") and the Knowledge Server ("Body").
 
@@ -22,7 +46,8 @@ The `WorkerSignalBus` uses a tiny 64-byte shared memory segment specifically str
 *   **Safety:** Little-endian byte order is enforced to ensure cross-process compatibility.
 *   **Schema ownership (important)**: the MMF layout constants are single-owned in
     `modules/ipc-common/src/main/java/io/justsearch/ipc/mmf/MmfWorkerSignalLayoutV1.java` to prevent silent drift.
-    A cross-compat test (`MmfSignalBusCompatibilityTest`) ensures Head/Worker agree on offsets/sizes.
+    A cross-compat test used to ensure Head/Worker agreed on offsets/sizes; it was deleted at
+    item A10 with the Worker-side implementation it compared against.
 
 | Offset | Size | Purpose | Writer | Reader |
 | :--- | :--- | :--- | :--- | :--- |
@@ -64,11 +89,11 @@ The Worker throttles indexing while the user is waiting on a foreground request.
 Head→Worker input signal** for this: the Worker observes its own load.
 
 *   **Signal:** `ForegroundLoad` (`modules/worker-services/.../loop/pacing/ForegroundLoad.java`) is a
-    counter of in-flight **search-family gRPC calls**. A single `ServerInterceptor`
-    (`ForegroundLoadInterceptor`, registered in `KnowledgeServerGrpcWiring`) increments it when one
-    of the nine user-waiting `SearchService` methods starts and decrements it on completion, error
-    or cancellation. `IngestService` calls — `IndexStatus` above all — never count, so polling
-    status cannot throttle indexing.
+    counter of in-flight **search-family port calls**. A single producer
+    (`ForegroundLoadGate` in the Engine composition root; before lane F stage A item A9 it was a
+    gRPC `ServerInterceptor`) increments it when one of the nine user-waiting search methods starts
+    and decrements it on completion, error or cancellation. Ingest calls — `IndexStatus` above all —
+    never count, so polling status cannot throttle indexing.
 *   **Policy:** `IndexingPacing` turns that gauge into a duty cycle. While a foreground call is in
     flight (plus a short cooldown after the last one completes), each unit of indexing or backfill
     work is followed by a proportional yield, so indexing keeps at most `foregroundDutyPct` of the
@@ -173,7 +198,7 @@ After port discovery, `KnowledgeServerBootstrap.validateWorkerPid()` verifies th
 
 ### Crash Reporting
 
-`Thread.setDefaultUncaughtExceptionHandler` is installed as the first statement in `main()` for both Head (`HeadlessApp.java`) and Worker (`IndexerWorker.java`). It catches uncaught exceptions on any thread (including virtual threads) and writes a structured crash report before `System.exit(1)`.
+`Thread.setDefaultUncaughtExceptionHandler` is installed as the first statement in `HeadlessApp.main()`. It catches uncaught exceptions on any thread (including virtual threads) and writes a structured crash report before `System.exit(1)`. (There was a second installation in `IndexerWorker.main()` for the Worker process; lane F stage A item A13 deleted that entry point, and the index half now crashes into the Engine's handler.)
 
 `CrashReporter` (`modules/telemetry/`) writes JSON to `<dataDir>/crashes/crash-<role>-<pid>-<epochMs>.json`:
 - Manual JSON via `StringBuilder` (no Jackson — must not itself crash during crash handling)
@@ -271,7 +296,7 @@ When `hotSwapOk === false` and structural changes are detected, the Worker conti
 
 After a successful reload (`hotSwapOk === true`), the MCP reload tool propagates the build stamp:
 
-1. Reads `build-stamp.txt` from the distribution root (`build/install/indexer-worker/build-stamp.txt`).
+1. Reads `build-stamp.txt` from the distribution root (`modules/ui/build/install/ui/build-stamp.txt` — lane F stage A item A13 re-homed `generateBuildStamp` onto the one surviving distribution; it used to stamp `modules/indexer-worker/build/install/indexer-worker/`).
 2. Writes the stamp to `<dataDir>/reload-build-stamp.txt` **before** the MMF signal, to avoid a race with the Worker's sentinel thread that triggers `performReload()`.
 3. After service reconstruction, `DevReloadManager.updateBuildStampFromReloadFile()` reads the reload stamp file and calls `System.setProperty()` to update the running system property.
 
@@ -314,7 +339,15 @@ Aligned 4/8-byte fields are "effectively atomic" on 64-bit x86/ARM platforms. Th
 | Fallback search on Worker failure | NOT PLANNED | Existing circuit breaker + auto-restart is correct. |
 | Multi-worker support | NOT PLANNED | Desktop app with single data directory; complexity not justified. |
 
-## Appendix: gRPC Service Reference
+## Appendix: gRPC Service Reference (historical — the services no longer exist)
+
+None of the services below is declared any more. Item A14 removed the last three `service` blocks
+(`SearchService`, `IngestService`, `HealthService`) from `indexing.proto` and deleted
+`io/justsearch/ipc/v1/infra_diagnostics.proto` outright; `protoc-gen-grpc-java` was dropped from
+`modules/ipc-common/build.gradle.kts` at the same time, so nothing generates a stub. The method
+names and their deadline categories survive as the in-process port calls on
+`SearchServiceCalls` / `IngestServiceCalls` (`modules/app-services/src/main/java/io/justsearch/app/services/worker/`),
+which is why this table is still worth reading.
 
 ### SearchService Methods
 | Method | Deadline | Description |
@@ -349,9 +382,13 @@ Aligned 4/8-byte fields are "effectively atomic" on 64-bit x86/ARM platforms. Th
 ### HealthService
 | Namespace | Methods | Notes |
 | :--- | :--- | :--- |
-| `io.justsearch.ipc` | `Check` (returns `worker_state` enum) | The only health RPC (`indexing.proto`, `service HealthService`) |
+| `io.justsearch.ipc` | `Check` (returned a `worker_state` enum) | Was the only health RPC (`indexing.proto`, `service HealthService`) |
 
-**Note:** `io.justsearch.ipc.v1` carries no health RPCs — its one service is `InfraDiagnosticsService`
-(`infra_diagnostics.proto`, two diagnostics RPCs). An earlier revision of this table listed
-`Liveness` / `Readiness` / `Version` under that namespace; they never existed in either proto file
-(verified 2026-09-06, tempdoc 917 brief correction 4).
+**Note:** `io.justsearch.ipc.v1` never carried a health RPC — its one service was
+`InfraDiagnosticsService` (`infra_diagnostics.proto`, two diagnostics RPCs: `CurrentSnapshot`,
+`StreamSnapshots`). An earlier revision of this table listed `Liveness` / `Readiness` / `Version`
+under that namespace; they never existed in either proto file (verified 2026-09-06, tempdoc 917
+brief correction 4). Item A14 deleted that proto file and its service: nothing dialled either RPC,
+and an HTTP handler over the same `InfraDiagnosticsService` payload already existed
+(`modules/app-observability/src/main/java/io/justsearch/app/observability/InfraHealthController.java`),
+so it was removed rather than migrated.

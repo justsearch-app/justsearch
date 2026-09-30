@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.observability.ledger;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.io.Closeable;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -9,8 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
@@ -62,7 +64,9 @@ public final class ScanRollupLedger implements Closeable {
 
   private final ActionLedgerChangeRegistry registry;
   private final Executor emitExecutor;
+  private final EngineExecutorRegistry.Registration sweeperRegistration;
   private final ScheduledExecutorService sweeper;
+  private final ScheduledFuture<?> sweeperTask;
   private final LongSupplier clock;
   private final long quiesceMs;
 
@@ -71,44 +75,115 @@ public final class ScanRollupLedger implements Closeable {
 
   private volatile boolean closed;
 
-  /** Production wiring: a daemon sweeper thread + the real clock. */
-  public ScanRollupLedger(ActionLedgerChangeRegistry registry) {
+  /** Production wiring: a registry-owned daemon sweeper thread + the real clock. */
+  public ScanRollupLedger(
+      EngineExecutorRegistry processExecutors, ActionLedgerChangeRegistry registry) {
+    this(processExecutors, registry, openSweeper(processExecutors),
+        System::currentTimeMillis, DEFAULT_QUIESCE_MS);
+  }
+
+  private ScanRollupLedger(
+      EngineExecutorRegistry processExecutors,
+      ActionLedgerChangeRegistry registry,
+      SchedulerResources resources,
+      LongSupplier clock,
+      long quiesceMs) {
     this(
+        processExecutors,
         registry,
         null,
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "scan-rollup-ledger");
-              t.setDaemon(true);
-              return t;
-            }),
-        System::currentTimeMillis,
-        DEFAULT_QUIESCE_MS);
+        resources.scheduler(),
+        resources.registration(),
+        clock,
+        quiesceMs);
   }
 
   /**
-   * Test/composition seam. {@code emitExecutor} null ⇒ emit on the {@code sweeper} (production:
-   * never on the publishing thread, so a listener callback cannot re-enter the ledger publish
-   * path); a test passes {@code Runnable::run} for synchronous emission. {@code sweeper} null ⇒ no
-   * periodic quiescence sweep (the test drives {@link #sweep()} itself).
+   * Test/composition seam. The registry is still required for construction; an explicit sweeper
+   * remains a borrowed test scheduler and is not registered or closed by this ledger. A null
+   * sweeper disables periodic quiescence so the test can drive {@link #sweep()} itself.
    */
   ScanRollupLedger(
+      EngineExecutorRegistry processExecutors,
       ActionLedgerChangeRegistry registry,
       Executor emitExecutor,
       ScheduledExecutorService sweeper,
       LongSupplier clock,
       long quiesceMs) {
+    this(processExecutors, registry, emitExecutor, sweeper, null, clock, quiesceMs);
+  }
+
+  private ScanRollupLedger(
+      EngineExecutorRegistry processExecutors,
+      ActionLedgerChangeRegistry registry,
+      Executor emitExecutor,
+      ScheduledExecutorService sweeper,
+      EngineExecutorRegistry.Registration sweeperRegistration,
+      LongSupplier clock,
+      long quiesceMs) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
     this.registry = Objects.requireNonNull(registry, "registry");
+    this.sweeperRegistration = sweeperRegistration;
     this.sweeper = sweeper;
     this.emitExecutor = emitExecutor != null ? emitExecutor : (sweeper != null ? sweeper : Runnable::run);
     this.clock = Objects.requireNonNull(clock, "clock");
     this.quiesceMs = quiesceMs;
-    registry.addEventListener(this::onEvent);
-    if (sweeper != null) {
-      long period = Math.max(1_000L, quiesceMs / 2);
-      sweeper.scheduleWithFixedDelay(this::sweepQuietly, period, period, TimeUnit.MILLISECONDS);
+    try {
+      registry.addEventListener(this::onEvent);
+      if (sweeper != null) {
+        long period = Math.max(1_000L, quiesceMs / 2);
+        this.sweeperTask =
+            sweeper.scheduleWithFixedDelay(
+                this::sweepQuietly, period, period, TimeUnit.MILLISECONDS);
+      } else {
+        this.sweeperTask = null;
+      }
+    } catch (RuntimeException | Error failure) {
+      if (sweeperRegistration != null) {
+        try {
+          sweeperRegistration.close();
+        } catch (RuntimeException | Error cleanupFailure) {
+          failure.addSuppressed(cleanupFailure);
+        }
+      }
+      throw failure;
     }
   }
+
+  private static SchedulerResources openSweeper(EngineExecutorRegistry processExecutors) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.scan-rollup-ledger",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, "scan-rollup-ledger");
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 
   /**
    * The Head learned the worker's scan id (first progress frame). Records the scan as open and
@@ -263,7 +338,13 @@ public final class ScanRollupLedger implements Closeable {
       }
     }
     if (sweeper != null) {
+      if (sweeperTask != null) {
+        sweeperTask.cancel(false);
+      }
       sweeper.shutdownNow();
+    }
+    if (sweeperRegistration != null) {
+      sweeperRegistration.close();
     }
   }
 

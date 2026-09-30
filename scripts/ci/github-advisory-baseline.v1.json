@@ -1,29 +1,19 @@
 {
   "schema": "github-advisory-baseline.v1",
-  "generated_at": "2026-09-05T08:57:56.593Z",
+  "generated_at": "2026-09-12T08:25:53.378Z",
   "source_report": "tmp/github-advisory-report.json",
   "targets": {
     "root": {
       "advisories": []
     },
     "runtime-client": {
-      "advisories": [
-        {
-          "ghsa_id": "GHSA-2883-XCG3-V3HH",
-          "severity": "high"
-        }
-      ]
+      "advisories": []
     },
     "shell": {
       "advisories": []
     },
     "ui-web": {
-      "advisories": [
-        {
-          "ghsa_id": "GHSA-7W5X-HRQM-74C2",
-          "severity": "high"
-        }
-      ]
+      "advisories": []
     },
     "wire-contract": {
       "advisories": []

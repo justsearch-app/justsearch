@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation.spi;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.ContextInjector;
 import io.justsearch.agent.api.conversation.ConversationContext;
 import io.justsearch.agent.api.conversation.InjectorResult;
@@ -291,6 +293,7 @@ public final class RAGContext implements ContextInjector {
 
   @Override
   public InjectorResult inject(ConversationContext ctx) {
+    var engineContext = ctx.engineContext();
     Map<String, Object> body = ctx.requestBody();
     String question = asString(body.get("question"));
     // Tempdoc 603 C2 — prefer the decontextualized standalone question (QueryRewriteInjector runs before
@@ -329,9 +332,9 @@ public final class RAGContext implements ContextInjector {
     // (BM25 pre-search discovers relevant documents from the full index).
     RetrievalAttempt attempt;
     if (docIds.isEmpty()) {
-      attempt = tryOpenRetrieval(budget, question, topK, excludedSourceIds, collection);
+      attempt = tryOpenRetrieval(budget, question, topK, excludedSourceIds, collection, engineContext);
     } else {
-      attempt = tryRetrieveContext(question, docIdSet, topK, excludedSourceIds, collection);
+      attempt = tryRetrieveContext(question, docIdSet, topK, excludedSourceIds, collection, engineContext);
     }
     ContextResult retrieval = attempt.result();
     String context = retrieval == null ? null : retrieval.context();
@@ -405,7 +408,7 @@ public final class RAGContext implements ContextInjector {
       // Tempdoc 610 §J.3 — mirror the worker fallback: never re-inject (via whole-doc fetch) a parent
       // doc whose chunks the user hid. If every selected doc is hidden, this empties to NO_CONTENT.
       List<String> fallbackDocIds = dropExcludedParentDocs(docIds, excludedSourceIds);
-      String fallback = fallbackDocIds.isEmpty() ? null : fetchBatchFallback(fallbackDocIds);
+      String fallback = fallbackDocIds.isEmpty() ? null : fetchBatchFallback(fallbackDocIds, engineContext);
       if (fallback == null || fallback.isBlank()) {
         Map<String, Object> err = errorPayload("No content in selected files", "NO_CONTENT");
         err.put("docIds", docIds);
@@ -701,7 +704,7 @@ public final class RAGContext implements ContextInjector {
 
   private RetrievalAttempt tryRetrieveContext(
       String question, Set<String> docIdSet, int topK, List<String> excludedSourceIds,
-      List<String> collection) {
+      List<String> collection, EngineContext engineContext) {
     try {
       // Tempdoc 610 §J.3 — go through the rich params path so the hidden-source exclusion threads to
       // the Worker. maxContextTokens=0 preserves the scoped path's char-budget behavior.
@@ -709,7 +712,7 @@ public final class RAGContext implements ContextInjector {
           RetrieveContextParams.of(question, topK, 0, docIdSet, excludedSourceIds, collection);
       return RetrievalAttempt.ok(
           documents
-              .retrieveContext(params)
+              .retrieveContext(params, engineContext)
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS));
     } catch (Exception e) {
@@ -723,7 +726,7 @@ public final class RAGContext implements ContextInjector {
       String question,
       int topK,
       List<String> excludedSourceIds,
-      List<String> collection) {
+      List<String> collection, EngineContext engineContext) {
     try {
       // Tempdoc 845 — the honest budget, not a hardcoded 8192/1024. This one crosses the wire as
       // the Worker's maxContextTokens, so it decides how many passages come back: an over-budget
@@ -737,7 +740,7 @@ public final class RAGContext implements ContextInjector {
               question, topK, budgetTokens, Set.of(), excludedSourceIds, collection);
       return RetrievalAttempt.ok(
           documents
-              .retrieveContext(params)
+              .retrieveContext(params, engineContext)
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS));
     } catch (Exception e) {
@@ -781,11 +784,11 @@ public final class RAGContext implements ContextInjector {
     return List.of();
   }
 
-  private String fetchBatchFallback(List<String> docIds) {
+  private String fetchBatchFallback(List<String> docIds, EngineContext engineContext) {
     try {
       Map<String, DocumentRecord> docs =
           documents
-              .fetchBatch(docIds)
+              .fetchBatch(docIds, engineContext)
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       return formatDocuments(docs, docIds);

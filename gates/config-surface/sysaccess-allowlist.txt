@@ -25,7 +25,7 @@
 # Reasons carried over from the retired rules' inline exemptions:
 #   - indexerworker.server.DevReloadManager — dev-only build-stamp updater (tempdoc 371).
 #   - indexerworker.services.IndexStatusOps — reads the stamp via EnvRegistry indirection (371).
-#   - indexerworker.services.GrpcHealthService — JUSTSEARCH_WORKER_HEALTH_SYNTHETIC_DELAY_MS, a
+#   - indexerworker.services.WorkerHealthService — JUSTSEARCH_WORKER_HEALTH_SYNTHETIC_DELAY_MS, a
 #     test-only synthetic-delay hook, default 0/off (374 alpha.25 R13-A).
 #   - workerservices/indexerworker extract.TikaOcrRuntime — native-resource DISCOVERY (locating the
 #     bundled/system Tesseract binary and tessdata via PATH/APPDATA/LOCALAPPDATA/TESSERACT_PATH/
@@ -41,7 +41,7 @@
 # (javac's `lambda$foo$3` is normalised to `foo`), because the index shifts on unrelated edits and a
 # ratchet that cries wolf gets deleted.
 #
-# ---- entries (104 as of 2026-09-02) ----
+# ---- entries (95 as of 2026-09-08) ----
 io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard#allowMismatch
 io.justsearch.aibackend.local.DeterminismProfile#from
 io.justsearch.app.inference.BrainSupervisionPolicy#defaults
@@ -80,7 +80,6 @@ io.justsearch.app.services.ai.runtime.RuntimeActivationService#runDeactivate
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#getJustSearchHome
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#initialRuntimeContext
 io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#resolveOccurrenceBufferSize
-io.justsearch.app.services.bootstrap.phases.BootstrapHelpers#startInfraHealthGrpcServer
 io.justsearch.app.services.bootstrap.phases.ExamplePlugin#enabled
 io.justsearch.app.services.bootstrap.phases.InferenceDecision#createInferenceManager
 io.justsearch.app.services.bootstrap.phases.InferenceDecision#decideInferenceConfigured
@@ -97,17 +96,11 @@ io.justsearch.app.services.worker.KnowledgeServerBootstrap#tryIngestHelpFiles
 io.justsearch.app.services.worker.KnowledgeServerConfig#detectProductionMode
 io.justsearch.app.services.worker.KnowledgeServerConfig#envOrProperty
 io.justsearch.app.services.worker.KnowledgeServerConfig#resolveLibDir
-io.justsearch.app.services.worker.WorkerSpawner#buildCommand
-io.justsearch.app.services.worker.WorkerSpawner#isWindows
-io.justsearch.app.services.worker.WorkerSpawner#spawnWorker
-io.justsearch.app.services.worker.WorkerSpawner#workerJavaBinary
-io.justsearch.app.util.WindowsJobObject#isWindows
 io.justsearch.app.util.WindowsPowerStatus#isWindows
 io.justsearch.applauncher.Launcher#emitSmokeSummary
 io.justsearch.applauncher.Launcher#setIfBlank
 io.justsearch.applauncher.LauncherBootstrap#setIfBlank
 io.justsearch.applauncher.LauncherEnvironment#<init>
-io.justsearch.applauncher.LauncherEnvironment#close
 io.justsearch.applauncher.SmokeDriver#execute
 io.justsearch.benchmarks.EngineVectorIndexBench#main
 io.justsearch.benchmarks.FilteredKnnBench#main
@@ -123,7 +116,7 @@ io.justsearch.indexerworker.extract.TikaOcrRuntime#findTessdataDirectory
 io.justsearch.indexerworker.extract.TikaOcrRuntime#localAppDataHome
 io.justsearch.indexerworker.extract.TikaOcrRuntime#resolve
 io.justsearch.indexerworker.server.DevReloadManager#updateBuildStampFromReloadFile
-io.justsearch.indexerworker.services.GrpcHealthService#parseLongEnv
+io.justsearch.indexerworker.services.WorkerHealthService#parseLongEnv
 io.justsearch.indexerworker.services.IndexStatusOps#buildStamp
 io.justsearch.ort.GpuAutoDetection#isWindows
 io.justsearch.ort.GpuDriverApiProbe#probe
@@ -139,10 +132,7 @@ io.justsearch.telemetry.TracingBootstrap#<init>
 io.justsearch.ui.HeadlessApp#buildApi
 io.justsearch.ui.HeadlessApp#harmonizeDataDirProperties
 io.justsearch.ui.HeadlessApp#hasCudaRuntime
-io.justsearch.ui.HeadlessApp#main
 io.justsearch.ui.HeadlessApp#maybeAutoSelectCuda12Variant
-io.justsearch.ui.HeadlessApp#resolveConfig
-io.justsearch.ui.HeadlessApp#setupInfra
 io.justsearch.ui.api.DebugConditionController#handleClear
 io.justsearch.ui.api.DebugConditionController#handleTrip
 io.justsearch.ui.api.LocalApiServer#handleResetIndex

@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -99,18 +98,24 @@ public final class CommitOps {
 
     // Synchronize only the Lucene interaction: setLiveCommitData must be atomic with commit()
     // to prevent a concurrent caller's metadata from overwriting ours before our commit executes.
-    synchronized (this) {
-      try {
-        LifecycleSnapshot snap = session.snapshot;
-        IndexWriter w = snap != null ? snap.writer() : null;
-        if (w == null) throw new IllegalStateException("IndexWriter not available");
-        w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
-        long start = System.nanoTime();
-        w.commit();
-        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-      } catch (IOException e) {
-        throw new IndexRuntimeIOException(classifyIOException(e), "Commit failed", e);
+    try {
+      synchronized (this) {
+        try {
+          LifecycleSnapshot snap = session.snapshot;
+          IndexWriter w = snap != null ? snap.writer() : null;
+          if (w == null) throw new IllegalStateException("IndexWriter not available");
+          w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
+          long start = System.nanoTime();
+          w.commit();
+          return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        } catch (IOException e) {
+          throw new IndexRuntimeIOException(classifyIOException(e), "Commit failed", e);
+        }
       }
+    } finally {
+      // Run only after leaving this object's monitor. The listener may initiate whole-Engine
+      // shutdown and must not make the shutdown hook wait behind the failed commit's lock.
+      session.reportTerminalWriterFailureIfPresent();
     }
   }
 
@@ -260,10 +265,8 @@ public final class CommitOps {
    * {@link #maybeRefreshBlocking()} to ensure subsequent queries see committed data.
    */
   public void suspendNrtRefresh() {
-    var thread = session.crtrt;
-    if (thread != null) {
-      thread.close(); // Signals finish, joins the thread. One-shot — can't restart.
-      session.crtrt = null;
+    if (session.crtrt != null) {
+      session.stopNrtUntil(System.nanoTime() + RuntimeSession.CLOSE_WAIT_NANOS);
       log.info("NRT refresh thread suspended for bulk backfill");
     }
   }
@@ -297,19 +300,24 @@ public final class CommitOps {
    * pair here reverted it to the continuous 500/50 on the first bulk backfill (885 review B1).
    */
   public void resumeNrtRefresh() {
-    LifecycleSnapshot snap = session.snapshot;
-    if (snap == null || snap.writer() == null || snap.searcherManager() == null) return;
-    if (session.crtrt != null) return; // Already running
+    if (session.isClosing()) return;
+    synchronized (session) {
+      if (session.isClosing()) return;
+      LifecycleSnapshot snap = session.snapshot;
+      if (snap == null || snap.writer() == null || snap.searcherManager() == null) return;
+      if (session.crtrt != null) return; // Already running
 
-    var thread =
-        NrtReopenThreads.create(
-            snap.writer(),
-            snap.searcherManager(),
-            session.nrtReopenTargetMs,
-            session.nrtReopenHardMs);
-    thread.start();
-    session.crtrt = thread;
-    log.info("NRT refresh thread resumed after bulk backfill");
+      var thread =
+          NrtReopenThreads.create(
+              snap.writer(),
+              snap.searcherManager(),
+              session.nrtReopenTargetMs,
+              session.nrtReopenHardMs);
+      session.routeTerminalWriterFailuresFrom(thread);
+      thread.start();
+      session.crtrt = thread;
+      log.info("NRT refresh thread resumed after bulk backfill");
+    }
   }
 
   // ==========================================================================
@@ -319,25 +327,35 @@ public final class CommitOps {
   /**
    * Starts a periodic commit timer that commits when {@code pendingDocs > 0} and no explicit commit
    * has occurred recently. This is the universal safety net that catches writes from any code path
-   * (GrpcIngestService, backfill ops, etc.) even when IndexingLoop is idle.
+   * (WorkerIngestService, backfill ops, etc.) even when IndexingLoop is idle.
    *
    * <p>Call after the runtime is fully started and the writer is available. Only call in read-write
    * mode — read-only runtimes have no writer and no pending writes.
    */
   public void startCommitTimer() {
-    if (commitTimer != null) return;
     long intervalMs = commitTimerIntervalMs();
-    ScheduledExecutorService executor =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "commit-timer");
-              t.setDaemon(true);
-              return t;
-            });
-    this.commitTimer = executor;
-    this.commitTimerFuture =
-        executor.scheduleAtFixedRate(
-            this::timerTick, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+    try {
+      synchronized (session) {
+        if (session.isClosing()) throw new IllegalStateException("Lucene runtime is closing");
+        if (commitTimer != null) return;
+        ScheduledExecutorService executor = session.executorRegistrations.openCommitTimer(r -> {
+          Thread t = new Thread(r, "commit-timer");
+          t.setDaemon(true);
+          return t;
+        });
+        this.commitTimer = executor;
+        this.commitTimerFuture =
+            executor.scheduleAtFixedRate(
+                this::timerTick, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+      }
+    } catch (RuntimeException | Error failure) {
+      try {
+        stopCommitTimer();
+      } catch (RuntimeException | Error cleanup) {
+        failure.addSuppressed(cleanup);
+      }
+      throw failure;
+    }
     log.debug("Commit timer started (interval={}ms)", intervalMs);
   }
 
@@ -373,15 +391,45 @@ public final class CommitOps {
    * Stops the commit timer. Safe to call multiple times or if the timer was never started.
    */
   public void stopCommitTimer() {
-    ScheduledFuture<?> future = this.commitTimerFuture;
-    if (future != null) {
-      future.cancel(false);
-      this.commitTimerFuture = null;
+    stopCommitTimerUntil(System.nanoTime() + RuntimeSession.CLOSE_WAIT_NANOS);
+  }
+
+  void requestCommitTimerStop() {
+    synchronized (session) {
+      if (commitTimerFuture != null) commitTimerFuture.cancel(false);
+      if (commitTimer != null) commitTimer.shutdown();
     }
+  }
+
+  void stopCommitTimerUntil(long deadlineNanos) {
+    requestCommitTimerStop();
     ScheduledExecutorService executor = this.commitTimer;
     if (executor != null) {
-      executor.shutdown();
-      this.commitTimer = null;
+      boolean interrupted = Thread.interrupted();
+      try {
+        if (interrupted) executor.shutdownNow();
+        while (!executor.isTerminated()) {
+          long remaining = deadlineNanos - System.nanoTime();
+          if (remaining <= 0) {
+            executor.shutdownNow();
+            log.warn("Commit timer close deadline exceeded; callback still owns Lucene resources");
+            throw new IllegalStateException("Commit timer still running after close deadline");
+          }
+          try { executor.awaitTermination(remaining, TimeUnit.NANOSECONDS); }
+          catch (InterruptedException expected) {
+            interrupted = true;
+            executor.shutdownNow();
+          }
+        }
+        synchronized (session) {
+          if (this.commitTimer == executor) {
+            this.commitTimerFuture = null;
+            this.commitTimer = null;
+          }
+        }
+      } finally {
+        if (interrupted) Thread.currentThread().interrupt();
+      }
       log.debug("Commit timer stopped");
     }
   }

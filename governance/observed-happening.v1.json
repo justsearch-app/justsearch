@@ -32,10 +32,10 @@
       "note": "Tempdoc 550 Thesis I (shipped) — one action record; operation-history and terminal indexing-job outcomes (ActionEvent.Index) are federated contributors projected from the one record, not competing sources."
     },
     {
-      "id": "head-log",
+      "id": "engine-log",
       "kind": "diagnostic-channel",
-      "canonicalSource": "core.head-log",
-      "contributors": ["core.head-log"],
+      "canonicalSource": "core.engine-log",
+      "contributors": ["core.engine-log"],
       "projections": ["jf-log-surface"],
       "stateful": false
     },

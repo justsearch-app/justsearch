@@ -6,6 +6,7 @@ import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.api.conversation.ConversationStore;
 import io.justsearch.agent.api.interaction.InteractionEvent;
 import io.justsearch.agent.api.interaction.InteractionEventKind;
+import io.justsearch.core.execution.EngineExecutorRegistry;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -49,12 +50,31 @@ public final class InteractionThreadController {
   private final AgentService agentService;
   private final io.justsearch.agent.BackgroundRunService backgroundRunService;
 
-  public InteractionThreadController(ConversationStore conversationStore, AgentService agentService) {
+  public InteractionThreadController(
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      ConversationStore conversationStore,
+      AgentService agentService,
+      EngineExecutorRegistry processExecutors) {
+    this(attempts, conversationStore, agentService, processExecutors, null);
+  }
+
+  public InteractionThreadController(
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      ConversationStore conversationStore,
+      AgentService agentService,
+      EngineExecutorRegistry processExecutors,
+      io.justsearch.app.api.EngineAdmissionService admission) {
     this.conversationStore = Objects.requireNonNull(conversationStore, "conversationStore");
     this.agentService = Objects.requireNonNull(agentService, "agentService");
     // Tempdoc 561 P-D2: the real background producer — fires an agent run detached from any watcher,
     // stamped background (safe-by-default), surfaced by presenceSince on the user's return.
-    this.backgroundRunService = new io.justsearch.agent.BackgroundRunService(agentService);
+    this.backgroundRunService =
+        new io.justsearch.agent.BackgroundRunService(attempts, agentService, processExecutors, admission);
+  }
+
+  /** Stops the owned background-run scheduler and cancels pending work. */
+  public void shutdown() {
+    backgroundRunService.shutdown();
   }
 
   /** Handles {@code GET /api/thread/{id}}. */
@@ -191,7 +211,13 @@ public final class InteractionThreadController {
               null,
               conversationId);
       // Schedule with zero delay so the HTTP thread returns immediately; the run executes detached.
-      backgroundRunService.schedule(request, java.time.Duration.ZERO);
+      var incomingContext = RequestEngineContext.get(ctx);
+      var engineContext = io.justsearch.app.services.intent.EngineProvenance.context(
+          incomingContext.clientKind(), incomingContext.clientId(), incomingContext.sessionId(),
+          incomingContext.grantReference(), io.justsearch.agent.api.registry.TransportTag.AGENT_LOOP,
+          io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
+      backgroundRunService.schedule(request, java.time.Duration.ZERO, engineContext);
       ctx.json(Map.of("ok", true, "scheduled", true));
     } catch (Exception e) {
       log.error("Failed to schedule background run", e);

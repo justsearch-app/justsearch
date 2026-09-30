@@ -595,9 +595,10 @@ def _check_build_freshness(base_url: str) -> None:
     """371: Warn if the running backend's build stamp doesn't match the on-disk distribution."""
     from .._paths import REPO_ROOT
 
+    # Lane F stage A item A13: the ADR-0021 stamp moved with its producing task from the deleted
+    # Worker distribution to the one surviving Engine distribution.
     stamp_path = (
-        REPO_ROOT / "modules" / "indexer-worker" / "build" / "install"
-        / "indexer-worker" / "build-stamp.txt"
+        REPO_ROOT / "modules" / "ui" / "build" / "install" / "ui" / "build-stamp.txt"
     )
     if not stamp_path.exists():
         log.debug("No build-stamp.txt found at %s — skipping freshness check", stamp_path)

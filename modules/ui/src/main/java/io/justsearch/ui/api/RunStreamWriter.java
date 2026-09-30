@@ -58,9 +58,9 @@ import tools.jackson.databind.json.JsonMapper;
  * </ol>
  *
  * <p><strong>Frame order deviates from §15.1.2's sentence, deliberately.</strong> That sentence
- * puts the snapshot AFTER {@code replay_truncated}; this writer emits the snapshot before the
- * subscribe attempt in BOTH branches, because §6.1 is the stronger statement: the primer is pushed
- * before the replay so it is the one frame guaranteed to arrive. Emitting it after a successful
+ * puts the snapshot AFTER {@code replay_truncated}; this writer validates/registers first, then
+ * emits the primer before truncation and replay in both branches. The primer must arrive before
+ * the retained narrative. Emitting it after a successful
  * replay would put it behind thousands of narrative frames on exactly the reattach that needs it
  * first.
  */
@@ -90,10 +90,12 @@ public final class RunStreamWriter {
 
   private final SseClient client;
   private final RunChannel run;
+  private final SseConnection connection;
 
-  private RunStreamWriter(SseClient client, RunChannel run) {
+  private RunStreamWriter(SseClient client, RunChannel run, Runnable onClientClose) {
     this.client = Objects.requireNonNull(client, "client");
     this.run = Objects.requireNonNull(run, "run");
+    this.connection = new SseConnection(client, Objects.requireNonNull(onClientClose, "onClientClose"));
   }
 
   /**
@@ -107,37 +109,42 @@ public final class RunStreamWriter {
       RunChannel run,
       ScheduledExecutorService heartbeatScheduler,
       long heartbeatSeconds) {
+    return attach(client, run, heartbeatScheduler, heartbeatSeconds, () -> {});
+  }
+
+  /** The creating run supplies its waiting-client transition; observers supply cleanup only. */
+  public static Optional<RunStreamWriter> attach(
+      SseClient client,
+      RunChannel run,
+      ScheduledExecutorService heartbeatScheduler,
+      long heartbeatSeconds,
+      Runnable onClientClose) {
     Objects.requireNonNull(run, "run");
     Objects.requireNonNull(heartbeatScheduler, "heartbeatScheduler");
     SseEnvelopeWriter.forceSseHeaders(client);
-    RunStreamWriter writer = new RunStreamWriter(client, run);
-
+    RunStreamWriter writer = new RunStreamWriter(client, run, onClientClose);
+    try {
     OptionalCursor cursor = writer.readCursor();
     if (cursor.rejected()) {
+      // No operation has started. A malformed cursor's error is not a lost waiting client.
       writer.sendError(cursor.rejection(), ApiErrorCode.INVALID_REQUEST);
       return Optional.empty();
     }
 
-    writer.sendRunStarted();
-    run.snapshot().ifPresent(writer::sendSnapshot);
-
-    SseStreamChannel.Subscription subscription = writer.subscribeFrom(cursor.sinceSeq());
-
-    var heartbeat =
-        heartbeatScheduler.scheduleAtFixedRate(
-            writer::sendHeartbeat, heartbeatSeconds, heartbeatSeconds, TimeUnit.SECONDS);
-
-    client.onClose(
-        () -> {
-          subscription.unsubscribe();
-          heartbeat.cancel(false);
-        });
-    // The run being over is not the client's decision to notice: without this the connection would
-    // hang open on a retired run until the socket happened to fail a write.
-    run.onRetire(client::close);
-
-    client.keepAlive();
+    writer.connection.start();
+    if (writer.connection.isClosed()) return Optional.of(writer);
+    boolean retiredAtAttach = run.retired();
+    if (!retiredAtAttach) run.onRetire(writer.connection::terminate);
+    writer.subscribeFrom(cursor.sinceSeq());
+    if (writer.connection.isClosed()) return Optional.of(writer);
+    writer.connection.own(heartbeatScheduler.scheduleAtFixedRate(writer::sendHeartbeat,
+        heartbeatSeconds, heartbeatSeconds, TimeUnit.SECONDS));
+    if (retiredAtAttach) writer.connection.terminate();
     return Optional.of(writer);
+    } catch (RuntimeException | Error failure) {
+      writer.connection.terminateAfter(failure);
+      throw failure;
+    }
   }
 
   /**
@@ -145,21 +152,30 @@ public final class RunStreamWriter {
    * so and fall back to the path that always succeeds.
    */
   private SseStreamChannel.Subscription subscribeFrom(long sinceSeq) {
-    Optional<SseStreamChannel.Subscription> resumed = run.observe(this::sendEnvelope, sinceSeq);
+    Optional<SseStreamChannel.Subscription> resumed =
+        run.observe(this::sendEnvelope, sinceSeq, () -> sendPrefix(null), connection::own);
     if (resumed.isPresent()) {
       return resumed.get();
     }
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("sinceSeq", sinceSeq);
     body.put("oldestRetainedSeq", run.channel().oldestRetainedSeq());
-    sendLifecycle(new RunFrame(REPLAY_TRUNCATED_EVENT, body));
-    return run.observe(this::sendEnvelope, 0)
+    return run.observe(this::sendEnvelope, 0, () -> sendPrefix(body), connection::own)
         .orElseThrow(
             () ->
                 new IllegalStateException(
                     "subscribeAndReplay(listener, 0) must always succeed — the resume window "
                         + "rejects only a cursor ahead of the stream or behind the retained "
                         + "window, and 0 is neither"));
+  }
+
+  private void sendPrefix(Map<String, Object> truncated) {
+    sendRunStarted();
+    if (connection.isClosed()) return;
+    run.snapshot().ifPresent(this::sendSnapshot);
+    if (truncated != null && !connection.isClosed()) {
+      sendLifecycle(new RunFrame(REPLAY_TRUNCATED_EVENT, truncated));
+    }
   }
 
   private OptionalCursor readCursor() {
@@ -204,7 +220,12 @@ public final class RunStreamWriter {
 
   /** Package-private for the heartbeat schedule; also the seam the cadence test drives. */
   void sendHeartbeat() {
-    sendLifecycle(RunFrame.of(HEARTBEAT_EVENT));
+    try {
+      sendLifecycle(RunFrame.of(HEARTBEAT_EVENT));
+    } catch (RuntimeException | Error failure) {
+      connection.terminateAfter(failure);
+      throw failure;
+    }
   }
 
   /** The one SSE {@code error} shape, matching what the chat surface already emits. */
@@ -227,6 +248,7 @@ public final class RunStreamWriter {
   }
 
   private void sendEnvelope(SseEnvelope envelope) {
+    if (connection.isClosed()) return;
     RunFrame frame =
         RunFrame.from(envelope)
             .orElseThrow(
@@ -236,7 +258,11 @@ public final class RunStreamWriter {
     try {
       // The TWO-arg sendEvent, deliberately: the three-arg form writes an `id:` line, which would
       // re-open Last-Event-ID as a second, unvalidated resume channel beside ?sinceSeq (§1.6).
-      client.sendEvent(frame.event(), MAPPER.writeValueAsString(frame.data()));
+      synchronized (client) {
+        if (!connection.isClosed()) {
+          client.sendEvent(frame.event(), MAPPER.writeValueAsString(frame.data()));
+        }
+      }
     } catch (RuntimeException e) {
       log.debug("Run stream frame send failed; the observer will be evicted on this throw", e);
       throw e;

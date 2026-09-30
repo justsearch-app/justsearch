@@ -1,0 +1,204 @@
+{
+  "revision": "082119b34 + final workflow approval delivery correction",
+  "command": "gradlew.bat :modules:app-services:test --tests '*WorkflowShapeRunnerTest' --tests '*WorkflowToolRunnerImplTest' :modules:ui:test --tests '*AgentControllerApprovalDispatchTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 32,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 8
+  },
+  "tasks": [
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    }
+  ],
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-workflow-approval-negative1012",
+    "c2-3-workflow-approval1013",
+    "c2-3-workflow-approval1014"
+  ],
+  "sources": [
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/WorkflowShapeRunner.java",
+      "sha256": "b1e3c8ec298cd03851148aa46cc570536ebccdc7ea5cae911d9e6139ce3be2e5"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/WorkflowToolRunnerImpl.java",
+      "sha256": "a102ae844360c110818dad6f26deb9b3e5841679e324d1bacde02f9140f4b363"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/WorkflowShapeRunnerTest.java",
+      "sha256": "9daa045519a26a688e449f601b67324a83e93eda0b1282cb9d7910ea32750f25"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/WorkflowToolRunnerImplTest.java",
+      "sha256": "db080fb39179950f85b0863eb19ec6d734c3ce433619fc74e3d5355fa560e121"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/AgentControllerApprovalDispatchTest.java",
+      "sha256": "98c0ade34521d9d1348de2cbb5dfbf4d0b6f6bcf0157c60332a71c9eb5846354"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "tmp/c2-3-workflow-approval-negative1012-counts.json",
+      "bytes": 477,
+      "sha256": "23737f9865ffb40c7c96db224ae196c873fe6f66fb81523975223e8ccf331f7b"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval-negative1012-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowShapeRunnerTest.xml",
+      "bytes": 9838,
+      "sha256": "0753e3fca3e7d5155375c4f59563c96c6f52a9b6354419078a7d1cab3de6a7ff"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval-negative1012-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowToolRunnerImplTest.xml",
+      "bytes": 8891,
+      "sha256": "f0ec73ceab14819c6475c299c30a720bc7a464ab88ffca2a8ac33361cea7589a"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval-negative1012-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22098,
+      "sha256": "cc385ec0d89fd4f372dc3d04a12589227e2b8aa44c6908b3b6363617aa066dff"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval-negative1012-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169243,
+      "sha256": "9faa261c54162ae0a0ed66d690cc76b265041dbb5251925f5831d32807b81d9f"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval-negative1012-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141306,
+      "sha256": "e8ff03cfb33f29b421fee8e0e7e669ee28350d112b8e73d6f922a8fea9a1c2ff"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval-negative1012-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "5e8f998930ebc728d34a21ffb47ab20dd50447cc19c80bab083245ae4f2074af"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval-negative1012.txt",
+      "bytes": 38507,
+      "sha256": "c4451ac07fc22306973508e73735370649e4ed5c9d8b1a624882e5c423ccedf5"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013-counts.json",
+      "bytes": 662,
+      "sha256": "e2975e6642aa8e2539a82c911c9c855a3ac86b052afd6e6d6fa8ddd55765a6c5"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowShapeRunnerTest.xml",
+      "bytes": 3739,
+      "sha256": "dafe8c4a56268fcc000984151a4ebe908a9a91aa3447d19cc32ceb21bed879ef"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowToolRunnerImplTest.xml",
+      "bytes": 1248,
+      "sha256": "0b735cab962570f03d6bde8b6c196a827a84bd3ee8e68220fe8d39e1d9df5bff"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22099,
+      "sha256": "a827347843988c957ef07923b823b3b774247780d97c6324d7f9a2fb80de9a9e"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169243,
+      "sha256": "a7a0a882eaee5079d49cecea52c1b67d6535af5f6ee3af676479190d3d24d806"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141307,
+      "sha256": "be7995945aede8a81e1d5d8a6e50f832f054b93c61b2d4e3fe44105bb841ccdc"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "08fe03541e3287b53be0425be3ec34550f7fd2e50cda7e7096493f989a76809f"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013-xml/ui/test/TEST-io.justsearch.ui.api.AgentControllerApprovalDispatchTest.xml",
+      "bytes": 1265,
+      "sha256": "2bb40f2e12f1c0adab3aea76e49d2aefd2ed661d0c11c8e0729c3f5f289e9929"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "35aaf867b9ac3d481edde2dfb245177accb5e2c07d7dc3180fb87b4f8ceb3ef5"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1013.txt",
+      "bytes": 40645,
+      "sha256": "3d6380e98c51c00f6b7b9f0679896fb2c98e3620e6958ee6c6cb12ea656f3d08"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014-counts.json",
+      "bytes": 673,
+      "sha256": "394d98ff5f86f4b37166c55aab27a79458d99ddea6ae1b5227127b7f46883804"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowShapeRunnerTest.xml",
+      "bytes": 2584,
+      "sha256": "66f0661f1062d385c3e8eb6c98c88965c37d2e4b34907076b2e31510211996e7"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowToolRunnerImplTest.xml",
+      "bytes": 1248,
+      "sha256": "4747442f4b9d1c03b6090475a21c534252567503178f617a7fd83b7a47491734"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22099,
+      "sha256": "3980c6176f59391c1146d0543eee00d9d3cb7d0b9fd8cef9ad35a15a22033114"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169243,
+      "sha256": "8c845f9772581000233ec266f3d8929d275e77c8e55997cd968b1dbbce9317db"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141307,
+      "sha256": "6937739dae7b372ce78a43d5d9eeaff4afdb3dcd917081054372dba987777a17"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "754c178d02ae90e2a4fc374a7993d871cc12f6755f0b903e6448699cb559f388"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014-xml/ui/test/TEST-io.justsearch.ui.api.AgentControllerApprovalDispatchTest.xml",
+      "bytes": 1265,
+      "sha256": "2bb40f2e12f1c0adab3aea76e49d2aefd2ed661d0c11c8e0729c3f5f289e9929"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "35aaf867b9ac3d481edde2dfb245177accb5e2c07d7dc3180fb87b4f8ceb3ef5"
+    },
+    {
+      "path": "tmp/c2-3-workflow-approval1014.txt",
+      "bytes": 8442,
+      "sha256": "4e6b39c182dfacd8c1fe97280b89b08b0b628bc1476e27e9079f5343e186af65"
+    }
+  ],
+  "limits": "Focused backend correction. UI task reused unchanged successful1013 results. Initial1013 cleanup-test expectation and PMD qualifier corrected; intermediate PMD XML was not retained. Prepared references/private preview/nested snapshot remain required."
+}

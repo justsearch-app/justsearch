@@ -37,7 +37,7 @@ In desktop bundles, the Tauri shell sets `JUSTSEARCH_HOME` to the OS app-data di
 - `<JUSTSEARCH_HOME>/models/` – downloaded or BYO GGUF model files
 - `<JUSTSEARCH_HOME>/native-bin/llama-server/` – restored `llama-server.exe` runtime payload
 - `<JUSTSEARCH_HOME>/native-bin/onnxruntime/` – optional ONNX Runtime native payloads installed via runtime packs (used for reranker GPU acceleration when available)
-- `<JUSTSEARCH_HOME>/logs/` – `headless-backend.log`, `worker.log`, `llama-server.log`
+- `<JUSTSEARCH_HOME>/logs/` – `engine.log`, `llama-server.log`
 
 Additional v2 state files under AI Home:
 
@@ -215,8 +215,7 @@ This checklist validates that v3 GPU Booster Pack support is wired end-to-end.
 
 Copy these from AI Home:
 
-- `<JUSTSEARCH_HOME>/logs/headless-backend.log`
-- `<JUSTSEARCH_HOME>/logs/worker.log`
+- `<JUSTSEARCH_HOME>/logs/engine.log`
 - `<JUSTSEARCH_HOME>/logs/llama-server.log` (if Online mode was started)
 
 Also capture snapshots:

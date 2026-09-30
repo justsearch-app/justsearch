@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -52,7 +54,7 @@ public final class SettleIndexHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     boolean expungeDeletesOnly = DEFAULT_EXPUNGE_DELETES_ONLY;
     int maxSegments = DEFAULT_MAX_SEGMENTS;
     if (argumentsJson != null && !argumentsJson.isBlank()) {
@@ -96,7 +98,7 @@ public final class SettleIndexHandler implements OperationHandler {
             300L,
             Map.of("expungeDeletesOnly", expungeDeletesOnly, "maxSegments", maxSegments));
     try {
-      SettleIndexOutcome outcome = indexing.settleIndex(expungeDeletesOnly, maxSegments);
+      SettleIndexOutcome outcome = indexing.settleIndex(expungeDeletesOnly, maxSegments, engineContext);
       if (!outcome.accepted()) {
         handle.release(OpLeaseOutcome.FAILURE);
         return OperationResult.failure(

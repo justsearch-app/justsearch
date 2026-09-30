@@ -47,7 +47,7 @@ final class WorkerCapabilityCorruptLatchTest {
     assertEquals(REMEDY, cap.pendingDetail(), "the remedy sentence is retained with the code");
 
     cap.transition(
-        CapabilityHealth.DEGRADED, LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code(), "gave up");
+        CapabilityHealth.DEGRADED, LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(), "gave up");
     assertEquals(
         CORRUPT,
         cap.pendingReason(),

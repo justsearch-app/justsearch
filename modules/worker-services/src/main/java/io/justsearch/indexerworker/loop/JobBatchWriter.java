@@ -105,7 +105,7 @@ public final class JobBatchWriter {
     writeSpan.setAttribute("embedding.source", embeddingSource);
     try {
       if (staleResolver.tryHandleStale(
-          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write")) {
+          ex.filePath(), ex.envelope(), ex.collection(), ex.artifact(), "before write", ex.provenance(), ex.claim())) {
         batchStats.recordSkipped();
         return;
       }
@@ -158,9 +158,9 @@ public final class JobBatchWriter {
 
       journal.enqueueTransition(
           new JobQueue.IngestionLedgerTransition(
-              ex.filePath(),
+              ex.claim(),
               LedgerEntryFactory.forEnvelope(
-                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy())));
+                  ex.envelope(), ex.collection(), ex.artifact(), contentExtractor.extractionPolicy(), ex.provenance())));
 
       long latencyMs = System.currentTimeMillis() - ex.startTime();
       metrics.recordDocumentIndexed(latencyMs);
@@ -175,8 +175,8 @@ public final class JobBatchWriter {
             ex.filePath(),
             "WRITE_UNAVAILABLE_DRAINING",
             () ->
-                jobQueue.defer(
-                    ex.filePath(),
+                jobQueue.deferClaim(
+                    ex.claim(),
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_UNAVAILABLE_DRAINING,
                         IngestionReasonCodes.WRITE_UNAVAILABLE_DRAINING,
@@ -186,14 +186,14 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy())));
+                        contentExtractor.extractionPolicy(), ex.provenance())));
       } else {
         journal.recordOutcomeSafely(
             ex.filePath(),
             "WRITE_FAILED",
             () ->
-                jobQueue.markFailed(
-                    ex.filePath(),
+                jobQueue.markClaimFailed(
+                    ex.claim(),
                     journal.outcome(
                         IngestionOutcomeClass.WRITE_FAILED,
                         IngestionReasonCodes.WRITE_FAILED,
@@ -203,7 +203,7 @@ public final class JobBatchWriter {
                         ex.envelope(),
                         ex.collection(),
                         ex.artifact(),
-                        contentExtractor.extractionPolicy())));
+                        contentExtractor.extractionPolicy(), ex.provenance())));
         journal.recordFailedMetric(ex.filePath(), ex.artifact().result().mimeType());
         batchStats.recordFailed();
       }

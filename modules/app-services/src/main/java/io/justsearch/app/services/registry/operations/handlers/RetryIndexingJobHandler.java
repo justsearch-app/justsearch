@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -31,7 +33,7 @@ public final class RetryIndexingJobHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     String pathHash;
     try {
       JsonNode root = HandlerJson.MAPPER.readTree(argumentsJson);
@@ -54,7 +56,7 @@ public final class RetryIndexingJobHandler implements OperationHandler {
       return OperationResult.failure("Indexing service unavailable");
     }
     try {
-      Map<String, Object> result = indexing.retryIndexingJob(pathHash);
+      Map<String, Object> result = indexing.retryIndexingJob(pathHash, engineContext);
       boolean retried = Boolean.TRUE.equals(result.get("retried"));
       String previousState = String.valueOf(result.getOrDefault("previousState", ""));
       return retried

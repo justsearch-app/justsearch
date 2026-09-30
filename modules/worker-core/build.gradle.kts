@@ -23,7 +23,6 @@ dependencies {
   implementation(libs.commons.text)
   implementation(libs.commons.codec)
   api(libs.opentelemetry.api)
-  implementation(libs.grpc.stub)  // provides io.grpc.Context, Metadata, ServerInterceptor (via grpc-api transitive)
   implementation(libs.hdrhistogram)
 
   // SQLite for EntityClusterStore (disambiguation) and queue DB health

@@ -139,11 +139,11 @@ public record SubstrateGraph(
               readinessReconciliationTrigger) {}
 
   /**
-   * Diagnostic channel catalogs (core head-log + the composed plugin-contributed channels, tempdoc
+   * Diagnostic channel catalogs (core engine-log + the composed plugin-contributed channels, tempdoc
    * 560 §10.4) + SSE stream registry.
    */
   public record ChannelSubstrate(
-      DiagnosticChannelCatalog headLogCatalog,
+      DiagnosticChannelCatalog engineLogCatalog,
       DiagnosticChannelCatalog pluginChannelCatalog,
       DiagnosticChannelStreamRegistry streams) {}
 

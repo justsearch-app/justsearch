@@ -155,7 +155,9 @@ final class InferenceHandlersTest {
     }
 
     @Override
-    public void triggerOfflineProcessing() {
+    public java.util.concurrent.CompletionStage<io.justsearch.app.api.OfflineProcessingOutcome>
+        triggerOfflineProcessing(io.justsearch.core.context.EngineContext context,
+            java.util.function.Consumer<io.justsearch.app.api.OfflineProcessingOutcome> progress) {
       throw new UnsupportedOperationException("not used by this test");
     }
   }

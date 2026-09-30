@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.databind.JsonNode;
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
@@ -152,11 +154,11 @@ public final class SearchTool implements OperationHandler {
   private final Supplier<ContextBudget> budget;
 
   public SearchTool(SearchCallback searchCallback) {
-    this(searchCallback, (Supplier<List<BrowseTool.RootInfo>>) null);
+    this(searchCallback, (java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>>) null);
   }
 
   public SearchTool(
-      SearchCallback searchCallback, Supplier<List<BrowseTool.RootInfo>> rootsSupplier) {
+      SearchCallback searchCallback, java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> rootsSupplier) {
     this(searchCallback, AgentToolPaths.RootsView.of(rootsSupplier));
   }
 
@@ -181,7 +183,7 @@ public final class SearchTool implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     // Tempdoc 877 §2.1 — the argument keys, and who authors each one. Model-visible: `query`,
     // `limit`, `path_prefix` — exactly what AgentToolsOperationCatalog.searchIndex() declares, which
     // is the only schema the model is shown (AgentOperationEmitter projects op.intf().inputs()).
@@ -222,12 +224,12 @@ public final class SearchTool implements OperationHandler {
       // Resolve relative path_prefix against indexed roots, then validate
       if (pathPrefix != null && !pathPrefix.isBlank()) {
         if (!AgentToolPaths.looksAbsolute(pathPrefix)) {
-          String resolved = rootsView.resolveRelative(pathPrefix);
+          String resolved = rootsView.resolveRelative(pathPrefix, engineContext);
           if (resolved != null) {
             pathPrefix = resolved;
           }
         }
-        String rejection = rootsView.validate(pathPrefix, "path_prefix");
+        String rejection = rootsView.validate(pathPrefix, "path_prefix", engineContext);
         if (rejection != null) {
           return OperationResult.failure(rejection);
         }
@@ -260,7 +262,7 @@ public final class SearchTool implements OperationHandler {
       // cannot hold the agent loop thread forever (it could, before this).
       KnowledgeSearchResponse response =
           io.justsearch.agent.AgentTimeouts.call(
-              "core_search_index", () -> searchCallback.search(request));
+              "core_search_index", () -> searchCallback.search(request, engineContext));
       if (response == null) {
         return OperationResult.failure("Search returned no response");
       }
@@ -651,6 +653,6 @@ public final class SearchTool implements OperationHandler {
   /** Callback for executing search queries against the knowledge index. */
   @FunctionalInterface
   public interface SearchCallback {
-    KnowledgeSearchResponse search(KnowledgeSearchRequest request);
+    KnowledgeSearchResponse search(KnowledgeSearchRequest request, EngineContext engineContext);
   }
 }

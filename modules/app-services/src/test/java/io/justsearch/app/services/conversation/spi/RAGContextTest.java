@@ -979,6 +979,11 @@ final class RAGContextTest {
 
   private static ConversationContext stubCtx(Map<String, Object> body) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> a = new HashMap<>();
       private final Map<String, Object> b = new LinkedHashMap<>(body);
 
@@ -1025,12 +1030,12 @@ final class RAGContextTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(batch.get(docId));
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       Map<String, DocumentRecord> out = new LinkedHashMap<>();
       for (String id : docIds) {
         DocumentRecord r = batch.get(id);
@@ -1041,7 +1046,7 @@ final class RAGContextTest {
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(retrieval);
     }
   }
@@ -1055,19 +1060,19 @@ final class RAGContextTest {
         new ContextResult("", 0, 0, 0, List.of(), "BM25", "", false, List.of());
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       fetchBatchCalls++;
       return CompletableFuture.completedFuture(Map.of());
     }
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       retrieveCalls++;
       lastTopK = topK;
       return CompletableFuture.completedFuture(retrieveResult);
@@ -1083,24 +1088,24 @@ final class RAGContextTest {
     RetrieveContextParams lastParams;
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(Map.of());
     }
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(
           new ContextResult("", 0, 0, 0, List.of(), "BM25", "", false, List.of()));
     }
 
     @Override
-    public CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params) {
+    public CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params, io.justsearch.core.context.EngineContext engineContext) {
       lastParams = params;
       return CompletableFuture.completedFuture(
           new ContextResult("text", 1, 1, 1, List.of(), "BM25", "ok", false, List.of()));
@@ -1116,18 +1121,18 @@ final class RAGContextTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(Map.of());
     }
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.failedFuture(cause);
     }
   }
@@ -1140,12 +1145,12 @@ final class RAGContextTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(batch.get(docId));
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       Map<String, DocumentRecord> out = new LinkedHashMap<>();
       for (String id : docIds) {
         DocumentRecord r = batch.get(id);
@@ -1156,7 +1161,7 @@ final class RAGContextTest {
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.failedFuture(new RuntimeException("retrieval down"));
     }
   }

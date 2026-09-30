@@ -45,7 +45,7 @@ import org.junit.jupiter.api.io.TempDir;
 @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
 // 120s, not 60s: setUp uses the Head's own bounded worker-start retry, whose worst case is three
 // spawn+validate rounds. A budget that a legal slow path can exceed turns a diagnosable failure
-// (with the worker log tail) into a bare timeout.
+// (with the engine log tail) into a bare timeout.
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 final class SchemaMismatchStatusContractTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -58,7 +58,8 @@ final class SchemaMismatchStatusContractTest {
   private ConfigStore prevConfigStore;
   private KnowledgeServerBootstrap bootstrap;
   private LocalApiServer server;
-  private Path workerLogPath;
+  private final io.justsearch.core.execution.TestEngineExecutors executors = new io.justsearch.core.execution.TestEngineExecutors();
+  private Path engineLogPath;
 
   @BeforeEach
   void setup() throws Exception {
@@ -86,31 +87,45 @@ final class SchemaMismatchStatusContractTest {
     // Seed a legacy index with a mismatched stored schema fingerprint.
     seedLegacyIndexWithBogusSchemaFingerprint(dataDir);
 
-    // Start a real worker via KnowledgeServerBootstrap (required for /api/status schema fields).
+    // Start a real index half via KnowledgeServerBootstrap (required for /api/status schema
+    // fields). Lane F stage A item A9: it runs INSIDE this JVM now. Before A9 this spawned the
+    // indexer-worker distribution and waited for it to publish a gRPC port; A9 deleted that
+    // server, so the spawn path cannot come up at all. The property under test — a schema
+    // mismatch surfaces on /api/status as reindexRequired — is unchanged and is now exercised
+    // without a second process, which also removes this test's dependency on the
+    // indexer-worker installDist and its Windows file-lock teardown dance.
     KnowledgeServerConfig config = KnowledgeServerConfig.load();
-    workerLogPath = config.dataDir().resolve("logs").resolve("worker.log");
-    assertTrue(
-        Files.isDirectory(config.workerLibDir()),
-        "❌ Worker distribution required for this test. Build with: ./gradlew :modules:indexer-worker:installDist");
+    // Item A16: one process, one log. This was <dataDir>/logs/worker.log, which nothing has
+    // written since A11 deleted the Worker child — a failure tail read from it was empty.
+    engineLogPath = config.dataDir().resolve("logs").resolve("engine.log");
 
-    bootstrap = new KnowledgeServerBootstrap(config);
+    bootstrap =
+        new KnowledgeServerBootstrap(executors,
+            config,
+            null,
+            new io.justsearch.app.services.lifecycle.WorkerCapability(),
+            new io.justsearch.app.engine.EngineRoot(
+                org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+                org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+                config.deadlineMs(), config.batchSize()));
     try {
       // Same bounded retry the Head uses: on a loaded dev machine a transient PID-validation
       // timeout must not read as a schema-contract failure. (This test never runs in CI — see the
       // @DisabledIfEnvironmentVariable above — so the budget below covers local load only.)
       bootstrap.startWithRetry();
     } catch (Exception e) {
-      String tail = readTailBestEffort(workerLogPath, 12_000);
+      String tail = readTailBestEffort(engineLogPath, 12_000);
       throw new IllegalStateException(
-          "Failed to start KnowledgeServerBootstrap. Worker log tail:\n" + tail, e);
+          "Failed to start KnowledgeServerBootstrap. Engine log tail:\n" + tail, e);
     }
 
     UiSettingsStore settingsStore =
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tmp.resolve("settings.json"));
     Path indexBase = tmp.resolve("index");
     Files.createDirectories(indexBase);
-    server = LocalApiServer.builder(settingsStore, indexBase)
+    server = LocalApiServer.builder(executors, settingsStore, indexBase)
         .knowledgeServer(bootstrap)
+        .perSourceSearch(org.mockito.Mockito.mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class))
         .build();
   }
 
@@ -135,9 +150,11 @@ final class SchemaMismatchStatusContractTest {
       }
     }
 
-    // Windows: Worker subprocess holds file locks on jobs.db/worker.log that the OS
-    // releases lazily (100–2000ms after process exit). Poll-delete regular files so
-    // JUnit @TempDir cleanup only needs to remove empty directories.
+    executors.close();
+
+    // Windows: the index half holds file locks on jobs.db (and, before item A11, the Worker
+    // subprocess held one on worker.log) that the OS releases lazily (100-2000ms after close).
+    // Poll-delete regular files so JUnit @TempDir cleanup only needs to remove empty directories.
     if (tmp != null) {
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
       while (System.nanoTime() < deadline) {
@@ -151,7 +168,7 @@ final class SchemaMismatchStatusContractTest {
       }
     }
 
-    workerLogPath = null;
+    engineLogPath = null;
 
     restoreProp("justsearch.data.dir", prevDataDir);
     restoreProp("justsearch.api.port", prevApiPort);
@@ -234,7 +251,7 @@ final class SchemaMismatchStatusContractTest {
       Thread.sleep(pollMs);
     }
 
-    String workerTail = readTailBestEffort(workerLogPath, 12_000);
+    String engineTail = readTailBestEffort(engineLogPath, 12_000);
     fail(
         "Timed out waiting for /api/status readiness after "
             + timeout.toSeconds()
@@ -244,8 +261,8 @@ final class SchemaMismatchStatusContractTest {
             + (lastError == null ? "<none>" : lastError)
             + ", lastBody="
             + (lastBody == null ? "<none>" : lastBody)
-            + "\nWorker log tail:\n"
-            + workerTail);
+            + "\nEngine log tail:\n"
+            + engineTail);
     throw new IllegalStateException("unreachable");
   }
 
@@ -261,7 +278,7 @@ final class SchemaMismatchStatusContractTest {
     }
   }
 
-  private static void seedLegacyIndexWithBogusSchemaFingerprint(Path dataDir) throws Exception {
+  private void seedLegacyIndexWithBogusSchemaFingerprint(Path dataDir) throws Exception {
     // Worker default when index.collections is absent: collectionName=default.
     //
     // Important (Windows): avoid creating a "legacy" index directly under indexBasePath because
@@ -300,12 +317,14 @@ final class SchemaMismatchStatusContractTest {
     @SuppressWarnings("unchecked")
     Supplier<io.justsearch.indexing.runtime.CommitMetadataSource> typedSupplier =
         (Supplier<io.justsearch.indexing.runtime.CommitMetadataSource>) (Supplier<?>) metadataSupplier;
+    try (var luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors)) {
     RunningRuntime runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 catalog,
                 typedSupplier,
                 new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator())
             .atPath(genPath)
+            .withExecutorRegistrations(luceneExecutors)
             .open();
 
     try {
@@ -326,6 +345,7 @@ final class SchemaMismatchStatusContractTest {
       runtime.commitOps().commitAndTrack();
     } finally {
       runtime.close();
+    }
     }
   }
 

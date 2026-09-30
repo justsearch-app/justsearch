@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.server.ops;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.adapters.lucene.runtime.CleanShutdownMarker;
@@ -19,8 +18,9 @@ import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
-import io.justsearch.indexerworker.rag.ChunkDocumentWriter;
-import io.justsearch.indexerworker.services.GrpcIngestService;
+import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.services.WorkerIngestService;
+import io.justsearch.indexerworker.services.WorkerServiceException;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.RecoverVduProcessingRequest;
 import io.justsearch.ipc.RecoverVduProcessingResponse;
@@ -61,16 +61,16 @@ public final class KnowledgeServerMigrationOps {
       // Tempdoc 598 review Fix E: deterministically finalize the embedding rebuild (flip the ECC to
       // COMPATIBLE iff the green is fully embedded) BEFORE the COMPLETE commit, so that commit stamps
       // the embedding fingerprint deterministically rather than racing the indexing-loop thread.
-      Runnable finalizeEmbeddingRebuildAction,
+      BooleanSupplier finalizeEmbeddingRebuildAction,
       BooleanSupplier verifyGreenCommitMetadataSupplier,
       Runnable drainSwitchBufferAction,
-      Runnable initiateShutdownAction,
       // Tempdoc 915 (live validation D4): flush the worker metrics snapshot before the cutover
       // restart. The snapshot cadence is 60s and the cutover restarts the worker roughly 20s after
       // the migration starts, so the session that performed the cutover was discarded before any
       // snapshot was written - and commit_by_reason therefore never carried migration/cutover in a
       // live run, though both emit sites are production code.
       Runnable flushTelemetryAction,
+      Runnable requestedRestartAction,
       Path dataDir,
       Logger log) {}
 
@@ -87,6 +87,7 @@ public final class KnowledgeServerMigrationOps {
       // Tempdoc 931 §E item 8: rag.chunk_splade.enabled, read from the LIVE resolved config each
       // time a buffered VDU_UPDATE regenerates chunks — a drain can span a config change.
       BooleanSupplier chunkSpladeEnabledSupplier,
+      BooleanSupplier vduReplayAllowed,
       Logger log) {}
 
   public record EnqueueContext(
@@ -222,6 +223,14 @@ public final class KnowledgeServerMigrationOps {
           return;
         }
 
+        if (!context.finalizeEmbeddingRebuildAction().getAsBoolean()) {
+          // Startup root scanning can enqueue before deferred embeddings are ready. A drained
+          // primary queue therefore does not imply that Green's embedding backfill has drained.
+          // Keep the existing SWITCHING deadline and verification; pending work is not failure.
+          Thread.sleep(500);
+          continue;
+        }
+
         try {
           // Tempdoc 598 review Fix E: finalize the embedding rebuild on this (drained) green BEFORE
           // the COMPLETE commit. This deterministically flips the ECC to COMPATIBLE iff the green is
@@ -229,7 +238,6 @@ public final class KnowledgeServerMigrationOps {
           // than racing the indexing-loop thread that would otherwise flip rebuildCompleted. A green
           // that is genuinely not fully embedded is NOT flipped, so its commit lacks the fingerprint
           // and the verification below correctly blocks promotion (no false promote-into-BLOCKED).
-          context.finalizeEmbeddingRebuildAction().run();
           // Phase 5 (folded into Phase 2-3 Step C): commitWithBuildState replaces the
           // setBuildState + commit two-step. Updates ctx.buildState then commits, so
           // the final commit (and any subsequent timer commit) stamps build_state=COMPLETE.
@@ -263,8 +271,9 @@ public final class KnowledgeServerMigrationOps {
           // Best-effort cleanup of stale marker; failure is non-fatal to cutover.
         }
         preserveEvidenceBeforeRestart(context, promoted);
-        context.log().info("Migration cutover complete. Restarting worker to open new active generation...");
-        context.initiateShutdownAction().run();
+        context.log().info("Migration promoted generation {}; requesting Engine restart",
+            promoted == null ? "(unknown)" : promoted.active_generation());
+        context.requestedRestartAction().run();
         return;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -419,27 +428,34 @@ public final class KnowledgeServerMigrationOps {
     if (!(context.jobQueue() instanceof SwitchBufferCapableQueue sbq)) {
       return;
     }
-    List<SwitchBufferCapableQueue.SwitchBufferOp> ops = sbq.listSwitchBufferOps();
+    boolean allowVdu = context.vduReplayAllowed().getAsBoolean();
+    List<SwitchBufferCapableQueue.SwitchBufferOp> ops = sbq.listSwitchBufferOps().stream()
+        .filter(op -> allowVdu || !isVduBufferKind(op.op())).toList();
     if (ops.isEmpty()) {
       return;
     }
     context.log().info("Draining {} buffered ops from durable switch buffer...", ops.size());
 
-    ArrayList<Path> toEnqueue = new ArrayList<>();
+    ArrayList<io.justsearch.indexerworker.queue.SwitchBufferUpsert> toEnqueue = new ArrayList<>();
     boolean mutatedLucene = false;
     boolean allApplied = true;
 
     for (SwitchBufferCapableQueue.SwitchBufferOp op : ops) {
-      if (op == null || op.op() == null || op.payload() == null) {
+      if (op.op() == null || op.payload() == null) {
+        allApplied = false;
         continue;
       }
       String kind = op.op().trim().toUpperCase(Locale.ROOT);
       String payload = op.payload();
+      if (payload.isBlank() || (!"UPSERT".equals(kind) && context.ingestLifecycle() == null)) {
+        allApplied = false;
+        continue;
+      }
       switch (kind) {
         case "UPSERT" -> {
           if (!payload.isBlank()) {
             try {
-              toEnqueue.add(Path.of(payload));
+              toEnqueue.add(io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(payload));
             } catch (Exception e) {
               allApplied = false;
               context
@@ -490,12 +506,18 @@ public final class KnowledgeServerMigrationOps {
             try {
               var node = context.json().readTree(payload);
               String docId = node.path("doc_id").asText();
-              int retryCount = node.path("retry_count").asInt();
+              if (docId.isBlank()) throw new IllegalArgumentException("Buffered VDU mark has no document id");
+              var retry = node.path("retry_count");
+              if (!retry.isIntegralNumber() || !retry.canConvertToInt() || retry.asInt() <= 0) {
+                throw new IllegalArgumentException("Buffered VDU mark has no positive retry count");
+              }
+              int retryCount = retry.asInt();
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING);
               updates.put(SchemaFields.VDU_RETRY_COUNT, String.valueOf(retryCount));
               boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
               if (!updated) {
+                allApplied = false;
                 context.log().warn("Buffered VDU_MARK_PROCESSING: document not found: {}", docId);
               }
               mutatedLucene = true;
@@ -515,11 +537,13 @@ public final class KnowledgeServerMigrationOps {
             try {
               var node = context.json().readTree(payload);
               String docId = node.path("doc_id").asText();
+              if (docId.isBlank()) throw new IllegalArgumentException("Buffered VDU mark has no document id");
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_FAILED);
               updates.put(SchemaFields.VDU_ENRICHMENT, "{\"error\": \"Max retries exceeded\"}");
               boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
               if (!updated) {
+                allApplied = false;
                 context.log().warn("Buffered VDU_MARK_FAILED: document not found: {}", docId);
               }
               mutatedLucene = true;
@@ -537,8 +561,11 @@ public final class KnowledgeServerMigrationOps {
         case "VDU_RECOVER_PROCESSING" -> {
           if (context.ingestLifecycle() != null) {
             try {
-              GrpcIngestService tmp =
-                  new GrpcIngestService(
+              if (!context.json().readTree(payload).isObject()) {
+                throw new IllegalArgumentException("Buffered VDU recovery payload is not an object");
+              }
+              WorkerIngestService tmp =
+                  new WorkerIngestService(
                       context.jobQueue(),
                       null,
                       context.signalBus(),
@@ -546,39 +573,26 @@ public final class KnowledgeServerMigrationOps {
                       context.indexBasePath(),
                       context.activeIndexPath(),
                       context.ingestLifecycle(),
+                      context.ingestLifecycle(),
                       null,
-                      null,
-                      0L,
-                      null);
-              AtomicReference<RecoverVduProcessingResponse> resp = new AtomicReference<>();
-              AtomicReference<Throwable> err = new AtomicReference<>();
-              tmp.recoverVduProcessing(
-                  RecoverVduProcessingRequest.getDefaultInstance(),
-                  new StreamObserver<>() {
-                    @Override
-                    public void onNext(RecoverVduProcessingResponse value) {
-                      resp.set(value);
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                      err.set(t);
-                    }
-
-                    @Override
-                    public void onCompleted() {}
-                  });
-              if (err.get() != null) {
+                      0L);
+              RecoverVduProcessingResponse resp;
+              try {
+                resp =
+                    tmp.recoverVduProcessing(
+                        RecoverVduProcessingRequest.getDefaultInstance(), CallContext.none());
+              } catch (WorkerServiceException wse) {
                 allApplied = false;
                 context
                     .log()
                     .warn(
                         "Failed to replay buffered VDU_RECOVER_PROCESSING (will retry later): key={} err={}",
                         op.key(),
-                        err.get().getMessage());
+                        wse.getMessage());
                 break;
               }
-              int recovered = resp.get() == null ? 0 : resp.get().getRecoveredCount();
+              if (resp == null) throw new IllegalStateException("Buffered VDU recovery has no outcome");
+              int recovered = resp.getRecoveredCount();
               if (recovered > 0) {
                 mutatedLucene = true;
               }
@@ -610,100 +624,20 @@ public final class KnowledgeServerMigrationOps {
               int pageCount = node.path("page_count").asInt(0);
               int outcomeNum = node.path("outcome").asInt(0);
 
-              io.justsearch.ipc.VduUpdateOutcome outcome =
-                  io.justsearch.ipc.VduUpdateOutcome.forNumber(outcomeNum);
-              if (outcome == null
-                  || outcome == io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED) {
-                if ("FAILED".equalsIgnoreCase(vduStatus)) {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED;
-                } else if ("COMPLETED_EMPTY".equalsIgnoreCase(vduStatus)) {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY;
-                } else if (hasExtracted && extracted != null && !extracted.isBlank()) {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT;
-                } else {
-                  outcome = io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY;
-                }
-              }
-
-              Map<String, Object> updates = new HashMap<>();
-
-              switch (outcome) {
-                case VDU_UPDATE_OUTCOME_SUCCESS_TEXT -> {
-                  if (extracted != null && !extracted.isBlank()) {
-                    String preview =
-                        io.justsearch.indexerworker.services.LanguageUtils.contentPreview(extracted, 4096);
-                    updates.put(SchemaFields.CONTENT, extracted);
-                    // Tempdoc 931 §C.6: the content revision moves with the content it describes.
-                    updates.put(
-                        SchemaFields.CONTENT_SHA256,
-                        io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(extracted));
-                    updates.put(SchemaFields.CONTENT_PREVIEW, preview);
-                    updates.put(
-                        SchemaFields.LANGUAGE,
-                        io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage(preview));
-                    updates.put(SchemaFields.VDU_PROCESSED, "true");
-                    updates.put(SchemaFields.VDU_STATUS, "COMPLETED");
-                    updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-                  } else {
-                    updates.put(SchemaFields.VDU_STATUS, "COMPLETED_EMPTY");
-                    updates.put(SchemaFields.VDU_PROCESSED, "true");
-                  }
-                }
-                case VDU_UPDATE_OUTCOME_SUCCESS_EMPTY -> {
-                  updates.put(SchemaFields.VDU_STATUS, "COMPLETED_EMPTY");
-                  updates.put(SchemaFields.VDU_PROCESSED, "true");
-                }
-                case VDU_UPDATE_OUTCOME_FAILED -> {
-                  updates.put(SchemaFields.VDU_STATUS, "FAILED");
-                  updates.put(SchemaFields.VDU_PROCESSED, "true");
-                }
-                default -> {
-                  if (!vduStatus.isBlank()) {
-                    updates.put(SchemaFields.VDU_STATUS, vduStatus);
-                  }
-                  updates.put(SchemaFields.VDU_PROCESSED, "true");
-                }
-              }
-
-              if (!enrichment.isBlank()) {
-                updates.put(SchemaFields.VDU_ENRICHMENT, enrichment);
-              }
-              if (pageCount > 0) {
-                updates.put(SchemaFields.VDU_PAGE_COUNT, String.valueOf(pageCount));
-              }
-
-              boolean updated = context.ingestLifecycle().indexingCoordinator().updateDocument(docId, updates);
-              if (!updated) {
+              var request = io.justsearch.ipc.UpdateVduResultRequest.newBuilder()
+                  .setDocId(docId).setVduStatus(vduStatus).setVduEnrichment(enrichment)
+                  .setPageCount(pageCount).setOutcomeValue(outcomeNum);
+              if (hasExtracted && extracted != null) request.setExtractedContent(extracted);
+              boolean updated = io.justsearch.indexerworker.services.VduResultWriter.apply(
+                  context.ingestLifecycle(), request.build(),
+                  context.chunkSpladeEnabledSupplier().getAsBoolean());
+              if (updated) {
+                mutatedLucene = true;
+                context.log().debug("Replayed buffered VDU_UPDATE: docId={}", docId);
+              } else {
+                allApplied = false;
                 context.log().warn("Buffered VDU_UPDATE: document not found: {}", docId);
-              } else if (outcome == io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT
-                  && extracted != null
-                  && !extracted.isBlank()) {
-                try {
-                  int chunksRegenerated =
-                      ChunkDocumentWriter.regenerateChunksFromExistingParent(
-                          context.ingestLifecycle().documentFieldOps(),
-                          context.ingestLifecycle().indexingCoordinator(),
-                          docId, extracted,
-                          context.chunkSpladeEnabledSupplier().getAsBoolean());
-                  if (chunksRegenerated > 0) {
-                    context
-                        .log()
-                        .debug(
-                            "Buffered VDU_UPDATE: regenerated {} chunks for {}",
-                            chunksRegenerated,
-                            docId);
-                  }
-                } catch (Exception ce) {
-                  context
-                      .log()
-                      .warn(
-                          "Buffered VDU_UPDATE: chunk regeneration failed for {}: {}",
-                          docId,
-                          ce.getMessage());
-                }
               }
-              mutatedLucene = true;
-              context.log().debug("Replayed buffered VDU_UPDATE: docId={} outcome={}", docId, outcome);
             } catch (Exception e) {
               allApplied = false;
               context
@@ -713,21 +647,22 @@ public final class KnowledgeServerMigrationOps {
                       op.key(),
                       e.getMessage());
             }
+          } else {
+            allApplied = false;
           }
         }
         case "SYNC_ROOT" -> {
-          if (context.ingestLifecycle() != null && !payload.isBlank()) {
+          if (context.ingestLifecycle() == null || payload.isBlank()) {
+            allApplied = false;
+          } else {
             try {
-              var node = context.json().readTree(payload);
-              String rootPath = node.path("root_path").asText();
-              boolean force = node.path("force").asBoolean(false);
-              if (rootPath == null || rootPath.isBlank()) {
-                context.log().warn("Buffered SYNC_ROOT missing root_path: key={}", op.key());
-                break;
-              }
+              var buffered = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(payload);
+              String rootPath = buffered.rootPath();
+              boolean force = buffered.force();
+              JobQueue.EnqueueProvenance provenance = buffered.provenance();
 
-              GrpcIngestService tmp =
-                  new GrpcIngestService(
+              WorkerIngestService tmp =
+                  new WorkerIngestService(
                       context.jobQueue(),
                       null,
                       context.signalBus(),
@@ -737,43 +672,24 @@ public final class KnowledgeServerMigrationOps {
                       context.ingestLifecycle(),
                       null,
                       null,
-                      0L,
-                      null);
+                      0L);
               SyncDirectoryRequest req =
                   SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
 
-              AtomicReference<SyncDirectoryResponse> resp = new AtomicReference<>();
-              AtomicReference<Throwable> err = new AtomicReference<>();
-
-              tmp.syncDirectory(
-                  req,
-                  new StreamObserver<>() {
-                    @Override
-                    public void onNext(SyncDirectoryResponse value) {
-                      resp.set(value);
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                      err.set(t);
-                    }
-
-                    @Override
-                    public void onCompleted() {}
-                  });
-
-              if (err.get() != null) {
+              SyncDirectoryResponse r;
+              try {
+                r = tmp.syncDirectoryForReplay(req, provenance);
+              } catch (WorkerServiceException wse) {
                 allApplied = false;
                 context
                     .log()
                     .warn(
                         "Failed to replay buffered SYNC_ROOT (will retry later): key={} err={}",
                         op.key(),
-                        err.get().getMessage());
+                        wse.getMessage());
                 break;
               }
 
-              SyncDirectoryResponse r = resp.get();
               if (r != null && !r.getError().isBlank()) {
                 allApplied = false;
                 context
@@ -824,16 +740,21 @@ public final class KnowledgeServerMigrationOps {
             }
           }
         }
-        default -> context.log().warn("Unknown switch buffer op '{}': key={}", kind, op.key());
+        default -> {
+          allApplied = false;
+          context.log().warn("Unknown switch buffer op '{}': key={}", kind, op.key());
+        }
       }
     }
 
     if (!toEnqueue.isEmpty()) {
-      // 813 Slice B: replayed buffer ops carry only a path — stat for the size (unknown on failure).
-      int enqueued =
-          context
-              .jobQueue()
-              .enqueueEntries(toEnqueue.stream().map(JobQueue.EnqueueEntry::stat).toList());
+      int enqueued = 0;
+      for (var upsert : toEnqueue) {
+        int accepted = context.jobQueue().enqueueEntries(List.of(upsert.entry()), upsert.collection());
+        enqueued += accepted;
+        // A refused enqueue must leave the durable buffer available for the next replay.
+        if (accepted != 1) allApplied = false;
+      }
       context.log().info("Enqueued {} buffered UPSERT ops back into the job queue", enqueued);
     }
 
@@ -854,12 +775,25 @@ public final class KnowledgeServerMigrationOps {
       }
     }
 
+    if (allApplied && ops.stream().anyMatch(op -> isVduBufferKind(op.op()))
+        && !context.vduReplayAllowed().getAsBoolean()) {
+      allApplied = false;
+      context.log().warn("Serving generation changed during VDU replay; retaining snapshot for retry");
+    }
     if (allApplied) {
-      int cleared = sbq.clearSwitchBuffer();
-      context.log().info("Cleared {} buffered ops from durable switch buffer", cleared);
+      try {
+        int cleared = sbq.removeReplayedSwitchBufferOps(ops);
+        context.log().info("Removed {} replayed buffer versions; later admissions remain", cleared);
+      } catch (IllegalStateException failure) {
+        context.log().warn("Failed to remove committed buffer versions; retaining for retry", failure);
+      }
     } else {
       context.log().warn("Not clearing switch buffer because one or more buffered ops failed to replay");
     }
+  }
+
+  private static boolean isVduBufferKind(String kind) {
+    return kind != null && kind.trim().toUpperCase(Locale.ROOT).startsWith("VDU_");
   }
 
   /** Loads watched roots from persisted file + config collections. */

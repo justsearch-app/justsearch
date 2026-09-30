@@ -149,7 +149,7 @@ RRD) describe the reopen/commit cadence:
 
 | Metric | Meaning |
 | :--- | :--- |
-| `index.runtime.commit_count` | every `CommitOps.commitAndTrack` — the commit timer, gRPC deletes, prune and backfill included. Distinct from `worker.commits.total`, which counts only the `IndexingLoop`-attributed commits. |
+| `index.runtime.commit_count` | every `CommitOps.commitAndTrack` — the commit timer, port-call deletes, prune and backfill included. Distinct from `worker.commits.total`, which counts only the `IndexingLoop`-attributed commits. |
 | `index.runtime.reopen_count` | reopens that swapped in a new reader, across every reopen path (background thread, `CommitOps.maybeRefresh*`, the on-demand seam). |
 | `index.runtime.segments_since_reopen` | `IndexWriter.getSegmentInfosCounter()` delta since the last reopen — the backlog of new segments the next reopen has to open. |
 
@@ -452,12 +452,12 @@ Query building is centralized in `buildSimpleContentQuery()`, shared by both dir
 
 ### 5.4 Search Correction Pipeline
 
-When a SIMPLE-mode query returns zero hits, `GrpcSearchService` applies a two-stage correction pipeline:
+When a SIMPLE-mode query returns zero hits, `WorkerSearchService` applies a two-stage correction pipeline:
 
 1. **Zero-hit retry:** `buildFuzzyTextQuery()` resolves each query token to the closest indexed term via `resolveClosestTerm()` (Levenshtein distance + docFreq tiebreaker), then pipes the resolved terms through `buildSimpleContentQuery()` for score parity with normal queries.
 2. **Per-term correction:** When total hits > 0 but some individual terms have zero `docFreq`, `buildPerTermFuzzyQuery()` replaces only the missing terms with their closest resolved equivalents, preserving exact terms.
 
-Both paths set `correctionApplied = true` on the gRPC response and produce scores identical to equivalent exact queries (score parity via shared `buildSimpleContentQuery()` pipeline).
+Both paths set `correctionApplied = true` on the response message and produce scores identical to equivalent exact queries (score parity via shared `buildSimpleContentQuery()` pipeline).
 
 **Key methods in `TextQueryOps`:** `resolveClosestTerm()`, `levenshteinDistance()`, `buildFuzzyTextQuery()`, `buildPerTermFuzzyQuery()`. The facade retains thin delegation stubs for `buildFuzzyTextQuery` and `buildPerTermFuzzyQuery`.
 
@@ -746,7 +746,7 @@ if (twoPhase != null) {
 
 ## 12. Runtime Concurrency Model
 
-`LuceneIndexRuntime` is accessed from multiple threads (gRPC handlers, commit scheduler, close). The following patterns ensure thread safety without heavy locking:
+`LuceneIndexRuntime` is accessed from multiple threads (port-call threads, commit scheduler, close). The following patterns ensure thread safety without heavy locking:
 
 ### 12.1 Volatile Snapshot Accessors
 

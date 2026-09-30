@@ -108,10 +108,12 @@ public final class EmbeddingFingerprint {
     // modelPath instead of re-discovering via EmbeddingOnnxModelDiscovery.resolve(null).
     // Pre-alpha.20 this called resolve(null) which reads EnvRegistry.X.get() (sysprop OR
     // env var only) — diverging from EmbeddingConfig.from(config) which correctly
-    // consults the resolved-config snapshot at ordinal 450. On cold restart the head
-    // sysprop isn't set (Install AI's applyOnnxSettings only runs during install),
-    // and the JUSTSEARCH_MODELS_DIR env var doesn't inherit across GUI launches.
-    // Auto-discovery then failed because paths.modelsDir() was null at the worker.
+    // consults the resolved config. On cold restart the sysprop isn't set (Install AI's
+    // applyOnnxSettings only runs during install), and the JUSTSEARCH_MODELS_DIR env var
+    // doesn't inherit across GUI launches. Auto-discovery then failed because
+    // paths.modelsDir() was null. (Pre-A19 the resolved config reached the index half as a
+    // snapshot at ordinal 450; that tier is deleted — one JVM, one ResolvedConfig — which
+    // changes how the value arrives, not the defect this comment records.)
     // Round-10 evidence: same JVM, 3ms apart — `EmbeddingService created … modelPath=…`
     // followed by `No embedding model found`. They disagreed because they used
     // different config-source priorities. EmbeddingConfig.from already resolves through

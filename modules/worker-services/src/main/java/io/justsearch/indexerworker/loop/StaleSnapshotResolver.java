@@ -62,13 +62,13 @@ public final class StaleSnapshotResolver {
       FileEnvelope envelope,
       String collection,
       ValidatedExtractionArtifact artifact,
-      String timing) {
+      String timing, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
     FileFreshnessSnapshot.SourceValidationResult validation =
         FileFreshnessSnapshot.fromEnvelope(envelope).validateNow();
     if (validation == FileFreshnessSnapshot.SourceValidationResult.FRESH) {
       return false;
     }
-    return handleStale(filePath, envelope, collection, artifact, timing, validation);
+    return handleStale(filePath, envelope, collection, artifact, timing, validation, provenance, claim);
   }
 
   /** Records a caller-proven stale condition through the same fail-closed outcome path. */
@@ -78,11 +78,11 @@ public final class StaleSnapshotResolver {
       String collection,
       ValidatedExtractionArtifact artifact,
       String timing,
-      FileFreshnessSnapshot.SourceValidationResult validation) {
+      FileFreshnessSnapshot.SourceValidationResult validation, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
     if (validation == FileFreshnessSnapshot.SourceValidationResult.FRESH) {
       throw new IllegalArgumentException("Known-stale validation must not be FRESH");
     }
-    return handleStale(filePath, envelope, collection, artifact, timing, validation);
+    return handleStale(filePath, envelope, collection, artifact, timing, validation, provenance, claim);
   }
 
   private boolean handleStale(
@@ -91,7 +91,7 @@ public final class StaleSnapshotResolver {
       String collection,
       ValidatedExtractionArtifact artifact,
       String timing,
-      FileFreshnessSnapshot.SourceValidationResult validation) {
+      FileFreshnessSnapshot.SourceValidationResult validation, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
     IngestionOutcome staleOutcome = ingestionAuthority.staleOutcome(validation, timing);
     if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED) {
       indexedDelta.accept(staleSourceHandler.deleteMissingSource(filePath));
@@ -99,22 +99,22 @@ public final class StaleSnapshotResolver {
           filePath,
           "STALE_DELETED",
           () ->
-              jobQueue.markDone(
-                  filePath,
+              jobQueue.markClaimDone(
+                  claim,
                   staleOutcome,
                   LedgerEntryFactory.forEnvelope(
-                      envelope, collection, artifact, contentExtractor.extractionPolicy())));
+                      envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance)));
       return true;
     }
     journal.recordOutcomeSafely(
         filePath,
         "STALE_DEFER",
         () ->
-            jobQueue.defer(
-                filePath,
+            jobQueue.deferClaim(
+                claim,
                 staleOutcome,
                 LedgerEntryFactory.forEnvelope(
-                    envelope, collection, artifact, contentExtractor.extractionPolicy())));
+                    envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance)));
     return true;
   }
 }

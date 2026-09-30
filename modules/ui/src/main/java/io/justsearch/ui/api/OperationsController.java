@@ -32,8 +32,8 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <ul>
  *   <li>Request body: {@link OperationInvocationRequest} with {@code args},
- *       {@code idempotencyKey} (deferred per §A.5), {@code confirmationToken} (FE-trust
- *       in V1; backend enforcement is a follow-up).
+ *       {@code idempotencyKey} (durable UUIDv7 identity), {@code confirmationToken} (backend-verified
+ *       single-use consent capsule).
  *   <li>Success response (HTTP 200): {@link OperationInvocationResponse} with
  *       {@code success=true} carrying handler {@code message} + optional
  *       {@code executionId} + {@code structuredData}.
@@ -47,10 +47,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>Handler threw uncaught (HTTP 500): {@code errorClass=HANDLER_ERROR}.
  * </ul>
  *
- * <p>HIGH-risk confirmation enforcement is the FE ActionButton's responsibility in V1
- * (per slice 3a-1-2 §A.7); the controller forwards {@code confirmationToken} unchanged
- * to the dispatcher (which currently ignores it). Backend defense-in-depth lands in a
- * future slice.
+ * <p>The dispatcher enforces the backend trust lattice and consumes bound consent capsules.
+ * A known operation key returns its metadata receipt without authorizing a second effect.
  */
 public final class OperationsController {
 
@@ -174,12 +172,18 @@ public final class OperationsController {
             ? Optional.empty()
             : Optional.of(request.confirmationToken());
     try {
-      result = dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken);
+      result = request.preparationNonce() != null
+          ? dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken, RequestEngineContext.get(ctx),
+              request.idempotencyKey(), request.preparationNonce())
+          : request.idempotencyKey() == null
+          ? dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken, RequestEngineContext.get(ctx))
+          : dispatcher.dispatch(op, argumentsJson, provenance, confirmationToken,
+              RequestEngineContext.get(ctx), request.idempotencyKey());
     } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException e) {
       // Slice 487 §4.4: the lattice produced a non-AUTO gate and no token was supplied.
       // Surface the gate behavior + the destination's ConfirmStrategy so the FE can
       // render trust-aware elicitation UX and re-invoke with the token.
-      writeConfirmationRequired(ctx, op, e, argumentsJson, provenance.transport());
+      writeConfirmationRequired(ctx, op, e, argumentsJson, provenance, request.idempotencyKey(), false);
       return;
     } catch (io.justsearch.agent.api.registry.TrustGateDeniedException e) {
       writeError(
@@ -187,6 +191,12 @@ public final class OperationsController {
           403,
           "Trust gate denied operation " + op.id().value() + ": " + e.getMessage(),
           io.justsearch.app.api.ApiErrorCode.TRUST_DENIED.name());
+      return;
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException e) {
+      writeResponse(ctx, 423, OperationInvocationResponse.fromLockedStore());
+      return;
+    } catch (io.justsearch.app.api.operations.OperationStoreException e) {
+      writeStoreFailure(ctx, e);
       return;
     } catch (RuntimeException e) {
       log.warn("Operation handler threw for id={}", op.id().value(), e);
@@ -217,24 +227,14 @@ public final class OperationsController {
    * operator triage.
    */
   private InvocationProvenance resolveProvenance(Context ctx) {
-    String header = ctx.header("X-JustSearch-Transport");
-    java.time.Instant now = clock.instant();
-    if (header == null || header.isBlank()) {
-      return InvocationProvenance.uiButton(now);
-    }
-    TransportTag tag;
-    try {
-      tag = TransportTag.valueOf(header.trim().toUpperCase(java.util.Locale.ROOT));
-    } catch (IllegalArgumentException e) {
-      log.warn(
-          "Unknown X-JustSearch-Transport header value '{}'; falling back to BUTTON",
-          header);
-      return InvocationProvenance.uiButton(now);
-    }
-    return InvocationProvenance.fromTransport(tag, Optional.empty(), now);
+    var engineContext = RequestEngineContext.get(ctx);
+    var transport = TransportTag.valueOf(engineContext.transport());
+    var executor = InvocationProvenance.fromTransport(transport, Optional.empty(), clock.instant()).executor();
+    return io.justsearch.app.services.intent.EngineProvenance.invocation(
+        engineContext, executor, clock.instant(), Optional.empty());
   }
 
-  /** Handles {@code POST /api/operations/{id}/undo}. */
+  /** Handles {@code POST /api/undo/{id}}. */
   public void handleUndo(Context ctx) {
     String idValue = ctx.pathParam("id");
     if (idValue == null || idValue.isBlank()) {
@@ -249,6 +249,8 @@ public final class OperationsController {
     }
 
     String executionId;
+    String operationKey;
+    java.util.UUID preparationNonce;
     Optional<String> confirmationToken;
     try {
       String body = ctx.body();
@@ -263,6 +265,19 @@ public final class OperationsController {
         return;
       }
       executionId = eidNode.asText();
+      var keyNode = parsed.get("idempotencyKey");
+      if (keyNode != null && !keyNode.isNull() && !keyNode.isTextual()) {
+        writeError(ctx, 400, "idempotencyKey must be a string", "BAD_REQUEST");
+        return;
+      }
+      operationKey = keyNode == null || keyNode.isNull() ? null : keyNode.asText();
+      var nonceNode = parsed.get("preparationNonce");
+      preparationNonce = nonceNode == null || nonceNode.isNull() ? null
+          : MAPPER.treeToValue(nonceNode, java.util.UUID.class);
+      if (preparationNonce != null && (operationKey == null || operationKey.isBlank())) {
+        writeError(ctx, 400, "A preparation nonce requires its operation key", "BAD_REQUEST");
+        return;
+      }
       // Tempdoc 875 §C.7: undo now meets the trust lattice, so it accepts the same
       // confirmationToken the invoke path does — the FE re-posts with a minted capsule
       // after the 428 below.
@@ -280,7 +295,12 @@ public final class OperationsController {
     InvocationProvenance provenance = resolveProvenance(ctx);
     OperationResult result;
     try {
-      result = dispatcher.undo(op, executionId, provenance, confirmationToken);
+      result = preparationNonce != null
+          ? dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx),
+              operationKey, preparationNonce)
+          : operationKey == null
+          ? dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx))
+          : dispatcher.undo(op, executionId, provenance, confirmationToken, RequestEngineContext.get(ctx), operationKey);
     } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException e) {
       // Same typed 428 the invoke path emits — the capsule the FE mints must bind to the
       // reversal's canonical arguments, which is what is echoed here.
@@ -289,7 +309,7 @@ public final class OperationsController {
           op,
           e,
           OperationDispatcher.undoArguments(executionId),
-          provenance.transport());
+          provenance, operationKey, true);
       return;
     } catch (io.justsearch.agent.api.registry.TrustGateDeniedException e) {
       writeError(
@@ -297,6 +317,12 @@ public final class OperationsController {
           403,
           "Trust gate denied undo of operation " + op.id().value() + ": " + e.getMessage(),
           io.justsearch.app.api.ApiErrorCode.TRUST_DENIED.name());
+      return;
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException e) {
+      writeResponse(ctx, 423, OperationInvocationResponse.fromLockedStore());
+      return;
+    } catch (io.justsearch.app.api.operations.OperationStoreException e) {
+      writeStoreFailure(ctx, e);
       return;
     } catch (RuntimeException e) {
       log.warn("Undo handler threw for id={}, executionId={}", op.id().value(), executionId, e);
@@ -346,6 +372,17 @@ public final class OperationsController {
     writeResponse(ctx, status, OperationInvocationResponse.error(message, errorClass));
   }
 
+  private void writeStoreFailure(Context ctx, io.justsearch.app.api.operations.OperationStoreException failure) {
+    var response = OperationInvocationResponse.fromStoreFailure(failure);
+    int status = switch (response.errorClass()) {
+      case "BAD_REQUEST" -> 400;
+      case "CONFLICT" -> 409;
+      case "UNAVAILABLE" -> 503;
+      default -> 500;
+    };
+    writeResponse(ctx, status, response);
+  }
+
   /**
    * Slice 487 §4.4: surface a non-AUTO gate decision as a typed HTTP response so
    * the FE can render trust-aware elicitation UX and re-invoke with a token.
@@ -368,7 +405,7 @@ public final class OperationsController {
       Operation op,
       io.justsearch.agent.api.registry.ConfirmationRequiredException e,
       String argumentsJson,
-      TransportTag transport) {
+      InvocationProvenance provenance, String operationKey, boolean undo) {
     java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
     body.put("success", false);
     body.put("errorClass", io.justsearch.app.api.ApiErrorCode.CONFIRMATION_REQUIRED.name());
@@ -377,13 +414,17 @@ public final class OperationsController {
     body.put("sourceTier", e.sourceTier().name());
     body.put("confirmStrategy", confirmStrategyName(e.declaredStrategy()));
     body.put("operationId", op.id().value());
+    String stableKey = e.operationKey() == null ? operationKey : e.operationKey();
+    if (stableKey != null) body.put("operationKey", stableKey);
+    if (e.preparationNonce() != null) body.put("preparationNonce", e.preparationNonce().toString());
     // Tempdoc 550 P1: surface the decision context the ceremony should show — the op's risk,
     // whether the action is reversible (undo-supported), and a short args summary — all already
     // known at gate time. Lets the prompt say "Reindex everything? (HIGH risk, can't be undone)"
     // instead of just the operation id.
     body.put("riskTier", op.policy().risk().name());
     body.put("undoSupported", op.policy().undoSupported());
-    body.put("argsSummary", ArgsSummary.summarize(argumentsJson));
+    body.put("argsSummary", e.approvalPreview() == null
+        ? ArgsSummary.summarize(argumentsJson) : e.approvalPreview().summary());
     // Tempdoc 550 C3: register a pending authorization and hand the FE its id. The FE
     // approves by this id (POST /api/authorizations/approve {pendingId}); the capsule is
     // then minted against the STORED (operationId, argsJson), so the approve gesture cannot
@@ -398,7 +439,7 @@ public final class OperationsController {
               e.gateBehavior(),
               e.getMessage(),
               null,
-              transport);
+              provenance.transport(), RequestEngineContext.get(ctx), provenance, stableKey, undo, e.preparationNonce(), e.approvalPreview());
       body.put("pendingId", pendingId);
       // Tempdoc 655: also broadcast on the pending-authorization SSE stream, so the shell
       // (already open, potentially on a different view than whatever triggered this 428) has one

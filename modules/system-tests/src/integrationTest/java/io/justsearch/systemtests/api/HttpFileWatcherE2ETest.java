@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * Uses generous timeouts (30s) to accommodate slow systems.
  *
  * <p><b>Implementation Note:</b> File watcher is now started for dynamically added roots via HTTP API.
- * {@code RemoteKnowledgeClient.addWatchedRoot()} starts both indexing and file watching.
+ * {@code KnowledgeClient.addWatchedRoot()} starts both indexing and file watching.
  */
 @DisplayName("HTTP File Watcher E2E Tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

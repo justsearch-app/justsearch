@@ -247,10 +247,10 @@ final class SurfaceAreaValidatorTest {
   @Test
   @DisplayName("channel floor: consuming OPERATOR_OVERRIDE channel lifts floor to OPERATOR")
   void operatorOverrideChannelLiftsFloor() {
-    DiagnosticChannel ch = channel("core.head-log", ConsumerPermission.OPERATOR_OVERRIDE);
+    DiagnosticChannel ch = channel("core.engine-log", ConsumerPermission.OPERATOR_OVERRIDE);
     SurfaceConsumes consumes = new SurfaceConsumes(
         Set.of(), Set.of(), Set.of(), Set.of(ch.id()));
-    Surface s = surface("core.head-log-surface", Audience.USER, Placement.STAGE, TrustTier.CORE, consumes);
+    Surface s = surface("core.engine-log-surface", Audience.USER, Placement.STAGE, TrustTier.CORE, consumes);
     var findings = validator.validate(catalogOf(s), List.of(channelCatalog(ch)));
     assertEquals(1, findings.size());
     assertTrue(findings.get(0).issue().contains("OPERATOR"));
@@ -281,18 +281,18 @@ final class SurfaceAreaValidatorTest {
   @Test
   @DisplayName("channel floor: OPERATOR_OVERRIDE channel + OPERATOR audience is accepted")
   void operatorChannelOperatorAudienceAccepted() {
-    DiagnosticChannel ch = channel("core.head-log", ConsumerPermission.OPERATOR_OVERRIDE);
+    DiagnosticChannel ch = channel("core.engine-log", ConsumerPermission.OPERATOR_OVERRIDE);
     SurfaceConsumes consumes = new SurfaceConsumes(
         Set.of(), Set.of(), Set.of(), Set.of(ch.id()));
     Surface s = surface(
-        "core.head-log-surface", Audience.OPERATOR, Placement.STAGE, TrustTier.CORE, consumes);
+        "core.engine-log-surface", Audience.OPERATOR, Placement.STAGE, TrustTier.CORE, consumes);
     assertTrue(validator.validate(catalogOf(s), List.of(channelCatalog(ch))).isEmpty());
   }
 
   @Test
   @DisplayName("§B.A.1: TRUSTED_PLUGIN surface + OPERATOR_OVERRIDE channel + OPERATOR audience accepted (no false-rejection)")
   void noFalseRejectionForSignedPluginOperator() {
-    DiagnosticChannel ch = channel("core.head-log", ConsumerPermission.OPERATOR_OVERRIDE);
+    DiagnosticChannel ch = channel("core.engine-log", ConsumerPermission.OPERATOR_OVERRIDE);
     SurfaceConsumes consumes = new SurfaceConsumes(
         Set.of(), Set.of(), Set.of(), Set.of(ch.id()));
     Surface s = surface(

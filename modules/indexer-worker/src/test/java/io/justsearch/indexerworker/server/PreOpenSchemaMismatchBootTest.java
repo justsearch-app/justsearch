@@ -64,7 +64,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), "f".repeat(64), 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     IndexGenerationManager.State after = stateAfterBoot(layout);
@@ -74,7 +74,7 @@ final class PreOpenSchemaMismatchBootTest {
         "an index whose shape changed must start migrating at boot — this is the whole point of"
             + " making BLUE_GREEN_MIGRATE the production default");
     assertNotNull(after.building_generation(), "a Green generation was allocated");
-    assertTrue(server.getPort() > 0, "and Blue keeps serving while it rebuilds");
+    assertNotNull(server.appServices(), "Blue's service surface is built while Green rebuilds");
   }
 
   /** (a) The same index under the refusing policy. */
@@ -96,7 +96,7 @@ final class PreOpenSchemaMismatchBootTest {
     root.addAppender(appender);
     try {
       KnowledgeServer refusing =
-          new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+          new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
       IOException ex = assertThrows(IOException.class, refusing::start);
       assertTrue(
           KnowledgeServer.isSchemaMismatch(ex),
@@ -144,9 +144,14 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.publishConfig(
         layout.dataDir(), layout.indexBase(), "REBUILD_BACKUP_FIRST");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
-    assertTrue(server.getPort() > 0, "the Worker comes up on the rebuilt index");
+    // Review S7: this asserted `isRunning()`, which after item A9 is two booleans start() sets —
+    // it no longer means "a socket is accepting", so it reads as a much stronger claim than it
+    // makes. `appServices()` is the claim the test actually wants: start() ran to completion and
+    // the service surface was built on the rebuilt index. (Its sibling below already asserts both.)
+    assertNotNull(
+        server.appServices(), "the Worker comes up on the rebuilt index with its services built");
 
     Path backup = soleSiblingWithSuffix(layout.activePath(), ".bak-");
     assertNotNull(
@@ -172,11 +177,11 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), "f".repeat(64), 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "blue_green_migrat");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
-    assertTrue(server.isRunning(), "a misspelled policy is a typo, not a reason to refuse to boot");
-    assertTrue(server.getPort() > 0);
+    assertNotNull(
+        server.appServices(), "a misspelled policy must still build the service surface");
   }
 
   /**
@@ -207,11 +212,11 @@ final class PreOpenSchemaMismatchBootTest {
     appender.start();
     root.addAppender(appender);
     try {
-      server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+      server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
       server.start();
 
-      assertTrue(server.isRunning(), "auto-recovery must still get its chance to run");
-      assertTrue(server.getPort() > 0, "a Worker with no port is a Worker gone");
+      assertNotNull(
+          server.appServices(), "a Worker with no service surface is a Worker gone");
       var messages = appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
       assertEquals(
           1,
@@ -286,7 +291,7 @@ final class PreOpenSchemaMismatchBootTest {
     appender.start();
     root.addAppender(appender);
     try {
-      server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+      server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
       server.start();
 
       assertEquals(
@@ -294,7 +299,7 @@ final class PreOpenSchemaMismatchBootTest {
           stateAfterBoot(layout).migration_state(),
           "a matching index must not be migrated — a detector that fires on everything is not a"
               + " detector");
-      assertTrue(server.getPort() > 0);
+      assertNotNull(server.appServices(), "a matching index builds its service surface");
       assertFalse(
           appender.list.stream()
               .map(ILoggingEvent::getFormattedMessage)
@@ -313,7 +318,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), WorkerBootFixture.NO_FINGERPRINT, 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     IndexGenerationManager.State after = stateAfterBoot(layout);
@@ -332,7 +337,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), WorkerBootFixture.NO_FINGERPRINT, 0);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     assertEquals(

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -195,26 +197,26 @@ public final class AgentToolPaths {
   public static final class RootsView {
 
     /** Nullable: a tool wired without a roots supplier (test constructors) behaves as "no roots". */
-    private final Supplier<List<BrowseTool.RootInfo>> supplier;
+    private final java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> supplier;
 
     private final AtomicBoolean warned = new AtomicBoolean();
 
-    private RootsView(Supplier<List<BrowseTool.RootInfo>> supplier) {
+    private RootsView(java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> supplier) {
       this.supplier = supplier;
     }
 
-    /** Null-tolerant: {@code of(null)} is a view whose {@link #roots()} is always empty. */
-    public static RootsView of(Supplier<List<BrowseTool.RootInfo>> supplier) {
+    /** Null-tolerant: {@code of(null)} is a view whose {@link #roots(EngineContext)} is always empty. */
+    public static RootsView of(java.util.function.Function<EngineContext, List<BrowseTool.RootInfo>> supplier) {
       return new RootsView(supplier);
     }
 
     /** Never throws, never null. A throwing supplier warns ONCE and reads as "no roots". */
-    List<BrowseTool.RootInfo> roots() {
+    List<BrowseTool.RootInfo> roots(EngineContext engineContext) {
       if (supplier == null) {
         return List.of();
       }
       try {
-        List<BrowseTool.RootInfo> got = supplier.get();
+        List<BrowseTool.RootInfo> got = supplier.apply(engineContext);
         return got == null ? List.of() : got;
       } catch (RuntimeException e) {
         if (warned.compareAndSet(false, true)) {
@@ -228,8 +230,8 @@ public final class AgentToolPaths {
      * {@code null} when {@code path} is valid OR when the roots are unknown/empty; otherwise the
      * rejection message from {@link AgentToolPaths#validateAgainstRoots}.
      */
-    String validate(String path, String paramName) {
-      List<BrowseTool.RootInfo> rootInfos = roots();
+    String validate(String path, String paramName, EngineContext engineContext) {
+      List<BrowseTool.RootInfo> rootInfos = roots(engineContext);
       if (rootInfos.isEmpty()) {
         return null;
       }
@@ -241,8 +243,8 @@ public final class AgentToolPaths {
     }
 
     /** The absolute form of a root-relative path, or {@code null} when no root matches. */
-    String resolveRelative(String path) {
-      return resolveRelativePath(path, roots());
+    String resolveRelative(String path, EngineContext engineContext) {
+      return resolveRelativePath(path, roots(engineContext));
     }
   }
 }

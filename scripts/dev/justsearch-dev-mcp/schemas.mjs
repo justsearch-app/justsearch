@@ -95,8 +95,8 @@ export const StartInputSchema = z
     waitLevel: ReadyLevelSchema.optional().describe('Readiness level to wait for after start (default: ready_worker)'),
     skipBuild: z.boolean().optional().describe('Skip the Gradle build step and launch from the '
       + 'artifacts already on disk (default: false). Two consequences, both from tempdoc 844: the '
-      + 'step that is skipped is `assemble + :modules:ui:installDist + :modules:indexer-worker:'
-      + 'installDist` (F4 — `assemble` alone left the launched dist untouched), so a Java edit you '
+      + 'step that is skipped is `assemble + :modules:ui:installDist` (F4 — `assemble` alone left '
+      + 'the launched dist untouched), so a Java edit you '
       + 'have not installed will NOT be in the running stack; and hot reload needs the '
       + 'worker-services classes dir to be paired with those jars, which skipping the build cannot '
       + 'establish. When they are not paired the dev-runner turns hot reload OFF for the run and '
@@ -735,8 +735,9 @@ export const PreflightOutputSchema = z
     ready: z.boolean(),
     // Compatibility booleans remain for older harnesses. `checkStates` is authoritative because
     // false cannot distinguish a verified failure from an observation error.
+    // Lane F stage A item A13 removed `workerDist` from both maps: the Worker distribution it
+    // probed no longer exists, and `headDist` covers the one distribution the Engine launches from.
     checks: z.object({
-      workerDist: z.boolean(),
       headDist: z.boolean(),
       noStaleRun: z.boolean(),
       modelsDir: z.boolean(),
@@ -745,7 +746,6 @@ export const PreflightOutputSchema = z
       llamaVariantResolvable: z.boolean(),
     }),
     checkStates: z.object({
-      workerDist: z.enum(['PASS', 'FAIL', 'UNKNOWN', 'SKIPPED']),
       headDist: z.enum(['PASS', 'FAIL', 'UNKNOWN', 'SKIPPED']),
       noStaleRun: z.enum(['PASS', 'FAIL', 'UNKNOWN', 'SKIPPED']),
       modelsDir: z.enum(['PASS', 'FAIL', 'UNKNOWN', 'SKIPPED']),

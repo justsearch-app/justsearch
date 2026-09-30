@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.services;
 
 import static io.justsearch.indexerworker.services.IngestResponses.*;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
@@ -12,19 +11,15 @@ import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.ipc.BatchResponse;
 import io.justsearch.ipc.DeleteByIdResponse;
 import io.justsearch.ipc.DeleteByPathResponse;
-import io.justsearch.ipc.MarkVduProcessingResponse;
 import io.justsearch.ipc.PruneResponse;
-import io.justsearch.ipc.RecoverVduProcessingResponse;
 import io.justsearch.ipc.SyncDirectoryResponse;
-import io.justsearch.ipc.UpdateVduResultRequest;
-import io.justsearch.ipc.UpdateVduResultResponse;
 import java.nio.file.Path;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * SWITCHING buffer coordination for {@link GrpcIngestService}.
+ * SWITCHING buffer coordination for {@link WorkerIngestService}.
  *
  * <p>During migration cutover (SWITCHING state), mutation requests are durably buffered via the
  * SQLite switch-buffer instead of being applied directly to the index. This class encapsulates
@@ -39,14 +34,7 @@ final class IngestSwitchBufferOps {
   static final String SWITCHBUF_OP_UPSERT = "UPSERT";
   static final String SWITCHBUF_OP_DELETE = "DELETE";
   static final String SWITCHBUF_OP_DELETE_PREFIX = "DELETE_PREFIX";
-  static final String SWITCHBUF_OP_SYNC_ROOT = "SYNC_ROOT";
   static final String SWITCHBUF_OP_PRUNE_PREFIX = "PRUNE_PREFIX";
-  static final String SWITCHBUF_OP_VDU_UPDATE = "VDU_UPDATE";
-  static final String SWITCHBUF_OP_VDU_MARK_FAILED = "VDU_MARK_FAILED";
-  static final String SWITCHBUF_OP_VDU_MARK_PROCESSING = "VDU_MARK_PROCESSING";
-  static final String SWITCHBUF_OP_VDU_RECOVER_PROCESSING = "VDU_RECOVER_PROCESSING";
-
-  private static final String VDU_MAX_RETRIES_EXCEEDED_ERROR = "Max retries exceeded";
 
   private final JobQueue jobQueue;
   private final IndexGenerationManager indexGenerationManager;
@@ -78,76 +66,69 @@ final class IngestSwitchBufferOps {
 
   // ==================== Buffer infrastructure ====================
 
+  /** A buffer write that produces the response the caller answers with, or throws. */
   @FunctionalInterface
-  interface SwitchingBufferOp {
-    boolean run(SwitchBufferCapableQueue sbq) throws Exception;
+  interface SwitchingBufferOp<T> {
+    T run(SwitchBufferCapableQueue sbq) throws Exception;
   }
 
-  void bufferDuringSwitchingOrReplyUnavailable(
-      String context, StreamObserver<?> responseObserver, SwitchingBufferOp bufferOp) {
+  /**
+   * Runs {@code bufferOp} against a switch-buffer-capable queue and returns its response.
+   *
+   * <p>The {@link WorkerServiceException} rethrow must precede the generic catch: a buffer WRITE
+   * failure has already reported its own "Switch buffer write failed during migration" reason, and
+   * letting the catch-all swallow it would re-label that as the different, less specific
+   * "Migration is switching" reply — exactly the pre-conversion behaviour's inverse (before the
+   * conversion the failing write replied and returned false, and this method then returned without
+   * sending a second error).
+   */
+  <T> T bufferDuringSwitchingOrThrow(String context, SwitchingBufferOp<T> bufferOp) {
     if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
       try {
-        if (!bufferOp.run(sbq)) {
-          return;
-        }
-        return;
+        return bufferOp.run(sbq);
+      } catch (WorkerServiceException e) {
+        throw e;
       } catch (Exception e) {
         log.warn("Failed to buffer {} during SWITCHING", context, e);
       }
     }
-    replySwitchingUnavailable(responseObserver);
+    throw switchingUnavailable();
   }
 
-  boolean putSwitchBufferOrReplyUnavailable(
+  void putSwitchBufferOrThrow(
       SwitchBufferCapableQueue sbq,
       String key,
       String operation,
       String payload,
-      String context,
-      StreamObserver<?> responseObserver) {
-    boolean buffered = sbq.putSwitchBuffer(key, operation, payload);
-    if (buffered) {
-      return true;
+      String context) {
+    if (sbq.putSwitchBuffer(key, operation, payload)) {
+      return;
     }
     log.error("Switch buffer write failed for {} during SWITCHING", context);
-    replySwitchBufferUnavailable(responseObserver);
-    return false;
+    throw switchBufferUnavailable();
   }
 
-  static void replySwitchBufferUnavailable(StreamObserver<?> responseObserver) {
-    responseObserver.onError(
-        io.grpc.Status.UNAVAILABLE
-            .withDescription("Switch buffer write failed during migration; retry shortly")
-            .asException());
+  static WorkerServiceException switchBufferUnavailable() {
+    return WorkerServiceException.unavailable(
+        "Switch buffer write failed during migration; retry shortly");
   }
 
-  static void replySwitchingUnavailable(StreamObserver<?> responseObserver) {
-    responseObserver.onError(
-        io.grpc.Status.UNAVAILABLE
-            .withDescription("Migration is switching; retry shortly")
-            .asException());
+  static WorkerServiceException switchingUnavailable() {
+    return WorkerServiceException.unavailable("Migration is switching; retry shortly");
   }
 
   // ==================== Per-endpoint buffer methods ====================
 
-  boolean bufferSubmitBatchDuringSwitching(
-      SwitchBufferCapableQueue sbq,
-      List<Path> validPaths,
-      int totalFiles,
-      int rejected,
-      StreamObserver<BatchResponse> responseObserver) {
+  BatchResponse bufferSubmitBatchDuringSwitching(
+      SwitchBufferCapableQueue sbq, List<Path> validPaths, int totalFiles, int rejected,
+      String collection, JobQueue.EnqueueProvenance provenance) {
     int accepted = 0;
     for (Path p : validPaths) {
       String normalized = PathNormalizer.normalizeKey(p);
-      if (!putSwitchBufferOrReplyUnavailable(
-          sbq,
-          switchBufferPathKey(normalized),
-          SWITCHBUF_OP_UPSERT,
-          normalized,
-          "submitBatch",
-          responseObserver)) {
-        return false;
-      }
+      putSwitchBufferOrThrow(
+          sbq, switchBufferPathKey(normalized), SWITCHBUF_OP_UPSERT,
+          new io.justsearch.indexerworker.queue.SwitchBufferUpsert(normalized, collection, provenance)
+              .encode(), "submitBatch");
       accepted++;
     }
     metrics.recordBatchSubmitted(accepted);
@@ -157,165 +138,50 @@ final class IngestSwitchBufferOps {
         accepted,
         totalFiles,
         rejected);
-    responseObserver.onNext(batchSuccessResponse(accepted));
-    responseObserver.onCompleted();
-    return true;
+    return batchSuccessResponse(accepted);
   }
 
-  boolean bufferUpdateVduResultDuringSwitching(
-      SwitchBufferCapableQueue sbq,
-      UpdateVduResultRequest request,
-      String docId,
-      StreamObserver<UpdateVduResultResponse> responseObserver)
-      throws Exception {
-    String normalizedId = normalizeDocIdForMutation(docId);
-    String payload = updateVduSwitchBufferPayload(request, normalizedId);
-    if (!putSwitchBufferOrReplyUnavailable(
-        sbq,
-        switchBufferVduUpdateKey(normalizedId),
-        SWITCHBUF_OP_VDU_UPDATE,
-        payload,
-        "updateVduResult",
-        responseObserver)) {
-      return false;
-    }
-    responseObserver.onNext(updateVduSuccessResponse());
-    responseObserver.onCompleted();
-    return true;
-  }
-
-  boolean bufferSyncDirectoryDuringSwitching(
-      SwitchBufferCapableQueue sbq,
-      String rootPath,
-      boolean force,
-      StreamObserver<SyncDirectoryResponse> responseObserver)
-      throws Exception {
+  SyncDirectoryResponse bufferSyncDirectoryDuringSwitching(
+      SwitchBufferCapableQueue sbq, String rootPath, boolean force,
+      JobQueue.EnqueueProvenance provenance) throws Exception {
     String resolvedRoot = resolveNormalizedPathPrefix(rootPath);
-    String payload = syncDirectorySwitchBufferPayload(resolvedRoot, force);
-    if (!putSwitchBufferOrReplyUnavailable(
-        sbq,
-        switchBufferSyncRootKey(resolvedRoot),
-        SWITCHBUF_OP_SYNC_ROOT,
-        payload,
-        "syncDirectory",
-        responseObserver)) {
-      return false;
+    if (!sbq.putSyncRoot(switchBufferSyncRootKey(resolvedRoot),
+        new io.justsearch.indexerworker.queue.SwitchBufferSyncRoot(resolvedRoot, force, provenance))) {
+      throw switchBufferUnavailable();
     }
-    responseObserver.onNext(deferredSyncDirectoryResponse());
-    responseObserver.onCompleted();
-    return true;
+    return deferredSyncDirectoryResponse();
   }
 
-  boolean bufferDeleteByPathDuringSwitching(
-      SwitchBufferCapableQueue sbq,
-      String pathPrefix,
-      StreamObserver<DeleteByPathResponse> responseObserver) {
+  DeleteByPathResponse bufferDeleteByPathDuringSwitching(
+      SwitchBufferCapableQueue sbq, String pathPrefix) {
     String normalizedPrefix = normalizeDeletePrefixForMutation(pathPrefix);
-    if (!putSwitchBufferOrReplyUnavailable(
+    putSwitchBufferOrThrow(
         sbq,
         switchBufferPrefixKey(normalizedPrefix),
         SWITCHBUF_OP_DELETE_PREFIX,
         normalizedPrefix,
-        "deleteByPath",
-        responseObserver)) {
-      return false;
-    }
+        "deleteByPath");
     log.info("Buffered deleteByPathPrefix during SWITCHING: {}", normalizedPrefix);
-    responseObserver.onNext(bufferedDeleteByPathResponse());
-    responseObserver.onCompleted();
-    return true;
+    return bufferedDeleteByPathResponse();
   }
 
-  boolean bufferDeleteByIdDuringSwitching(
-      SwitchBufferCapableQueue sbq,
-      String normalizedId,
-      StreamObserver<DeleteByIdResponse> responseObserver) {
-    if (!putSwitchBufferOrReplyUnavailable(
-        sbq,
-        switchBufferPathKey(normalizedId),
-        SWITCHBUF_OP_DELETE,
-        normalizedId,
-        "deleteById",
-        responseObserver)) {
-      return false;
-    }
+  DeleteByIdResponse bufferDeleteByIdDuringSwitching(
+      SwitchBufferCapableQueue sbq, String normalizedId) {
+    putSwitchBufferOrThrow(
+        sbq, switchBufferPathKey(normalizedId), SWITCHBUF_OP_DELETE, normalizedId, "deleteById");
     log.info("Buffered deleteById during SWITCHING: {}", normalizedId);
-    responseObserver.onNext(bufferedDeleteByIdResponse());
-    responseObserver.onCompleted();
-    return true;
+    return bufferedDeleteByIdResponse();
   }
 
-  boolean bufferPruneMissingDuringSwitching(
-      SwitchBufferCapableQueue sbq, String pathPrefix, StreamObserver<PruneResponse> responseObserver) {
+  PruneResponse bufferPruneMissingDuringSwitching(
+      SwitchBufferCapableQueue sbq, String pathPrefix) {
     String prefix = resolveNormalizedPathPrefix(pathPrefix);
-    if (!putSwitchBufferOrReplyUnavailable(
+    putSwitchBufferOrThrow(
         sbq,
         switchBufferPrunePrefixKey(prefix),
         SWITCHBUF_OP_PRUNE_PREFIX,
         prefix,
-        "pruneMissing",
-        responseObserver)) {
-      return false;
-    }
-    responseObserver.onNext(deferredPruneResponse());
-    responseObserver.onCompleted();
-    return true;
+        "pruneMissing");
+    return deferredPruneResponse();
   }
-
-  boolean bufferMarkVduDuringSwitching(
-      SwitchBufferCapableQueue sbq,
-      String normalizedId,
-      int currentCount,
-      int maxRetries,
-      StreamObserver<MarkVduProcessingResponse> responseObserver)
-      throws Exception {
-    MarkVduRetryDecision decision = decideMarkVduRetry(currentCount, maxRetries);
-    if (decision.maxRetriesExceeded()) {
-      String payload = vduMarkFailedSwitchBufferPayload(normalizedId, decision.retryCount());
-      if (!putSwitchBufferOrReplyUnavailable(
-          sbq,
-          switchBufferVduMarkKey(normalizedId),
-          SWITCHBUF_OP_VDU_MARK_FAILED,
-          payload,
-          "markVduProcessing (FAILED)",
-          responseObserver)) {
-        return false;
-      }
-      responseObserver.onNext(markVduErrorResponse(VDU_MAX_RETRIES_EXCEEDED_ERROR));
-      responseObserver.onCompleted();
-      return true;
-    }
-
-    String payload = vduMarkProcessingSwitchBufferPayload(normalizedId, decision.retryCount());
-    if (!putSwitchBufferOrReplyUnavailable(
-        sbq,
-        switchBufferVduMarkKey(normalizedId),
-        SWITCHBUF_OP_VDU_MARK_PROCESSING,
-        payload,
-        "markVduProcessing (PROCESSING)",
-        responseObserver)) {
-      return false;
-    }
-    responseObserver.onNext(markVduSuccessResponse(decision.retryCount()));
-    responseObserver.onCompleted();
-    return true;
-  }
-
-  boolean bufferRecoverVduProcessingDuringSwitching(
-      SwitchBufferCapableQueue sbq, StreamObserver<RecoverVduProcessingResponse> responseObserver)
-      throws Exception {
-    if (!putSwitchBufferOrReplyUnavailable(
-        sbq,
-        SWITCHBUF_KEY_VDU_RECOVER_PROCESSING,
-        SWITCHBUF_OP_VDU_RECOVER_PROCESSING,
-        "{}",
-        "recoverVduProcessing",
-        responseObserver)) {
-      return false;
-    }
-    responseObserver.onNext(recoverVduCountResponse(0));
-    responseObserver.onCompleted();
-    return true;
-  }
-
 }

@@ -265,7 +265,7 @@ final class AgentSessionController {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, "toolName and executionId are required", telemetry, ApiErrorHandler.routeOf(ctx)));
         return;
       }
-      var result = queries().undoOperation(toolName, executionId);
+      var result = queries().undoOperation(toolName, executionId, RequestEngineContext.agent(ctx));
       ctx.json(Map.of(
           "success", result.success(),
           "output", result.message(),

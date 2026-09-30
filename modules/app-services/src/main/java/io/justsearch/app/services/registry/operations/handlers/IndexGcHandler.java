@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -56,7 +58,7 @@ public final class IndexGcHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     int keepLatest = DEFAULT_KEEP_LATEST;
     boolean pruneMarkedOnly = DEFAULT_PRUNE_MARKED_ONLY;
     if (argumentsJson != null && !argumentsJson.isBlank()) {
@@ -97,7 +99,7 @@ public final class IndexGcHandler implements OperationHandler {
         300L,
         Map.of("keepLatest", keepLatest, "pruneMarkedOnly", pruneMarkedOnly));
     try {
-      IndexGcOutcome outcome = indexing.runIndexGc(keepLatest, pruneMarkedOnly);
+      IndexGcOutcome outcome = indexing.runIndexGc(keepLatest, pruneMarkedOnly, engineContext);
       if (!outcome.accepted()) {
         handle.release(OpLeaseOutcome.FAILURE);
         return OperationResult.failure(

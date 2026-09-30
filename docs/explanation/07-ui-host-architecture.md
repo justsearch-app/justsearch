@@ -99,22 +99,22 @@ The `LocalApiServer` exposes REST endpoints that map to controllers:
 *   **UI Ready:** `POST /api/ui/ready`, `GET /api/ui/ready`
 *   **Diagnostics:** `POST /api/diagnostics/export`
 *   **Worker Control:** `POST /api/worker/restart` (restarts the Knowledge Worker for embedding/apply scenarios)
-*   **Debug:** `GET /api/debug/state`, `GET /api/debug/events`, `GET /api/debug/worker-log`, `GET /api/debug/dashboard`, `GET /api/debug/chunks`, `GET /api/debug/effective-config`
+*   **Debug:** `GET /api/debug/state`, `GET /api/debug/events`, `GET /api/debug/engine-log`, `GET /api/debug/dashboard`, `GET /api/debug/chunks`, `GET /api/debug/effective-config`
 
 ## REST contract boundaries (DTO direction)
 
 JustSearch uses **two** API layers:
 
 - **REST (`/api/*`)**: the stable, UI-facing contract owned by the Head process.
-- **gRPC (internal)**: the Head ↔ Worker contract used for performance and strong typing.
+- **In-process ports (internal)**: the Head ↔ index-half contract (`SearchServiceCalls`, `IngestServiceCalls`), still typed on generated protobuf **messages** — the transport is gone, the DTO vocabulary is not (lane F items A6/A14, [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)).
 
 Important direction rule (to prevent leaking internal proto churn into the UI layer):
 
-- **UI REST controllers should not import gRPC proto DTOs** by default.
-  - The Head should translate gRPC responses into **Head-owned** JSON DTOs (or plain maps) and expose those over REST.
+- **UI REST controllers should not import proto DTOs** by default.
+  - The Head should translate port responses into **Head-owned** JSON DTOs (or plain maps) and expose those over REST.
   - This keeps the UI REST surface stable even if the proto evolves.
 
-This is enforced by ArchUnit guardrails (see `UiApiGuardrailsTest`). A concrete example is Worker status mapping: `RemoteKnowledgeClient` exposes UI-friendly status snapshots to the Head so `LocalApiServer` doesn’t depend on proto DTO types.
+This is enforced by ArchUnit guardrails (see `UiApiGuardrailsTest`). A concrete example is Worker status mapping: `KnowledgeClient` exposes UI-friendly status snapshots to the Head so `LocalApiServer` doesn’t depend on proto DTO types.
 
 ## Network posture (local-only)
 The Local API is intentionally **not** a network service.
@@ -148,7 +148,7 @@ Since the backend is a separate process, the UI must handle "Disconnects" gracef
 Additionally:
 
 - **Worker startup failures are observable**: `/api/status` includes a `knowledgeServerStartError` and uses `indexState=ERROR` when the Head is up but the Worker failed to start.
-- **Typed HTTP errors for index operations**: `/api/knowledge/search` and indexing endpoints map gRPC error codes to meaningful HTTP statuses (e.g., 503/409/429) so the UI can distinguish “backend up, worker unavailable” from “request rejected”.
+- **Typed HTTP errors for index operations**: `/api/knowledge/search` and indexing endpoints map `KnowledgeClientException.Status` codes to meaningful HTTP statuses (e.g., 503/409/429) so the UI can distinguish “backend up, worker unavailable” from “request rejected”.
 
 ## Tauri Shell-Direct Operations
 

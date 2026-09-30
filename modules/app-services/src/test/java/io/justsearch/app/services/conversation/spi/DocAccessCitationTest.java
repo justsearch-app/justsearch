@@ -166,13 +166,18 @@ final class DocAccessCitationTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(byId.get(docId));
     }
   }
 
   private static ConversationContext ctx(Map<String, Object> body) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> attrs = new HashMap<>();
       private final Map<String, Object> bodyCopy = new LinkedHashMap<>(body);
 

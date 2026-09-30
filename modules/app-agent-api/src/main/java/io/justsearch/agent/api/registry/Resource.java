@@ -59,8 +59,9 @@ import java.util.Set;
  *       collection-level affordances beyond standard read.
  *   <li>{@link #primaryKey}: name of the field on a row / item that uniquely
  *       identifies it (slice 3a.1.9 §A.5). Required for {@link Category#TABULAR}
- *       Resources (the FE keyed-map state shape requires it); empty string
- *       for non-TABULAR Resources where the concept doesn't apply. The
+ *       Resources (the FE keyed-map state shape requires it). EVENT_STREAM and
+ *       HISTORY may declare it to merge keyed snapshot/update overlap; rows without
+ *       a key still append independently. Empty string retains append semantics. The
  *       schema-heuristic alternative (look for {@code *Hash} / {@code *Id}
  *       fields automatically) was rejected because it silently mis-identifies
  *       rows with multiple key-shaped fields.

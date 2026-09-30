@@ -25,6 +25,10 @@ import org.mockito.quality.Strictness;
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("FilterNormalizationService")
 class FilterNormalizationServiceTest {
+  private static final io.justsearch.core.context.EngineContext TEST_CONTEXT =
+      io.justsearch.app.services.intent.EngineProvenance.internal("filter-test",
+          io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+          io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
 
   @Mock OnlineAiService aiService;
 
@@ -187,13 +191,13 @@ class FilterNormalizationServiceTest {
       System.setProperty("justsearch.filter_norm.enabled", "true");
       when(aiService.isAvailable()).thenReturn(true);
 
-      var result = service.normalize(filtersWithSource("techcrunch"), FACET_SNAPSHOT).get();
+      var result = service.normalize(filtersWithSource("techcrunch"), FACET_SNAPSHOT, TEST_CONTEXT).get();
 
       assertNotNull(result);
       assertEquals("exact_match", result.source());
       assertEquals(0L, result.latencyMs());
       assertEquals(List.of("techcrunch"), result.normalizedFilters().metaSource());
-      verify(aiService, never()).chatCompletion(any(), anyInt(), any());
+      verify(aiService, never()).chatCompletion(any(), anyInt(), any(), any());
 
       System.clearProperty("justsearch.filter_norm.enabled");
     }
@@ -204,19 +208,19 @@ class FilterNormalizationServiceTest {
       System.setProperty("justsearch.filter_norm.enabled", "true");
       when(aiService.isAvailable()).thenReturn(true);
 
-      var result = service.normalize(filtersWithSource("TechCrunch"), FACET_SNAPSHOT).get();
+      var result = service.normalize(filtersWithSource("TechCrunch"), FACET_SNAPSHOT, TEST_CONTEXT).get();
 
       assertNotNull(result);
       assertEquals("exact_match", result.source());
       assertEquals(List.of("techcrunch"), result.normalizedFilters().metaSource());
-      verify(aiService, never()).chatCompletion(any(), anyInt(), any());
+      verify(aiService, never()).chatCompletion(any(), anyInt(), any(), any());
 
       System.clearProperty("justsearch.filter_norm.enabled");
     }
 
     @Test
     void nullFiltersReturnsNull() throws Exception {
-      var result = service.normalize(null, FACET_SNAPSHOT).get();
+      var result = service.normalize(null, FACET_SNAPSHOT, TEST_CONTEXT).get();
       assertNull(result);
     }
   }
@@ -230,11 +234,11 @@ class FilterNormalizationServiceTest {
       // "cbs sports" has no prefix/contains match for "cbssports.com" — needs LLM
       System.setProperty("justsearch.filter_norm.enabled", "true");
       when(aiService.isAvailable()).thenReturn(true);
-      when(aiService.chatCompletion(any(), anyInt(), any()))
+      when(aiService.chatCompletion(any(), anyInt(), any(), any()))
           .thenReturn(CompletableFuture.completedFuture(
               "cbs sports -> cbssports.com"));
 
-      var result = service.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT).get();
+      var result = service.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT).get();
 
       assertNotNull(result);
       assertEquals("hybrid", result.source());
@@ -248,11 +252,11 @@ class FilterNormalizationServiceTest {
       // "bloomberg" has no deterministic match — LLM returns NO_MATCH
       System.setProperty("justsearch.filter_norm.enabled", "true");
       when(aiService.isAvailable()).thenReturn(true);
-      when(aiService.chatCompletion(any(), anyInt(), any()))
+      when(aiService.chatCompletion(any(), anyInt(), any(), any()))
           .thenReturn(CompletableFuture.completedFuture(
               "bloomberg -> NO_MATCH"));
 
-      var result = service.normalize(filtersWithSource("Bloomberg"), FACET_SNAPSHOT).get();
+      var result = service.normalize(filtersWithSource("Bloomberg"), FACET_SNAPSHOT, TEST_CONTEXT).get();
 
       assertNotNull(result);
       assertEquals("hybrid", result.source());
@@ -267,11 +271,11 @@ class FilterNormalizationServiceTest {
       // LLM returns a value not in vocabulary — should be rejected
       System.setProperty("justsearch.filter_norm.enabled", "true");
       when(aiService.isAvailable()).thenReturn(true);
-      when(aiService.chatCompletion(any(), anyInt(), any()))
+      when(aiService.chatCompletion(any(), anyInt(), any(), any()))
           .thenReturn(CompletableFuture.completedFuture(
               "cbs sports -> cbs sports network"));  // not in vocabulary
 
-      var result = service.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT).get();
+      var result = service.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT).get();
 
       assertNotNull(result);
       // Hallucinated value rejected — unresolved value kept as-is
@@ -286,11 +290,11 @@ class FilterNormalizationServiceTest {
       // "fortune" resolves deterministically, "cbs sports" needs LLM
       System.setProperty("justsearch.filter_norm.enabled", "true");
       when(aiService.isAvailable()).thenReturn(true);
-      when(aiService.chatCompletion(any(), anyInt(), any()))
+      when(aiService.chatCompletion(any(), anyInt(), any(), any()))
           .thenReturn(CompletableFuture.completedFuture(
               "cbs sports -> cbssports.com"));
 
-      var result = service.normalize(filtersWithSource("Fortune", "CBS Sports"), FACET_SNAPSHOT).get();
+      var result = service.normalize(filtersWithSource("Fortune", "CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT).get();
 
       assertNotNull(result);
       assertEquals("hybrid", result.source());
@@ -311,7 +315,7 @@ class FilterNormalizationServiceTest {
       // "cbs sports" has no deterministic match, LLM times out → keep lowercased original
       System.setProperty("justsearch.filter_norm.enabled", "true");
       when(aiService.isAvailable()).thenReturn(true);
-      when(aiService.chatCompletion(any(), anyInt(), any()))
+      when(aiService.chatCompletion(any(), anyInt(), any(), any()))
           .thenReturn(CompletableFuture.supplyAsync(() -> {
             try {
               Thread.sleep(10_000);
@@ -321,7 +325,7 @@ class FilterNormalizationServiceTest {
             return "cbs sports -> cbssports.com";
           }));
 
-      var result = service.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT).get();
+      var result = service.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT).get();
 
       assertNotNull(result);
       assertEquals("timeout", result.source());
@@ -334,10 +338,10 @@ class FilterNormalizationServiceTest {
     void llmErrorFallsToDetPlusOriginal() throws Exception {
       System.setProperty("justsearch.filter_norm.enabled", "true");
       when(aiService.isAvailable()).thenReturn(true);
-      when(aiService.chatCompletion(any(), anyInt(), any()))
+      when(aiService.chatCompletion(any(), anyInt(), any(), any()))
           .thenReturn(CompletableFuture.failedFuture(new RuntimeException("LLM down")));
 
-      var result = service.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT).get();
+      var result = service.normalize(filtersWithSource("CBS Sports"), FACET_SNAPSHOT, TEST_CONTEXT).get();
 
       assertNotNull(result);
       assertEquals("timeout", result.source());
@@ -352,7 +356,7 @@ class FilterNormalizationServiceTest {
       System.setProperty("justsearch.filter_norm.enabled", "true");
       when(aiService.isAvailable()).thenReturn(true);
 
-      var result = service.normalize(filtersWithSource("FOX News"), FACET_SNAPSHOT).get();
+      var result = service.normalize(filtersWithSource("FOX News"), FACET_SNAPSHOT, TEST_CONTEXT).get();
 
       assertNotNull(result);
       assertEquals("deterministic", result.source());
@@ -361,7 +365,7 @@ class FilterNormalizationServiceTest {
       assertTrue(sources.contains("fox news - health"));
       assertTrue(sources.contains("fox news - lifestyle"));
       assertTrue(sources.contains("fox news - entertainment"));
-      verify(aiService, never()).chatCompletion(any(), anyInt(), any());
+      verify(aiService, never()).chatCompletion(any(), anyInt(), any(), any());
 
       System.clearProperty("justsearch.filter_norm.enabled");
     }

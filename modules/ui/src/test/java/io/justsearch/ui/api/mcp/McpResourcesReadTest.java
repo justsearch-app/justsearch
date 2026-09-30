@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -78,11 +80,11 @@ final class McpResourcesReadTest {
   private static KnowledgeSearchController controllerWithStatusAndFacets(
       KnowledgeStatus status, Map<String, Map<String, Long>> facets) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.status()).thenReturn(status);
+    when(adapter.status(any(EngineContext.class))).thenReturn(status);
     KnowledgeSearchResponse resp =
         new KnowledgeSearchResponse(
             0L, 0L, 0L, List.of(), null, facets, null, null, null, null, null, null, null);
-    when(adapter.search(any())).thenReturn(resp);
+    when(adapter.search(any(), any(EngineContext.class))).thenReturn(resp);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     return ctrl;
@@ -113,7 +115,7 @@ final class McpResourcesReadTest {
   void indexSummaryKeyOrder() {
     KnowledgeSearchController ctrl =
         controllerWithStatusAndFacets(statusFixture(), Map.of());
-    Map<String, Object> result = surface(ctrl).readResource("justsearch://index/summary");
+    Map<String, Object> result = surface(ctrl).readResource("justsearch://index/summary", TestRequestContexts.mcp("s1"));
 
     Map<String, Object> content = soleContent(result);
     assertKeyOrder(content);
@@ -129,7 +131,7 @@ final class McpResourcesReadTest {
     // takes its defensive-text branch rather than throwing -- still exercises the same
     // orderedMap construction the success path uses.
     KnowledgeSearchController ctrl = controllerWithStatusAndFacets(statusFixture(), Map.of());
-    Map<String, Object> result = surface(ctrl).readResource("justsearch://index/roots");
+    Map<String, Object> result = surface(ctrl).readResource("justsearch://index/roots", TestRequestContexts.mcp("s1"));
 
     Map<String, Object> content = soleContent(result);
     assertKeyOrder(content);
@@ -143,7 +145,7 @@ final class McpResourcesReadTest {
     KnowledgeSearchController ctrl =
         controllerWithStatusAndFacets(
             statusFixture(), Map.of("meta_source", Map.of("acme-corp", 5L)));
-    Map<String, Object> result = surface(ctrl).readResource("justsearch://index/top-sources");
+    Map<String, Object> result = surface(ctrl).readResource("justsearch://index/top-sources", TestRequestContexts.mcp("s1"));
 
     Map<String, Object> content = soleContent(result);
     assertKeyOrder(content);
@@ -158,7 +160,7 @@ final class McpResourcesReadTest {
     KnowledgeSearchController ctrl =
         controllerWithStatusAndFacets(
             statusFixture(), Map.of("entity_persons_raw", Map.of("Ada Lovelace", 3L)));
-    Map<String, Object> result = surface(ctrl).readResource("justsearch://index/top-entities");
+    Map<String, Object> result = surface(ctrl).readResource("justsearch://index/top-entities", TestRequestContexts.mcp("s1"));
 
     Map<String, Object> content = soleContent(result);
     assertKeyOrder(content);
@@ -171,7 +173,7 @@ final class McpResourcesReadTest {
   @DisplayName("justsearch://resource/<id> redirects to readIndexSummary, same key order")
   void catalogResourceUriRedirectsToIndexSummary() {
     KnowledgeSearchController ctrl = controllerWithStatusAndFacets(statusFixture(), Map.of());
-    Map<String, Object> result = surface(ctrl).readResource("justsearch://resource/some-id");
+    Map<String, Object> result = surface(ctrl).readResource("justsearch://resource/some-id", TestRequestContexts.mcp("s1"));
 
     Map<String, Object> content = soleContent(result);
     assertKeyOrder(content);
@@ -187,7 +189,7 @@ final class McpResourcesReadTest {
   @Test
   @DisplayName("index/summary error path (no knowledge server): resourceError key order + shape")
   void indexSummaryErrorPathKeyOrder() {
-    Map<String, Object> result = surface(null).readResource("justsearch://index/summary");
+    Map<String, Object> result = surface(null).readResource("justsearch://index/summary", TestRequestContexts.mcp("s1"));
 
     Map<String, Object> content = soleContent(result);
     assertKeyOrder(content);
@@ -199,7 +201,7 @@ final class McpResourcesReadTest {
   @Test
   @DisplayName("index/top-sources error path (no knowledge server): resourceError key order + shape")
   void topSourcesErrorPathKeyOrder() {
-    Map<String, Object> result = surface(null).readResource("justsearch://index/top-sources");
+    Map<String, Object> result = surface(null).readResource("justsearch://index/top-sources", TestRequestContexts.mcp("s1"));
 
     Map<String, Object> content = soleContent(result);
     assertKeyOrder(content);
@@ -211,7 +213,7 @@ final class McpResourcesReadTest {
   @Test
   @DisplayName("index/top-entities error path (no knowledge server): resourceError key order + shape")
   void topEntitiesErrorPathKeyOrder() {
-    Map<String, Object> result = surface(null).readResource("justsearch://index/top-entities");
+    Map<String, Object> result = surface(null).readResource("justsearch://index/top-entities", TestRequestContexts.mcp("s1"));
 
     Map<String, Object> content = soleContent(result);
     assertKeyOrder(content);
@@ -227,14 +229,14 @@ final class McpResourcesReadTest {
   @Test
   @DisplayName("null uri returns an empty contents list")
   void nullUriReturnsEmptyContents() {
-    Map<String, Object> result = surface(null).readResource(null);
+    Map<String, Object> result = surface(null).readResource(null, TestRequestContexts.mcp("s1"));
     assertEquals(List.of(), result.get("contents"));
   }
 
   @Test
   @DisplayName("unknown uri returns an empty contents list")
   void unknownUriReturnsEmptyContents() {
-    Map<String, Object> result = surface(null).readResource("justsearch://not-a-real-resource");
+    Map<String, Object> result = surface(null).readResource("justsearch://not-a-real-resource", TestRequestContexts.mcp("s1"));
     assertEquals(List.of(), result.get("contents"));
   }
 }

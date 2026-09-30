@@ -3,8 +3,6 @@ package io.justsearch.indexerworker.server;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import io.grpc.Server;
-import io.grpc.ServerInterceptor;
 import io.justsearch.adapters.lucene.runtime.IndexRecoveryMarker;
 import io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException;
 import io.justsearch.adapters.lucene.runtime.DeferredRuntime;
@@ -14,8 +12,9 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeBuilder;
 import io.justsearch.adapters.lucene.runtime.ReadOnlyRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
+import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
-import io.justsearch.indexerworker.coordination.MmfWorkerSignalBus;
+import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
@@ -36,15 +35,9 @@ import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.app.api.status.MigrationSource;
 import io.justsearch.indexerworker.liveness.LivenessWindows;
 import io.justsearch.indexerworker.util.IndexRootLock;
-import io.justsearch.indexerworker.grpc.DelegatingHealthService;
-import io.justsearch.indexerworker.grpc.DelegatingIngestService;
-import io.justsearch.indexerworker.grpc.DelegatingSearchService;
-import io.justsearch.indexerworker.grpc.RequestMetadataInterceptor;
-import io.justsearch.indexerworker.grpc.TracingServerInterceptor;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
-import io.justsearch.indexerworker.server.ops.KnowledgeServerGrpcWiring;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps;
 import io.justsearch.indexerworker.server.ops.KnowledgeServerSafeMetrics;
 import io.justsearch.indexing.SchemaFields;
@@ -83,32 +76,37 @@ import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The Knowledge Server hosts gRPC services for search and indexing.
- *
- * <p>This is the main entry point for the isolated worker process that handles:
+ * The Knowledge Server owns the index half's infrastructure — Lucene runtimes, the job queue, the
+ * signal bus — and the application services built on top of it:
  * <ul>
- *   <li>Search queries via gRPC</li>
+ *   <li>Search queries</li>
  *   <li>Batch ingestion of file paths</li>
  *   <li>Background indexing loop</li>
- *   <li>Process coordination via MMF (memory-mapped file)</li>
+ *   <li>The signal bus: the GPU-scheduling gauge it shares with the application half, and the
+ *       dev-only hot-reload request file</li>
  * </ul>
  *
- * <p>The server binds to an ephemeral port (port 0) and writes the actual bound
- * port to the signal bus for discovery by the main process.
+ * <p><b>It is not a server in the socket sense any more.</b> Until lane F stage A it hosted gRPC
+ * services for a second JVM: item A9 deleted the gRPC server, its interceptors and the ephemeral
+ * port it published to the signal bus, and item A11 deleted the worker process itself. Since item
+ * A6 this class is constructed and started in the Head JVM by
+ * {@code io.justsearch.app.engine.EngineRoot}, and callers reach its services as direct calls
+ * through {@link #appServices()}. The name is kept because every log line, metric and doc uses it.
  */
 public final class KnowledgeServer implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServer.class);
   private static final ObjectMapper JSON = new ObjectMapper();
 
-  private static final int SHUTDOWN_TIMEOUT_SECONDS = 5;
   private static final long MIGRATION_SWITCHING_QUEUE_DEPTH_THRESHOLD = 1_000L;
   private static final long MIGRATION_SWITCHING_MAX_DURATION_MS = 30L * 60_000L;
 
@@ -133,10 +131,17 @@ public final class KnowledgeServer implements Closeable {
   private Path buildingIndexPath;
   private IndexGenerationManager indexGenerationManager;
   private IndexRootLock indexRootLock;
+  private boolean closePrepared;
+  private WorkerAppServices pendingAppServices;
+  private final Object closeLock = new Object();
+  private final ReentrantLock runtimeSwapLock = new ReentrantLock();
+  private volatile boolean closeStarted;
   private volatile boolean migrationEnumeratorDone;
 
   // Package-private: accessed by DevReloadManager for hot-reload (tempdoc 305 Phase 2)
   WorkerSignalBus signalBus;
+  private final WorkerSignalBus injectedSignalBus;
+  private final io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry;
   private JobQueue jobQueue;
 
   // Tempdoc 550 Thesis II / 575 §4.3b (liveness): periodic reaper re-queues PROCESSING rows orphaned by a
@@ -146,6 +151,8 @@ public final class KnowledgeServer implements Closeable {
   private static final long STALE_PROCESSING_MS = LivenessWindows.REAPER_STALE_MS; // 5 min liveness window
   private static final long REAP_INTERVAL_MS = 2 * 60_000L; // check every 2 min (poll cadence, not a window)
   private java.util.concurrent.ScheduledExecutorService stuckJobReaper;
+  private java.util.concurrent.ScheduledFuture<?> stuckJobReapTask;
+  private java.util.concurrent.ExecutorService deferredModelExecutor;
   // Tempdoc 419 / T5.1 (ADR-0028): scoped reverse-lookup store. Constructed in init() against
   // the same jobs.db as JobQueue; closed in shutdown alongside JobQueue.
   private io.justsearch.indexerworker.queue.SqlitePathResolutionStore pathResolutionStore;
@@ -159,8 +166,9 @@ public final class KnowledgeServer implements Closeable {
   /**
    * Tempdoc 885 item 3: the foreground-load gauge and the duty-cycle policy that reads it. Both are
    * process-scoped and owned here rather than by {@code appServices}, because the app services are
-   * reconstructed (deferred-runtime upgrade, dev hot-reload) while the gRPC server — and therefore
-   * the single interceptor that feeds the gauge — is not. A per-appServices gauge would be orphaned
+   * reconstructed (deferred-runtime upgrade, dev hot-reload) while this server — and therefore the
+   * single producer that feeds the gauge ({@code ForegroundLoadGate} since item A9, the gRPC
+   * {@code ForegroundLoadInterceptor} before it) — is not. A per-appServices gauge would be orphaned
    * from its only producer on the first reconstruction and silently stop throttling.
    */
   private final ForegroundLoad foregroundLoad =
@@ -168,9 +176,6 @@ public final class KnowledgeServer implements Closeable {
 
   private volatile IndexingPacing indexingPacing =
       IndexingPacing.unthrottled();
-  DelegatingSearchService searchWrapper;
-  DelegatingIngestService ingestWrapper;
-  DelegatingHealthService healthWrapper;
   io.justsearch.indexerworker.disambiguation.DisambiguationService disambiguationService;
   io.justsearch.indexerworker.ner.NerService nerServiceInstance;
   io.justsearch.indexerworker.splade.SpladeEncoder spladeEncoderInstance;
@@ -185,7 +190,11 @@ public final class KnowledgeServer implements Closeable {
   // Catalog instance is retained for lifetime; OTel async callbacks fire at flush time.
   @SuppressWarnings("unused")
   private io.justsearch.indexerworker.services.WorkerOpsMetricCatalog workerOpsCatalog;
-  private Server grpcServer;
+  /**
+   * Released only after {@link #close()} reaches its final resource-release step. EngineRoot
+   * checks {@link #awaitClosed(long)} to distinguish completed teardown from an interrupted close.
+   */
+  private final CountDownLatch shutdownLatch = new CountDownLatch(1);
   InfraContext infraCtx; // package-private: DevReloadManager
   volatile CompletableFuture<ModelContext> deferredModelInit; // package-private: DevReloadManager
   private DevReloadManager devReloadManager;
@@ -194,6 +203,10 @@ public final class KnowledgeServer implements Closeable {
   private Thread migrationEnumeratorThread;
   private Thread migrationCutoverThread;
   private volatile boolean running;
+  private volatile Consumer<Throwable> terminalWriterFaultHandler =
+      failure -> log.error("Terminal writer failure has no Engine fault handler", failure);
+  private volatile Runnable migrationRestartAction =
+      () -> log.warn("Promoted generation requires an Engine restart; no process owner is installed");
   private int migrationCutoverMaxFailedJobs = -1;
   /**
    * Tempdoc 819: set when this boot started a corruption-recovery rebuild (the active generation
@@ -206,10 +219,11 @@ public final class KnowledgeServer implements Closeable {
   /**
    * Set when this boot found a schema mismatch it has already tried to rebuild away
    * {@link IndexGenerationManager#MAX_AUTO_REBUILD_ATTEMPTS} times. The Worker then serves the
-   * existing index READ-ONLY and does not ingest: it must still finish starting, because a Worker
-   * that returns early from {@code start()} never binds gRPC, never writes its port, and exits with
-   * no explanation — the same silent dead-end the old FAIL_CLOSED default produced, which is the
-   * whole thing this brake exists to avoid (tempdoc 915 §C.8).
+   * existing index READ-ONLY and does not ingest: it must still finish starting, because a
+   * {@code start()} that returns early never publishes its services and leaves the caller with no
+   * explanation — the same silent dead-end the old FAIL_CLOSED default produced, which is the
+   * whole thing this brake exists to avoid (tempdoc 915 §C.8). Before item A9 the same dead-end
+   * read as "never binds gRPC, never writes its port".
    *
    * <p>The durable form of this state is {@code auto_rebuild_*} in {@code state.json}; this field is
    * only the in-process consequence for the remainder of {@code start()}.
@@ -268,7 +282,7 @@ public final class KnowledgeServer implements Closeable {
    *   <li><b>Query handlers</b> (tempdoc 397 §14.28 U3) — wired via
    *       {@link io.justsearch.indexerworker.server.WorkerAppServices#wireModelReadyLatch}
    *       in {@link #initDeferredModels()}, consumed by
-   *       {@code GrpcSearchService.awaitModelsReady(...)} on entry of
+   *       {@code WorkerSearchService.awaitModelsReady(...)} on entry of
    *       {@code search}/{@code retrieveContext}/{@code rerank}/{@code matchCitations}.
    *       Closes a boot-race regression where queries arriving before init completed
    *       silently missed reranker + citation wiring.</li>
@@ -286,13 +300,78 @@ public final class KnowledgeServer implements Closeable {
       new AtomicReference<>(java.util.Optional::empty);
 
   /**
-   * Creates a new KnowledgeServer with the specified configuration.
+   * Creates a new KnowledgeServer with the specified configuration and its own signal bus.
+   *
+   * <p>The bus it builds reads a gauge no other component writes, so nothing claims the GPU and
+   * nothing reports an energy signal. That is the right answer for an index half composed on its
+   * own; the Engine's composition root uses the two-argument constructor instead, because the
+   * point of the gauge is that the Head-side writers and this reader share ONE instance.
    *
    * @param config Worker configuration
    */
-  public KnowledgeServer(WorkerConfig config) {
+  public KnowledgeServer(io.justsearch.core.execution.EngineExecutorRegistry executors, WorkerConfig config) {
+    this(executors, config, null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  /**
+   * Creates a new KnowledgeServer with an externally-supplied signal bus (lane F stage A item A6).
+   *
+   * <p>When the index half runs inside the Engine JVM there is no second process, so a
+   * memory-mapped bus would have nothing to carry: the composition root passes an
+   * {@code InProcessWorkerSignalBus} over the shared {@code GpuSchedulingGauge} instead. Item A10
+   * deleted the memory-mapped implementation and the suicide pact with it, so this parameter is now
+   * about gauge identity rather than transport: a bus built here would read a gauge the Head-side
+   * writers never touch, and the index half would never yield the GPU.
+   *
+   * @param config Worker configuration
+   * @param signalBus the bus to use, or {@code null} to build one over a private gauge
+   */
+  public KnowledgeServer(io.justsearch.core.execution.EngineExecutorRegistry executors, WorkerConfig config, WorkerSignalBus signalBus) {
+    this(executors, config, signalBus, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  private final io.justsearch.core.execution.EngineExecutorRegistry executors;
+  private final WorkerExecutorRegistrations workerExecutors;
+  private final io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations luceneExecutors;
+
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this.executors = Objects.requireNonNull(executors, "executors");
     this.config = config;
     this.dataDir = config.dataDir();
+    this.injectedSignalBus = signalBus;
+    this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
+    this.luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+    try { this.workerExecutors = new WorkerExecutorRegistrations(executors); }
+    catch (RuntimeException | Error failure) {
+      try { luceneExecutors.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
+  }
+
+  /** Installs the whole-Engine owner for an irrecoverably closed active Lucene writer. */
+  public void onTerminalWriterFailure(Consumer<Throwable> handler) {
+    terminalWriterFaultHandler = Objects.requireNonNull(handler, "handler");
+  }
+
+  /** Bind before start: a resumed migration may promote during startup. */
+  public void onMigrationRestart(Runnable action) {
+    migrationRestartAction = Objects.requireNonNull(action, "action");
+  }
+
+  private void bindTerminalWriterFaultSource(RunningRuntime source) {
+    source.onTerminalWriterFailure(failure -> terminalWriterFaultHandler.accept(failure));
+  }
+
+  /** Publishes an ingest runtime only after its terminal-writer owner is installed. */
+  void publishIngestLifecycle(LuceneRuntime runtime) {
+    if (runtime instanceof RunningRuntime runningRuntime) {
+      bindTerminalWriterFaultSource(runningRuntime);
+    }
+    this.ingestLifecycle = runtime;
   }
 
   /**
@@ -323,12 +402,11 @@ public final class KnowledgeServer implements Closeable {
    *
    * <p>Initialization order:
    * <ol>
-   *   <li>Open signal bus (MMF)</li>
+   *   <li>Open the signal bus (the in-process one under the Engine; the memory-mapped one on the
+   *       standalone path, until item A10 deletes it)</li>
    *   <li>Open job queue (SQLite)</li>
    *   <li>Initialize Lucene runtime</li>
    *   <li>Resolve the embedding compatibility controller — must precede any commit (tempdoc 819)</li>
-   *   <li>Start gRPC server on port 0</li>
-   *   <li>Write bound port to signal bus</li>
    *   <li>Start indexing loop</li>
    *   <li>Start sentinel thread (liveness monitor)</li>
    * </ol>
@@ -351,7 +429,7 @@ public final class KnowledgeServer implements Closeable {
       // construct the typed catalog after LocalTelemetry exists.
       LocalTelemetry workerTelemetry =
           new LocalTelemetry(
-              dataDir,
+              executors, dataDir,
               config.telemetryFlushMs(),
               "justsearch-worker",
               config.serviceVersion(),
@@ -440,6 +518,16 @@ public final class KnowledgeServer implements Closeable {
 
       // 0b. Initialize tracing (must happen before service class loading at step 3b).
       // Read config directly from EnvRegistry — ConfigStore is not ready until step 3.
+      //
+      // Lane F review S13: there is ONE GlobalOpenTelemetry per JVM, and since item A6 the Head and
+      // the index half share one. Whichever bootstrap runs first wins, and the Head's runs first
+      // (its API phase precedes this start()). So in the Engine, JUSTSEARCH_INDEX_TRACING_LEVEL
+      // does not decide anything on its own — it decides only when the Head declined to register,
+      // which happens when JUSTSEARCH_HEAD_TRACING_LEVEL is 'none'. That coupling is real and
+      // stage A does not resolve it (the two levels become one key when the manifest's worker
+      // projection is re-cut in stage B); what it must not do is happen silently. The catch below
+      // used to log at DEBUG under the Worker's INFO threshold, so an operator who set the index
+      // level and saw no indexing spans had nothing to read.
       String tracingLevel = EnvRegistry.INDEX_TRACING_LEVEL
           .getString("none").toLowerCase(Locale.ROOT);
       if (!"none".equals(tracingLevel)) {
@@ -448,7 +536,13 @@ public final class KnowledgeServer implements Closeable {
               dataDir, ((LocalTelemetry) telemetry).getHealthState(), tracingLevel);
           log.info("Worker tracing initialized: level={}", tracingLevel);
         } catch (IllegalStateException e) {
-          log.debug("GlobalOpenTelemetry already set, skipping TracingBootstrap: {}", e.getMessage());
+          log.info(
+              "Index tracing level '{}' is not in effect: OpenTelemetry is already registered in"
+                  + " this JVM by the Head (JUSTSEARCH_HEAD_TRACING_LEVEL governs both halves of"
+                  + " the Engine). Indexing spans are emitted at the Head's level, or not at all if"
+                  + " that level is 'none'. ({})",
+              tracingLevel,
+              e.getMessage());
         }
       }
 
@@ -457,13 +551,16 @@ public final class KnowledgeServer implements Closeable {
       tPrev = tPhase;
 
       // 1. Initialize signal bus.
-      // Tempdoc 630: pass Head's PID (forwarded via EnvRegistry.HEAD_PID) so the suicide-pact can
-      // distinguish a real Head death from a benign OS-resume stale heartbeat. Read directly from
-      // EnvRegistry (ConfigStore is not ready until step 3, like INDEX_TRACING_LEVEL above);
-      // 0 ⇒ unknown ⇒ heartbeat-only (pre-630) behavior (standalone runs).
-      Path signalPath = dataDir.resolve("worker_signal.lock");
-      long headPid = EnvRegistry.HEAD_PID.getLong(0L);
-      signalBus = new MmfWorkerSignalBus(signalPath, headPid);
+      // Lane F item A6: the Engine composition root supplies the in-process bus over the gauge it
+      // shares with the Head-side writers. Item A10 deleted the memory-mapped alternative, so the
+      // fallback below is the same implementation over a gauge nobody else writes — the honest
+      // reading for an index half composed on its own (tests, a standalone boot): no GPU claim, no
+      // energy signal, and therefore no yielding.
+      if (injectedSignalBus != null) {
+        signalBus = injectedSignalBus;
+      } else {
+        signalBus = new InProcessWorkerSignalBus(new GpuSchedulingGauge());
+      }
       signalBus.open();
 
       tPhase = System.nanoTime();
@@ -517,25 +614,7 @@ public final class KnowledgeServer implements Closeable {
       // startup; this re-queues PROCESSING rows orphaned WITHOUT a restart (worker claimed a job
       // then died mid-process while the Head/UI keep running), so the rail never shows a dead job
       // as perpetually "running". Age-bounded → never touches actively-draining jobs.
-      JobQueue reaperQueue = jobQueue;
-      stuckJobReaper =
-          java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
-              r -> {
-                Thread t = new Thread(r, "stuck-job-reaper");
-                t.setDaemon(true);
-                return t;
-              });
-      stuckJobReaper.scheduleWithFixedDelay(
-          () -> {
-            try {
-              reaperQueue.recoverStuckJobs(STALE_PROCESSING_MS);
-            } catch (RuntimeException reapErr) {
-              log.warn("stuck-job reaper tick failed (will retry): {}", reapErr.toString());
-            }
-          },
-          REAP_INTERVAL_MS,
-          REAP_INTERVAL_MS,
-          TimeUnit.MILLISECONDS);
+      startStuckJobReaper(jobQueue);
 
       tPhase = System.nanoTime();
       long jobQueueMs = (tPhase - tPrev) / 1_000_000;
@@ -655,19 +734,19 @@ public final class KnowledgeServer implements Closeable {
         blueReadOnly = buildReadOnlyRuntime(activeIndexPath).openReadOnly();
         this.searchLifecycle = blueReadOnly;
         this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
-        this.ingestLifecycle =
+        publishIngestLifecycle(
             buildIndexRuntime(buildingIndexPath, fpSupplier)
                 .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                .open();
+                .open());
       } else {
         // Normal operation: single runtime against active generation.
         //
         // Tempdoc 406 Phase 4a: deferred-writer mode is re-enabled. When the index
         // has existing segments, openDeferred() opens read-only first (fast); the
         // background initDeferredModels later calls DeferredRuntime.upgradeWriter()
-        // which returns a fresh RunningRuntime. KS reconstructs appServices and
-        // swaps the gRPC wrappers via reconstructAppServicesAfterDeferredUpgrade()
-        // so write methods become available without restarting the gRPC server.
+        // which returns a fresh RunningRuntime. KS reconstructs and republishes
+        // appServices via reconstructAppServicesAfterDeferredUpgrade() so write
+        // methods become available without restarting this server.
         // A detected mismatch is raised here for the two policies whose handling lives in the
         // catch below. REBUILD_BACKUP_FIRST is deliberately NOT raised: its backup-then-rebuild
         // recovery lives inside RuntimeSession.openComponentsWithRecovery and is the one
@@ -684,7 +763,7 @@ public final class KnowledgeServer implements Closeable {
           LuceneRuntimeBuilder builder =
               buildIndexRuntime(activeIndexPath, fpSupplier)
                   .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE);
-          this.ingestLifecycle = useDeferredWriter ? builder.openDeferred() : builder.open();
+          publishIngestLifecycle(useDeferredWriter ? builder.openDeferred() : builder.open());
           this.searchLifecycle = this.ingestLifecycle;
 
           // tempdoc 628 Stage B (G3): if the adapter recovered this index to empty on open it dropped
@@ -705,10 +784,10 @@ public final class KnowledgeServer implements Closeable {
             }
             this.ingestLifecycle.close();
             this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
-            this.ingestLifecycle =
+            publishIngestLifecycle(
                 buildIndexRuntime(buildingIndexPath, fpSupplier)
                     .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                    .open();
+                    .open());
             startMigrationEnumeratorBestEffort(rc);
             IndexRecoveryMarker.clear(activeIndexPath);
             // Tempdoc 819: remember that BLUE is an index recovered to EMPTY. The green being built
@@ -761,10 +840,10 @@ public final class KnowledgeServer implements Closeable {
                 // Close the writable runtime on the old generation before opening Green.
                 this.ingestLifecycle.close();
                 this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
-                this.ingestLifecycle =
+                publishIngestLifecycle(
                     buildIndexRuntime(buildingIndexPath, fpSupplier)
                         .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                        .open();
+                        .open());
 
                 startMigrationEnumeratorBestEffort(rc);
               }
@@ -821,7 +900,7 @@ public final class KnowledgeServer implements Closeable {
                   IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS,
                   e);
               this.searchLifecycle = blue;
-              this.ingestLifecycle = this.searchLifecycle;
+              publishIngestLifecycle(this.searchLifecycle);
               this.buildingIndexPath = null;
               this.rebuildBrakeExhausted = true;
             } else {
@@ -847,10 +926,10 @@ public final class KnowledgeServer implements Closeable {
                     "Failed to start migration: building_generation missing in state.json");
               }
               this.buildingIndexPath = genManager.resolveGenerationPathStrict(greenGenId);
-              this.ingestLifecycle =
+              publishIngestLifecycle(
                   buildIndexRuntime(buildingIndexPath, fpSupplier)
                       .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING)
-                      .open();
+                      .open());
 
               // Kick off background enumeration to populate Green.
               startMigrationEnumeratorBestEffort(rc);
@@ -895,8 +974,8 @@ public final class KnowledgeServer implements Closeable {
 
       // 3.5 Construct application services via registry (models wired later via deferred init)
       // Tempdoc 419 / T5.1 (ADR-0028): construct PathResolutionStore against the same jobs.db
-      // already migrated by SqliteJobQueue. Threaded through InfraContext so the gRPC handler
-      // and IndexingLoop can both consume it without violating module dependency direction.
+      // already migrated by SqliteJobQueue. Threaded through InfraContext so the ingest/search
+      // services and IndexingLoop can both consume it without violating module dependency direction.
       this.pathResolutionStore =
           new io.justsearch.indexerworker.queue.SqlitePathResolutionStore(dbPath);
       this.infraCtx =
@@ -912,13 +991,12 @@ public final class KnowledgeServer implements Closeable {
               activeIndexPath,
               this::migrationProgressSnapshot,
               MIGRATION_SWITCHING_MAX_DURATION_MS,
-              this::initiateShutdown,
               pathResolutionStore,
               documentIdentityStore);
       // Tempdoc 885 item 3: build the duty-cycle policy from resolved config before the app
-      // services that consume it. The duty/cooldown arrive through the ordinal-450 worker config
-      // snapshot, not through a raw Worker sysprop — a key the Worker cannot see is the [R1]
-      // defect this item removes.
+      // services that consume it. The duty/cooldown come from the one resolved config in this JVM.
+      // They arrived through the ordinal-450 worker snapshot until item A19 deleted that tier; the
+      // [R1] defect it removed (a key the Worker could not see) needed two processes to exist.
       this.indexingPacing = buildIndexingPacing();
       log.info(
           "Indexing pacing: foreground duty {}%, cooldown {} ms",
@@ -952,27 +1030,12 @@ public final class KnowledgeServer implements Closeable {
       long initMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
 
-      // 4. Create and start gRPC server on ephemeral port (before model loading)
-      List<ServerInterceptor> interceptors = List.of(
-          new TracingServerInterceptor(),
-          new RequestMetadataInterceptor(),
-          // Tempdoc 885 item 3: the only producer of the foreground-load gauge the indexing duty
-          // cycle reads. Ingest RPCs (IndexStatus above all) deliberately do not count.
-          new io.justsearch.indexerworker.server.ops.ForegroundLoadInterceptor(foregroundLoad)
-      );
-
-      grpcServer = createGrpcServer(interceptors);
-      grpcServer.start();
-
-      int boundPort = grpcServer.getPort();
-      log.info("gRPC server started on port {}", boundPort);
-
-      // 5. Write port to signal bus — Head is unblocked from here
-      signalBus.writePort(boundPort);
-
-      tPhase = System.nanoTime();
-      long grpcMs = (tPhase - tPrev) / 1_000_000;
-      tPrev = tPhase;
+      // 4-5. The gRPC server, its three interceptors and the port publication used to be here.
+      // Item A9 deleted all of it: the ports are direct calls (item A6), so there is nothing to
+      // bind, no trace/request-id header to extract (the caller's OTel context and MDC are already
+      // current on this thread) and no port for a second process to discover. The foreground-load
+      // gauge kept its producer — ForegroundLoadGate in the composition root, wired at A6 —
+      // which is why the interceptor could go without the gauge going with it.
 
       // 6. Start indexing loop (runs immediately; null-gates embedding/SPLADE until wired)
       // ...unless the rebuild brake is exhausted. The loop's whole job is to write into
@@ -997,27 +1060,28 @@ public final class KnowledgeServer implements Closeable {
       long loopMs = (System.nanoTime() - tPrev) / 1_000_000;
       long totalMs = (System.nanoTime() - t0) / 1_000_000;
       log.info(
-          "Startup phases (ms): telemetry={}, signalBus={}, jobQueue={}, lucene={}, init={}, grpc={}, loop={}, total={} [models loading in background]",
-          telemetryMs, signalBusMs, jobQueueMs, luceneMs, initMs, grpcMs, loopMs, totalMs);
+          "Startup phases (ms): telemetry={}, signalBus={}, jobQueue={}, lucene={}, init={}, loop={}, total={} [models loading in background]",
+          telemetryMs, signalBusMs, jobQueueMs, luceneMs, initMs, loopMs, totalMs);
 
-      log.info("KnowledgeServer started successfully on port {}", boundPort);
+      log.info("KnowledgeServer started successfully (in-process; no port)");
 
       // --- Deferred model initialization (background) ---
-      // Models load in a background thread while gRPC is already serving. Callers
+      // Models load in a background thread while the ports are already answering. Callers
       // are null-safe: search degrades to BM25, IndexingLoop skips embedding/SPLADE,
       // ingest queues jobs normally. Models become available via volatile setters.
-      deferredModelInit = CompletableFuture.supplyAsync(this::initDeferredModels);
+      startDeferredModelInitialization(this::initDeferredModels);
 
     } catch (Exception e) {
       log.error("Failed to start KnowledgeServer", e);
       // tempdoc 628 Stage D-part2: if startup failed because the index is corrupt and could not be
       // auto-recovered (FAIL_CLOSED / recovery-failed), stamp a fatal-reason marker so the Head can
       // offer a "Rebuild index" affordance instead of blind-restarting. This is a controlled exit (the
-      // throw below → IndexerWorker's handler → System.exit), so the write is reliable.
+      // throw below → the Engine's boot failure path in HeadlessApp), so the write is reliable.
       //
       // A FAIL_CLOSED schema mismatch is the same kind of fact and was missing (tempdoc 915, live
       // validation): the refusal reached the Head only as "Worker process crashed (exit code 1)",
-      // with the actual cause visible nowhere but worker.log. It is a deliberate refusal, not a
+      // with the actual cause visible nowhere but the (then separate) worker.log. It is a
+      // deliberate refusal, not a
       // crash, and it has its own remedy. Other fatal causes stay generic.
       if (isCorruptIndexCause(e)) {
         io.justsearch.ipc.WorkerFatalReasonMarker.write(
@@ -1029,6 +1093,34 @@ public final class KnowledgeServer implements Closeable {
       closeQuietly();
       throw new IOException("Failed to start KnowledgeServer", e);
     }
+  }
+
+  /** Opens the server-owned periodic queue producer on its registered background scheduler. */
+  void startStuckJobReaper(JobQueue reaperQueue) {
+    Objects.requireNonNull(reaperQueue, "reaperQueue");
+    stuckJobReaper = workerExecutors.stuckJobReaper().openScheduled(r -> {
+      Thread thread = new Thread(r, "stuck-job-reaper");
+      thread.setDaemon(true);
+      return thread;
+    });
+    stuckJobReapTask = stuckJobReaper.scheduleWithFixedDelay(() -> {
+      try {
+        reaperQueue.recoverStuckJobs(STALE_PROCESSING_MS);
+      } catch (RuntimeException failure) {
+        log.warn("stuck-job reaper tick failed (will retry): {}", failure.toString());
+      }
+    }, REAP_INTERVAL_MS, REAP_INTERVAL_MS, TimeUnit.MILLISECONDS);
+  }
+
+  /** The executor remains an actual-exit owner even if its exposed completion is canceled. */
+  void startDeferredModelInitialization(java.util.function.Supplier<ModelContext> initializer) {
+    Objects.requireNonNull(initializer, "initializer");
+    deferredModelExecutor = workerExecutors.deferredModelInit().open(r -> {
+      Thread thread = new Thread(r, "deferred-model-init");
+      thread.setDaemon(true);
+      return thread;
+    });
+    deferredModelInit = io.justsearch.core.execution.EngineFutures.supplyAsync(initializer, deferredModelExecutor);
   }
 
   /**
@@ -1102,11 +1194,17 @@ public final class KnowledgeServer implements Closeable {
    * {@link DevReloadManager}'s hot-reload path so all three observe the same wiring.
    */
   DefaultWorkerAppServices newAppServices() {
+    LuceneRuntime currentIngest = this.ingestLifecycle;
+    if (currentIngest instanceof RunningRuntime runningRuntime) {
+      bindTerminalWriterFaultSource(runningRuntime);
+    }
     return new DefaultWorkerAppServices(
+        workerExecutors,
         infraCtx,
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
         embeddingTelemetry,
-        indexingPacing);
+        indexingPacing,
+        childRegistry);
   }
 
   /** Tempdoc 885 item 3: the process-scoped duty-cycle policy, built from resolved config. */
@@ -1128,24 +1226,24 @@ public final class KnowledgeServer implements Closeable {
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
     // 343: Wire resolved config supplier for search config status reporting.
-    svc.grpcIngestService()
+    svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());
 
     // 516 P3 FINAL CUT: wireMigrationActiveSupplier removed — pre-wired via DWAS 2-arg ctor.
 
-    // Tempdoc 397 §14.28 U3: wire the modelReadyLatch so GrpcSearchService's query handlers
+    // Tempdoc 397 §14.28 U3: wire the modelReadyLatch so WorkerSearchService's query handlers
     // can await encoder wiring before first use.
     svc.wireModelReadyLatch(() -> modelReadyLatch);
 
-    // Tempdoc 397 §14.28 U4: wire the PolicySnapshot supplier so the GetSessionPolicies
-    // gRPC rpc can return Worker's authoritative snapshot.
+    // Tempdoc 397 §14.28 U4: wire the PolicySnapshot supplier so the getSessionPolicies
+    // port can return the index half's authoritative snapshot.
     svc.wirePolicySnapshotSupplier(
         () -> inferenceSurface != null ? inferenceSurface.policies() : null);
 
     // Tempdoc 406 — wire the runtime reload trigger so POST /api/admin/runtime/reload
     // can drive a holder swap on the active ingest runtime. Captures the active
     // index path lazily at trigger time so post-cutover paths swap correctly.
-    svc.grpcIngestService()
+    svc.ingestService()
         .setRuntimeReloadTrigger(
             reason ->
                 swapRuntime(
@@ -1160,7 +1258,7 @@ public final class KnowledgeServer implements Closeable {
     // recent-job-queue-depth trend. Late-bound supplier handles the LocalTelemetry-pre-init
     // path safely (returns null → empty array on the receiver side).
     if (telemetry instanceof LocalTelemetry lt) {
-      svc.grpcIngestService().setRrdStoreSupplier(lt::getRrdStore);
+      svc.ingestService().setRrdStoreSupplier(lt::getRrdStore);
     }
 
     // Tempdoc 819: the ECC is now resolved BEFORE the first appServices reconstruction
@@ -1180,51 +1278,53 @@ public final class KnowledgeServer implements Closeable {
    * runtime, the existing {@code appServices} captured ops from the now-closed
    * deferred runtime. Reconstruct from the current {@code infraCtx} (which sees
    * the post-upgrade {@code RunningRuntime} via supplier re-read), re-apply
-   * post-construction wiring, swap the {@link DelegatingSearchService} /
-   * {@link DelegatingIngestService} delegates, and start the new indexing loop.
-   * Mirrors {@code DevReloadManager.performReload}'s swap dance.
+   * post-construction wiring, publish the new instance and start its indexing loop.
+   *
+   * <p>Item A9: the three {@code Delegating*Service} wrappers this used to re-point are gone with
+   * the gRPC registration they existed for. Publishing {@code appServices} IS the swap now, because
+   * every caller reaches the services through {@link #appServices()} per call rather than through a
+   * registered wrapper — see {@code EngineKnowledgeClient}, which holds a supplier for exactly this
+   * reason. Mirrors {@code DevReloadManager.performReload}'s swap.
    */
   private void reconstructAppServicesAfterDeferredUpgrade() {
     log.info("Reconstructing appServices after DeferredRuntime.upgradeWriter()");
+    closePendingAppServices();
     WorkerAppServices oldServices = appServices;
     WorkerAppServices newServices = newAppServices();
-    wireAppServicesPostConstruction(newServices);
-    if (searchWrapper != null) {
-      searchWrapper.setDelegate(newServices.grpcSearchService());
-    }
-    if (ingestWrapper != null) {
-      ingestWrapper.setDelegate(newServices.grpcIngestService());
-    }
-    if (healthWrapper != null) {
-      healthWrapper.setDelegate(newServices.grpcHealthService());
-    }
-    this.appServices = newServices;
-    newServices.startIndexingLoop();
-    if (oldServices != null) {
-      try {
-        oldServices.close();
-      } catch (Exception e) {
-        log.warn("Old appServices close after upgrade failed (best-effort): {}", e.getMessage());
-      }
+    pendingAppServices = newServices;
+    try {
+      wireAppServicesPostConstruction(newServices);
+      if (oldServices != null) oldServices.close();
+      this.appServices = null; // The incumbent has actually closed; callers see unavailability.
+      newServices.startIndexingLoop();
+      this.appServices = newServices;
+      pendingAppServices = null;
+    } catch (Exception | Error failure) {
+      try { closePendingAppServices(); }
+      catch (RuntimeException | Error cleanup) { if (cleanup != failure) failure.addSuppressed(cleanup); }
+      if (failure instanceof Error fatal) throw fatal;
+      throw new IllegalStateException("Application-service replacement failed; owners retained", failure);
     }
   }
 
-  private Server createGrpcServer(List<ServerInterceptor> interceptors) throws IOException {
-    KnowledgeServerGrpcWiring.GrpcWiringResult wiring =
-        KnowledgeServerGrpcWiring.createGrpcServer(config, interceptors, appServices);
-    this.searchWrapper = wiring.searchService();
-    this.ingestWrapper = wiring.ingestService();
-    this.healthWrapper = wiring.healthService();
-    return wiring.server();
+  private void closePendingAppServices() {
+    if (pendingAppServices == null) return;
+    try {
+      pendingAppServices.close();
+      pendingAppServices = null;
+    } catch (IOException failure) {
+      throw new IllegalStateException("Unpublished application services still own resources", failure);
+    }
   }
 
   /**
    * Tempdoc 406 swap helper. Drains the current ingest runtime, opens a fresh one
    * via {@code opener}, atomically replaces the holder fields, and reconstructs
-   * the gRPC service wrappers so downstream consumers see the new runtime via
-   * supplier re-read. Returns the swap duration in milliseconds.
+   * the application services so downstream consumers see the new runtime via
+   * supplier re-read. Returns the swap duration in milliseconds. Before item A9 the
+   * reconstruction step also re-registered the gRPC service wrappers.
    *
-   * <p>Synchronized so concurrent reload triggers serialize. Errors during open
+   * <p>Serialized with other reloads and shutdown. Errors during open
    * leave the old runtime in place and re-throw — callers see a hard failure
    * rather than a half-swapped state.
    *
@@ -1233,49 +1333,56 @@ public final class KnowledgeServer implements Closeable {
    * @param reason low-cardinality tag for telemetry ("admin_triggered" / etc.)
    * @return total swap duration (ms) including drain + open
    */
-  public synchronized long swapRuntime(
+  public long swapRuntime(
       java.util.function.Supplier<RunningRuntime> opener,
       java.time.Duration drainTimeout,
       io.justsearch.adapters.lucene.runtime.SwapReason reason) {
     Objects.requireNonNull(opener, "opener");
     Objects.requireNonNull(drainTimeout, "drainTimeout");
     Objects.requireNonNull(reason, "reason");
-    long startNanos = System.nanoTime();
-    LuceneRuntime old = this.ingestLifecycle;
-    if (old instanceof RunningRuntime running) {
-      running.drainAndClose(drainTimeout, reason);
-    } else if (old != null) {
-      try {
-        old.close();
-      } catch (Exception e) {
-        log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
+    if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
+    runtimeSwapLock.lock();
+    try {
+      if (closeStarted) throw new IllegalStateException("Runtime reload refused during server close");
+      long startNanos = System.nanoTime();
+      LuceneRuntime old = this.ingestLifecycle;
+      if (old instanceof RunningRuntime running) {
+        running.drainAndClose(drainTimeout, reason);
+      } else if (old != null) {
+        try {
+          old.close();
+        } catch (Exception e) {
+          log.warn("swapRuntime: best-effort close of non-RunningRuntime old: {}", e.getMessage());
+        }
       }
+      RunningRuntime fresh = opener.get();
+      publishIngestLifecycle(fresh);
+      this.searchLifecycle = fresh;
+      reconstructAppServicesAfterDeferredUpgrade();
+      return (System.nanoTime() - startNanos) / 1_000_000L;
+    } finally {
+      runtimeSwapLock.unlock();
     }
-    RunningRuntime fresh = opener.get();
-    this.ingestLifecycle = fresh;
-    this.searchLifecycle = fresh;
-    reconstructAppServicesAfterDeferredUpgrade();
-    return (System.nanoTime() - startNanos) / 1_000_000L;
   }
 
   /**
-   * Background model initialization — runs in a separate thread after gRPC is serving. Loads
-   * embedding, NER, SPLADE/BGE-M3, and disambiguation models. Opens deferred IndexWriter if
-   * applicable. Non-fatal: failures degrade capabilities but don't crash the server.
+   * Background model initialization — runs in a separate thread once the services are published
+   * and answering. Loads embedding, NER, SPLADE/BGE-M3, and disambiguation models. Opens deferred
+   * IndexWriter if applicable. Non-fatal: failures degrade capabilities but don't crash the server.
    */
   @SuppressWarnings("PMD.CognitiveComplexity")
   private ModelContext initDeferredModels() {
     long bgStart = System.nanoTime();
     try {
-      // Open IndexWriter (deferred from sync path for faster gRPC readiness).
+      // Open IndexWriter (deferred from sync path so reads are answerable sooner).
       // Phase types: DeferredRuntime.upgradeWriter() returns a fresh RunningRuntime;
-      // swap the holder fields, reconstruct appServices (which captured ops from the
-      // now-closed deferred session), and swap the gRPC wrappers. After this:
+      // swap the holder fields and reconstruct appServices (which captured ops from
+      // the now-closed deferred session), then republish it. After this:
       //   - search continues seamlessly via the upgraded runtime
       //   - write methods stop returning UNAVAILABLE; the indexing loop starts
       if (ingestLifecycle instanceof DeferredRuntime deferred) {
         RunningRuntime upgraded = deferred.upgradeWriter();
-        this.ingestLifecycle = upgraded;
+        publishIngestLifecycle(upgraded);
         if (this.searchLifecycle == deferred) {
           this.searchLifecycle = upgraded;
         }
@@ -1385,8 +1492,8 @@ public final class KnowledgeServer implements Closeable {
         appServices.wireNerService(nerService);
         var nerModelPath = nerConfig.modelPath().toString();
         var nerGpuEnabled = nerConfig.gpuEnabled();
-        appServices.grpcIngestService().setNerModelPathSupplier(() -> nerModelPath);
-        appServices.grpcIngestService().setNerGpuEnabledSupplier(() -> nerGpuEnabled);
+        appServices.ingestService().setNerModelPathSupplier(() -> nerModelPath);
+        appServices.ingestService().setNerGpuEnabledSupplier(() -> nerGpuEnabled);
       } else if (nerConfig.isReady()) {
         log.info("NER: surface returned no assembly; NER will be unavailable.");
       }
@@ -1480,13 +1587,13 @@ public final class KnowledgeServer implements Closeable {
       // term-stats, IndexSearcher) so the first real user query after boot doesn't pay the
       // Lucene/ICU JIT + class-load cold-start penalty (measured ~870ms cold vs ~12ms warm).
       // Runs after all encoders above are wired, so the synthetic pass exercises the same
-      // production search stack a real query would. Calls GrpcSearchService.warmUpSearchPath()
-      // directly (in-process, below the gRPC boundary) — see its Javadoc + SearchOrchestrator
+      // production search stack a real query would. Calls WorkerSearchService.warmUpSearchPath()
+      // directly, below the port boundary — see its Javadoc + SearchOrchestrator
       // .warmUp()'s Javadoc for why this can't leak into /api/status search telemetry or the
       // Head's app-services feedback layer (feature snapshots / dispositions / GPL triples).
       try {
         long searchWarmStart = System.nanoTime();
-        boolean searchWarmed = appServices.grpcSearchService().warmUpSearchPath();
+        boolean searchWarmed = appServices.searchService().warmUpSearchPath();
         long searchWarmMs = (System.nanoTime() - searchWarmStart) / 1_000_000;
         if (searchWarmed) {
           log.info("Search path ready (warm-up={}ms)", searchWarmMs);
@@ -1566,7 +1673,7 @@ public final class KnowledgeServer implements Closeable {
       // wired (embedding + ECC + SPLADE + BGE-M3 + disambiguation + NER + reranker +
       // citation). This closes both (a) the SPLADE timing gap from 312 — migration
       // enumerator now waits until sparse vectors are available — and (b) the query-
-      // handler boot-race — GrpcSearchService.awaitModelsReady unblocks here. See the
+      // handler boot-race — WorkerSearchService.awaitModelsReady unblocks here. See the
       // modelReadyLatch field Javadoc for the full consumer list before changing the
       // release point.
       modelReadyLatch.countDown();
@@ -1812,7 +1919,7 @@ public final class KnowledgeServer implements Closeable {
             metadataSupplier,
             new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
             null);
-    LuceneRuntimeBuilder builder = schema.atPath(indexPath);
+    LuceneRuntimeBuilder builder = schema.atPath(indexPath).withExecutorRegistrations(luceneExecutors);
     // Tempdoc 406 observability: wire WorkerLuceneTelemetryAdapter so commit /
     // backpressure / drain / swap / lock-contention events flow into
     // metrics-worker.ndjson under the index.runtime.* namespace.
@@ -1822,8 +1929,8 @@ public final class KnowledgeServer implements Closeable {
               indexRuntimeCatalog));
     }
     // Tempdoc 885 item 19: the reopen-on-demand seam must fire for user-facing reads only.
-    // ForegroundLoad is the one component that knows a search-family RPC is in flight (item 3's
-    // gauge, fed by ForegroundLoadInterceptor); adapters-lucene cannot see it, so it arrives as
+    // ForegroundLoad is the one component that knows a search-family call is in flight (item 3's
+    // gauge, fed by ForegroundLoadGate since item A9); adapters-lucene cannot see it, so it arrives as
     // a predicate. Without this, enrichment-backfill document fetches reopened the searcher.
     builder.withForegroundActive(() -> foregroundLoad.inFlight() > 0);
     return builder;
@@ -1863,7 +1970,8 @@ public final class KnowledgeServer implements Closeable {
     if ("bge-m3".equalsIgnoreCase(sparseModel)) {
       catalog = catalog.withVectorDimension(1024);
     }
-    LuceneRuntimeBuilder builder = IndexSchema.fromCatalog(catalog).atPath(indexPath);
+    LuceneRuntimeBuilder builder = IndexSchema.fromCatalog(catalog).atPath(indexPath)
+        .withExecutorRegistrations(luceneExecutors);
     if (telemetry != null) {
       builder.withTelemetry(
           new io.justsearch.indexerworker.services.WorkerLuceneTelemetryAdapter(
@@ -1929,7 +2037,6 @@ public final class KnowledgeServer implements Closeable {
     log.info("║ Active index dir: {}", padRight(String.valueOf(activeIndexPath), 44) + "║");
     log.info("║ Build index dir:  {}", padRight(String.valueOf(buildingIndexPath), 44) + "║");
     log.info("║ Jobs DB path:     {}", padRight(dataDir.resolve("jobs.db").toString(), 44) + "║");
-    log.info("║ Signal bus path:  {}", padRight(dataDir.resolve("worker_signal.lock").toString(), 44) + "║");
     log.info("║ Host:             {}", padRight(config.host(), 44) + "║");
 
     // SSOT paths
@@ -1987,11 +2094,10 @@ public final class KnowledgeServer implements Closeable {
         try {
           Thread.sleep(1000); // Check every second
 
-          if (signalBus.shouldDie()) {
-            log.info("Sentinel detected termination condition, initiating shutdown");
-            initiateShutdown();
-            break;
-          }
+          // Lane F item A10: the suicide-pact arm is gone with the memory-mapped bus that fed it.
+          // In one JVM there is no heartbeat to miss, so self-termination on a stale beat could
+          // only ever be a false positive. Shutdown is now exclusively the ordered in-process
+          // sequence the composition root drives.
 
           // Dev hot-reload: check for reload signal from Gradle continuous build
           if (devReloadManager != null && signalBus.isReloadRequested()) {
@@ -2090,40 +2196,29 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  private void initiateShutdown() {
-    running = false;
-    if (grpcServer != null) {
-      grpcServer.shutdown();
-    }
+  /**
+   * The composed application services (lane F stage A item A6).
+   *
+   * <p>Public so the Engine composition root can bind the ports over the same instance the
+   * indexing loop uses. Null before {@link #start()}, and REPLACED on
+   * a deferred-runtime upgrade or a dev hot-reload — callers must re-read it rather than cache it.
+   */
+  public WorkerAppServices appServices() {
+    return appServices;
   }
 
   /**
-   * Blocks until the server terminates.
+   * The process-scoped foreground-load gauge (tempdoc 885 item 3).
    *
-   * @throws InterruptedException if interrupted while waiting
+   * <p>Public since lane F stage A item A6: {@code ForegroundLoadGate} in the composition root was
+   * the second producer alongside the wire interceptor, and since item A9 deleted that interceptor
+   * it is the only one. Either way it must feed THIS instance.
+   * Reading the gauge off {@code indexingPacing().foregroundLoad()} instead would be wrong before
+   * {@link #start()} has run — the field starts as {@code IndexingPacing.unthrottled()}, which
+   * constructs a gauge of its own that nothing paces off.
    */
-  public void blockUntilShutdown() throws InterruptedException {
-    if (grpcServer != null) {
-      grpcServer.awaitTermination();
-    }
-  }
-
-  /**
-   * Returns the bound port, or -1 if not started.
-   *
-   * @return The bound gRPC port
-   */
-  public int getPort() {
-    return grpcServer != null ? grpcServer.getPort() : -1;
-  }
-
-  /**
-   * Checks if the server is running.
-   *
-   * @return true if the server is running
-   */
-  public boolean isRunning() {
-    return running && grpcServer != null && !grpcServer.isShutdown();
+  public ForegroundLoad foregroundLoad() {
+    return foregroundLoad;
   }
 
   /**
@@ -2137,237 +2232,299 @@ public final class KnowledgeServer implements Closeable {
 
   @Override
   public void close() throws IOException {
-    log.info("Shutting down KnowledgeServer...");
-    running = false;
-
-    // Tempdoc 550 Thesis II: stop the periodic stuck-job reaper.
-    if (stuckJobReaper != null) {
-      stuckJobReaper.shutdownNow();
-    }
-
-    // Wait for deferred model init to complete before closing models
-    if (deferredModelInit != null) {
+    synchronized (closeLock) {
+      if (shutdownLatch.getCount() == 0) return;
+      closeStarted = true;
+      boolean acquired;
       try {
-        deferredModelInit.get(5, TimeUnit.SECONDS);
-      } catch (Exception e) {
-        log.warn("Deferred model init did not complete before shutdown: {}", e.getMessage());
-      }
-    }
-
-    // Tempdoc 413: emit unload_total{reason=SHUTDOWN} and explicitly flush *before* any close-
-    // time shutdown begins. The close-time meterProvider.forceFlush().join(2s) at the tail of
-    // LocalTelemetry.close() races the file write — same shutdown gap that affects every other
-    // counter in the system (e.g., worker.documents.indexed.total's last value never reaches
-    // NDJSON either). Calling LocalTelemetry.flush() here (5s join, SDK fully alive) guarantees
-    // the metric lands in metrics-worker.ndjson before any close-time race conditions begin.
-    // Counterpart to GPU_HANDOFF emitted from IndexingLoop.unloadEmbeddingService on hybrid-
-    // inference VRAM handoff. The actual embeddingService.close() runs later in the close
-    // sequence — this emit reflects intent regardless of whether close() succeeds.
-    if (embeddingService != null && embeddingTelemetry != null) {
-      embeddingTelemetry.onUnload(
-          io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents.UnloadReason.SHUTDOWN);
-      if (telemetry instanceof LocalTelemetry lt) {
-        lt.flush();
-      }
-    }
-
-    // Stop sentinel thread
-    if (sentinelThread != null) {
-      sentinelThread.interrupt();
-      try {
-        sentinelThread.join(5_000);  // Allow 5s for sentinel cleanup
-      } catch (InterruptedException e) {
+        acquired = runtimeSwapLock.tryLock(5, TimeUnit.SECONDS);
+      } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
+        throw new IOException("Interrupted waiting for active runtime replacement; server retained", interrupted);
       }
-    }
-
-    // Stop indexing loop (via application services registry)
-    if (appServices != null) {
-      try {
-        appServices.close();
-      } catch (Exception e) {
-        log.warn("Error closing application services", e);
+      if (!acquired) {
+        log.warn("Server close deadline exceeded; active runtime replacement still owns the server");
+        throw new IOException("Active runtime replacement prevented close; server retained for retry");
       }
-    }
-
-    // Close disambiguation service (after indexing loop which uses it)
-    if (disambiguationService != null) {
       try {
-        disambiguationService.close();
-      } catch (Exception e) {
-        log.warn("Error closing disambiguation service", e);
-      }
-    }
+        if (!closePrepared) {
+          LuceneRuntime currentIngest = ingestLifecycle;
+          if (currentIngest instanceof RunningRuntime runningRuntime) {
+            runningRuntime.retireTerminalWriterFailureNotifications();
+          }
+          log.info("Shutting down KnowledgeServer...");
+          running = false;
 
-    // Close SPLADE encoder (after indexing loop which uses it)
-    if (spladeEncoderInstance != null) {
-      try {
-        spladeEncoderInstance.close();
-      } catch (Exception e) {
-        log.warn("Error closing SPLADE encoder", e);
-      }
-    }
+          // Tempdoc 550 Thesis II: stop the periodic stuck-job reaper.
+          if (stuckJobReapTask != null) stuckJobReapTask.cancel(true);
+          if (stuckJobReaper != null) {
+            stuckJobReaper.shutdownNow();
+            stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.
+          }
 
-    // Close BGE-M3 encoder (after indexing loop which uses it)
-    if (bgeM3EncoderInstance != null) {
-      try {
-        bgeM3EncoderInstance.close();
-      } catch (Exception e) {
-        log.warn("Error closing BGE-M3 encoder", e);
-      }
-    }
+          // The initializer publishes model/runtime fields that the remaining close steps release. It
+          // must finish before those fields are closed and before the Engine exits: JVM shutdown hooks
+          // may tear down native ORT environment state concurrently with a still-running initializer.
+          if (deferredModelExecutor != null) deferredModelExecutor.close();
+          if (deferredModelInit != null) {
+            try {
+              deferredModelInit.join();
+            } catch (java.util.concurrent.CompletionException
+                | java.util.concurrent.CancellationException e) {
+              log.warn("Deferred model init completed exceptionally before shutdown: {}", e.toString());
+            }
+          }
 
-    // 360: Close search reranker (ORT session + tokenizer)
-    if (searchRerankerInstance != null) {
-      try {
-        searchRerankerInstance.close();
-      } catch (Exception e) {
-        log.warn("Error closing search reranker", e);
-      }
-    }
+          // Both an incumbent and a failed candidate may still own resources. Attempt both
+          // before propagating; a successful close is cleared so retries do not repeat teardown.
+          Throwable serviceCloseFailure = null;
+          try { closePendingAppServices(); }
+          catch (RuntimeException | Error failure) { serviceCloseFailure = failure; }
+          if (appServices != null) {
+            try {
+              appServices.close();
+              appServices = null;
+            } catch (Exception | Error failure) {
+              if (serviceCloseFailure == null) serviceCloseFailure = failure;
+              else if (serviceCloseFailure != failure) serviceCloseFailure.addSuppressed(failure);
+            }
+          }
+          if (serviceCloseFailure instanceof Error fatal) throw fatal;
+          if (serviceCloseFailure != null) {
+            throw new IOException("Application services still own resources", serviceCloseFailure);
+          }
 
-    // Tempdoc 397 §14.26 T2-C1/C2: close any surface-owned SessionHandle that wasn't covered
-    // by the encoder closes above (e.g., citation scorer's handle, which is wired to
-    // appServices rather than owned by a local encoder instance). Handle closes are
-    // idempotent, so double-closing the encoder-owned handles is safe.
-    if (inferenceSurface != null) {
-      try {
-        inferenceSurface.close();
-      } catch (Exception e) {
-        log.warn("Error closing inference surface handles", e);
-      }
-    }
+          // Tempdoc 413: emit unload_total{reason=SHUTDOWN} and explicitly flush *before* any close-
+          // time shutdown begins. The close-time meterProvider.forceFlush().join(2s) at the tail of
+          // LocalTelemetry.close() races the file write — same shutdown gap that affects every other
+          // counter in the system (e.g., worker.documents.indexed.total's last value never reaches
+          // NDJSON either). Calling LocalTelemetry.flush() here (5s join, SDK fully alive) guarantees
+          // the metric lands in metrics-worker.ndjson before any close-time race conditions begin.
+          // Counterpart to GPU_HANDOFF emitted from IndexingLoop.unloadEmbeddingService on hybrid-
+          // inference VRAM handoff. The actual embeddingService.close() runs later in the close
+          // sequence — this emit reflects intent regardless of whether close() succeeds.
+          if (embeddingService != null && embeddingTelemetry != null) {
+            embeddingTelemetry.onUnload(
+                io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents.UnloadReason.SHUTDOWN);
+            if (telemetry instanceof LocalTelemetry lt) {
+              lt.flush();
+            }
+          }
 
-    // Phase 3c: OTel callback handles are managed by LocalTelemetry's gaugeHandles list
-    // (each catalog gauge/observable-counter goes through registry.buildGauge/buildObservableCounter
-    // which adds the handle there). LocalTelemetry.close() drains them on shutdown.
+          // Stop sentinel thread
+          if (sentinelThread != null) {
+            sentinelThread.interrupt();
+            try {
+              sentinelThread.join(5_000);  // Allow 5s for sentinel cleanup
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
 
-    // Close tracing (flush spans) before telemetry shuts down.
-    if (tracingBootstrap != null) {
-      try {
-        tracingBootstrap.close();
-      } catch (Exception e) {
-        log.warn("Error closing tracing", e);
-      }
-    }
+          // Close disambiguation service (after indexing loop which uses it)
+          if (disambiguationService != null) {
+            try {
+              disambiguationService.close();
+            } catch (Exception e) {
+              log.warn("Error closing disambiguation service", e);
+            }
+          }
 
-    // Close telemetry (flush best-effort) after loop shutdown so the last stage/commit timings are captured.
-    if (telemetry != null) {
-      try {
-        telemetry.close();
-      } catch (Exception e) {
-        log.warn("Error closing telemetry", e);
-      } finally {
-        telemetry = null;
-      }
-    }
+          // Close SPLADE encoder (after indexing loop which uses it)
+          if (spladeEncoderInstance != null) {
+            try {
+              spladeEncoderInstance.close();
+            } catch (Exception e) {
+              log.warn("Error closing SPLADE encoder", e);
+            }
+          }
 
-    // Stop gRPC server
-    if (grpcServer != null) {
-      grpcServer.shutdown();
-      try {
-        if (!grpcServer.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-          grpcServer.shutdownNow();
+          // Close BGE-M3 encoder (after indexing loop which uses it)
+          if (bgeM3EncoderInstance != null) {
+            try {
+              bgeM3EncoderInstance.close();
+            } catch (Exception e) {
+              log.warn("Error closing BGE-M3 encoder", e);
+            }
+          }
+
+          // 360: Close search reranker (ORT session + tokenizer)
+          if (searchRerankerInstance != null) {
+            try {
+              searchRerankerInstance.close();
+            } catch (Exception e) {
+              log.warn("Error closing search reranker", e);
+            }
+          }
+
+          // Tempdoc 397 §14.26 T2-C1/C2: close any surface-owned SessionHandle that wasn't covered
+          // by the encoder closes above (e.g., citation scorer's handle, which is wired to
+          // appServices rather than owned by a local encoder instance). Handle closes are
+          // idempotent, so double-closing the encoder-owned handles is safe.
+          if (inferenceSurface != null) {
+            try {
+              inferenceSurface.close();
+            } catch (Exception e) {
+              log.warn("Error closing inference surface handles", e);
+            }
+          }
+
+          // Phase 3c: OTel callback handles are managed by LocalTelemetry's gaugeHandles list
+          // (each catalog gauge/observable-counter goes through registry.buildGauge/buildObservableCounter
+          // which adds the handle there). LocalTelemetry.close() drains them on shutdown.
+
+          // Close tracing (flush spans) before telemetry shuts down.
+          if (tracingBootstrap != null) {
+            try {
+              tracingBootstrap.close();
+            } catch (Exception e) {
+              log.warn("Error closing tracing", e);
+            }
+          }
+
+          // Close telemetry (flush best-effort) after loop shutdown so the last stage/commit timings are captured.
+          if (telemetry != null) {
+            try {
+              telemetry.close();
+            } catch (Exception e) {
+              log.warn("Error closing telemetry", e);
+            } finally {
+              telemetry = null;
+            }
+          }
+
+          // Stop migration enumerator thread (best-effort)
+          if (migrationEnumeratorThread != null) {
+            migrationEnumeratorThread.interrupt();
+            try {
+              migrationEnumeratorThread.join(10_000);  // Allow 10s for large directory walks
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+
+          // Stop migration cutover monitor thread (best-effort)
+          if (migrationCutoverThread != null) {
+            migrationCutoverThread.interrupt();
+            try {
+              migrationCutoverThread.join(10_000);  // Allow 10s for cutover cleanup
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+
+          closePrepared = true;
         }
-      } catch (InterruptedException e) {
-        grpcServer.shutdownNow();
-        Thread.currentThread().interrupt();
-      }
-    }
 
-    // Stop migration enumerator thread (best-effort)
-    if (migrationEnumeratorThread != null) {
-      migrationEnumeratorThread.interrupt();
-      try {
-        migrationEnumeratorThread.join(10_000);  // Allow 10s for large directory walks
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
+        // A timed-out runtime still owns live Lucene children. Attempt both runtimes, but preserve
+        // the enclosing stores, executor registrations and root lock if either needs a close retry.
+        IOException runtimeCloseFailure = null;
+        if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) {
+          try {
+            ingestLifecycle.close();
+          } catch (Exception e) {
+            log.warn("Error closing ingest runtime", e);
+            runtimeCloseFailure = new IOException("Ingest runtime close incomplete", e);
+          }
+        }
+        if (searchLifecycle != null) {
+          try {
+            searchLifecycle.close();
+          } catch (Exception e) {
+            log.warn("Error closing search runtime", e);
+            if (runtimeCloseFailure == null) {
+              runtimeCloseFailure = new IOException("Search runtime close incomplete", e);
+            } else {
+              runtimeCloseFailure.addSuppressed(e);
+            }
+          }
+        }
+        if (runtimeCloseFailure != null) throw runtimeCloseFailure;
 
-    // Stop migration cutover monitor thread (best-effort)
-    if (migrationCutoverThread != null) {
-      migrationCutoverThread.interrupt();
-      try {
-        migrationCutoverThread.join(10_000);  // Allow 10s for cutover cleanup
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
+        // Close embedding service. unload_total{reason=SHUTDOWN} was emitted earlier (before
+        // telemetry shutdown) so the metric lands in metrics-worker.ndjson regardless of close()'s
+        // outcome.
+        if (embeddingService != null) {
+          try {
+            embeddingService.close();
+          } catch (Exception e) {
+            log.warn("Error closing embedding service", e);
+          }
+        }
 
-    // Close Lucene runtimes
-    if (ingestLifecycle != null && ingestLifecycle != searchLifecycle) {
-      try {
-        ingestLifecycle.close();
-      } catch (Exception e) {
-        log.warn("Error closing ingest runtime", e);
-      }
-    }
-    if (searchLifecycle != null) {
-      try {
-        searchLifecycle.close();
-      } catch (Exception e) {
-        log.warn("Error closing search runtime", e);
-      }
-    }
+        // Close auxiliary jobs.db stores before the queue connection.
+        if (documentIdentityStore != null) {
+          try {
+            documentIdentityStore.close();
+          } catch (Exception e) {
+            log.warn("Error closing document-identity store", e);
+          }
+        }
 
-    // Close embedding service. unload_total{reason=SHUTDOWN} was emitted earlier (before
-    // telemetry shutdown) so the metric lands in metrics-worker.ndjson regardless of close()'s
-    // outcome.
-    if (embeddingService != null) {
-      try {
-        embeddingService.close();
-      } catch (Exception e) {
-        log.warn("Error closing embedding service", e);
-      }
-    }
+        if (pathResolutionStore != null) {
+          try {
+            pathResolutionStore.close();
+          } catch (Exception e) {
+            log.warn("Error closing path-resolution store", e);
+          }
+        }
 
-    // Close auxiliary jobs.db stores before the queue connection.
-    if (documentIdentityStore != null) {
-      try {
-        documentIdentityStore.close();
-      } catch (Exception e) {
-        log.warn("Error closing document-identity store", e);
-      }
-    }
+        // Retain the queue and index exclusion if native connection cleanup needs retry.
+        // EngineRoot must not observe completed shutdown while this mutable owner remains live.
+        if (jobQueue != null) {
+          jobQueue.close();
+        }
 
-    if (pathResolutionStore != null) {
-      try {
-        pathResolutionStore.close();
-      } catch (Exception e) {
-        log.warn("Error closing path-resolution store", e);
-      }
-    }
+        // Close signal bus
+        if (signalBus != null) {
+          try {
+            signalBus.close();
+          } catch (Exception e) {
+            log.warn("Error closing signal bus", e);
+          }
+        }
 
-    // Close job queue
-    if (jobQueue != null) {
-      try {
-        jobQueue.close();
-      } catch (Exception e) {
-        log.warn("Error closing job queue", e);
-      }
-    }
+        try { workerExecutors.close(); }
+        finally { luceneExecutors.close(); }
 
-    // Close signal bus
-    if (signalBus != null) {
-      try {
-        signalBus.close();
-      } catch (Exception e) {
-        log.warn("Error closing signal bus", e);
-      }
-    }
+        if (indexRootLock != null) {
+          // Keep the failed owner available for retry and never signal completed shutdown
+          // while native lock cleanup remains unconfirmed.
+          indexRootLock.close();
+          indexRootLock = null;
+        }
 
-    if (indexRootLock != null) {
-      try {
-        indexRootLock.close();
-      } catch (Exception e) {
-        log.warn("Error closing index root lock", e);
+        // Stage-A checkpoint (re-review). This countdown used to sit ~90 lines earlier, where the gRPC
+        // server's termination used to be, and the comment there called it "releasing the shutdown
+        // latch". It marked a point in the MIDDLE of close(): the Lucene runtimes, the embedding
+        // service, the migration threads and the index root lock were all still to come. So the latch
+        // answered "close() got past step N", which is not a fact anyone wants.
+        //
+        // It is the last statement of close() now, so it means exactly one thing: this server ran its
+        // shutdown to completion. That is what EngineRoot.close() consults.
+        shutdownLatch.countDown();
+        log.info("KnowledgeServer shutdown complete");
       } finally {
-        indexRootLock = null;
+        runtimeSwapLock.unlock();
       }
     }
+  }
 
-    log.info("KnowledgeServer shutdown complete");
+  /**
+   * Blocks until {@link #close()} has run to completion, or the timeout elapses.
+   *
+   * <p>{@code true} means close() reached its final statement — every runtime closed, every thread
+   * joined or abandoned on its own timeout, the index root lock released. {@code false} means it
+   * did not: either close() was never called, or it threw partway and left resources open. A caller
+   * that then re-opens the same data directory is the one who finds out, via a held index lock.
+   *
+   * <p>This exists because the obvious predicate does not work. {@code isRunning()} is
+   * {@code running && latch > 0} and {@code close()} sets {@code running = false} in its FIRST
+   * statement, so reading {@code isRunning()} after {@code close()} returns is constant-false and
+   * can never report a problem.
+   */
+  public boolean awaitClosed(long timeoutMs) throws InterruptedException {
+    return shutdownLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
   }
 
   // Tempdoc 417 Phase 3c: registerOtelObservableCallbacks() removed — its 25 metrics now flow
@@ -2427,8 +2584,8 @@ public final class KnowledgeServer implements Closeable {
                         this::finalizeEmbeddingRebuildBeforeCutover,
                         this::verifyGreenCommitMetadataBestEffort,
                         this::drainSwitchBufferBestEffort,
-                        this::initiateShutdown,
                         this::flushTelemetryBestEffort,
+                        () -> migrationRestartAction.run(),
                         dataDir,
                         log)),
             "migration-cutover");
@@ -2451,26 +2608,28 @@ public final class KnowledgeServer implements Closeable {
    * immediately before the cutover COMPLETE commit. Flips the ECC to COMPATIBLE iff the green is fully
    * embedded (job queue + pending-embeddings both 0), so the COMPLETE commit's overlay stamps the
    * embedding fingerprint — instead of racing the indexing-loop thread that would otherwise call
-   * {@code checkRebuildCompletion}. Idempotent (no-op unless the ECC is REBUILDING) and best-effort: a
-   * green that is genuinely not fully embedded is not flipped, so {@link #verifyGreenCommitMetadataBestEffort}
-   * correctly blocks its promotion.
+   * {@code checkRebuildCompletion}. Pending work or an unreadable pending count defers the cutover
+   * under its existing switching deadline. Metadata verification still guards promotion after
+   * certification and the final commit.
    */
-  private void finalizeEmbeddingRebuildBeforeCutover() {
+  private boolean finalizeEmbeddingRebuildBeforeCutover() {
     var ecc = embeddingCompatController;
-    if (ecc == null || ingestLifecycle == null) {
-      return;
+    if (ecc == null || ecc.currentFingerprint() == null || ecc.currentFingerprint().isBlank()) {
+      return true; // No resolvable embedding model: a legitimate keyword-only rebuild.
     }
+    if (ingestLifecycle == null) return false;
     try {
       long queueDepth = jobQueue.queueDepth();
       int pendingEmbeddings =
           ingestLifecycle
               .indexCountOps()
-              .countByField(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+              .countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+      if (pendingEmbeddings > 0) return false;
       ecc.checkRebuildCompletion(queueDepth, pendingEmbeddings);
-    } catch (RuntimeException e) {
-      log.warn(
-          "Fix E: finalize embedding rebuild before cutover failed (best-effort): {}",
-          e.getMessage());
+      return true;
+    } catch (IOException | RuntimeException e) {
+      log.warn("Cannot establish embedding completion before cutover: {}", e.getMessage());
+      return false;
     }
   }
 
@@ -2492,6 +2651,8 @@ public final class KnowledgeServer implements Closeable {
           ingestLifecycle == null ? "null" : ingestLifecycle.getClass().getSimpleName());
       return;
     }
+    LuceneRuntime capturedServing = searchLifecycle;
+    Path capturedPath = activeIndexPath;
     KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(
         new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
             jobQueue,
@@ -2499,10 +2660,21 @@ public final class KnowledgeServer implements Closeable {
             signalBus,
             indexingPacing,
             indexBasePath,
-            activeIndexPath,
+            capturedPath,
             JSON,
             KnowledgeServer::chunkSpladeEnabled,
+            () -> vduReplayAllowed(running, capturedServing, capturedPath),
             log));
+  }
+
+  private boolean vduReplayAllowed(RunningRuntime target, LuceneRuntime serving, Path targetPath) {
+    if (target != serving || indexGenerationManager == null) return false;
+    try {
+      return indexGenerationManager.isIdleActiveGeneration(targetPath);
+    } catch (IOException | RuntimeException unavailable) {
+      log.warn("VDU replay awaits readable active generation state: {}", unavailable.getMessage());
+      return false;
+    }
   }
 
   /**

@@ -28,15 +28,15 @@ class DurableGrantStoreTest {
   @DisplayName("grant → allowed for that (op, tier) only; revoke → no longer allowed")
   void grantScopeAndRevoke() {
     DurableGrantStore store = new DurableGrantStore();
-    assertFalse(store.isAllowed("core.x", RiskTier.MEDIUM, SourceTier.UNTRUSTED));
+    assertFalse(store.isAllowed("core.x", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()));
 
     store.grantAllowAlways("core.x", SourceTier.UNTRUSTED);
-    assertTrue(store.isAllowed("core.x", RiskTier.MEDIUM, SourceTier.UNTRUSTED));
-    assertFalse(store.isAllowed("core.x", RiskTier.MEDIUM, SourceTier.TRUSTED), "scoped to the granted tier");
-    assertFalse(store.isAllowed("core.other", RiskTier.MEDIUM, SourceTier.UNTRUSTED), "scoped to the granted op");
+    assertTrue(store.isAllowed("core.x", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()));
+    assertFalse(store.isAllowed("core.x", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.ui()), "scoped to the granted tier");
+    assertFalse(store.isAllowed("core.other", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()), "scoped to the granted op");
 
     store.revoke("core.x", SourceTier.UNTRUSTED);
-    assertFalse(store.isAllowed("core.x", RiskTier.MEDIUM, SourceTier.UNTRUSTED));
+    assertFalse(store.isAllowed("core.x", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()));
   }
 
   @Test
@@ -48,8 +48,8 @@ class DurableGrantStoreTest {
 
     store.revokeNonUser();
 
-    assertFalse(store.isAllowed("core.agent", RiskTier.MEDIUM, SourceTier.UNTRUSTED), "non-user durable grant revoked");
-    assertTrue(store.isAllowed("core.user", RiskTier.MEDIUM, SourceTier.TRUSTED), "user durable grant survives");
+    assertFalse(store.isAllowed("core.agent", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()), "non-user durable grant revoked");
+    assertTrue(store.isAllowed("core.user", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.ui()), "user durable grant survives");
   }
 
   @Test
@@ -78,21 +78,21 @@ class DurableGrantStoreTest {
     Optional<String> family = Optional.of("file-operations");
 
     // No grant: an op in the family is not allowed by family.
-    assertFalse(store.isAllowed("core.ingest", family, RiskTier.MEDIUM, SourceTier.UNTRUSTED));
+    assertFalse(store.isAllowed("core.ingest", family, RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()));
 
     store.grantFamilyAllowAlways("file-operations", SourceTier.UNTRUSTED);
-    assertTrue(store.isAllowed("core.ingest", family, RiskTier.MEDIUM, SourceTier.UNTRUSTED), "any op in the family");
+    assertTrue(store.isAllowed("core.ingest", family, RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()), "any op in the family");
     assertTrue(
-        store.isAllowed("core.other-in-family", family, RiskTier.MEDIUM, SourceTier.UNTRUSTED),
+        store.isAllowed("core.other-in-family", family, RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()),
         "a different op too");
     assertFalse(
-        store.isAllowed("core.ingest", Optional.empty(), RiskTier.MEDIUM, SourceTier.UNTRUSTED),
+        store.isAllowed("core.ingest", Optional.empty(), RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()),
         "an op WITHOUT the family is not covered");
     assertFalse(
-        store.isAllowed("core.ingest", family, RiskTier.MEDIUM, SourceTier.TRUSTED), "scoped to the granted tier");
+        store.isAllowed("core.ingest", family, RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.ui()), "scoped to the granted tier");
 
     store.revokeFamily("file-operations", SourceTier.UNTRUSTED);
-    assertFalse(store.isAllowed("core.ingest", family, RiskTier.MEDIUM, SourceTier.UNTRUSTED));
+    assertFalse(store.isAllowed("core.ingest", family, RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()));
   }
 
   /**
@@ -108,13 +108,13 @@ class DurableGrantStoreTest {
     store.grantFamilyAllowAlways("file-operations", SourceTier.UNTRUSTED);
 
     assertTrue(
-        store.isAllowed("core.ingest-files", family, RiskTier.MEDIUM, SourceTier.UNTRUSTED),
+        store.isAllowed("core.ingest-files", family, RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()),
         "560 §28's family axis is preserved: the MEDIUM member is still auto-approved");
     assertFalse(
-        store.isAllowed("core.file-operations", family, RiskTier.HIGH, SourceTier.UNTRUSTED),
+        store.isAllowed("core.file-operations", family, RiskTier.HIGH,io.justsearch.app.services.TestEngineContexts.agent()),
         "a family grant never satisfies a HIGH-risk operation — destructive work costs a fresh gesture");
     assertTrue(
-        store.isAllowed("core.ingest-files", family, RiskTier.LOW, SourceTier.UNTRUSTED),
+        store.isAllowed("core.ingest-files", family, RiskTier.LOW,io.justsearch.app.services.TestEngineContexts.agent()),
         "the ceiling is HIGH-only — LOW is unaffected");
   }
 
@@ -126,11 +126,11 @@ class DurableGrantStoreTest {
     store.grantAllowAlways("core.file-operations", SourceTier.UNTRUSTED);
 
     assertFalse(
-        store.isAllowed("core.file-operations", RiskTier.HIGH, SourceTier.UNTRUSTED),
+        store.isAllowed("core.file-operations", RiskTier.HIGH,io.justsearch.app.services.TestEngineContexts.agent()),
         "'Always allow this action' cannot durably suppress a HIGH-risk gate");
     // Right-reason check: the grant IS present — it is the risk ceiling refusing, not a missing grant.
     assertTrue(
-        store.isAllowed("core.file-operations", RiskTier.MEDIUM, SourceTier.UNTRUSTED),
+        store.isAllowed("core.file-operations", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()),
         "the same grant still answers true below the ceiling — the refusal is risk-driven");
     assertTrue(
         store.snapshot().stream()
@@ -151,9 +151,9 @@ class DurableGrantStoreTest {
 
     // A fresh store over the same file reloads both grants.
     DurableGrantStore reopened = new DurableGrantStore(Clock.systemUTC(), file);
-    assertTrue(reopened.isAllowed("core.x", RiskTier.MEDIUM, SourceTier.UNTRUSTED), "operation grant survived");
+    assertTrue(reopened.isAllowed("core.x", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()), "operation grant survived");
     assertTrue(
-        reopened.isAllowed("core.ingest", Optional.of("file-operations"), RiskTier.MEDIUM, SourceTier.TRUSTED),
+        reopened.isAllowed("core.ingest", Optional.of("file-operations"), RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.ui()),
         "family grant survived");
     assertEquals(2, reopened.snapshot().size());
     assertTrue(Files.readString(file).contains("\"schemaVersion\":1"));
@@ -168,7 +168,7 @@ class DurableGrantStoreTest {
         {"grants":[{"kind":"OPERATION","target":"core.x","sourceTier":"UNTRUSTED"}]}
         """);
     DurableGrantStore store = new DurableGrantStore(Clock.systemUTC(), file);
-    assertTrue(store.isAllowed("core.x", RiskTier.MEDIUM, SourceTier.UNTRUSTED));
+    assertTrue(store.isAllowed("core.x", RiskTier.MEDIUM,io.justsearch.app.services.TestEngineContexts.agent()));
   }
 
   @Test

@@ -23,7 +23,7 @@ import org.slf4j.Logger;
 /**
  * Persistence adapter for watched roots (watched_roots.json).
  *
- * <p>This is extracted from {@link RemoteKnowledgeClient} to keep the gRPC client focused on
+ * <p>This is extracted from {@link KnowledgeClient} to keep the gRPC client focused on
  * transport/retry behavior.
  */
 final class WatchedRootsStore {

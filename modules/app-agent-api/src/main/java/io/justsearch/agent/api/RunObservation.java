@@ -70,7 +70,7 @@ public interface RunObservation {
           public void setSnapshotSupplier(Supplier<AgentEvent.StateSnapshot> supplier) {}
 
           @Override
-          public Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer) {
+          public Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer, Runnable onDetached) {
             return Optional.empty();
           }
 
@@ -100,13 +100,14 @@ public interface RunObservation {
 
     /**
      * Attaches an observer, replaying the retained frames after {@code sinceSeq} atomically with
-     * the registration, and returns an unsubscribe handle.
+     * the registration, and returns an unsubscribe handle. {@code onDetached} fires when that
+     * observer is retired (including delivery failure/overflow), independently of run retirement.
      *
      * <p>Empty means the cursor fell outside the retained window and NOTHING was registered — the
      * caller must re-attach from 0 rather than hold a silently dead stream. {@code sinceSeq == 0}
      * always succeeds, so it is the guaranteed path.
      */
-    Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer);
+    Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer, Runnable onDetached);
 
     /** Registers a callback fired once when the run is retired. */
     void onRetire(Runnable listener);

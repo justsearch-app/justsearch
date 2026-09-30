@@ -21,7 +21,7 @@ final class WorkerUpgradeQuiescenceTest {
     IndexingLoop loop = mock(IndexingLoop.class);
     when(loop.isRunning()).thenReturn(true);
     when(loop.quiesceForUpgrade(10_000)).thenReturn(true);
-    when(queue.checkpointForUpgrade()).thenReturn(true);
+    when(queue.checkpointWal()).thenReturn(true);
     var barrier = new WorkerUpgradeQuiescence(queue, loop, null);
 
     var prepared = barrier.prepare("prep-1");
@@ -31,7 +31,7 @@ final class WorkerUpgradeQuiescenceTest {
     assertTrue(prepared.getQueueCheckpointed());
     assertEquals("IDLE", prepared.getMigrationState());
     verify(loop).quiesceForUpgrade(10_000);
-    verify(queue).checkpointForUpgrade();
+    verify(queue).checkpointWal();
   }
 
   @Test
@@ -40,7 +40,7 @@ final class WorkerUpgradeQuiescenceTest {
     IndexingLoop loop = mock(IndexingLoop.class);
     when(loop.isRunning()).thenReturn(true);
     when(loop.quiesceForUpgrade(10_000)).thenReturn(true);
-    when(queue.checkpointForUpgrade()).thenReturn(false);
+    when(queue.checkpointWal()).thenReturn(false);
     var barrier = new WorkerUpgradeQuiescence(queue, loop, null);
 
     var prepared = barrier.prepare("prep-1");
@@ -61,7 +61,7 @@ final class WorkerUpgradeQuiescenceTest {
     IndexingLoop loop = mock(IndexingLoop.class);
     when(loop.isRunning()).thenReturn(true);
     when(loop.quiesceForUpgrade(10_000)).thenReturn(true);
-    when(queue.checkpointForUpgrade()).thenReturn(false, true);
+    when(queue.checkpointWal()).thenReturn(false, true);
     var barrier = new WorkerUpgradeQuiescence(queue, loop, null);
 
     assertFalse(barrier.prepare("prep-1").getReady());

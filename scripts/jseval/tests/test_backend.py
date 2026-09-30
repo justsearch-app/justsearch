@@ -473,7 +473,11 @@ class TestOrphanWorkerSweep:
         mock_proc.create_time.return_value = now_ts  # time key: matches
         mock_proc.cmdline.return_value = [
             "java", f"-Djustsearch.data.dir={data_dir}",
-            "io.justsearch.indexerworker.IndexerWorker",
+            # Lane F stage A: the merged Engine JVM's main class (io.justsearch.ui.HeadlessApp)
+            # -- there is no more separate io.justsearch.indexerworker.IndexerWorker process.
+            # The match itself is keyed only on the -Djustsearch.data.dir= sysprop (see
+            # _cmdline_matches_data_dir), so this class name is illustrative, not load-bearing.
+            "io.justsearch.ui.HeadlessApp",
         ]  # cmdline key: matches
         mock_process_cls.return_value = mock_proc
 

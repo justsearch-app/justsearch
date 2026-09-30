@@ -115,7 +115,7 @@ class InferenceLifecycleManagerPropsInsightsTest {
             contextSize,
             0,
             false);
-    return new InferenceLifecycleManager(config);
+    return new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
   }
 
   private static void setUsingExternalServer(InferenceLifecycleManager manager, boolean value) {

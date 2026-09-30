@@ -17,10 +17,11 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.observability.ledger.ScanRollupLedger;
 import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.ScanProgressRegistry;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.lang.reflect.Field;
@@ -50,15 +51,18 @@ final class AgentToolFactoryScanWiringTest {
   // KnowledgeHttpApiAdapter's constructor builds a KnowledgeSearchEngine, which reads the global
   // reranker config — so the adapter cannot be constructed without a published ConfigStore.
   private ConfigStore previousConfigStore;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void publishConfigStore() {
     previousConfigStore = ConfigStore.globalOrNull();
     TestResolvedConfigHelper.storeWithDefaults();
+    processExecutors = new TestEngineExecutors();
   }
 
   @AfterEach
   void restoreConfigStore() {
+    processExecutors.close();
     TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
   }
 
@@ -74,7 +78,7 @@ final class AgentToolFactoryScanWiringTest {
   }
 
   private static KnowledgeHttpApiAdapter agentAdapter() {
-    return new KnowledgeHttpApiAdapter(mock(KnowledgeServerBootstrap.class));
+    return new KnowledgeHttpApiAdapter(mock(KnowledgeServerBootstrap.class), mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class));
   }
 
   @Test
@@ -84,7 +88,7 @@ final class AgentToolFactoryScanWiringTest {
     assertNull(boundField(adapter, "scanProgressRegistry"), "unbound before the wiring call");
     assertNull(boundField(adapter, "scanRollupLedger"), "unbound before the wiring call");
 
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       AgentToolFactory.bindScanObservability(adapter, registry, ledger);
 
@@ -96,7 +100,7 @@ final class AgentToolFactoryScanWiringTest {
   @Test
   @DisplayName("a null adapter (prerequisites unmet in build) is a no-op, not an NPE")
   void nullAdapterIsNoOp() {
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       assertDoesNotThrow(
           () -> AgentToolFactory.bindScanObservability(null, registry, mock(ScanRollupLedger.class)));
     }
@@ -112,16 +116,17 @@ final class AgentToolFactoryScanWiringTest {
     WorkerCapability capability = mock(WorkerCapability.class);
     when(capability.available()).thenReturn(true);
 
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       boolean registered =
           AgentToolHandlers.registerLateBound(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
               new HandlerRegistry(),
               mock(KnowledgeServerBootstrap.class),
-              mock(RemoteKnowledgeClient.class),
+              mock(KnowledgeClient.class),
               capability,
               dataDir,
-              mock(RemoteKnowledgeClient.class),
+              mock(KnowledgeClient.class),
               OnlineAiService.unavailable(),
               null,
               adapter,
@@ -153,13 +158,14 @@ final class AgentToolFactoryScanWiringTest {
   @Test
   @DisplayName("both paths register the same operation set")
   void bothPathsRegisterTheSameOperations(@TempDir Path dataDir) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     WorkerCapability capability = mock(WorkerCapability.class);
     when(capability.available()).thenReturn(true);
 
     HandlerRegistry eager = new HandlerRegistry();
     AgentToolFactory.Output eagerTools =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -172,6 +178,7 @@ final class AgentToolFactoryScanWiringTest {
     HandlerRegistry lateBound = new HandlerRegistry();
     assertTrue(
         AgentToolHandlers.registerLateBound(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             lateBound,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -212,7 +219,7 @@ final class AgentToolFactoryScanWiringTest {
   @Test
   @DisplayName("eager then late-bound on the SAME registry registers all six handlers (fails on main)")
   void eagerThenLateBoundRegistersAllSixOnTheSameRegistry(@TempDir Path dataDir) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     WorkerCapability capability = mock(WorkerCapability.class);
     when(capability.available()).thenReturn(true);
 
@@ -221,6 +228,7 @@ final class AgentToolFactoryScanWiringTest {
     // Step 1: the eager path, exactly as SubstratePhase.run calls it at construction time.
     AgentToolFactory.Output eagerTools =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -239,6 +247,7 @@ final class AgentToolFactoryScanWiringTest {
     // permanently suppresses REMEMBER").
     boolean lateBoundRan =
         AgentToolHandlers.registerLateBound(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             registry,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -271,11 +280,12 @@ final class AgentToolFactoryScanWiringTest {
   @Test
   @DisplayName("adapter identity: late-bound reuses the eager adapter, and builds one when absent")
   void adapterIdentitySemantics(@TempDir Path dataDir) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     KnowledgeHttpApiAdapter existing = agentAdapter();
 
     AgentToolFactory.Output reused =
         AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -291,6 +301,7 @@ final class AgentToolFactoryScanWiringTest {
 
     AgentToolFactory.Output fresh =
         AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -309,11 +320,12 @@ final class AgentToolFactoryScanWiringTest {
   @Test
   @DisplayName("the freshly built adapter — the normal async-Worker boot — gets the scan bindings")
   void freshAdapterGetsScanBindings(@TempDir Path dataDir) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       AgentToolFactory.Output out =
           AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
               dataDir,
               mock(KnowledgeServerBootstrap.class),
               client,
@@ -334,9 +346,10 @@ final class AgentToolFactoryScanWiringTest {
   @Test
   @DisplayName("every bundle component is composed on both paths")
   void bundleIsFullyComposed(@TempDir Path dataDir) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     AgentToolFactory.Output out =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -375,10 +388,11 @@ final class AgentToolFactoryScanWiringTest {
   void eagerGuardNullsTheWorkerBackedToolsButNotTheJournal(@TempDir Path dataDir) {
     AgentToolFactory.Output out =
         AgentToolFactory.build(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             null,
-            mock(RemoteKnowledgeClient.class),
+            mock(KnowledgeClient.class),
             OnlineAiService.unavailable(),
             null,
             mock(DocumentService.class));
@@ -418,12 +432,13 @@ final class AgentToolFactoryScanWiringTest {
   @Test
   @DisplayName("assemble reuses a supplied file-operation journal instead of building a second")
   void suppliedJournalIsReused(@TempDir Path dataDir) {
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
+    KnowledgeClient client = mock(KnowledgeClient.class);
     io.justsearch.agent.tools.FileOperationLog existing =
         new io.justsearch.agent.tools.FileOperationLog(dataDir.resolve("file-operations"));
 
     AgentToolFactory.Output reused =
         AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -439,6 +454,7 @@ final class AgentToolFactoryScanWiringTest {
 
     AgentToolFactory.Output fresh =
         AgentToolFactory.assemble(
+            mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class),
             dataDir,
             mock(KnowledgeServerBootstrap.class),
             client,
@@ -458,7 +474,7 @@ final class AgentToolFactoryScanWiringTest {
   @DisplayName("a null collaborator does not clobber an already-bound one")
   void nullCollaboratorDoesNotUnbind() {
     KnowledgeHttpApiAdapter adapter = agentAdapter();
-    try (ScanProgressRegistry registry = new ScanProgressRegistry()) {
+    try (ScanProgressRegistry registry = new ScanProgressRegistry(processExecutors)) {
       ScanRollupLedger ledger = mock(ScanRollupLedger.class);
       AgentToolFactory.bindScanObservability(adapter, registry, ledger);
       AgentToolFactory.bindScanObservability(adapter, null, null);

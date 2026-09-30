@@ -4,12 +4,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
@@ -67,6 +76,194 @@ final class IndexingJobsChangeStreamTest {
     assertEquals(1, jobQueue.changeStream().currentSeq());
 
     s.subscription().close();
+  }
+
+  @Test
+  void projectionFailureAfterCommitDoesNotRollbackPersistedJob() throws Exception {
+    Path dbPath = tempDir.resolve("jobs.db");
+    Path jobPath = tempDir.resolve("projection-failure.txt");
+    Connection originalConnection = readField("connection", Connection.class);
+    IndexingJobsChangeStream originalChangeStream = jobQueue.changeStream();
+    Connection connectionSpy = spy(originalConnection);
+    IndexingJobsChangeStream changeStreamSpy = spy(originalChangeStream);
+    RuntimeException projectionFailure = new RuntimeException("projection failure");
+    doThrow(projectionFailure).when(changeStreamSpy).commitSucceeded();
+    writeField("connection", connectionSpy);
+    writeField("changeStream", changeStreamSpy);
+
+    try {
+      RuntimeException thrown =
+          assertThrows(RuntimeException.class, () -> jobQueue.enqueue(List.of(jobPath)));
+      assertSame(projectionFailure, thrown, "the projection failure must reach the caller intact");
+      verify(connectionSpy).commit();
+      verify(connectionSpy, never()).rollback();
+
+      try (Connection observer = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+          var statement = observer.createStatement();
+          var rows = statement.executeQuery("SELECT state FROM jobs")) {
+        assertTrue(rows.next(), "the committed job must remain visible to another connection");
+        assertEquals("PENDING", rows.getString(1));
+        assertFalse(rows.next(), "the fixture should contain exactly one inserted job");
+      }
+    } finally {
+      writeField("connection", originalConnection);
+      writeField("changeStream", originalChangeStream);
+    }
+  }
+
+  @Test
+  void failedNormalCloseRefusesReopenUntilTheRetainedConnectionCloses() throws Exception {
+    Path jobPath = tempDir.resolve("close-reopen.txt");
+    jobQueue.enqueue(List.of(jobPath));
+    Connection original = readField("connection", Connection.class);
+    Connection intercepted = org.mockito.Mockito.mock(Connection.class,
+        org.mockito.AdditionalAnswers.delegatesTo(original));
+    var failure = new java.sql.SQLException("native queue close unavailable");
+    var first = new java.util.concurrent.atomic.AtomicBoolean(true);
+    org.mockito.Mockito.doAnswer(call -> {
+      if (first.getAndSet(false)) throw failure;
+      original.close();
+      return null;
+    }).when(intercepted).close();
+    writeField("connection", intercepted);
+    try {
+      assertSame(failure, assertThrows(java.io.IOException.class, jobQueue::close).getCause());
+      assertSame(intercepted, readField("connection", Connection.class));
+      assertSame(failure, assertThrows(java.sql.SQLException.class, jobQueue::open).getCause());
+      assertThrows(IllegalStateException.class, () -> jobQueue.enqueue(List.of(jobPath)));
+      assertFalse(jobQueue.queueDbHealthSnapshot().healthy());
+    } finally {
+      jobQueue.close();
+      original.close();
+    }
+    assertTrue(original.isClosed());
+    jobQueue.open();
+    assertEquals("PENDING", observedJobState());
+  }
+
+  @Test
+  void errorAfterSqlWriteRollsBackWithoutAnImplicitCommit() throws Exception {
+    transactionWorkFailure(false, false);
+  }
+
+  @Test
+  void failedRollbackClosesConnectionWithoutRestoringAutoCommit() throws Exception {
+    transactionWorkFailure(true, false);
+  }
+
+  @Test
+  void failedRollbackAndCloseRefuseFurtherQueueUseUntilCleanup() throws Exception {
+    transactionWorkFailure(true, true);
+  }
+
+  private void transactionWorkFailure(boolean rollbackFails, boolean closeFails) throws Exception {
+    Path jobPath = tempDir.resolve("transaction-failure.txt");
+    jobQueue.enqueue(List.of(jobPath));
+    Connection original = readField("connection", Connection.class);
+    Connection intercepted = org.mockito.Mockito.mock(Connection.class,
+        org.mockito.AdditionalAnswers.delegatesTo(original));
+    Throwable primary = rollbackFails ? new IllegalStateException("ledger preparation failed after job update")
+        : new AssertionError("ledger preparation failed after job update");
+    org.mockito.Mockito.doAnswer(call -> {
+      String sql = call.getArgument(0);
+      if (sql.contains("INSERT INTO ingestion_ledger")) throw primary;
+      return original.prepareStatement(sql);
+    }).when(intercepted).prepareStatement(org.mockito.ArgumentMatchers.anyString());
+    var rollback = new java.sql.SQLException("rollback unavailable");
+    var close = new java.sql.SQLException("connection close unavailable");
+    if (rollbackFails) doThrow(rollback).when(intercepted).rollback();
+    if (closeFails) doThrow(close).when(intercepted).close();
+    List<IndexingJobChangeFeed.Delta> deltas = new java.util.ArrayList<>();
+    var stream = jobQueue.changeStream();
+    stream.subscribe(deltas::add);
+    writeField("connection", intercepted);
+    try {
+      Class<? extends Throwable> expected = rollbackFails ? IllegalStateException.class : AssertionError.class;
+      assertSame(primary, assertThrows(expected,
+          () -> jobQueue.markDone(jobPath, successOutcome(), null)));
+      assertEquals("PENDING", observedJobState(), "an independent connection must not see a partial DONE write");
+      verify(intercepted).rollback();
+      if (rollbackFails) {
+        verify(intercepted, never()).setAutoCommit(true);
+        verify(intercepted).close();
+        assertSame(rollback, primary.getSuppressed()[0]);
+        if (closeFails) {
+          assertSame(close, primary.getSuppressed()[1]);
+          assertSame(close, assertThrows(java.io.IOException.class, jobQueue::close).getCause());
+          assertSame(intercepted, readField("connection", Connection.class), "failed close retains its handle");
+        }
+        assertThrows(IllegalStateException.class, () -> jobQueue.enqueue(List.of(jobPath)));
+        assertThrows(IllegalStateException.class, () -> stream.subscribeWithSnapshot(delta -> {}));
+        assertThrows(java.sql.SQLException.class, jobQueue::open,
+            "reopening cannot discard an unresolved transaction owner");
+      }
+      assertTrue(deltas.isEmpty(), "a rolled-back or uncertain update cannot be projected");
+      assertEquals("PENDING", observedJobState(), "an independent connection must not see a partial DONE write");
+    } finally {
+      writeField("connection", original);
+    }
+    jobQueue.close();
+    jobQueue.open();
+    assertEquals("PENDING", observedJobState());
+  }
+
+  @Test
+  void failedRestoreAfterCommitStillProjectsTheConfirmedRow() throws Exception {
+    failedRestoreAfterCommit(false);
+  }
+
+  @Test
+  void failedRestoreKeepsPrimaryCauseWhenASubscriberThrowsError() throws Exception {
+    failedRestoreAfterCommit(true);
+  }
+
+  private void failedRestoreAfterCommit(boolean subscriberFails) throws Exception {
+    Path jobPath = tempDir.resolve("restore-failure.txt");
+    jobQueue.enqueue(List.of(jobPath));
+    Connection original = readField("connection", Connection.class);
+    Connection intercepted = org.mockito.Mockito.mock(Connection.class,
+        org.mockito.AdditionalAnswers.delegatesTo(original));
+    var restore = new java.sql.SQLException("auto-commit restore unavailable");
+    doThrow(restore).when(intercepted).setAutoCommit(true);
+    List<IndexingJobChangeFeed.Delta> deltas = new java.util.ArrayList<>();
+    jobQueue.changeStream().subscribe(deltas::add);
+    var subscriberFailure = new AssertionError("subscriber failed after confirmed commit");
+    if (subscriberFails) jobQueue.changeStream().subscribe(delta -> { throw subscriberFailure; });
+    var projection = spy(jobQueue.changeStream());
+    writeField("connection", intercepted);
+    writeField("changeStream", projection);
+    try {
+      var failure = assertThrows(OutcomeWriteException.class,
+          () -> jobQueue.markDone(jobPath, successOutcome(), null));
+      assertSame(restore, failure.getCause());
+      if (subscriberFails) assertSame(subscriberFailure, restore.getSuppressed()[0]);
+      verify(intercepted).commit();
+      verify(intercepted, never()).rollback();
+      assertEquals("DONE", observedJobState());
+      assertEquals(1, deltas.size(), "confirmed commit must still reach its projection");
+      verify(projection).commitSucceeded();
+      assertEquals("DONE", ((IndexingJobChangeFeed.Delta.Update) deltas.getFirst()).row().state());
+      assertFalse(failure.getMessage().contains("transaction rolled back"));
+      assertThrows(IllegalStateException.class, () -> jobQueue.enqueue(List.of(jobPath)));
+    } finally {
+      writeField("connection", original);
+    }
+  }
+
+  private String observedJobState() throws Exception {
+    try (var observer = DriverManager.getConnection("jdbc:sqlite:" + tempDir.resolve("jobs.db"));
+        var statement = observer.createStatement();
+        var rows = statement.executeQuery("SELECT state FROM jobs")) {
+      assertTrue(rows.next());
+      String state = rows.getString(1);
+      assertFalse(rows.next());
+      return state;
+    }
+  }
+
+  private static IngestionOutcome successOutcome() {
+    return IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+        io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE);
   }
 
   /**
@@ -237,5 +434,17 @@ final class IndexingJobsChangeStreamTest {
       }
       assertEquals(n, deltas.size(), "expected " + n + " deltas, got " + deltas.size());
     }
+  }
+
+  private <T> T readField(String name, Class<T> type) throws ReflectiveOperationException {
+    Field field = SqliteJobQueue.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return type.cast(field.get(jobQueue));
+  }
+
+  private void writeField(String name, Object value) throws ReflectiveOperationException {
+    Field field = SqliteJobQueue.class.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(jobQueue, value);
   }
 }

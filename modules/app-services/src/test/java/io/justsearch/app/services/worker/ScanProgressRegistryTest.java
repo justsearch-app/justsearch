@@ -3,8 +3,14 @@ package io.justsearch.app.services.worker;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import io.justsearch.core.execution.EngineExecutorRejectedException;
 
 import io.justsearch.app.api.scan.ScanProgressEvent;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -22,16 +28,19 @@ import org.junit.jupiter.api.Test;
 final class ScanProgressRegistryTest {
 
   private ScanProgressRegistry registry;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void setUp() {
+    processExecutors = new TestEngineExecutors();
     // Tight retention for the past-retention test; other tests don't depend on the value.
-    registry = new ScanProgressRegistry(50);
+    registry = new ScanProgressRegistry(processExecutors, 50);
   }
 
   @AfterEach
   void tearDown() {
     registry.close();
+    processExecutors.close();
   }
 
   @Test
@@ -196,6 +205,152 @@ final class ScanProgressRegistryTest {
     registry.pruneNow();
     assertEquals(0, registry.activeBufferCount(),
         "Pruner must drop completed buffers older than the retention window");
+  }
+
+  @Test
+  void replayRetainsBoundedSuffixAndSlowSubscriberExpires() {
+    registry.register("bounded", new CancelToken());
+    try (var slow = registry.subscribe("bounded")) {
+      for (int i = 1; i <= 100; i++) {
+        registry.record("bounded", progress("bounded", i, i == 100, ""));
+      }
+      var expired = drain(slow);
+      assertEquals("UNKNOWN_SCAN_OR_RETENTION_EXPIRED", expired.getFirst().terminalReasonCode());
+      try (var late = registry.subscribe("bounded")) {
+        var retained = drain(late);
+        assertEquals(64, retained.size());
+        assertEquals(37, retained.getFirst().filesWalked());
+        assertEquals(100, retained.getLast().filesWalked());
+        assertTrue(retained.getLast().complete());
+      }
+    }
+  }
+
+  @Test
+  void subscriberCapacityReturnsOnExplicitCloseAndTerminalConsumption() {
+    registry.register("slots", new CancelToken());
+    var subscriptions = new ArrayList<ScanProgressRegistry.Subscription>();
+    try {
+      for (int i = 0; i < 48; i++) subscriptions.add(registry.subscribe("slots"));
+      assertEquals(EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+          assertThrows(EngineExecutorRejectedException.class, () -> registry.subscribe("slots")).reason());
+      subscriptions.getFirst().close();
+      subscriptions.getFirst().close();
+      try (var replacement = registry.subscribe("slots")) {
+        registry.record("slots", progress("slots", 1, true, ""));
+        assertTrue(replacement.next().complete());
+        try (var available = registry.subscribe("slots")) {
+          assertTrue(available.next().complete());
+        }
+      }
+    } finally {
+      subscriptions.forEach(ScanProgressRegistry.Subscription::close);
+    }
+  }
+
+  @Test
+  void idleExpiryReleasesCapacity() {
+    registry.close();
+    registry = new ScanProgressRegistry(processExecutors, 50, 10);
+    registry.register("idle", new CancelToken());
+    var subscriptions = new ArrayList<ScanProgressRegistry.Subscription>();
+    try {
+      for (int i = 0; i < 48; i++) subscriptions.add(registry.subscribe("idle"));
+      assertThrows(EngineExecutorRejectedException.class, () -> registry.subscribe("idle"));
+      assertFalse(subscriptions.getFirst().hasNext());
+      try (var replacement = registry.subscribe("idle")) {
+        assertFalse(replacement.hasNext());
+      }
+    } finally {
+      subscriptions.forEach(ScanProgressRegistry.Subscription::close);
+    }
+  }
+
+  @Test
+  void stagedTerminalStillOwnsCapacityUntilDeliveredOrClosed() {
+    registry.register("complete", new CancelToken());
+    registry.record("complete", progress("complete", 7, true, ""));
+    var subscriptions = new ArrayList<ScanProgressRegistry.Subscription>();
+    try {
+      for (int i = 0; i < 48; i++) {
+        var subscription = registry.subscribe(i % 2 == 0 ? "complete" : "unknown");
+        subscriptions.add(subscription);
+        assertTrue(subscription.hasNext());
+      }
+      assertThrows(EngineExecutorRejectedException.class, () -> registry.subscribe("complete"));
+      assertTrue(subscriptions.getFirst().next().complete());
+      try (var replacement = registry.subscribe("complete")) {
+        assertTrue(replacement.hasNext());
+        assertThrows(EngineExecutorRejectedException.class, () -> registry.subscribe("complete"));
+      }
+      try (var replacement = registry.subscribe("complete")) {
+        assertTrue(replacement.next().complete());
+      }
+    } finally {
+      subscriptions.forEach(ScanProgressRegistry.Subscription::close);
+    }
+  }
+
+  @Test
+  void retainedReleasedSubscriptionObjectsDoNotPinReplayRings() throws Exception {
+    var field = ScanProgressRegistry.Subscription.class.getDeclaredField("buffer");
+    field.setAccessible(true);
+    var retained = new ArrayList<ScanProgressRegistry.Subscription>();
+    for (int i = 0; i < 100; i++) {
+      String scan = "retained-" + i;
+      registry.register(scan, new CancelToken());
+      var subscription = registry.subscribe(scan);
+      retained.add(subscription);
+      assertNotNull(field.get(subscription), "precondition: cursor owns the replay ring");
+      registry.record(scan, progress(scan, 1, true, ""));
+      if (i % 2 == 0) assertTrue(subscription.next().complete());
+      else subscription.close();
+    }
+    for (var subscription : retained) {
+      assertNull(field.get(subscription), "released cursor must sever its replay ownership");
+      subscription.close();
+    }
+  }
+
+  @Test
+  void fullActiveRegistryRefusesAndCompletedEntryMakesRoom() {
+    for (int i = 0; i < 64; i++) registry.register("scan-" + i, new CancelToken());
+    assertEquals(EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+        assertThrows(EngineExecutorRejectedException.class,
+            () -> registry.register("overflow", new CancelToken())).reason());
+    registry.markComplete("overflow", progress("overflow", 0, true, "RPC_FAILED"));
+    assertEquals(64, registry.activeBufferCount());
+    registry.record("scan-0", progress("scan-0", 1, true, ""));
+    registry.register("replacement", new CancelToken());
+    assertEquals(64, registry.activeBufferCount());
+    assertEquals("UNKNOWN_SCAN_OR_RETENTION_EXPIRED",
+        drain(registry.subscribe("scan-0")).getFirst().terminalReasonCode());
+  }
+
+  @Test
+  void interruptReleasesSubscriberAndCloseWakesWaitingReader() throws Exception {
+    registry.register("waiting", new CancelToken());
+    var subscriptions = new ArrayList<ScanProgressRegistry.Subscription>();
+    for (int i = 0; i < 47; i++) subscriptions.add(registry.subscribe("waiting"));
+    try (var waiting = registry.subscribe("waiting")) {
+      var done = new java.util.concurrent.CompletableFuture<Boolean>();
+      Thread reader = Thread.ofPlatform().daemon().start(() -> {
+        Thread.currentThread().interrupt();
+        done.complete(!waiting.hasNext() && Thread.currentThread().isInterrupted());
+      });
+      assertTrue(done.get(5, TimeUnit.SECONDS));
+      reader.join(5000);
+      try (var replacement = registry.subscribe("waiting")) {
+        var terminal = new java.util.concurrent.CompletableFuture<ScanProgressEvent>();
+        Thread closingReader = Thread.ofPlatform().daemon().start(() -> terminal.complete(replacement.next()));
+        registry.close();
+        assertEquals("UNKNOWN_SCAN_OR_RETENTION_EXPIRED", terminal.get(5, TimeUnit.SECONDS).terminalReasonCode());
+        closingReader.join(5000);
+      }
+    } finally {
+      subscriptions.forEach(ScanProgressRegistry.Subscription::close);
+    }
+    assertThrows(EngineExecutorRejectedException.class, () -> registry.register("after-close", new CancelToken()));
   }
 
   // ===== helpers =====

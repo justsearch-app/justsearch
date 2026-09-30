@@ -35,17 +35,13 @@ All path resolution follows this priority:
 
 ### 2.2. Testing IPC
 
-Use `WorkerProcessManager` to spawn the worker and `MmfTestHarness` to discover the ephemeral port.
-
-```java
-// Standard pattern for system tests
-WorkerProcessManager worker = new WorkerProcessManager(workerJar, tempDir);
-worker.spawnWorker();
-MmfTestHarness mmf = new MmfTestHarness(worker.getSignalFilePath());
-mmf.open();
-int port = mmf.awaitPort(30_000, 100); // Wait for startup
-GrpcTestClient client = new GrpcTestClient(port);
-```
+**This pattern is gone.** `WorkerProcessManager`, `MmfTestHarness` and `GrpcTestClient` were deleted
+at lane F stage A (items A11-A14): there is no worker process to spawn, no memory-mapped port to
+discover and no gRPC client to build. Tests that need a working index compose the Engine in-process
+through `EngineRoot` and run in `modules/app-engine/src/test/java/io/justsearch/app/engine/` on every
+build; see [Testing Strategy](../../explanation/09-testing-strategy.md). The process boundaries that
+survive — `llama-server` and the extraction sandbox child pool — are still exercised from
+`modules/system-tests`.
 
 ### 2.3. Test Tiers in Practice
 
@@ -55,17 +51,31 @@ Use the right Gradle command for the verification level you need:
 |---------|-----------|-------------|
 | `./gradlew test` | Unit tests only (`src/test/java`) | **Fast inner loop** — after every code change |
 | `./gradlew check` | Unit + integration + PMD + Spotless | **Pre-commit** — before pushing |
-| `./gradlew fullTestSuite` | Unit + integration + system (no soak; system tier requires `-PincludeSystemTests=true`) | Full verification (system-tests module) |
-| `./gradlew nightlyTestSuite` | Full suite including soak (requires opt-in flags for system/soak tiers) | Nightly CI only |
+| `./gradlew fullTestSuite` | Unit + integration + system (system tier requires `-PincludeSystemTests=true`) | Full verification (system-tests module) |
 
 **Opt-in flags** (system-tests module only):
 
 - `-PincludeSystemTests=true` — include system/chaos tests
 - `-PincludeAiTests=true` — include AI inference tests (requires GPU)
 - `-PincludeAgentTests=true` — include agent deterministic battery tests
-- `-PincludeSoakTests=true` — include long-running soak tests
 
 Source of truth for test tier definitions: `modules/system-tests/build.gradle.kts`.
+
+**Load-sensitive latency gates are quarantined, not weakened.** A test that asserts wall-clock
+latency fails on a machine running a concurrent Gradle build for a reason that has nothing to do
+with the code — and the right response is never to raise the threshold, because a tight threshold
+is exactly what makes it a regression detector. Tag it `@Tag("load-sensitive")`, exclude the tag
+from the suite that `check` depends on, and run it from a dedicated task on an idle machine:
+
+| Command | What runs |
+|---------|-----------|
+| `./gradlew :modules:app-services:loadSensitiveTest` | the `load-sensitive` latency gates, thresholds unchanged |
+
+There is **no perf-ratchet CI lane** today, so these tasks are manual by construction: wiring one
+into hosted CI would reproduce the flake there instead of here. If a perf lane is ever added, wire
+every `loadSensitiveTest` task into it rather than back into `check`. Worked case:
+`LambdaMartBenchmarkTest` (5 ms p50; measured 8.6-22 ms under sibling-worktree build load on four
+occasions in one session, green on every isolated re-run), quarantined 2026-09-07.
 
 **AI eval runtime policy (canonical):**
 
@@ -125,7 +135,7 @@ PMD is configured in `config/pmd/ruleset.xml` across 6 categories:
 | documentation (1) | `CommentContent` — the parked-marker (TODO/FIXME/XXX) ban, successor to the retired `todo-fixme` kernel gate |
 
 **Scope — every Java source set.** `pmdMain` uses `ruleset.xml`; every other source set
-(`test`, `integrationTest`, `systemTest`, `soakTest`, `determinismTest`, `testFixtures`) uses
+(`test`, `integrationTest`, `systemTest`, `determinismTest`, `testFixtures`) uses
 `config/pmd/ruleset-tests.xml`, which is the same ruleset minus `SystemPrintln` (a test's console
 output is its report) and `NonThreadSafeSingleton` (it fires on `@BeforeAll`/`@AfterAll` fixture
 assignment, which JUnit serialises). CLI-entry-point modules (`ssot-tools`, `core-contracts`) point

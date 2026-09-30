@@ -9,7 +9,7 @@ import java.util.List;
  * <p>Contract-layer projection of the Worker's gRPC {@code UpgradeQuiescenceResponse}. The Head's
  * REST layer consumes this record rather than the proto message: {@code ui.api} must not depend on
  * ipc proto types (enforced by {@code UiApiGuardrailsTest}), so the mapping happens once at the
- * gRPC boundary in {@code RemoteKnowledgeClient} instead of leaking generated types into the
+ * gRPC boundary in {@code KnowledgeClient} instead of leaking generated types into the
  * controllers.
  */
 public record WorkerQuiescenceSnapshot(

@@ -26,14 +26,14 @@ import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.store.MMapDirectory;
 import org.junit.jupiter.api.Test;
 
-class CommitMetadataIntegrationTest {
+class CommitMetadataIntegrationTest extends LuceneExecutorTestBase {
   @Test
   void commitStampsUserData() throws Exception {
     Path dir = Files.createTempDirectory("lucene-commit-test");
     CommitMetadataSource meta = new SsotCommitMetadataSource();
     CommitMetadataValidator validator = new JsonSchemaCommitMetadataValidator();
 
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), meta, validator).atPath(dir).open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), meta, validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     r.indexingCoordinator().indexSingle(
         new IndexDocument(
             Map.of(SchemaFields.DOC_ID, "commit-1", SchemaFields.DOC_UID, "commit-1#0")));
@@ -93,7 +93,7 @@ class CommitMetadataIntegrationTest {
         };
     CommitMetadataValidator validator = metadata -> {};
 
-    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), supplier, validator).atPath(dir).open();
+    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), supplier, validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     runtime.indexingCoordinator().indexSingle(
         new IndexDocument(
             Map.of(
@@ -132,7 +132,7 @@ class CommitMetadataIntegrationTest {
     CommitMetadataSource source = () -> Map.of("index_fingerprint", "ignored");
     CommitMetadataValidator validator = metadata -> validatorCalls.incrementAndGet();
     try {
-      var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), source, validator).atPath(dir).open();
+      var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), source, validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
       runtime.indexingCoordinator().indexSingle(
           new IndexDocument(
               Map.of(SchemaFields.DOC_ID, "commit-0", SchemaFields.DOC_UID, "commit-0#0")));
@@ -165,7 +165,7 @@ class CommitMetadataIntegrationTest {
     CommitMetadataValidator validator = new RequiredFieldsCommitMetadataValidator();
     Path dir = Files.createTempDirectory("lucene-invalid-meta");
     var runtime =
-        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4), badSource, validator).atPath(dir).open();
+        IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4), badSource, validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     runtime.indexingCoordinator().indexSingle(
         new IndexDocument(
             Map.of(SchemaFields.DOC_ID, "invalid-1", SchemaFields.DOC_UID, "invalid-1#0")));

@@ -64,4 +64,30 @@ public record OperationInvocationResponse(
     return new OperationInvocationResponse(
         false, message, null, Map.of(), errorClass, null, null, null);
   }
+
+  /** Existing STORE_LOCKED contract: unlock is required before retry, with no private content. */
+  public static OperationInvocationResponse fromLockedStore() {
+    String code = io.justsearch.app.api.ApiErrorCode.STORE_LOCKED.name();
+    return new OperationInvocationResponse(false, "Unlock encrypted storage to continue", null,
+        Map.of(), code, code, Map.of("locked", true), false);
+  }
+
+  /** Public key/storage failure projection; native causes and stored invocation content stay private. */
+  public static OperationInvocationResponse fromStoreFailure(
+      io.justsearch.app.api.operations.OperationStoreException failure) {
+    String code = switch (failure.code()) {
+      case INVALID_OPERATION_KEY -> "OPERATION_KEY_INVALID";
+      case OPERATION_EXPIRED -> "OPERATION_KEY_EXPIRED";
+      case STORAGE_FAILED -> "OPERATION_STORAGE_FAILED";
+      default -> failure.code().name();
+    };
+    String errorClass = switch (failure.code()) {
+      case INVALID_OPERATION_KEY -> "BAD_REQUEST";
+      case OPERATION_EXPIRED, OPERATION_KEY_REUSED, OPERATION_PREPARATION_UNAVAILABLE -> "CONFLICT";
+      case OPERATIONS_CAPACITY -> "UNAVAILABLE";
+      case STORAGE_FAILED -> "HANDLER_ERROR";
+    };
+    return new OperationInvocationResponse(false, code, null, Map.of(), errorClass, code, null,
+        failure.code() == io.justsearch.app.api.operations.OperationStoreException.Code.OPERATIONS_CAPACITY);
+  }
 }

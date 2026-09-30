@@ -43,4 +43,16 @@ public interface ConsentCapsuleAuthority {
    * Never throws on malformed input — returns {@code false}.
    */
   boolean verifyAndConsume(String token, String operationId, String argumentsJson);
+
+  /** Approve one frozen preparation in a domain distinct from ordinary public-argument capsules. */
+  default String mintPrepared(String operationId, String argumentsJson, SourceTier sourceTier,
+      String operationKey, java.util.UUID preparationNonce) {
+    throw new UnsupportedOperationException("Prepared consent is unavailable");
+  }
+
+  /** Verify the exact prepared reference; an implementation must never fall back to public-only consent. */
+  default boolean verifyPreparedAndConsume(String token, String operationId, String argumentsJson,
+      String operationKey, java.util.UUID preparationNonce) {
+    return false;
+  }
 }

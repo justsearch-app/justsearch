@@ -151,7 +151,7 @@ final class LlamaServerOpsCrashTelemetryTest {
           }
         };
     LlamaServerOps ops =
-        new LlamaServerOps(
+        new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
             HttpClient.newHttpClient(),
             new ObjectMapper(),
             () -> null, // config supplier — not exercised in handleServerCrash path

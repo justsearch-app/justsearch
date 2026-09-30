@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +46,19 @@ public final class RunningRuntime implements LuceneRuntime {
     return session.pruneOps;
   }
 
+  /**
+   * Installs the owning Engine's callback for a Lucene writer that has become permanently unusable.
+   * The callback fires at most once for this runtime and never for its intentional drain/close.
+   */
+  public void onTerminalWriterFailure(Consumer<Throwable> listener) {
+    session.onTerminalWriterFailure(listener);
+  }
+
+  /** Prevents this retiring runtime from reporting close-induced writer failures. */
+  public void retireTerminalWriterFailureNotifications() {
+    session.retireTerminalWriterFailureNotifications();
+  }
+
   // ==========================================================================
   // LuceneRuntime — common methods
   // ==========================================================================
@@ -57,6 +71,16 @@ public final class RunningRuntime implements LuceneRuntime {
   @Override
   public LuceneRuntimeBuilder origin() {
     return origin;
+  }
+
+  @Override
+  public LuceneExecutorRegistrations executorRegistrations() {
+    return session.executorRegistrations;
+  }
+
+  @Override
+  public io.justsearch.core.execution.EngineTaskLifetime taskLifetime() {
+    return session::retainTaskLifetime;
   }
 
   @Override
@@ -157,9 +181,8 @@ public final class RunningRuntime implements LuceneRuntime {
    * writer mid-write (critical-analysis fix item 4). If {@code pendingDocs > 0} a final
    * {@code "drain"} commit lands the in-flight work; calls {@link #close()}.
    *
-   * <p>If the write lock isn't acquired before the timeout, close still runs (best-effort);
-   * a WARN is logged. Use a generous timeout for production holder swaps where in-flight
-   * writes are expected.
+   * <p>If the write lock isn't acquired before the timeout, a WARN and exception report the
+   * outstanding writes. Resources stay owned until a later close attempt can drain them.
    *
    * @param timeout maximum time to wait for in-flight writes to drain
    * @see DeferredRuntime#upgradeWriter for the upgrade variant from deferred mode
@@ -176,6 +199,7 @@ public final class RunningRuntime implements LuceneRuntime {
   public void drainAndClose(Duration timeout, SwapReason reason) {
     Objects.requireNonNull(timeout, "timeout");
     Objects.requireNonNull(reason, "reason");
+    session.retireTerminalWriterFailureNotifications();
     LuceneRuntimeTypes.TelemetryEvents events = session.telemetryEvents;
     long swapStartNanos = System.nanoTime();
     if (events != null) events.onSwapStart(reason);
@@ -184,23 +208,25 @@ public final class RunningRuntime implements LuceneRuntime {
     Lock writeLock = session.writeBarrier.writeLock();
     boolean acquired = false;
     try {
-      acquired = writeLock.tryLock(timeout.toMillis(), TimeUnit.MILLISECONDS);
-      if (!acquired) {
-        long pending = session.queueDepth.get();
+      try {
+        acquired = writeLock.tryLock(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        if (!acquired) {
+          long pending = session.queueDepth.get();
+          log.warn(
+              "drainAndClose: write barrier not acquired within {}ms; {} writes still in flight."
+                  + " Retaining runtime resources for retry.",
+              timeout.toMillis(),
+              pending);
+          if (events != null) events.onDrainTimeout(timeout.toMillis(), pending);
+          throw new IllegalStateException("Lucene writes still active after drain deadline");
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         log.warn(
-            "drainAndClose: write barrier not acquired within {}ms; {} writes still in flight."
-                + " Closing anyway (best-effort).",
-            timeout.toMillis(),
-            pending);
-        if (events != null) events.onDrainTimeout(timeout.toMillis(), pending);
+            "drainAndClose interrupted with queueDepth={}; retaining runtime resources for retry",
+            session.queueDepth.get());
+        throw new IllegalStateException("Lucene drain interrupted before write barrier acquired", e);
       }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      log.warn(
-          "drainAndClose interrupted with queueDepth={}; closing best-effort",
-          session.queueDepth.get());
-    }
-    try {
       // Only commit if there's actual pending work — avoids noise commit + spurious commitCount.
       if (session.pendingDocs.get() > 0 && session.commitOps != null) {
         try {

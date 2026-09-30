@@ -41,6 +41,8 @@ import io.justsearch.app.services.conversation.ConversationEngine;
 import io.justsearch.app.services.conversation.IterationControllerRegistry;
 import io.justsearch.app.services.conversation.PromptContributorRegistry;
 import io.justsearch.app.services.conversation.StreamConsumerRegistry;
+import io.justsearch.core.execution.TestEngineExecutors;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -51,6 +53,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -68,12 +71,31 @@ final class RunStreamControllerTest {
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
   private static final ConversationShapeRef SHAPE = new ConversationShapeRef("core.test-ask");
 
+  private final List<Fixture> fixtures = new ArrayList<>();
+
+  @AfterEach
+  void closeFixtures() {
+    fixtures.forEach(Fixture::close);
+  }
+
+  private Fixture fixture() {
+    Fixture fixture = new Fixture();
+    fixtures.add(fixture);
+    return fixture;
+  }
+
+  private Fixture fixture(Consumer<RunChannelRegistry> hook) {
+    Fixture fixture = new Fixture(hook);
+    fixtures.add(fixture);
+    return fixture;
+  }
+
   // ── §3.4: the ask-survival law ───────────────────────────────────────────────────────────────
 
   @Test
   @DisplayName("§3.4 — an ask whose observer dies mid-generation still reaches done AND persists")
   void askSurvivesItsObserverDying() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     // A dead socket: every write throws, so the channel evicts the observer on the first frame and
     // observerCount reaches 0 while the run is still generating.
     SseClient client = f.client("{\"shapeId\":\"core.test-ask\",\"sessionId\":\"s1\",\"prompt\":\"hi\"}");
@@ -101,7 +123,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("§3.4 — a conversational run is structurally unparkable")
   void conversationalRunsAreOneShot() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     f.controller.streamNewRun(
         f.client("{\"shapeId\":\"core.test-ask\",\"sessionId\":\"s1\",\"prompt\":\"hi\"}"));
 
@@ -114,7 +136,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("the run is retired when the dispatch returns, and its ring stays readable")
   void theRunIsRetiredWhenTheDispatchReturns() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     f.controller.streamNewRun(
         f.client("{\"shapeId\":\"core.test-ask\",\"sessionId\":\"s1\",\"prompt\":\"hi\"}"));
 
@@ -135,7 +157,7 @@ final class RunStreamControllerTest {
     // then make the LLM call blow up. Before §15.1.3 that exception was written straight to the
     // CREATING request's Context, so this observer's stream would simply have stopped, with no
     // reason on it: a failing run terminating invisibly for every non-creating observer.
-    Fixture f = new Fixture(registry -> registry.live().get(0).observe(secondObserver::add, 0));
+    Fixture f = fixture(registry -> registry.live().get(0).observe(secondObserver::add, 0));
     f.ai.failWith = "the model went away";
 
     f.controller.streamNewRun(
@@ -155,7 +177,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("§15.1.3 — an unregistered shape fails on the run with the typed NOT_FOUND code")
   void anUnknownShapeFailsOnTheRun() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     f.controller.streamNewRun(f.client("{\"shapeId\":\"core.nope\",\"prompt\":\"hi\"}"));
 
     RunChannel run = f.onlyRun();
@@ -171,7 +193,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("§1.6 — observing an unknown runId is a typed 404, never a 200 with an empty stream")
   void observingAnUnknownRunIs404Unknown() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     Captured c = f.observe("run-never-existed");
 
     assertEquals(404, c.status);
@@ -182,7 +204,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("§1.6 — observing a run past its linger says RETIRED, and names where the record is")
   void observingARetiredRunIs404RetiredWithARecordHint() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     f.registry.open(
         new RunId("run-gone"),
         new RunDescriptor("core.test-ask", "conv-42", 1L),
@@ -202,7 +224,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("§1.6 — a run inside its linger is still observable, not 404'd")
   void aLingeringRunIsStillObservable() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     f.registry.open(
         new RunId("run-lingering"),
         new RunDescriptor("core.test-ask", "conv-42", 1L),
@@ -220,7 +242,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("§1.6 — a malformed runId is answered 404, not a 500")
   void aMalformedRunIdIs404() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     Captured c = f.observe("../../etc/passwd");
     assertEquals(404, c.status);
     assertEquals("unknown", c.body.get("reason").asString());
@@ -231,7 +253,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("a missing shapeId is a 400 BEFORE the stream commits a 200")
   void missingShapeIdIs400() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     Captured c = f.create("{\"prompt\":\"hi\"}");
     assertEquals(400, c.status);
     assertEquals("INVALID_REQUEST", c.body.get("errorCode").asString());
@@ -240,7 +262,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("a body that will not parse is a 400, not a half-open stream")
   void malformedBodyIs400() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     Captured c = f.create("{not json");
     assertEquals(400, c.status);
   }
@@ -248,7 +270,7 @@ final class RunStreamControllerTest {
   @Test
   @DisplayName("734 F4 — a locked store refuses the run with 423, before the SSE headers commit")
   void lockedStoreIs423() {
-    Fixture f = new Fixture();
+    Fixture f = fixture();
     f.store.locked = true;
 
     Captured c = f.create("{\"shapeId\":\"core.test-ask\",\"sessionId\":\"s1\",\"prompt\":\"hi\"}");
@@ -263,8 +285,9 @@ final class RunStreamControllerTest {
 
   private record Captured(int status, JsonNode body) {}
 
-  private static final class Fixture {
+  private static final class Fixture implements AutoCloseable {
     private final RunChannelRegistry registry = new RunChannelRegistry();
+    private final TestEngineExecutors processExecutors = new TestEngineExecutors();
     private final FakeStore store = new FakeStore();
     private final ScriptedAi ai = new ScriptedAi("the answer");
     private final RunStreamController controller;
@@ -297,7 +320,8 @@ final class RunStreamControllerTest {
               store);
       controller =
           new RunStreamController(
-              registry, new ChatController(engine, new SseWriter(null), null, store));
+              processExecutors,
+              registry, new ChatController(new TestEngineExecutors(), engine, new SseWriter(null), null, store));
     }
 
     private RunChannel onlyRun() {
@@ -389,6 +413,7 @@ final class RunStreamControllerTest {
     private static Context requestContext(
         String body, AtomicInteger status, AtomicReference<Object> json) {
       Context ctx = mock(Context.class);
+      when(ctx.path()).thenReturn("/api/chat/runs/test/observe");
       when(ctx.body()).thenReturn(body);
       when(ctx.contentType(anyString())).thenReturn(ctx);
       when(ctx.attributeOrCompute(anyString(), any())).thenReturn(new Object());
@@ -407,6 +432,12 @@ final class RunStreamControllerTest {
           .when(ctx)
           .json(any(Object.class));
       return ctx;
+    }
+
+    @Override
+    public void close() {
+      controller.shutdown();
+      processExecutors.close();
     }
   }
 

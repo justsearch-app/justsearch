@@ -1,0 +1,321 @@
+{
+  "revision": "652949e43 + final journal durability and rotated retry",
+  "command": "./gradlew.bat :modules:app-observability:spotlessApply :modules:app-observability:test --tests '*ActionEventJournalDurabilityTest' --tests '*ActionEventJournalTest' --tests '*ActionEventJournalRetryTest' --tests '*ActionLedgerChangeRegistryTest' --tests '*OperationHistoryPendingTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:test --tests '*ActionLedgerControllerTest' :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 47,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 8
+  },
+  "tasks": [
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 32,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    }
+  ],
+  "base": "652949e43",
+  "runs": {
+    "c2-4-journal-force1158": {
+      "revision": "652949e43 + final journal durability and rotated retry",
+      "command": "./gradlew.bat :modules:app-observability:spotlessApply :modules:app-observability:test --tests '*ActionEventJournalDurabilityTest' --tests '*ActionEventJournalTest' --tests '*ActionEventJournalRetryTest' --tests '*ActionLedgerChangeRegistryTest' --tests '*OperationHistoryPendingTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:test --tests '*ActionLedgerControllerTest' :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 47,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 8
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 32,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "c2-4-journal-force1156": {
+      "revision": "652949e43 + journal durability barrier",
+      "command": "./gradlew.bat :modules:app-observability:spotlessApply :modules:app-observability:test --tests '*ActionEventJournalDurabilityTest' --tests '*ActionEventJournalTest' --tests '*ActionLedgerChangeRegistryTest' --tests '*OperationHistoryPendingTest' :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:ui:test --tests '*ActionLedgerControllerTest' :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 41,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 7
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "c2-4-journal-force-negative1155": {
+      "revision": "652949e43 + durability seam without force invocation",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*ActionEventJournalDurabilityTest' --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 3,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 3,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "c2-4-journal-force-negative1157": {
+      "revision": "652949e43 + retained retry forces wrong active generation",
+      "command": "./gradlew.bat :modules:app-observability:test --tests '*ActionEventJournalDurabilityTest.uncertainLineRotatedByAnotherAppendForcesItsRetainedGenerationOnRetry' --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 2,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionEventJournal.java",
+      "bytes": 15510,
+      "sha256": "c029a01f31e30108db7a113b8dcc647d8aa3cb392b1764b56336a219b3511fe4"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ActionEventJournalDurabilityTest.java",
+      "bytes": 3552,
+      "sha256": "0fe4541a6aa37b4f782c67bb08b07001dbe993db82abf4f6512090643d1775c0"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-4-journal-force-negative1155-counts.json",
+      "bytes": 561,
+      "sha256": "ca2e4f2a2791fe7231a5b62232a2d73cd24f1064d83dcc9e3e739d4629027962"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-negative1155-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "85d87ab7ce1a1bb6c625333798463a9fa44f4a95eeaeb8ab5e29cb18da515392"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-negative1155-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalDurabilityTest.xml",
+      "bytes": 3037,
+      "sha256": "722dca8fdeb604aaf625024c6fc8ae803b4d1d31d5a6fd4693532d68be6d4663"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-negative1155.txt",
+      "bytes": 35863,
+      "sha256": "034228f28213af40437ead5360ea8adcfa7386d623bb15df79250c6ad329f8fa"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-negative1157-counts.json",
+      "bytes": 636,
+      "sha256": "a3631248c13aa8dd3d2d2ba8ff7f8be0f79f5dddffca9345b92e5a63dc361f9d"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-negative1157-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "b0ff52d8788d15d794093e18d37eac943f292bfc3ebcfb64e4fc316ab1314f82"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-negative1157-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalDurabilityTest.xml",
+      "bytes": 12905,
+      "sha256": "a592f4aeb37ea4c6f403a0624f34c4ee2ca599e6324898cee2627fcdb5bbee22"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-negative1157.java",
+      "bytes": 15510,
+      "sha256": "c029a01f31e30108db7a113b8dcc647d8aa3cb392b1764b56336a219b3511fe4"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-negative1157.txt",
+      "bytes": 35286,
+      "sha256": "827d8e1131bc4c4a8b1174b7c67c4b6e65e1c72e0cee4a2434fd4ad7a10161a2"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1156-counts.json",
+      "bytes": 1051,
+      "sha256": "d5ef7d643a3d7529a3c4b204a783ba059c04b422d4b91d3cd5f2eaf9ddc89d34"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1156-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "ff17c1440ec9d760791d128daf671aecbe029f32ea59ac8d826f22fcc620f3ec"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1156-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalDurabilityTest.xml",
+      "bytes": 21814,
+      "sha256": "9564fb760cc23160fb485f16587369bc63822e904c61ed69bc10610291741328"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1156-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalTest.xml",
+      "bytes": 14908,
+      "sha256": "bd8218fc331fcde636036865182c935a141b79408b1716b35406b60ea8af4461"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1156-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionLedgerChangeRegistryTest.xml",
+      "bytes": 1503,
+      "sha256": "c535e0502cd516d84b5f67a38b39ac251de9e1f7706f06f2d0d62f8cd38c0ad2"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1156-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryPendingTest.xml",
+      "bytes": 1505,
+      "sha256": "3e257648e1dc1adbcccc8f0ff82726249528dd11266eb0ecbd98e14956875fc1"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1156-xml/ui/test/TEST-io.justsearch.ui.api.ActionLedgerControllerTest.xml",
+      "bytes": 3386,
+      "sha256": "54d2bfc547ab6a24f23952c68c0954ed46e8896dc917963d3875740ea54f860f"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1156-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 602,
+      "sha256": "67561c492219a410c5c4f3053d96a0e107c0278ef1ffa56c549be80065440da0"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1156.txt",
+      "bytes": 44098,
+      "sha256": "3a3a7c5a4c18eb16adf723eab2482b96c5592ba8fdbd2d1f23da58270526140e"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158-counts.json",
+      "bytes": 1108,
+      "sha256": "00327843d20ea52791df3807ec1bc80a379f44250c4a30a29e36334de311ed5f"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "310e10a305df9b40ff9bcea5ab9cbdbd74ec1cfc250eadc9019eb92bee63f3d6"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalDurabilityTest.xml",
+      "bytes": 43053,
+      "sha256": "1f02c82872794b7f39aaeefc79ecdae540c2f25117fcf8c645f4bd55a5ed9878"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalRetryTest.xml",
+      "bytes": 47687,
+      "sha256": "1fc8d5380db3cb00e564dbfc6ce078ca0713a82983431a6f08a8cca705de1985"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionEventJournalTest.xml",
+      "bytes": 14908,
+      "sha256": "b10dabd810e1a63abc5474987ad0e1eb7ef3ef0155e0df3714c5c6008d574d96"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionLedgerChangeRegistryTest.xml",
+      "bytes": 1503,
+      "sha256": "2ccf55ddc993568b45912866a4e7ad48619e5c9c65e8ccb509f3afe8294514a8"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryPendingTest.xml",
+      "bytes": 1506,
+      "sha256": "b613d03312b960437a63cd0583720f29e5af7df707c7f5837904a7edce3ff9ec"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158-xml/ui/test/TEST-io.justsearch.ui.api.ActionLedgerControllerTest.xml",
+      "bytes": 3386,
+      "sha256": "54d2bfc547ab6a24f23952c68c0954ed46e8896dc917963d3875740ea54f860f"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 602,
+      "sha256": "67561c492219a410c5c4f3053d96a0e107c0278ef1ffa56c549be80065440da0"
+    },
+    {
+      "path": "tmp/c2-4-journal-force1158.txt",
+      "bytes": 39067,
+      "sha256": "5306764378ff481a973bf4ab13049839959e164b36de71cd9edcdf398635c3d7"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-checks1160.txt",
+      "bytes": 534,
+      "sha256": "ab5a10c397730e10e8b2c2d9c185b6c9ba737f89a4d98d37b580686622c144cf"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-gates1160.sarif",
+      "bytes": 914,
+      "sha256": "1ae0ef506e546529c41bd1b4b589811da0f55b075453cd02666da94f2efab9c9"
+    },
+    {
+      "path": "tmp/c2-4-journal-force-docs1161.txt",
+      "bytes": 312,
+      "sha256": "c12de90aa23901a096af7ad3b3f4a075e8603e44e4820e7d63b5f4cdb4bf3834"
+    }
+  ],
+  "retention": "Lane worktree tmp; retain until lane acceptance plus30 days; export before worktree release.",
+  "review": "Independent reviewer c2_pending_source_review found no remaining actionable findings after rotated-generation regression1157/1158.",
+  "limits": "Normal file force and injected failure ordering only; no physical power-loss, source-consumer integration, installed/hosted proof.",
+  "captureNote": "1160 contains overlapping redirected doc output; the complete sequential docs checks are1161. The1160 SARIF and governance completion are intact."
+}

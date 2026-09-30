@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.agent.EngineContextTestFixtures;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.api.knowledge.FolderBrowseResponse;
 import io.justsearch.app.api.knowledge.KnowledgeIngestResponse;
@@ -18,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,15 +42,15 @@ final class AgentToolRootsDegradeTest {
   @TempDir Path tempDir;
 
   /** The four ways the roots can be unusable, as suppliers. */
-  private static List<Supplier<List<BrowseTool.RootInfo>>> brokenSuppliers() {
-    List<Supplier<List<BrowseTool.RootInfo>>> suppliers = new ArrayList<>();
+  private static List<Function<EngineContext, List<BrowseTool.RootInfo>>> brokenSuppliers() {
+    List<Function<EngineContext, List<BrowseTool.RootInfo>>> suppliers = new ArrayList<>();
     suppliers.add(null);
-    suppliers.add(() -> null);
+    suppliers.add(context -> null);
     suppliers.add(
-        () -> {
+        context -> {
           throw new IllegalStateException("worker unavailable");
         });
-    suppliers.add(List::of);
+    suppliers.add(context -> List.of());
     return suppliers;
   }
 
@@ -65,18 +67,18 @@ final class AgentToolRootsDegradeTest {
   @DisplayName("search: unusable roots never throw and never reject a relative path_prefix")
   void searchDegradesOpen() {
     KnowledgeSearchResponse response = KnowledgeSearchResponseBuilder.builder().tookMs(1).build();
-    List<Supplier<List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
+    List<Function<EngineContext, List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
     for (int i = 0; i < suppliers.size(); i++) {
       var called = new boolean[1];
       SearchTool.SearchCallback search =
-          req -> {
+          (req, context) -> {
             called[0] = true;
             return response;
           };
       SearchTool tool = new SearchTool(search, suppliers.get(i));
 
       OperationResult result =
-          tool.execute("{\"query\":\"anything\",\"path_prefix\":\"docs/explanation\"}");
+          tool.execute("{\"query\":\"anything\",\"path_prefix\":\"docs/explanation\"}", EngineContextTestFixtures.AGENT_LOOP);
 
       assertTrue(result.success(), label(i) + " must not reject: " + result.message());
       assertTrue(called[0], label(i) + " must still reach the index");
@@ -86,18 +88,18 @@ final class AgentToolRootsDegradeTest {
   @Test
   @DisplayName("browse: unusable roots never throw and never reject a relative parent_path")
   void browseDegradesOpen() {
-    List<Supplier<List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
+    List<Function<EngineContext, List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
     for (int i = 0; i < suppliers.size(); i++) {
       var called = new boolean[1];
       BrowseTool.BrowseCallback browse =
-          req -> {
+          (req, context) -> {
             called[0] = true;
             return new FolderBrowseResponse(
                 List.of(new FolderBrowseResponse.Folder("/docs/sub", "sub", 1, 10, 0)), 1, false);
           };
       BrowseTool tool = new BrowseTool(browse, suppliers.get(i));
 
-      OperationResult result = tool.execute("{\"parent_path\":\"docs/explanation\"}");
+      OperationResult result = tool.execute("{\"parent_path\":\"docs/explanation\"}", EngineContextTestFixtures.AGENT_LOOP);
 
       assertTrue(result.success(), label(i) + " must not reject: " + result.message());
       assertTrue(called[0], label(i) + " must still reach the Worker");
@@ -107,12 +109,12 @@ final class AgentToolRootsDegradeTest {
   @Test
   @DisplayName("browse: unusable roots leave the top-level listing empty, not thrown")
   void browseTopLevelDegradesOpen() {
-    List<Supplier<List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
+    List<Function<EngineContext, List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
     for (int i = 0; i < suppliers.size(); i++) {
-      BrowseTool.BrowseCallback browse = req -> new FolderBrowseResponse(List.of(), 0, false);
+      BrowseTool.BrowseCallback browse = (req, context) -> new FolderBrowseResponse(List.of(), 0, false);
       BrowseTool tool = new BrowseTool(browse, null, suppliers.get(i));
 
-      OperationResult result = tool.execute("{}");
+      OperationResult result = tool.execute("{}", EngineContextTestFixtures.AGENT_LOOP);
 
       assertNotNull(result, label(i) + " must produce a result, not an exception");
       assertTrue(
@@ -126,11 +128,11 @@ final class AgentToolRootsDegradeTest {
   void ingestDegradesOpen() throws IOException {
     Path file = tempDir.resolve("note.md");
     Files.writeString(file, "content");
-    List<Supplier<List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
+    List<Function<EngineContext, List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
     for (int i = 0; i < suppliers.size(); i++) {
       var accepted = new ArrayList<Path>();
       IngestTool.IngestCallback ingest =
-          (files, collection) -> {
+          (files, collection, context) -> {
             accepted.addAll(files);
             return new KnowledgeIngestResponse(files.size(), null);
           };
@@ -138,7 +140,7 @@ final class AgentToolRootsDegradeTest {
 
       OperationResult result =
           tool.execute(
-              "{\"paths\":[\"" + file.toString().replace("\\", "\\\\") + "\"]}");
+              "{\"paths\":[\"" + file.toString().replace("\\", "\\\\") + "\"]}", EngineContextTestFixtures.AGENT_LOOP);
 
       assertTrue(result.success(), label(i) + " must not block an absolute path: " + result.message());
       assertTrue(accepted.contains(file.normalize()), label(i) + " must ingest the named file");
@@ -148,11 +150,11 @@ final class AgentToolRootsDegradeTest {
   @Test
   @DisplayName("read-document: unusable roots never throw and never reject a relative path")
   void readDocumentDegradesOpen() {
-    List<Supplier<List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
+    List<Function<EngineContext, List<BrowseTool.RootInfo>>> suppliers = brokenSuppliers();
     for (int i = 0; i < suppliers.size(); i++) {
       var seen = new String[1];
       ReadDocumentTool.SliceFetcher fetch =
-          (docId, offset, max) -> {
+          (docId, offset, max, context) -> {
             seen[0] = docId;
             return CompletableFuture.completedFuture(
                 new DocumentService.DocumentSlice(
@@ -160,7 +162,7 @@ final class AgentToolRootsDegradeTest {
           };
       ReadDocumentTool tool = new ReadDocumentTool(fetch, suppliers.get(i));
 
-      OperationResult result = tool.execute("{\"path\":\"docs/explanation/overview.md\"}");
+      OperationResult result = tool.execute("{\"path\":\"docs/explanation/overview.md\"}", EngineContextTestFixtures.AGENT_LOOP);
 
       assertTrue(result.success(), label(i) + " must not reject: " + result.message());
       assertFalse(
@@ -172,14 +174,14 @@ final class AgentToolRootsDegradeTest {
 
   /** Mirrors {@code IngestToolTest}'s local-walk stand-in for the Worker-side scan RPC. */
   private static IngestTool.ScanRootCallback localScan(IngestTool.IngestCallback ingest) {
-    return (rootPath, collection, excludeGlobs) -> {
+    return (rootPath, collection, excludeGlobs, engineContext) -> {
       List<Path> expanded = new ArrayList<>();
       try (Stream<Path> stream = Files.walk(Path.of(rootPath))) {
         stream.filter(Files::isRegularFile).limit(1000).forEach(expanded::add);
       } catch (IOException e) {
         return new KnowledgeIngestResponse(0, e.getMessage());
       }
-      return ingest.ingest(expanded, collection);
+      return ingest.ingest(expanded, collection, engineContext);
     };
   }
 }

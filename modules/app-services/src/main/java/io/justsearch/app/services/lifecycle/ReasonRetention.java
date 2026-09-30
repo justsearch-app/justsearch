@@ -75,9 +75,6 @@ final class ReasonRetention {
    * <p>Deliberately keyed on BOTH codes, not on "incoming is worker.recovering":
    *
    * <ul>
-   *   <li>{@code worker.restart_exhausted} is SUPERVISION's terminal verdict and must never be
-   *       superseded by boot recovery (825 §D5 decision 2 — the veto that keeps it terminal). It is a
-   *       FAULT and falls through to the general rule below, which retains it.
    *   <li>{@code worker.index_corrupt} is STICKY and is retained by the branch above — a recovery
    *       attempt is a downstream symptom of the corruption, not a competing cause.
    *   <li>{@code worker.spawn_recovery_exhausted} (this recovery loop's OWN terminal code) is a FAULT
