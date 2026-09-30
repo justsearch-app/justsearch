@@ -80,6 +80,47 @@ final class NativeGenerationPromotionTest {
   }
 
   @Test
+  void freshMigrationRefusesAnExistingCandidateWithAnUnchangedPointer() throws Exception {
+    Path base = temp.resolve("fresh-candidate-capacity");
+    var manager = new IndexGenerationManager(base);
+    manager.initializeOrLoad();
+    IndexGenerationManager.State retained = manager.startFreshMigration("first");
+    List<String> directoriesBeforeRefusal = generationDirectoryNames(base);
+
+    IOException refused =
+        assertThrows(IOException.class, () -> manager.startFreshMigration("second"));
+
+    assertEquals(
+        "A migration candidate is already active or retained; resolve it before starting another",
+        refused.getMessage());
+    assertEquals(retained, new IndexGenerationManager(base).readStateBestEffort());
+    assertEquals(directoriesBeforeRefusal, generationDirectoryNames(base));
+    assertEquals(2L, generationDirectoryCount(base));
+  }
+
+  @Test
+  void freshMigrationRefusesARetainedPredecessorWithAnUnchangedPointer() throws Exception {
+    Path base = temp.resolve("fresh-predecessor-capacity");
+    var manager = new IndexGenerationManager(base);
+    String blue = manager.initializeOrLoad().state().active_generation();
+    String green = manager.startFreshMigration("first").building_generation();
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+    IndexGenerationManager.State promoted;
+    try (var promotion = manager.beginNativePromotion(blue, green)) {
+      promoted = promotion.promote();
+    }
+    List<String> directoriesBeforeRefusal = generationDirectoryNames(base);
+
+    IOException refused =
+        assertThrows(IOException.class, () -> manager.startFreshMigration("second"));
+
+    assertEquals("Previous generation still occupies build capacity", refused.getMessage());
+    assertEquals(promoted, new IndexGenerationManager(base).readStateBestEffort());
+    assertEquals(directoriesBeforeRefusal, generationDirectoryNames(base));
+    assertEquals(2L, generationDirectoryCount(base));
+  }
+
+  @Test
   void nextBuildPrunesAnAbandonedCandidateBeforeAllocating() throws Exception {
     var manager = new IndexGenerationManager(temp.resolve("index"));
     String active = manager.initializeOrLoad().state().active_generation();
@@ -89,6 +130,22 @@ final class NativeGenerationPromotionTest {
     assertNotEquals(active, manager.startMigration("after-prune").building_generation());
     try (var directories = Files.list(temp.resolve("index/indices"))) {
       assertEquals(2L, directories.filter(Files::isDirectory).count());
+    }
+  }
+
+  private static long generationDirectoryCount(Path base) throws IOException {
+    try (var entries = Files.list(base.resolve("indices"))) {
+      return entries.filter(Files::isDirectory).count();
+    }
+  }
+
+  private static List<String> generationDirectoryNames(Path base) throws IOException {
+    try (var entries = Files.list(base.resolve("indices"))) {
+      return entries
+          .filter(Files::isDirectory)
+          .map(path -> path.getFileName().toString())
+          .sorted()
+          .toList();
     }
   }
 }

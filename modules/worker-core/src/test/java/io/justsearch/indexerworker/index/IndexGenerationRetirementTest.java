@@ -11,6 +11,7 @@ import io.justsearch.adapters.lucene.runtime.SafeIndexPathOps;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
@@ -299,6 +300,43 @@ final class IndexGenerationRetirementTest {
   }
 
   @Test
+  void freshTransitionNeverUsesMoreThanTwoDirectoriesAndRetiresToOne() throws Exception {
+    Path base = temp.resolve("fresh-transition-count");
+    IndexGenerationManager manager = new IndexGenerationManager(base);
+    List<Long> counts = new ArrayList<>();
+    String blue = manager.initializeOrLoad().state().active_generation();
+    recordGenerationCount(base, counts);
+
+    IndexGenerationManager.State building = manager.startFreshMigration("fresh");
+    recordGenerationCount(base, counts);
+    assertEquals(blue, building.active_generation());
+    assertEquals(2L, counts.get(1));
+
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+    recordGenerationCount(base, counts);
+
+    IndexGenerationManager.State promoted = manager.promoteBuildingGenerationToActive();
+    recordGenerationCount(base, counts);
+    assertEquals(building.building_generation(), promoted.active_generation());
+    assertEquals(blue, promoted.previous_generation());
+
+    IndexGenerationManager.State retired =
+        manager.retirePreviousGeneration(
+            promoted.active_generation(), promoted.previous_generation());
+    recordGenerationCount(base, counts);
+    assertEquals(1L, counts.get(counts.size() - 1));
+    assertNull(retired.previous_generation());
+    assertEquals(List.of(1L, 2L, 2L, 2L, 1L), counts);
+    assertTrue(
+        counts.stream().allMatch(count -> count <= 2), () -> "directory trace=" + counts);
+    assertTrue(
+        Files.isDirectory(base.resolve("indices").resolve(promoted.active_generation())));
+    assertFalse(Files.exists(base.resolve("indices").resolve(blue)));
+    assertEquals(List.of(promoted.active_generation()), generationDirectoryNames(base));
+    assertEquals(retired, new IndexGenerationManager(base).readStateBestEffort());
+  }
+
+  @Test
   void unreferencedPhysicalRepresentationStillConsumesRecordedBuildCapacity() throws Exception {
     Path base = temp.resolve("retained-capacity");
     IndexGenerationManager manager = new IndexGenerationManager(base);
@@ -331,6 +369,22 @@ final class IndexGenerationRetirementTest {
     try (var entries = Files.list(base.resolve("indices"))) {
       return entries.filter(Files::isDirectory).count();
     }
+  }
+
+  private static List<String> generationDirectoryNames(Path base) throws IOException {
+    try (var entries = Files.list(base.resolve("indices"))) {
+      return entries
+          .filter(Files::isDirectory)
+          .map(path -> path.getFileName().toString())
+          .sorted()
+          .toList();
+    }
+  }
+
+  private static void recordGenerationCount(Path base, List<Long> counts) throws IOException {
+    long count = generationDirectoryCount(base);
+    counts.add(count);
+    assertTrue(count <= 2, () -> "directory trace exceeded capacity: " + counts);
   }
 
   private record Promoted(

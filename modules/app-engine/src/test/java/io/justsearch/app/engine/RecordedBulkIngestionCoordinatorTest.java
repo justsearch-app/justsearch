@@ -359,6 +359,70 @@ final class RecordedBulkIngestionCoordinatorTest {
   }
 
   @Test
+  void promotedRecoveryRequiresWritableSealedAndReplaySettledBeforeCompletion()
+      throws Exception {
+    AtomicBoolean afterPromotionReached = new AtomicBoolean();
+    AtomicReference<String> faultKey = new AtomicReference<>();
+    try (var harness = new BulkHarness(temp.resolve("pointer-cut-settlement-order"), boundary -> {
+      if (!"bulk-after-promotion".equals(boundary.phase())) return;
+      assertEquals(OperationKind.REINDEX, boundary.parentKind());
+      assertEquals(faultKey.get(), boundary.parentKey());
+      afterPromotionReached.set(true);
+      throw new IllegalStateException("simulated owner stop after committed promotion");
+    })) {
+      faultKey.set(harness.key);
+      harness.completeOneCapturedClaim();
+
+      assertThrows(IllegalStateException.class,
+          () -> harness.coordinator.promoteRecordedGeneration(harness.key, harness.queue, () -> {
+            harness.runtime.set(promotedRuntime(harness.key, false, SERVING_GENERATION, false));
+            return new IndexGenerationManager.State(1, "g-" + harness.key, null,
+                SERVING_GENERATION, "IDLE", false, null, null, System.currentTimeMillis(),
+                null, null, null);
+          }));
+      assertTrue(afterPromotionReached.get(),
+          "the installed bulk fault seam must run only after the promotion callback returns");
+      assertEquals(OperationState.RUNNING,
+          harness.operations.find(harness.key).orElseThrow().state());
+
+      harness.closeOwner();
+      harness.openOwner(true, false);
+
+      RecordedIngestionLifecycle.BulkRuntime pointerOnly = harness.runtime.get();
+      assertEquals("g-" + harness.key, pointerOnly.activeGeneration());
+      assertEquals(SERVING_GENERATION, pointerOnly.writableGeneration());
+      assertNotEquals(pointerOnly.activeGeneration(), pointerOnly.writableGeneration());
+      assertEquals(OperationState.RUNNING,
+          harness.operations.find(harness.key).orElseThrow().state(),
+          "a restarted active B pointer cannot finish while the writer still names A");
+
+      harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, false));
+      harness.coordinator.maintain();
+      RecordedIngestionLifecycle.BulkRuntime recovered = harness.runtime.get();
+      assertEquals("g-" + harness.key, recovered.writableGeneration(),
+          "recovery must observe the exact writable B before terminal settlement");
+      JobQueue.WalkProgress sealed = harness.queue.recordedWalk(harness.key).orElseThrow();
+      assertNotNull(sealed.sealedAt(), "the recovered queue must retain its sealed receipt");
+      BulkReindexProgress settled = harness.progress();
+      assertEquals(BulkReindexProgress.Phase.SETTLED, settled.phase());
+      assertEquals(sealed.revision(), settled.settlement().revision(),
+          "the durable operation settlement must name the sealed queue revision");
+      assertFalse(recovered.promotedReplaySettled());
+      assertEquals(OperationState.RUNNING,
+          harness.operations.find(harness.key).orElseThrow().state(),
+          "exact writable B and a sealed settlement cannot finish before replay settles");
+
+      harness.runtime.set(promotedRuntime(harness.key, true, "g-" + harness.key, true));
+      harness.coordinator.maintain();
+
+      OperationRecord completed = harness.operations.find(harness.key).orElseThrow();
+      assertEquals(OperationState.COMPLETE, completed.state());
+      assertEquals("SUCCESS", completed.receipt().code());
+      assertEquals(1, completed.unitsCompleted());
+    }
+  }
+
+  @Test
   void unsupersededGapCannotAuthorizeRecordedPromotion() throws Exception {
     try (var harness = new BulkHarness(temp.resolve("gap-awaiting-acceptance"))) {
       harness.replacePhysical(buildingRuntime(harness.key));
@@ -1057,15 +1121,29 @@ final class RecordedBulkIngestionCoordinatorTest {
     RecordedIngestionLifecycle.Attachment attachment;
     String key;
     private final boolean expectInitialRestartFailure;
+    private final java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook;
 
     BulkHarness(Path directory) throws Exception {
-      this(directory, false);
+      this(directory, false, OperationAttemptRunnerImpl.NO_FAULT_HOOK);
     }
 
     BulkHarness(Path directory, boolean failInitialRestartOnce) throws Exception {
+      this(directory, failInitialRestartOnce, OperationAttemptRunnerImpl.NO_FAULT_HOOK);
+    }
+
+    BulkHarness(Path directory,
+        java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook)
+        throws Exception {
+      this(directory, false, faultHook);
+    }
+
+    private BulkHarness(Path directory, boolean failInitialRestartOnce,
+        java.util.function.Consumer<OperationAttemptRunnerImpl.FaultBoundary> faultHook)
+        throws Exception {
       this.directory = Files.createDirectories(directory);
       this.expectInitialRestartFailure = failInitialRestartOnce;
       this.failInitialRestartOnce.set(failInitialRestartOnce);
+      this.faultHook = faultHook;
       watchedRoot = Files.createDirectory(directory.resolve("watched"));
       member = Files.writeString(watchedRoot.resolve("one.txt"), "captured cancellation source");
       memberSize = Files.size(member);
@@ -1109,7 +1187,7 @@ final class RecordedBulkIngestionCoordinatorTest {
       operationOwner = operationStoreWithCrashCut(operations);
       attempts = new OperationAttemptRunnerImpl(operationOwner, CLOCK,
           Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
-          null, new RecordedIngestPlanResolver());
+          null, new RecordedIngestPlanResolver(), faultHook);
       sqliteQueue = new SqliteJobQueue(directory.resolve("jobs.db"), operationKey -> {
         RecordedIngestionCoordinator current = coordinatorRef.get();
         return current == null ? JobQueue.RecordedClaimDecision.DENY

@@ -7,12 +7,16 @@ import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.server.KnowledgeServer;
+import io.justsearch.indexerworker.server.MigrationTransitionBarrier;
 import io.justsearch.ipc.StatusResponse;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * Lane F stage A item A12 — the in-process replacement for the chaos tier's three-part rig
@@ -51,20 +55,32 @@ final class EngineTestHarness implements AutoCloseable {
   private final Path dataDir;
   private final Path indexBase;
   private final Map<String, String> extraConfig;
+  private final MigrationTransitionBarrier.Hook migrationHook;
 
   private EngineRoot root;
   private KnowledgeClient client;
   private GpuSchedulingGauge gauge;
 
-  private EngineTestHarness(Path dataDir, Path indexBase, Map<String, String> extraConfig) {
+  private EngineTestHarness(
+      Path dataDir,
+      Path indexBase,
+      Map<String, String> extraConfig,
+      MigrationTransitionBarrier.Hook migrationHook) {
     this.dataDir = dataDir;
     this.indexBase = indexBase;
     this.extraConfig = new LinkedHashMap<>(extraConfig);
+    this.migrationHook = migrationHook;
   }
 
   /** Publishes a config rooted at {@code dataDir} and starts the Engine's index half. */
   static EngineTestHarness start(Path dataDir) throws Exception {
     return start(dataDir, dataDir.resolve("index"), Map.of());
+  }
+
+  /** As {@link #start(Path)}, with a checked hook installed before the index half starts. */
+  static EngineTestHarness start(Path dataDir, MigrationTransitionBarrier.Hook migrationHook)
+      throws Exception {
+    return start(dataDir, dataDir.resolve("index"), Map.of(), migrationHook);
   }
 
   /** As {@link #start(Path)}, with extra resolved-config defaults (recovery policy, pacing, …). */
@@ -75,7 +91,21 @@ final class EngineTestHarness implements AutoCloseable {
   /** As {@link #start(Path)}, with the index base path pointed somewhere other than the default. */
   static EngineTestHarness start(Path dataDir, Path indexBase, Map<String, String> extraConfig)
       throws Exception {
-    EngineTestHarness harness = new EngineTestHarness(dataDir, indexBase, extraConfig);
+    return start(dataDir, indexBase, extraConfig, MigrationTransitionBarrier.NO_HOOK);
+  }
+
+  private static EngineTestHarness start(
+      Path dataDir,
+      Path indexBase,
+      Map<String, String> extraConfig,
+      MigrationTransitionBarrier.Hook migrationHook)
+      throws Exception {
+    EngineTestHarness harness =
+        new EngineTestHarness(
+            dataDir,
+            indexBase,
+            extraConfig,
+            java.util.Objects.requireNonNull(migrationHook, "migrationHook"));
     harness.open();
     return harness;
   }
@@ -106,8 +136,88 @@ final class EngineTestHarness implements AutoCloseable {
   private void open() throws Exception {
     publishConfig(dataDir, indexBase, extraConfig);
     gauge = new GpuSchedulingGauge();
-    root = new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), DEADLINE_MS, BATCH_SIZE);
+    if (migrationHook == MigrationTransitionBarrier.NO_HOOK) {
+      root = new EngineRoot(
+          org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+          org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+          DEADLINE_MS, BATCH_SIZE);
+      client = root.start(gauge, IpcTelemetry.noop());
+      return;
+    }
+    EngineRoot.ServerFactory production = productionServerFactory();
+    EngineRoot.ServerFactory hooked =
+        new EngineRoot.ServerFactory() {
+          @Override
+          public io.justsearch.configuration.resolved.ResolvedConfig captureConfiguration() {
+            return production.captureConfiguration();
+          }
+
+          @Override
+          public KnowledgeServer create(
+              GpuSchedulingGauge scheduling,
+              io.justsearch.core.execution.EngineExecutorRegistry executors,
+              io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+              io.justsearch.core.component.ComponentHandle indexComponent,
+              io.justsearch.core.component.ComponentHandle encoderComponent) {
+            return installMigrationHook(
+                production.create(
+                    scheduling, executors, ingestion, indexComponent, encoderComponent));
+          }
+
+          @Override
+          public KnowledgeServer create(
+              GpuSchedulingGauge scheduling,
+              io.justsearch.core.execution.EngineExecutorRegistry executors,
+              io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+              io.justsearch.core.component.ComponentHandle indexComponent,
+              io.justsearch.core.component.ComponentHandle encoderComponent,
+              io.justsearch.configuration.resolved.ResolvedConfig startupConfiguration) {
+            return installMigrationHook(
+                production.create(
+                    scheduling,
+                    executors,
+                    ingestion,
+                    indexComponent,
+                    encoderComponent,
+                    startupConfiguration));
+          }
+        };
+    root = new EngineRoot(
+        org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+        org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+        hooked, DEADLINE_MS, BATCH_SIZE);
     client = root.start(gauge, IpcTelemetry.noop());
+  }
+
+  private KnowledgeServer installMigrationHook(KnowledgeServer server) {
+    try {
+      Method install = KnowledgeServer.class.getDeclaredMethod(
+          "installMigrationBarrierForTests", MigrationTransitionBarrier.Hook.class);
+      install.setAccessible(true);
+      install.invoke(server, migrationHook);
+      return server;
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException("Cannot install the pre-start migration hook", unwrap(failure));
+    }
+  }
+
+  private static EngineRoot.ServerFactory productionServerFactory() {
+    try {
+      Method factory = EngineRoot.class.getDeclaredMethod("serverFactory",
+          io.justsearch.app.api.runtime.ManagedChildRegistry.class, Supplier.class);
+      factory.setAccessible(true);
+      Supplier<ConfigStore> authority = ConfigStore::global;
+      return (EngineRoot.ServerFactory) factory.invoke(
+          null, io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), authority);
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException("Cannot decorate the production Engine server factory",
+          unwrap(failure));
+    }
+  }
+
+  private static Throwable unwrap(ReflectiveOperationException failure) {
+    return failure instanceof InvocationTargetException invocation && invocation.getCause() != null
+        ? invocation.getCause() : failure;
   }
 
   /**
