@@ -17,8 +17,10 @@ and their unfinished proof below; do not represent them as production changes.
 The user resumed autonomous execution of all remaining D1/D2/E/F, requested
 Luna/Sol subagents, and directed that routine work require no input. Continue
 in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`, branch
-`codex/lane-f-pr1`, current committed/pushed checkpoint
-`3ce0357dae4decf4a9274c882205fc76e0f214f9` (explicit retired predecessor owners).
+`codex/lane-f-pr1`, current runtime checkpoint `ef636fa3a`
+(parser-gap control readiness, mandatory A restoration, pre-Green deletes and
+accepted four-case matrix). Prior checkpoint
+`3ce0357dae4decf4a9274c882205fc76e0f214f9` records explicit retired predecessor owners.
 Checkpoint commits and pushes to draft PR727 remain authorized; merge remains
 separate at F. The worktree is HELD through 2026-10-04. Preserve main and the
 foreign untracked `modules/app-inference/logs/`.
@@ -83,8 +85,13 @@ vocabulary before any A mutation. The earlier metadata-failure test now restores
 the good source only after proving no durable success, so owned close can retry.
 Private applyProjection now validates the captured active pointer directly
 instead of borrowing ordinary recorded ingestion's IDLE-only capture. This
-admits no-file writes during the pre-Green shared-A interval; its independent
-ownership review is pending. Production ordinary file admission remains unchanged.
+admits no-file writes during the pre-Green shared-A interval; independent Sol
+accepts that narrow pointer/read-lease ownership change. Production ordinary file
+admission remains unchanged. Map runtime failure only around the concrete
+candidate journal call, preserving its cause and leaving stale/conflict and A
+effect classification outside the catch. Sol's proposed strict-ordering test uses
+the real SQLite delegate and queue/coordinator spies to observe journal admission
+before the real A mutation is issued, without adding a production helper.
 Strengthen the journal-before-A oracle beyond post-hoc receipt presence, then
 rerun implementation checks when resuming D2; no extra run is needed for handoff.
 Private sources are under `tmp/lane-f-d2-port-draft/` and tests under
