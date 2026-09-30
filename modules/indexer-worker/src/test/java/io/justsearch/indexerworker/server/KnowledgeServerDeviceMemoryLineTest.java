@@ -89,7 +89,7 @@ final class KnowledgeServerDeviceMemoryLineTest {
   void ordinaryQueryUnknownMemoryRefusesBeforePublishingDegradedView(@TempDir Path dir)
       throws Exception {
     try (var fixture = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, null);
-        var composition = fixture.composition()) {
+        var ignored = fixture.composition()) {
       var refusal = assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class,
           fixture::prepare);
       assertTrue(refusal.getMessage().contains("free_device_memory_unknown"));

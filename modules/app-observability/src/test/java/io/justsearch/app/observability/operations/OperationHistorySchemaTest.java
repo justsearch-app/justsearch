@@ -96,14 +96,14 @@ final class OperationHistorySchemaTest {
   @Test
   @DisplayName("Keyed operation outcome schema matches the shared HTTP/MCP view")
   void operationOutcomeViewSchema() throws Exception {
-    captureOrVerify(io.justsearch.app.api.operations.OperationOutcomeView.class, "operation-outcome-view.v1.json");
+    captureOrVerify(OperationOutcomeView.class, "operation-outcome-view.v1.json");
   }
 
   @Test
   @DisplayName("Outcome state schema enumerates the actual lowercase JSON values")
   void outcomeSchemaUsesSerializedStateValues() {
-    JsonNode schema = schemaGenerator.generateSchema(io.justsearch.app.api.operations.OperationOutcomeView.class);
-    assertEquals(MAPPER.valueToTree(io.justsearch.app.api.operations.OperationOutcomeView.State.values()),
+    JsonNode schema = schemaGenerator.generateSchema(OperationOutcomeView.class);
+    assertEquals(MAPPER.valueToTree(OperationOutcomeView.State.values()),
         schema.path("properties").path("state").path("enum"));
   }
 

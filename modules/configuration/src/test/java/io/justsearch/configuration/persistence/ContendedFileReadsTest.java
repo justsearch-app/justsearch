@@ -305,7 +305,7 @@ class ContendedFileReadsTest {
   private static final class RecordingFailureFiles implements AtomicFileWrites.FileAccess {
     @Override
     public void writeNewForced(Path path, byte[] content) throws IOException {
-      Files.write(path, content, java.nio.file.StandardOpenOption.CREATE_NEW, java.nio.file.StandardOpenOption.WRITE);
+      Files.write(path, content, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
     }
 
     @Override

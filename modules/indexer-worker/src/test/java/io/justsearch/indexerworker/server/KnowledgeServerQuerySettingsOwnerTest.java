@@ -166,7 +166,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
 
   @Test
   void inPlaceWaitsForIssuedARequestBeforeRetiringQuery(@TempDir Path dir) throws Exception {
-    try (var f = new QueryFixture(dir, 512L); var composition = f.composition()) {
+    try (var f = new QueryFixture(dir, 512L); var ignored = f.composition()) {
       var issued = f.server.captureServingView();
       var released = new java.util.concurrent.CountDownLatch(1);
       var holder = new Thread(() -> {
@@ -198,7 +198,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
   @Test
   void inPlaceIgnoresOlderServiceCleanupAfterItsQueryCallsDrain(@TempDir Path dir)
       throws Exception {
-    try (var f = new QueryFixture(dir, 512L); var composition = f.composition()) {
+    try (var f = new QueryFixture(dir, 512L); var ignored = f.composition()) {
       var older = newServingView(mock(DefaultWorkerAppServices.class), mock(RunningRuntime.class),
           dir.resolve("older"));
       attach(older, "attachEncoderSet", EncoderSet.class, f.index);
@@ -227,7 +227,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
 
   @Test
   void inPlaceOlderIssuedQueryTimeoutRestoresUntouchedA(@TempDir Path dir) throws Exception {
-    try (var f = new QueryFixture(dir, 512L); var composition = f.composition()) {
+    try (var f = new QueryFixture(dir, 512L); var ignored = f.composition()) {
       var older = newServingView(mock(DefaultWorkerAppServices.class), mock(RunningRuntime.class),
           dir.resolve("older-held"));
       attach(older, "attachEncoderSet", EncoderSet.class, f.index);
@@ -256,7 +256,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
   @Test
   void retirementTimeoutRepublishesUntouchedA(@TempDir Path dir) throws Exception {
     try (var f = new QueryFixture(dir, 512L); var composition = f.composition();
-        var held = f.server.captureServingView()) {
+        var ignoredHeld = f.server.captureServingView()) {
       assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class, f::prepare);
       assertFalse(f.queryA.isClosed());
       f.assertA();
@@ -375,7 +375,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
 
   @Test
   void failedCandidateCleanupIsRetainedByQueryRecovery(@TempDir Path dir) throws Exception {
-    try (var f = new QueryFixture(dir, 512L); var composition = f.composition()) {
+    try (var f = new QueryFixture(dir, 512L); var ignored = f.composition()) {
       var prepared = f.prepare();
       doThrow(new java.io.IOException("B service close refused")).when(f.candidate).close();
       var cause = new IllegalStateException("later owner rejected");
@@ -395,7 +395,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
   @Test
   void retainedQueryRecoveryShutdownClosesDegradedAndRetriesCandidate(@TempDir Path dir)
       throws Exception {
-    try (var f = new QueryFixture(dir, 512L); var composition = f.composition()) {
+    try (var f = new QueryFixture(dir, 512L); var ignored = f.composition()) {
       var prepared = f.prepare();
       doThrow(new java.io.IOException("B service close refused")).doNothing()
           .when(f.candidate).close();

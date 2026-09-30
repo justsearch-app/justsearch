@@ -4866,7 +4866,7 @@ public final class KnowledgeServer implements Closeable {
 
     private void compose(EncoderConfigurationProjection projection, QueryRoleSelection selected) {
       query = composeQuery(projection, selected, Set.of(),
-          selected.reranker().targetEp() == io.justsearch.configuration.model.ExecutionProvider.CUDA);
+          selected.reranker().targetEp() == ExecutionProvider.CUDA);
       services = queryServices(configuration, projection, query);
       successor = queryView(services, query);
       observation = encoderCompositionObservation(old.encoderSet, query, configuration,
@@ -4959,7 +4959,7 @@ public final class KnowledgeServer implements Closeable {
           || expectedView().retiring || query == null || query.isClosed() || aborted) {
         throw new IllegalStateException("Prepared query owner lost its physical predecessor");
       }
-      if (selection.reranker().targetEp() == io.justsearch.configuration.model.ExecutionProvider.CUDA
+      if (selection.reranker().targetEp() == ExecutionProvider.CUDA
           && query.reranker() != null && !query.reranker().isGpuAvailable()) {
         throw new IllegalStateException("Prepared CUDA query device changed before commitment");
       }

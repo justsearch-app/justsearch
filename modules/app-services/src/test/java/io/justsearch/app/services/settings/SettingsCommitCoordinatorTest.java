@@ -25,6 +25,7 @@ import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.model.ChatModelProfile;
+import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.context.EngineContext;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -122,8 +123,8 @@ final class SettingsCommitCoordinatorTest {
             io.justsearch.configuration.model.ModelPrecision.INT8,
             io.justsearch.configuration.model.ExecutionProvider.CPU));
     AtomicBoolean preparedOwner = new AtomicBoolean();
-    var composition = new io.justsearch.core.component.ComposeEvidence(
-        io.justsearch.core.component.ComposeEvidence.Mode.IN_PLACE,
+    var composition = new ComposeEvidence(
+        ComposeEvidence.Mode.IN_PLACE,
         "candidate_fits_after_source_release", 10L, 20L);
     SettingsComponentComposer components = (candidate, desired, affected) -> {
       assertEquals(Set.of("encoders"), affected.keySet());
@@ -133,7 +134,7 @@ final class SettingsCommitCoordinatorTest {
         @Override public Optional<QueryRoleSelection> queryRoleSelection() {
           return Optional.of(selection);
         }
-        @Override public Optional<io.justsearch.core.component.ComposeEvidence> composition() {
+        @Override public Optional<ComposeEvidence> composition() {
           return Optional.of(composition);
         }
         @Override public void includeObservation(
@@ -794,9 +795,9 @@ final class SettingsCommitCoordinatorTest {
       var query = org.mockito.Mockito.mock(FixedSettingsComponentComposer.QueryRolePreparedOwner.class);
       org.mockito.Mockito.when(query.selection()).thenReturn(new QueryRoleSelection(
           QueryRoleSelection.Role.disabled(), QueryRoleSelection.Role.disabled()));
-      org.mockito.Mockito.when(query.composition()).thenReturn(java.util.Optional.of(
-          new io.justsearch.core.component.ComposeEvidence(
-              io.justsearch.core.component.ComposeEvidence.Mode.BESIDE,
+      org.mockito.Mockito.when(query.composition()).thenReturn(Optional.of(
+          new ComposeEvidence(
+              ComposeEvidence.Mode.BESIDE,
               "candidate_fits_free_device_memory", 20L, 10L)));
       org.mockito.Mockito.when(query.observation()).thenReturn(
           componentObservation("encoders"));
