@@ -138,10 +138,12 @@ release note, every first-party client including MCP and CLI) or fix it.
    mismatch can make the JVM ignore the cache. Verify with `-Xlog:aot` on an installed dist
    whether the cache loads, and align the training flags with the spawn set.
 
-Running Codex sessions (resume with `codex exec resume <id>` from the worktree if cut off):
-reconfigure in-place `01a0f2e5-978c-7492-9ab9-42adaeb5abbc` (`lane-f-reconf`, holds
-`tmp/grants/gradle-reconf`); WP2 2b `01a0f2ed-988d-73d1-94c5-f4dcc6fd9214` (`lane-f-wp2b`,
-Gradle gated on `tmp/grants/gradle-wp2b`, issued after reconfigure releases).
+Running Codex sessions (resume with `codex exec resume <id>` from the worktree only after its log stops growing):
+help review fixes `01a0f2bb-6611-7850-abea-6ced24298a09` (`lane-f-d1-help`, holds `tmp/grants/gradle-help2`);
+WP2 2b `01a0f2ed-988d-73d1-94c5-f4dcc6fd9214` (`lane-f-wp2b`, next grant `gradle-wp2b`);
+D1 closure assertions `01a0f35a-ab44-78d0-93b6-3cc776dad953` (`lane-f-d1-close`, then `gradle-d1close`);
+reconfigure review `01a0f34f-6814-7510-a5d0-d7632e37ec72` (read-only). Reconfigure implementation is
+committed on `codex/lane-f-reconf-inplace` at `5ccfa74a8` (113 focused tests; installed CUDA run pending), not yet merged.
 
 Done this session: D1-17 help source in Green (`1ac1407ef`, merged `63b83ffad`; integrated
 build green at `tmp/lane-f-help-integrated-compile-r2.log`, focused 212 tests at
