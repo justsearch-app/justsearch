@@ -11,8 +11,14 @@
 import { z } from 'zod';
 
 export interface SettingsV2 {
-  citationScorerModelPath?: string | null;
   apiPort?: number | null;
+  citationScorerModelPath?: string | null;
+  composition?: {
+    footprintBytes?: number | null;
+    freeBytes?: number | null;
+    mode?: string | null;
+    reason?: string | null;
+  } | null;
   indexPaths?: string[] | null;
   llm?: {
     contextWindow?: number | null;
@@ -46,8 +52,14 @@ export interface SettingsV2 {
   } | null;
 }
 export const settingsV2Schema = z.strictObject({
-  "citationScorerModelPath": z.string().nullable().optional(),
   "apiPort": z.number().int().nullable().optional(),
+  "citationScorerModelPath": z.string().nullable().optional(),
+  "composition": z.strictObject({
+    "footprintBytes": z.number().int().nullable().optional(),
+    "freeBytes": z.number().int().nullable().optional(),
+    "mode": z.string().nullable().optional(),
+    "reason": z.string().nullable().optional(),
+  }).nullable().optional(),
   "indexPaths": z.array(z.string()).nullable().optional(),
   "llm": z.strictObject({
     "contextWindow": z.number().int().nullable().optional(),

@@ -475,9 +475,11 @@ claim. Malformed/non-v7 keys and missing far-future keys return `OPERATION_KEY_I
 | CANCELLED | failed | `reason: cancelled` |
 | COMPLETE_WITH_GAPS | running | `phase: awaiting_acceptance`; recorded gaps when present |
 
-`result` carries only receipt `code`/optional `executionId`, or a pending gap list
-of `{unitId, reason}`. The read excludes public input, arbitrary handler results
-and sealed preparation. HTTP returns200 for every successful query, including a
+`result` carries only receipt `code`/optional `executionId`, an optional bounded query-model
+`composition` decision, or a pending gap list of `{unitId, reason}`. The composition object is the
+same response-only shape returned by settings v2 and survives same-key replay; its reason is limited
+to the physical device-memory decision vocabulary. The read excludes public input, all other handler
+results and sealed preparation. HTTP returns200 for every successful query, including a
 recorded failed operation; invalid keys return400 and store failures500. MCP uses
 the same body as `structuredContent` and serializes it into its text block.
 
@@ -567,6 +569,12 @@ Resume contract notes:
 - `apiPort` is validated in the inclusive range `0..65535`; in a partial patch, null or omission preserves the incumbent value. The desired policy is resolved through the normal precedence chain, while the positive endpoint bound by the current process is observed separately in the runtime manifest (`head.apiPort`) and in `process.apiPort` within effective-config diagnostics.
 - A non-null `rerankerModelPath` or `citationScorerModelPath` sets that query role's desired directory; an empty string explicitly clears it. Omission or null preserves the prior path. A higher-priority process override masks a path change and causes a precommit refusal.
 - A completed write that changes the API port returns `restartScheduled: true` with its committed witness. The requested successor is scheduled after the operation row reaches `COMPLETE`; the current process retains its serving API-port resolution and reports its actually bound endpoint until it closes. The persisted `apiPort` is the desired value for the successor.
+- A query-model write that reaches a physical composition decision returns a nullable, response-only
+  `composition` object. Its `mode` is `BESIDE`, `IN_PLACE`, or `REFUSED`; `reason` is the bounded
+  device-memory decision token; and nullable `freeBytes` / `footprintBytes` are non-negative byte
+  measurements. The object is never persisted as settings state; the bounded operation receipt
+  retains it only for same-key replay. A value supplied in a request is ignored. A typed
+  `COMPONENT_PREPARATION_REQUIRED` refusal carries the same nested object in its error response.
 - Shell mode writes include `X-JustSearch-UI-Mode-Intent: <client-id>:<sequence>`. The client ID and
   Web-Lock-allocated sequence are durable in origin storage, putting reloads and concurrent shell
   windows in one monotonic ordering domain. The server ignores only the `ui.mode` field of an older

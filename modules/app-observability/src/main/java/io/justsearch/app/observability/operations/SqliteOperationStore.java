@@ -694,7 +694,8 @@ public final class SqliteOperationStore implements OperationStore {
       String receiptJson = row.getString("result_json");
       if (receiptJson != null) {
         OperationReceipt receipt = JSON.readValue(receiptJson, OperationReceipt.class);
-        result = new OperationOutcomeView.Result(receipt.code(), receipt.executionId(), null, null);
+        result = new OperationOutcomeView.Result(receipt.code(), receipt.executionId(), null, null,
+            receipt.composition());
       }
     }
     return new OperationOutcomeView(wireState,

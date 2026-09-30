@@ -201,6 +201,9 @@ public final class EngineRoot implements WorkerHost {
         @Override public io.justsearch.app.api.settings.QueryRoleSelection selection() {
           return prepared.selection();
         }
+        @Override public java.util.Optional<io.justsearch.core.component.ComposeEvidence> composition() {
+          return java.util.Optional.of(prepared.composition());
+        }
         @Override public io.justsearch.core.component.EngineComponentSnapshot.Component observation() {
           return prepared.observation();
         }
@@ -219,6 +222,7 @@ public final class EngineRoot implements WorkerHost {
         @Override public void notifyObservers() { prepared.notifyObservers(); }
         @Override public void retire() { prepared.retire(); }
         @Override public void abort() { prepared.abort(); }
+        @Override public void abort(Throwable cause) { prepared.abort(cause); }
       };
     };
   }

@@ -4,6 +4,7 @@ package io.justsearch.app.services.settings;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.core.component.ComposeEvidence;
 import java.util.Map;
 import java.util.Set;
 
@@ -35,6 +36,10 @@ public interface SettingsComponentComposer {
     default java.util.Optional<QueryRoleSelection> queryRoleSelection() {
       return java.util.Optional.empty();
     }
+    /** Present only when a physical owner made a measured composition decision. */
+    default java.util.Optional<ComposeEvidence> composition() {
+      return java.util.Optional.empty();
+    }
     /** Add a generation-owned observation before the final shared registry batch is built. */
     void includeObservation(io.justsearch.core.component.EngineComponentSnapshot.Component observation);
     /** Holds physical owner lifecycle locks before entering the publication write section. */
@@ -54,5 +59,10 @@ public interface SettingsComponentComposer {
 
     /** Disposes a refused candidate before commitment. Never closes an uncertain candidate. */
     void abort();
+
+    /** Disposes a refused candidate while retaining the reason that prevented commitment. */
+    default void abort(Throwable cause) {
+      abort();
+    }
   }
 }

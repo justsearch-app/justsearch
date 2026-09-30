@@ -804,6 +804,18 @@ final class EngineSupervisedRecoveryE2ETest {
         "JUSTSEARCH_RERANK_GPU_MEM_MB", "1024");
   }
 
+  static String runQueryReconfigureRound(boolean inPlace) throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedCudaReranker(repo),
+        "D1 query reconfigure requires retained CUDA reranker model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/query-reconfigure-" + UUID.randomUUID());
+    String scenario = inPlace ? "query-reconfigure-in-place" : "query-reconfigure-beside";
+    String[] output = new String[1];
+    withModelCacheCleanup(repo, work, () -> output[0] = runInstalledModelScenario(
+        repo, work, scenario, Map.of(), "QUERY_RECONFIGURE_ROUND_PASS"));
+    return output[0];
+  }
+
   @FunctionalInterface
   private interface FixtureWork {
     void run() throws Exception;
@@ -874,6 +886,7 @@ final class EngineSupervisedRecoveryE2ETest {
     try {
       long timeoutSeconds = 330L;
       if (scenario.startsWith("generative-recovery-") || scenario.contains("low-memory")
+          || scenario.startsWith("query-reconfigure-")
           || "model-live-a-b-accepted-cancel-crash".equals(scenario)
           || "model-live-a-b".equals(scenario)
               && "1".equals(extraEnvironment.get("JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE"))) {
@@ -1290,6 +1303,15 @@ final class EngineSupervisedRecoveryE2ETest {
           && Files.isRegularFile(models.resolve("onnx/citation-scorer/tokenizer.json"))) {
         return true;
       }
+    }
+    return false;
+  }
+
+  private static boolean hasRetainedCudaReranker(Path repo) {
+    for (Path ancestor = repo; ancestor != null; ancestor = ancestor.getParent()) {
+      Path model = ancestor.resolve("models/onnx/reranker");
+      if (Files.isRegularFile(model.resolve("model_fp16.onnx"))
+          && Files.isRegularFile(model.resolve("tokenizer.json"))) return true;
     }
     return false;
   }

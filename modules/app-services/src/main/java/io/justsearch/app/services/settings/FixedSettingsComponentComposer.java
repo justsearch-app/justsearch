@@ -6,6 +6,7 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.core.component.EngineComponentSnapshot;
 import java.util.ArrayList;
@@ -41,6 +42,7 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
   /** The encoder owner alone can supply the exact selection persisted by the settings owner. */
   public interface QueryRolePreparedOwner extends PreparedOwner {
     QueryRoleSelection selection();
+    @Override java.util.Optional<ComposeEvidence> composition();
   }
 
   private final EngineComponentRegistry registry;
@@ -112,6 +114,7 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
     try {
       Map<String, EngineComponentSnapshot.Component> observations = new LinkedHashMap<>();
       QueryRoleSelection queryRoles = null;
+      ComposeEvidence composition = null;
       for (var entry : selected.entrySet()) {
         PreparedOwner owner = Objects.requireNonNull(
             entry.getValue().prepare(candidate, desired, affected.get(entry.getKey()),
@@ -124,18 +127,24 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
             throw new IllegalStateException("Encoder owner has no prepared query-role selection");
           }
           queryRoles = Objects.requireNonNull(queryOwner.selection(), "Query-role selection");
+          composition = queryOwner.composition().orElseThrow(
+              () -> new IllegalStateException("Encoder owner has no query composition evidence"));
         }
-        observations.put(entry.getKey(), Objects.requireNonNull(owner.observation(),
-            "Prepared observation: " + entry.getKey()));
+        var observation = Objects.requireNonNull(owner.observation(),
+            "Prepared observation: " + entry.getKey());
+        if ("encoders".equals(entry.getKey())) {
+          observation = withComposition(observation, composition);
+        }
+        observations.put(entry.getKey(), observation);
         afterOwnerPrepared.accept(entry.getKey());
       }
-      return new Composite(List.copyOf(prepared), observations, queryRoles, registry, lease);
+      return new Composite(List.copyOf(prepared), observations, queryRoles, composition,
+          registry, lease);
     } catch (RuntimeException | Error failure) {
-      int priorSuppressed = failure.getSuppressed().length;
-      abortAll(prepared, failure);
+      boolean aborted = abortAll(prepared, failure);
       // A failed abort may still own native or process resources. Keep the apply permit held
       // until an owner can prove its cleanup; another candidate must not cross that lifetime.
-      if (failure.getSuppressed().length == priorSuppressed) {
+      if (aborted) {
         try { lease.close(); } catch (RuntimeException | Error closeFailure) {
           failure.addSuppressed(closeFailure);
         }
@@ -144,11 +153,24 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
     }
   }
 
-  private static void abortAll(List<PreparedOwner> prepared, Throwable failure) {
+  private static EngineComponentSnapshot.Component withComposition(
+      EngineComponentSnapshot.Component observation, ComposeEvidence composition) {
+    return new EngineComponentSnapshot.Component(observation.spec(), observation.state(),
+        observation.reasonCode(), observation.stateSince(), observation.stateSinceMonotonicNanos(),
+        observation.appliedVersion(), observation.desiredVersion(), composition,
+        observation.recoveryAttempts(), observation.evidence());
+  }
+
+  private static boolean abortAll(List<PreparedOwner> prepared, Throwable failure) {
+    boolean succeeded = true;
     for (int i = prepared.size() - 1; i >= 0; i--) {
-      try { prepared.get(i).abort(); }
-      catch (RuntimeException | Error abortFailure) { failure.addSuppressed(abortFailure); }
+      try { prepared.get(i).abort(failure); }
+      catch (RuntimeException | Error abortFailure) {
+        succeeded = false;
+        failure.addSuppressed(abortFailure);
+      }
     }
+    return succeeded;
   }
 
   private static void throwIfFailed(Throwable failure) {
@@ -160,22 +182,27 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
     private final List<PreparedOwner> owners;
     private final Map<String, EngineComponentSnapshot.Component> observations;
     private final QueryRoleSelection queryRoles;
+    private final ComposeEvidence composition;
     private final EngineComponentRegistry registry;
     private final EngineComponentRegistry.ApplyLease lease;
     private EngineComponentRegistry.PreparedBatch batch;
 
     private Composite(List<PreparedOwner> owners,
         Map<String, EngineComponentSnapshot.Component> observations,
-        QueryRoleSelection queryRoles,
+        QueryRoleSelection queryRoles, ComposeEvidence composition,
         EngineComponentRegistry registry, EngineComponentRegistry.ApplyLease lease) {
       this.owners = owners;
       this.observations = new LinkedHashMap<>(observations);
       this.queryRoles = queryRoles;
+      this.composition = composition;
       this.registry = registry;
       this.lease = lease;
     }
     @Override public java.util.Optional<QueryRoleSelection> queryRoleSelection() {
       return java.util.Optional.ofNullable(queryRoles);
+    }
+    @Override public java.util.Optional<ComposeEvidence> composition() {
+      return java.util.Optional.ofNullable(composition);
     }
     @Override public void withOwnerLocks(Runnable publication) {
       underOwnerLocks(0, publication);
@@ -237,13 +264,21 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
     }
 
     @Override public void abort() {
-      RuntimeException failure = new IllegalStateException("Prepared component abort failed");
-      abortAll(owners, failure);
-      if (failure.getSuppressed().length == 0) {
-        try { lease.close(); }
-        catch (RuntimeException | Error closeFailure) { failure.addSuppressed(closeFailure); }
+      abort(new IllegalStateException("Prepared component abort failed"));
+    }
+
+    @Override public void abort(Throwable cause) {
+      Objects.requireNonNull(cause, "abort cause");
+      RuntimeException cleanup = new IllegalStateException("Prepared component abort failed");
+      for (int i = owners.size() - 1; i >= 0; i--) {
+        try { owners.get(i).abort(cause); }
+        catch (RuntimeException | Error abortFailure) { cleanup.addSuppressed(abortFailure); }
       }
-      if (failure.getSuppressed().length > 0) throw failure;
+      if (cleanup.getSuppressed().length == 0) {
+        try { lease.close(); }
+        catch (RuntimeException | Error closeFailure) { cleanup.addSuppressed(closeFailure); }
+      }
+      if (cleanup.getSuppressed().length > 0) throw cleanup;
     }
   }
 }

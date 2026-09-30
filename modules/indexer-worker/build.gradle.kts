@@ -10,6 +10,7 @@ plugins {
 }
 
 dependencies {
+  testImplementation(project(":modules:app-services"))
   testImplementation(testFixtures(project(":modules:adapters-lucene")))
   testImplementation(testFixtures(project(":modules:core")))
   implementation(project(":modules:app-api"))
