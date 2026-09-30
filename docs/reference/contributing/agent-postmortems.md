@@ -24,7 +24,7 @@ Indexed reference cases that lessons in `CLAUDE.md` and `.claude/rules/agent-les
 | `catalog-verbatim` | [§7](#7-catalog-verbatim--slice-486-27) | slice 486 §27 |
 | `wire-emitter-elision` | [§8](#8-wire-emitter-elision--slice-447-x115-phase-3) | slice 447 §X.11.5 |
 | `ai-offline-isnt-a-wall` | [§9](#9-ai-offline-isnt-a-wall--slice-497-v11) | slice 497 V1.1 |
-| `standalone-capability-stays-stuck` | [§10](#10-standalone-capability-stays-stuck--tempdoc-521-merge-t25) | tempdoc 521 merge T2.5 |
+| `standalone-capability-stays-stuck` | [Section 10](#10-standalone-capability-stays-stuck---historical-tempdoc-521-merge-t25) | tempdoc 521 merge T2.5 |
 | `native-callable-receiver` | [§11](#11-native-callable-receiver--tempdoc-560-28g) | tempdoc 560 §28.G |
 | `unreachable-seed-green` | [§12](#12-unreachable-seed-green--tempdoc-618-10b) | tempdoc 618 §10b |
 | `subset-isnt-the-suite` | [§13](#13-subset-isnt-the-suite--tempdoc-618-10c) | tempdoc 618 §10c |
@@ -79,7 +79,7 @@ The Phase 3 partition added `availability` and `lineage` components to `Operatio
 
 Three rounds of "live verification" stopped at `AI_OFFLINE` and declared "can't test end-to-end." `ai_activate` was one MCP call away (~11s warm cache). **Principle**: before declaring any verification tier unavailable, check whether you have a tool that provides it. The current environment state is not necessarily an immutable constraint.
 
-## 10. `standalone-capability-stays-stuck` — tempdoc 521 merge T2.5
+## 10. `standalone-capability-stays-stuck` - historical tempdoc 521 merge T2.5
 
 `AppFacadeBootstrap` constructed with `knowledgeServer=null` (the async-start path used by every dev-runner launch) created a standalone `WorkerCapability` at default state (`PENDING` / "Worker not yet connected"). When `connectKnowledgeServer` later ran, the KS bootstrap held its OWN distinct `WorkerCapability` instance which it then transitioned through `PENDING → READY` correctly — but never the AppFacadeBootstrap's standalone copy. Result: `/api/chat/agent`'s capability gate consulted the bootstrap's stuck `WorkerCapability` and rejected every request with 503 "Worker capability unavailable", even when the worker was functionally healthy (gRPC responsive, `ai_ready=true`, `embedding_ready=true`, `indexedDocuments=109`). Caught only by live verification of the 507/508 merge follow-up; static green + unit tests had nothing to catch because no test exercised the late-bind + cross-instance capability path. **Principle**: when a class constructs a Capability lazily because a dependency isn't ready yet, AND that dependency is later supposed to drive the Capability's state, AND the dependency holds its own Capability instance — the late-bind step must bridge the two via `addListener` (mirror initial state synchronously, then forward transitions). "I created the right object" ≠ "the right object's state will be updated." See `HeadAssembly.connectKnowledgeServer` (`AppFacadeBootstrap` at the time) (the bridge) and `WorkerCapabilityBridgeTest` (the regression test).
 

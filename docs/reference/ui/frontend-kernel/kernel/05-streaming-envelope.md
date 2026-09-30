@@ -56,7 +56,7 @@ Field semantics:
 - `resumeToken` — opaque server-encoded cursor. Consumers send it as
   `?since=<resumeToken>` on reconnect.
 
-## Frame kinds
+## Frame kinds (SSE liveness; retired process signalling is separate)
 
 `frameKind` is the top-level discriminator:
 
@@ -101,7 +101,7 @@ Validation lives in `StreamId.PATTERN`
 (`modules/app-api/.../stream/StreamId.java`), mirrored on the wire by
 `stream.proto`'s `stream_id` pattern constraint.
 
-## Resume semantics
+## Resume semantics (SSE liveness; retired process signalling is separate)
 
 A consumer may include `?since=<resumeToken>` on reconnect. The
 controller decodes the token and either:
@@ -143,7 +143,7 @@ their checkpoints in the reconnect bundle.
 The opacity is contractual so the encoding can change without a
 protocol break.
 
-## Heartbeat policy
+## Heartbeat policy (SSE liveness; retired process signalling is separate)
 
 Default cadence is 30 seconds (per the original spec). The four
 shipped controllers override to 15 seconds — tighter heartbeats are
@@ -206,7 +206,7 @@ Frame discipline:
 Resume reads `framesSince(sinceSeq)` from the ring; `oldestRetainedSeq()`
 reports the buffer's first frame (or 0 when empty).
 
-## Per-connection writer
+## Per-connection writer (SSE liveness; retired process signalling is separate)
 
 `SseEnvelopeWriter` is the canonical per-connection helper. The four
 shipped controllers each delegate via the static `attach()`

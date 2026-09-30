@@ -15,26 +15,30 @@ The indexer is reporting unavailable. Search queries fail; ingestion is paused.
 - `/api/health/events/stream` emits an `AssertedCondition` with `id="index.unavailable"` and `status=TRUE`.
 - `/api/status` shows `INDEX_SERVING` in `NOT_READY` or `NOT_CONFIGURED`.
 
-## Likely causes (by reason code)
+## Reason vocabulary
 
-| Reason code | Cause | Urgency |
-| --- | --- | --- |
-| `WorkerStarting` | Worker process is still coming up after a restart. | Low — should clear within ~30s. |
-| `WorkerCrashed` | Worker process crashed; supervisor is restarting it. | Medium — investigate the crash log. |
-| `IndexCorrupted` | Lucene index integrity check failed. | High — manual rebuild required. |
-| (no reason) | Worker is unreachable; reason wasn't classified. | Investigate before treating as transient. |
+`/api/status` and `/api/debug/state` are authoritative. Their schema 2 lifecycle envelope uses dotted `LifecycleReasonCode` values. The health event stream projects that value into PascalCase `AssertedCondition.reason` (for example, `index.starting` becomes `IndexStarting`). The generic condition wire shape also permits names such as `WorkerStarting`, `WorkerCrashed`, and `IndexCorrupted`; these names do not identify a separate worker process. Use the dotted status reason for diagnosis.
+
+| Current status reason | Meaning and action |
+| --- | --- |
+| `index.starting` | The Engine index component is opening. Poll the readiness envelope; do not infer failure from elapsed time alone. |
+| `index.failed` | Index startup or health failed; Engine recovery may still be in progress. Read the Engine log and follow the state until it becomes ready or reaches `component.recovery_exhausted`. |
+| `component.start_deadline` | The index component missed its startup deadline. Inspect the Engine bootstrap detail and follow [`index-start-error.md`](index-start-error.md). |
+| `index.corrupt` | Essential index corruption. The ordered, counted Engine restart path is requested; inspect the post-restart detail and log. Do not promise a Health-view rebuild. |
+| `index.schema_open_refused` | The stored index cannot open under the active schema policy. This essential failure uses the same ordered, counted Engine restart path; inspect the policy detail after restart. Do not promise a Health-view rebuild. |
+| `component.recovery_exhausted` | The component recovery budget is spent. The recovery handler directs the operator to restart the application before retrying. |
+| `index.not_healthy` | The serving health check failed. Use `core.rebuild-index` only when the current Health payload declares that recovery operation for this reason. |
+| `index.unavailable`, `index.shut_down`, `engine.not_started` | The index is not serving. Check composition and startup state in the Engine log; start or restart the application when the Engine is stopped. |
+
+The system overview defines corruption and schema mismatch in an essential index as an ordered, counted Engine restart (exit code 5). The runtime does not promise a read-only incumbent or a UI rebuild action for those fatal causes. See [the system overview](../explanation/01-system-overview.md) for that contract.
 
 ## Diagnostics
 
-1. Check Worker process state:
+1. Check `/api/status` and `/api/debug/state`. Record the lane F retained `WORKER_CONTROL_PLANE` and `INDEX_SERVING` states and their dotted reason codes.
 
-   ```powershell
-   Get-Process -Name java | Where-Object { $_.MainWindowTitle -like '*indexer-worker*' }
-   ```
+2. Check `/api/health` and `/api/health/events/stream` for the lifecycle envelope and condition detail. Treat the PascalCase event reason as a projection; use the dotted status reason when selecting the response above.
 
-2. Check `/api/health` and `/api/debug/state` for the lifecycle envelope. Look at `WORKER_CONTROL_PLANE` and `INDEX_SERVING` dimensions and their reason codes.
-
-3. Look for stack traces in the Engine log — since lane F stage A there is no separate `worker.log`; the index half logs into the one Engine log:
+3. Look for stack traces in the Engine log - since lane F stage A there is no separate `worker.log` file (retired filename); the index half logs into the one Engine log:
 
    ```powershell
    Get-Content (Join-Path $env:LOCALAPPDATA 'JustSearch\logs\engine.log') -Tail 200
@@ -42,13 +46,15 @@ The indexer is reporting unavailable. Search queries fail; ingestion is paused.
 
 ## Remediation
 
-- **`WorkerStarting`** — wait. If it doesn't clear within a minute, treat as `WorkerCrashed`.
-- **`WorkerCrashed`** — read the last stack trace in `engine.log`; if startup is failing repeatedly, see [`index-start-error.md`](index-start-error.md).
-- **`IndexCorrupted`** — trigger a full reindex from the Health view, or in dev with `jseval run --reset`.
-- **Worker unreachable, no reason** — there is no Worker port to check: the index half runs in the Engine JVM behind in-process ports (ADR-0049), so "unreachable" means the knowledge client is unset because the index half has not composed. Read `engine.log` for the composition failure.
+- **`index.starting`** - keep polling `/api/status` and `/api/debug/state`. There is no fixed timeout promise. If the reason changes to `index.failed` or `component.recovery_exhausted`, follow that row and inspect `engine.log`.
+- **`index.failed` or `component.start_deadline`** - read the failure detail and allow an admitted Engine recovery attempt to report its outcome. If recovery reaches `component.recovery_exhausted`, restart the application to reset the recovery budget; if startup fails again, see [`index-start-error.md`](index-start-error.md).
+- **`index.corrupt` or `index.schema_open_refused`** - preserve the reported detail, allow the ordered Engine restart to complete, and inspect the new `/api/status` and `/api/debug/state` values. If the Engine did not restart, relaunch JustSearch. Follow any explicit policy or data-repair instruction in the detail; do not trigger a generic Health-view rebuild.
+- **`index.not_healthy`** - use `core.rebuild-index` only when the current Health payload declares it for this reason; do not infer this remedy for corruption or schema-open refusal.
+- **`index.unavailable`, `index.shut_down`, or `engine.not_started`** - confirm the Engine composition and startup state in `engine.log`. Start or restart JustSearch when the Engine is stopped, then verify `/api/health` and `/api/status`.
+- **No reason** - there is no Worker port to check: the index half runs in the Engine JVM behind in-process ports (ADR-0049), so an unreachable index means the knowledge client has not been composed or the serving component is down. Read `engine.log` and use the lifecycle reason once it is published.
 
 ## Related
 
-- `index.start-error` — when the indexer fails to start at all (see [`index-start-error.md`](index-start-error.md)).
-- `schema.blocked` — schema mismatch (different remediation path; reindex via Health view).
-- Architecture: `docs/explanation/01-system-overview.md` (Worker process role).
+- `index.start-error` - when the index component fails to start (see [`index-start-error.md`](index-start-error.md)).
+- Index schema migration and its policy details: [`11-index-schema-migration.md`](../explanation/11-index-schema-migration.md).
+- Architecture and restart contract: [`01-system-overview.md`](../explanation/01-system-overview.md).

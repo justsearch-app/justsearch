@@ -371,9 +371,10 @@ Three properties are load-bearing, and each replaces a measured silent failure (
   another agent's JVM and reported as success.
 - **The target VM proves its identity before anything is redefined.** The dev-runner records the
   hot-reload classes dir in `run.json` and puts that same absolute path first on the Engine's
-  classpath itself (`assessHotReloadClasspath`, `dev-runner.cjs:901`) — `WorkerSpawner` did this
-  until lane F stage A item A11 deleted it along with the process it spawned; `HotSwapPush` reads the attached VM's own classpath back over JDI and refuses
-  unless the entry is there. Attaching to "whatever listens on 5005" is no longer possible.
+  classpath itself (`assessHotReloadClasspath`, `dev-runner.cjs:1211`); the historical `WorkerSpawner`
+  path did this until lane F stage A item A11 deleted it along with the process it spawned.
+  `HotSwapPush` reads the attached VM's own classpath back over JDI and refuses unless the entry is
+  there. Attaching to "whatever listens on 5005" is no longer possible.
 - **Success is confirmed, not assumed.** A push that redefined zero classes is not success, the
   marker file is not advanced, and the reload signal is **not** written — a failed push no longer
   tears down and reconstructs a stack's services with no new bytecode to show for it. `REDEFINED n`

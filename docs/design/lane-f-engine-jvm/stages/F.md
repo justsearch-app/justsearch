@@ -83,7 +83,17 @@ labelled hits; `docs-validate` and the regen set green.**
 
 ### 0.1 Corrections found while sweeping (appended per item)
 
-*(empty at stage start.)*
+2026-09-30, F-1/F-2 docs batch: D2 is post-merge work and is not documented as shipped.
+The Engine uses explicit G1 at the Tauri and dev-runner spawn sites. Boot-phase selectors
+remain `head|worker|brain` in `BootRoutes`; `worker` returns 501. Schema-2 lifecycle slots
+are migrated, but `ReadinessDimension.WORKER_CONTROL_PLANE` remains a live identifier;
+the canonical docs describe that retained vocabulary rather than inventing a rename.
+The runtime-config matrix generator still described the removed ordinal-450 snapshot tier;
+its prose and projection were corrected against `ResolvedConfigBuilder`.
+The residue checker is verified with red/green labelling mutation and adversarial regressions.
+Docs-only proof and remaining outside-docs hits are recorded in `../evidence/F/f1-f2-checks.md`.
+The full-branch clean checkpoint remains for the later F batches. No Gradle, backend,
+commit or push is part of this batch.
 
 ---
 

@@ -38,7 +38,8 @@ Per-target emitters mirror wire-Category exactly:
 
 - **Java**: `protoc-gen-java` generates a `*ReasonCode` enum + a
   `*Catalog` message containing `repeated *Metadata`. Consumers use
-  the enum directly (`HealthEventReasonCode.WORKER_STARTING`); metadata
+  the enum directly (historical Worker-era example:
+  `HealthEventReasonCode.WORKER_STARTING`); metadata (historical example)
   lookups go through a generated `*Catalog.lookup(code)` static helper.
 - **TypeScript**: `protoc-gen-es` generates a TS enum (numeric values
   per protobuf-es convention) + the catalog descriptor. Closed-set
@@ -82,7 +83,7 @@ per-value metadata attached via custom enum-value options
 - **Pro**: closed-set type ergonomics; metadata is co-located with
   the value declaration.
 - **Con**: protobuf custom enum-value options are awkward to query at
-  runtime (descriptor inspection: `MyEnum.WORKER_STARTING.getValueDescriptor().getOptions().getExtension(Catalog.label)`).
+  runtime (historical Worker-era descriptor example: `MyEnum.WORKER_STARTING.getValueDescriptor().getOptions().getExtension(Catalog.label)`).
   Custom options also require a separate `.proto` file declaring the
   extension under `google.protobuf.EnumValueOptions`. Adds substrate
   complexity for the metadata-access path.
@@ -93,6 +94,8 @@ cost that compounds over time.
 ### Option C — hybrid: proto enum + companion metadata message (CHOSEN)
 
 Each catalog is a `.proto` file declaring BOTH:
+
+#### Historical Worker-era proto enum example
 
 ```proto
 enum HealthEventReasonCode {
@@ -125,13 +128,13 @@ The catalog spec also includes a static `Catalog` constant:
 // table without runtime parsing.
 ```
 
-For Java consumers:
+For Java consumers (historical Worker-era example):
 - Use `HealthEventReasonCode.WORKER_STARTING` directly (closed-set type
   ergonomics).
 - Lookup metadata via `HealthEventReasonCatalogStaticData.lookup(code)`
   (static helper; constant-time HashMap lookup; no descriptor walking).
 
-For TS consumers:
+For TS consumers (historical Worker-era example):
 - Use `HealthEventReasonCode.WORKER_STARTING` (TS enum from protobuf-es).
 - Lookup metadata via the same static helper, regenerated for TS.
 
