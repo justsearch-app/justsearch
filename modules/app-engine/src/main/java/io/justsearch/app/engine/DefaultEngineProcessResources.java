@@ -53,6 +53,11 @@ public final class DefaultEngineProcessResources implements EngineProcessResourc
   public OperationLeaseService operationLeases() { return admission; }
 
   @Override
+  public java.util.Optional<String> recordDataVersions(java.nio.file.Path dataDir) {
+    return DataVersionMarker.recordBoot(dataDir);
+  }
+
+  @Override
   public void close() {
     // A live apply lease refuses teardown; its work must keep the executors until retry.
     components.close();

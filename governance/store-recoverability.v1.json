@@ -65,17 +65,21 @@
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
       "corruptionPolicy": "REWRITE_UNREADABLE_BUILD_HIGH_WATER_MARKER",
-      "corruptionNote": "Log an unreadable marker once, treat it as absent for comparison, and atomically record this build as the best available high-water mark. Read or write failures never block boot.",
+      "corruptionNote": "Log an unreadable marker once, treat it as absent for comparison, and atomically record this build as the best available high-water mark. Read or write failures never block boot. Headless and all CLI store-opening commands reach one Engine-owned pre-store hook; CLI notices are logged by the Engine.",
       "reconciliation": "RAISE_BUILD_AND_STORE_VERSION_HIGH_WATER_BEFORE_STORE_OPEN",
       "status": "READY",
       "implementationSources": [
         "modules/app-engine/src/main/java/io/justsearch/app/engine/DataVersionMarker.java",
         "modules/app-engine/src/main/java/io/justsearch/app/engine/SupportedDataVersions.java",
         "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
-        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/EngineProcessResources.java",
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/DefaultEngineProcessResources.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java"
       ],
       "tests": [
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/DataVersionMarkerTest.java"
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/DataVersionMarkerTest.java",
+        "modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherDataVersionMarkerTest.java"
       ],
       "fixtures": []
     },
@@ -110,7 +114,7 @@
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
       "corruptionPolicy": "PRESERVE_AND_RECOVER_DEFAULTS",
-      "corruptionNote": "Unparseable file is moved to settings.json.corrupt-<timestamp>, defaults are loaded, and LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT is raised as a WARN condition (ADR-0008, tempdoc 882 item 24). A future schemaVersion still fails loud (futureVersionRefusalTest). Test methods: readWrite_malformedStateIsQuarantinedAndDefaulted and readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback in the tests file below; the refusal is readWrite_futureVersionIsRefusedWithoutOverwrite. Writable legacy loads first retain byte-identical settings.v<old>.bak.json once per version. Failed preservation refuses without quarantining valid settings.",
+      "corruptionNote": "Unparseable file is moved to settings.json.corrupt-<timestamp>, defaults are loaded, and LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT is raised as a WARN condition (ADR-0008, tempdoc 882 item 24). A future schemaVersion still fails loud (futureVersionRefusalTest). Test methods: readWrite_malformedStateIsQuarantinedAndDefaulted and readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback in the tests file below; the refusal is readWrite_futureVersionIsRefusedWithoutOverwrite. Writable legacy loads first retain byte-identical settings.v<old>.bak.json once per version. Backup I/O failures or non-regular destinations log a WARN with the path and cause, then migration continues without quarantining valid settings.",
       "reconciliation": "READ_V0_OR_V1_AND_WRITE_V1",
       "reconciliationNote": "Frozen updater compatibility-strategy identifier from the v1 register: it names read-in-place legacy upcast and atomic rewrite, not the current schema number. UiSettingsStore now writes v5 and reads v0-v4; currentVersion, readableLegacyVersions and versionSource carry those actual versions. Renaming this token would make installed v0.2.0/v0.3.0 updaters reject the successor release before checking readable versions.",
       "status": "READY",
@@ -121,10 +125,11 @@
       ],
       "tests": [
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreMigrationBackupTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreMigrationBackupTest.java",
+        "modules/configuration/src/test/java/io/justsearch/configuration/persistence/AtomicFileWritesCreateOnceTest.java"
       ],
       "fixtures": [],
-      "pathVerificationNote": "UiSettingsStore resolves ui/settings.json and composes settings.v<old>.bak.json from the resolved readable legacy schema. The first byte-identical backup for each old version is retained before migration."
+      "pathVerificationNote": "UiSettingsStore resolves ui/settings.json and composes settings.v<old>.bak.json from the resolved readable legacy schema. The first byte-identical backup for each old version is retained before migration. Concurrent Engines sharing a settings path publish a forced sibling temp by atomic hard-link create, which never replaces the first snapshot. Unsupported hard links (including FileSystemException) use a forced CREATE_NEW fallback: create-once but not all-or-nothing on crash. Backup I/O failures warn and allow migration."
     },
     {
       "id": "action-ledger-audit-journal",

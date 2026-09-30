@@ -185,6 +185,7 @@ final class LauncherEnvironment implements AutoCloseable {
       // Even another owner in this JVM is a distinct launcher, not permission to share its stores.
       createdInstanceLock = new io.justsearch.app.util.AppInstanceLock(PlatformPaths.resolveDataDir());
       createdInstanceLock.acquire();
+      createdResources.recordDataVersions(PlatformPaths.resolveDataDir());
       createdOperations = new io.justsearch.app.observability.operations.SqliteOperationStore(
           PlatformPaths.resolveDataDir().resolve("operations.db"));
       this.HeadAssembly = appFacadeFactory.create(

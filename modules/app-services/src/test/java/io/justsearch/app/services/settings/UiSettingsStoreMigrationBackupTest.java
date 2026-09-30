@@ -6,7 +6,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.SettingsWitness;
-import java.io.UncheckedIOException;
+import java.io.IOException;
+import io.justsearch.configuration.persistence.AtomicFileWrites;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,9 +57,30 @@ class UiSettingsStoreMigrationBackupTest {
     var store = new UiSettingsStore(READ_WRITE, file);
     Path backup = dir.resolve("settings.v2.bak.json");
     Files.createDirectory(backup);
-    assertThrows(UncheckedIOException.class, store::load);
+    assertEquals(777, assertDoesNotThrow(store::load).getMaxTokens());
     assertTrue(Files.isDirectory(backup));
     assertEquals(legacy, Files.readString(file));
     assertTrue(store.lastRecovery().isEmpty());
   }
+  @Test
+  void everyBackupWriteFailureStillReturnsMigratedSettings() throws Exception {
+    Path file = dir.resolve("settings.json");
+    String legacy = "{\"schemaVersion\":1,\"settings\":{\"maxTokens\":777,\"contextLength\":4096}}";
+    Files.writeString(file, legacy);
+    var store = new UiSettingsStore(READ_WRITE, file);
+    try (var writes = org.mockito.Mockito.mockStatic(AtomicFileWrites.class, invocation -> {
+      throw new IOException("all writes denied by test filesystem");
+    })) {
+      var settings = assertDoesNotThrow(store::load);
+      assertEquals(777, settings.getMaxTokens());
+      assertEquals(0, settings.getContextLength(), "legacy default must still migrate");
+      writes.verify(() -> AtomicFileWrites.createOnceStrict(
+          org.mockito.ArgumentMatchers.eq(dir.resolve("settings.v1.bak.json")),
+          org.mockito.ArgumentMatchers.any(byte[].class)));
+    }
+    assertEquals(legacy, Files.readString(file));
+    assertTrue(store.lastRecovery().isEmpty());
+    assertFalse(Files.exists(dir.resolve("settings.v1.bak.json")));
+  }
+
 }

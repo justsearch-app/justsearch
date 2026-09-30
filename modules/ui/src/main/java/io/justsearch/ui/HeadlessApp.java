@@ -1112,8 +1112,7 @@ public class HeadlessApp {
         return;
       }
       final var newerDataNotice = io.justsearch.app.engine.DataVersionMarker.recordBoot(
-          bootDataDir, EnvRegistry.APP_VERSION.get().filter(v -> !v.isBlank()).orElse("0.0.0-dev"),
-          io.justsearch.app.engine.SupportedDataVersions.current());
+          bootDataDir);
       operations = new io.justsearch.app.observability.operations.SqliteOperationStore(
           bootDataDir.resolve("operations.db"));
       // Phase 0: resolve config (tempdoc 502 Â§3.3)

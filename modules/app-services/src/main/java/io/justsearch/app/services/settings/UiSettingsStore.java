@@ -302,8 +302,6 @@ public final class UiSettingsStore {
         preserveLegacySettings(resolvedVersion, original);
       }
       return new Snapshot(migrate(settings, resolvedVersion), witness, queryRoles);
-    } catch (UncheckedIOException preservationFailure) {
-      throw preservationFailure;
     } catch (CorruptDurableStoreException
         | io.justsearch.configuration.persistence.UnsupportedStoreVersionException e) {
       throw e;
@@ -313,20 +311,23 @@ public final class UiSettingsStore {
     }
   }
 
-  // The data-directory instance lock and settings owner serialize writes. Keep the first
-  // snapshot of each legacy version; failure to preserve valid bytes must not quarantine them.
+  // Distinct Engines may share settings despite holding different data-directory locks.
+  // Create-once retains the first snapshot; backup failure warns but never blocks migration.
   private void preserveLegacySettings(int version, byte[] original) {
     Path backup = settingsFile.resolveSibling("settings.v" + version + ".bak.json");
-    if (Files.exists(backup, LinkOption.NOFOLLOW_LINKS)) {
-      if (!Files.isRegularFile(backup, LinkOption.NOFOLLOW_LINKS)) {
-        throw new UncheckedIOException(new IOException("Legacy settings backup is not a regular file"));
-      }
-      return;
-    }
     try {
-      AtomicFileWrites.replaceStrict(backup, original);
+      if (Files.exists(backup, LinkOption.NOFOLLOW_LINKS)) {
+        if (!Files.isRegularFile(backup, LinkOption.NOFOLLOW_LINKS)) {
+          throw new IOException("Legacy settings backup is not a regular file");
+        }
+        return;
+      }
+      if (!AtomicFileWrites.createOnceStrict(backup, original)
+          && !Files.isRegularFile(backup, LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException("Legacy settings backup is not a regular file");
+      }
     } catch (IOException failure) {
-      throw new UncheckedIOException("Cannot preserve legacy settings before migration", failure);
+      log.warn("Cannot preserve legacy settings backup {}; continuing migration", backup, failure);
     }
   }
 

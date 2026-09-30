@@ -9,6 +9,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
@@ -34,6 +36,50 @@ public final class AtomicFileWrites {
 
   static void replaceStrict(Path target, byte[] content, FileAccess files) throws IOException {
     replace(target, content, files, true);
+  }
+
+  /** Publish forced bytes exactly once. Collision leaves the existing target untouched.
+   * Hard-link publication is atomic. Unsupported links fall back to CREATE_NEW plus a forced
+   * write: create-once, but a crash may leave partial bytes rather than all-or-nothing publication.
+   * Like replaceStrict, this does not promise parent-directory durability on power loss.
+   */
+  public static boolean createOnceStrict(Path target, byte[] content) throws IOException {
+    return createOnceStrict(target, content, NIO);
+  }
+
+  static boolean createOnceStrict(Path target, byte[] content, FileAccess files) throws IOException {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(content, "content");
+    Objects.requireNonNull(files, "files");
+    Path absoluteTarget = target.toAbsolutePath().normalize();
+    Path parent = absoluteTarget.getParent();
+    if (parent == null) throw new IOException("Target has no parent: " + target);
+    files.createDirectories(parent);
+    Path temp = files.createTempFile(parent, absoluteTarget.getFileName().toString() + ".", ".tmp");
+    boolean created;
+    try {
+      files.writeForced(temp, content);
+      try {
+        files.createLink(absoluteTarget, temp);
+        created = true;
+      } catch (FileAlreadyExistsException collision) {
+        created = false;
+      } catch (UnsupportedOperationException | FileSystemException unsupported) {
+        try {
+          files.writeNewForced(absoluteTarget, content);
+          created = true;
+        } catch (FileAlreadyExistsException collision) {
+          created = false;
+        }
+      }
+    } catch (IOException | RuntimeException | Error failure) {
+      try { files.deleteIfExists(temp); } catch (IOException | RuntimeException | Error cleanup) {
+        if (cleanup != failure) failure.addSuppressed(cleanup);
+      }
+      throw failure;
+    }
+    files.deleteIfExists(temp);
+    return created;
   }
 
   public static void replaceUtf8(Path target, String content) throws IOException {
@@ -118,6 +164,10 @@ public final class AtomicFileWrites {
 
     void writeForced(Path path, byte[] content) throws IOException;
 
+    void writeNewForced(Path path, byte[] content) throws IOException;
+
+    void createLink(Path target, Path existing) throws IOException;
+
     void moveAtomicReplace(Path source, Path target) throws IOException;
 
     void moveReplace(Path source, Path target) throws IOException;
@@ -126,6 +176,21 @@ public final class AtomicFileWrites {
   }
 
   private static final class NioFileAccess implements FileAccess {
+    @Override
+    public void writeNewForced(Path path, byte[] content) throws IOException {
+      try (FileChannel channel = FileChannel.open(
+          path, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        while (buffer.hasRemaining()) channel.write(buffer);
+        channel.force(true);
+      }
+    }
+
+    @Override
+    public void createLink(Path target, Path existing) throws IOException {
+      Files.createLink(target, existing);
+    }
+
     @Override
     public void createDirectories(Path directory) throws IOException {
       Files.createDirectories(directory);

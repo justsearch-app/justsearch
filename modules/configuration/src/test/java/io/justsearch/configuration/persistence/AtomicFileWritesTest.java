@@ -224,6 +224,16 @@ class AtomicFileWritesTest {
   }
 
   private static final class RecordingFileAccess implements AtomicFileWrites.FileAccess {
+    @Override
+    public void writeNewForced(Path path, byte[] content) throws IOException {
+      Files.write(path, content, java.nio.file.StandardOpenOption.CREATE_NEW, java.nio.file.StandardOpenOption.WRITE);
+    }
+
+    @Override
+    public void createLink(Path target, Path existing) throws IOException {
+      Files.createLink(target, existing);
+    }
+
     private final java.util.List<String> events = new java.util.ArrayList<>();
     private final java.util.List<Path> atomicSources = new java.util.ArrayList<>();
     private final java.util.List<Boolean> tempExistedAtMove = new java.util.ArrayList<>();
