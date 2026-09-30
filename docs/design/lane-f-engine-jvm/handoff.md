@@ -115,7 +115,21 @@ release note, every first-party client including MCP and CLI) or fix it.
    ([refutation](evidence/D1/reconfigure-restart-fallback-refutation-2026-09-30.md)).
    Sol is implementing in `codex/lane-f-reconf-inplace`; its Gradle use waits for
    `tmp/grants/gradle-reconf` (root creates it after the help worker finishes).
-6. D1 acceptance reconciliation for the implemented-unproven items, then the D1-17 sweep and D1 close.
+6. D1 close. [Reconciliation](evidence/D1/acceptance-reconciliation-2026-09-30.md) shows most
+   clauses proved; remaining closure work:
+   a. New assertions (Sol worker, Gradle): D1-9 fresh-start capacity refusal with the
+      retained-state reason (D1.md:1871); D1-8 held-lease timeout branch, generation-count
+      trace (<= 2, then 1), per-response generation witness in the swap search loop, manifest
+      instance id unchanged, exact cut/writable-B/sealed-queue/settlement ordering, and the
+      acquisition/swap fault matrix (D1.md:1620-1653).
+   b. D1-13 installed held-native controlled-exit scenario (written by a worker, run by root).
+   c. D1-6 retirement grep receipt and a dead-code baseline shrink receipt; D1-17 sweep.
+   d. Root installed round after reconfigure and help merge (proof is stale after `1ac1407ef`):
+      recovery release/exhaustion pair, `migrationStartsLiveInTheInstalledEngine`,
+      `issuedASearchCompletesAfterBesideBServes`, watcher mutation, parser gap, both
+      low-memory pointer cuts, the new reconfigure scenario, held-native exit; record
+      restoration time against the reconfigure budget; current `library-gap-decision` ui-check.
+   e. One exact-SHA hosted CI run; D1-6 signed restart-required proof moves to E7.
 7. Contract-change verification (above; Luna check running), E values (owner sets the E4
    soak duration), E1-E7, F.
 8. AOT cache fidelity (needs Gradle): `modules/ui/build.gradle.kts:1070-1083` trains and
