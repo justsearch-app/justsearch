@@ -17,6 +17,7 @@ import {
 import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
 import { captureFromLive } from '../codegen/gen-api-client.mjs';
 import { exerciseReconfigureRefresh } from './reconfigure-refresh-scenario.mjs';
+import { exerciseQueryReconfigure } from './query-reconfigure.mjs';
 import { exerciseQueryRoleScenario } from './query-role-scenario.mjs';
 import { exerciseIndexLockRecovery } from './index-lock-recovery-scenario.mjs';
 import { assertFixtureFreeSpace, pruneRegenerableModelCaches } from './prune-model-caches.mjs';
@@ -35,6 +36,8 @@ import {
 
 const repo = process.cwd();
 const scenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO;
+const queryReconfigureMode = scenario === 'query-reconfigure-beside' ? 'BESIDE'
+  : scenario === 'query-reconfigure-in-place' ? 'IN_PLACE' : null;
 const nativeMixedAfterPointer = scenario === NATIVE_MIXED_AFTER_POINTER;
 const operationFault = new Set(['ingest-before-accept', 'settings-before-accept',
   'ingest-after-accept-before-effect', 'settings-after-accept-before-effect',
@@ -102,6 +105,7 @@ function findRetainedModelsRoot() {
   }
 }
 const operationKey = operationFault || bulkFault || bulkGapApproval || installerFault || modelLiveAB
+  || scenario === 'query-reconfigure-in-place'
   || scenario === 'query-role-after-file-crash' || scenario === 'query-role-two-owner-rollback'
   ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
@@ -194,6 +198,31 @@ const env = {
   AI_OFFLINE: 'true',
   CI: '',
 };
+if (queryReconfigureMode) {
+  const sourceReranker = path.join(findRetainedModelsRoot(), 'onnx', 'reranker');
+  env.JUSTSEARCH_QUERY_RECONFIGURE_A = sourceReranker;
+  env.JUSTSEARCH_RERANK_ENABLED = 'true';
+  env.JUSTSEARCH_RERANK_GPU_ENABLED = 'true';
+  env.JUSTSEARCH_RERANK_GPU_MEM_MB = '1024';
+  env.JUSTSEARCH_AI_EMBED_ENABLED = 'false';
+  env.JUSTSEARCH_NER_ENABLED = 'false';
+  env.JUSTSEARCH_SPLADE_ENABLED = 'false';
+  env.JUSTSEARCH_RERANK_CHUNKS_ENABLED = 'false';
+  delete env.AI_OFFLINE;
+  const corpus = path.join(work, 'query-reconfigure-corpus');
+  fs.mkdirSync(corpus, { recursive: true });
+  for (let i = 0; i < 6; i++) {
+    fs.writeFileSync(path.join(corpus, `rerank-${i}.txt`),
+      `query reconfigure availability candidate ${i} preserves ordinary search continuity`);
+  }
+  fs.mkdirSync(data, { recursive: true });
+  fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
+    schemaVersion: 1, roots: [{ path: corpus }],
+  }));
+  if (queryReconfigureMode === 'IN_PLACE') {
+    env.JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB = '1';
+  }
+}
 delete env.JUSTSEARCH_OPERATION_FAULT_KEY;
 delete env.JUSTSEARCH_OPERATION_FAULT_KIND;
 delete env.JUSTSEARCH_OPERATION_FAULT_POINT;
@@ -206,6 +235,11 @@ delete env.JUSTSEARCH_ISSUED_CITATION_BARRIER_ANSWER;
 delete env.JUSTSEARCH_QUERY_PUBLICATION_BARRIER;
 delete env.JUSTSEARCH_INDEX_START_BARRIERS;
 delete env.JUSTSEARCH_GENERATIVE_RECOVERY_BARRIER;
+if (queryReconfigureMode === 'IN_PLACE') {
+  env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
+  env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reconfigure';
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = 'settings-mid-compose';
+}
 if (indexLockScenario) {
   env.JUSTSEARCH_INDEX_START_BARRIERS = 'index-start-initial,index-start-recovery-1';
 }
@@ -682,6 +716,10 @@ try {
   } else if (scenario === 'reconfigure-refresh') {
     await exerciseReconfigureRefresh({ apiPort, manifest, request, post, waitFor,
       requireThat, createOperationKey });
+  } else if (queryReconfigureMode) {
+    await exerciseQueryReconfigure({ mode: queryReconfigureMode, work, data, indexBase,
+      modelsRoot: findRetainedModelsRoot(), apiPort, manifest, first, readJson, waitFor,
+      request, post, requireThat, createOperationKey, operationKey });
   } else if (queryRoleScenario) {
     await exerciseQueryRoleScenario({ scenario, work, data,
       modelsRoot: findRetainedModelsRoot(), apiPort, manifest, first, readJson,

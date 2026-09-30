@@ -71,6 +71,12 @@ environment changes (ORT version, driver, hardware).
 
 Settled empirical facts. Each was an open question that got answered.
 
+### F-022: ordinary query reconfigure uses realized GPU ownership for admission
+
+- **Answer:** Query-only settings composition estimates every rebuilt query session from the same selected variants and policies as composition. Releasable device memory includes only live GPU-backed query sessions; CPU fallback contributes zero. IN_PLACE releases its own captured view before draining issued views, retires only the query owner, and retains index and producer ownership until publication. Precommit refusal restores exact captured A; failed restoration uses existing encoder recovery.
+- **Evidence:** Lane F D1 reconfigure implementation; `KnowledgeServerQuerySettingsOwnerTest`, `KnowledgeServerDeviceMemoryLineTest`, and `InferenceCompositionRootFootprintTest`. The installed `reconfigure-beside-in-place` scenario is wired for CUDA verification; execution remains pending.
+- **Conditions/caveats:** The device-memory ceiling simulates pressure by clamping observations; it is not a hard VRAM allocation bound. No new native-session construction path or durable settings writer is introduced.
+
 ### F-001: ONNX GPU lazy session init causes first-query timeouts
 
 - **Answer:** First query after backend start exceeds the 5 s search deadline (a gRPC deadline when this was measured; the same budget is now enforced on the in-process port call) because the ONNX GPU session initializes lazily on first use.

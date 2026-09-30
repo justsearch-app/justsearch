@@ -19,7 +19,11 @@ public record SettingsV2(
     Integer apiPort,
     Boolean restartScheduled,
     String rerankerModelPath,
-    String citationScorerModelPath
+    String citationScorerModelPath,
+    String mode,
+    String reason,
+    Long freeBytes,
+    Long footprintBytes
 ) {
   public SettingsV2 {
     // Do not replace nulls with defaults here.
@@ -34,19 +38,22 @@ public record SettingsV2(
 
   /** Compatibility projection without an observed or committed witness. */
   public SettingsV2(UiSettingsV2 ui, LlmSettingsV2 llm, List<String> indexPaths, String settingsMode) {
-    this(ui, llm, indexPaths, settingsMode, null, null, null, null, null, null, null);
+    this(ui, llm, indexPaths, settingsMode, null, null, null, null, null, null, null,
+        null, null, null, null);
   }
 
   /** Compatibility constructor for receipts created before the desired API-port field. */
   public SettingsV2(UiSettingsV2 ui, LlmSettingsV2 llm, List<String> indexPaths, String settingsMode,
       SettingsWitness witness, String operationKey, String state) {
-    this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, null, null, null, null);
+    this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, null, null, null, null,
+        null, null, null, null);
   }
 
   /** Compatibility constructor for callers that do not project restart scheduling. */
   public SettingsV2(UiSettingsV2 ui, LlmSettingsV2 llm, List<String> indexPaths, String settingsMode,
       SettingsWitness witness, String operationKey, String state, Integer apiPort) {
-    this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort, null, null, null);
+    this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort, null, null, null,
+        null, null, null, null);
   }
 
   /** Compatibility constructor for receipts without query model-path projections. */
@@ -54,7 +61,15 @@ public record SettingsV2(
       SettingsWitness witness, String operationKey, String state, Integer apiPort,
       Boolean restartScheduled) {
     this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
-        restartScheduled, null, null);
+        restartScheduled, null, null, null, null, null, null);
+  }
+
+  /** Compatibility constructor for callers that do not project composition evidence. */
+  public SettingsV2(UiSettingsV2 ui, LlmSettingsV2 llm, List<String> indexPaths, String settingsMode,
+      SettingsWitness witness, String operationKey, String state, Integer apiPort,
+      Boolean restartScheduled, String rerankerModelPath, String citationScorerModelPath) {
+    this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
+        restartScheduled, rerankerModelPath, citationScorerModelPath, null, null, null, null);
   }
 
   public static SettingsV2 empty() {

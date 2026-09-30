@@ -214,6 +214,69 @@ public final class InferenceCompositionRoot {
                 modelsDir,
                 selection));
 
+    return withCompositionHeadroom(arenaCapBytes);
+  }
+
+  /**
+   * Estimates only the independently rebuilt query-role sessions for a committed selection.
+   *
+   * <p>The plans are resolved by the same helpers as {@link #composeQueryRoles}; retained index
+   * roles cannot enter this total. The returned value uses the same ten-percent headroom as the
+   * generation candidate estimator so {@link io.justsearch.core.component.DeviceMemoryLine}
+   * compares candidate and releasable source bytes on one convention.
+   */
+  static long estimateQueryFootprintBytes(EncoderConfigurationProjection projection,
+      QueryRoleSelection selection, HardwareProfile hardware) {
+    Objects.requireNonNull(projection, "projection");
+    Objects.requireNonNull(selection, "selection");
+    Objects.requireNonNull(hardware, "hardware");
+    ResolvedConfig cfg = projection.config();
+    QueryPlan rerankerPlan = resolveRerankerPlan(projection.reranker(), hardware, null, null,
+        null, selection.reranker());
+    QueryPlan citationPlan = resolveCitationPlan(projection.citation(), hardware, null, null,
+        null, selection.citation());
+    long arenaCapBytes = queryPlanArenaCapBytes(EncoderRole.RERANKER, rerankerPlan, cfg, hardware);
+    arenaCapBytes = Math.addExact(arenaCapBytes,
+        queryPlanArenaCapBytes(EncoderRole.CITATION, citationPlan, cfg, hardware));
+    return withCompositionHeadroom(arenaCapBytes);
+  }
+
+  /**
+   * Returns the releasable footprint of query sessions that are GPU-backed right now.
+   *
+   * <p>A CPU fallback releases no device memory. A live GPU assembly without its resolved policy
+   * is unknown rather than guessed from desired configuration. The source total carries the same
+   * headroom as candidate estimates to preserve the device-line admission convention.
+   */
+  static Long sourceQueryReleasableBytes(QueryRoleSet source) {
+    if (source == null || source.isClosed()) return 0L;
+    InferenceSurface surface = source.surfaceForOwner();
+    long arenaCapBytes = 0L;
+    if (surface.reranker().isPresent()
+        && surface.reranker().orElseThrow().sessions().isGpuAvailable()) {
+      ModelSessionPolicy policy = surface.policies() == null ? null
+          : surface.policies().models().get(EncoderRole.RERANKER);
+      if (policy == null) return null;
+      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
+    }
+    if (surface.citation().isPresent()
+        && surface.citation().orElseThrow().sessions().isGpuAvailable()) {
+      ModelSessionPolicy policy = surface.policies() == null ? null
+          : surface.policies().models().get(EncoderRole.CITATION);
+      if (policy == null) return null;
+      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
+    }
+    return withCompositionHeadroom(arenaCapBytes);
+  }
+
+  private static long queryPlanArenaCapBytes(EncoderRole role, QueryPlan plan,
+      ResolvedConfig cfg, HardwareProfile hardware) {
+    return plan.variant() == null ? 0L
+        : ModelSessionPolicyResolver.resolve(role, cfg, hardware, plan.variant())
+            .gpu().arenaCapBytes();
+  }
+
+  private static long withCompositionHeadroom(long arenaCapBytes) {
     long headroomBytes = arenaCapBytes / 10L + (arenaCapBytes % 10L == 0L ? 0L : 1L);
     return Math.addExact(arenaCapBytes, headroomBytes);
   }

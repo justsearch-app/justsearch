@@ -11,8 +11,10 @@
 import { z } from 'zod';
 
 export interface SettingsV2 {
-  citationScorerModelPath?: string | null;
   apiPort?: number | null;
+  citationScorerModelPath?: string | null;
+  footprintBytes?: number | null;
+  freeBytes?: number | null;
   indexPaths?: string[] | null;
   llm?: {
     contextWindow?: number | null;
@@ -22,7 +24,9 @@ export interface SettingsV2 {
     modelPath?: string | null;
     serverExecutable?: string | null;
   } | null;
+  mode?: string | null;
   operationKey?: string | null;
+  reason?: string | null;
   rerankerModelPath?: string | null;
   restartScheduled?: boolean | null;
   settingsMode?: string | null;
@@ -46,8 +50,10 @@ export interface SettingsV2 {
   } | null;
 }
 export const settingsV2Schema = z.strictObject({
-  "citationScorerModelPath": z.string().nullable().optional(),
   "apiPort": z.number().int().nullable().optional(),
+  "citationScorerModelPath": z.string().nullable().optional(),
+  "footprintBytes": z.number().int().nullable().optional(),
+  "freeBytes": z.number().int().nullable().optional(),
   "indexPaths": z.array(z.string()).nullable().optional(),
   "llm": z.strictObject({
     "contextWindow": z.number().int().nullable().optional(),
@@ -57,7 +63,9 @@ export const settingsV2Schema = z.strictObject({
     "modelPath": z.string().nullable().optional(),
     "serverExecutable": z.string().nullable().optional(),
   }).nullable().optional(),
+  "mode": z.string().nullable().optional(),
   "operationKey": z.string().nullable().optional(),
+  "reason": z.string().nullable().optional(),
   "rerankerModelPath": z.string().nullable().optional(),
   "restartScheduled": z.boolean().nullable().optional(),
   "settingsMode": z.string().nullable().optional(),

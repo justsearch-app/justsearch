@@ -2,10 +2,16 @@
   "$schema" : "https://json-schema.org/draft/2020-12/schema",
   "type" : "object",
   "properties" : {
+    "apiPort" : {
+      "type" : [ "integer", "null" ]
+    },
     "citationScorerModelPath" : {
       "type" : [ "string", "null" ]
     },
-    "apiPort" : {
+    "footprintBytes" : {
+      "type" : [ "integer", "null" ]
+    },
+    "freeBytes" : {
       "type" : [ "integer", "null" ]
     },
     "indexPaths" : {
@@ -37,7 +43,13 @@
         }
       }
     },
+    "mode" : {
+      "type" : [ "string", "null" ]
+    },
     "operationKey" : {
+      "type" : [ "string", "null" ]
+    },
+    "reason" : {
       "type" : [ "string", "null" ]
     },
     "rerankerModelPath" : {

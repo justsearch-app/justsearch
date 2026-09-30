@@ -122,6 +122,9 @@ final class SettingsCommitCoordinatorTest {
             io.justsearch.configuration.model.ModelPrecision.INT8,
             io.justsearch.configuration.model.ExecutionProvider.CPU));
     AtomicBoolean preparedOwner = new AtomicBoolean();
+    var composition = new io.justsearch.core.component.ComposeEvidence(
+        io.justsearch.core.component.ComposeEvidence.Mode.IN_PLACE,
+        "candidate_fits_after_source_release", 10L, 20L);
     SettingsComponentComposer components = (candidate, desired, affected) -> {
       assertEquals(Set.of("encoders"), affected.keySet());
       assertFalse(Files.exists(settingsPath));
@@ -129,6 +132,9 @@ final class SettingsCommitCoordinatorTest {
       return new SettingsComponentComposer.Prepared() {
         @Override public Optional<QueryRoleSelection> queryRoleSelection() {
           return Optional.of(selection);
+        }
+        @Override public Optional<io.justsearch.core.component.ComposeEvidence> composition() {
+          return Optional.of(composition);
         }
         @Override public void includeObservation(
             io.justsearch.core.component.EngineComponentSnapshot.Component observation) {}
@@ -156,6 +162,11 @@ final class SettingsCommitCoordinatorTest {
       assertEquals(OperationState.COMPLETE, result.record().state());
       assertTrue(preparedOwner.get());
       assertEquals(selection, settings.inspect().queryRoles());
+      assertEquals("IN_PLACE", result.response().structuredData().get("mode"));
+      assertEquals("candidate_fits_after_source_release",
+          result.response().structuredData().get("reason"));
+      assertEquals(10L, result.response().structuredData().get("freeBytes"));
+      assertEquals(20L, result.response().structuredData().get("footprintBytes"));
     }
   }
 
@@ -750,7 +761,11 @@ final class SettingsCommitCoordinatorTest {
       assertEquals(OperationState.FAILED, result.record().state());
       assertEquals("COMPONENT_PREPARATION_REQUIRED", result.response().errorCode().orElseThrow());
       assertEquals("index", result.response().errorDetails().get("component"));
-      org.mockito.Mockito.verify(first).abort();
+      org.mockito.Mockito.verify(first).abort(org.mockito.ArgumentMatchers.argThat(cause ->
+          cause instanceof SettingsCommitOwner.Refused refused
+              && "COMPONENT_PREPARATION_REQUIRED".equals(
+                  refused.response().errorCode().orElse(null))
+              && "index".equals(refused.response().errorDetails().get("component"))));
       org.mockito.Mockito.verify(lease).close();
       assertArrayEquals(originalBytes, Files.readAllBytes(settingsPath));
       assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
@@ -775,8 +790,12 @@ final class SettingsCommitCoordinatorTest {
       var query = org.mockito.Mockito.mock(FixedSettingsComponentComposer.QueryRolePreparedOwner.class);
       org.mockito.Mockito.when(query.selection()).thenReturn(new QueryRoleSelection(
           QueryRoleSelection.Role.disabled(), QueryRoleSelection.Role.disabled()));
+      org.mockito.Mockito.when(query.composition()).thenReturn(java.util.Optional.of(
+          new io.justsearch.core.component.ComposeEvidence(
+              io.justsearch.core.component.ComposeEvidence.Mode.BESIDE,
+              "candidate_fits_free_device_memory", 20L, 10L)));
       org.mockito.Mockito.when(query.observation()).thenReturn(
-          org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentSnapshot.Component.class));
+          componentObservation("encoders"));
       var components = new FixedSettingsComponentComposer(registry);
       components.register("encoders", (candidate, desired, keys) -> query);
       components.register("generative", (candidate, desired, keys) -> {
@@ -798,7 +817,9 @@ final class SettingsCommitCoordinatorTest {
 
       assertEquals(OperationState.FAILED, result.record().state());
       assertEquals("generative", result.response().errorDetails().get("component"));
-      org.mockito.Mockito.verify(query).abort();
+      org.mockito.Mockito.verify(query).abort(org.mockito.ArgumentMatchers.argThat(cause ->
+          cause instanceof SettingsCommitOwner.Refused refused
+              && "generative".equals(refused.response().errorDetails().get("component"))));
       org.mockito.Mockito.verify(lease).close();
       assertArrayEquals(originalBytes, Files.readAllBytes(settingsPath));
       assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
@@ -1804,6 +1825,58 @@ final class SettingsCommitCoordinatorTest {
     assertSame(serving, config.get());
     assertNull(control.receipt);
     owner.releaseAfterTerminal(1);
+  }
+
+  @Test
+  void componentValidationFailureReachesAbortAndLeavesExactSettingsAtA() throws Exception {
+    var marker = new IllegalStateException("prepared encoder validation failed");
+    assertComponentPrecommitAbortReason("component-validation", marker, true);
+  }
+
+  @Test
+  void componentCancellationReachesAbortAndLeavesExactSettingsAtA() throws Exception {
+    var marker = assertComponentPrecommitAbortReason("component-cancellation", null, false);
+    assertInstanceOf(java.util.concurrent.CancellationException.class, marker);
+  }
+
+  private Throwable assertComponentPrecommitAbortReason(String name, RuntimeException validationFailure,
+      boolean admit) throws Exception {
+    Path path = temp.resolve(name + ".json");
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, path);
+    settings.replacePrepared(settings.prepareExact(new UiSettings(), new SettingsWitness(0, null)));
+    byte[] originalBytes = Files.readAllBytes(path);
+    var config = new ConfigStore(ConfigStoreRebuilder.prepare(settings.load()));
+    var serving = config.get();
+    var abortReason = new AtomicReference<Throwable>();
+    SettingsComponentComposer components = (candidate, desired, affected) ->
+        new SettingsComponentComposer.Prepared() {
+          @Override public void includeObservation(
+              io.justsearch.core.component.EngineComponentSnapshot.Component observation) {}
+          @Override public void withOwnerLocks(Runnable publication) { publication.run(); }
+          @Override public void validate() {
+            if (validationFailure != null) throw validationFailure;
+          }
+          @Override public void install() { throw new AssertionError("Precommit failure installed B"); }
+          @Override public void notifyObservers() {}
+          @Override public void retire() {}
+          @Override public void abort() { throw new AssertionError("Cause-aware abort was bypassed"); }
+          @Override public void abort(Throwable cause) { abortReason.set(cause); }
+        };
+    var owner = new SettingsCommitCoordinator(settings, config, () -> {},
+        candidate -> OperationResult.success("prepared"), () -> false, components);
+    owner.inspectRecovery(List.of());
+    var reservation = owner.reserve(1, OperationKeys.generate(CLOCK), settings.inspect().witness());
+    UiSettings candidate = settings.load();
+    candidate.setChatEnabled(true);
+
+    Throwable actual = assertThrows(RuntimeException.class,
+        () -> owner.apply(reservation, candidate, new RecordingControl(admit)));
+
+    assertSame(actual, abortReason.get());
+    assertArrayEquals(originalBytes, Files.readAllBytes(path));
+    assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+    assertSame(serving, config.get());
+    return actual;
   }
 
   @Test

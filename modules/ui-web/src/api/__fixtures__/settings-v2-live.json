@@ -31,5 +31,9 @@
   "apiPort" : null,
   "restartScheduled" : null,
   "rerankerModelPath" : null,
-  "citationScorerModelPath" : null
+  "citationScorerModelPath" : null,
+  "mode" : null,
+  "reason" : null,
+  "freeBytes" : null,
+  "footprintBytes" : null
 }

@@ -238,6 +238,66 @@ final class SettingsControllerReconfigureDispatchTest {
   }
 
   @Test
+  void completedQueryReconfigureExposesCompositionEvidence() {
+    OperationDispatcher dispatcher = mock(OperationDispatcher.class);
+    SettingsV2 input = fullSettings();
+    ContextFixture fixture = contextFixture(input);
+    AtomicReference<Object> responseBody = new AtomicReference<>();
+    doAnswer(call -> {
+      responseBody.set(call.getArgument(0));
+      return fixture.context;
+    }).when(fixture.context).json(any());
+    var data = new java.util.LinkedHashMap<>(responseData(input));
+    data.put("mode", "IN_PLACE");
+    data.put("reason", "candidate_fits_after_source_release");
+    data.put("freeBytes", 10L);
+    data.put("footprintBytes", 20L);
+    when(dispatcher.dispatch(eq(RECONFIGURE), anyString(), any(InvocationProvenance.class),
+        eq(Optional.empty()), eq(fixture.engineContext), eq(input.operationKey())))
+        .thenReturn(OperationResult.success("Settings committed", data));
+
+    new SettingsController(null, Path.of("."), null, null, dispatcher, RECONFIGURE)
+        .handleUpdateSettingsV2(fixture.context);
+
+    SettingsV2 response = (SettingsV2) responseBody.get();
+    assertEquals("IN_PLACE", response.mode());
+    assertEquals("candidate_fits_after_source_release", response.reason());
+    assertEquals(10L, response.freeBytes());
+    assertEquals(20L, response.footprintBytes());
+  }
+
+  @Test
+  void queryCompositionRefusalExposesMeasuredReason() {
+    OperationDispatcher dispatcher = mock(OperationDispatcher.class);
+    SettingsV2 input = fullSettings();
+    ContextFixture fixture = contextFixture(input);
+    AtomicReference<Object> responseBody = new AtomicReference<>();
+    doAnswer(call -> {
+      responseBody.set(call.getArgument(0));
+      return fixture.context;
+    }).when(fixture.context).json(any());
+    when(dispatcher.dispatch(eq(RECONFIGURE), anyString(), any(InvocationProvenance.class),
+        eq(Optional.empty()), eq(fixture.engineContext), eq(input.operationKey())))
+        .thenReturn(OperationResult.failure("Query encoder composition was refused",
+            "COMPONENT_PREPARATION_REQUIRED",
+            Map.of("component", "encoders", "mode", "REFUSED",
+                "reason", "candidate_exceeds_releasable_device_memory",
+                "freeBytes", 10L, "footprintBytes", 20L), true));
+
+    new SettingsController(null, Path.of("."), null, null, dispatcher, RECONFIGURE)
+        .handleUpdateSettingsV2(fixture.context);
+
+    verify(fixture.context).status(503);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> response = (Map<String, Object>) responseBody.get();
+    assertEquals("encoders", response.get("component"));
+    assertEquals("REFUSED", response.get("mode"));
+    assertEquals("candidate_exceeds_releasable_device_memory", response.get("reason"));
+    assertEquals(10L, response.get("freeBytes"));
+    assertEquals(20L, response.get("footprintBytes"));
+  }
+
+  @Test
   void missingWitnessPreparationRefusalIsHttp400() {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     SettingsV2 complete = fullSettings();

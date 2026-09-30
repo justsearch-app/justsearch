@@ -201,7 +201,11 @@ public class SettingsController {
     } else if ("RESTART_SOURCE_DRIFT".equals(code)) {
       payload.put("keys", refusal.errorDetails().get("keys"));
     } else if ("COMPONENT_PREPARATION_REQUIRED".equals(code)) {
-      payload.put("components", refusal.errorDetails().get("components"));
+      for (String field : java.util.List.of("component", "components", "mode", "reason",
+          "freeBytes", "footprintBytes")) {
+        Object value = refusal.errorDetails().get(field);
+        if (value != null) payload.put(field, value);
+      }
     }
     ctx.status(status).json(payload);
   }

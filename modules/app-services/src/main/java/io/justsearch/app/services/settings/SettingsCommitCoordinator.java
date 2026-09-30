@@ -392,7 +392,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           preparedComponents, desired, receipt, restartRequired);
     } catch (RuntimeException | Error failure) {
       if (preparedComponents != null) {
-        try { preparedComponents.abort(); }
+        try { preparedComponents.abort(failure); }
         catch (RuntimeException | Error cleanup) {
           control.uncertain();
           failure.addSuppressed(cleanup);
@@ -756,6 +756,12 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       // The physical candidate and its exact file identities exist before final serialization.
       var prepared = store.prepareExact(preparedCandidate, next, queryRoles);
       OperationResult preparedResponse = prepareResponse.apply(prepared.settings());
+      var composition = preparedComponents == null
+          ? java.util.Optional.<io.justsearch.core.component.ComposeEvidence>empty()
+          : preparedComponents.composition();
+      if (composition.isPresent()) {
+        preparedResponse = withCompositionEvidence(preparedResponse, composition.orElseThrow());
+      }
       if (restartRequired) preparedResponse = withRestartScheduled(preparedResponse);
       var receipt = new Receipt(active.key, next.acceptedRevision(), preparedResponse);
       ConfigStore.PreparedSwap preparedConfig = config.prepareSwap(servingResolved);
@@ -841,7 +847,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (!committed[0] && preparedComponents != null) {
         SettingsCommitFence active = fence;
         if (active != null && active.phase == Phase.PREPARING) {
-          try { preparedComponents.abort(); }
+          try { preparedComponents.abort(Objects.requireNonNull(failed, "precommit failure")); }
           catch (RuntimeException | Error cleanupFailure) {
             // A refused close leaves a physical owner alive. Preserve the armed row for boot
             // reconciliation and ask the runner for ordered recovery instead of reporting a
@@ -877,6 +883,17 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     }
     if (postCommitFailure instanceof RuntimeException runtime) throw runtime;
     if (postCommitFailure instanceof Error error) throw error;
+  }
+
+  private static OperationResult withCompositionEvidence(OperationResult response,
+      io.justsearch.core.component.ComposeEvidence evidence) {
+    var data = new LinkedHashMap<String, Object>(response.structuredData());
+    data.put("mode", evidence.mode().name());
+    if (evidence.reason() != null) data.put("reason", evidence.reason());
+    if (evidence.freeBytes() != null) data.put("freeBytes", evidence.freeBytes());
+    if (evidence.footprintBytes() != null) data.put("footprintBytes", evidence.footprintBytes());
+    return new OperationResult(response.success(), response.message(), response.executionId(), data,
+        response.errorCode(), response.errorDetails(), response.retryable());
   }
 
   private SettingsCommitFence requireFence(Reservation reservation) {

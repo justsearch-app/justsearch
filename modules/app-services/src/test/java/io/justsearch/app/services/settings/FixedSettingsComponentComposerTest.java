@@ -23,6 +23,7 @@ import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.component.ComponentSpec;
+import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.core.component.EngineComponentSnapshot;
 import java.time.Duration;
@@ -39,6 +40,8 @@ import org.junit.jupiter.api.Test;
 final class FixedSettingsComponentComposerTest {
   private static final UiSettings CANDIDATE = new UiSettings();
   private static final ResolvedConfig DESIRED = ConfigStoreRebuilder.prepare(CANDIDATE);
+  private static final ComposeEvidence QUERY_COMPOSITION = new ComposeEvidence(
+      ComposeEvidence.Mode.IN_PLACE, "candidate_fits_after_source_release", 10L, 20L);
 
   @Test
   void missingPhysicalOwnerRefusesWithAComponentCodeBeforeTakingApplyPermit() {
@@ -75,12 +78,20 @@ final class FixedSettingsComponentComposerTest {
   void encoderOwnerSelectionIsExposedByThePreparedComposite() {
     EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
     EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
+    EngineComponentRegistry.PreparedBatch batch = mock(EngineComponentRegistry.PreparedBatch.class);
+    AtomicReference<Map<String, EngineComponentSnapshot.Component>> replacements =
+        new AtomicReference<>();
     when(registry.tryApply()).thenReturn(new Acquired(lease));
+    when(registry.prepareBatch(anyMap())).thenAnswer(invocation -> {
+      replacements.set(invocation.getArgument(0));
+      return batch;
+    });
     var selection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
         QueryRoleSelection.Role.disabled());
     FixedSettingsComponentComposer.QueryRolePreparedOwner prepared =
         mock(FixedSettingsComponentComposer.QueryRolePreparedOwner.class);
     when(prepared.selection()).thenReturn(selection);
+    when(prepared.composition()).thenReturn(java.util.Optional.of(QUERY_COMPOSITION));
     when(prepared.observation()).thenReturn(
         new RecordingPrepared("encoders", null, new ArrayList<>()).observation());
     FixedSettingsComponentComposer composer = new FixedSettingsComponentComposer(registry);
@@ -90,6 +101,9 @@ final class FixedSettingsComponentComposerTest {
     var composite = composer.prepare(CANDIDATE, DESIRED,
         Map.of("encoders", Set.of("model")));
     assertEquals(selection, composite.queryRoleSelection().orElseThrow());
+    assertEquals(QUERY_COMPOSITION, composite.composition().orElseThrow());
+    composite.validate();
+    assertEquals(QUERY_COMPOSITION, replacements.get().get("encoders").lastCompose());
     composite.abort();
     verify(lease).close();
   }
@@ -111,6 +125,7 @@ final class FixedSettingsComponentComposerTest {
 
     assertEquals(failure, actual);
     assertEquals(1, first.prepared.abortCount);
+    assertEquals(failure, first.prepared.abortCause);
     assertEquals(0, second.preparedCount);
     verify(registry, never()).prepareBatch(anyMap());
     verify(lease, times(1)).close();
@@ -135,8 +150,33 @@ final class FixedSettingsComponentComposerTest {
               throw marker;
             })));
     assertEquals(1, first.prepared.abortCount);
+    assertEquals(marker, first.prepared.abortCause);
     verify(registry, never()).prepareBatch(anyMap());
     verify(lease).close();
+  }
+
+  @Test
+  void restoredOwnerMayAnnotateFailureWithoutRetainingTheApplyPermit() {
+    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry.ApplyLease firstLease = mock(EngineComponentRegistry.ApplyLease.class);
+    EngineComponentRegistry.ApplyLease secondLease = mock(EngineComponentRegistry.ApplyLease.class);
+    when(registry.tryApply()).thenReturn(new Acquired(firstLease), new Acquired(secondLease));
+    RecordingOwner first = new RecordingOwner("first");
+    RecordingOwner second = new RecordingOwner("second");
+    first.annotateAbortCause = true;
+    second.prepareFailure = new IllegalStateException("second owner refused");
+    FixedSettingsComponentComposer composer = composer(registry, first, second);
+
+    IllegalStateException failure = assertThrows(IllegalStateException.class,
+        () -> composer.prepare(CANDIDATE, DESIRED, affected("first", "second")));
+
+    assertEquals(1, failure.getSuppressed().length);
+    verify(firstLease).close();
+    second.prepareFailure = null;
+    var next = composer.prepare(CANDIDATE, DESIRED, affected("first", "second"));
+    next.abort();
+    verify(registry, times(2)).tryApply();
+    verify(secondLease).close();
   }
 
   @Test
@@ -316,6 +356,7 @@ final class FixedSettingsComponentComposerTest {
     private final List<String> events;
     private RuntimeException prepareFailure;
     private RuntimeException abortFailure;
+    private boolean annotateAbortCause;
     private RecordingPrepared prepared;
     private int preparedCount;
 
@@ -338,6 +379,7 @@ final class FixedSettingsComponentComposerTest {
       preparedCount++;
       prepared = new RecordingPrepared(name, publicationLock, events);
       prepared.abortFailure = abortFailure;
+      prepared.annotateAbortCause = annotateAbortCause;
       return prepared;
     }
   }
@@ -352,6 +394,8 @@ final class FixedSettingsComponentComposerTest {
     private int abortCount;
     private RuntimeException retireFailure;
     private RuntimeException abortFailure;
+    private boolean annotateAbortCause;
+    private Throwable abortCause;
 
     private RecordingPrepared(String name, ReentrantReadWriteLock publicationLock,
         List<String> events) {
@@ -413,6 +457,13 @@ final class FixedSettingsComponentComposerTest {
       abortCount++;
       events.add(name + ".abort");
       if (abortFailure != null) throw abortFailure;
+    }
+
+    @Override
+    public void abort(Throwable cause) {
+      abortCause = cause;
+      if (annotateAbortCause) cause.addSuppressed(new IllegalStateException("A restored"));
+      abort();
     }
   }
 }
