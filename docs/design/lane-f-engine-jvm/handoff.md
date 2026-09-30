@@ -50,8 +50,8 @@ Read it only to resolve a specific uncertainty; the facts that still govern are 
   branch `codex/lane-f-d2-drafts` (`039a4bbb2`, under `docs/design/lane-f-engine-jvm/d2-drafts/`,
   committed without hooks; never push it without running them).
 - **Gradle ownership:** while a delegated worker holds a Gradle grant (named in
-  its brief), root runs no Gradle. Current grant: the D1-17 help-source worker in
-  `.claude/worktrees/lane-f-d1-help` (branch `codex/lane-f-d1-help`).
+  its brief), root runs no Gradle. Current grant: the reconfigure worker (`codex/lane-f-reconf-inplace`), via the file
+  `tmp/grants/gradle-reconf`; root deletes the file to revoke it.
 - **WP2:** retirement contract implemented and reviewed. Signed installed
   predecessor-to-target proof needs the external signing/AppControl environment.
 - **E:** nothing run. E1 instrument fixes are in progress on child branch
@@ -119,7 +119,14 @@ release note, every first-party client including MCP and CLI) or fix it.
    mismatch can make the JVM ignore the cache. Verify with `-Xlog:aot` on an installed dist
    whether the cache loads, and align the training flags with the spawn set.
 
-Done this session: E1 instruments (`9919dde24`), WP2 2c downgrade tooling (`dacecd8ca`),
+Running Codex sessions (resume with `codex exec resume <id>` from the worktree if cut off):
+reconfigure in-place `01a0f2e5-978c-7492-9ab9-42adaeb5abbc` (`lane-f-reconf`, holds
+`tmp/grants/gradle-reconf`); WP2 2b `01a0f2ed-988d-73d1-94c5-f4dcc6fd9214` (`lane-f-wp2b`,
+Gradle gated on `tmp/grants/gradle-wp2b`, issued after reconfigure releases).
+
+Done this session: D1-17 help source in Green (`1ac1407ef`, merged `63b83ffad`; integrated
+build green at `tmp/lane-f-help-integrated-compile-r2.log`, focused 212 tests at
+`tmp/lane-f-help-focused-integrated.log`); settings callers and API docs (`6dda15e24`); E1 instruments (`9919dde24`), WP2 2c downgrade tooling (`dacecd8ca`),
 Engine collector switched to explicit G1 at both spawn sites per design section 8
 (`bb399e495`; `test-dev-runner-head-java-opts` passes; Rust compile is hosted-only).
 
