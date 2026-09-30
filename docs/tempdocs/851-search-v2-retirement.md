@@ -69,8 +69,12 @@ Two conditions:
 
 - **(a) Reappearance.** `views/search-v2/` must stay deleted. Restoring it FAILS at any date. The
   window was retired by owner decision, not shelved.
-- **(b) Cutover deadline.** The Search v3 promotion must be complete by **2026-09-30**. Before that
+- **(b) Cutover deadline.** The Search v3 promotion must be complete by **2026-11-30**. Before that
   date, incomplete WARNs (exit 0); on or after it, incomplete FAILS.
+  *2026-09-30 owner decision:* the original 2026-09-30 deadline was moved to 2026-11-30. Main was
+  frozen for lane F from 2026-09-08, so tempdoc 852 (S4 partial, S5-S11 pending) could not
+  progress, and the failing gate blocked every PR through the required `Public claims` check.
+  The new date follows the expected lane F merge; the gate still forces finish-or-retire.
 
 "Complete" is structural, not attested — both must hold:
 
