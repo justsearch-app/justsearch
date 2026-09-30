@@ -51,7 +51,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { iterateTurns } from './lib/transcript-store.mjs';
-import { findPricing, isKnownModel, PER_M } from './lib/transcript-cost.mjs';
+import { findPricing, isKnownModel, isNonBillableModel, PER_M } from './lib/transcript-cost.mjs';
 import { listClaudeTranscriptFiles } from './lib/ledger/claude-adapter.mjs';
 import { listCalls } from './lib/ledger/index.mjs';
 
@@ -148,6 +148,10 @@ export function emptyReport() {
     delegation: { spawns: 0, coldWrite: 0, ttlRewrite: 0, ttlEvents: 0, subRead: 0, subOut: 0, mainRead: 0, mainOut: 0 },
     pricing: {
       pricedCost: 0, unpricedModels: {}, unpricedRead: 0, unpricedTurns: 0,
+      // known-non-billable placeholders (tempdoc 908 §4.5, e.g. `<synthetic>`)
+      // tracked SEPARATELY from genuinely unknown models, so they never trip
+      // the loud "!!" alarm below -- that alarm is reserved for a real gap.
+      nonBillable: {},
       // per-line split, so "N% of spend is context re-presentation rather than
       // generation" is a figure this tool produces rather than a claim someone
       // has to take on trust
@@ -250,9 +254,15 @@ export function analyseTranscript(file, report, { sinceMs = null } = {}) {
     }
     if (!isKnownModel(cur.model)) {
       const m = cur.model || '(missing-model)';
-      report.pricing.unpricedModels[m] = (report.pricing.unpricedModels[m] || 0) + cur.read;
-      report.pricing.unpricedRead += cur.read;
-      report.pricing.unpricedTurns += 1;
+      if (isNonBillableModel(m)) {
+        const slot = (report.pricing.nonBillable[m] ||= { turns: 0, read: 0 });
+        slot.turns += 1;
+        slot.read += cur.read;
+      } else {
+        report.pricing.unpricedModels[m] = (report.pricing.unpricedModels[m] || 0) + cur.read;
+        report.pricing.unpricedRead += cur.read;
+        report.pricing.unpricedTurns += 1;
+      }
     }
     prev = cur;
   }
@@ -408,6 +418,12 @@ function main() {
       + `(${pct(report.pricing.unpricedRead, t.read)} of all cache-read) are priced at $0 —`);
     console.log(`     the figure above EXCLUDES them. Add the missing row(s) to PRICING in lib/transcript-cost.mjs:`);
     for (const [m, read] of um) console.log(`       ${m.padEnd(28)} ${fmtM(read)} cache-read`);
+  }
+  // Known-non-billable placeholders (908 §4.5) get a quiet one-liner, never
+  // the "!!" alarm above -- that alarm is reserved for a genuinely unknown model.
+  const nb = Object.entries(report.pricing.nonBillable || {});
+  for (const [m, s] of nb) {
+    console.log(`  (known non-billable: ${m} — ${s.turns} turns, ${fmtM(s.read)} cache-read, priced at $0 by design, not a gap)`);
   }
 }
 
