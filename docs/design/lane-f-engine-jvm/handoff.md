@@ -65,15 +65,15 @@ Per-worker cost ledger (self + children, API-equivalent):
 | Worker (session) | Model | Self | Children | Note |
 |---|---|---|---|---|
 | reconfigure impl + fixes (`01a0f2e5`) | gpt-6.1-sol | $6.81 | 6, $54.63 | children on gpt-5.6-sol |
-| D1 closure (`01a0f35a`) | gpt-6.1-sol | $2.34+ | 8, $35.77+ | running at 21:00 |
+| D1 closure (`01a0f35a`) | gpt-6.1-sol | $2.61+ | 8, $38.41 | waiting (shell sleep) for `gradle-d1close` until ~22:16; resume with the grant under the new flags |
 | help source + fixes (`01a0f2bb`) | gpt-6.1-sol | $4.61 | 0 | grant polling heavy |
-| WP2 2b + fixes (`01a0f2ed`) | gpt-6.1-sol | $4.72+ | 1, $0.18 | running at 21:00 |
+| WP2 2b + fixes (`01a0f2ed`) | gpt-6.1-sol | $5.60+ | 1, $0.23 | hard-link fallback fix running (no-spawn flags) |
 | F-1/F-2 docs (`01a0f37a`) | gpt-6.1-sol | $1.63 | 6, $2.82 | |
-| F-3/4/5 (`01a0f39e`) | gpt-6.1-sol | $0.83+ | 1, $0.22 | running at 21:00 |
+| F-3/4/5 (`01a0f39e`) | gpt-6.1-sol | $1.88 | 1, $0.55 | done; merged `82b5fa129` |
 | D1/D2 audit, reconciliation, 4 reviews | gpt-6.1-sol | $6.25 | 6, $7.57 | read-only |
 | E1, WP2 2c, callers, contract, sweep, 2e | mixed | $1.09 | 0 | |
 
-Codex weekly `used_percent`: 21 at 21:00 on 2026-09-30.
+Codex weekly `used_percent`: 21 at 21:00 and 21:35 on 2026-09-30. Total API-equivalent today: $134.56.
 
 ## Current state (2026-09-30)
 
