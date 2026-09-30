@@ -30,6 +30,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -226,6 +227,80 @@ class MainArgvDrivenUpgradeTests(unittest.TestCase):
             )
         message = str(ctx.exception.code)
         self.assertNotIn("mutually exclusive", message)
+
+
+class DowngradeLaunchTests(unittest.TestCase):
+    def test_resolver_rejects_invalid_paths_in_downgrade_direction(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            non_exe = tmp / "older.zip"
+            non_exe.write_bytes(b"not exe")
+            for path, message in ((tmp / "missing.exe", "not found"),
+                                  (non_exe, "must be a .exe")):
+                with self.subTest(path=path), self.assertRaises(SystemExit) as ctx:
+                    resolve_upgrade_from(str(path), tmp / "candidate.exe", "downgrade")
+                self.assertIn("--downgrade-from", str(ctx.exception.code))
+                self.assertIn(message, str(ctx.exception.code))
+
+    def test_downgrade_resolver_rejects_same_filename(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            older = Path(tmp_str) / "candidate.exe"
+            older.write_bytes(b"older")
+            with self.assertRaisesRegex(SystemExit, "same filename"):
+                resolve_upgrade_from(str(older), Path("candidate.exe"), "downgrade")
+
+    def test_upgrade_and_downgrade_flags_are_mutually_exclusive(self):
+        with patch.object(sys, "argv", ["sandbox-launch.py", "--upgrade-from", "old.exe",
+                                        "--downgrade-from", "older.exe"]):
+            with self.assertRaises(SystemExit) as ctx:
+                main()
+            self.assertEqual(ctx.exception.code, 2)
+
+    def test_downgrade_and_models_dir_are_mutually_exclusive(self):
+        with patch.object(sys, "argv", ["sandbox-launch.py", "--downgrade-from", "old.exe",
+                                        "--models-dir", "models"]):
+            with self.assertRaisesRegex(SystemExit, "mutually exclusive"):
+                main()
+
+    def test_main_parses_downgrade_and_resolves_before_staging(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            tmp = Path(tmp_str)
+            candidate = tmp / "candidate.exe"
+            older = tmp / "release.exe"
+            candidate.write_bytes(b"candidate")
+            older.write_bytes(b"release")
+            argv = ["sandbox-launch.py", "--downgrade-from", str(older),
+                    "--installer", str(candidate), "--no-charter", "--no-launch",
+                    "--stage-dir", str(tmp / "stage")]
+            with patch.object(sys, "argv", argv), patch.object(
+                sandbox_launch, "resolve_upgrade_from", wraps=resolve_upgrade_from
+            ) as resolver, patch.object(
+                sandbox_launch, "archive_existing_evidence", side_effect=RuntimeError("staging boundary")
+            ):
+                with self.assertRaisesRegex(RuntimeError, "staging boundary"):
+                    main()
+                resolver.assert_called_once_with(str(older), candidate, "downgrade")
+
+    def test_downgrade_mode_records_install_order_and_release_provenance(self):
+        with tempfile.TemporaryDirectory() as tmp_str:
+            share = Path(tmp_str)
+            older = share / "old.exe"
+            older.write_bytes(b"older release")
+            info = stage_upgrade_installer(share, older)
+            write_validation_mode(share, Path("candidate.exe"), None, True,
+                                  upgrade_info=info, direction="downgrade")
+            text = (share / "validation-mode.md").read_text(encoding="utf-8")
+            self.assertIn("Mode: downgrade-to-release", text)
+            self.assertIn("ExpectPriorInstall: true", text)
+            self.assertIn("previous-release/old.exe", text)
+            self.assertIn(hashlib.sha256(b"older release").hexdigest(), text)
+            self.assertLess(text.index("1. Install main's current release"),
+                            text.index("2. Install the Lane F CANDIDATE"))
+            self.assertLess(text.index("2. Install the Lane F CANDIDATE"),
+                            text.index("3. Install main's release again"))
+            for action in ("add a setting", "ingest", "run a durable operation"):
+                self.assertIn(action, text)
+            self.assertNotIn("Mode: fresh-install", text)
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ Five staged files govern this round. Read them before launching JustSearch:
    is the authority for *what to cover*; it cannot silently omit a newly-shipped
    surface. If a surface is on it and you cannot reach it, that is a finding.
 2. **`validation-mode.md`** — the model mode for this instance (`fresh-install`
-   vs `pre-staged-models` vs `upgrade-from-release` vs
+   vs `pre-staged-models` vs `upgrade-from-release` vs `downgrade-to-release` vs
    `in-app-update-from-release`). Overrides any static
    wording about host models.
    **Round-mode policy:** a release's FIRST round and its FINAL qualifying round
@@ -31,6 +31,10 @@ Five staged files govern this round. Read them before launching JustSearch:
    over it) — real users arrive from the previous version, not only from a clean
    machine, and the strongest defect repro this harness ever produced came from a
    non-fresh arrival state (tempdoc 734 A.1, round 2). Tempdoc 750 Part C.
+   For `downgrade-to-release`, follow validation-mode.md and the generated
+   `downgrade-after-lane-f` mustWatch checklist: seed main's current release,
+   exercise the Lane F candidate, then over-install main's release again.
+   Capture candidate surface evidence before downgrading and label each phase.
    For `in-app-update-from-release`, also follow
    `updater-qualification.md`: the installed source is a previous-source
    Sandbox build with the updater test gate, the target is served from the

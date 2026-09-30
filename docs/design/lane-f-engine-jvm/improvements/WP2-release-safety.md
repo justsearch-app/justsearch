@@ -231,3 +231,37 @@ succeeds; its original hosted failure and matching local invocation are
 `tmp/lane-f-wp2-wrapper-hosted-native-failure.log` and
 `tmp/lane-f-wp2-wrapper-hosted-shell-regression.log`. This correction still needs a
 fresh hosted run. Required signed predecessor-to-target qualification remains open.
+
+
+## 2026-09-30 WP2 2c tooling (local proof; installed round open)
+
+On `codex/lane-f-wp2c`, based on `ca12f00e6`, the launcher now shares the
+previous-release resolver/staging with a direction parameter. The mutually
+exclusive `--downgrade-from` resolves `downgrade-to-release` and instructions
+seed main's release, exercise the Lane F candidate, then over-install the older
+release. `mustWatch:downgrade-after-lane-f` projects the exact five WP2 2c
+assertions and phase-labelled evidence checklist into the existing brief/plan.
+The existing generic mode filter and verdict checker accept the row without a
+new schema, mode registry, or lifecycle redesign. Candidate mustTouch evidence
+is captured before downgrade; a legacy setting is seeded before migration so
+the backup/restore observation cannot pass vacuously.
+
+Local checks and readable output are under `tmp/wp2c-tooling/`:
+- `python -m pytest scripts/sandbox/test_sandbox_launch_upgrade.py scripts/sandbox/test_sandbox_coverage_mode_filter.py -q`: 35 passed, 27 subtests passed (`tests.log`).
+- `python -m pytest scripts/sandbox/test_derive_round_plan.py scripts/sandbox/test_sandbox_launch_charter.py -q`: 57 passed (`plan-charter.log`).
+- `python scripts/sandbox/gen_coverage_brief.py --check`: all 21 cohorts, 16 surfaces and 5 shapes classified (`register.log`).
+- `node scripts/ci/check-sandbox-authorization-field.mjs`: passed (`authorization.log`).
+- Negative control: temporarily removing the downgrade row makes the new
+  end-to-end brief/plan test fail specifically on its missing id (`red.log`);
+  restoring the exact register bytes makes it pass (`green.log`). The test also
+  proves that omitting its verdict fails the finalization checker.
+
+No `.js`/`.mjs` edits; script lint is not applicable. No governance registry gate
+references this register. `check_coverage.py` is a round finalization checker,
+requiring a manifest and real evidence; its mustWatch acceptance/rejection is
+exercised by the new test. A local log wrapper initially failed to print Unicode
+under cp1252; rerunning with explicit UTF-8 output produced the logs above.
+No Gradle, dev stack, Sandbox, installer, commit or push was run. Signed installed
+proof at stage E remains open; WP2 2e's documented restore is a dependency of
+that proof, and the generated checklist records missing documentation as a gap.
+These tooling checks do not close the installed-round acceptance item.
