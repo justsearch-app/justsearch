@@ -51,13 +51,13 @@ See ADR-0024 for the full decision record: NSIS over MSI/WiX, per-user install, 
 
 <!-- source: docs/explanation/12-desktop-installer-and-sandbox-setup.md -->
 
-# 12. Desktop Installer + Sandbox Setup (How it works today)
+# Desktop Installer + Sandbox Setup (How it works today)
 
 This document is a **purely descriptive** explanation of the current Windows desktop setup:
 
 - how the **NSIS installer** is produced and what it installs,
 - how the **Tauri shell** boots the app,
-- how the **Java headless backend** and **Worker** are started,
+- how the **Java headless backend** starts and composes the index half in-process,
 - how the **UI discovers and connects** to the local API,
 - what the **Windows Sandbox harness scripts** do during Phase 3 verification,
 - where to find the **artifacts and logs**.
@@ -84,12 +84,12 @@ For the decision rationale (NSIS over MSI/WiX, per-user install, download-on-dem
   - Provides a Tauri command for the UI to read the backend port (`api_port`).
   - Enforces deterministic single-instance behavior (via `tauri-plugin-single-instance`).
   - Checks the authenticated application-release feed, coordinates an orderly
-    Head/Worker shutdown, and launches a verified NSIS update only after
+    Engine shutdown, and launches a verified NSIS update only after
     explicit user consent.
 
 Entry point: `modules/shell/src-tauri/src/lib.rs`
 
-### 1.3 Java “HeadlessApp” (local HTTP API)
+### 1.3 Java "HeadlessApp" (local HTTP API)
 
 - **Class**: `io.justsearch.ui.HeadlessApp` (`modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java`)
 - **Role**: Starts core services and exposes the local REST API via `LocalApiServer`.
@@ -97,28 +97,34 @@ Entry point: `modules/shell/src-tauri/src/lib.rs`
   - Uses an **ephemeral** port (`0`) by default in bundled/desktop mode.
   - Prints `JUSTSEARCH_API_PORT=<port>` to stdout for diagnostics; discovery reads the admitted runtime manifest.
 
-### 1.4 Knowledge Worker (background indexing + embeddings)
+There are two current Engine launch sites: the packaged Tauri shell (`spawn_headless_backend`)
+and the development runner (`spawnEngineChild`). Both launch `io.justsearch.ui.HeadlessApp`,
+which composes the application and index halves in one JVM. Their shared JVM flag set is
+covered by the launch-option test; the packaged path also supplies the production heap and
+desktop trust-boundary properties.
 
-- **Distribution**: none of its own. Item A13 deleted the `lib/worker/` staging: the index half ships as ordinary jars in the bundle’s single `lib/` (via `ui -> app-engine -> indexer-worker` on the Engine’s runtime classpath). Before A13 the bundle carried both, paying for onnxruntime_gpu, Lucene and Tika twice.
-- **Composition**: since lane F stage A item A6 the index half runs **inside the Head JVM**, composed by `EngineRoot` (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java`). Item A11 deleted `WorkerSpawner` and the worker child process it launched; item A13 deleted the distribution, the `IndexerWorker` entry point and the second AOT cache.
-- **Logs**: the Engine log under the app data logs directory (see “Logs” below). Item A13 deleted the Worker’s own `logback.xml`; nothing writes `worker.log` any more.
+### 1.4 Knowledge Server (Engine index half: background indexing + embeddings)
+
+- **Distribution**: none of its own. Item A13 deleted the `lib/worker/` staging: the index half ships as ordinary jars in the bundle's single `lib/` (via `ui -> app-engine -> indexer-worker` on the Engine's runtime classpath). Before A13 the bundle carried both, paying for onnxruntime_gpu, Lucene and Tika twice.
+- **Composition**: since lane F stage A item A6 the index half runs **inside the Engine JVM**, composed by `EngineRoot` (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java`). Item A11 deleted `WorkerSpawner` and the worker child process it launched; item A13 deleted the distribution, the `IndexerWorker` entry point and the second AOT cache.
+- **Logs**: the Engine log under the app data logs directory (see "Logs" below). Item A13 deleted the Worker's own `logback.xml`; nothing writes `worker.log` any more.
 
 Embeddings (current):
-- Generated in the Worker via **ONNX Runtime** (not llama.cpp in-process):
+- Generated in the Engine's index half via **ONNX Runtime** (not llama.cpp in-process):
   - `EmbeddingService` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/embed/EmbeddingService.java`)
   - ORT session management: `SessionHandle` interface + `NativeSessionHandle` concrete impl, built via `OrtSessionAssembler` (`modules/ort-common/...`)
-- Requires an **ONNX embedding model** (e.g., gte-multilingual-base), discovered via `JUSTSEARCH_MODEL_PATH` or local “AI Home” locations.
+- Requires an **ONNX embedding model** (e.g., gte-multilingual-base), discovered via `JUSTSEARCH_MODEL_PATH` or local "AI Home" locations.
 
 ## 2. What gets bundled vs. what is BYO
 
 ### 2.1 Bundled inside the desktop app
 
-Gradle stages a “headless bundle” into the Tauri resources directory via `:modules:ui:bundleSidecar`:
+Gradle stages a "headless bundle" into the Tauri resources directory via `:modules:ui:bundleSidecar`:
 
 - Path: `modules/shell/src-tauri/resources/headless/**`
 - Includes (current):
   - `ui-headless.jar`
-  - `lib/**` (the Engine’s one classpath — application half AND index half; the `lib/worker/` subdirectory was deleted at item A13)
+  - `lib/**` (the Engine's one classpath  -  application half AND index half; the `lib/worker/` subdirectory was deleted at item A13)
   - `runtime/**` (a stripped Java runtime image created via `jlink`)
   - `native-bin/llama-server/**` (pinned **CPU-only** llama.cpp runtime payload: `llama-server.exe` + adjacent DLLs)
   - `SSOT/**` (so repo-layout discovery works in packaged mode)
@@ -127,24 +133,24 @@ Gradle stages a “headless bundle” into the Tauri resources directory via `:m
   - **ORT CUDA DLLs** (optional): `stageOrtCudaVariant` task bundles ORT CUDA DLLs into a sidecar directory. Not included in alpha builds.
 
 - ONNX model staging: The `stageOnnxModels` Gradle task stages all 5 model types (embedding, reranker, citation, NER, SPLADE) from local `models/` via Git LFS. Skippable with `-PskipOnnxModels`.
-- **Models are NOT bundled in the alpha installer** — the full model set (ONNX + GGUF) exceeds the NSIS 32-bit PE limit (~7 GB). Models are downloaded post-install via "Install AI" (see §6.1.1). The lean installer is 249 MB as shipped in the v0.2.0 release (measured on the signed artifact); the ~260 MB figure from tempdoc 772 / CI run 29901314606 was the pre-release composition measurement.
+- **Models are NOT bundled in the alpha installer**  -  the full model set (ONNX + GGUF) exceeds the NSIS 32-bit PE limit (~7 GB). Models are downloaded post-install via "Install AI" (see section 6.1.1). The lean installer is 249 MB as shipped in the v0.2.0 release (measured on the signed artifact); the ~260 MB figure from tempdoc 772 / CI run 29901314606 was the pre-release composition measurement.
 - **Version sync**: `scripts/ci/sync-version.ps1` propagates the version from `gradle.properties` to `tauri.conf.json`, `package.json`, and `Cargo.toml`.
 
 See: `modules/ui/build.gradle.kts` (`bundleSidecarResources` task)
 
 ### 2.2 BYO (not bundled by the installer)
 
-The installer does **not** bundle user model weights. Models are installed into “AI Home” at runtime (Simple Mode “Install AI”),
+The installer does **not** bundle user model weights. Models are installed into "AI Home" at runtime (Simple Mode "Install AI"),
 or can be provided manually (advanced/BYO):
 
 - **GGUF models** (chat/VLM + embedding model)
 - **(Optional override) `llama-server.exe`**: advanced users can point JustSearch to a different runtime build (e.g., GPU-capable).
 
-Instead, the app creates an “AI Home” skeleton under the user-writable app data directory (details below).
+Instead, the app creates an "AI Home" skeleton under the user-writable app data directory (details below).
 
 ## 3. Runtime directories (AI Home + logs)
 
-### 3.1 App data directory (“AI Home” root)
+### 3.1 App data directory ("AI Home" root)
 
 On startup, the shell sets:
 
@@ -156,14 +162,14 @@ and ensures these directories exist:
 - `<JUSTSEARCH_HOME>/native-bin/llama-server/`
 - `<JUSTSEARCH_HOME>/logs/`
 
-See: `modules/shell/src-tauri/src/lib.rs` (the “Contract A: AI Home” section in `spawn_headless_backend`)
+See: `modules/shell/src-tauri/src/lib.rs` (the "Contract A: AI Home" section in `spawn_headless_backend`)
 
 ### 3.2 Log files
 
 The most useful runtime logs in desktop mode are written under:
 
-- `<JUSTSEARCH_HOME>/logs/engine.log` — the one JVM log (item A13 deleted the Worker's own
-  logback config, so there is no separate `worker.log`)
+- `<JUSTSEARCH_HOME>/logs/engine.log`  -  the one JVM log (item A13 deleted the Worker's own
+  logback config, so there is no second process log)
 - `<JUSTSEARCH_HOME>/logs/llama-server.log` (when Online inference is in use)
 
 The shell opens `engine.log` **before** spawning Java so startup failures are recorded.
@@ -188,14 +194,14 @@ unavailable optional AI does not prevent the reset.
 
 See: `modules/shell/src-tauri/src/lib.rs`
 
-### 4.2 HeadlessApp starts the Local API and Worker
+### 4.2 HeadlessApp starts the Local API and composes the index half
 
 At a high level:
 
 1. `HeadlessApp` loads persisted UI settings (if any).
 2. It starts core services (via `HeadAssembly`) and then creates `LocalApiServer`.
 3. It prints `JUSTSEARCH_API_PORT=<port>` to stdout.
-4. It attempts to start the Knowledge Server / Worker early; if the worker fails, the API still comes up and reports a deterministic error via `/api/status`.
+4. It attempts to start the Knowledge Server early; if the index half fails, the API still comes up and reports a deterministic error via `/api/status`.
 
 See:
 - `modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java`
@@ -239,11 +245,11 @@ are reused in place.
 3. Tauri verifies the installer signature while downloading. The shell then
    independently checks byte count, SHA-256, and executable shape.
 4. The shell holds Engine replacement and joins the old supervision loop.
-   When the Engine API is available, Head closes mutating admission and reports
+   When the Engine API is available, the application half closes mutating admission and reports
    active operation-lease blockers.
-   Worker stops ingest admission, drains accepted work, and checkpoints its
+   The index half stops ingest admission, drains accepted work, and checkpoints its
    SQLite queue.
-5. Head performs ordered shutdown and atomically writes a nonce-bound
+5. The Engine performs ordered shutdown and atomically writes a nonce-bound
    `upgrade/head-shutdown-receipt.v1.json`. The shell accepts `HEAD_STOPPED`
    only after the original child exits and the receipt proves a clean,
    graceful shutdown.
@@ -262,6 +268,33 @@ the existing intent, with no invented preparation, nonce, or clean shutdown rece
 That evidence survives later phases; target reconciliation echoes its kind and
 attempt instead of a shutdown nonce. A failed installer launch resumes one child
 and one supervision loop. Other uncertain handoffs remain explicitly held.
+
+Store compatibility permits additional incoming stores while requiring every installed store to
+remain present with the same owner, recoverability role and reconciliation strategy, and a readable
+installed format. The release generator accepts `--compat-baseline <register.json>` to project the
+previous release's row set with current target formats. This allows older installers with an exact
+row-count check to consume the descriptor. After installation, the shell validates every inherited
+owner expectation against its embedded register and sends the complete installed owner set to the
+Engine. The Engine and shell still require exact reconciliation of that complete set; a new store
+cannot disappear merely because it was absent from the compatibility baseline.
+
+Production tag assembly acquires that baseline with `derive-release-sequence.mjs
+--compat-baseline-out`: the same highest-sequence published predecessor supplies
+both the sequence and its complete tag-bound recoverability register. Descriptor
+identity/format mismatches, missing stores and ambiguous predecessors fail before
+sequence output. `package-installer-win.ps1` and `build-release-assets.ps1` require
+an explicit existing `-CompatibilityBaselinePath` for updater assembly, then pass
+the generator's `--compat-baseline`. Installer-only assembly needs no baseline.
+
+#### Retired compatibility owners (historical, no longer active)
+
+Intentionally retired owners live in the same register's disjoint
+`retiredDurableStores` list. Their exact historical tuple is emitted only when
+inherited from the predecessor; unspecified missing owners still refuse.
+`worker-config-snapshot` retains its version0 compatibility identity while its
+old bytes remain untouched and unread. The target shell consumes that exact
+inherited retired id/version, then reconciles every active owner with the Engine.
+Retired rows never become active stores or Engine readiness attestations.
 
 The frontend never authenticates releases. `appUpdateState.ts` projects
 shell-owned status into Settings and the global update banner. The background
@@ -294,18 +327,18 @@ See: `modules/ui/src/main/java/io/justsearch/ui/api/LocalApiServer.java`
 
 ## 6. BYO AI wiring (how model paths flow today)
 
-### 6.1 Persisted UI settings → sysprops/env
+### 6.1 Persisted UI settings -> sysprops/env
 
 On backend startup, `HeadlessApp` reads UI settings and maps them to canonical system properties:
 
 - `justsearch.server.exe` (BYO llama-server path)
 - `justsearch.llm.model_path` (explicit model path override)
-- `justsearch.model.path` (embedding model path; later forwarded to the worker env)
+- `justsearch.model.path` (embedding model path; consumed by the Engine index half)
 - `llama.lib.path` (native llama library override)
 
 See: `modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java`
 
-### 6.1.1 Simple Mode “Install AI” (v1)
+### 6.1.1 Simple Mode "Install AI" (v1)
 
 In v1 Simple Mode, the app provides an **in-app installer** that downloads and verifies pinned model weights (with consent),
 persists the resulting paths into UI settings, and runs a small smoke test. This keeps the base desktop installer offline-safe
@@ -313,11 +346,11 @@ while still supporting a one-click AI setup once the user opts in.
 
 Current scope: **24 assets, 9.08 GB total**, including ONNX `.onnx` files (embedding, reranker, citation, NER, SPLADE) and a GGUF LLM.
 
-**Per-asset failure isolation (INS-005 is fixed).** A failed asset fails only its own package: the download loop calls `failPackage(...)` and `continue`s to the next asset (`modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java`). Sandbox round 16 confirms it on real data — after `splade/model_fp16.onnx` failed, the same run went on to fetch that package's `tokenizer.json`, `vocab.txt`, `idf.json` and `config.json`. A package that has failed stays failed for the run (`updatePackageState` refuses to leave `failed`), so `installedFully` cannot lie, and the overall state completes with a counting message ("AI installed (6/7 packages; 1 failed)").
+**Per-asset failure isolation (INS-005 is fixed).** A failed asset fails only its own package: the download loop calls `failPackage(...)` and `continue`s to the next asset (`modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java`). Sandbox round 16 confirms it on real data  -  after `splade/model_fp16.onnx` failed, the same run went on to fetch that package's `tokenizer.json`, `vocab.txt`, `idf.json` and `config.json`. A package that has failed stays failed for the run (`updatePackageState` refuses to leave `failed`), so `installedFully` cannot lie, and the overall state completes with a counting message ("AI installed (6/7 packages; 1 failed)").
 
-**Transport reliability.** Each asset gets up to 4 transport attempts, spaced ~3 s / 9 s / 27 s with jitter and escalating transport (BITS→curl, then curl, then curl on HTTP/1.1). Only transport-transient failures are retried — an HTTP 4xx (curl exit 22) or a SHA/size mismatch fails immediately. Round 16 measured why the spacing matters: connection resets arrived in bursts, and the old BITS→curl fallback fired within ~0.8 s of the failure it was answering, so it failed 82 % of the time. See tempdoc 823/824 (round-16 F1).
+**Transport reliability.** Each asset gets up to 4 transport attempts, spaced ~3 s / 9 s / 27 s with jitter and escalating transport (BITS->curl, then curl, then curl on HTTP/1.1). Only transport-transient failures are retried  -  an HTTP 4xx (curl exit 22) or a SHA/size mismatch fails immediately. Round 16 measured why the spacing matters: connection resets arrived in bursts, and the old BITS->curl fallback fired within ~0.8 s of the failure it was answering, so it failed 82 % of the time. See tempdoc 823/824 (round-16 F1).
 
-### 6.2 Worker receives embedding model path
+### 6.2 Index-half embedding model path (historical Worker forwarding)
 
 Until lane F stage A item A11 the worker was a child process, and `WorkerSpawner` forwarded, at spawn time:
 
@@ -328,7 +361,7 @@ That spawner is deleted. In one JVM there is nothing to forward across: the same
 
 ### 6.3 Embedding runtime uses ONNX Runtime
 
-When an ONNX embedding model is present (e.g., gte-multilingual-base), the Worker loads it lazily via ONNX Runtime and generates embeddings. GPU acceleration is used when CUDA is available; otherwise embeddings are generated on CPU.
+When an ONNX embedding model is present (e.g., gte-multilingual-base), the Engine's index half loads it lazily via ONNX Runtime and generates embeddings. GPU acceleration is used when CUDA is available; otherwise embeddings are generated on CPU.
 
 See: `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/embed/EmbeddingService.java`, `modules/ort-common/`
 
@@ -340,16 +373,16 @@ The NSIS installer uses pre-install and pre-uninstall hooks to best-effort termi
 
 See: `modules/shell/src-tauri/nsis/installer-hooks.nsh`
 
-## 8. Windows Sandbox harness (Phase 3) — what the scripts do today
+## 8. Windows Sandbox harness (Phase 3)  -  what the scripts do today
 
 ### 8.1 Host-side launcher (staging + .wsb generation)
 
 Script: `scripts/sandbox/sandbox-launch.py`
 
 Current behavior:
-- Stages the newest NSIS installer and project documentation into `tmp/sandbox/share/`, plus both harness entry points (tempdoc 939): the sandbox charter as `CLAUDE.md` **and** `AGENTS.md`, a sanitized `.claude/` for Claude Code, and for Codex a generated credential-free `.codex/config.toml` (model pin, no inner sandbox/approvals, raised `project_doc_max_bytes`, Computer Use allowlist) + `.agents/skills/start/`. The repo's own `.codex/` is deliberately NOT copied — it declares a required MCP server that does not exist in the sandbox.
+- Stages the newest NSIS installer, project docs, sandbox `CLAUDE.md`, and a sanitized `.claude/` config into `tmp/sandbox/share/`.
 - Generates a `.wsb` file with **16 GB RAM** allocation that maps `tmp/sandbox/share/` to `Desktop\JustSearchTest` inside the sandbox and (optionally) maps the host `models/` directory to `Desktop\JustSearchModels`.
-- LogonCommand opens an Explorer window at the mapped folder. Nothing else runs automatically. Install Git, ONE agent harness (Claude Code or Codex), and JustSearch manually inside the sandbox (see `scripts/sandbox/sandbox-CLAUDE.md` "Setup (manual)"). Under Codex, accept the trust prompt for the mapped folder or the staged `.codex/config.toml` is ignored. There is no checkout, no hooks, and no `justsearch-dev` MCP server in the sandbox — the round runs against the installed product only.
+- LogonCommand opens an Explorer window at the mapped folder. Nothing else runs automatically  -  Git, one agent harness (Claude Code or Codex), and JustSearch are installed manually by the user inside the sandbox (see `scripts/sandbox/sandbox-CLAUDE.md` "Setup (manual)" for the exact commands). The launcher stages entry points for both harnesses: the charter as `CLAUDE.md` and `AGENTS.md`, a sanitized `.claude/`, and a generated credential-free `.codex/config.toml` + `.agents/skills/start/` (tempdoc 939). Graders are harness-agnostic  -  they only read the evidence files.
 - Drop any host-pre-staged installers (e.g. Git for Windows) into `tmp/sandbox/share/tools/` before launch; they appear inside the sandbox at `Desktop\JustSearchTest\tools\`.
 - `--upgrade-from <installer>` stages the exact previous published installer
   for an installer-over-release arrival test.
@@ -360,14 +393,14 @@ Current behavior:
   trust overrides and non-HTTPS endpoints by design.
 
   Build that candidate with the `Build Installer` workflow's `sandboxTestMode`
-  input (`candidateVersion` produces the source/target pair an N→N+1 round
+  input (`candidateVersion` produces the source/target pair an N->N+1 round
   needs). The workflow refuses that input on a `v*` tag: a published binary
   honouring runtime trust overrides would hand the update channel to anything
   able to set an environment variable.
 
   Inside the sandbox, `start-in-app-update-test.ps1 -Autorun` drives check and
-  install with no operator input, so the apply machinery — prepare, freeze,
-  witnessed shutdown, installer launch, restart reconciliation — is qualified
+  install with no operator input, so the apply machinery  -  prepare, freeze,
+  witnessed shutdown, installer launch, restart reconciliation  -  is qualified
   unattended. The verdict appears as `autorunVerdict` in
   `collect-updater-evidence.ps1` output, written by the **second** boot, because
   a successful apply exits the process that started it.
@@ -376,7 +409,7 @@ Current behavior:
   anything is applied, and that the apply machinery is correct, fail
   independently; run both.
 
-In addition, `scripts/ci/package-installer-win.ps1` keeps the Sandbox share “fresh” by staging the newest installer under a
+In addition, `scripts/ci/package-installer-win.ps1` keeps the Sandbox share "fresh" by staging the newest installer under a
 stable alias plus a unique alias:
 
 - `JustSearch-LATEST-setup.exe` (best-effort stable alias; may be locked while Sandbox is running)
@@ -387,18 +420,16 @@ Important:
 - The memory cap only applies when launching Sandbox via the generated `.wsb` file.
 - Launching Windows Sandbox from the Start Menu ignores these settings and will use the default memory behavior (often ~4 GB).
 - **GPU note:** Windows Sandbox passes through the GPU for DirectX/vGPU rendering but does **not** expose the CUDA runtime. All ONNX inference and LLM inference runs **CPU-only** in sandbox. To enable GPU, both CUDA runtime DLLs and ORT CUDA DLLs must be staged from the host.
-- **Model pre-staging:** `JUSTSEARCH_MODELS_DIR` env var can point to host models mapped into the sandbox, eliminating the 8.5 GB “Install AI” download.
+- **Model pre-staging:** `JUSTSEARCH_MODELS_DIR` env var can point to host models mapped into the sandbox, eliminating the 8.5 GB "Install AI" download.
 - **Correct main class:** `io.justsearch.ui.HeadlessApp` (not `io.justsearch.ui.headless.HeadlessApp`).
 
 The Sandbox is used as a clean, ephemeral environment to validate:
 - install/uninstall behavior,
 - first-run boot,
-- UI ↔ backend connection,
+- UI <-> backend connection,
 - (optionally) BYO AI enablement.
 
 ### 8.2 Operational caveats
 
 - **Retired Worker configuration snapshot:** The one-Engine runtime no longer reads or writes `runtime/worker-config-snapshot.json`. A file left by an older release is inert; it is not a reason to clear user data or invalidate current Engine configuration. The former stale-path failure (374 G26) belonged to the removed Worker launch path.
 - **`isProd` gate fix:** `resolveWorkerLibDir()` now checks the bundled layout unconditionally (not gated on `isProd`), fixing Worker spawn failures on installed apps where Tauri passes `isProd=false`. (375 G27)
-
-<!-- end manually maintained Codex copy -->

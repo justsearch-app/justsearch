@@ -322,7 +322,7 @@ def _poll_until_stable(
             if on_snapshot is not None:
                 on_snapshot(elapsed, snapshot)
 
-            # A fatal indexing-loop death is terminal even while the Worker process and search
+            # A fatal indexing-loop death is terminal even while the Engine and search
             # RPCs remain healthy. ERROR is deliberately distinct: declared document failures
             # can be acceptable to a corpus-specific predicate. Stale snapshots were excluded above.
             if snapshot.get("indexState") == "FAILED":

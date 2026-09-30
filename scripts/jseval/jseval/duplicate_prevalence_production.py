@@ -423,9 +423,9 @@ def _validate_live_state(
     health = client.health()
     lifecycle = health.get("lifecycle")
     components = health.get("components")
-    head = components.get("head") if isinstance(components, Mapping) else None
-    worker = components.get("worker") if isinstance(components, Mapping) else None
-    inference = components.get("inference") if isinstance(components, Mapping) else None
+    api = components.get("api") if isinstance(components, Mapping) else None
+    index = components.get("index") if isinstance(components, Mapping) else None
+    generative = components.get("generative") if isinstance(components, Mapping) else None
     lifecycle_ready = (
         isinstance(lifecycle, Mapping)
         and lifecycle.get("state") == "LIFECYCLE_STATE_READY"
@@ -434,20 +434,20 @@ def _validate_live_state(
         isinstance(lifecycle, Mapping)
         and lifecycle.get("state") == "LIFECYCLE_STATE_DEGRADED"
         and lifecycle.get("reason_code") == "inference.offline"
-        and isinstance(inference, Mapping)
-        and inference.get("state") == "LIFECYCLE_STATE_DEGRADED"
-        and inference.get("reason_code") == "inference.offline"
+        and isinstance(generative, Mapping)
+        and generative.get("state") == "UNAVAILABLE"
+        and generative.get("reason_code") == "inference.offline"
     )
     if (
         not isinstance(lifecycle, Mapping)
         or not (lifecycle_ready or inference_offline)
-        or not isinstance(head, Mapping)
-        or head.get("state") != "LIFECYCLE_STATE_READY"
-        or not isinstance(worker, Mapping)
-        or worker.get("state") != "LIFECYCLE_STATE_READY"
+        or not isinstance(api, Mapping)
+        or api.get("state") != "READY"
+        or not isinstance(index, Mapping)
+        or index.get("state") != "READY"
     ):
         raise ProductionDuplicatePrevalenceError(
-            "/api/health does not report ready Head/Worker control planes with an "
+            "/api/health does not report ready API/index components with an "
             "allowed inference disposition"
         )
 
@@ -525,12 +525,12 @@ def _validate_live_state(
     return (
         lifecycle.get("state"),
         lifecycle.get("reason_code"),
-        head.get("state"),
-        head.get("reason_code"),
-        worker.get("state"),
-        worker.get("reason_code"),
-        inference.get("state") if isinstance(inference, Mapping) else None,
-        inference.get("reason_code") if isinstance(inference, Mapping) else None,
+        api.get("state"),
+        api.get("reason_code"),
+        index.get("state"),
+        index.get("reason_code"),
+        generative.get("state") if isinstance(generative, Mapping) else None,
+        generative.get("reason_code") if isinstance(generative, Mapping) else None,
     ), status, debug
 
 
