@@ -8,7 +8,7 @@ scope-of-this-file: S0, S1, S2, S3 and S4-partial. The full program charter (tar
   the slice DAG S1-S11, the open questions) lives with the orchestrator and lands here as the
   program's later slices land. This file exists so each slice's code has its design of record
   in-repo rather than only in a PR body.
-forcing-function: "`check-window-cutover` (shipped with 851) WARNs until 2026-09-30 and FAILS after, keyed on (a) `core.search-v3-surface` audience USER in CorePlugin.ts and (b) the `governance/window-cutover.done` marker the program's final slice writes."
+forcing-function: "`check-window-cutover` (shipped with 851) WARNs until 2026-11-30 (moved from 2026-09-30 by owner decision 2026-09-30; see 851) and FAILS after, keyed on (a) `core.search-v3-surface` audience USER in CorePlugin.ts and (b) the `governance/window-cutover.done` marker the program's final slice writes."
 related: "847 (citation correctness — S1-S3 shipped in #488; 852-S1 is sequenced strictly behind 847-S3, which owns `Sv3Turn.recordId` and the identity-keyed merge), 848 (reasoning parity), 846 (markdown substrate), 849 (evidence reader), 822 (the Search v3 window itself: Phases F1-F10), 610 (the context set), 513 (stable message ids + branch), 629/734 (the conversation-store lock)"
 ---
 

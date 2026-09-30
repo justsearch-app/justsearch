@@ -74,8 +74,10 @@ function makeFixture({ pluginSource = plugin('DEVELOPER'), marker = false, reviv
   return root;
 }
 
-const BEFORE = '2026-09-01';
-const AFTER = '2026-10-01';
+// Derived from DEADLINE so a moved deadline keeps testing its own boundary: the day before WARNS,
+// the deadline day itself FAILS ("on or after").
+const BEFORE = new Date(Date.parse(`${DEADLINE}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+const AFTER = DEADLINE;
 
 // --- audience parsing ------------------------------------------------------
 ok(
