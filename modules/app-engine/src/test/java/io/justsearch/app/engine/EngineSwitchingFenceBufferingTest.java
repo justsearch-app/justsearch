@@ -90,6 +90,7 @@ final class EngineSwitchingFenceBufferingTest {
 
     assertTrue(
         engine.client().startMigration("system_test_switching", TestEngineContexts.FOREGROUND).accepted(), "startMigration must be accepted");
+    assertTrue(engine.awaitLiveGreen(60_000), "live Green preparation must complete before restart");
     engine.restart();
 
     assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(), "requestCutover must be accepted");

@@ -89,6 +89,7 @@ final class EngineVduMigrationReplayTest {
         engine.client().pauseMigration("vdu_replay_gate", TestEngineContexts.FOREGROUND),
         "pauseMigration must be accepted before the migration boot");
 
+    assertTrue(engine.awaitLiveGreen(60_000), "paused Green preparation must complete before restart");
     engine.restart();
     StatusResponse paused = engine.status();
     assertTrue(paused.getMigration().getPaused(), "the pause flag must survive reopening");
