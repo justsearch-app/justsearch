@@ -18,8 +18,8 @@ Checkpoint commits and pushes to draft PR727 remain authorized; merge remains
 separate at F. The worktree is HELD through 2026-10-04. Preserve main and the
 foreign untracked `modules/app-inference/logs/`.
 
-The uncommitted connected native endpoint is now on a selective broad replay
-design; see D1's 2026-09-30 plan delta before resuming implementation. The
+The connected native endpoint uses the selective broad replay design committed
+at `2f62a59ea`; see D1's 2026-09-30 plan delta. The
 intermediate connected in-process native restart passes at
 `tmp/lane-f-native-connected-r3.log` (3m21s), but its proof-only broad replay
 prototype was superseded after independent queue-side crash refutation.
@@ -53,8 +53,94 @@ fresh indexer execution plus unchanged-module result reuse, not a claim that
 every case re-executed in the final invocation. Regeneration, strict runtime
 manifest closure, store recoverability, canonical links, dependency/config
 matrices and privacy checks pass under `tmp/lane-f-captured-*` logs.
-Installed/supervised native proof remains pending; its owner-correct startup
-design is recorded in D1. No Gradle build or owned stack is currently running.
+The actual-Head native source/driver and installed supervisor runner now pass
+the supported lifecycle test with real standard embedding queries, nine exact
+ordered B receipts, one counted after-pointer crash, successor B publication,
+empty B journal and physical A retirement. Final proof is
+`tmp/lane-f-native-supervised-lifecycle-r6.log` (45s, one executed AI case,
+zero failures/errors/skips), its `-xml/` archive and private fixture
+`tmp/lane-f-takeover/writer-junit-1d4c48de-5bc2-4670-8402-7ee87a7780bc/`.
+Independent Sol review rejected r5's overlapping content tokens as a possible
+wrong-reason TEXT pass. R6 uses opaque tokens absent from title/path/collection
+and keeps exact identity, source, revision and payload-digest checks. Successor
+boot registers the final source owner; committed B recovery settles retained
+receipts and does not execute a second source enumeration.
+
+The native helper's nine cases, UI/static checks and installDist pass at
+`tmp/lane-f-native-helper-oracle-r4.log` (8s). Integrated stress, Spotless, PMD
+and installDist pass at `tmp/lane-f-native-helper-integrated-r3.log` (12m15s):
+1,873 XML suites, 12,377 recorded cases, zero failures/errors and 33 existing
+skips; fresh affected-module execution plus unchanged-module result reuse.
+The complete XML/counts/skips archive remains at its `-xml/` directory.
+Installed r1-r4 exposed private readiness, post-pointer parser and projection
+query-oracle assumptions; their original logs/fixtures and clean stop reports
+remain accessible under `tmp/lane-f-native-supervised-installed-r{1,2,3,4}.log`.
+The distinct accepted-cancellation crash variant is implemented. R1/R2 stopped
+before cancellation on a superseded readiness reason and the live UI notice
+defect; their original logs and red XML remain accessible. The frontend now
+preserves physical encoder reloading through fresh degraded migration verdicts,
+with 6,636 frontend cases plus typecheck passing and full build/static proof at
+`tmp/lane-f-native-notice-build-r1.log` (44s). R3 returned green at
+`tmp/lane-f-refused-source-supervised-lifecycle-r3.log`, but independent review
+rejected its final recovery claim: it captured cleanup incarnation 2 while
+incarnation 3 answered the queries. Recorded FENCED recovery intentionally
+requests a free handoff after settling A and retiring B. The corrected R4 at
+`tmp/lane-f-refused-source-supervised-lifecycle-r4.log` distinguishes both
+successors, binds queries before and after to serving incarnation 3, and counts
+exactly one fatal crash plus one uncounted requested restart. Fresh R4 passes in
+4m45s: one executed AI case, zero failures/errors/skips, archived XML at its
+`-xml/` directory and selected proof at its `-summary.json`. Its private fixture is
+`tmp/lane-f-takeover/lifecycle-accepted-cancel-crash-c2b494ef-ad56-4eec-98d4-4eee0970ad25/`.
+The actual before-SWITCHING barrier remains held through verified death;
+recorded-child receipt binding, durable pre-cleanup refusal, exact cleanup and
+serving owners, empty B receipts, physical B retirement and A TEXT/VECTOR all
+pass. The live UI measure has zero axe/console violations; root inspected the
+visible semantic-pause notice. STOP 0 and official health ABSENT confirm cleanup.
+Independent Sol artifact review accepts R4: it reread the durable parent/child
+and hash bindings, exact final A state, empty/absent B, all three incarnations,
+real vector witness, UI measure and clean stop. D1/D2/E/F remain the governing
+queue. The speculative PRUNE settlement design is resolved below. VDU producers were
+retired before scoped native generation receipts existed; keep VDU under the
+documented unscoped legacy replay owner and preserve the native rejection test.
+A PRUNE current-filesystem fixed point cannot prove the historical effect after
+file recreation, and broad absence can hide over-deletion. Current native
+migration explicitly rejects PRUNE before buffering; only legacy single-runtime
+SWITCHING produces the prefix-only receipt. Preserve its native unsupported fence
+and add a mixed-snapshot negative regression. This closes the speculative native
+PRUNE implementation queue; legacy compatibility remains with its existing owner.
+D2-5's recorded owner design reuses the runtime write barrier and retains
+dispatch serialization; C2 operation identity and transition visibility still
+need connecting before implementation; its concrete accepted C2 projection
+consumer remains unresolved, as recorded in D2's 2026-09-30 design consolidation.
+
+The coherent final stress/Spotless/PMD gate passes at
+`tmp/lane-f-native-checkpoint-integrated-r5.log` (2m38s): 1,873 XML suites,
+12,378 recorded cases, zero failures/errors, 33 existing skips; the final call
+freshly executes 1,014 indexer cases and reuses unchanged-module results. Full
+XML/counts/skips are archived at `-r5-xml/`; the earlier r4 archive is preserved
+before the focused run overwrote its indexer output. The focused PRUNE fence
+class passes 18 cases with no skips at `tmp/lane-f-prune-fence-focused-r2.log`
+(8s), with XML at `-r2-xml/`. An initial command selected nonexistent module
+`pmdAll`; its unchanged task-selection failure is preserved at
+`tmp/lane-f-prune-fence-focused.log`, then corrected to the actual `pmdTest` task.
+Frozen module/script diff hash against `2f62a59ea` is
+`a8005a0aa91aa7e0000b4624ff1a01eb67278fd0`; installed source remains unchanged
+after the reviewed R4 and R6 runs. Script lint, runtime closure, store gate/self-tests, documentation/index/skills,
+canonical links, module/config matrices and pre-commit privacy pass at
+`tmp/lane-f-native-*-checkpoint.log` and `-script-lint-final.log`.
+
+Reviewed checkpoint `2f62a59ea51e3bfabe69bd9e0c9b1e87f7d224c8` is committed
+and pushed to existing draft PR727. Its code is the exact frozen hash above;
+the PR description records local proof and outstanding acceptance. Exact-SHA
+hosted CI [36674259729](https://github.com/justsearch-app/justsearch/actions/runs/36674259729)
+completed: twelve jobs passed, including Windows-native and system integration;
+Public claims failed on the same separately owned Search v3 cutover deadline.
+The complete snapshot and failed-job log are retained at
+`tmp/lane-f-captured-checkpoint-hosted-progress.json` and
+`tmp/lane-f-captured-checkpoint-hosted-failure.log`. Root continues the remaining
+D1 endpoints with bounded Luna implementation/exploration and independent Sol
+refutation. New helper/runner changes remain uncommitted until their coherent
+checks complete; merge remains unauthorized.
 
 The broader receipt core is committed at `5490f6c67` on this branch.
 Its final proved module/script code-diff hash

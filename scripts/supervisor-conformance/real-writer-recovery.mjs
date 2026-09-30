@@ -24,9 +24,18 @@ import {
   exerciseGenerativeRecovery,
   stagePrivateGenerativeRuntime,
 } from './component-recovery-scenario.mjs';
+import {
+  prepareNativeMixedAfterPointerFixture,
+  exerciseNativeMixedAfterPointer,
+  NATIVE_MIXED_AFTER_POINTER,
+  NATIVE_MIGRATION_POINT,
+  NATIVE_ACTION_REACHED,
+  NATIVE_ACTION_RELEASE,
+} from './native-projection-scenario.mjs';
 
 const repo = process.cwd();
 const scenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO;
+const nativeMixedAfterPointer = scenario === NATIVE_MIXED_AFTER_POINTER;
 const operationFault = new Set(['ingest-before-accept', 'settings-before-accept',
   'ingest-after-accept-before-effect', 'settings-after-accept-before-effect',
   'ingest-after-effect-before-checkpoint', 'settings-after-effect-before-checkpoint',
@@ -47,7 +56,9 @@ const queryRoleScenario = scenario === 'query-role-commit' || scenario === 'quer
 const modelLiveABGap = scenario === 'model-live-a-b-gap';
 const modelLiveABCancel = scenario === 'model-live-a-b-cancel';
 const modelLiveABRecomposeFailure = scenario === 'model-live-a-b-recompose-failure';
-const modelLiveABAcceptedCancel = scenario === 'model-live-a-b-accepted-cancel';
+const refusedSourceCrash = scenario === 'model-live-a-b-accepted-cancel-crash';
+const modelLiveABAcceptedCancel = scenario === 'model-live-a-b-accepted-cancel'
+  || refusedSourceCrash;
 const modelLiveABIssuedSearch = scenario === 'model-live-a-b-issued-search';
 const modelLiveABLowMemoryBeforePointer = scenario === 'model-live-a-b-low-memory-before-pointer';
 const modelLiveABLowMemoryPointerBeforeSettings =
@@ -99,6 +110,42 @@ const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
 assertFixtureFreeSpace(work);
 const state = path.join(work, 'state');
 const data = path.join(work, 'data');
+const nativeSourceInputPath = path.join(data, 'fixtures', 'native-projection-source.json');
+if (nativeMixedAfterPointer) {
+  // Native proof requires a fresh owned fixture. Refuse stale state instead of recursively
+  // deleting a caller's worktree; only the exact barrier markers may be cleared below.
+  const nativeRuntime = path.join(data, 'runtime');
+  const nativeFixtures = path.join(data, 'fixtures');
+  const nativeMarkers = [NATIVE_ACTION_REACHED, 'native-projection-actions-reached.pending',
+    NATIVE_ACTION_RELEASE, 'migration-barrier-reached.json', 'migration-barrier-reached.pending',
+    'migration-barrier-release'];
+  const forbidden = [state, path.join(work, 'index'), path.join(data, 'jobs.db'),
+    nativeSourceInputPath, path.join(data, 'watched_roots.json'),
+    path.join(work, 'native-prefix-root'), path.join(work, 'native-collection-root'),
+    path.join(work, 'retained-projection.md')].filter(fs.existsSync);
+  if (forbidden.length > 0) {
+    throw new Error(`native mixed proof requires a fresh fixture; existing paths: ${forbidden.join(', ')}`);
+  }
+  if (fs.existsSync(data)) {
+    const staleData = fs.readdirSync(data).filter(name => !['runtime', 'fixtures'].includes(name));
+    if (staleData.length > 0) {
+      throw new Error(`native mixed proof found stale data entries: ${staleData.join(', ')}`);
+    }
+  }
+  if (fs.existsSync(nativeFixtures) && fs.readdirSync(nativeFixtures).length > 0) {
+    throw new Error('native mixed proof requires an empty data/fixtures directory');
+  }
+  if (fs.existsSync(nativeRuntime)) {
+    const staleRuntime = fs.readdirSync(nativeRuntime)
+      .filter(name => !nativeMarkers.includes(name));
+    if (staleRuntime.length > 0) {
+      throw new Error(`native mixed proof found stale runtime entries: ${staleRuntime.join(', ')}`);
+    }
+    for (const marker of nativeMarkers) {
+      fs.rmSync(path.join(nativeRuntime, marker), { force: true });
+    }
+  }
+}
 if (modelLiveAB || bulkGapApproval) {
   // This owned installed fixture previously exercised a different crash cut.
   for (const marker of ['operation-fault-reached.json', 'operation-fault-release',
@@ -182,7 +229,7 @@ if (['writer', 'processing', 'operation'].includes(scenario) || scenario === und
   }));
 }
 if (['processing', 'operation'].includes(scenario) || operationFault || bulkFault || installerFault
-    || modelLiveABLowMemoryCrash) {
+    || modelLiveABLowMemoryCrash || nativeMixedAfterPointer || refusedSourceCrash) {
   // Observe durable state after actual Engine death and before its successor claims it.
   env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
   env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
@@ -286,8 +333,9 @@ if (modelLiveAB) {
     env.JUSTSEARCH_WORKER_DEADLINE_MS = '180000';
   } else if (acceptedWriteDuringBuild) {
     env.JUSTSEARCH_MIGRATION_BARRIER_POINT = 'migration-before-switching';
-    if (watcherDeleteDuringBuild) {
-      // Add and delete may each need a separate 60s periodic reconciliation tick.
+    if (watcherDeleteDuringBuild || refusedSourceCrash) {
+      // Watcher reconciliation and the refused-source cut's cold UI capture can
+      // retain this barrier for several minutes; absence of release is still proved.
       env.JUSTSEARCH_MIGRATION_BARRIER_TIMEOUT_SECONDS = '480';
     }
   }
@@ -342,6 +390,21 @@ if (aiEnabled) {
   delete env.JUSTSEARCH_RERANK_ENABLED;
   delete env.JUSTSEARCH_RERANK_CHUNKS_ENABLED;
   delete env.AI_OFFLINE;
+}
+if (nativeMixedAfterPointer) {
+  // The native proof uses the standard real embedding model on CPU. Other AI roles remain
+  // disabled so this scenario does not add unrelated model startup or query dependencies.
+  env.JUSTSEARCH_AI_EMBED_ENABLED = 'true';
+  env.JUSTSEARCH_EMBED_GPU_ENABLED = 'false';
+  env.JUSTSEARCH_CHAT_PROFILE = 'standard';
+  env.JUSTSEARCH_GPU_ENABLED = 'false';
+  env.JUSTSEARCH_NER_ENABLED = 'false';
+  env.JUSTSEARCH_SPLADE_ENABLED = 'false';
+  env.JUSTSEARCH_RERANK_ENABLED = 'false';
+  env.JUSTSEARCH_RERANK_CHUNKS_ENABLED = 'false';
+  delete env.AI_OFFLINE;
+  env.JUSTSEARCH_MIGRATION_BARRIER_POINT = NATIVE_MIGRATION_POINT;
+  env.JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT = '1';
 }
 if (process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO === 'migration') {
   const sources = path.join(work, 'migration-sources');
@@ -402,6 +465,55 @@ if (queryRoleScenario) {
     env.JUSTSEARCH_QUERY_PUBLICATION_BARRIER = '1';
   }
 }
+function normalizeNativePathKey(value) {
+  const normalized = path.resolve(value);
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+function normalizeNativePathPrefix(value) {
+  const normalized = normalizeNativePathKey(value);
+  return normalized.endsWith(path.sep) ? normalized : `${normalized}${path.sep}`;
+}
+function nativeProjectionPayload(documentId, sourceRevision, title, marker, projectionPath, collection) {
+  return {
+    version: 1,
+    source_id: 'native-supervised-fixture',
+    document_id: documentId,
+    source_revision: sourceRevision,
+    kind: 'UPSERT',
+    fields: {
+      title,
+      content: marker,
+      path: normalizeNativePathKey(projectionPath),
+      collection,
+    },
+  };
+}
+const nativeMixedFixture = nativeMixedAfterPointer
+  ? (() => {
+    const retainedProjectionPath = path.resolve(work, 'retained-projection.md');
+    const lateProjectionPath = path.join(work, 'native-prefix-root', 'deleted',
+      'late-projection.md');
+    const retained = nativeProjectionPayload('retained', 1, 'native-retained-projection', 'retainedbodyq7x91',
+      retainedProjectionPath, 'keep-collection');
+    const late = nativeProjectionPayload('late', 2, 'native-late-projection', 'latebodyk9z83',
+      lateProjectionPath, 'deleted-files');
+    return prepareNativeMixedAfterPointerFixture({
+      work,
+      data,
+      sourceInputPath: nativeSourceInputPath,
+      sourceInput: {
+        version: 1,
+        source_id: 'native-supervised-fixture',
+        phase: 'initial',
+        initial: [retained],
+        final: [retained, late],
+      },
+      normalizePathKey: normalizeNativePathKey,
+      normalizePathPrefix: normalizeNativePathPrefix,
+      requireThat,
+    });
+  })()
+  : null;
 const runner = path.join(repo, 'scripts', 'dev', 'dev-runner.cjs');
 const engineLogWindow = modelLiveAB ? (() => {
   const file = path.join(data, 'logs', 'engine.log');
@@ -427,7 +539,7 @@ const engineLogWindow = modelLiveAB ? (() => {
 const child = spawn(process.execPath, [
   runner, 'start', '--json', '--skip-build', '--clean', 'none', '--api-port', '0',
   '--ui-port', String(port), '--data-dir', data, '--session-id', 'writer-recovery-live',
-  '--lease-duration-sec', '600',
+  '--lease-duration-sec', nativeMixedAfterPointer ? '900' : '600',
 ], { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let output = '';
 let ownedRunId = null;
@@ -554,7 +666,14 @@ try {
         return response.status === 200 ? response : null;
       } catch { return null; }
     });
-  if (scenario === 'route-capture') {
+  if (nativeMixedAfterPointer) {
+    const result = await exerciseNativeMixedAfterPointer({
+      work, data, indexBase, jobsPath: path.join(data, 'jobs.db'),
+      sourceInputPath: nativeMixedFixture.sourceInputPath,
+      fixture: nativeMixedFixture, first, manifest, readJson, waitFor, request, post, requireThat,
+    });
+    console.log('PASS native-mixed-after-pointer', JSON.stringify({ ...result, work }));
+  } else if (scenario === 'route-capture') {
     const captured = await captureFromLive(`http://127.0.0.1:${apiPort}`);
     requireThat(captured.routes.every((route) => ![
       '/api/inference/reload', '/api/admin/inference/reload',
@@ -589,7 +708,8 @@ try {
       gapApproval: modelLiveABGap,
       gapCancellation: modelLiveABCancel || modelLiveABRecomposeFailure,
       gapRecomposeFailure: modelLiveABRecomposeFailure,
-      cancelBeforePointer: modelLiveABAcceptedCancel, engineLogWindow,
+      cancelBeforePointer: modelLiveABAcceptedCancel, refusedSourceCrash, engineLogWindow,
+      output: () => output,
       bootRootChanges: env.JUSTSEARCH_WRITER_RECOVERY_BOOT_ROOT_CHANGES === '1',
        issuedSearch: modelLiveABIssuedSearch });
   } else if (generativeRecovery) {

@@ -84,6 +84,25 @@ describe('the window says when capability is reduced, and says nothing when it i
     expect(projection?.causes.map((cause) => cause.code)).toEqual(['index.embedding_rebuilding']);
     expect(projection?.remedy).toEqual({ target: 'core.health-surface', label: 'Open Health' });
   });
+  it('D1-14: projects the physical encoder reload through a generation switch', () => {
+    const reloading: SystemHealthVerdict = {
+      kind: 'transitioning',
+      severity: 'info',
+      reasons: ['generation-switch', 'encoders.reloading'],
+    };
+    const notice = readinessNotice(reloading)!;
+    const projection = projectSv3Degradation(snapshotFor(reloading));
+    expect(notice.headline).toBe('Semantic search paused; keyword search available.');
+    expect(notice.body).toContain('Keyword search remains available');
+    expect(notice.causes).toEqual(['Semantic search models are reloading']);
+    expect(projection).toEqual({
+      headline: notice.headline,
+      body: notice.body,
+      causes: [{ code: 'encoders.reloading', wording: 'Semantic search models are reloading' }],
+      remedy: { target: 'core.health-surface', label: 'Open Health' },
+      severity: 'info',
+    });
+  });
   it('projects a banner for a degraded verdict and NONE for a healthy one', () => {
     // The mutation probe: this pair fails if the condition inverts, in whichever direction.
     expect(projectSv3Degradation(snapshotFor(degraded(['encoders.health.embedding_not_ready'])))).not.toBeNull();

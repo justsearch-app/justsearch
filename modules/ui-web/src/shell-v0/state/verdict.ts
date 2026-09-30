@@ -314,6 +314,7 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
         ? i.readiness.value.reasonCodes.filter(
             (code) =>
               code === 'index.embedding_rebuilding' ||
+              code === 'encoders.reloading' ||
               (cause === 'generation-switch' && code === 'index.activating') ||
               (cause === 'rebuilding' && code === 'migration.awaiting_gap_acceptance'),
           )
@@ -486,7 +487,7 @@ export function verdictBody(v: SystemHealthVerdict): string {
       if (v.reasons.includes('index.activating')) {
         return 'The current index remains available until cutover while the freshly-built index is activated.';
       }
-      if (v.reasons.includes('index.embedding_rebuilding')) {
+      if (v.reasons.includes('index.embedding_rebuilding') || v.reasons.includes('encoders.reloading')) {
         return 'Semantic search is paused while the index is rebuilt; keyword search remains available.';
       }
       switch (v.reasons[0]) {

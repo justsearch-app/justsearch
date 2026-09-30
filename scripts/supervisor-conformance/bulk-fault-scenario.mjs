@@ -706,6 +706,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   distinctModelB = false, inPlaceModelB = false, acceptedWriteDuringBuild = false,
   watcherDeleteDuringBuild = false, gapApproval = false, gapCancellation = false,
   gapRecomposeFailure = false, cancelBeforePointer = false,
+  refusedSourceCrash = false, output = null,
   issuedSearch = false, extraBuildFiles = 0, engineLogWindow = null, crashBoundary = null,
   bootRootChanges = false }) {
   const runtime = path.join(data, 'runtime');
@@ -732,6 +733,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     'side-by-side activation key is already present');
   if (cancelBeforePointer) requireThat(acceptedWriteDuringBuild && distinctModelB && inPlaceModelB,
     'accepted-write cancellation requires a distinct forced in-place candidate');
+  if (refusedSourceCrash) requireThat(cancelBeforePointer && acceptedWriteDuringBuild
+      && distinctModelB && inPlaceModelB,
+    'refused-source crash requires accepted in-place cancellation with a distinct candidate');
   if (crashBoundary) requireThat(acceptedWriteDuringBuild && distinctModelB && inPlaceModelB
       && ['installer-before-pointer', 'installer-pointer-before-settings'].includes(crashBoundary),
     `combined maintenance requires a supported forced in-place crash boundary: ${crashBoundary}`);
@@ -852,6 +856,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
   let issuedAReached;
   let watcherPassEvidence;
   let acceptedWriteEvidence;
+  let refusedSourceCrashEvidence;
+  let refusedSourceCrashSuccessor;
+  let refusedSourceCleanupSuccessor;
   let watcherSemanticEvidence;
   try {
     const acceptedFile = path.join(work, 'installer-root-a', `accepted-during-b-${operationKey}.txt`);
@@ -1124,12 +1131,18 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
           encoders: combinedFloor,
         })}`);
     }
-    if (acceptedWriteDuringBuild) fs.writeFileSync(migrationBarrier.releaseFile, 'release');
-    const reached = await waitFor('settled B before activation marker',
-      acceptedWriteDuringBuild ? 300000 : 170000,
-      () => readJson(reachedFile));
-    requireThat(reached.phase === (crashBoundary ?? 'installer-before-marker')
-      && reached.operationKey === operationKey,
+    if (acceptedWriteDuringBuild && !refusedSourceCrash) {
+      fs.writeFileSync(migrationBarrier.releaseFile, 'release');
+    }
+    const reached = refusedSourceCrash
+      ? readJson(migrationBarrier.reachedFile)
+      : await waitFor('settled B before activation marker',
+        acceptedWriteDuringBuild ? 300000 : 170000, () => readJson(reachedFile));
+    requireThat(refusedSourceCrash
+      ? reached?.point === 'migration-before-switching' && reached.pid === manifest.pid
+        && !fs.existsSync(migrationBarrier.releaseFile)
+      : reached.phase === (crashBoundary ?? 'installer-before-marker')
+        && reached.operationKey === operationKey,
     `side-by-side B stopped at the wrong marker: ${JSON.stringify(reached)}`);
     if (crashBoundary) {
       const capturedAtCut = snapshot({ operationPath, jobsPath, indexBase, operationKey });
@@ -1169,8 +1182,11 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       && bManifest?.models?.embedding?.id?.startsWith(bRoot)
       && (!distinctModelB || bManifest.models.embedding.sha256
         !== sourceManifest.models.embedding.sha256)
-      && inFlight?.phase === 'settled' && inFlight?.building_generation_id === bGeneration
-      && inFlight.units_completed >= 2 + extraBuildFiles && inFlight.units_failed === 0
+      && (refusedSourceCrash ? aState.migration_state === 'MIGRATING'
+        : inFlight?.phase === 'settled')
+      && inFlight?.building_generation_id === bGeneration
+      && (refusedSourceCrash || inFlight.units_completed >= 2 + extraBuildFiles)
+      && inFlight.units_failed === 0
       && settingsWitnessOnDisk(data).witness.acceptedRevision
         === beforeSettings.witness.acceptedRevision,
     `A/B cut lost serving A or settled B: ${JSON.stringify({ aState, bManifest,
@@ -1181,6 +1197,20 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       { query: marker, limit: 10, mode: 'vector' }, 30000);
     const statusReply = await request(apiPort, '/api/status', {}, 15000);
     const status = statusReply.status === 200 ? JSON.parse(statusReply.text) : null;
+    if (refusedSourceCrash) {
+      const capturedJobs = snapshot({ operationPath, jobsPath, indexBase, operationKey }).jobs;
+      requireThat(status?.worker?.migration?.migrationState === 'MIGRATING'
+          && status.worker.migration.activeGenerationId === sourceGeneration
+          && status.worker.migration.buildingGenerationId === bGeneration
+          && !fs.existsSync(migrationBarrier.releaseFile)
+          && capturedJobs.length >= 2 + extraBuildFiles
+          && capturedJobs.every(job => job.state === 'DONE'
+            && job.content_hash === job.planned_source_sha256
+            && /^[0-9a-f]{64}$/.test(job.content_hash ?? '')),
+        `refused-source cut lost its held B queue certificate: ${JSON.stringify({
+          migration: status?.worker?.migration, capturedJobs,
+        })}`);
+    }
     if (!watcherDeleteDuringBuild) {
       console.log('MODEL_LIVE_AB_HELD_READINESS', JSON.stringify({
         migration: status?.worker?.migration?.migrationState,
@@ -1205,8 +1235,8 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     if (!watcherDeleteDuringBuild) {
       requireThat(actualInPlace
         ? retrieval?.state === 'DEGRADED'
-          && retrieval.reasonCodes?.includes('index.embedding_rebuilding')
-        : !retrieval?.reasonCodes?.includes('index.embedding_rebuilding'),
+          && retrieval.reasonCodes?.includes('encoders.reloading')
+        : !retrieval?.reasonCodes?.includes('encoders.reloading'),
       `semantic-pause readiness contradicted ${composeMode}: ${JSON.stringify(retrieval)}`);
       const vectorOutcome = actualInPlace
         ? vectorSearch.status === 200
@@ -1248,11 +1278,11 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       };
       try {
         const uiOutput = await new Promise((resolve, reject) => {
-          execFile('python', ['-m', 'jseval', 'ui-shot', 'search-semantic-paused-live',
+          execFile('python', ['-u', '-m', 'jseval', 'ui-shot', 'search-semantic-paused-live',
             '--no-demo', '--output-dir', outputDir],
-          { cwd: work, env: uiEnv, timeout: 90000, maxBuffer: 1024 * 1024 },
+          { cwd: work, env: uiEnv, timeout: 150000, maxBuffer: 1024 * 1024 },
           (error, stdout, stderr) => error
-            ? reject(new Error(`installed semantic-pause UI capture failed: ${stderr || stdout || error.message}`))
+            ? reject(new Error(`installed semantic-pause UI capture failed: ${error.message}\n${stdout}\n${stderr}`))
             : resolve(stdout));
         });
         const measure = readJson(path.join(outputDir, 'search-semantic-paused-live.measure.json'));
@@ -1306,6 +1336,72 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       cancellationKey = await cancelReindexWithApproval({ apiPort, manifest,
         reindexKey: operationKey, createOperationKey, request, post, requireThat });
     }
+    if (refusedSourceCrash) {
+      requireThat(acceptedWriteEvidence?.visibleInA === true
+          && typeof acceptedWriteEvidence.operationKey === 'string'
+          && typeof acceptedWriteEvidence.path === 'string',
+        'refused-source crash requires the accepted child write evidence');
+      const refusal = await waitFor('cancelled parent refusal while B remains held', 60000, () => {
+        const parent = operationRows(operationPath, operationKey)[0];
+        const invocation = operationRows(operationPath, acceptedWriteEvidence.operationKey)[0];
+        const children = readRows(operationPath,
+          `SELECT operation_key FROM operations WHERE kind = 'ingest'
+           AND json_extract(identity_json, '$.mode') = 'ingest-child'
+           AND json_extract(identity_json, '$.parentOperationKey') = ?`,
+          acceptedWriteEvidence.operationKey);
+        const child = children.length === 1
+          ? operationRows(operationPath, children[0].operation_key)[0] : null;
+        const state = readJson(path.join(indexBase, 'state.json'));
+        const held = readJson(migrationBarrier.reachedFile);
+        const live = readJson(path.join(runtime, 'manifest.json'));
+        const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+        const durable = parent?.processing_history_counts_json
+          ? JSON.parse(parent.processing_history_counts_json) : null;
+        const acceptedPath = path.resolve(acceptedWriteEvidence.path);
+        const acceptedKey = `path:${process.platform === 'win32'
+          ? acceptedPath.toLowerCase() : acceptedPath}`;
+        const journal = readRows(jobsPath,
+          'SELECT key, op, payload FROM switch_buffer WHERE generation = ?',
+          `g-${operationKey}`).filter(row => row.key === acceptedKey);
+        const jobs = readRows(jobsPath,
+          `SELECT path, state, scan_id, unit_revision, planned_source_sha256,
+             content_hash, originator, transport FROM jobs WHERE path = ?`,
+          process.platform === 'win32' ? acceptedPath.toLowerCase() : acceptedPath);
+        const job = jobs.length === 1 ? jobs[0] : null;
+        let payload = null;
+        try { payload = journal.length === 1 ? JSON.parse(journal[0].payload) : null; }
+        catch { payload = null; }
+        return parent?.state === 'RUNNING' && parent.failure_reason == null
+            && durable?.refusalCode === 'cancelled'
+            && invocation?.state === 'COMPLETE' && child?.state === 'COMPLETE'
+            && job?.state === 'DONE' && job.scan_id === child.operation_key
+            && state?.active_generation === sourceGeneration
+            && state.migration_state === 'MIGRATING'
+            && state?.building_generation === `g-${operationKey}`
+            && held?.point === 'migration-before-switching'
+            && held.sourceGeneration === sourceGeneration
+            && held.buildingGeneration === `g-${operationKey}`
+            && held.pid === manifest.pid
+            && !fs.existsSync(migrationBarrier.releaseFile)
+            && live?.pid === manifest.pid && live.instanceId === manifest.instanceId
+            && supervisor?.pid === manifest.pid && supervisor.instanceId === manifest.instanceId
+            && journal.length === 1 && journal[0].op === 'UPSERT'
+            && payload?.version === 2 && samePath(payload.path, acceptedPath)
+            && typeof payload.unit_revision === 'string' && payload.unit_revision.length > 0
+            && job.unit_revision === payload.unit_revision
+            && job.planned_source_sha256 === payload.source_sha256
+            && job.content_hash === payload.source_sha256
+            && job.originator === 'user' && job.transport === 'BUTTON'
+            && payload.originator === job.originator && payload.transport === job.transport
+            && payload.source_sha256 === crypto.createHash('sha256')
+              .update(fs.readFileSync(acceptedPath)).digest('hex')
+          ? { parent, invocation, child, job, state, held, live, supervisor, journal, payload } : null;
+      });
+      const cooldown = await killOwnedEngineAndObserveCooldown({
+        engine: first, data, readJson, waitFor, requireThat,
+      });
+      refusedSourceCrashEvidence = { refusal, cooldown, acceptedWriteEvidence };
+    }
   } finally {
     if (acceptedWriteDuringBuild) fs.writeFileSync(migrationBarrier.releaseFile, 'release');
     fs.writeFileSync(releaseFile, 'release');
@@ -1356,6 +1452,51 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     }));
   }
   await dispatched.settled;
+  if (refusedSourceCrash) {
+    refusedSourceCleanupSuccessor = await waitFor(
+      'refused-source crash exact same-run successor', 180000, () => {
+        const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+        const currentManifest = readJson(path.join(runtime, 'manifest.json'));
+        return supervisor?.state === 'running'
+            && supervisor.runId === first.runId
+            && supervisor.incarnation === first.incarnation + 1
+            && supervisor.restartCount === 1
+            && supervisor.pid !== first.pid
+            && supervisor.instanceId !== first.instanceId
+            && currentManifest?.pid === supervisor.pid
+            && currentManifest.instanceId === supervisor.instanceId
+          ? { supervisor, manifest: currentManifest } : null;
+      });
+    // Recorded FENCED recovery closes its producer after exact B retirement;
+    // the existing compatibility owner requests one uncounted NATIVE handoff.
+    refusedSourceCrashSuccessor = await waitFor(
+      'refused-source exact requested handoff to serving A', 180000, () => {
+        const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+        const currentManifest = readJson(path.join(runtime, 'manifest.json'));
+        const cleanup = refusedSourceCleanupSuccessor.supervisor;
+        let cleanupAlive = true;
+        try { process.kill(cleanup.pid, 0); }
+        catch (error) {
+          if (error.code !== 'ESRCH') throw error;
+          cleanupAlive = false;
+        }
+        return !cleanupAlive && supervisor?.state === 'running'
+            && supervisor.runId === first.runId
+            && supervisor.incarnation === first.incarnation + 2
+            && supervisor.restartCount === 1
+            && supervisor.pid !== cleanup.pid && supervisor.pid !== first.pid
+            && supervisor.instanceId !== cleanup.instanceId
+            && supervisor.instanceId !== first.instanceId
+            && supervisor.lastExit?.incarnation === cleanup.incarnation
+            && supervisor.lastExit.code === 4
+            && supervisor.lastExit.reason === 'requested_restart'
+            && supervisor.lastExit.class === 'REQUESTED'
+            && supervisor.lastExit.counted === false
+            && currentManifest?.pid === supervisor.pid
+            && currentManifest.instanceId === supervisor.instanceId
+          ? { supervisor, manifest: currentManifest } : null;
+      });
+  }
   if (cancelBeforePointer) {
     const retired = await waitFor('accepted-write B cancelled and physically retired',
       180000, () => {
@@ -1365,6 +1506,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
           || state?.active_generation !== sourceGeneration
           || state?.migration_state !== 'IDLE'
           || state?.building_generation != null
+          || (refusedSourceCrash && state?.previous_generation != null)
           || fs.existsSync(path.join(indexBase, 'indices', `g-${operationKey}`))) return null;
         const durable = row.processing_history_counts_json
           ? JSON.parse(row.processing_history_counts_json) : null;
@@ -1380,11 +1522,18 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
         try {
           const live = readJson(path.join(runtime, 'manifest.json'));
           if (!live?.head?.apiPort) return null;
+          if (refusedSourceCrash && (live.pid !== refusedSourceCrashSuccessor.supervisor.pid
+              || live.instanceId !== refusedSourceCrashSuccessor.supervisor.instanceId)) return null;
+          const before = readJson(path.join(runtime, 'supervisor.v1.json'));
+          if (refusedSourceCrash && (before?.pid !== live.pid
+              || before.instanceId !== live.instanceId || before.runId !== first.runId
+              || before.incarnation !== first.incarnation + 2 || before.restartCount !== 1)) return null;
           const reply = await request(live.head.apiPort, '/api/status', {}, 15000);
           if (reply.status !== 200) return null;
           const status = JSON.parse(reply.text);
           if (status.worker?.compatibility?.embeddingFingerprintCurrent
               !== sourceManifest.models.embedding.sha256
+            || status.worker?.migration?.activeGenerationId !== sourceGeneration
             || status.components?.encoders?.state !== 'READY') return null;
           const text = await post(live.head.apiPort, '/api/knowledge/search',
             { query: 'lexicalbridgecobalt', limit: 10, mode: 'text' }, 30000);
@@ -1392,15 +1541,55 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
             || !matchingHit(text, acceptedFile, 'lexicalbridgecobalt')) return null;
           const vector = await post(live.head.apiPort, '/api/knowledge/search',
             { query: marker, limit: 10, mode: 'vector' }, 30000);
-          return vector.status === 200 && JSON.parse(vector.text).results?.length > 0
-            ? { status, text, vector } : null;
+          const after = readJson(path.join(runtime, 'manifest.json'));
+          const supervisor = readJson(path.join(runtime, 'supervisor.v1.json'));
+          const sameServingOwner = !refusedSourceCrash || (after?.pid === live.pid
+            && after.instanceId === live.instanceId && supervisor?.pid === live.pid
+            && supervisor.instanceId === live.instanceId
+            && supervisor.runId === first.runId
+            && supervisor.incarnation === first.incarnation + 2 && supervisor.restartCount === 1);
+          return vector.status === 200 && matchingHit(vector, file, marker) && sameServingOwner
+            ? { status, text, vector, servingOwner: { pid: live.pid,
+              instanceId: live.instanceId, supervisor } } : null;
         } catch { return null; }
       });
+    if (refusedSourceCrash) {
+      const exitLines = output().split(/\r?\n/)
+        .filter(line => line.includes('[dev-runner] Engine incarnation ') && line.includes(' exited '));
+      requireThat(exitLines.length === 2
+        && exitLines[0].includes(`Engine incarnation ${first.incarnation} exited 1 (fatal_or_uncaught, TRANSIENT); decision=restart counted 1/3`)
+        && exitLines[1].includes(`Engine incarnation ${first.incarnation + 1} exited 4 (requested_restart, REQUESTED); decision=restart`)
+        && !exitLines[1].includes(' counted '),
+      `refused-source recovery requires one counted crash and one free handoff: ${JSON.stringify(exitLines)}`);
+      refusedSourceCrashEvidence.exitLines = exitLines;
+      const vectorBody = JSON.parse(recoveredA.vector.text);
+      const vectorTrace = vectorBody.searchTrace;
+      requireThat(refusedSourceCrashEvidence?.refusal?.parent?.processing_history_counts_json
+          && refusedSourceCrashEvidence.cooldown?.lastExit?.counted === true
+          && refusedSourceCrashSuccessor?.supervisor?.runId === first.runId
+          && refusedSourceCrashSuccessor.supervisor.pid !== first.pid
+          && refusedSourceCrashSuccessor.supervisor.instanceId !== first.instanceId
+          && vectorTrace?.effectiveMode === 'VECTOR'
+          && vectorTrace.degradation?.vectorBlocked !== true
+          && vectorTrace.stages?.some(stage => stage.id === 'dense-retrieval'
+            && stage.status === 'executed'),
+        `refused-source crash recovery lacked exact successor/vector proof: ${JSON.stringify({
+          evidence: refusedSourceCrashEvidence, successor: refusedSourceCrashSuccessor,
+          trace: vectorTrace,
+        })}`);
+    }
     console.log('MODEL_LIVE_AB_ACCEPTED_CANCEL_PASS', JSON.stringify({ operationKey,
       cancellationKey, sourceGeneration, activeGeneration: retired.state.active_generation,
       acceptedFile, aVectorHits: JSON.parse(recoveredA.vector.text).results.length,
       aEmbeddingSha: recoveredA.status.worker.compatibility.embeddingFingerprintCurrent,
-      terminalState: retired.row.state }));
+      terminalState: retired.row.state,
+      refusedSourceCrash: refusedSourceCrash ? {
+        evidence: refusedSourceCrashEvidence,
+        servingSuccessor: refusedSourceCrashSuccessor?.supervisor,
+        cleanupSuccessor: refusedSourceCleanupSuccessor?.supervisor,
+        servingOwner: recoveredA.servingOwner,
+        vectorTrace: JSON.parse(recoveredA.vector.text).searchTrace,
+      } : null }));
     return;
   }
   const completed = await waitFor('side-by-side activation terminal promotion', 180000, () => {

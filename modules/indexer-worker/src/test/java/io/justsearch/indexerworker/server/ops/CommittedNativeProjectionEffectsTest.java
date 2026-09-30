@@ -231,6 +231,26 @@ final class CommittedNativeProjectionEffectsTest extends LuceneExecutorTestBase 
   }
 
   @Test
+  void unsupportedPrunePrefixReceiptRemainsFencedWithOwnedProjectionEvidence() throws Exception {
+    String prefix = io.justsearch.adapters.lucene.runtime.QueryFilterBuilder
+        .normalizePathPrefix(tempPath("owned-prune-prefix"));
+    var projection = projectionWithPath(SOURCE, "prune-prefix-owned", 4, "notes",
+        prefix + "owned.md", "owned projection");
+    var marker = op(sourceKey(SOURCE), "PROJECTION_SOURCE", SOURCE, 1);
+    var row = projectionOp(projection, 2);
+    var prune = op("prune_prefix:" + prefix, "PRUNE_PREFIX", prefix, 3);
+    try (var runtime = runtime()) {
+      index(runtime, projection);
+      assertProjection(runtime, projection);
+      var queue = queue(List.of(marker, row, prune));
+
+      assertFalse(settle(queue, runtime, GENERATION, List.of(SOURCE)));
+      assertProjection(runtime, projection);
+      verify(queue, never()).removeReplayedSwitchBufferOps(List.of(marker, row, prune));
+    }
+  }
+
+  @Test
   void higherProjectionRevisionRequiresACompleteDigestWitness() throws Exception {
     var indexed = projection(SOURCE, "incomplete-newer", 12, "notes", "new seed");
     var retained = projection(SOURCE, "incomplete-newer", 11, "notes", "old receipt");

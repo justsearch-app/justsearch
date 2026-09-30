@@ -43,20 +43,40 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(warrantsSearchDegradationBanner(paused)).toBe(true);
     expect(readinessNotice({ ...paused, reasons: ['rebuilding', 'source:embedding_model_change'] })).toBeNull();
   });
+  it('D1-14: projects the physical encoder reload and prefers it when the legacy code is also present', () => {
+    const reloading: SystemHealthVerdict = {
+      kind: 'transitioning', severity: 'info',
+      reasons: ['rebuilding', 'encoders.reloading'],
+    };
+    const notice = readinessNotice(reloading);
+    expect(notice?.headline).toBe('Semantic search paused; keyword search available.');
+    expect(notice?.body).toContain('Keyword search remains available');
+    expect(notice?.causes).toEqual(['Semantic search models are reloading']);
+
+    const both = readinessNotice({
+      ...reloading,
+      severity: 'warn',
+      reasons: ['rebuilding', 'index.embedding_rebuilding', 'encoders.reloading'],
+    });
+    expect(both?.causes).toEqual(['Semantic search models are reloading']);
+  });
   it('D1-15: presents activating and parked-candidate transitions while A remains available', () => {
     const activating = readinessNotice({
-      kind: 'transitioning', severity: 'info', reasons: ['generation-switch', 'index.activating'],
+      kind: 'transitioning', severity: 'info',
+      reasons: ['generation-switch', 'index.activating', 'encoders.reloading'],
     });
     expect(activating?.headline).toBe('Activating the new index.');
     expect(activating?.body).toContain('current index remains available');
     expect(activating?.body).toContain('until cutover');
     expect(activating?.causes).toEqual(['The search index is activating']);
     expect(readinessNotice({
-      kind: 'transitioning', severity: 'warn', reasons: ['generation-switch', 'overdue', 'index.activating'],
+      kind: 'transitioning', severity: 'warn',
+      reasons: ['generation-switch', 'overdue', 'index.activating', 'encoders.reloading'],
     })).toBeNull();
 
     const awaiting = readinessNotice({
-      kind: 'transitioning', severity: 'warn', reasons: ['rebuilding', 'migration.awaiting_gap_acceptance'],
+      kind: 'transitioning', severity: 'warn',
+      reasons: ['rebuilding', 'migration.awaiting_gap_acceptance', 'encoders.reloading'],
     });
     expect(awaiting?.headline).toBe('Index migration needs operator review.');
     expect(awaiting?.body).toContain('current index remains available');
@@ -66,9 +86,20 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
 
     // Even an incomplete stability projection must not turn this recognized serving
     // diagnostic into the generic keyword-only fallback.
-    const degradedAwaiting = readinessNotice(degraded('warn', ['migration.awaiting_gap_acceptance']));
+    const degradedAwaiting = readinessNotice(
+      degraded('warn', ['migration.awaiting_gap_acceptance', 'encoders.reloading']),
+    );
     expect(degradedAwaiting?.body).toContain('current index remains available');
     expect(degradedAwaiting?.body).not.toContain('keyword');
+  });
+  it('keeps paused and overdue migration advice ahead of the physical reload detail', () => {
+    for (const marker of ['paused', 'overdue'] as const) {
+      expect(readinessNotice({
+        kind: 'transitioning',
+        severity: 'warn',
+        reasons: ['rebuilding', marker, 'encoders.reloading'],
+      })).toBeNull();
+    }
   });
   it('returns null for every non-rendering verdict (the banner does not render)', () => {
     for (const kind of ['operational', 'checking', 'connecting'] as const) {

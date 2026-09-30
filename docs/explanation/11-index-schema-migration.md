@@ -544,6 +544,15 @@ or mismatched evidence retains the snapshot. Exact conditional cleanup follows p
 of every effect and must leave that generation's receipt scope empty. The file-only
 UPSERT/exact-DELETE recovery path retains its existing replay contract. Legacy VDU and
 PRUNE compatibility paths do not inherit this mixed-snapshot certificate.
+Native blue/green migration rejects `pruneMissing` retryably while its candidate
+is distinct from the writable serving runtime, including SWITCHING. Only legacy
+single-runtime SWITCHING buffers the normalized prefix as `PRUNE_PREFIX`.
+A retained prefix-only PRUNE receipt records no historical affected-document set:
+file recreation can hide a missed deletion, and requiring broad absence can hide
+deletion of files that should have survived. Native committed settlement therefore
+retains this unsupported receipt instead of inferring its effect from the current
+filesystem. Historical VDU receipts likewise remain under their serving-generation
+replay compatibility owner; new VDU calls create no journal rows.
 The file-only path also uses strict source-hash reads and proves parent/chunk absence
 after the exact delete's covering commit and refresh; unreadable absence retains its receipt.
 
@@ -587,7 +596,8 @@ Buffered operations include (current):
 - No-file projections and source completeness: `PROJECTION` and `PROJECTION_SOURCE`.
 - Watcher reconciliation:
   - `syncDirectory(force=true)` buffered as `SYNC_ROOT(root, force)`
-  - `pruneMissing` buffered as `PRUNE_PREFIX(prefix)`
+  - Legacy single-runtime SWITCHING only: `pruneMissing` buffered as
+    `PRUNE_PREFIX(prefix)`; native blue/green migration refuses it retryably.
 
 Older `VDU_UPDATE`, `VDU_MARK_PROCESSING`, `VDU_MARK_FAILED` and
 `VDU_RECOVER_PROCESSING` rows are replay-only compatibility records.

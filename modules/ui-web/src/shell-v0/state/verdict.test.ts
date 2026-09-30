@@ -447,6 +447,29 @@ describe('D1-14 — semantic pause during an in-place build', () => {
     expect(verdictBody(verdict)).toContain('keyword search remains available');
   });
 
+  it('carries the physical encoder reload through rebuilding and generation-switch transitions', () => {
+    const reloading = known<ReadinessView>({
+      ...readyReadiness,
+      retrieval: 'degraded',
+      reasonCodes: ['encoders.reloading'],
+    });
+    const cases = [
+      {
+        stability: rebuilding,
+        reasons: ['rebuilding', 'source:embedding_model_change', 'encoders.reloading'],
+      },
+      {
+        stability: { kind: 'provisional', cause: 'generation-switch' } as const,
+        reasons: ['generation-switch', 'encoders.reloading'],
+      },
+    ];
+    for (const { stability, reasons } of cases) {
+      const verdict = computeVerdict({ phase: 'connected', stability, readiness: reloading });
+      expect(verdict).toEqual({ kind: 'transitioning', severity: 'info', reasons });
+      expect(verdictBody(verdict)).toContain('keyword search remains available');
+    }
+  });
+
   it('does not infer a dense outage from model-change source alone or stale data', () => {
     const beside = computeVerdict({ phase: 'connected', stability: rebuilding, readiness: known(readyReadiness) });
     expect(beside.reasons).not.toContain('index.embedding_rebuilding');
@@ -455,6 +478,37 @@ describe('D1-14 — semantic pause during an in-place build', () => {
     expect(stale.reasons).not.toContain('index.embedding_rebuilding');
     const restarting = computeVerdict({ phase: 'connected', stability: { kind: 'provisional', cause: 'worker-restart' }, readiness: denseOff });
     expect(restarting.reasons).not.toContain('index.embedding_rebuilding');
+  });
+
+  it('does not infer an encoder outage from BESIDE, stale, disconnected, or restart states', () => {
+    const reloading = known<ReadinessView>({
+      ...readyReadiness,
+      retrieval: 'degraded',
+      reasonCodes: ['encoders.reloading'],
+    });
+    const beside = computeVerdict({
+      phase: 'connected',
+      stability: rebuilding,
+      readiness: known(readyReadiness),
+    });
+    expect(beside.reasons).not.toContain('encoders.reloading');
+    expect(verdictBody(beside)).not.toContain('keyword search remains available');
+
+    const stale = computeVerdict({ phase: 'stale', stability: rebuilding, readiness: reloading });
+    expect(stale.reasons).not.toContain('encoders.reloading');
+    const disconnected = computeVerdict({
+      phase: 'disconnected',
+      stability: rebuilding,
+      readiness: reloading,
+    });
+    expect(disconnected.kind).toBe('unreachable');
+    expect(disconnected.reasons).not.toContain('encoders.reloading');
+    const restarting = computeVerdict({
+      phase: 'connected',
+      stability: { kind: 'provisional', cause: 'worker-restart' },
+      readiness: reloading,
+    });
+    expect(restarting.reasons).not.toContain('encoders.reloading');
   });
 
   it('keeps actionable paused and overdue wording ahead of the dense-pause detail', () => {
@@ -470,6 +524,25 @@ describe('D1-14 — semantic pause during an in-place build', () => {
     });
     expect(overdue.reasons).toContain('index.embedding_rebuilding');
     expect(verdictBody(overdue)).toContain('taking longer than expected');
+
+    const reloading = known<ReadinessView>({
+      ...readyReadiness,
+      retrieval: 'degraded',
+      reasonCodes: ['encoders.reloading'],
+    });
+    const pausedReload = computeVerdict({
+      phase: 'connected', stability: rebuilding, readiness: reloading, migrationPaused: true,
+    });
+    expect(pausedReload.reasons).toEqual([
+      'rebuilding', 'paused', 'source:embedding_model_change', 'encoders.reloading',
+    ]);
+    const overdueReload = computeVerdict({
+      phase: 'connected', stability: rebuilding, readiness: reloading,
+      migrationSwitchingAgeMs: 10_000, migrationSwitchingMaxDurationMs: 5_000,
+    });
+    expect(overdueReload.reasons).toEqual([
+      'rebuilding', 'overdue', 'source:embedding_model_change', 'encoders.reloading',
+    ]);
   });
 });
 

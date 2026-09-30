@@ -760,14 +760,17 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
       remedy: OPEN_HEALTH,
     };
   }
-  // D1-14: the worker reports embedding rebuilding during an in-place migration while
+  // D1-14: the worker reports encoder reloading or embedding rebuilding during an in-place migration while
   // keyword serving continues. The verdict carries that real reason through the
   // transition, so a BESIDE build cannot produce this notice by source alone.
-  if (verdict.kind === 'transitioning' && verdict.reasons.includes('index.embedding_rebuilding')) {
+  const semanticPauseReason = verdict.reasons.includes('encoders.reloading')
+    ? 'encoders.reloading'
+    : verdict.reasons.includes('index.embedding_rebuilding') ? 'index.embedding_rebuilding' : null;
+  if (isMigrationPresentation && verdict.kind === 'transitioning' && semanticPauseReason !== null) {
     return {
       headline: 'Semantic search paused; keyword search available.',
       body: 'Keyword search remains available while the index is rebuilt; semantic ranking resumes afterward.',
-      causes: wordCauses(['index.embedding_rebuilding']),
+      causes: wordCauses([semanticPauseReason]),
       remedy: OPEN_HEALTH,
     };
   }

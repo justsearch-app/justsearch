@@ -180,6 +180,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
   inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/index-lock-recovery-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/bulk-fault-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/native-projection-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/component-recovery-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/hostile-lock-scenario.mjs"))
@@ -342,6 +343,7 @@ tasks.register<Test>("lifecycleIntegrationTest") {
   inputs.file(rootProject.file("scripts/supervisor-conformance/real-writer-recovery.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/index-lock-recovery-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/bulk-fault-scenario.mjs"))
+  inputs.file(rootProject.file("scripts/supervisor-conformance/native-projection-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/barrier-files.mjs"))
   // The installed lifecycle harness invokes jseval against the worktree Lit source.

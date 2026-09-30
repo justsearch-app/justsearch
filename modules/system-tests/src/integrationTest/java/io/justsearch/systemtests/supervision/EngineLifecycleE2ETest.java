@@ -30,6 +30,13 @@ final class EngineLifecycleE2ETest {
 
   @Tag("ai")
   @Test
+  void nativeCompleteSourceSurvivesMixedReceiptsAndSupervisedPointerCrash() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runScenario("native-mixed-after-pointer");
+    System.out.println("LIFECYCLE_NATIVE_PROJECTION_PASS §16 mixed receipts and pointer crash");
+  }
+
+  @Tag("ai")
+  @Test
   void stuckIndexRecoversLocallyWithoutRestart() throws Exception {
     EngineSupervisedRecoveryE2ETest.runScenario("lock-index-release");
     System.out.println("LIFECYCLE_STUCK_INDEX_LOCAL_RECOVERY_PASS §16 stuck component");
@@ -84,6 +91,13 @@ final class EngineLifecycleE2ETest {
   @Test
   void acceptedWriteDuringInPlaceBuildKeepsTheSameEngine() throws Exception {
     EngineSupervisedRecoveryE2ETest.runSeededInPlaceAcceptedWriteDuringBuild();
+  }
+
+  @Tag("ai")
+  @Test
+  @Timeout(14 * 60)
+  void refusedAcceptedInPlaceCancellationCrashRecoversExactSourceAndSettles() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runSeededInPlaceAcceptedCancellationCrash();
   }
 
   @Tag("ai")

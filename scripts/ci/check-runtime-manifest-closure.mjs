@@ -80,6 +80,12 @@ const ALLOWED_RUNTIME_ARTIFACTS = new Map([
   ['issued-a-citation-reached.json', 'lane F D1 Batch 5 — held query-A citation observation'],
   ['query-publication-reached.json', 'lane F D1 Batch 5 — registry/view publication barrier'],
   ['operation-fault-reached.json', 'lane F D1 Batch 5 — settings after-file crash barrier'],
+  // tempdoc-ref: Lane F D1-16 native mixed-after-pointer installed acceptance. These exact
+  // names are private native-projection harness handshakes under the owned fixture directory;
+  // they carry no product runtime discovery state.
+  ['native-projection-actions-reached.json', 'lane F D1-16 — native projection action observation'],
+  ['native-projection-actions-reached.pending', 'lane F D1-16 — atomic staging file for native projection action observation'],
+  ['native-projection-actions-release', 'lane F D1-16 — native projection action release presence signal'],
   ['dev-reload.request', 'lane F stage A review S2 — dev-only hot-reload trigger, written by the dev MCP reload tool and deleted by the Engine on consumption. Not a discovery surface: existence is the whole payload, and the file is absent except for the instant between a bytecode push and the service reconstruction it asks for.'],
 ]);
 

@@ -1213,6 +1213,9 @@ public class HeadlessApp {
           runtimeResources);
       processRoot = engineRoot;
       engineRoot.bindQueryRoleBootSelection(() -> resetSettingsStore.loadSnapshot().queryRoles());
+      var nativeProjectionHarness = NativeProjectionHarness.fromEnvironment(
+          configPhase.dataDir(), SystemAccess::rawEnvVar);
+      if (nativeProjectionHarness != null) nativeProjectionHarness.registerBeforeStart(engineRoot);
 
       // Phase 1: infrastructure (telemetry, policy)
       InfraPhaseResult infraPhase = setupInfra(configPhase, engineRoot.executors());
@@ -1249,7 +1252,10 @@ public class HeadlessApp {
                   return tryStartKnowledgeServer(
                       ksConfig, engineRoot,
                       OperationFaultBarrier.automaticRootProducersEnabled(SystemAccess::rawEnvVar,
-                          operationFaultHook), constructedWorker::complete);
+                          operationFaultHook)
+                          && (nativeProjectionHarness == null
+                              || nativeProjectionHarness.automaticRootProducersEnabled()),
+                      constructedWorker::complete);
               });
       // Graceful retirement from the completing task cannot interrupt its own completion path.
       // The process registry continues accounting the concrete instance until it actually exits.
@@ -1338,6 +1344,7 @@ public class HeadlessApp {
           engineRoot.components(), engineRoot.encoderComponent(), componentEscalation);
       knowledgeServer = workerResult.knowledgeServer();
       healthMonitor = workerResult.healthMonitor();
+      if (nativeProjectionHarness != null) nativeProjectionHarness.startAfterBootstrap(engineRoot, knowledgeServer);
 
       // D1-2: one publisher-owned Engine component subscription drives the manifest aggregate and
       // its legacy worker/AI/mode projections from the same immutable registry observation.

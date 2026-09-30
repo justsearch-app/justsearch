@@ -364,6 +364,56 @@ final class EngineSupervisedRecoveryE2ETest {
     });
   }
 
+  static void runSeededInPlaceAcceptedCancellationCrash() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-16 refused-source crash requires retained CPU A and FP16 CUDA B model bytes");
+    Path work = repo.resolve(
+        "tmp/lane-f-takeover/lifecycle-accepted-cancel-crash-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      var environment = new java.util.HashMap<>(inPlaceModelEnvironment());
+      environment.put("JUSTSEARCH_WRITER_RECOVERY_ACCEPTED_WRITE", "1");
+      String output = runInstalledModelScenario(repo, work,
+          "model-live-a-b-accepted-cancel-crash", environment,
+          "MODEL_LIVE_AB_ACCEPTED_CANCEL_PASS");
+      var result = markerPayload(output, "MODEL_LIVE_AB_ACCEPTED_CANCEL_PASS");
+      assertEquals("CANCELLED", result.path("terminalState").asText(), output);
+      assertTrue(result.path("aVectorHits").asInt() > 0, output);
+      var crash = result.path("refusedSourceCrash");
+      assertTrue(crash.isObject(), output);
+      var refusal = crash.path("evidence").path("refusal");
+      assertEquals("RUNNING", refusal.path("parent").path("state").asText(), output);
+      assertEquals("COMPLETE", refusal.path("child").path("state").asText(), output);
+      assertFalse(refusal.path("parent").path("processing_history_counts_json")
+          .asText().isBlank(), output);
+      assertTrue(crash.path("evidence").path("cooldown").path("lastExit")
+          .path("counted").asBoolean(), output);
+      var cleanup = crash.path("cleanupSuccessor");
+      var serving = crash.path("servingSuccessor");
+      assertTrue(serving.path("pid").asLong() > 0, output);
+      assertEquals(1, serving.path("restartCount").asInt(), output);
+      assertEquals(cleanup.path("incarnation").asInt() + 1,
+          serving.path("incarnation").asInt(), output);
+      assertEquals(4, serving.path("lastExit").path("code").asInt(), output);
+      assertFalse(serving.path("lastExit").path("counted").asBoolean(), output);
+      assertEquals(serving.path("pid").asLong(),
+          crash.path("servingOwner").path("pid").asLong(), output);
+      assertEquals(serving.path("instanceId").asText(),
+          crash.path("servingOwner").path("instanceId").asText(), output);
+      assertEquals(2, crash.path("evidence").path("exitLines").size(), output);
+      assertEquals("VECTOR", crash.path("vectorTrace").path("effectiveMode").asText(), output);
+      assertTrue(crash.path("vectorTrace").path("stages").toString()
+          .contains("dense-retrieval"), output);
+      System.out.println("LIFECYCLE_ACCEPTED_CANCEL_CRASH_PASS §16 operation="
+          + result.path("operationKey").asText() + " source="
+          + result.path("activeGeneration").asText() + " cleanup=" + cleanup.path("pid")
+          + " serving=" + serving.path("pid") + " countedRestarts="
+          + serving.path("restartCount"));
+    });
+  }
+
   static void runSeededInPlaceWatcherDeleteReplay() throws Exception {
     Path repo = repositoryRoot();
     assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
@@ -802,6 +852,7 @@ final class EngineSupervisedRecoveryE2ETest {
     try {
       long timeoutSeconds = 330L;
       if (scenario.startsWith("generative-recovery-") || scenario.contains("low-memory")
+          || "model-live-a-b-accepted-cancel-crash".equals(scenario)
           || "model-live-a-b".equals(scenario)
               && "1".equals(extraEnvironment.get("JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE"))) {
         timeoutSeconds = 720L;
@@ -914,6 +965,7 @@ final class EngineSupervisedRecoveryE2ETest {
     boolean indexLockExhaustionScenario = "lock-index-exhaustion".equals(scenario)
         || "lock-index-exhaustion-no-ai".equals(scenario);
     boolean indexLockScenario = semanticIndexLockScenario || indexLockExhaustionScenario;
+    boolean nativeProjectionScenario = "native-mixed-after-pointer".equals(scenario);
     if ("lock-boot".equals(scenario) || indexLockScenario) {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "mandatory file-locking contention at boot is a Windows property");
@@ -923,7 +975,7 @@ final class EngineSupervisedRecoveryE2ETest {
           "the repository's process identity collector currently supports Windows only");
     }
     Path repo = repositoryRoot();
-    if (semanticIndexLockScenario) {
+    if (semanticIndexLockScenario || nativeProjectionScenario) {
       assumeTrue(hasRetainedStandardEmbedding(repo),
           "installed index recovery requires retained standard embedding model bytes");
     }
@@ -1133,6 +1185,9 @@ final class EngineSupervisedRecoveryE2ETest {
       assertTrue(output.contains("fatal_or_uncaught"), output);
     } else if ("migration".equals(scenario)) {
       assertTrue(output.contains("MIGRATION_PASS"), output);
+    } else if (nativeProjectionScenario) {
+      assertTrue(output.contains("PASS native-mixed-after-pointer"), output);
+      assertTrue(output.contains("STOP"), output);
     } else if (scenario.startsWith("bulk-")) {
       assertTrue(output.contains("\"scenario\":\"" + scenario + "\""), output);
       assertTrue(output.contains("BULK_FAULT_PASS"), output);
