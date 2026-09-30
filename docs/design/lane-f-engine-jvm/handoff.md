@@ -102,7 +102,14 @@ release note, every first-party client including MCP and CLI) or fix it.
 2. E1 instrument fixes (Sol, `codex/lane-f-e1`, no Gradle).
 3. WP2 2c downgrade sandbox round (Sol, `codex/lane-f-wp2c`, no Gradle).
 4. WP2 2b settings backup plus data-version marker (brief ready, needs the Gradle grant next).
-5. D1-4/12/14/16 reconfigure beside/in-place: design refutation first, then implementation.
+5. D1-4/12/14/16 reconfigure beside/in-place. Remaining gap: memory-aware ordinary
+   reconfigure of query-only encoders ([design pass](evidence/D1/reconfigure-remaining-design-2026-09-30.md)).
+   Decision 2026-09-30: implement the in-place hot swap (Proposal A, about 450-700 lines), not a
+   requested-restart fallback, because the fallback drops API connections (design.md:2312),
+   loses failed-B-restores-A and violates D1.md:372 and :2524
+   ([refutation](evidence/D1/reconfigure-restart-fallback-refutation-2026-09-30.md)).
+   Sol is implementing in `codex/lane-f-reconf-inplace`; its Gradle use waits for
+   `tmp/grants/gradle-reconf` (root creates it after the help worker finishes).
 6. D1 acceptance reconciliation for the implemented-unproven items, then the D1-17 sweep and D1 close.
 7. Contract-change verification (above; Luna check running), E values (owner sets the E4
    soak duration), E1-E7, F.
