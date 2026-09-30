@@ -32,44 +32,8 @@ export function canonicalJson(value) {
   return JSON.stringify(value);
 }
 
-export async function buildReleaseAssets(options) {
-  const {
-    installerPath,
-    artifactSignaturePath,
-    metadataPrivateKeyPath,
-    compatibilityRegisterPath,
-    compatibilityBaselinePath,
-    outDir,
-    version,
-    sequence,
-    installerUrl,
-    artifactKeyId,
-    artifactPublicKey,
-    metadataKeyId,
-    publishedAt = new Date().toISOString(),
-    notes = '',
-  } = options;
-  requireNonBlank('version', version);
-  requireNonBlank('installerUrl', installerUrl);
-  requireNonBlank('artifactKeyId', artifactKeyId);
-  requireNonBlank('artifactPublicKey', artifactPublicKey);
-  requireNonBlank('metadataKeyId', metadataKeyId);
-  if (!Number.isSafeInteger(sequence) || sequence <= 0) {
-    throw new Error('sequence must be a positive safe integer');
-  }
-
-  const [installer, artifactSignature, privateKeyPem, registerRaw] = await Promise.all([
-    readFile(installerPath),
-    readFile(artifactSignaturePath, 'utf8'),
-    readFile(metadataPrivateKeyPath, 'utf8'),
-    readFile(compatibilityRegisterPath, 'utf8'),
-  ]);
-  const register = JSON.parse(registerRaw);
-  verifyTauriArtifactSignature(
-    installer,
-    artifactSignature.trim(),
-    artifactPublicKey.trim(),
-  );
+export async function loadReleaseCompatibility(compatibilityRegisterPath, compatibilityBaselinePath) {
+  const register = JSON.parse(await readFile(compatibilityRegisterPath, 'utf8'));
   if ((register.knownCompatibilityGaps ?? []).length > 0) {
     throw new Error(
       `compatibility register is not release-ready: ${register.knownCompatibilityGaps.join(', ')}`,
@@ -132,6 +96,46 @@ export async function buildReleaseAssets(options) {
     });
   }
 
+  return compatibility;
+}
+
+export async function buildReleaseAssets(options) {
+  const {
+    installerPath,
+    artifactSignaturePath,
+    metadataPrivateKeyPath,
+    compatibilityRegisterPath,
+    compatibilityBaselinePath,
+    outDir,
+    version,
+    sequence,
+    installerUrl,
+    artifactKeyId,
+    artifactPublicKey,
+    metadataKeyId,
+    publishedAt = new Date().toISOString(),
+    notes = '',
+  } = options;
+  requireNonBlank('version', version);
+  requireNonBlank('installerUrl', installerUrl);
+  requireNonBlank('artifactKeyId', artifactKeyId);
+  requireNonBlank('artifactPublicKey', artifactPublicKey);
+  requireNonBlank('metadataKeyId', metadataKeyId);
+  if (!Number.isSafeInteger(sequence) || sequence <= 0) {
+    throw new Error('sequence must be a positive safe integer');
+  }
+
+  const [installer, artifactSignature, privateKeyPem] = await Promise.all([
+    readFile(installerPath),
+    readFile(artifactSignaturePath, 'utf8'),
+    readFile(metadataPrivateKeyPath, 'utf8'),
+  ]);
+  const compatibility = await loadReleaseCompatibility(compatibilityRegisterPath, compatibilityBaselinePath);
+  verifyTauriArtifactSignature(
+    installer,
+    artifactSignature.trim(),
+    artifactPublicKey.trim(),
+  );
   const descriptor = {
     schemaVersion: 1,
     sequence,
@@ -406,6 +410,8 @@ async function main() {
       publishedAt: args['published-at'],
       notes: args.notes ?? '',
     });
+  } else if (command === 'check-compatibility') {
+    await loadReleaseCompatibility(args.compatibility, args['compat-baseline']);
   } else if (command === 'verify') {
     await verifyReleaseAssets({
       installerPath: args.installer,
@@ -416,7 +422,7 @@ async function main() {
       expectedMetadataPublicKeyBase64: args['metadata-root-public-key'],
     });
   } else {
-    throw new Error('usage: app-release-assets.mjs <build|verify> [options]');
+    throw new Error('usage: app-release-assets.mjs <build|verify|check-compatibility> [options]');
   }
 }
 

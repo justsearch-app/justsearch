@@ -226,6 +226,14 @@ owner expectation against its embedded register and sends the complete installed
 Engine. The Engine and shell still require exact reconciliation of that complete set; a new store
 cannot disappear merely because it was absent from the compatibility baseline.
 
+Production tag assembly acquires that baseline with `derive-release-sequence.mjs
+--compat-baseline-out`: the same highest-sequence published predecessor supplies
+both the sequence and its complete tag-bound recoverability register. Descriptor
+identity/format mismatches, missing stores and ambiguous predecessors fail before
+sequence output. `package-installer-win.ps1` and `build-release-assets.ps1` require
+an explicit existing `-CompatibilityBaselinePath` for updater assembly, then pass
+the generator's `--compat-baseline`. Installer-only assembly needs no baseline.
+
 The frontend never authenticates releases. `appUpdateState.ts` projects
 shell-owned status into Settings and the global update banner. The background
 path checks only; install requires the user to activate Settings or the desktop

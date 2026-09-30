@@ -303,6 +303,13 @@ Owner-only steps (require repo permissions):
    > fetched or parsed is a hard error — the build fails rather than guessing, because
    > `updater.rs` persists `highest_accepted_sequence` and permanently refuses any descriptor
    > below it, with no in-client recovery.
+   > Updater assembly also derives `--compat-baseline-out` from the same highest-sequence
+   > published predecessor: its complete `governance/store-recoverability.v1.json` at that
+   > tag is checked against its descriptor before a sequence is emitted. Missing or inconsistent
+   > predecessor evidence fails the build. Both PowerShell wrappers require an existing
+   > `-CompatibilityBaselinePath` when `-AssembleUpdaterAssets` is selected; manual updater
+   > rehearsals must pass it explicitly. The current register supplies target formats, while
+   > the predecessor tag register supplies the inherited installed owner set.
    >
    > This replaced `GITHUB_RUN_NUMBER`, which GitHub scopes to the workflow *file*: renaming,
    > moving, or delete-and-recreating `build-installer.yml` reset the counter to 1 and would have

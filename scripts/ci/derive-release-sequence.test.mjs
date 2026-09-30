@@ -9,7 +9,10 @@
  */
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -113,6 +116,8 @@ for (const [label, sequence] of [
   ['zero', 0],
   ['negative', -1],
   ['fractional', 4.5],
+  ['unsafe', Number.MAX_SAFE_INTEGER + 1],
+  ['no safe successor', Number.MAX_SAFE_INTEGER],
 ]) {
   await expectThrow(
     `invalid sequence (${label}) throws`,
@@ -217,6 +222,138 @@ for (const [label, sequence] of [
   const r = spawnSync(process.execPath, [SCRIPT, '--help'], { encoding: 'utf8' });
   ok('--help exits 0', r.status === 0);
   ok('--help names the floor', /41/.test(r.stdout));
+}
+
+// The installed tag owns the complete baseline; its descriptor may be only an inherited subset.
+const frozenStrategy = 'READ_V0_OR_V1_AND_WRITE_V1';
+const predecessorRegister = {
+  durableStores: [{ id: 'ui-settings', owner: 'HEAD', recoverability: 'AUTHORED',
+    currentVersion: 4, reconciliation: frozenStrategy }],
+};
+const predecessorDescriptor = (sequence, tag = sequence === 57 ? 'v0.4.0' : 'v0.9.0') => ({
+  schemaVersion: 1, channel: 'stable', target: 'windows-x86_64', version: tag.slice(1),
+  sequence, compatibility: [{ ownerId: 'ui-settings',
+  owner: 'HEAD', role: 'AUTHORED', formatVersion: 4, reconciliationStrategy: frozenStrategy }] });
+{
+  const fetched = [];
+  const text = JSON.stringify({ durableStores: [...predecessorRegister.durableStores,
+    { ...predecessorRegister.durableStores[0], id: 'operations-db' }] }, null, 2) + '\n';
+  const result = await deriveReleaseSequence({
+    releases: [release('v0.4.0', { sequence: 57 }), release('v0.9.0', { sequence: 112 }),
+      release('v9.9.9', { sequence: 900 })],
+    fetchAsset: async (asset, rel) => JSON.stringify(predecessorDescriptor(asset._sequence, rel.tag_name)),
+    excludeTag: 'v9.9.9',
+    fetchCompatibilityBaseline: async rel => { fetched.push(rel.tag_name); return text; },
+  });
+  ok('baseline uses the same highest-sequence predecessor', result.sequence === 113
+    && result.compatibilityBaseline.tag === 'v0.9.0' && fetched.join() === 'v0.9.0');
+  ok('baseline retains exact tag bytes and full installed owner set',
+    result.compatibilityBaseline.text === text);
+}
+for (const [label, register, pattern] of [
+  ['renamed frozen strategy', { durableStores: [{ ...predecessorRegister.durableStores[0],
+    reconciliation: 'READ_V0_THROUGH_V5' }] }, /identity or format mismatch/],
+  ['missing descriptor owner', { durableStores: [{ ...predecessorRegister.durableStores[0],
+    id: 'different-owner' }] }, /identity or format mismatch/],
+  ['duplicate store', { durableStores: [...predecessorRegister.durableStores,
+    ...predecessorRegister.durableStores] }, /invalid or duplicate/],
+  ['empty store set', { durableStores: [] }, /no installed durable stores/],
+  ['wrong installed format', { durableStores: [{ ...predecessorRegister.durableStores[0],
+    currentVersion: 5 }] }, /identity or format mismatch/],
+]) {
+  await expectThrow(`baseline rejects ${label}`, deriveReleaseSequence({
+    releases: [release('v0.9.0', { sequence: 112 })],
+    fetchAsset: async () => JSON.stringify(predecessorDescriptor(112)),
+    fetchCompatibilityBaseline: async () => JSON.stringify(register),
+  }), pattern);
+}
+await expectThrow('baseline refuses a guessed zero-descriptor predecessor', deriveReleaseSequence({
+  releases: [], fetchAsset: fetcher(), fetchCompatibilityBaseline: async () => '{}',
+}), /No published predecessor/);
+await expectThrow('baseline refuses tied highest tags', deriveReleaseSequence({
+  releases: [release('v0.8.0', { sequence: 112 }), release('v0.9.0', { sequence: 112 })],
+  fetchAsset: async (asset, rel) => JSON.stringify(predecessorDescriptor(asset._sequence, rel.tag_name)),
+  fetchCompatibilityBaseline: async () => JSON.stringify(predecessorRegister),
+}), /ambiguous predecessor/);
+for (const [field, value] of [['version', '0.8.0'], ['schemaVersion', 2],
+  ['channel', 'preview'], ['target', 'linux-x86_64']]) {
+  await expectThrow(`baseline binds predecessor ${field}`, deriveReleaseSequence({
+    releases: [release('v0.9.0', { sequence: 112 })],
+    fetchAsset: async () => JSON.stringify({ ...predecessorDescriptor(112), [field]: value }),
+    fetchCompatibilityBaseline: async () => { throw new Error('must not fetch an inconsistent predecessor'); },
+  }), /descriptor\/tag identity mismatch/);
+}
+
+// Actual CLI/API/write chain: failure must emit neither a sequence nor a baseline artifact.
+{
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'release-predecessor-test-'));
+  let origin;
+  let mismatch = false;
+  const requests = [];
+  const server = createServer((request, response) => {
+    requests.push(request.url);
+    response.setHeader('Content-Type', 'application/json');
+    if (request.url.startsWith('/repos/owner/repo/releases?')) {
+      response.end(JSON.stringify([57, 112].map((sequence, index) => ({
+        tag_name: index ? 'v0.9.0' : 'v0.4.0',
+        assets: [{ name: DESCRIPTOR_ASSET_NAME, url: `${origin}/assets/${sequence}` }],
+      }))));
+    } else if (request.url.startsWith('/assets/')) {
+      response.end(JSON.stringify(predecessorDescriptor(Number(request.url.split('/').at(-1)))));
+    } else if (request.url === '/repos/owner/repo/contents/governance/store-recoverability.v1.json?ref=v0.9.0') {
+      response.end(JSON.stringify(mismatch ? { durableStores: [{
+        ...predecessorRegister.durableStores[0], reconciliation: 'READ_V0_THROUGH_V5',
+      }] } : predecessorRegister) + '\n');
+    } else { response.writeHead(404); response.end('{}'); }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  origin = `http://127.0.0.1:${server.address().port}`;
+  const run = destination => new Promise((resolve, reject) => {
+    const env = { ...process.env, DERIVE_RELEASE_SEQUENCE_API_ROOT: origin };
+    delete env.GITHUB_TOKEN;
+    delete env.GH_TOKEN;
+    const child = spawn(process.execPath, [SCRIPT, '--repo', 'owner/repo',
+      '--compat-baseline-out', destination], { env, timeout: 15_000 });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => { stdout += chunk; });
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('close', status => resolve({ status, stdout, stderr }));
+  });
+  try {
+    const baseline = path.join(directory, 'baseline.json');
+    const success = await run(baseline);
+    ok('CLI succeeds with exact predecessor sequence', success.status === 0 && success.stdout === '113\n');
+    ok('CLI emits exact validated tag bytes', await readFile(baseline, 'utf8')
+      === JSON.stringify(predecessorRegister) + '\n');
+    ok('CLI reads tag ref rather than default branch', requests.some(url => url.endsWith('?ref=v0.9.0')));
+    mismatch = true;
+    const failed = await run(path.join(directory, 'refused.json'));
+    ok('CLI renamed strategy fails before sequence output', failed.status === 1 && failed.stdout === ''
+      && /identity or format mismatch/.test(failed.stderr));
+    ok('CLI failed acquisition leaves no baseline or temporary artifact',
+      (await readdir(directory)).join() === 'baseline.json');
+    const stale = path.join(directory, 'stale.json');
+    await writeFile(stale, JSON.stringify(predecessorRegister));
+    const staleFailure = await run(stale);
+    ok('CLI invalidates a pre-existing baseline before failed acquisition', staleFailure.status === 1
+      && staleFailure.stdout === '' && (await readdir(directory)).join() === 'baseline.json');
+    await writeFile(stale, JSON.stringify(predecessorRegister));
+    const noRepositoryEnv = { ...process.env };
+    delete noRepositoryEnv.GITHUB_REPOSITORY;
+    const noRepository = spawnSync(process.execPath, [SCRIPT, '--compat-baseline-out', stale], {
+      env: noRepositoryEnv, encoding: 'utf8', timeout: 15_000,
+    });
+    ok('CLI invalidates a named baseline even when repository is missing', noRepository.status === 1
+      && noRepository.stdout === '' && /No repository/.test(noRepository.stderr)
+      && (await readdir(directory)).join() === 'baseline.json');
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir()));
+    await rm(directory, { recursive: true, force: true });
+  }
 }
 
 if (failures.length > 0) {

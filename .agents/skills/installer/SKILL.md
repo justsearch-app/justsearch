@@ -26,6 +26,10 @@ The release descriptor can project the prior release's store set with
 identity and readable formats. The installed shell expands inherited expectations
 against its own full register before exact Engine reconciliation, so added stores
 are checked even when an older installer required an exact compatibility row count.
+Tag updater assembly derives sequence and the full predecessor tag register together
+with `derive-release-sequence.mjs --compat-baseline-out`. Both PowerShell wrappers
+require an existing explicit `-CompatibilityBaselinePath` for updater assembly;
+manual rehearsals must provide it. Never substitute the current target register.
 
 ## Known Pitfalls
 

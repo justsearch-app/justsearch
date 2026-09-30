@@ -46,6 +46,7 @@ param(
   [switch]$AssembleUpdaterAssets,
 
   [long]$ReleaseSequence = 0,
+  [string]$CompatibilityBaselinePath,
   [string]$InstallerUrl,
   [string]$ArtifactKeyId,
   [string]$ArtifactPublicKey,
@@ -62,6 +63,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Split-Path -Parent (Split-Path -Parent $scriptDir) # scripts/ci -> scripts -> repo root
+
 if ($AssembleUpdaterAssets.IsPresent -and -not $AssembleReleaseAssets.IsPresent) {
   throw "-AssembleUpdaterAssets requires -AssembleReleaseAssets."
 }
@@ -69,6 +73,15 @@ if ($Release.IsPresent -and $env:JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE) {
   throw "Production -Release builds must not enable JUSTSEARCH_RELEASE_SANDBOX_TEST_MODE."
 }
 if ($AssembleUpdaterAssets.IsPresent) {
+  if ([string]::IsNullOrWhiteSpace($CompatibilityBaselinePath) -or
+      -not (Test-Path -LiteralPath $CompatibilityBaselinePath -PathType Leaf)) {
+    throw "-AssembleUpdaterAssets requires an existing predecessor -CompatibilityBaselinePath."
+  }
+  $CompatibilityBaselinePath = (Resolve-Path -LiteralPath $CompatibilityBaselinePath).Path
+  & node (Join-Path $repoRoot "scripts/release/app-release-assets.mjs") check-compatibility `
+    --compatibility (Join-Path $repoRoot "governance/store-recoverability.v1.json") `
+    --compat-baseline $CompatibilityBaselinePath
+  if ($LASTEXITCODE -ne 0) { throw "Predecessor compatibility preflight failed; refusing build/signing." }
   foreach ($name in @(
       "JUSTSEARCH_RELEASE_DESCRIPTOR_URL",
       "JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY",
@@ -79,9 +92,6 @@ if ($AssembleUpdaterAssets.IsPresent) {
     }
   }
 }
-
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repoRoot = Split-Path -Parent (Split-Path -Parent $scriptDir) # scripts/ci -> scripts -> repo root
 
 # Receipt dropped by scripts/ci/sign-windows.ps1 after it signs AND verifies the uninstaller.
 # Path must stay in sync with that script's $script:receiptPath.
@@ -520,6 +530,7 @@ try {
         $assetArgs += @(
           "-AssembleUpdaterAssets",
           "-ReleaseSequence", $ReleaseSequence,
+          "-CompatibilityBaselinePath", $CompatibilityBaselinePath,
           "-InstallerUrl", $resolvedInstallerUrl,
           "-ArtifactKeyId", $ArtifactKeyId,
           "-ArtifactPublicKey", $ArtifactPublicKey,

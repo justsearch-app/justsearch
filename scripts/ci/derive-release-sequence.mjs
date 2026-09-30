@@ -33,6 +33,8 @@
 
 import path from 'node:path';
 import process from 'node:process';
+import { mkdir, rename, rm, writeFile, lstat } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -67,9 +69,12 @@ export async function deriveReleaseSequence({
   fetchAsset,
   excludeTag = null,
   floor = RELEASE_SEQUENCE_FLOOR,
+  fetchCompatibilityBaseline = null,
 }) {
   const warnings = [];
   const observed = [];
+  let predecessor = null;
+  let ambiguousPredecessor = false;
 
   for (const release of releases) {
     const tag = release.tag_name ?? '(untagged)';
@@ -108,16 +113,31 @@ export async function deriveReleaseSequence({
     }
 
     const sequence = descriptor?.sequence;
-    if (!Number.isInteger(sequence) || sequence <= 0) {
+    if (!Number.isSafeInteger(sequence) || sequence <= 0 || sequence === Number.MAX_SAFE_INTEGER) {
       throw new Error(
         `Published release ${tag} has ${DESCRIPTOR_ASSET_NAME} with an invalid sequence ` +
-          `(${JSON.stringify(sequence)}); expected a positive integer.`,
+          `(${JSON.stringify(sequence)}); expected a positive safe integer with a safe successor.`,
       );
     }
+    if (fetchCompatibilityBaseline && (descriptor.schemaVersion !== 1
+        || descriptor.channel !== 'stable' || descriptor.target !== 'windows-x86_64'
+        || typeof descriptor.version !== 'string' || !descriptor.version.trim()
+        || tag !== `v${descriptor.version}`)) {
+      throw new Error(`Published predecessor ${tag} descriptor/tag identity mismatch.`);
+    }
     observed.push({ tag, sequence });
+    if (!predecessor || sequence > predecessor.sequence) {
+      predecessor = { release, descriptor, tag, sequence };
+      ambiguousPredecessor = false;
+    } else if (sequence === predecessor.sequence && tag !== predecessor.tag) {
+      ambiguousPredecessor = true;
+    }
   }
 
   if (observed.length === 0) {
+    if (fetchCompatibilityBaseline) {
+      throw new Error('No published predecessor descriptor; refusing to guess a compatibility baseline.');
+    }
     return {
       sequence: floor,
       provenance: `no published ${DESCRIPTOR_ASSET_NAME} found; using checked-in floor ${floor}`,
@@ -127,6 +147,13 @@ export async function deriveReleaseSequence({
   }
 
   const highest = observed.reduce((best, entry) => (entry.sequence > best.sequence ? entry : best));
+  let compatibilityBaseline;
+  if (fetchCompatibilityBaseline) {
+    if (ambiguousPredecessor) throw new Error('Highest published sequence has ambiguous predecessor tags.');
+    const text = await fetchCompatibilityBaseline(predecessor.release);
+    validateCompatibilityBaseline(text, predecessor.descriptor, predecessor.tag);
+    compatibilityBaseline = { tag: predecessor.tag, text };
+  }
   const next = highest.sequence + 1;
   if (next < floor) {
     return {
@@ -136,6 +163,7 @@ export async function deriveReleaseSequence({
         `raised to checked-in floor ${floor}`,
       warnings,
       observed,
+      ...(compatibilityBaseline ? { compatibilityBaseline } : {}),
     };
   }
   return {
@@ -143,7 +171,38 @@ export async function deriveReleaseSequence({
     provenance: `highest published sequence ${highest.sequence} (${highest.tag}/${DESCRIPTOR_ASSET_NAME}) + 1`,
     warnings,
     observed,
+    ...(compatibilityBaseline ? { compatibilityBaseline } : {}),
   };
+}
+
+function validateCompatibilityBaseline(text, descriptor, tag) {
+  const baseline = JSON.parse(text);
+  if (!Array.isArray(baseline.durableStores) || baseline.durableStores.length === 0) {
+    throw new Error(`Predecessor ${tag} compatibility baseline has no installed durable stores.`);
+  }
+  const byId = new Map();
+  for (const store of baseline.durableStores) {
+    if (!store || ['id', 'owner', 'recoverability', 'reconciliation'].some(
+      key => typeof store[key] !== 'string' || !store[key].trim())
+      || !Number.isSafeInteger(store.currentVersion) || store.currentVersion < 0
+      || byId.has(store.id)) {
+      throw new Error(`Predecessor ${tag} has invalid or duplicate installed durable stores.`);
+    }
+    byId.set(store.id, store);
+  }
+  if (!Array.isArray(descriptor.compatibility) || descriptor.compatibility.length === 0) {
+    throw new Error(`Predecessor ${tag} descriptor has no compatibility evidence.`);
+  }
+  const seen = new Set();
+  for (const row of descriptor.compatibility) {
+    const store = byId.get(row?.ownerId);
+    if (!store || seen.has(row.ownerId) || row.owner !== store.owner
+        || row.role !== store.recoverability || row.reconciliationStrategy !== store.reconciliation
+        || row.formatVersion !== store.currentVersion) {
+      throw new Error(`Predecessor ${tag} descriptor/tag compatibility identity or format mismatch.`);
+    }
+    seen.add(row.ownerId);
+  }
 }
 
 function authHeaders(token) {
@@ -194,12 +253,40 @@ function makeAssetFetcher(token) {
   };
 }
 
+function makeCompatibilityBaselineFetcher(repo, token) {
+  return async (release) => {
+    // Explicit ref binds the register to the selected published predecessor, never default main.
+    const url = `${API_ROOT}/repos/${repo}/contents/governance/store-recoverability.v1.json?ref=${encodeURIComponent(release.tag_name)}`;
+    const response = await fetch(url, {
+      headers: { ...authHeaders(token), Accept: 'application/vnd.github.raw+json' },
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error(`Cannot read predecessor compatibility register: HTTP ${response.status}`);
+    }
+    return response.text();
+  };
+}
+
+async function writeCompatibilityBaseline(destination, text) {
+  const target = path.resolve(destination);
+  await mkdir(path.dirname(target), { recursive: true });
+  const temporary = `${target}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, text, { flag: 'wx' });
+    await rename(temporary, target);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
 function parseArgs(argv) {
   const opts = { repo: process.env.GITHUB_REPOSITORY ?? null, excludeTag: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--repo' && argv[i + 1]) opts.repo = argv[++i];
     else if (arg === '--exclude-tag' && argv[i + 1]) opts.excludeTag = argv[++i];
+    else if (arg === '--compat-baseline-out' && argv[i + 1]) opts.compatibilityBaselineOut = argv[++i];
     else if (arg === '--help' || arg === '-h') opts.help = true;
     else throw new Error(`Unknown or incomplete argument: ${arg}`);
   }
@@ -210,12 +297,25 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.help) {
     console.log(
-      'Usage: node scripts/ci/derive-release-sequence.mjs [--repo owner/repo] [--exclude-tag vX.Y.Z]\n\n' +
+      'Usage: node scripts/ci/derive-release-sequence.mjs [--repo owner/repo] [--exclude-tag vX.Y.Z] [--compat-baseline-out FILE]\n\n' +
         'Prints max(sequence over published release.v1.json assets) + 1 on stdout,\n' +
         `never below the checked-in floor ${RELEASE_SEQUENCE_FLOOR}.`,
     );
     return;
   }
+  if (opts.compatibilityBaselineOut) {
+    // Invalidate only the explicitly named output before acquisition. A failed read must not
+    // leave a prior predecessor's bytes available under this run's requested output name.
+    const target = path.resolve(opts.compatibilityBaselineOut);
+    try {
+      const previous = await lstat(target);
+      if (!previous.isFile()) throw new Error('Compatibility baseline output must be a regular file path.');
+      await rm(target);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+
   if (!opts.repo) throw new Error('No repository: pass --repo owner/repo or set GITHUB_REPOSITORY.');
 
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || null;
@@ -226,7 +326,13 @@ async function main() {
     releases,
     fetchAsset: makeAssetFetcher(token),
     excludeTag: opts.excludeTag,
+    fetchCompatibilityBaseline: opts.compatibilityBaselineOut
+      ? makeCompatibilityBaselineFetcher(opts.repo, token) : null,
   });
+
+  if (opts.compatibilityBaselineOut) {
+    await writeCompatibilityBaseline(opts.compatibilityBaselineOut, result.compatibilityBaseline.text);
+  }
 
   for (const warning of result.warnings) console.error(`derive-release-sequence: ${warning}`);
   console.error(`derive-release-sequence: ${result.sequence} <- ${result.provenance}`);

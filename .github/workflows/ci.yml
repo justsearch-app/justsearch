@@ -1190,6 +1190,10 @@ jobs:
             modules/**/build/reports/tests/test/**
           retention-days: 30
 
+      - name: Release compatibility baseline contract tests
+        shell: pwsh
+        run: ./scripts/ci/test-release-compatibility-baseline.ps1
+
       - name: Release signing contract tests
         shell: pwsh
         run: |

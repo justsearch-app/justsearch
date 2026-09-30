@@ -109,3 +109,57 @@ legacy-local positive/negative test and release-descriptor projection test cover
 boundary. The production release wrapper still needs an inherited-register baseline
 argument before stage E, since its current invocation omits the generator's optional
 `--compat-baseline`; this remains WP2 work, not a completed release claim.
+
+## 2026-09-30 inherited-baseline owner design (wrapper implemented; retirement open)
+
+Extend `derive-release-sequence.mjs`, the existing published-release authority,
+with optional `--compat-baseline-out`. When requested, acquire the complete
+recoverability register from the same highest-sequence predecessor tag used for
+sequence derivation, excluding the tag being rebuilt. Validate nonempty unique
+installed store rows and cross-check the predecessor descriptor's compatibility
+identities and formats against that tag register. Descriptor projection alone
+cannot supply the complete installed predecessor owner set. Missing, ambiguous
+or inconsistent evidence must produce neither a sequence nor a usable baseline.
+Write validated exact register bytes atomically to the caller's temporary path.
+
+Require explicit `-CompatibilityBaselinePath` for updater assembly through both
+PowerShell wrappers, validate it before build/signing/staging, and pass the existing
+generator's `--compat-baseline`. The tag workflow derives sequence and baseline in
+one call. Ordinary installer assembly is unaffected. Do not default to the current
+register, add another checked-in authority, rename frozen reconciliation tokens,
+or publish a release as part of this implementation.
+
+Root owns wrapper/workflow production edits. Independent Sol design/review and
+offline negative controls cover a renamed predecessor strategy, duplicate/missing
+stores, highest-sequence selection, no sequence/file on failure, and omission of
+target-only stores while inherited target formats advance. Required hosted release
+asset inspection remains separate from local proof and needs a signed candidate;
+the existing signing/Sandbox dependency is not waived.
+
+### Review correction and live predecessor evidence
+
+After two substantive review rounds, root reassessed the acquisition boundary:
+one parsed invocation owns its explicit output from argument parsing onward, so
+every later failure invalidates old bytes, including a missing repository. Help
+remains read-only. Tag metadata and positive safe sequence integers bind selection;
+both wrappers invoke the generator's shared compatibility parser before expensive
+build/signing/staging. No separate compatibility representation was added.
+
+Offline predecessor tests (56 assertions), wrapper rejection tests (10 checks)
+and existing asset-generator tests (12 cases) passed in
+`tmp/lane-f-wp2-predecessor-tests-r3.log`,
+`tmp/lane-f-wp2-wrapper-negative-controls-r3.log` and
+`tmp/lane-f-wp2-assets-tests-r2.log`. The missing-repository stale-output
+regression subsequently passed at
+`tmp/lane-f-wp2-predecessor-tests-r4.log` (57 assertions). Independent Sol's
+final bounded review found no remaining acquisition/wrapper defect. Wrapper
+controls and existing generator cases passed again at their r4/r3 logs.
+
+The read-only real acquisition selected published v0.3.0, sequence41, and
+derived42 with its exact42-store tag register
+(`tmp/lane-f-wp2-live-predecessor-r2.log` and
+`tmp/lane-f-wp2-live-predecessor-register-r2.json`). Actual target preflight
+refuses the missing `worker-config-snapshot` owner, which stages A/B intentionally
+retired. Shared predecessor identities and versions otherwise match. This red
+preflight is an unresolved retirement contract, not release acceptance: preserve
+the missing-owner guard while designing exact explicit retirement evidence.
