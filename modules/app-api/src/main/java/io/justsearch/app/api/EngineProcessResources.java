@@ -14,6 +14,11 @@ public interface EngineProcessResources extends AutoCloseable {
 
   OperationLeaseService operationLeases();
 
+  /** Raise build/store high-water evidence under the instance lock, before opening durable stores.
+   * The Engine logs any non-blocking newer-data notice and returns it for notice surfaces.
+   */
+  java.util.Optional<String> recordDataVersions(java.nio.file.Path dataDir);
+
   /** Close after all component owners and their work have drained. */
   @Override
   void close();

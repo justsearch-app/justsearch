@@ -37,6 +37,14 @@ public final class DataVersionMarker {
     }
   }
 
+  /** Shared production hook: the composition root alone supplies this build's supported versions. */
+  public static Optional<String> recordBoot(Path dataDir) {
+    return recordBoot(dataDir,
+        io.justsearch.configuration.EnvRegistry.APP_VERSION.get()
+            .filter(v -> !v.isBlank()).orElse("0.0.0-dev"),
+        SupportedDataVersions.current());
+  }
+
   /** Called under the instance lock, before any store can migrate. A marker never blocks boot. */
   public static Optional<String> recordBoot(Path dataDir, String appVersion,
       Map<String, Integer> supported) {
