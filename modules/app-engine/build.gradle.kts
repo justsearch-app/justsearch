@@ -73,6 +73,8 @@ tasks.named<Test>("test") {
     .file(rootProject.file("modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java"))
     .withPropertyName("headlessAppExitSites")
     .withPathSensitivity(PathSensitivity.RELATIVE)
+  inputs.file(rootProject.file("governance/store-recoverability.v1.json"))
+    .withPropertyName("dataVersionStoreRegister").withPathSensitivity(PathSensitivity.RELATIVE)
   inputs
     .file(rootProject.file("governance/supervision-contract.v1.json"))
     .withPropertyName("supervisionContractRegister")

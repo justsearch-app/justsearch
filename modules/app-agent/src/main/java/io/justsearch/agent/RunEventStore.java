@@ -40,7 +40,7 @@ public final class RunEventStore {
   private static final Logger LOG = LoggerFactory.getLogger(RunEventStore.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final TypeReference<Map<String, Object>> MAP_REF = new TypeReference<>() {};
-  static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 1;
 
   private final Path rootDir; // nullable for noop
   private final StoreCipher cipher; // tempdoc 629 (LAYER) — seals events.ndjson + meta.json when enabled

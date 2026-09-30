@@ -47,14 +47,48 @@
   ],
   "durableStores": [
     {
-      "id": "ui-settings",
+      "id": "data-version-marker",
       "pathVerification": "LITERAL",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Only app and supported durable-store version identifiers; no user content or machine-local paths.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "data-version.json"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "JSON appVersion and storeVersions high-water object",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-engine/src/main/java/io/justsearch/app/engine/DataVersionMarker.java",
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "REWRITE_UNREADABLE_BUILD_HIGH_WATER_MARKER",
+      "corruptionNote": "Log an unreadable marker once, treat it as absent for comparison, and atomically record this build as the best available high-water mark. Read or write failures never block boot.",
+      "reconciliation": "RAISE_BUILD_AND_STORE_VERSION_HIGH_WATER_BEFORE_STORE_OPEN",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/DataVersionMarker.java",
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/SupportedDataVersions.java",
+        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
+      ],
+      "tests": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/DataVersionMarkerTest.java"
+      ],
+      "fixtures": []
+    },
+    {
+      "id": "ui-settings",
+      "pathVerification": "COMPOSED",
       "encryption": "UNSEALED_GAP",
       "encryptionNote": "Plaintext JSON holding the user's UI preferences, including the configured local model path and other machine-local settings. Nothing structural prevents sealing it; nothing seals it today.",
       "owner": "HEAD",
       "root": "DATA_DIR",
       "ownedPaths": [
-        "ui/settings.json"
+        "ui/settings.json",
+        "ui/settings.v*.bak.json"
       ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
@@ -68,12 +102,15 @@
         4
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
-      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
+      "versionSource": {
+        "file": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
+        "symbol": "CURRENT_SCHEMA_VERSION"
+      },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
       "corruptionPolicy": "PRESERVE_AND_RECOVER_DEFAULTS",
-      "corruptionNote": "Unparseable file is moved to settings.json.corrupt-<timestamp>, defaults are loaded, and LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT is raised as a WARN condition (ADR-0008, tempdoc 882 item 24). A future schemaVersion still fails loud (futureVersionRefusalTest). Test methods: readWrite_malformedStateIsQuarantinedAndDefaulted and readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback in the tests file below; the refusal is readWrite_futureVersionIsRefusedWithoutOverwrite.",
+      "corruptionNote": "Unparseable file is moved to settings.json.corrupt-<timestamp>, defaults are loaded, and LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT is raised as a WARN condition (ADR-0008, tempdoc 882 item 24). A future schemaVersion still fails loud (futureVersionRefusalTest). Test methods: readWrite_malformedStateIsQuarantinedAndDefaulted and readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback in the tests file below; the refusal is readWrite_futureVersionIsRefusedWithoutOverwrite. Writable legacy loads first retain byte-identical settings.v<old>.bak.json once per version. Failed preservation refuses without quarantining valid settings.",
       "reconciliation": "READ_V0_OR_V1_AND_WRITE_V1",
       "reconciliationNote": "Frozen updater compatibility-strategy identifier from the v1 register: it names read-in-place legacy upcast and atomic rewrite, not the current schema number. UiSettingsStore now writes v5 and reads v0-v4; currentVersion, readableLegacyVersions and versionSource carry those actual versions. Renaming this token would make installed v0.2.0/v0.3.0 updaters reject the successor release before checking readable versions.",
       "status": "READY",
@@ -83,9 +120,11 @@
         "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
       ],
       "tests": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreMigrationBackupTest.java"
       ],
-      "fixtures": []
+      "fixtures": [],
+      "pathVerificationNote": "UiSettingsStore resolves ui/settings.json and composes settings.v<old>.bak.json from the resolved readable legacy schema. The first byte-identical backup for each old version is retained before migration."
     },
     {
       "id": "action-ledger-audit-journal",

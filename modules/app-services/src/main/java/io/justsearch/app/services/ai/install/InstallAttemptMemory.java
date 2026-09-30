@@ -62,7 +62,7 @@ public final class InstallAttemptMemory {
   /** Serialized shape — a version tag plus the per-target-path map. */
   private record Persisted(int version, Map<String, Attempt> files) {}
 
-  private static final int VERSION = 1;
+  public static final int VERSION = 1;
 
   private final Path file;
   private final Map<String, Attempt> files;

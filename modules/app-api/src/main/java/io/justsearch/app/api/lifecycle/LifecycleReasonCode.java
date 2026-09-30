@@ -133,6 +133,7 @@ public enum LifecycleReasonCode {
   // timestamped .corrupt- sibling and defaults were loaded (ADR-0008). Not a fault to recover from:
   // the preferences are already gone, and the only thing left to do is tell the user so they can
   // re-author them. Deliberately NOT emitted for a FUTURE schemaVersion, which stays fail-loud.
+  DATA_NEWER_BUILD("data.newer_build"),
   SETTINGS_RESET_FROM_CORRUPT("settings.reset_from_corrupt"),
   SETTINGS_RECOVERY_REQUIRED("settings.recovery_required"),
   OPERATIONS_HISTORY_RESET("operations.history_reset"),
@@ -203,7 +204,7 @@ public enum LifecycleReasonCode {
       // Tempdoc 882 item 24: observed exactly once, at load, and never re-derived. The file that
       // proved it has already been moved aside. A later TRANSIENT write must not erase the only
       // notice the user gets that their preferences were reset.
-      case SETTINGS_RESET_FROM_CORRUPT, SETTINGS_RECOVERY_REQUIRED, OPERATIONS_HISTORY_RESET, OPERATIONS_PERSISTENCE_FAILED -> RetentionClass.STICKY;
+      case DATA_NEWER_BUILD, SETTINGS_RESET_FROM_CORRUPT, SETTINGS_RECOVERY_REQUIRED, OPERATIONS_HISTORY_RESET, OPERATIONS_PERSISTENCE_FAILED -> RetentionClass.STICKY;
 
       // Physical failure is a real cause, whether the index never opened or was lost after READY.
       case COMPONENT_START_DEADLINE, COMPONENT_RECOVERY_FAILED,

@@ -1,7 +1,7 @@
 {
   "kind": "readiness-reason-codes.v1",
   "note": "Tempdoc 600 PART IX/X — the degradation-cause reason vocabulary is ONE closed authority. The producer (StatusLifecycleHandler) emits readiness reason codes from the closed LifecycleReasonCode enum; the FE CAUSE_ROWS table words them (code -> wording/remedy/severity). This register's gate (scripts/ci/check-readiness-reason-codes.mjs) enforces producer<->consumer correspondence so neither can drift: FORWARD = every enum code that is NOT exempt has a CAUSE_ROWS row (so a user can never be shown a raw `Degraded: <code>` string in the degradation banner); BACKWARD = every CAUSE_ROWS code is a real enum member OR a declared FE-derived code (no dead/typo rows); PRODUCER (tempdoc 837 §5) = every enum code is referenced by at least one modules/**/src/main Java source outside the enum's own file, by enum NAME or quoted code string, matched AFTER comment-stripping. The two allow-lists below are the only curated artifact (the search-issuance gate's allowedReferences pattern); note that noWordingExempt does NOT exempt from the PRODUCER direction, since the two lists answer different questions (a code can legitimately never reach the banner and still need an emit site).",
-  "producerDirectionNote": "Tempdoc 837 §4/§5 and Lane F D1-15. Four ORT_CUDA_* codes lived in this vocabulary with no producer for months; the producer direction prevents that drift. The 61 current lifecycle codes have no producer exemption. A new code requires a real emission site. The desktop-owned engine.escalated_restart is FE-derived from supervisor lastExit.reason. Tap coverage remains a separate check: a reason with an emit site and wording row can still miss a (dimension, state, code) Condition mapping.",
+  "producerDirectionNote": "Tempdoc 837 sections 4/5 and Lane F D1-15. Four ORT_CUDA_* codes lived in this vocabulary with no producer for months; the producer direction prevents that drift. The current lifecycle codes have no producer exemption. A new code requires a real emission site. The desktop-owned engine.escalated_restart is FE-derived from supervisor lastExit.reason. Tap coverage remains a separate check: a reason with an emit site and wording row can still miss a (dimension, state, code) Condition mapping.",
   "producer": {
     "file": "modules/app-api/src/main/java/io/justsearch/app/api/lifecycle/LifecycleReasonCode.java",
     "symbol": "LifecycleReasonCode"
@@ -11,6 +11,10 @@
     "table": "CAUSE_ROWS"
   },
   "noWordingExempt": [
+    {
+      "code": "data.newer_build",
+      "why": "NewerDataNotice publishes a non-blocking Health condition with the recorded newer versions and preserved filenames in its Java message. It never enters the readiness envelope or wordCauses, like settings.reset_from_corrupt."
+    },
     {
       "code": "local_api.session_token_missing",
       "why": "Fail-closed boot refusal (tempdoc 884 item 23): the Head throws at LocalApiServer construction before the loopback bind, so no readiness envelope, ConditionStore or SSE stream exists to carry it. The operator sees it in the fatal log line and the process exit; there is no UI to word it in."

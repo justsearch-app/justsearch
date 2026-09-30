@@ -24,7 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** Persists {@code installed-packs.v1.json} under AI Home. */
 public final class InstalledPacksStore {
-  static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 1;
   private static final ObjectMapper MAPPER =
       JsonMapper.builder()
           .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
