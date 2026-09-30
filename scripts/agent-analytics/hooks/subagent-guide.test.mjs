@@ -32,6 +32,12 @@ function run(label, fn) {
   }
 }
 
+run('brief projects the current index boundary (lane F F-4)', () => {
+  const g = buildGuidance({}).replaceAll('**', '');
+  assert.ok(g.includes("Application code never touches Lucene. Index I/O is the index half's via a port (ADR-0049)."));
+  assert.doesNotMatch(g, /Head process never performs Lucene/);
+});
+
 run('brief carries the pipefail / exit-status hygiene line (935 D2)', () => {
   const g = buildGuidance({});
   assert.ok(/set -o pipefail/.test(g), 'expected `set -o pipefail` in the brief');

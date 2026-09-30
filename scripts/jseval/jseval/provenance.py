@@ -212,7 +212,7 @@ def _aggregate_stage_timing(query_evidences: list[dict]) -> dict:
     decomposition with an ``unaccounted_ms`` remainder + a per-entry ``share`` (tempdoc 647).
 
     ``unaccounted_ms`` = per-query ``took_ms − Σ present stage ms`` — Critical Path Tracing's
-    "unaccounted" node (serialization / gRPC transport / head-side glue not captured as a named
+    "unaccounted" node (serialization / port dispatch / application glue not captured as a named
     stage). ``took_ms`` is the head-side end-to-end latency that encloses every stage
     (``KnowledgeSearchEngine.totalSearchMs``), so ``Σ stages ≤ took_ms`` by construction; tiny
     negatives from sub-millisecond rounding are clamped to 0 and counted (``clamped_negative_count``).

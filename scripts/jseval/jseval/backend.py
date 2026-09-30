@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import datetime
 import logging
 import os
 import shutil
@@ -12,7 +11,6 @@ import time
 from pathlib import Path
 
 import httpx
-import psutil
 
 from . import run_register
 from ._paths import REPO_ROOT, shared_models_dir
@@ -24,30 +22,8 @@ _HEALTH_POLL_SEC = 2.0
 _HEALTH_TIMEOUT_SEC = 120.0
 _LLM_HEALTH_TIMEOUT_SEC = 240.0  # 369: LLM model loading adds significant time
 
-# Tempdoc 711 item 4: fail-closed --clean.
-#
-# History: at the time this was written, the Worker JVM was spawned by the Head's
-# ProcessBuilder (WorkerSpawner.java) as a grandchild of the `gradlew.bat runHeadlessEval`
-# process jseval starts. `taskkill /PID <head-pid> /T /F` kills the Gradle process tree, but
-# the Worker JVM had been observed to survive it (orphaned rather than reparented into the
-# killed tree), holding the Lucene index open and able to silently rewrite watched_roots.json —
-# which then made the *next* run's ingest an idempotent no-op while stale docs serve.
-# Since lane F item A6, index execution runs inside the Head JVM rather than a separate Worker
-# JVM, so the grandchild-process/orphaning mechanism described above no longer applies as
-# written; whether an equivalent stale-lock risk still exists for the merged process has not
-# been verified here. `--clean` must therefore fail CLOSED: if a wipe cannot be verified
-# complete, raise rather than let the run proceed on a dirty dir.
-_LOCK_FILE_REL = Path("index") / "default.index.lock"
-# Lane F stage A: the Worker's own log (worker.log, via its now-deleted
-# logback.xml) no longer exists — index execution runs inside the merged
-# Engine JVM, which writes logs/engine.log instead.
-_ENGINE_LOG_REL = Path("logs") / "engine.log"
-# IndexRootLock.writeOwnerMetadataBestEffort() (Java side) stamps started_at from
-# Instant.now(); ProcessHandle.info().startInstant() and psutil's create_time() can
-# each be off by OS scheduling/clock-resolution noise, so allow a generous skew
-# before treating a PID match as a coincidental reuse.
-_LOCK_PID_SKEW_SEC = 120.0
-_ENGINE_LOG_TAIL_LINES = 50
+# Lane F: dev-runner owns registered-child cleanup. --clean still fails closed.
+
 
 # Tempdoc 782 §I: `llm=True` cannot work through this entry point, and used to
 # discover that only after burning the full inference deadline (~240s) and failing
@@ -203,7 +179,7 @@ def start_backend(
         # durable artifacts are filed under the jseval-owned data root
         # (_paths.DEFAULT_JSEVAL_DATA_DIR), so the tempdoc-400 protected-set
         # carve-out is retired and --clean wipes the whole dir. Fail-closed
-        # semantics (verify + orphan sweep + hard error on survivors, tempdoc 711
+        # semantics (verify + retry + hard error on survivors, tempdoc 711
         # item 4) are unchanged.
         log.info("Cleaning data directory: %s", resolved_data)
         _clean_data_dir(resolved_data)
@@ -563,71 +539,36 @@ def _attempt_wipe(resolved_data: Path) -> list[Path]:
 
 
 def _clean_data_dir(resolved_data: Path) -> None:
-    """Wipe resolved_data entirely, failing CLOSED.
+    """Wipe every entry, retry deletion failures, and fail closed on survivors.
 
-    Tempdoc 711 item 4: attempts every deletion and collects failures rather
-    than swallowing them. On any failure, runs the orphan-Worker sweep (the
-    Worker JVM has been observed to survive the Head's process-tree kill —
-    see ``_sweep_orphan_worker``) and retries. If an entry still exists
-    afterward, raises rather than letting the caller proceed on a dirty
-    data dir — the log line "Cleaning data directory..." must only be
-    followed by a run when the postcondition actually holds.
+    Lane F F-4 removes the separate process sweep; registered-child cleanup
+    belongs to dev-runner. A failed wipe must still prevent the next run.
     """
-    # Capture forensics for a lock-file-identified orphan BEFORE any deletion
-    # is attempted: a partially-successful first-pass rmtree can delete the
-    # very lock file / engine.log this identification depends on (rmtree
-    # aborts on the first unhandled OSError, but earlier siblings in the
-    # same directory may already be gone by then) — "the wipe destroys the
-    # forensics" (711 item 4 brief). The catch-all cmdline scan inside
-    # _sweep_orphan_worker below does not depend on the lock file surviving,
-    # but the log tail does, so it is captured here unconditionally.
-    precheck = _find_orphan_worker_pid(resolved_data)
-    if precheck is not None:
-        _log_worker_forensics(precheck[0], precheck[1], resolved_data)
-
     failures = _attempt_wipe(resolved_data)
-    swept: list[tuple[int, list[str]]] = []
-
     if failures:
         log.warning(
-            "Clean wipe hit %d failure(s) on first pass (%s) — sweeping for an "
-            "orphan Worker holding %s open",
+            "Clean wipe hit %d failure(s) on first pass (%s) - retrying %s",
             len(failures), ", ".join(p.name for p in failures), resolved_data,
         )
-        swept = _sweep_orphan_worker(resolved_data)
-        if precheck is not None and not any(pid == precheck[0] for pid, _ in swept):
-            swept.append(precheck)
-        failures = _attempt_wipe(resolved_data)
+        _attempt_wipe(resolved_data)
 
     survivors = sorted(child.name for child in resolved_data.iterdir())
     if survivors:
-        holder = ""
-        if swept:
-            pid, cmdline = swept[0]
-            holder = f" Likely holder before sweep: PID {pid} ({' '.join(cmdline)})."
         raise RuntimeError(
             f"jseval --clean failed to wipe {resolved_data}: survivor(s) remain "
-            f"after wipe + orphan-Worker sweep: {', '.join(survivors)}."
-            f"{holder} A process still holds a handle inside this directory; "
+            f"after wipe + retry: {', '.join(survivors)}. "
+            "A process may still hold a handle inside this directory; "
             "aborting rather than proceeding on a dirty data dir "
-            "(tempdoc 711 item 4 — --clean is fail-closed)."
+            "(tempdoc 711 item 4 - --clean is fail-closed)."
         )
 
 
 def stop_backend(proc: subprocess.Popen, data_dir: Path | None = None) -> None:
-    """Stop the backend by killing the process tree, then sweep for orphans.
+    """Stop the Engine process tree and retire its foreign-run record.
 
-    Uses taskkill /T /F on Windows (canonical pattern from dev-runner.cjs).
-    The Worker JVM is spawned by the Head as a grandchild of the Gradle
-    process this kills, and has been observed to survive it (tempdoc 711
-    item 4) — when ``data_dir`` is given, also runs the double-keyed orphan
-    sweep so the Worker's Lucene handle and watched_roots.json writer are
-    actually gone, not just the head's process tree.
-
-    Tempdoc 844 D3: also drops this backend's foreign-run record. Keyed by ``proc.pid`` alone so
-    every existing call site is covered without threading a handle through; idempotent, so the
-    failure paths inside ``_boot_and_wait``/``_run_with_cache`` (which stop a proc that may never
-    have registered) are safe.
+    Uses taskkill /T /F on Windows. data_dir is retained for caller compatibility;
+    registered-child cleanup is owned by dev-runner, not a jseval process scan.
+    Unregistering by proc.pid also covers boot failures before registration.
     """
     if proc.poll() is not None:
         log.info("Backend already exited (rc=%d)", proc.returncode)
@@ -650,233 +591,7 @@ def stop_backend(proc: subprocess.Popen, data_dir: Path | None = None) -> None:
 
         log.info("Backend stopped")
 
-    # Tempdoc 844 S2: sweep FIRST, then retire the record. The earlier ordering rested on a comment
-    # ("the backend is already dead by here") that contradicts this function's own docstring: the
-    # Worker JVM is a grandchild that has been observed to survive the tree kill (tempdoc 711
-    # item 4), which is why the sweep exists at all. Unregistering first left a window — seconds,
-    # the sweep waits up to 10 — in which a GPU-holding orphan was running with nothing on the
-    # machine declaring it: the exact blind spot the register was added to close. In `finally`, so
-    # a sweep that raises still retires the record instead of leaving one behind that names a
-    # launcher pid which is already gone.
-    try:
-        if data_dir is not None:
-            _sweep_orphan_worker(data_dir)
-    finally:
-        run_register.unregister_backend(proc.pid)
-
-
-def _read_lock_metadata(lock_file: Path) -> tuple[int, str | None] | None:
-    """Parse ``pid=``/``started_at=`` out of a Worker's IndexRootLock sibling file.
-
-    Mirrors ``IndexRootLock.parsePidFromMetadata`` / ``parseStartedAtFromMetadata``
-    (modules/indexer-worker/.../util/IndexRootLock.java) on the Python side.
-    Returns None if the file is absent/unreadable or has no ``pid=`` line.
-    """
-    try:
-        content = lock_file.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    pid: int | None = None
-    started_at: str | None = None
-    for line in content.splitlines():
-        if line.startswith("pid="):
-            try:
-                pid = int(line[len("pid="):].strip())
-            except ValueError:
-                pass
-        elif line.startswith("started_at="):
-            started_at = line[len("started_at="):].strip()
-    if pid is None:
-        return None
-    return pid, started_at
-
-
-def _parse_java_instant(value: str) -> float | None:
-    """Parse a ``java.time.Instant.toString()`` value into a POSIX timestamp.
-
-    Format is always ``yyyy-MM-ddTHH:mm:ss[.SSSSSSSSS]Z`` (UTC, up to 9
-    fractional digits/nanoseconds). Python's ``datetime.fromisoformat`` only
-    accepts up to 6 (microseconds), so the fractional part is truncated.
-    """
-    if not value:
-        return None
-    text = value.strip()
-    if not text.endswith("Z"):
-        return None
-    body = text[:-1]
-    if "." in body:
-        head, frac = body.split(".", 1)
-        frac = (frac + "000000")[:6]
-        body = f"{head}.{frac}"
-    try:
-        dt = datetime.datetime.fromisoformat(body).replace(tzinfo=datetime.timezone.utc)
-    except ValueError:
-        return None
-    return dt.timestamp()
-
-
-def _normalize_path(value: str) -> str:
-    return os.path.normcase(os.path.normpath(value))
-
-
-_DATA_DIR_SYSPROPS = ("-djustsearch.data.dir=",)
-
-
-def _cmdline_matches_data_dir(cmdline: list[str], data_dir: Path) -> bool:
-    """True if cmdline carries -Djustsearch.data.dir=<data_dir>,
-    normalized-path-equal to the given data_dir (not a substring match — a data_dir
-    that happens to prefix another path must not false-positive)."""
-    target = _normalize_path(str(data_dir))
-    for arg in cmdline:
-        lowered = arg.lower()
-        for prefix in _DATA_DIR_SYSPROPS:
-            if lowered.startswith(prefix):
-                value = arg[len(prefix):]
-                if _normalize_path(value) == target:
-                    return True
-    return False
-
-
-def _find_orphan_worker_pid(data_dir: Path) -> tuple[int, list[str]] | None:
-    """Locate a Worker process still holding data_dir's index lock, if any.
-
-    Double-keyed so this can never target a different session's process on
-    a shared machine: (1) the PID recorded in the lock file must be a live
-    process whose actual start time is consistent (within
-    ``_LOCK_PID_SKEW_SEC``) with the ``started_at`` the Worker itself
-    stamped into the lock, AND (2) the process's command line must carry
-    ``-Djustsearch.data.dir=<this exact data_dir>``. If only one key
-    matches, this logs and returns None rather than killing anything.
-    """
-    lock_file = data_dir / _LOCK_FILE_REL
-    metadata = _read_lock_metadata(lock_file)
-    if metadata is None:
-        log.debug("No index lock file at %s — nothing to sweep via lock", lock_file)
-        return None
-    pid, started_at_raw = metadata
-
-    try:
-        proc = psutil.Process(pid)
-    except psutil.NoSuchProcess:
-        log.debug("Index lock references PID %d, which is no longer running", pid)
-        return None
-
-    lock_started_ts = _parse_java_instant(started_at_raw) if started_at_raw else None
-    if lock_started_ts is not None:
-        try:
-            key_time_ok = abs(proc.create_time() - lock_started_ts) <= _LOCK_PID_SKEW_SEC
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            key_time_ok = False
-    else:
-        # No started_at in the lock file (older Worker build) — the cmdline
-        # key below still has to match independently, so falling back to
-        # liveness alone here doesn't weaken the double-key guarantee.
-        key_time_ok = True
-
-    try:
-        cmdline = proc.cmdline()
-    except (psutil.NoSuchProcess, psutil.AccessDenied):
-        cmdline = []
-    key_cmdline_ok = _cmdline_matches_data_dir(cmdline, data_dir)
-
-    if key_time_ok and key_cmdline_ok:
-        return pid, cmdline
-
-    log.warning(
-        "Index lock at %s names PID %d but it did not pass both identity checks "
-        "(time_key=%s, cmdline_key=%s) — refusing to kill it (could belong to a "
-        "different session on this machine)",
-        lock_file, pid, key_time_ok, key_cmdline_ok,
-    )
-    return None
-
-
-def _scan_orphan_worker_processes(data_dir: Path) -> list[tuple[int, list[str]]]:
-    """Catch-all: find any java process whose cmdline carries this exact
-    -Djustsearch.data.dir=<data_dir>, independent of the lock file (covers a
-    Worker that died before writing the lock, or a lock file that was
-    already deleted/rotated). Same double-key rule as the lock-file path:
-    process name is java AND cmdline carries the exact data dir.
-    """
-    matches: list[tuple[int, list[str]]] = []
-    for proc in psutil.process_iter(["pid", "name"]):
-        try:
-            name = (proc.info.get("name") or "").lower()
-            if "java" not in name:
-                continue
-            cmdline = proc.cmdline()
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            continue
-        if _cmdline_matches_data_dir(cmdline, data_dir):
-            matches.append((proc.pid, cmdline))
-    return matches
-
-
-def _log_worker_forensics(pid: int, cmdline: list[str], data_dir: Path) -> None:
-    """Log the discovered orphan + the engine.log tail BEFORE any wipe/kill,
-    since the wipe destroys the forensics."""
-    log.warning("Orphan Worker detected: PID=%d cmdline=%s", pid, " ".join(cmdline))
-    log_file = data_dir / _ENGINE_LOG_REL
-    try:
-        text = log_file.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        log.debug("No engine.log at %s to capture before sweep", log_file)
-        return
-    tail = text.splitlines()[-_ENGINE_LOG_TAIL_LINES:]
-    log.warning("engine.log tail (%d lines) before sweep:\n%s", len(tail), "\n".join(tail))
-
-
-def _kill_pid(pid: int) -> None:
-    if os.name == "nt":
-        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
-        return
-    try:
-        proc = psutil.Process(pid)
-        proc.terminate()
-        proc.wait(timeout=10)
-    except psutil.NoSuchProcess:
-        pass
-    except psutil.TimeoutExpired:
-        try:
-            psutil.Process(pid).kill()
-        except psutil.NoSuchProcess:
-            pass
-
-
-def _sweep_orphan_worker(data_dir: Path) -> list[tuple[int, list[str]]]:
-    """Find and kill any Worker JVM still holding data_dir's index open.
-
-    Combines the lock-file-keyed lookup with the cmdline catch-all scan,
-    de-duplicated by PID. Logs forensics (PID/cmdline + engine.log tail)
-    before killing, since the caller's wipe will otherwise destroy them.
-    Returns the list of (pid, cmdline) this swept (whether or not the kill
-    is later confirmed) — used by ``_clean_data_dir`` to name a likely
-    holder if survivors remain.
-    """
-    candidates: list[tuple[int, list[str]]] = []
-    found = _find_orphan_worker_pid(data_dir)
-    if found is not None:
-        candidates.append(found)
-    for pid, cmdline in _scan_orphan_worker_processes(data_dir):
-        if not any(pid == existing_pid for existing_pid, _ in candidates):
-            candidates.append((pid, cmdline))
-
-    if not candidates:
-        log.debug("Orphan sweep found no matching Worker process for %s", data_dir)
-        return candidates
-
-    for pid, cmdline in candidates:
-        _log_worker_forensics(pid, cmdline, data_dir)
-        log.warning("Killing orphan Worker PID=%d (data_dir=%s)", pid, data_dir)
-        _kill_pid(pid)
-
-    deadline = time.monotonic() + 10.0
-    while time.monotonic() < deadline:
-        if not any(psutil.pid_exists(pid) for pid, _ in candidates):
-            break
-        time.sleep(0.2)
-
-    return candidates
+    run_register.unregister_backend(proc.pid)
 
 
 def _wait_for_health(

@@ -1429,7 +1429,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     # the setup's docstring for why a scroller has to be witnessed, not merely bounded).
     _OVERFLOWING_ASK = "?? " + " ".join(
         f"Part {i}: what does this file say about indexing, retrieval, ranking and "
-        "enrichment, and how does the worker hand its results back to the head process "
+        "enrichment, and how does the index half return its results to the application half "
         "so I can verify the whole path end to end?"
         for i in range(1, 25)
     )
@@ -1743,7 +1743,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         ta = page.locator(S.CSS_COMPOSER_TEXTAREA)
         await ta.wait_for(state="visible", timeout=10_000)
         await ta.click()
-        await ta.fill("How does indexing reach the head process?")
+        await ta.fill("How does indexing reach the application half?")
         await ta.press("Enter")
         await page.locator(S.CSS_ACTIVITY_LIFECYCLE).first.wait_for(state="attached", timeout=20_000)
         await page.locator(S.CSS_EVIDENCE_RAIL).first.wait_for(state="visible", timeout=20_000)
@@ -1833,7 +1833,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # search tool (so the turn gets sources) AND ground its sentences in those passages (so the
         # matcher emits citations) — both are required before a single `.cite-ref` mark renders.
         await ta.fill(
-            "Search the indexed documents and summarize how indexing reaches the head process, "
+            "Search the indexed documents and summarize how indexing reaches the application half, "
             "citing the specific sources you used."
         )
         await ta.press("Enter")

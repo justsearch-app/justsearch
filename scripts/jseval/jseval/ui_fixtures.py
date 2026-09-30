@@ -454,7 +454,7 @@ _AGENT_RUN_SOURCES: tuple[dict, ...] = (
         "chunkIndex": 1,
         "path": "docs/reference/api-contract-map.md",
         "title": "API contract map",
-        "excerpt": "Retrieval results reach the head over gRPC and are projected onto the surface.",
+        "excerpt": "Retrieval results cross the in-process port and are projected onto the surface.",
         "startLine": 88,
         "endLine": 95,
         "headingText": "Knowledge search",
@@ -501,7 +501,7 @@ _SV3_RETRIEVAL_CITATIONS: tuple[dict, ...] = (
         "startChar": 44,
         "endChar": 300,
         "score": 0.77,
-        "excerpt": "Retrieval results reach the head over gRPC and are projected onto the surface.",
+        "excerpt": "Retrieval results cross the in-process port and are projected onto the surface.",
         "startLine": 88,
         "endLine": 95,
         "headingText": "Knowledge search",
@@ -516,7 +516,7 @@ _SV3_LONG_ANSWER = (
     "Enrichment runs in stages: the extractor normalises the document body, the chunker splits it "
     "on structural boundaries, and the encoder produces the dense and sparse representations the "
     "index stores side by side. None of that work happens in the head process, which never touches "
-    "the index directly and reaches the worker over gRPC instead.\n\n"
+    "the index directly and reaches the index half through an in-process port.\n\n"
     "When a query arrives the head fans it out to both retrieval arms, fuses the two ranked lists, "
     "and reranks the survivors before any of it reaches the surface. The passages that come back "
     "carry their own provenance — the parent document, the chunk offsets and the heading they were "

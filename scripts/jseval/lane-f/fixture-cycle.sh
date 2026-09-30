@@ -48,7 +48,7 @@ out_dir=$(cd "$(dirname "$out")" && pwd)
 out_stem="$out_dir/diag-$(basename "$out" .json | sed 's/^capture-//')"
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
-# The Worker yields GPU backfill while the LLM is active (main_gpu_active, ADR-0048), so an
+# The Engine index half yields GPU backfill while the LLM is active (ADR-0048), so an
 # autostarted llama-server stalls enrichment: deactivate first, activate after the wait.
 curl -s -m 30 -X POST "${hdr[@]}" -d '{}' "$base/api/ai/runtime/deactivate" > /dev/null
 

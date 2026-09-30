@@ -95,6 +95,17 @@ Docs-only proof and remaining outside-docs hits are recorded in `../evidence/F/f
 The full-branch clean checkpoint remains for the later F batches. No Gradle, backend,
 commit or push is part of this batch.
 
+2026-09-30, F-3/F-4/F-5 batch: jseval's orphan-process sweep is removed after
+verifying dev-runner's registered-child terminal cleanup. Schema-2 health readers
+use component READY/UNAVAILABLE states. The subagent fallback was already removed
+and now has an exact-invariant regression. Governance owner identities remain frozen;
+WORKER-to-INDEXING GPU holder migration requires Java and remains a Java follow-up
+under the owner's no-Java constraint. The sandbox denies writes to `.agents`; F-3
+Codex edits are prepared as a patch and the new content-parity gate remains red on
+the unapplied divergence. Required suites have environment gaps recorded in
+`../evidence/F/f345-checks.md`; every scoped residue hit has a disposition in
+`../evidence/F/f345-residue.md`. This is not a stage-F clean checkpoint.
+
 ---
 
 ## 1. Inheritance ledger

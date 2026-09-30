@@ -26,7 +26,7 @@ node scripts/docs/llmstxt-generate.mjs                        # regenerate index
 ## Key ADRs
 
 - ADR-0017: ai-bridge module decomposition
-- ADR-0025: Core DTO dual-type layering (gRPC vs REST)
+- ADR-0025: Core DTO dual-type layering (in-process ports vs REST)
 
 ## Module-boundary test template (tempdoc 518 Appendix G S1 / E.1)
 
