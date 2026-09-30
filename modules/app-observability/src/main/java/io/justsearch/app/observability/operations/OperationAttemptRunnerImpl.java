@@ -7,6 +7,7 @@ import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationOutcomeView;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.CompositionV2;
 import java.io.IOException;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.operations.OperationKeys;
@@ -620,7 +621,9 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       boolean committed = control.settingsReceipt != null;
       finishObserved(control, committed ? OperationState.COMPLETE : OperationState.FAILED,
           committed ? receipt(control.settingsReceipt.response())
-              : new OperationReceipt(failureCode(control.settingsFailure), null));
+              : control.settingsFailure instanceof SettingsCommitOwner.Refused refused
+                  ? receipt(refused.response())
+                  : new OperationReceipt(failureCode(control.settingsFailure), null));
       OperationRecord row = current(control);
       OperationResult response = committed ? committedResponse
           : control.settingsFailure instanceof SettingsCommitOwner.Refused refused ? refused.response() : receiptResponse(row);
@@ -949,7 +952,11 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     String code = result.success() ? "SUCCESS" : result.errorCode()
         .filter(value -> value.matches("[A-Za-z][A-Za-z0-9_]{0,95}")).orElse("HANDLER_FAILED");
     String execution = result.executionId().filter(value -> value.matches("[A-Za-z0-9_.:/-]{1,128}")).orElse(null);
-    return new OperationReceipt(code, execution);
+    Object candidate = result.success()
+        ? result.structuredData().get("composition")
+        : result.errorDetails().get("composition");
+    CompositionV2 composition = candidate instanceof CompositionV2 typed ? typed : null;
+    return new OperationReceipt(code, execution, composition);
   }
 
   private static String failureCode(Throwable failure) {
@@ -971,10 +978,15 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       data.put("acceptedRevision", Math.addExact(row.expectedSettingsRevision(), 1));
       data.put("witness", new SettingsWitness(Math.addExact(row.expectedSettingsRevision(), 1), row.key()));
     }
+    CompositionV2 composition = Optional.ofNullable(row.receipt())
+        .map(OperationReceipt::composition).orElse(null);
+    if (!failed && composition != null) data.put("composition", composition);
+    Map<String, Object> errorDetails = failed && composition != null
+        ? Map.of("composition", composition) : Map.of();
     return new OperationResult(!failed, "Operation " + row.state().name(),
         Optional.ofNullable(row.receipt()).map(OperationReceipt::executionId),
         Map.copyOf(data),
-        failed ? Optional.ofNullable(row.failureReason()) : Optional.empty(), Map.of(), Optional.empty());
+        failed ? Optional.ofNullable(row.failureReason()) : Optional.empty(), errorDetails, Optional.empty());
   }
 
   private Prepared requirePrepared(PreparedAttempt attempt) {

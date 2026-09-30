@@ -79,7 +79,7 @@ public final class IndexGenerationManager {
   private static final DateTimeFormatter TS =
       DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
-  private static final int STATE_FORMAT_VERSION = 2;
+  public static final int STATE_FORMAT_VERSION = 2;
   private static final int MANIFEST_FORMAT_VERSION = 1;
   private static final int PROJECTION_MANIFEST_FORMAT_VERSION = 2;
   private static final int RECORDED_MANIFEST_FORMAT_VERSION = 2;

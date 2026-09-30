@@ -69,6 +69,36 @@ import org.mockito.MockedStatic;
 
 /** Worker publication proof with the physical device-memory supplier replaced at its boundary. */
 final class KnowledgeServerDeviceMemoryLineTest {
+  @Test
+  void ordinaryQueryCpuFallbackNeverCreditsPlannedGpuMemory(@TempDir Path dir) throws Exception {
+    try (var fixture = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 512L, true);
+        var composition = fixture.composition()) {
+      // A selected CUDA, but its realized handle is serving CPU fallback and frees no GPU bytes.
+      composition.when(() -> InferenceCompositionRoot.sourceQueryReleasableBytes(any()))
+          .thenCallRealMethod();
+      var refusal = assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class,
+          fixture::prepare);
+      assertTrue(refusal.getMessage().contains("candidate_exceeds_releasable_device_memory"));
+      fixture.assertA();
+      assertTrue(!fixture.queryA.isClosed());
+      verify(fixture.producer, never()).prepareQueryServingSuccessor(any(), any(), any());
+    }
+  }
+
+  @Test
+  void ordinaryQueryUnknownMemoryRefusesBeforePublishingDegradedView(@TempDir Path dir)
+      throws Exception {
+    try (var fixture = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, null);
+        var ignored = fixture.composition()) {
+      var refusal = assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class,
+          fixture::prepare);
+      assertTrue(refusal.getMessage().contains("free_device_memory_unknown"));
+      fixture.assertA();
+      assertTrue(!fixture.queryA.isClosed());
+      verify(fixture.producer, never()).prepareQueryServingSuccessor(any(), any(), any());
+    }
+  }
+
   private static final long FOOTPRINT = 1024L;
 
   @Test

@@ -128,4 +128,4 @@ It serves from the worktree's `modules/ui-web` (the served code is the worktree'
 - If a generic API call is rejected, the endpoint is outside the dev MCP allowlist — see the allowlist table in the reference.
 - If hot reload reports `structuralChangeDetected`, stop/start the dev stack instead of continuing to rely on hot swap.
 - If search results look stale after field/catalog changes, reset or rebuild the dev index instead of debugging query behavior first.
-- If AI activation fails, separate online runtime readiness from Worker encoder readiness; they use different processes and lifecycle controls.
+- If AI activation fails, separate online runtime readiness from Engine encoder readiness; they use different lifecycle controls.

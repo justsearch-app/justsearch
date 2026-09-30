@@ -18,7 +18,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { spawn, spawnSync, execFile } = require('child_process');
 // Tempdoc 696: resolve a >= 24 JDK (target Temurin 25) so a stale JDK-8 JAVA_HOME
-// can't break the assemble/head/worker JVMs. Injected into every JVM spawn's env below.
+// can't break the build/Engine JVMs. Injected into every JVM spawn's env below.
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
 

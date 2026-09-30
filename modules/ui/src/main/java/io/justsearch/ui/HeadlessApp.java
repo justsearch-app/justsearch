@@ -1111,6 +1111,8 @@ public class HeadlessApp {
         System.exit(io.justsearch.app.engine.EngineExit.DATA_DIR_LOCKED);
         return;
       }
+      final var newerDataNotice = io.justsearch.app.engine.DataVersionMarker.recordBoot(
+          bootDataDir);
       operations = new io.justsearch.app.observability.operations.SqliteOperationStore(
           bootDataDir.resolve("operations.db"));
       // Phase 0: resolve config (tempdoc 502 Â§3.3)
@@ -1309,6 +1311,9 @@ public class HeadlessApp {
       // condition substrate exists, and take the notice back down when they re-author settings.
       if (bootstrap != null && bootstrap.substrate() != null && bootstrap.substrate().health() != null) {
         var settingsHealth = bootstrap.substrate().health();
+        io.justsearch.app.engine.NewerDataNotice.publish(newerDataNotice,
+            settingsHealth.conditionStore(), settingsHealth.changes(), settingsHealth.headSource(),
+            java.time.Clock.systemUTC());
         io.justsearch.app.services.settings.SettingsRecoveryNotice.observeCommitRecovery(
             settingsOwner, settingsHealth.conditionStore(), settingsHealth.changes(),
             settingsHealth.headSource(), java.time.Clock.systemUTC());

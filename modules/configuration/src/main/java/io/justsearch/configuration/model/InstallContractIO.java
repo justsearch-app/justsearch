@@ -19,7 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
  * install pipeline writes it after successful completion; the runtime reads it on startup.
  */
 public final class InstallContractIO {
-  private static final int CURRENT_SCHEMA_VERSION = 2;
+  public static final int CURRENT_SCHEMA_VERSION = 2;
 
   private static final JsonMapper JSON =
       JsonMapper.builder()

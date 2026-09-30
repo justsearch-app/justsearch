@@ -37,7 +37,7 @@ import tools.jackson.databind.JsonNode;
  */
 public final class NdjsonAppendStore<T> {
 
-  private static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 1;
   private static final Logger log = LoggerFactory.getLogger(NdjsonAppendStore.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
 

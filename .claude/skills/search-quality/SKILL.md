@@ -1341,7 +1341,7 @@ above)*
   is the invariant that keeps vectors alive (691 §N-5 — a separate VECTOR-writing pass gets erased
   by the next stage's RMW with status still COMPLETED). Logged for tempdoc 710.
 - **Evidence:** tempdoc 691 §Phase J/M/N (arm tables, five-defect forensic chain, gate reports);
-  artifacts `tmp/691-ab2/` (per-arm summary.json + worker.log copies); reproduction commands in
+  artifacts `tmp/691-ab2/` (per-arm summary.json + historical worker.log filename copies); reproduction commands in
   691 §K-5.
 
 ### F-032: ALL chunk vectors were silently destroyed post-write at shipped HEAD — catalog-declared RMW preservation recovers them, legal vector 0.3401 → 0.6180 (tempdoc 711 Item 1, 2026-07-11; supersedes F-031's "structural caveat" with the structural fix)
@@ -2563,7 +2563,7 @@ above)*
   0.705 — live proof of the completeness-floor's sensitivity design (F-028).
 - **Bycatch (fixed on the 701 branch):** first contact with this corpus at 4k live-reproduced a worker
   enrichment **crash-loop** — `EmbeddingBackfillOps` + 4 sibling batch paths trusted batch-result
-  length; an empty result (backfill racing provider init after a worker restart) threw AIOOBE before
+  length; an empty result (backfill racing provider init after a historical Worker restart) threw AIOOBE before
   any failure-marking → eternal batch refetch, 199/199 doc embeddings starved. Guarded (null-or-mismatch
   → per-item fallback), 5 sites, new test fixture, module suite green.
 - **Runs:** `tmp/eval-results/20260709T235522_mixed_legal-clerc-200` + `20260710T001438_mixed_legal-clerc-4k`
@@ -3606,14 +3606,14 @@ these request choices. The pipeline executes across the two halves of one Engine
    search is fused and collapsed by parent document. Match spans, excerpt
    regions, and facets are computed. The response returns from the port call.
 
-3. **Head** (post-retrieval) merges any completed LLM expansion, then runs
+3. **Application half** (post-retrieval) merges any completed LLM expansion, then runs
    a reranking cascade: LambdaMART (fast, ~5 ms) followed by cross-encoder
    (deep, 200–500 ms). Results are trimmed to the requested limit and
    per-hit provenance metadata is assembled.
 
 The diagram below shows the complete flow. The three retrieval legs fan out
 in parallel from the dispatch stage. Dashed lines indicate what used to be the
-cross-process gRPC boundary and is now the in-process port boundary (ADR-0049).
+the replaced cross-process wire boundary and its current in-process port boundary (ADR-0049).
 
 ![Search Pipeline Overview](23-search-pipeline-overview.svg)
 
@@ -3648,15 +3648,15 @@ is the **sole** active leg. This is a Lucene API constraint, not a mode gate.
 
 ---
 
-## Ingestion-Time Stages (Body Process)
+## Ingestion-Time Stages (Engine index half)
 
-These stages run in the Worker (`indexer-worker`). They build the index that
+These stages run in the Engine's index half (`indexer-worker`). They build the index that
 query-time stages search against.
 
 | #   | Stage                    | Owner                          | What It Does                                                                                  |
 | --- | ------------------------ | ------------------------------ | --------------------------------------------------------------------------------------------- |
 | 1   | **File Discovery**       | `IndexingLoop`                 | Polls job queue, checks timestamps, paces against foreground load                                   |
-| 2   | **Content Extraction**   | `StructuredContentExtractor`   | Uses `AutoDetectParser.parse()` + `StructuredContentHandler`; preserves headings, tables, page breaks from 1,400+ formats. PDF, Office, archive and image files are parsed in a **persistent child JVM** (the extraction sandbox pool, default `justsearch.extraction.sandbox.mode=auto`) so a wedged or heap-exhausting parser is killed at the deadline instead of stalling the indexing loop; text, markdown, code and CSV/JSON stay in the Worker JVM — see [03-knowledge-server.md](03-knowledge-server.md) §Content Extraction. VDU-eligible files (PDF and the common image formats) whose extraction quality falls below `justsearch.vdu.quality_threshold` (default 0.3) are routed to VLM re-extraction via the Brain process as extraction fallback tier 2 — there is no enable flag; see [ADR-0018](../decisions/0018-vlm-pdf-extraction-via-chat-model.md) |
+| 2   | **Content Extraction**   | `StructuredContentExtractor`   | Uses `AutoDetectParser.parse()` + `StructuredContentHandler`; preserves headings, tables, page breaks from 1,400+ formats. PDF, Office, archive and image files are parsed in a **persistent child JVM** (the extraction sandbox pool, default `justsearch.extraction.sandbox.mode=auto`) so a wedged or heap-exhausting parser is killed at the deadline instead of stalling the indexing loop; text, markdown, code and CSV/JSON stay in the Engine JVM's index half - see [03-knowledge-server.md](03-knowledge-server.md) Content Extraction. VDU-eligible files (PDF and the common image formats) whose extraction quality falls below `justsearch.vdu.quality_threshold` (default 0.3) are routed to VLM re-extraction via the Brain process as extraction fallback tier 2 - there is no enable flag; see [ADR-0018](../decisions/0018-vlm-pdf-extraction-via-chat-model.md) |
 | 3   | **Text Analysis**        | `SsotAnalyzerRegistry`         | `ICUTokenizer → NFC → LowerCase` — locale-invariant, no per-language analyzer ([ADR-0043](../decisions/0043-multilingual-by-construction-no-per-language-levers.md))  |
 | 4   | **Chunking**             | `ChunkDocumentWriter`          | Splits docs >2,000 chars into 500-token chunks (50-token overlap); linked via `parent_doc_id` |
 | 5   | **BM25 Indexing**        | `FieldMapper` / `WritePathOps` | `content` as analyzed text; `content_preview` (first ~4 KB) for snippets                      |
@@ -3680,7 +3680,7 @@ Three retrieval models can run in any combination:
 | **Dense** (KNN)             | gte-multilingual-base (768-dim)                                          | `vector` / `chunk_vector`   | ef_search=100; HNSW M=16                        |
 | **SPLADE** (learned sparse) | opensearch-neural-sparse-encoding-multilingual-v1 (12L BERT-multilingual, 105K vocab) | `FeatureField` entries      | Optional IDF-weighted query encoding            |
 
-### Pre-Retrieval (Head — `KnowledgeHttpApiAdapter`)
+### Pre-Retrieval (application half - `KnowledgeHttpApiAdapter`)
 
 | #   | Stage                           | What It Does                                                                                                                                                |
 | --- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -3689,7 +3689,7 @@ Three retrieval models can run in any combination:
 | 2a  | **Filter Value Normalization** (async) | Two-tier: deterministic prefix/contains matching (0 ms); LLM grammar-constrained enum fallback (~400–1200 ms GPU). Gated by `JUSTSEARCH_FILTER_NORM_ENABLED`. Fires on both search and answer paths (366) |
 | 2b  | **Query Understanding** (async) | LLM extracts `boostFilters` from natural language queries; applied as `BooleanClause.SHOULD` + `BoostQuery(ConstantScoreQuery, weight=20)`. Gated by `JUSTSEARCH_QU_ENABLED`. Bypassed when explicit filters present (363) |
 
-### Retrieval (Worker — `SearchOrchestrator`)
+### Retrieval (index half - `SearchOrchestrator`)
 
 Stages 3–8 are **not sequential** — stages 6, 7, and 8 execute in parallel
 via virtual threads, then converge at the fusion stage.
@@ -3709,7 +3709,7 @@ via virtual threads, then converge at the fusion stage.
 
 ‖ = parallel execution
 
-### Post-Retrieval (Worker — `SearchOrchestrator`)
+### Post-Retrieval (index half - `SearchOrchestrator`)
 
 Stages 13a–13c implement **two-branch fusion**: a whole-document branch
 (stages 6–9 above) and a chunk branch (13a–13b) are independently scored,
@@ -3723,13 +3723,13 @@ RRF chunk merge.
 | 13c  | **Branch Fusion** (Stage 3b)               | Merges whole-doc branch with collapsed chunk-parent branch. Default strategy is CC (`fuseWithCCNamed`): chunk branch weight is modulated by parent length (short docs trust whole branch, long docs trust chunk branch; `chunkMinMultiplier` default 0.25). Alternative: RRF (`fuseWithRRFNamed`) when `branchFusionStrategy=rrf` |
 | 14   | **Match Spans + Excerpts + Facets**        | Character-offset spans for UI highlighting; IDF-weighted excerpt regions (top 3); DocValues facets first page only; entity canonical merge                                                                                                                 |
 
-### Post-Retrieval (Head — `KnowledgeHttpApiAdapter`)
+### Post-Retrieval (application half - `KnowledgeHttpApiAdapter`)
 
 | #   | Stage                                 | What It Does                                                                                                       |
 | --- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | 15  | **Expansion Merge**                   | If LLM expansion completed in budget, re-searches with expanded query (LUCENE syntax); otherwise uses base results |
 | 16  | **LambdaMART Reranking**              | 2 features (sparse + vector debug scores); fast (~5 ms); runs first in cascade. **Off by default** (requires a GPL-trained model). ⚠️ **GPL-trained LambdaMART is measured non-viable on real queries** (synthetic GPL training queries don't transfer) — see register **F-021**. Treat as present-but-inert substrate pending real user-feedback labels, *not* a current quality lever |
-| 17  | **Cross-Encoder Reranking**           | gte-multilingual-reranker-base (FP16 GPU, 306M params); Head makes the `rerank` port call into the index half with query-focused snippets; deadline-budgeted; runs on LambdaMART's output (360) |
+| 17  | **Cross-Encoder Reranking**           | gte-multilingual-reranker-base (FP16 GPU, 306M params); the application half makes the `rerank` port call into the index half with query-focused snippets; deadline-budgeted; runs on LambdaMART's output (360) |
 | 18  | **Result Trim + Provenance Assembly** | Trim to requested limit; structured provenance per hit (which legs contributed, fusion scores, CE scores)          |
 
 ---
@@ -3747,7 +3747,7 @@ arbitration). Optionally applies MMR diversification (opt-in via
 redundant passages, then assembles context within a token budget. Falls back to full-document
 retrieval with virtual chunking when no indexed chunks exist. Unlike the
 interactive pipeline, RAG retrieval is chunk-first (optimized for passage
-extraction) and runs entirely in the Worker process.
+extraction) and runs entirely in the Engine's index half.
 
 **Autocomplete / Suggest** (`SuggestOps`, `adapters-lucene`): Prefix and
 infix autocomplete on document titles and content. Builds a disjunctive
@@ -3804,8 +3804,8 @@ for the full contract and test references.
 
 | Component                     | Primary File                   | Module            |
 | ----------------------------- | ------------------------------ | ----------------- |
-| Search orchestration (Worker) | `SearchOrchestrator.java`      | `indexer-worker`  |
-| Head-side adapter + reranking | `KnowledgeHttpApiAdapter.java` | `app-services`    |
+| Search orchestration (index half) | `SearchOrchestrator.java`      | `indexer-worker`  |
+| Application-side adapter + reranking | `KnowledgeHttpApiAdapter.java` | `app-services`    |
 | Lucene runtime ops (read/write/lifecycle) | `ReadPathOps` / `WritePathOps` / `RunningRuntime` | `adapters-lucene` |
 | Hybrid fusion (RRF + CC)      | `HybridFusionUtils.java`       | `adapters-lucene` |
 | BM25 query building           | `TextQueryOps.java`            | `adapters-lucene` |

@@ -89,7 +89,7 @@ migration and remains intact; it is not classified as corruption or truncated.
 | `accepted_at`, `started_at`, `updated_at`, `completed_at INTEGER` | Engine clock, epoch ms |
 | `urgency_detached_at INTEGER` | C1-11's flip, recorded here |
 | `failure_reason TEXT`, `failure_detail TEXT` | reason code plus bounded detail |
-| `result_json TEXT` | bounded (4 KB), non-content outcome receipt: safe code, execution id, counts and record identity; no arbitrary handler message, structured data, prompt or excerpt. Same-key retry returns this receipt without rerunning, not the original rich response. |
+| `result_json TEXT` | bounded (4 KB), non-content outcome receipt: safe code, execution id, counts and record identity, plus the optional typed query-model composition decision. Composition is the narrow exception needed to preserve the physical device-memory verdict across same-key replay; its mode and six reason tokens are validated, and no arbitrary handler map, message, prompt or excerpt is admitted. Same-key retry returns this receipt without rerunning, not the original rich response. |
 | `accepted_settings_revision INTEGER` | `settings-apply` and `reconfigure`: the revision the call was issued against |
 | `building_generation_id TEXT`, `target_settings_json TEXT` | reindex: the journal identity and the generation-bound desired values *(D1)* |
 | `gaps_json TEXT`, `processing_history_json TEXT`, `processing_history_counts_json TEXT` | reindex: the full gap list; a capped sample (200) plus counts of failed and superseded units |

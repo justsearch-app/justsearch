@@ -1,8 +1,8 @@
 """NDJSON metric stream reader (tempdoc 400 LR3-b).
 
 Consumes the two metric files produced by the telemetry stack at
-``<dataDir>/telemetry/metrics.ndjson`` (Head process) and
-``<dataDir>/telemetry/metrics-worker.ndjson`` (Worker process). Provides
+``<dataDir>/telemetry/metrics.ndjson`` (application telemetry) and
+``<dataDir>/telemetry/metrics-worker.ndjson`` (index telemetry in the same Engine). Provides
 a single merged iterator ordered by timestamp so Layer 4 projections
 (rate-based timeline, stall tagging, stratified metrics, etc.) can
 consume both streams as one logical time-series.

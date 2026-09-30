@@ -12,6 +12,7 @@ import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationReceipt;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStoreException;
+import io.justsearch.app.api.settings.CompositionV2;
 import io.justsearch.core.context.EngineContext;
 import java.nio.file.Path;
 import java.sql.DriverManager;
@@ -223,6 +224,105 @@ final class OperationAttemptRunnerTest {
     }
     assertFalse(new String(java.nio.file.Files.readAllBytes(temp.resolve("operations.db")),
         java.nio.charset.StandardCharsets.ISO_8859_1).contains("private result body"));
+  }
+
+  @Test
+  void reopenedSameKeySuccessReplaysOnlyTypedCompositionEvidence() throws Exception {
+    var request = request(OperationKind.OPERATION, EngineContext.Survival.DURABLE);
+    var composition = new CompositionV2(
+        "IN_PLACE", "candidate_fits_after_source_release", 10L, 20L);
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var result = runner.start(runner.accept(request), handle -> OperationExecution.finished(
+          OperationResult.success("private success", java.util.Map.of(
+              "composition", composition, "privateContent", "must-not-persist"))));
+      assertEquals(OperationState.COMPLETE,
+          result.completion().toCompletableFuture().join().state());
+    }
+
+    try (var reopened = store()) {
+      var runner = new OperationAttemptRunnerImpl(reopened, CLOCK, Set.of());
+      AtomicInteger effects = new AtomicInteger();
+      var replay = runner.start(runner.accept(request), handle -> {
+        effects.incrementAndGet();
+        return OperationExecution.finished(OperationResult.success("wrong"));
+      });
+      assertEquals(0, effects.get());
+      assertEquals(composition, replay.response().structuredData().get("composition"));
+      assertFalse(replay.response().structuredData().containsKey("privateContent"));
+      assertEquals(composition, reopened.outcome(request.key()).result().composition());
+    }
+    assertFalse(new String(java.nio.file.Files.readAllBytes(temp.resolve("operations.db")),
+        java.nio.charset.StandardCharsets.ISO_8859_1).contains("must-not-persist"));
+  }
+
+  @Test
+  void reopenedSameKeyRefusalReplaysOnlyTypedCompositionEvidence() throws Exception {
+    var request = request(OperationKind.OPERATION, EngineContext.Survival.DURABLE);
+    var composition = new CompositionV2("REFUSED",
+        "candidate_exceeds_releasable_device_memory", 10L, 20L);
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var result = runner.start(runner.accept(request), handle -> OperationExecution.finished(
+          OperationResult.failure("private refusal", "COMPONENT_PREPARATION_REQUIRED",
+              java.util.Map.of("composition", composition,
+                  "privateContent", "must-not-persist-refusal"), true)));
+      assertEquals(OperationState.FAILED,
+          result.completion().toCompletableFuture().join().state());
+    }
+
+    try (var reopened = store()) {
+      var runner = new OperationAttemptRunnerImpl(reopened, CLOCK, Set.of());
+      AtomicInteger effects = new AtomicInteger();
+      var replay = runner.start(runner.accept(request), handle -> {
+        effects.incrementAndGet();
+        return OperationExecution.finished(OperationResult.success("wrong"));
+      });
+      assertEquals(0, effects.get());
+      assertEquals(composition, replay.response().errorDetails().get("composition"));
+      assertFalse(replay.response().errorDetails().containsKey("privateContent"));
+      assertEquals(composition, reopened.outcome(request.key()).result().composition());
+    }
+    assertFalse(new String(java.nio.file.Files.readAllBytes(temp.resolve("operations.db")),
+        java.nio.charset.StandardCharsets.ISO_8859_1).contains("must-not-persist-refusal"));
+  }
+
+  @Test
+  void legacyReceiptJsonRemainsReadableAndCompositionReasonIsBounded() throws Exception {
+    var request = request(OperationKind.OPERATION, EngineContext.Survival.DURABLE);
+    try (var store = store()) {
+      var row = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      assertTrue(store.start(row.id()));
+      assertTrue(store.finish(row.id(), OperationState.COMPLETE,
+          new OperationReceipt("SUCCESS", null)).isPresent());
+    }
+    execute("UPDATE operations SET result_json = '{\"code\":\"SUCCESS\",\"executionId\":null}'");
+
+    try (var reopened = store()) {
+      var outcome = reopened.outcome(request.key());
+      assertEquals("SUCCESS", outcome.result().code());
+      assertNull(outcome.result().composition());
+    }
+    assertThrows(IllegalArgumentException.class, () -> new OperationReceipt("SUCCESS", null,
+        new CompositionV2("REFUSED", "unbounded_private_reason", 1L, 2L)));
+    assertThrows(IllegalArgumentException.class, () -> new OperationReceipt("SUCCESS", null,
+        new CompositionV2("REFUSED", null, 1L, 2L)));
+  }
+
+  @Test
+  void mapShapedCompositionIsNotAdmittedToTheDurableReceipt() throws Exception {
+    var request = request(OperationKind.OPERATION, EngineContext.Survival.DURABLE);
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var result = runner.start(runner.accept(request), handle -> OperationExecution.finished(
+          OperationResult.success("done", java.util.Map.of("composition", java.util.Map.of(
+              "mode", "IN_PLACE", "reason", "candidate_fits_after_source_release",
+              "freeBytes", 10L, "footprintBytes", 20L)))));
+      assertEquals(OperationState.COMPLETE,
+          result.completion().toCompletableFuture().join().state());
+      assertNull(store.find(request.key()).orElseThrow().receipt().composition());
+      assertNull(store.outcome(request.key()).result().composition());
+    }
   }
 
   @Test

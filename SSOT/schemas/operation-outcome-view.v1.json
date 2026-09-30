@@ -23,6 +23,23 @@
         "code" : {
           "type" : "string"
         },
+        "composition" : {
+          "type" : "object",
+          "properties" : {
+            "footprintBytes" : {
+              "type" : [ "integer", "null" ]
+            },
+            "freeBytes" : {
+              "type" : [ "integer", "null" ]
+            },
+            "mode" : {
+              "type" : [ "string", "null" ]
+            },
+            "reason" : {
+              "type" : [ "string", "null" ]
+            }
+          }
+        },
         "executionId" : {
           "type" : "string"
         },

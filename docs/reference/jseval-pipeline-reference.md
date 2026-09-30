@@ -88,13 +88,13 @@ the exact source/member hashes that must be reviewed before commit; it is not a 
 an already observed manifest. The sibling intentionally leaves MBOX, EPUB, ODF, and optional MSG as
 deterministic-only coverage until separately provenance-cleared real sources exist.
 
-`duplicate-prevalence` measures either the immutable, pre-dedup Enron **source-body proxy** or a
-strictly reconciled **production-extracted** snapshot. The Enron v2 path does not claim Worker/Tika
-behavior: it streams the complete archive, commits raw → parsed → eligible → retained stage counts, and
+duplicate-prevalence measures either the immutable, pre-dedup Enron source-body proxy or a
+strictly reconciled production-extracted snapshot. The Enron v2 path does not claim legacy worker/Tika
+behavior: it streams the complete archive, commits raw -> parsed -> eligible -> retained stage counts, and
 computes exact raw-body and normalized-content censuses over every eligible occurrence before first-SHA
 retention. The memory-heavy analyzer runs only on a deterministic uniform reservoir. The production
-adapter obtains parent ids and stored content through Head-to-Worker RPC bridges, never through
-Head/Python Lucene access. Both modes emit no source paths, archive member names, document ids, or text.
+adapter obtains parent ids and stored content through index-half port calls, never through Head or Python
+Lucene access. Both modes emit no source paths, archive member names, document ids, or text.
 
 ```bash
 python -m jseval duplicate-prevalence \
@@ -268,52 +268,36 @@ enrichment. Status/readiness observation does not constitute user activity. The 
 command waits for this lifecycle; it does not change inference mode itself. Resume a preserved
 index with a positive wait and omit `--ingest` when its watched root is already registered.
 
-`/api/status`, `/api/debug/state`, and the Worker's complete id set must agree with that disposition
+`/api/status`, `/api/debug/state`, and the index half's complete id set must agree with that disposition
 accounting. The evaluation-only document-id export is one immutable request: callers must send offset zero and
-a limit no greater than 50,000, and the endpoint rejects continuation offsets rather than pretending that
-separate Worker reader generations form one snapshot. The production debug envelope's nested `worker`
-projection is authoritative, with the legacy flat shape accepted only for compatibility. Head and Worker must
-both be ready before and after capture; queues and writers must be quiescent, search and ingest generations
-identical, and build/generation/commit/count identity unchanged after capture. The aggregate lifecycle may be
-`DEGRADED` only for the exact `inference.offline`
-component disposition while Head and Worker remain ready and no VDU work is pending or processing. On the
-owned live-HTTP path, a bounded parent-id settle waits only for the final expected cohort after pipeline
-readiness; all subsequent before/after lifecycle, generation, manifest, failed-job, and complete-id checks
-remain strict.
+a limit no greater than 50,000; continuation offsets are rejected rather than pretending to provide a
+cross-request snapshot. The production debug envelope retains a nested index-half projection for wire
+compatibility. Engine lifecycle and component readiness use schema v2; capture still requires quiescent
+queues and writers, identical search and ingest generations, and unchanged build, commit, and count identity.
+On the owned live-HTTP path, a bounded parent-id settle waits only for the final expected cohort after
+pipeline readiness; all subsequent before/after lifecycle, generation, manifest, failed-job, and complete-id
+checks remain strict.
 
 Every preview page must make exact UTF-16 offset progress without splitting a Unicode scalar and retain stable
-`totalChars`, parser/policy/status metadata, and the Worker-stored source SHA-256. The Worker reads content
-and provenance through one Lucene searcher and exposes its canonical `content_sha256` revision as
-`contentSha256`. Every page must retain that revision, and the assembled UTF-8 text must hash to it; missing
-revisions, malformed Unicode, and same-source VDU changes fail closed. The source digest must equal
-the strict raw-manifest row, so a same-path/same-count stale index is rejected. `SUCCESS_PARTIAL` is accepted
-only when the Worker reports `contentTruncated=true`, and the extraction snapshot v2 discloses partial-success
-and terminal-exclusion counts in both reconciliation and top-level denominators. Any inconsistent status,
-truncation flag, or disposition fails closed. Run-local opaque ids, path aliases, extracted text, the strict
-path-bearing manifest digest, terminal-exclusion declarations, HMAC key, and Ed25519 private key remain in
-memory. The persisted corpus signature is a keyed commitment to the strict manifest, not a dictionary-testable
-path hash; only the aggregate artifact, committed provenance digest, alias HMAC, verification key, and
-aggregate disposition accounting may persist.
+totalChars, parser/policy/status metadata, and the index-half stored source SHA-256. The index half reads content
+and provenance through one Lucene searcher and exposes its canonical content_sha256 revision as contentSha256.
+Every page must retain that revision, and assembled UTF-8 text must hash to it; missing revisions, malformed
+Unicode, and same-source VDU changes fail closed. SUCCESS_PARTIAL is accepted only when the index half reports
+contentTruncated=true, and extraction snapshot v2 discloses partial-success and terminal-exclusion counts in
+both reconciliation and top-level denominators. Any inconsistent status, truncation flag, or disposition fails
+closed.
 
-Production result decoration is a CLI-only `run` option; it is intentionally not accepted from YAML. It
-requires a nonempty query-mode set, an owned `--start-backend --clean --fresh-index` lifecycle, normal
-ingestion, and an exactly matching raw root and base URL. Index-cache adoption and
-`JUSTSEARCH_CORPUS_SIGNATURE` are forbidden. Capture happens after readiness and before queries; after
-queries the raw manifest, lifecycle/generation identity, and complete Worker id set are revalidated against
-that in-memory snapshot, then `write_run` preflights and emits the aggregate
-analysis, signed result-identity mapping, and summary/manifest corpus bindings. The required
-`staged_recall_accounting` projection must succeed before history publication. Worker telemetry is not
-mirrored into a private run directory because indexing spans contain source paths; it remains only in the
-local backend scratch directory. The ordinary run path remains
-identity-only and unchanged. A standalone production aggregate can still be written with
-`duplicate-prevalence`, but later decoration from that artifact is deliberately unsupported.
+Production result decoration is a CLI-only run option; it is intentionally not accepted from YAML. It requires
+a nonempty query-mode set, an owned --start-backend --clean --fresh-index lifecycle, normal ingestion, and an
+exactly matching raw root and base URL. Index-cache adoption and JUSTSEARCH_CORPUS_SIGNATURE are forbidden.
+Capture happens after readiness and before queries; after queries the raw manifest, lifecycle/generation identity,
+and complete index-half id set are revalidated against the in-memory snapshot, then write_run preflights and
+emits the aggregate analysis, signed result-identity mapping, and summary/manifest corpus bindings. Index-half
+telemetry remains in the local backend scratch directory because indexing spans contain source paths.
 
-The source SHA-256 is a stored Worker field added by this contract, so existing indexes cannot satisfy it:
-use a complete clean reindex. For each newly admitted or reindexed source the Worker performs two additional
-sequential full-file reads—immediately before and after extraction—to bind the stored digest to stable source
-bytes. Unchanged documents are rejected before these reads. The reads currently sit outside the parser
-timeout; real-corpus runs must record their throughput impact before this mechanism is considered a standing
-default rather than a measurement-only provenance guard.
+The source SHA-256 is a stored index-half field added by this contract, so existing indexes cannot satisfy it:
+the index half performs two additional sequential full-file reads immediately before and after extraction to
+bind the stored digest to stable source bytes. Unchanged documents are rejected before these reads.
 
 The versioned output validates against `scripts/jseval/duplicate-prevalence.v1.schema.json`. Byte-exact,
 normalized-content-exact, and near-duplicate results remain separate. Enron v2 labels the exact census
@@ -811,8 +795,8 @@ so a newly captured field cannot slip through unclassified; and the differ **rai
 name outside the three. **No class is added after a diff is seen** — a changed citation is a
 regression unless its class was declared beforehand.
 
-Timing is **not captured at all** rather than given a class (`stages[].ms`, `tookMs`, the
-`latencyMs` figures, SSE `heartbeat` frames, the per-run session id), and the capture's
+Timing is not captured at all rather than given a class; SSE heartbeat frames are transport keep-alives independent of retired process signalling.
+latencyMs figures and the per-run session id are not captured; SSE heartbeat frames are transport keep-alives independent of retired process signalling.
 `provenance` block is informational — the two builds are expected to differ there, so it is not
 diffed.
 
@@ -850,8 +834,8 @@ distinguished from a `degenerate` verdict (`expected > 0` but the index shows no
 chunk docs) — the two 0-chunk cases that are otherwise bit-identical at the pipeline-output layer.
 
 **Threshold provenance (tempdoc 821 §3-C3).** The threshold is no longer a jseval-side mirror of
-`ChunkDocumentWriter.CHUNK_THRESHOLD_CHARS`; the worker's enrichment auditor OWNS it and publishes
-it on the wire as `worker.enrichment.chunkMinChars`, which `resolve_chunk_threshold_chars()` reads
+`ChunkDocumentWriter.CHUNK_THRESHOLD_CHARS`; the index half's enrichment auditor OWNS it and publishes
+it on the wire under the retained compatibility field worker.enrichment.chunkMinChars, which resolve_chunk_threshold_chars() reads
 off the same `/api/status` snapshot the observed counts come from. There is deliberately **no local
 fallback constant** — a fallback would re-create the mirror. `threshold_chars` in the block records
 which value the expectation was computed against (`null` = the backend published none). A backend
@@ -880,7 +864,7 @@ is treated as `ok` — backward-compatible. Implementation: `jseval/chunk_comple
 
 **Dual-source-of-truth risk — closed (tempdoc 821 §3-C3).** The 2000-char mirror of
 `ChunkDocumentWriter.CHUNK_THRESHOLD_CHARS` that tempdoc 718 flagged as drift-prone has been
-deleted; the oracle reads the backend's published `worker.enrichment.chunkMinChars` instead (see
+deleted; the oracle reads the backend published compatibility field worker.enrichment.chunkMinChars instead (see
 *Threshold provenance* above), and stands down loudly (`unevaluable`) rather than guessing when a
 backend does not publish it.
 
@@ -1073,18 +1057,11 @@ ambiguous assignments, or order mismatches fail the projection instead of produc
   since tempdoc 716, **unconditional**: every durable jseval artifact is
   filed under the jseval data root (`scripts/jseval/tmp/`), never inside the
   backend data dir, so nothing in the backend dir is protected from the wipe.
-  Because the Worker JVM (spawned by the Head as a grandchild of the
-  Gradle process) has been observed to survive the process-tree
-  `taskkill` and keep the Lucene index open, the wipe runs a
-  double-keyed orphan-Worker sweep (matched by the index lock file's
-  recorded PID/start-time **and** by the process command line's
-  `-Djustsearch.data.dir=` value, so it can never target another
-  session's process on a shared machine) before retrying any failed
-  deletion. If a survivor remains after the sweep and retry, the run
-  raises a hard error naming the survivor and the last-known holder
-  PID/cmdline instead of silently proceeding on a dirty data dir. This
-  also runs on `stop_backend()` after every `--start-backend` run, not
-  only under `--clean`.
+  The Engine is one JVM; extraction may launch a bounded child JVM. The fail-closed wipe verifies the
+  data directory is empty and checks the registered dev-runner owner before retrying a failed deletion.
+  A survivor remains a hard error naming the process owner rather than allowing a run against a dirty
+  data directory. This also runs on stop_backend() after every --start-backend run.
+
   `--llm` with this eval-backend entry point is rejected: its read-only
   settings discard the runtime activation intent. Inference-capable measurement uses the owned
   normal dev-runner recipe above, with writable settings and explicit activation.
@@ -1097,7 +1074,7 @@ ambiguous assignments, or order mismatches fail the projection instead of produc
 - **YAML config**: `--config run.yaml` for reproducible runs with GPU
   settings, dataset, modes in a single file
 - **Crash detection**: Fails fast after 5 consecutive status fetch
-  failures; checks `meta.workerRpcStale` for Worker-down detection
+  failures; uses current lifecycle and debug-state endpoints for Engine/index-half failure detection
 - **NDJSON progress**: `--json` emits structured progress objects to
   stderr and the final result to stdout
 - **Output**: Structured `summary.json` with metrics, git SHA,
@@ -1112,7 +1089,7 @@ ambiguous assignments, or order mismatches fail the projection instead of produc
 | `--splade` | Wait for SPLADE coverage ≥ 99.9% |
 | `--start-backend` | Start runHeadlessEval, stop when done |
 | `--llm` | Rejected with `--start-backend`: eval settings are read-only; use the owned full-inference dev-stack recipe |
-| `--clean` | Clean data dir before start (requires `--start-backend`); fail-closed — wipes the WHOLE backend data dir (tempdoc 716: calibration state lives under `scripts/jseval/tmp/`, not here), sweeps orphan Worker processes on a delete failure, raises rather than proceeding if a survivor remains (711 item 4) |
+| `--clean` | Clean data dir before start (requires `--start-backend`); fail-closed and raises if the registered Engine process owner or a survivor prevents a complete wipe.
 | `--reset` | Reset index via API before ingestion (eval mode, no restart) |
 | `--timeline PATH` | Record status snapshots to TSV during wait |
 | `--config PATH` | Load YAML run configuration file |
@@ -1127,7 +1104,7 @@ ambiguous assignments, or order mismatches fail the projection instead of produc
 | `--search-load-qpm N` | Drive N queries/minute (evenly spaced) against `POST /api/knowledge/search` on a background thread **during** ingest + the readiness/pipeline wait, and record a `search_load` block in `summary.json` (mode, queries issued, errors, latency p50/p95/max, start/end, request timeout). Queries come from the dataset's own query file, in `hybrid` mode. Off by default; nothing changes when it is absent (885) |
 | `--search-load continuous` | As above but back-to-back with one request in flight (the continuous MCP-style agent loop). Mutually exclusive with `--search-load-qpm` |
 | `--first-search-probe` | After every batch of `--first-search-probe-files` (default 50) newly indexed documents, issue ONE search and record its latency separately from `--search-load*`. Reopen-on-demand moves the segment-open cost onto exactly that query, so averaging it into steady-state traffic hides it. Off by default (885 item 19) |
-| `--settle-index` | Force-merge the active index to one tombstone-free segment (`POST /api/indexing/settle` with `expungeDeletesOnly: false, maxSegments: 1`) after the pre-query readiness gate and before the query phase, so two arms of a paired comparison query indexes with **equal merge state**. Expunge-only was not enough: Lucene skips segments under its 10 % deleted-fraction threshold, so it left 181 tombstones on scifact (931 C1 campaign). Readiness is re-checked once afterwards (the settle commits and reopens the searcher). Records `index_state_at_query.settled` plus the before/after counts under `index_state_at_query.settle`. Degrades to `settled: false` with a WARN on a 404 (pre-931 backend), a worker refusal, or a transport failure -- the run continues. Off by default: it holds the writer for the duration of a force-merge (931 SS-E item 10) |
+| settle-index | Force-merge the active index to one tombstone-free segment before the query phase; a 404, index-half refusal, or transport failure records a warning and continues. |
 
 Admitted search work contributes to the Engine's foreground-load gauge for its actual
 lifetime, which drives indexing pacing. These load flags measure throughput with foreground
@@ -1166,14 +1143,11 @@ scripts/jseval/tmp/                        # DEFAULT_JSEVAL_DATA_DIR
     result_identity.v1.json # Path-free run-local IDs for raw delivered hits
 ```
 
-**Additive schema key, always present (885 item 19).** Every `run` emits a `cadence` block in
-`summary.json`, whether or not `--first-search-probe` was passed — this is a disclosed schema
-addition, not a no-op: a consumer that enumerates `summary.json` keys will see it on every run.
-It carries `reopen_total`, `commit_total` and `segments_since_reopen` read from the Worker
-telemetry NDJSON (`index.runtime.*`), plus `first_search_after_indexing` (null unless the probe
-ran). Every field degrades to `null` when the Worker does not publish the metric, so the comparison
-columns exist on every row rather than appearing only on some — which is the point, an arm table
-with missing columns cannot be read.
+**Additive schema key, always present (885 item 19).** Every run emits a cadence block in summary.json, whether
+or not --first-search-probe was passed. It carries reopen_total, commit_total, and segments_since_reopen from
+index-half telemetry NDJSON (index.runtime.*), plus first_search_after_indexing (null unless the probe ran).
+Every field degrades to null when the index half does not publish the metric, so comparison columns exist on
+every row.
 
 **Additive schema key, always present (tempdoc 931 §E item 10).** Every `run` with modes (a
 query phase) emits an `index_state_at_query` block, snapshotted right after the pre-query
@@ -1188,14 +1162,9 @@ differs between two otherwise-identical fresh indexes of the same corpus (a meas
 doesn't publish it (older backend, or `--skip-readiness`), so a paired-arm comparison always has
 the column to check before attributing a metric delta to code.
 
-**Additive schema key, always present (930 §18.1 row 7).** Every `run` also emits an
-`encoder_latency` block: `{"encoders": {"<encoder.name>": {"n", "p50_ms", "p95_ms"}}}`, derived
-from the `encoder.ort_run` spans in the Worker's `traces.ndjson` (rotated siblings included).
-`encoders` is `{}` when the Worker published no such spans — typically because
-`JUSTSEARCH_INDEX_TRACING_LEVEL=detailed` was not exported. Absolute numbers, no baseline and
-no threshold: this replaced the `encoder_drift` PSI projection, whose per-cohort baseline never
-existed. Read it alongside `cpu_fallback_counts` to tell "the encoder got slower" from "the
-encoder moved to CPU".
+**Additive schema key, always present (930 row 7).** Every run also emits an encoder_latency block with encoder
+counts and p50/p95 latency, derived from encoder.ort_run spans in the index half traces.ndjson. The block is
+empty when the index half publishes no such spans, typically because detailed tracing was not exported.
 
 `result_identity.v1.json` is a local-run sidecar, not a replacement document namespace. It captures
 the full raw hit path/id in memory before legacy BEIR filename/stem normalization, assigns a random

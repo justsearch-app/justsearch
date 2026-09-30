@@ -107,7 +107,7 @@ A stack abandoned past a grace period is reaped automatically (the supervisor se
 
 **Honest limit (tempdoc 844 §6.1):** the lease only knows runs the dev-runner started. A `jseval` backend (hardcoded port 33221), a bare `gradlew runHeadless`, or a `runHeadlessEval` JVM is invisible to `quick_health` — so a "free" verdict can sit next to a 100%-GPU neighbour. This has already contaminated one measurement round. Check the ports before trusting a free verdict during eval work.
 
-Overnight/long GPU windows (tempdoc 743 P-N, arming step): an unattended multi-hour run starts only on an explicit, recent founder go for *that window* — a budget remark or standing goal is not an arming; declare the window with `leaseDurationSec` sized to it, and when a chain is halted mid-window, stopping the stack is part of the halt, not a follow-up. For supervising the run itself, `node scripts/dev/run-watcher.mjs` (heartbeat + `check` verdicts) replaces hand-rolled per-session watcher scripts; notify-on-failure/completion is the default posture — per-step progress belongs on disk, read at the coarse tick (743 P-M(c), founder-approved 2026-07-17).
+Overnight/long GPU windows (tempdoc 743 P-N, arming step): an unattended multi-hour run starts only on an explicit, recent founder go for *that window*  -  a budget remark or standing goal is not an arming; declare the window with `leaseDurationSec` sized to it, and when a chain is halted mid-window, stopping the stack is part of the halt, not a follow-up. For supervising the run itself, `node scripts/dev/run-watcher.mjs` (liveness pulse + `check` verdicts) replaces hand-rolled per-session watcher scripts; notify-on-failure/completion is the default posture  -  per-step progress belongs on disk, read at the coarse tick (743 P-M(c), founder-approved 2026-07-17).
 
 ## Live-validate a worktree's frontend (FE-only work)
 
@@ -126,4 +126,4 @@ It serves from the worktree's `modules/ui-web` (the served code is the worktree'
 - If a generic API call is rejected, the endpoint is outside the dev MCP allowlist — see the allowlist table in the reference.
 - If hot reload reports `structuralChangeDetected`, stop/start the dev stack instead of continuing to rely on hot swap.
 - If search results look stale after field/catalog changes, reset or rebuild the dev index instead of debugging query behavior first.
-- If AI activation fails, separate online runtime readiness from Worker encoder readiness; they use different processes and lifecycle controls.
+- If AI activation fails, separate online runtime readiness from Engine encoder readiness; they use different lifecycle controls.

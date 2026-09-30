@@ -21,7 +21,7 @@ The `IndexingLoop.java` class is an infinite loop that processes files one by on
 3.  **Validate:** Checks `Files.exists()` and `Files.isReadable()`.
 4.  **Check Modified:** Compares `Files.getLastModifiedTime()` against the Lucene index. If unchanged, mark `DONE` and skip.
 5.  **Extract:** Passes file to `TimeboxedContentExtractor` (wraps `ContentExtractor` / Tika) to prevent pathological files from hanging the loop; timeouts fail the job with `EXTRACTION_TIMEOUT`.
-6.  **Embed (Deferred):** During primary indexing, embedding is deferred — documents get `EMBEDDING_STATUS=PENDING`. After the queue drains, `EmbeddingBackfillOps` batch-embeds via ORT (EmbeddingGemma-300M by default). If `WorkerSignalBus.isMainGpuActive()` is true, the Worker skips/unloads GPU embedding work to avoid VRAM contention with Online mode.
+6.  **Embed (Deferred):** During primary indexing, embedding is deferred - documents get `EMBEDDING_STATUS=PENDING`. After the queue drains, `EmbeddingBackfillOps` batch-embeds via ORT (EmbeddingGemma-300M by default). If the in-process `WorkerSignalBus.isMainGpuActive()` flag is true, the index half skips or unloads GPU embedding work to avoid VRAM contention with Online mode.
 7.  **Index:** Writes `IndexDocument` via the write-path ops (`WritePathOps`/`CommitOps`), including canonical metadata fields used by the UI:
     - `mime_base`: normalized MIME without parameters (e.g., strip `; charset=` from Tika `mime`)
     - `file_kind`: UX-friendly type bucket (e.g., `pdf|markdown|image|code|text|office|archive|binary|unknown`)
@@ -31,7 +31,7 @@ The `IndexingLoop.java` class is an infinite loop that processes files one by on
 
 ## File skip lists
 
-The Worker applies hardcoded skip rules at two stages, independent of user-configured exclude patterns.
+The index half applies hardcoded skip rules at two stages, independent of user-configured exclude patterns.
 
 ### Directory traversal skips (`WALK_SKIP_DIRS` in `SyncDirectoryOps.java`)
 
@@ -54,10 +54,10 @@ Only unambiguously tool-generated patterns are hardcoded. Context-dependent dire
 
 ## The Job Queue (`SqliteJobQueue`)
 
-We use **SQLite** as a persistent Job Queue (`jobs.db`, stored under the Worker `dataDir`).
-*   **Why SQLite?** It survives crashes. An in-memory queue would lose thousands of pending files if the worker was killed by the "Suicide Pact."
+We use **SQLite** as a persistent Job Queue (`jobs.db`, stored under the Engine `dataDir`).
+*   **Why SQLite?** It survives crashes. An in-memory queue would lose thousands of pending files if the Engine process failed.
 *   **Schema (conceptual):** jobs are durable rows with a `state` machine and retry/backoff metadata.
-*   **States:** `PENDING`, `PROCESSING`, `DONE`, `FAILED`, `RETRY_EXHAUSTED`. The head-side vocabulary is the `IndexingJobView.STATE_*` constants; `FAILED` and `RETRY_EXHAUSTED` are both terminal and both counted as failures by every projection (failure summary, per-folder counts, scan rollup, the FE task rail).
+*   **States:** `PENDING`, `PROCESSING`, `DONE`, `FAILED`, `RETRY_EXHAUSTED`. The index-half vocabulary is the `IndexingJobView.STATE_*` constants; `FAILED` and `RETRY_EXHAUSTED` are both terminal and both counted as failures by every projection (failure summary, per-folder counts, scan rollup, the FE task rail).
 
 ### The failure ladder
 
@@ -147,11 +147,13 @@ they return or report completion.
 
 The indexing loop is also resilient *in-process*: a per-document `Error` (for example a plugin `LinkageError`, `AssertionError`, or `IOError`) is logged and uses the existing per-unit failure/retry path, allowing later batch units to proceed. A recoverable batch-embedding error uses the existing per-document fallback. A fatal `VirtualMachineError` or uncaught loop-thread failure publishes `LoopState.FAILED` and clears liveness before logging. Core status reports `indexState=FAILED` and `indexHealthy=false`; the index health port exposes the failed loop state while serving readiness remains independently probed. Ordinary document `ERROR`, deferred startup, and intentional quiescence remain distinct. A new loop start clears the fatal state.
 
-The Head's index component distinguishes control availability from corpus health. A fresh successful Worker observation may establish `READY` with ordinary `ERROR` or `INDEXING` and a positive failed-job count, while retaining `indexHealthy=false` and every failure diagnostic. This lets recorded rebuild and gap-decision operations run after a terminal document failure. Fatal `FAILED`, unhealthy states without that unit-failure evidence, stale or lost contact, and an unavailable API still refuse readiness; physical `ABSENT` and `RELOADING` ownership cannot be overwritten by an incumbent observation.
+The Engine's index component distinguishes control availability from corpus health. A fresh successful index observation may establish `READY` with ordinary `ERROR` or `INDEXING` and a positive failed-job count, while retaining `indexHealthy=false` and every failure diagnostic. This lets recorded rebuild and gap-decision operations run after a terminal document failure. Fatal `FAILED`, unhealthy states without that unit-failure evidence, stale or lost observations, and an unavailable API still refuse readiness; physical `ABSENT` and `RELOADING` ownership cannot be overwritten by an incumbent observation.
 
 After an in-place candidate is refused, mandatory restoration of active A keeps the encoder component `RELOADING` while lexical A serves and vectors report `REBUILD_IN_PROGRESS`. Restoration admits one recovery attempt atomically and publishes its terminal state against that exact claim. Ordinary component recovery continues to admit `STARTING`.
 
-KnowledgeServer also runs an age-bounded reaper every two minutes. It requeues unowned `PROCESSING` rows whose last update exceeds the five-minute liveness window; a live issued claim remains protected even if its timestamp is old. Actively processed jobs also refresh their timestamps through heartbeats. This can recover orphaned rows without a process restart, but does not itself restart a failed indexing loop.
+### Job liveness (replaced process supervision)
+
+KnowledgeServer also runs an age-bounded reaper every two minutes. It requeues unowned `PROCESSING` rows whose last update exceeds the five-minute liveness window; a live issued claim remains protected even if its timestamp is old. Actively processed jobs also refresh their timestamps through heartbeats. This is job-level liveness and recovery, not process supervision: it can recover orphaned rows without an Engine restart, but does not itself restart a failed indexing loop.
 
 The reaper owns the registered background scheduler `index.stuck-job-reaper`. Shutdown cancels the periodic task and waits for its actual exit before closing the job queue. Deferred model initialization similarly owns `index.deferred-model-init`; shutdown waits for its executor to terminate before closing published model and runtime resources, even when the initializer's exposed future has been canceled. Both registrations have one thread and one live instance, with queue capacity supplied by the Engine background policy.
 
@@ -231,7 +233,7 @@ acquisition after the outcome has already committed.
 
 ### Ingestion Ledger Privacy Contract (tempdoc 410 §8 + Slice E + Slice G.4)
 
-The Worker writes an `ingestion_ledger` audit row for typed ingestion outcomes (skip, success, failure, defer). Operators read these rows via `GET /api/diagnostics/ingestion/{recent,summary}` and the in-process `RecentIngestionEvents` / `IngestionOutcomeSummary` calls. Both surfaces marshal `JobQueue.IngestionEventView` records — never the raw queue row.
+The index half writes an `ingestion_ledger` audit row for typed ingestion outcomes (skip, success, failure, defer). Operators read these rows via `GET /api/diagnostics/ingestion/{recent,summary}` and the in-process `RecentIngestionEvents` / `IngestionOutcomeSummary` calls. Both surfaces marshal `JobQueue.IngestionEventView` records - never the raw queue row.
 
 Schema V14 adds nullable `originator` and `transport` to both `jobs` and `ingestion_ledger`.
 The Engine bridge derives originator through the existing action-ledger projection and passes
@@ -261,7 +263,7 @@ Subscribers read the latest durable receipt; runtime observer failure does not u
 queue commit. The display change stream retains its separate under-lock ordering.
 EngineRoot binds the recorded producer only after the physical lifecycle attaches. It uses the
 existing single-thread bounded root-walk executor and passes the accepted one-root plan's key,
-epoch, generation, root shape and frozen policy directly to WorkerIngestService. Service lookup
+epoch, generation, root shape and frozen policy directly to the index ingest service
 occurs at execution, so replacement does not leave a cached service behind. Queue receipts remain
 the durable progress authority; a finished walk alone cannot complete its parent operation.
 
@@ -281,7 +283,7 @@ still requires the accepted, prepared operation row; binding grants no independe
 - `path.toAbsolutePath()` resolves to the JVM's working-directory-anchored absolute form before normalisation. Symlinks are NOT followed (matches the `LinkOption.NOFOLLOW_LINKS` posture used elsewhere in the admission boundary).
 - `PathNormalizer.normalizePath` (`modules/worker-services/src/main/java/io/justsearch/indexerworker/util/PathNormalizer.java`) replaces every `/` with the platform-native separator (`File.separatorChar`) — on Windows that produces backslash-form paths like `c:\users\<user>\…\file.txt`; on Linux/macOS the path is left as-is. Case folding fires on case-insensitive filesystems (Windows): the normalizer lowercases the absolute path so the same file produces the same hash regardless of how the operator typed the case.
 - The hex form is **lowercase 64-char SHA-256**. Operators correlating events to files should match on the full 64 characters; substring matching breaks the privacy property because partial hashes can be brute-forced against a known directory layout.
-- The canonical helper lives at `CloudPlaceholderRecorder.sha256Hex` (`modules/worker-services/src/main/java/io/justsearch/indexerworker/services/CloudPlaceholderRecorder.java`, package-private static). Workers writing new ledger entries should reuse it; rolling a private SHA-256 helper risks producing inconsistent normalisation that breaks the operator-side correlation pattern below.
+- The canonical helper lives at `CloudPlaceholderRecorder.sha256Hex` (`modules/worker-services/src/main/java/io/justsearch/indexerworker/services/CloudPlaceholderRecorder.java`, package-private static). Index services writing new ledger entries should reuse it; rolling a private SHA-256 helper risks producing inconsistent normalisation that breaks the operator-side correlation pattern below.
 
 #### In-scope record fields
 
@@ -313,7 +315,7 @@ When deciding whether a new field belongs on `IngestionEventView`, ask: "could a
 - `sourceKind` — the typed source class (e.g., `CLOUD_PLACEHOLDER`, `REGULAR_FILE`).
 - `diagnosticSummary` strings that don't embed paths or extracted content (e.g., `"Indexed successfully"`, `"Cloud-only placeholder; reading would hydrate over network"`).
 
-**Rule for adding a field:** any new component on `IngestionEventView` or `IngestionLedgerEntry` must either (a) carry no path-derivable information per the examples above, or (b) be opted out of operator-visible exports via a documented mechanism (e.g., a separate internal projection that the gRPC layer never marshals — none currently exist; see Slice G.4 plan). The `ingestionEventViewExportContractIsPinned` test in `JobQueueTest` pins the exact 14-field set so accidental additions break the build with an actionable diff.
+**Rule for adding a field:** any new component on `IngestionEventView` or `IngestionLedgerEntry` must either (a) carry no path-derivable information per the examples above, or (b) be opted out of operator-visible exports via a documented mechanism (for example, a separate internal projection). The `ingestionEventViewExportContractIsPinned` test in `JobQueueTest` pins the exact 14-field set so accidental additions break the build with an actionable diff.
 
 #### Operator query pattern
 
@@ -339,7 +341,7 @@ The structural pin `ingestionEventViewExportContractIsPinned` is unchanged — `
 
 ### Durable cutover buffer (`switch_buffer`)
 
-During schema migration, the Worker durably buffers mutating ingest operations into
+During schema migration, the Engine's index half durably buffers mutating ingest operations into
 `jobs.db.switch_buffer`. Ordered candidate replay commits and verifies those effects
 before pointer commitment. After a committed native pointer crash, retained projection,
 source-marker and broad-delete receipts are certified under the final mutation fence
@@ -379,7 +381,7 @@ This is the core correctness mechanism that prevents lost updates during blue/gr
 JustSearch uses a generation-scoped index layout and a migration state machine so schema changes can be deployed without downtime:
 
 - **Generation manager**: `IndexGenerationManager` owns `<indexBasePath>/state.json` (active/building/previous generation pointers + `migration_state`).
-- **Dual runtime wiring** (Worker-only):
+- **Dual runtime wiring** (index-half only):
   - `searchRuntime` serves queries (Blue during migration; read-only for rollback safety)
   - `ingestRuntime` performs all writes (Green during migration; Active when not migrating)
 - **Schema mismatch policy**: when the active generation’s schema is incompatible, behavior is driven by `index.schema_mismatch.policy` (see `docs/explanation/04-storage-engine.md`).
@@ -391,19 +393,19 @@ Stable migration architecture is described in `docs/explanation/11-index-schema-
 
 We use **Apache Tika** to handle diverse formats.
 *   **Supported:** PDF, DOCX, PPTX, HTML, XML, Markdown, Source Code.
-*   **Timeout protection:** `TimeboxedContentExtractor` enforces a hard extraction deadline (default 60s) and increments `extraction.timeout_total` when it triggers. The job is marked failed as `EXTRACTION_TIMEOUT` instead of blocking the indexing loop indefinitely. On a timeout the extractor also replaces its single-thread executor, because `Future.cancel(true)` only interrupts and a wedged native parser ignores the interrupt — without the replacement, one bad file held the only extraction thread and stopped **all** extraction until the Worker restarted.
+*   **Timeout protection:** `TimeboxedContentExtractor` enforces a hard extraction deadline (default 60s) and increments `extraction.timeout_total` when it triggers. The job is marked failed as `EXTRACTION_TIMEOUT` instead of blocking the indexing loop indefinitely. On a timeout the extractor also replaces its single-thread executor, because `Future.cancel(true)` only interrupts and a wedged native parser ignores the interrupt - without the replacement, one bad file held the only extraction thread and stopped **all** extraction until the parser executor was replaced.
 
 ### Extraction sandbox pool
 
 Parser families that can wedge or exhaust a heap run **out of process**, in a pool of persistent child JVMs.
 
-*   **Routing (`justsearch.extraction.sandbox.mode`)**: `auto` (default) routes by the file kind `IndexingDocumentOps.classifyFileKind` already assigns — `pdf`, `office`, `archive`, `image` and unrecognised `binary` go out of process; `text`, `markdown` and `code` (which includes CSV/JSON) stay in the Worker JVM, where the IPC round-trip would be pure overhead. `in_process` and `process` force one side for measurement or incident response.
+*   **Routing (`justsearch.extraction.sandbox.mode`)**: `auto` (default) routes by the file kind `IndexingDocumentOps.classifyFileKind` already assigns - `pdf`, `office`, `archive`, `image` and unrecognised `binary` go to the persistent extraction child pool; `text`, `markdown` and `code` (which includes CSV/JSON) stay in the Engine JVM's index half, where the IPC round-trip would be pure overhead. `in_process` and `process` force one side for measurement or incident response. `RoutingExtractionSandbox` owns this one process/in-process verdict; it does not introduce a second file taxonomy.
 *   **Persistent children, not one JVM per file**: `PersistentExtractionSandbox` spawns each child lazily and reuses it, so JVM start and Tika class-loading are paid once rather than per file. One request is in flight per child; `justsearch.extraction.sandbox.pool` (default 1) sets how many children exist.
 *   **Protocol**: length-prefixed UTF-8 JSON frames (`SandboxFrames`) over the child's stdin/stdout, carrying schema2 `SandboxExtractionRequest` / `SandboxExtractionResponse` records. Each request has a fresh UUID `requestId`; the child echoes that bounded opaque ID, and the parent rejects missing/mismatched IDs or schema versions before accepting any text. Bundled Engine and parser versions upgrade together; custom commands must implement schema2. A refused reader submission after frame write, or a malformed/stale response, retires the parser before another document can use the slot. If termination does not complete, the exact child stays in that slot and later acquisition retries termination; no replacement is spawned while the old process remains alive. The child captures the real `System.out` at startup and redirects `System.out` to stderr, so parser chatter cannot corrupt a frame. The child's stderr is drained continuously into a bounded tail — draining is mandatory, not diagnostic, since a full stderr pipe would wedge the child mid-parse.
-*   **Child command**: built in-process from `java.home` + `java.class.path` (the Worker runs from a plain `-cp lib\*` classpath, not a jlink image), with `-XX:+UseSerialGC`, `--enable-native-access=ALL-UNNAMED`, and a heap of at least 4x the largest accepted input with a 512m floor (`justsearch.extraction.sandbox.heap`). The Worker's own `-XX:AOTCache` is inherited when it has one and the file exists. `JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND` overrides the whole argv.
+*   **Child command**: built in-process from `java.home` + `java.class.path` (the Engine runs from a plain `-cp lib\*` classpath, not a jlink image), with `-XX:+UseSerialGC`, `--enable-native-access=ALL-UNNAMED`, and a heap of at least 4x the largest accepted input with a 512m floor (`justsearch.extraction.sandbox.heap`). The Engine's own `-XX:AOTCache` is inherited when it has one and the file exists. `JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND` overrides the whole argv.
 *   **Two deadlines, deliberately unequal**: the sandbox owns the extraction deadline and enforces it by killing the child; the surrounding `TimeboxedContentExtractor` waits 15s longer and is only a backstop for a sandbox that itself wedges. When both used the same value the timebox always won (it starts its clock first), its `shutdownNow()` interrupted the pool's wait, and the pool's kill-at-the-deadline path never ran.
 *   **Recycling**: a child is killed and respawned on a missed deadline, on a crash, and after `justsearch.extraction.sandbox.max_requests` requests (default 500 — the leak guard). Each event increments `extraction.sandbox_restart_total{reason}` (`timeout` | `crash` | `oom` | `request_budget` | `protocol` | `interrupted` | `probe_failed`); spawns increment `extraction.sandbox_spawn_total`.
-*   **Startup probe**: because spawning is lazy, a broken child command would otherwise be invisible until the first file and would then fail every file. At wiring time the Worker spawns one child and runs a trivial extraction through it. The extraction deadline is 20s and the kill that follows a hang waits up to 5s more, so boot blocks for at most ~25s — and only against a child that launches and then hangs. A command that cannot launch at all is rejected immediately. On failure it logs a WARN naming the reason and records `reason=probe_failed`. Process-routed families remain isolated and report `SANDBOX_FAILED` until the child command recovers; decoder-only families continue in-process under `auto`. The probe never enables an implicit in-process fallback.
+*   **Startup probe**: because spawning is lazy, a broken child command would otherwise be invisible until the first file and would then fail every file. At wiring time the Engine's index half spawns one child and runs a trivial extraction through it. The extraction deadline is 20s and the kill that follows a hang waits up to 5s more, so boot blocks for at most ~25s - and only against a child that launches and then hangs. A command that cannot launch at all is rejected immediately. On failure it logs a WARN naming the reason and records `reason=probe_failed`. Process-routed families remain isolated and report `SANDBOX_FAILED` until the child command recovers; decoder-only families continue in-process under `auto`. The probe never enables an implicit in-process fallback.
 *   **Failure classification**: a missed deadline is `PARSER_TIMEOUT` (retryable) as before; a child whose stderr carries `OutOfMemoryError` is a **permanent** `PARSER_FAILED` (`IngestionRetryPolicy.NONE`), because a file that does not fit the child heap will exhaust it again; any other non-zero exit is a retryable `SANDBOX_FAILED` carrying the exit code and a bounded stderr tail.
 *   **Parser and native-child lifetime**: the Engine kills parser JVMs when the extractor closes or a request is recycled. Before serving any request, `ExtractionSandboxChild.initializeProcessBoundary` assigns the Windows parser to a kill-on-close Job Object through `WindowsParserContainment` in `worker-services`. The parser retains the sole non-inheritable handle until process death, so Windows also terminates its native descendants (including Tesseract) on forced recycling. Setup failure aborts bootstrap; it never enables in-process fallback. The parent-PID watchdog halts the parser after Engine death, triggering the same native cleanup. Custom parser implementations must call this bootstrap before spawning native children. Windows is the supported platform; other platforms retain only the parent watchdog and have no native-descendant containment guarantee.
 *   **Garbage Detection:**
@@ -411,9 +413,9 @@ Parser families that can wedge or exhaust a heap run **out of process**, in a po
     *   We use `TextQualityAnalyzer` (Alphanumeric Ratio < 0.3) to detect this.
     *   **OCR fallback:** If the structured Tika pass is weak and the file is OCR-eligible, extraction may render PDF pages and invoke the app-owned Tesseract runtime. Each OCR component lazily opens one bounded pool, registered in the Engine or local to a parser child, and reuses it until component close. Document cancellation has a five-second cleanup budget and retains live tasks, child handles and temporary files in bounded document slots until actual exit; it never shuts down the shared pool. Optional OCR capacity refusal preserves successful structured text and records failure evidence. Auto worker count respects the Engine background thread policy, and an explicit larger count is rejected before extraction starts. Direct image OCR remains synchronous. Successful OCR writes `extraction_method=OCR_TIKA`, becomes the baseline searchable text, and records compact visual extraction evidence such as OCR language, optional confidence summary, fallback route, truncation, and skip/guard reason.
     *   **VDU enrichment:** Documents that still lack baseline readable text, or that can benefit from richer visual/layout understanding, are marked `VDU_STATUS_PENDING` with `vdu_demand_kind` distinguishing `baseline_text` from `visual_enrichment`.
-    *   When VDU later produces non-empty text, the Worker updates `content`, `content_preview`, `language`, chunks, and `extraction_method=VDU`. Failed or empty VDU preserves the best baseline text.
+    *   When VDU later produces non-empty text, the index half updates `content`, `content_preview`, `language`, chunks, and `extraction_method=VDU`. Failed or empty VDU preserves the best baseline text.
 *   **Frontmatter title extraction:** Apache Tika's `MarkdownParser` does not extract YAML frontmatter metadata. `ContentExtractor.extractFrontmatterTitle()` provides a fallback: when Tika returns null for title and content starts with `---`, it parses the `title:` field from YAML frontmatter (handles standard, double-quoted, and single-quoted values). This populates the `title` field used by suggest ranking.
-*   **Archive/Binary guardrails:** archives and unknown binaries are classified as `file_kind=archive|binary`. Extraction is best-effort and must not crash the Worker on corrupt/unknown inputs. Regression coverage lives in `modules/system-tests/src/test/java/io/justsearch/systemtests/NastyCorpusTest.java` (fixtures under `modules/system-tests/src/test/resources/corpus/nasty/`).
+*   **Archive/Binary guardrails:** archives and unknown binaries are classified as `file_kind=archive|binary`. Extraction is best-effort and must not crash the Engine on corrupt/unknown inputs. Regression coverage lives in `modules/system-tests/src/test/java/io/justsearch/systemtests/NastyCorpusTest.java` (fixtures under `modules/system-tests/src/test/resources/corpus/nasty/`).
 
 ### Extraction Resilience
 
@@ -421,15 +423,15 @@ The content extraction pipeline is hardened against real-world file system edge 
 
 *   **Cloud-provider placeholder detection:** On Windows, `isCloudPlaceholder()` checks `dos:attributes` for `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS` (0x400000) to detect OneDrive Files-on-Demand placeholders. Reading these would trigger silent network downloads or IOException. Uses `FileSystems.getDefault().supportedFileAttributeViews().contains("dos")` for platform detection (respects ArchUnit guardrails against `System.getProperty`). No-op on non-Windows.
 *   **File walking resilience:** `syncDirectory()` uses `Files.walkFileTree()` (not `Files.walk()`) to survive `AccessDeniedException` on system directories (`$Recycle.Bin`, `System Volume Information`). The `visitFileFailed` handler logs and continues instead of aborting the entire walk. `preVisitDirectory` applies `WALK_SKIP_DIRS` at traversal time to avoid entering system/tool directories.
-*   **Office document memory protection:** A 30MB size limit (`MAX_OFFICE_FILE_SIZE`) gates Office documents before Tika parsing. POI (Tika's Office parser) can expand a 12MB xlsx to 300MB+ in heap — exceeding the Worker's 512MB default. MIME detection via `tika.detect(file)` (magic bytes only) short-circuits before `parseToString()`.
-*   **Native access:** both the Head and Worker JVMs are launched with `--enable-native-access=ALL-UNNAMED` because they make FFM downcalls (NVML, the Windows job object, the GPU driver probe); Lucene 10's `MMapDirectory` uses the FFM `MemorySegment` provider, so no `--add-opens` is needed.
+*   **Office document memory protection:** A 30MB size limit (`MAX_OFFICE_FILE_SIZE`) gates Office documents before Tika parsing. POI (Tika's Office parser) can expand a 12MB xlsx to 300MB+ in heap - exceeding the parser child's 512MB floor. MIME detection via `tika.detect(file)` (magic bytes only) short-circuits before `parseToString()`.
+*   **Native access:** the Engine and its extraction child JVMs are launched with `--enable-native-access=ALL-UNNAMED` because they make FFM downcalls (NVML, the Windows job object, the GPU driver probe); Lucene 10's `MMapDirectory` uses the FFM `MemorySegment` provider, so no `--add-opens` is needed.
 *   **Encoding resilience:** Tika 3.x correctly auto-detects and decodes UTF-8 (with/without BOM), UTF-16 LE/BE, Windows-1252, ISO-8859-1, and Shift-JIS. Verified by 8 encoding tests in `ContentExtractorTest`. Correctly-decoded non-ASCII text passes `TextQualityAnalyzer` without false positives.
 
-One filesystem-identity gap remains here: Windows junction points can expose the same file under distinct paths and therefore produce duplicate documents. Tempdoc 889 owns the active investigation. User-configured excludes already reach the Worker's traversal, and extraction failures become typed failed-job and ingestion-ledger outcomes rather than placeholder-indexed documents.
+One filesystem-identity gap remains here: Windows junction points can expose the same file under distinct paths and therefore produce duplicate documents. Tempdoc 889 owns the active investigation. User-configured excludes already reach the index half's traversal, and extraction failures become typed failed-job and ingestion-ledger outcomes rather than placeholder-indexed documents.
 
 ## Embedding Strategy
 
-> **Session construction.** The `OnnxEmbeddingEncoder` session is built by the Worker's composition root alongside the other five ORT encoders (SPLADE, NER, BGE-M3, reranker, citation). See [24-worker-inference-composition.md](24-worker-inference-composition.md) for the pipeline (resolvers → composition root → assembler → `SessionHandle`) and register entry D-007.
+> **Session construction.** The `OnnxEmbeddingEncoder` session is built by the Engine's index-half composition root alongside the other five ORT encoders (SPLADE, NER, BGE-M3, reranker, citation). See [24-engine-inference-composition.md](24-engine-inference-composition.md) for the pipeline (resolvers -> composition root -> assembler -> `SessionHandle`) and register entry D-007.
 
 *   **Class:** `io.justsearch.indexerworker.embed.EmbeddingService`
 *   **Backend:** ONNX Runtime via `OnnxEmbeddingEncoder` (default model: EmbeddingGemma-300M INT8, 298 MB).
@@ -444,8 +446,8 @@ One filesystem-identity gap remains here: Windows junction points can expose the
     *   `JUSTSEARCH_LLM_BACKEND=stub`: disables embeddings entirely (useful for hermetic tests).
 *   **Constraint:** When `llama-server` is running in Online mode on low-VRAM cards, we must not keep a GPU embedding backend loaded.
 *   **Logic (`IndexingLoop.handleGpuStateTransition`):**
-    *   If `signalBus.isMainGpuActive()` is **TRUE**: the Worker **unloads** `EmbeddingService` (best-effort VRAM release) and skips embedding work.
-    *   If `signalBus.isMainGpuActive()` is **FALSE**: the Worker **reloads** `EmbeddingService` (auto-discovery) and performs a backfill pass for pending embeddings.
+    *   If `signalBus.isMainGpuActive()` is **TRUE**: the index half **unloads** `EmbeddingService` (best-effort VRAM release) and skips embedding work.
+    *   If `signalBus.isMainGpuActive()` is **FALSE**: the index half **reloads** `EmbeddingService` (auto-discovery) and performs a backfill pass for pending embeddings.
 
 ### Deferred embedding lifecycle
 
@@ -454,7 +456,7 @@ During primary indexing, embedding is **deferred** to backfill (tempdoc 312 item
 **Exception:** During blue-green migration (embedding model change), inline batch embedding is enabled so the new index has vectors at cutover. Controlled by `migrationActiveSupplier` in `IndexingLoop` (tempdoc 312 item 20).
 
 Embedding compatibility gating (vector safety):
-- The Worker compares the current embedding model fingerprint to the stored index fingerprint (commit metadata) and blocks VECTOR/HYBRID queries when incompatible; `/api/status` surfaces `embeddingCompatState` and `embeddingCompatReason`.
+- The index half compares the current embedding model fingerprint to the stored index fingerprint (commit metadata) and blocks VECTOR/HYBRID queries when incompatible; `/api/status` surfaces `embeddingCompatState` and `embeddingCompatReason`.
 - Legacy auto-rebuild heuristics count **parent docs only** (exclude `is_chunk=true`) so chunk documents do not break “all pending” detection when chunks exist.
 
 Chunk vectors (Phase 6) are also supported:
@@ -487,6 +489,6 @@ Chunk regeneration is centralized in `ChunkDocumentWriter` so index-time chunkin
 
 ## Search and Retrieval
 
-The Worker handles both interactive search and RAG retrieval behind the `SearchServiceCalls` port. The search pipeline includes BM25, dense vector (KNN), and SPLADE retrieval legs with multi-stage fusion and reranking.
+The index half handles both interactive search and RAG retrieval behind the `SearchServiceCalls` port. The search pipeline includes BM25, dense vector (KNN), and SPLADE retrieval legs with multi-stage fusion and reranking.
 
 For the full query pipeline (fusion algorithms, reranking cascade, degradation signals), see `docs/explanation/23-search-pipeline-overview.md`.

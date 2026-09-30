@@ -16,9 +16,18 @@ import org.junit.jupiter.api.Timeout;
 final class EngineLifecycleE2ETest {
   private record PendingScenario(String name, String owner, boolean requiresAi, String proof) {}
 
-  private static final List<PendingScenario> PENDING = List.of(
-      new PendingScenario("reconfigure-beside-in-place", "D1-4/D1-12/D1-14", true,
-          "beside and in-place reconfigure under the device ceiling"));
+  private static final List<PendingScenario> PENDING = List.of();
+
+  @Tag("ai")
+  @Test
+  @Timeout(20 * 60)
+  void ordinaryQueryReconfigureProvesBesideAndForcedInPlaceWithoutRestart() throws Exception {
+    String beside = EngineSupervisedRecoveryE2ETest.runQueryReconfigureRound(false);
+    String inPlace = EngineSupervisedRecoveryE2ETest.runQueryReconfigureRound(true);
+    assertTrue(beside.contains("\"mode\":\"BESIDE\""), beside);
+    assertTrue(inPlace.contains("\"mode\":\"IN_PLACE\""), inPlace);
+    System.out.println("LIFECYCLE_QUERY_RECONFIGURE_PASS D1-4/D1-12/D1-14");
+  }
 
   @Test
   void migrationStartsLiveInTheInstalledEngine() throws Exception {
@@ -167,6 +176,6 @@ final class EngineLifecycleE2ETest {
           + " ai=" + scenario.requiresAi() + " proof=" + scenario.proof());
     }
     // Reduce this count only when an actual exercise*(c) scenario replaces a pending entry.
-    assertEquals(1, names.size());
+    assertEquals(0, names.size());
   }
 }

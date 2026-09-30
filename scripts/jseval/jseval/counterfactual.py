@@ -1,12 +1,13 @@
 """Counterfactual single-pass runner (tempdoc 400 LR5-a).
 
-**Design deviation vs §8.5 spec.** The spec proposes a proto change
+**Historical design deviation vs section 8.5 spec.** The spec proposed a proto change
 (``repeated string counterfactual_modes`` on SearchRequest +
 ``map<string, RankList>`` on response) so the Worker returns
 all counterfactual rankings in one request ("single-pass"). Since
 ``SearchOrchestrator`` already computes per-branch rankings (C1 spike
 confirmed) but discards them after fusion, the spec's single-pass is
-efficient but requires a Java+proto+gRPC+REST cascade.
+efficient but required a cross-process protocol cascade at that time. The current
+Engine uses in-process ports; the multi-pass implementation below is unchanged.
 
 This implementation uses a **multi-pass variant**: jseval issues
 one request per mode against the existing ``/api/knowledge/search``

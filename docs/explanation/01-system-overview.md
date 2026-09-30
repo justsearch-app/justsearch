@@ -17,7 +17,7 @@ Functionally it is more than a search index: over the local corpus it layers an 
 runtime and its toolchain churn, the failure domain, or ownership of a scarce resource. Where only
 the *rate of change* differs, a module boundary — an interface in a contract module, pinned by
 ArchUnit — is enough. That rule is [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md),
-which supersedes ADR-0001 (three OS processes) and ADR-0002 (gRPC + MMF hybrid IPC).
+which makes ADR-0001 (three OS processes) and ADR-0002 (gRPC + MMF hybrid IPC) superseded designs.
 
 Applying it leaves **one JVM — the Engine — plus two native process boundaries.** The application
 half (HTTP + MCP API, agent loop, conversation, RAG assembly) and the index half (Lucene, job queue,
@@ -57,7 +57,7 @@ graph TD
 *   **API gateway:** exposes the REST surface used by the UI (e.g. `/api/status`, `/api/health`, `/api/knowledge/*`, `/api/inference/*`) plus the MCP endpoint, and reaches the index half through port calls.
 *   **Component recovery:** `KnowledgeServerHealthMonitor` owns component deadlines, the single serialized admission slot, backoff, and retry budgets. Physical component owners report exact failures and perform one admitted action; they do not run competing retry loops. There is no worker-process watchdog.
 *   **Deterministic failure surfacing:** recoverable candidate failures and permitted degraded states remain observable through component and readiness state. An observed essential-index corruption or schema-mismatch reason bypasses local retries and immediately requests the Engine's ordered, counted restart (exit code 5). Process-fatal failures and OOM remain process/supervisor events rather than component recovery outcomes.
-*   **One log:** `%DATA_DIR%/logs/engine.log`. There is no separate `worker.log`.
+*   **One log:** `%DATA_DIR%/logs/engine.log`. There is no second process log for the index half.
 *   **`--add-modules=jdk.incubator.vector`** was removed to enable the JDK 25 AOT cache's full-module-graph optimization; Lucene uses its scalar fallback. See tempdoc 269 §D4a.
 
 #### Ports: how the two halves meet
@@ -84,7 +84,7 @@ call appears to need none of them.
 *   **Modules:** `modules/indexer-worker` (lifecycle, job queue, recovery), `modules/worker-services` (search, ingest, indexing loop, pacing, extraction), `modules/worker-core` (encoders), `modules/adapters-lucene` (the only module that depends on Lucene).
 *   **Role:** the heavy lifter — all file indexing, text extraction, and hybrid search.
 *   **Index ownership:** owns Lucene + the generation layout (`state.json`, `indices/<gen>/`) and orchestrates blue/green schema migrations when configured.
-*   **Pacing, not partition:** with one heap and one set of pools, a runaway batch can starve the HTTP listener in a way two JVMs made impossible. The mitigation is `IndexingPacing` — the loop yields to hold indexing at `justsearch.indexing.foreground_duty_pct` (default 20%) while user-waiting calls are in flight — plus per-operation budgets, rather than a second address space. See `modules/indexer-worker/README.md`.
+*   **Pacing, not partition:** with one heap and one set of pools, a runaway batch can starve the HTTP listener in a way a second address space made impossible. The mitigation is `IndexingPacing` -- the loop yields to hold indexing at `justsearch.indexing.foreground_duty_pct` (default 20%) while user-waiting calls are in flight -- plus per-operation budgets, rather than a second address space. See `modules/indexer-worker/README.md`.
 *   **Deferred model init:** the ONNX encoders load on a background thread while the ports already answer. Search degrades to BM25 and the loop skips embedding/SPLADE until they are wired.
 
 ### 3. The extraction sandbox pool
@@ -99,7 +99,9 @@ object for both, and a key resolved once is resolved for everything.
 
 **Adding a new config key:** add it to `EnvRegistry`. That is the whole procedure.
 
-**What this replaced, and why the replacement is smaller.** Until lane F stage A the Worker was a
+#### Historical configuration propagation (replaced in lane F stage A)
+
+Until lane F stage A the Worker was a
 second process, and getting config into it took three mechanisms plus a detector:
 
 1. a **config snapshot** — `HeadlessApp` serialised the resolved config to
@@ -166,7 +168,7 @@ The system is built to be deterministic.
 *   **Port Discovery (gRPC):** *Retired.* The Knowledge Server's gRPC listener used to bind port `0` (ephemeral) and write the assigned port to a shared **Memory-Mapped File (MMF)**. Lane F stage A merged the two halves into one JVM, so there is no second port to discover and no handoff to verify — the gRPC channel, the MMF bus and (at item A14) gRPC itself are deleted. See [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md).
 *   **Port Discovery (HTTP):** The UI-facing HTTP API is usually configured (default `33221`), but can also be ephemeral. The backend prints `JUSTSEARCH_API_PORT=<port>` to stdout and the desktop shell injects it (Tauri `api_port` command / bridge). In browser dev mode, if no explicit port is provided, the UI auto-discovers by scanning a small loopback range (currently `33221..33250`) and validating the `/api/status` payload.
 *   **State Polling:** The frontend polls `/api/status` to determine if the backend is ready, rather than assuming it is after X seconds.
-*   **Lifecycle Gate:** Automation uses `GET /api/health` as a **contract-tested gate** (schema v1). It returns HTTP `200` for `READY|DEGRADED` and `503` otherwise; `/api/status` remains the richer “what’s running?” payload.
+*   **Lifecycle Gate:** Automation uses `GET /api/health` as a **contract-tested gate** (schema 2). It returns HTTP `200` for `READY|DEGRADED` and `503` otherwise; `/api/status` remains the richer "what's running?" payload.
 
 ### "One Owner" Policy
 Data corruption on Windows is often caused by two processes trying to open the same file. Merging

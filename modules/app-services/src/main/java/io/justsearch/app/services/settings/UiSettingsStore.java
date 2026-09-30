@@ -61,7 +61,7 @@ public final class UiSettingsStore {
 
   private static final Logger log = LoggerFactory.getLogger(UiSettingsStore.class);
 
-  static final int CURRENT_SCHEMA_VERSION = 5;
+  public static final int CURRENT_SCHEMA_VERSION = 5;
 
   /**
    * Versions this build can still read and migrate forward. {@code 0} is the unversioned legacy
@@ -238,9 +238,10 @@ public final class UiSettingsStore {
     catch (NoSuchAlgorithmException failure) { throw new AssertionError("SHA-256 is required by Java", failure); }
   }
 
-  private Snapshot parseOrThrow() {
+  private synchronized Snapshot parseOrThrow() {
     try {
-      JsonNode root = MAPPER.readTree(settingsFile.toFile());
+      byte[] original = Files.readAllBytes(settingsFile);
+      JsonNode root = MAPPER.readTree(original);
       if (root == null || !root.isObject()) {
         throw new CorruptDurableStoreException("ui-settings", "expected a JSON object");
       }
@@ -297,6 +298,9 @@ public final class UiSettingsStore {
           throw new CorruptDurableStoreException("ui-settings", "invalid query role selection");
         }
       }
+      if (mode.isWritable() && resolvedVersion < CURRENT_SCHEMA_VERSION) {
+        preserveLegacySettings(resolvedVersion, original);
+      }
       return new Snapshot(migrate(settings, resolvedVersion), witness, queryRoles);
     } catch (CorruptDurableStoreException
         | io.justsearch.configuration.persistence.UnsupportedStoreVersionException e) {
@@ -304,6 +308,26 @@ public final class UiSettingsStore {
     } catch (Exception e) {
       throw new CorruptDurableStoreException(
           "ui-settings", "cannot parse " + settingsFile, e);
+    }
+  }
+
+  // Distinct Engines may share settings despite holding different data-directory locks.
+  // Create-once retains the first snapshot; backup failure warns but never blocks migration.
+  private void preserveLegacySettings(int version, byte[] original) {
+    Path backup = settingsFile.resolveSibling("settings.v" + version + ".bak.json");
+    try {
+      if (Files.exists(backup, LinkOption.NOFOLLOW_LINKS)) {
+        if (!Files.isRegularFile(backup, LinkOption.NOFOLLOW_LINKS)) {
+          throw new IOException("Legacy settings backup is not a regular file");
+        }
+        return;
+      }
+      if (!AtomicFileWrites.createOnceStrict(backup, original)
+          && !Files.isRegularFile(backup, LinkOption.NOFOLLOW_LINKS)) {
+        throw new IOException("Legacy settings backup is not a regular file");
+      }
+    } catch (IOException failure) {
+      log.warn("Cannot preserve legacy settings backup {}; continuing migration", backup, failure);
     }
   }
 

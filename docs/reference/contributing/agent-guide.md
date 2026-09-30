@@ -35,9 +35,9 @@ All path resolution follows this priority:
 
 ### 2.2. Testing IPC
 
-**This pattern is gone.** `WorkerProcessManager`, `MmfTestHarness` and `GrpcTestClient` were deleted
+**Retired pattern (lane F stage A).** `WorkerProcessManager`, `MmfTestHarness` and `GrpcTestClient` were deleted
 at lane F stage A (items A11-A14): there is no worker process to spawn, no memory-mapped port to
-discover and no gRPC client to build. Tests that need a working index compose the Engine in-process
+discover and no historical gRPC client to build. Tests that need a working index compose the Engine in-process
 through `EngineRoot` and run in `modules/app-engine/src/test/java/io/justsearch/app/engine/` on every
 build; see [Testing Strategy](../../explanation/09-testing-strategy.md). The process boundaries that
 survive — `llama-server` and the extraction sandbox child pool — are still exercised from

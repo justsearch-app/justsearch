@@ -25,15 +25,15 @@ model, `nomic-embed-text`, `EMBED_GPU_LAYERS`) is no longer accurate.
 this policy across a Head/Worker process split that no longer exists. Lane F
 stage A merged the application half and the index half into one JVM — the
 Engine — so the ORT encoders and the process that serves the API are now the
-same process, and `main_gpu_active` is a field on the in-process
-`GpuSchedulingGauge` (`modules/core`), not a memory-mapped flag: the MMF signal
-bus was deleted at item A10. What survives unchanged is the policy itself and
+same process, and the GPU activity state is held by the in-process
+`GpuSchedulingGauge` (`modules/core`), not a memory-mapped flag: the historical
+signal bus was deleted at item A10. What survives unchanged is the policy itself and
 the boundary it coordinates across — `llama-server` is still a separate process
 owning VRAM (ADR-0049 keeps it), so mutual exclusion between ORT GPU sessions
 and the generative LLM is still cross-process and still required. Read every
-"Head process" / "Worker process" below as "the Engine".
+**Historical Head process / Worker process terminology** below means "the Engine".
 
-## Context
+## Historical Context (pre-Engine architecture)
 
 JustSearch runs two GPU-intensive workloads:
 
@@ -47,7 +47,7 @@ The target hardware is consumer GPUs with 8GB VRAM. Loading both models simultan
 
 NVIDIA's CUDA runtime does not provide reliable VRAM reservation or preemption between processes. Two processes competing for VRAM is a race condition with no portable resolution.
 
-## Decision
+## Historical Decision (MMF implementation, superseded)
 
 Enforce **mutual exclusion** for GPU access across processes using an advisory MMF flag:
 
@@ -106,9 +106,9 @@ See also: [AI Architecture](../explanation/05-ai-architecture.md) for the full i
 
 ## Update — tempdoc 598 R4 (2026-06-17): query-embed is exempt from full eviction
 
-The Decision above states that on Online Mode the Worker "unloads the embedding
+The historical Decision above states that on Online Mode the Worker "unloads the embedding
 backend to release VRAM." As of tempdoc 598 R4 this is **narrowed**: on the
-`main_gpu_active` rising edge the Worker now **releases the embedder's GPU
+At the GPU-active rising edge the Engine now **releases the embedder's GPU
 session** (freeing VRAM, preserving GPU single-tenancy for the chat LLM) but
 **keeps the `EmbeddingService` alive** so a single **query embedding** continues
 on the CPU fallback session. Bulk embedding **backfill** stays paused exactly as

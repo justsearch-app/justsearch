@@ -74,7 +74,7 @@ class TestExecutePreflight:
         mock_fetch.side_effect = [
             {
                 "indexAvailable": False,
-                "indexStatusReason": "Worker process not running",
+                "indexStatusReason": "Index component not ready",
                 "meta": {"workerRpcStale": True},
             },
             None,  # commit-metadata fails

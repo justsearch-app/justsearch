@@ -263,7 +263,8 @@ public final class ResolvedConfigBuilder {
   /**
    * Contributes the standard worker-relevant source set that every config-resolution entry point
    * needs: the {@link #contributeEnvRegistry() EnvRegistry} sources and the {@link #contributeYaml
-   * YAML root} (loaded via {@link JustSearchConfigurationLoader#loadYamlRoot()}).
+   * YAML root} (loaded via {@link JustSearchConfigurationLoader#loadYamlRoot()}), plus the
+   * loader's discovered physical SSOT directory at auto-detect priority.
    *
    * <p>Centralizing this base composition is the structural realization of the tempdoc 331
    * "resolve once; divergence is impossible" contract: a boot site that calls this cannot silently
@@ -277,6 +278,9 @@ public final class ResolvedConfigBuilder {
   public ResolvedConfigBuilder contributeBaseSources() {
     contributeEnvRegistry();
     JustSearchConfigurationLoader.loadYamlRoot().ifPresent(this::contributeYaml);
+    new JustSearchConfigurationLoader().ssotRoot().ifPresent(path ->
+        put(EnvRegistry.SSOT_PATH.configKey(), ORDINAL_AUTO_DETECT, "auto_detected",
+            "ssot_discovery", path.toString()));
     return this;
   }
 

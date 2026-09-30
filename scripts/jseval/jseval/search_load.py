@@ -1,11 +1,11 @@
-"""Background search load driven against the Head during ingestion (tempdoc 885).
+"""Background search load driven against the Engine during ingestion (tempdoc 885).
 
 Lane C's throughput comparison needs the indexing pipeline measured *while foreground search
 traffic is present*. Before item 3 that was because `POST /api/knowledge/search` wrote the
-Worker's MMF activity slot and the slot made `IndexingLoop` breath-hold (pause outright). Since
-item 3 the search RPC itself is the signal: it increments the Worker's in-flight foreground
+historical Worker's MMF activity slot and the slot made `IndexingLoop` breath-hold (pause outright). Since
+item 3 the search call itself is the signal: it increments the index half's in-flight foreground
 gauge for its duration, which drives the indexing duty cycle (`IndexingPacing`). Either way this
-module's job is the same — hold real foreground traffic against the Worker while ingest runs.
+module's job is the same  -  hold real foreground traffic against the Engine while ingest runs.
 
 Two modes:
 

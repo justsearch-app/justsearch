@@ -320,7 +320,7 @@ def test_commit_by_reason_maxes_per_reason_not_across_reasons(tmp_path):
          "value": 4, "tags": {"reason": "timer"}},
         {"t": "2026-09-02T00:00:10Z", "name": cadence.COMMIT_TOTAL, "type": "counter",
          "value": 9, "tags": {"reason": "timer"}},
-        # A Worker restart resets the cumulative counter, so the LAST sample is not the run
+        # An Engine restart resets the cumulative counter, so the LAST sample is not the run
         # total. Keeping the max per reason is what the untagged counters already do; a
         # last-wins read would report 2 here.
         {"t": "2026-09-02T00:00:20Z", "name": cadence.COMMIT_TOTAL, "type": "counter",

@@ -1,5 +1,5 @@
 ---
-title: "ADR-0002: Use gRPC + MMF Hybrid for IPC"
+title: "ADR-0002: Use gRPC + MMF Hybrid for IPC (superseded)"
 type: decision
 status: superseded
 description: "gRPC for structured data transfer, MMF for sub-millisecond signaling. SUPERSEDED by ADR-0049: the channel this IPC design served no longer exists."
@@ -9,7 +9,7 @@ probes: []
 last_reviewed: 2026-09-07
 ---
 
-# ADR-0002: Use gRPC + MMF Hybrid for IPC
+# ADR-0002: Use gRPC + MMF Hybrid for IPC (superseded)
 
 > **SUPERSEDED by [ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) (2026-09-07).**
 > This ADR designed an IPC channel between the Head and the Worker. There is no such channel: the

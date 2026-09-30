@@ -27,7 +27,53 @@ launched it; a killed wrapper (30-minute auto-background cap, or Claude Code's
 memory-pressure reaper, now disabled in user settings from the next Claude Code
 start) does not stop the work. Resume with `codex exec resume <session id>` only
 after its log has stopped growing, never while the original process still writes.
-Serialize Gradle across workers with grant files under `tmp/grants/`. Root keeps Gradle, the dev stack, integration and commits.
+Root keeps Gradle, the dev stack, integration and commits.
+
+### Codex cost rules (owner, 2026-09-30; binding for every launch and resume)
+
+Measured: about $114 of Codex spend in the first four hours, of which about $90 came from
+sub-agents the Sol workers spawned under the stale `gpt-5.6-*` role pins. About 70% of spend
+was cached-input re-reads while workers polled for a Gradle grant.
+
+1. **No nested spawning.** Every `codex exec` and `codex exec resume` carries
+   `-c agents.enabled=false`, and every brief says "Do not spawn sub-agents; do the work
+   yourself." Probe on 2026-09-30: with the override Codex reported spawning unavailable and
+   created no child session (`01a0f3ad-4bae-...`); the control without it created one
+   (`01a0f3ad-7b8c-...` -> child `01a0f3ad-97e2-...`).
+3. **No idle waiting.** A worker never polls for a Gradle grant. Build-bound work is phased:
+   the worker edits, then ends with `READY FOR BUILD: <exact commands>` and exits. When Gradle
+   is free, root issues the grant and runs `codex exec resume <id> -c agents.enabled=false`
+   with "You hold the Gradle grant; run: ...". Launch a worker only while it has non-build work.
+   Brief template: `C:/Users/Elias/AppData/Local/Temp/cx/brief-rules.md` (copy its lines into
+   every brief).
+5. **Visibility and budget.** Every status report counts actual Codex sessions, children
+   included (`node C:/Users/Elias/AppData/Local/Temp/cx/codex-status.js`). After each worker
+   finishes, record its API-equivalent cost below from the session's final
+   `total_token_usage` at $/1M (uncached in / cached in / out): gpt-6.1-sol 2 / 0.10 / 10,
+   gpt-6-luna 0.10 / 0.01 / 0.50, gpt-5.6-sol 4 / 0.40 / 20, gpt-5.6-luna 0.20 / 0.02 / 1.20.
+   Note the Codex weekly `used_percent`; tell the owner if it passes 50% before the week resets.
+6. **Model tiering.** Luna (`gpt-6-luna`) for every read-only inventory, contract check, doc
+   edit and mechanical change. Sol (`gpt-6.1-sol`) only for design, non-trivial implementation
+   and refute-first review.
+
+Role pins: PR #735 moves `.codex/agents/*.toml` and `default_subagent_model` to
+`gpt-6.1-sol` / `gpt-6-luna`; owner merges it. Until then the override in rule 1 is what
+prevents stale-pin children.
+
+Per-worker cost ledger (self + children, API-equivalent):
+
+| Worker (session) | Model | Self | Children | Note |
+|---|---|---|---|---|
+| reconfigure impl + fixes (`01a0f2e5`) | gpt-6.1-sol | $6.81 | 6, $54.63 | children on gpt-5.6-sol |
+| D1 closure (`01a0f35a`) | gpt-6.1-sol | $2.61+ | 8, $38.41 | waiting (shell sleep) for `gradle-d1close` until ~22:16; resume with the grant under the new flags |
+| help source + fixes (`01a0f2bb`) | gpt-6.1-sol | $4.61 | 0 | grant polling heavy |
+| WP2 2b + fixes (`01a0f2ed`) | gpt-6.1-sol | $5.60+ | 1, $0.23 | hard-link fallback fix running (no-spawn flags) |
+| F-1/F-2 docs (`01a0f37a`) | gpt-6.1-sol | $1.63 | 6, $2.82 | |
+| F-3/4/5 (`01a0f39e`) | gpt-6.1-sol | $1.88 | 1, $0.55 | done; merged `82b5fa129` |
+| D1/D2 audit, reconciliation, 4 reviews | gpt-6.1-sol | $6.25 | 6, $7.57 | read-only |
+| E1, WP2 2c, callers, contract, sweep, 2e | mixed | $1.09 | 0 | |
+
+Codex weekly `used_percent`: 21 at 21:00 and 21:35 on 2026-09-30. Total API-equivalent today: $134.56.
 
 ## Current state (2026-09-30)
 
@@ -138,10 +184,15 @@ release note, every first-party client including MCP and CLI) or fix it.
    mismatch can make the JVM ignore the cache. Verify with `-Xlog:aot` on an installed dist
    whether the cache loads, and align the training flags with the spawn set.
 
-Running Codex sessions (resume with `codex exec resume <id>` from the worktree if cut off):
-reconfigure in-place `01a0f2e5-978c-7492-9ab9-42adaeb5abbc` (`lane-f-reconf`, holds
-`tmp/grants/gradle-reconf`); WP2 2b `01a0f2ed-988d-73d1-94c5-f4dcc6fd9214` (`lane-f-wp2b`,
-Gradle gated on `tmp/grants/gradle-wp2b`, issued after reconfigure releases).
+Running Codex sessions (resume with `codex exec resume <id>` from the worktree only after its log stops growing):
+help review fixes `01a0f2bb-6611-7850-abea-6ced24298a09` (`lane-f-d1-help`, holds `tmp/grants/gradle-help2`);
+WP2 2b `01a0f2ed-988d-73d1-94c5-f4dcc6fd9214` (`lane-f-wp2b`, next grant `gradle-wp2b`);
+D1 closure assertions `01a0f35a-ab44-78d0-93b6-3cc776dad953` (`lane-f-d1-close`, then `gradle-d1close`);
+reconfigure fixes `01a0f2e5-978c-7492-9ab9-42adaeb5abbc` (`lane-f-reconf`, grant `gradle-reconf2`) for the
+[review](evidence/D1/reconfigure-review-2026-09-30.md): two blockers (CUDA realized after commitment;
+restoration Error bypasses recovery) and five should-fix; API fields move into a nested `composition`
+object. Gradle order: reconf2 (now), wp2b2 (WP2 2b review fixes: CLI boot bypasses the marker;
+create-once backup; [batch 2 review](evidence/batch2-review-2026-09-30.md)), d1close. Implementation `5ccfa74a8` is not merged.
 
 Done this session: D1-17 help source in Green (`1ac1407ef`, merged `63b83ffad`; integrated
 build green at `tmp/lane-f-help-integrated-compile-r2.log`, focused 212 tests at

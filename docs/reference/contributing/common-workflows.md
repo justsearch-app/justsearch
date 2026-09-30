@@ -14,9 +14,9 @@ tool) are *also* registered for just-in-time consultation in
 `governance/consult-register.v1.json` when you edit the relevant region; this
 file is the full reference behind those recipes.
 
-## Add a proto message field (there is no gRPC method to add)
+## Add a proto message field (retained wire messages; retired gRPC method)
 
-**There is no gRPC method to add.** Lane F stage A item A14 removed the last `service` block from
+**The gRPC transport is retired; there is no gRPC method to add.** Lane F stage A item A14 removed the last `service` block from
 `modules/ipc-common/src/main/proto/` and dropped `protoc-gen-grpc-java` from
 `modules/ipc-common/build.gradle.kts`, so `protoc` generates messages and nothing else. Adding a
 `service` block back is not a way to add an API; it is a way to resurrect a deleted transport.
@@ -69,7 +69,7 @@ explicitly with `cd modules/ui-web && npm install`, then commit the updated
 Load `/ssot-catalog` for the dual-copy checklist and field role reference.
 1. Edit JSON in `SSOT/catalogs/`
 2. **If adding fields**: also update the classpath copy at `modules/adapters-lucene/src/main/resources/SSOT/catalogs/fields.v1.json` — production loads this when the repo root is unavailable
-3. **If adding fields with extraction logic**: update `IndexingDocumentOps.java` to populate the new field during ingestion. Existing indices will NOT have the new field — test corpora must be re-indexed (`jseval run --reset` or `--start-backend --clean`). `--clean` is fail-closed (tempdoc 711 item 4): it verifies the wipe actually completed (sweeping an orphaned Worker JVM if a delete is blocked) and raises rather than silently re-running against a stale index if a survivor remains — see `docs/reference/jseval-pipeline-reference.md`
+3. **If adding fields with extraction logic**: update IndexingDocumentOps.java to populate the new field during ingestion. Existing indices will NOT have the new field; test corpora must be re-indexed (jseval run --reset or --start-backend --clean). --clean is fail-closed: it verifies the wipe and raises rather than silently re-running against a stale index if a registered Engine process survivor remains; see docs/reference/jseval-pipeline-reference.md.
 4. Regenerate fingerprints if needed
 5. Verify pinned-hash tests: `./gradlew.bat :modules:ssot-tools:test`
 6. Check commit metadata compatibility: `./gradlew.bat :modules:adapters-lucene:test`

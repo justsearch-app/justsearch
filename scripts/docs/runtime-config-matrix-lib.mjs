@@ -339,7 +339,7 @@ export function renderMatrixMarkdown(model) {
   lines.push(
     "The per-row notes above cover only the sources this table can derive from `EnvRegistry` /" +
       " `ConfigKey`. The full ordinal chain in `ResolvedConfigBuilder` has more: `jvm_arg` 500 >" +
-      " `worker_snapshot` 450 > `env_var` 400 > `ci_profile` 350 > `settings.json` 300 > `yaml`" +
+      " `env_var` 400 > `ci_profile` 350 > `settings.json` 300 > `yaml`" +
       " 200 > `auto_detected` 150 > `default` 100. Two of those contributors are invisible here" +
       " because they are written by callers rather than declared as keys:",
   );
@@ -374,6 +374,10 @@ export function renderMatrixMarkdown(model) {
       " Its `justsearch.server.exe.source` marker is retired. The model-path marker has no current" +
       " writer; its compatibility reader remains for the separately designed profile persistence path.",
   );
+  lines.push("");
+  lines.push("## Configuration declarations (retained pre-lane F identifiers)");
+  lines.push("");
+  lines.push("The declaration, environment and constant names below retain their pre-merge spelling. They identify Engine configuration keys, not a separate index process.");
   lines.push("");
   lines.push("| Declaration | Lifecycle | YAML key | Env var | System property | EnvRegistry constant | Owner module | Precedence notes |");
   lines.push("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |");

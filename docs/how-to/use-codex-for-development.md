@@ -141,7 +141,7 @@ disjoint file ownership), not by the cap.
 
 Open a `companion` when at least two related questions need the same
 supporting context (a module-contract map, a log corpus, a set of doc deltas)
-or during a multi-question lifecycle, gRPC, or contract investigation. Do not
+or during a multi-question lifecycle or contract investigation. Do not
 open one for a single lookup, a status check, or a task with no repeated
 context. Rules:
 

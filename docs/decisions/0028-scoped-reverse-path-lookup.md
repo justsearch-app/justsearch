@@ -151,7 +151,7 @@ permitted).
 
 **Neutral:**
 
-- Worker process memory and disk usage both grow modestly. Negligible
+- Historical Worker-process memory and disk usage both grow modestly. Negligible
   at desktop-app scale; would warrant revisiting if JustSearch ever
   served multi-tenant deployments.
 - The ArchUnit test adds ~1 second to the system-tests run.

@@ -47,14 +47,52 @@
   ],
   "durableStores": [
     {
-      "id": "ui-settings",
+      "id": "data-version-marker",
       "pathVerification": "LITERAL",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Only app and supported durable-store version identifiers; no user content or machine-local paths.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        "data-version.json"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "JSON appVersion and storeVersions high-water object",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-engine/src/main/java/io/justsearch/app/engine/DataVersionMarker.java",
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "REWRITE_UNREADABLE_BUILD_HIGH_WATER_MARKER",
+      "corruptionNote": "Log an unreadable marker once, treat it as absent for comparison, and atomically record this build as the best available high-water mark. Read or write failures never block boot. Headless and all CLI store-opening commands reach one Engine-owned pre-store hook; CLI notices are logged by the Engine.",
+      "reconciliation": "RAISE_BUILD_AND_STORE_VERSION_HIGH_WATER_BEFORE_STORE_OPEN",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/DataVersionMarker.java",
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/SupportedDataVersions.java",
+        "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/EngineProcessResources.java",
+        "modules/app-engine/src/main/java/io/justsearch/app/engine/DefaultEngineProcessResources.java",
+        "modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java"
+      ],
+      "tests": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/DataVersionMarkerTest.java",
+        "modules/app-launcher/src/test/java/io/justsearch/applauncher/LauncherDataVersionMarkerTest.java"
+      ],
+      "fixtures": []
+    },
+    {
+      "id": "ui-settings",
+      "pathVerification": "COMPOSED",
       "encryption": "UNSEALED_GAP",
       "encryptionNote": "Plaintext JSON holding the user's UI preferences, including the configured local model path and other machine-local settings. Nothing structural prevents sealing it; nothing seals it today.",
       "owner": "HEAD",
       "root": "DATA_DIR",
       "ownedPaths": [
-        "ui/settings.json"
+        "ui/settings.json",
+        "ui/settings.v*.bak.json"
       ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
@@ -68,12 +106,15 @@
         4
       ],
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
-      "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
+      "versionSource": {
+        "file": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
+        "symbol": "CURRENT_SCHEMA_VERSION"
+      },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
       "writeMode": "FULL_REWRITE",
       "atomicity": "ATOMIC_REPLACE",
       "corruptionPolicy": "PRESERVE_AND_RECOVER_DEFAULTS",
-      "corruptionNote": "Unparseable file is moved to settings.json.corrupt-<timestamp>, defaults are loaded, and LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT is raised as a WARN condition (ADR-0008, tempdoc 882 item 24). A future schemaVersion still fails loud (futureVersionRefusalTest). Test methods: readWrite_malformedStateIsQuarantinedAndDefaulted and readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback in the tests file below; the refusal is readWrite_futureVersionIsRefusedWithoutOverwrite.",
+      "corruptionNote": "Unparseable file is moved to settings.json.corrupt-<timestamp>, defaults are loaded, and LifecycleReasonCode.SETTINGS_RESET_FROM_CORRUPT is raised as a WARN condition (ADR-0008, tempdoc 882 item 24). A future schemaVersion still fails loud (futureVersionRefusalTest). Test methods: readWrite_malformedStateIsQuarantinedAndDefaulted and readWrite_saveAfterRecoveryClearsRecoveryAndFiresCallback in the tests file below; the refusal is readWrite_futureVersionIsRefusedWithoutOverwrite. Writable legacy loads first retain byte-identical settings.v<old>.bak.json once per version. Backup I/O failures or non-regular destinations log a WARN with the path and cause, then migration continues without quarantining valid settings.",
       "reconciliation": "READ_V0_OR_V1_AND_WRITE_V1",
       "reconciliationNote": "Frozen updater compatibility-strategy identifier from the v1 register: it names read-in-place legacy upcast and atomic rewrite, not the current schema number. UiSettingsStore now writes v5 and reads v0-v4; currentVersion, readableLegacyVersions and versionSource carry those actual versions. Renaming this token would make installed v0.2.0/v0.3.0 updaters reject the successor release before checking readable versions.",
       "status": "READY",
@@ -83,9 +124,12 @@
         "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
       ],
       "tests": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreMigrationBackupTest.java",
+        "modules/configuration/src/test/java/io/justsearch/configuration/persistence/AtomicFileWritesCreateOnceTest.java"
       ],
-      "fixtures": []
+      "fixtures": [],
+      "pathVerificationNote": "UiSettingsStore resolves ui/settings.json and composes settings.v<old>.bak.json from the resolved readable legacy schema. The first byte-identical backup for each old version is retained before migration. Concurrent Engines sharing a settings path publish a forced sibling temp by atomic hard-link create, which never replaces the first snapshot. Unsupported hard links (including FileSystemException) use a forced CREATE_NEW fallback: create-once but not all-or-nothing on crash. Backup I/O failures warn and allow migration."
     },
     {
       "id": "action-ledger-audit-journal",
@@ -640,6 +684,7 @@
       "corruptionNote": "document_identity is restored indirectly: the existing pre-migration jobs.db backup can predate schema v11, so after backup restore (or a fresh queue rebuild when no backup exists) the Worker imports missing parent doc_id/doc_uid pairs from the serving Lucene index before indexing starts (KnowledgeServer.java:992-999,394-413; DocumentIdentityBootImport.java:30-31,50-114; SqliteDocumentIdentityStore.java:158-187), streaming them in transactions of 1000. Existing identity rows remain authoritative during normal and mid-migration restarts. Since v12 the scan is a seeding step, not a per-boot pass: it runs only when document_identity is empty or document_identity_import has no row for the serving generation, because every later parent resolves its uid through the store. A live parent whose doc_id/doc_uid docvalues are missing or blank is counted in parents_skipped and re-mints at its next admission rather than failing the boot. Recovery limit: if the identity rows and their backup are lost and the serving Lucene index is also lost or unreadable, the old random uids cannot be reconstructed; later admission mints new uids, so uid-keyed derived or feedback links to the lost identities can become orphaned. That is a total-data-loss boundary, not a recoverable migration case.",
       "catalogDirName": "jobs.db",
       "owner": "WORKER",
+      "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
       "root": "DATA_DIR",
       "ownedPaths": [
         "jobs.db",
@@ -709,6 +754,7 @@
       "encryptionNote": "The largest plaintext user-content store in the product: the Lucene index stores the user's document text verbatim in stored fields (FieldMapper.java:370,380,382,393,395,410 use Field.Store.YES / StoredField), alongside the source paths. StoreCatalog frames it OPAQUE - a DERIVED store rebuildable from the source documents - so it is deliberately unsealed and covered by OS disk encryption only.",
       "catalogDirName": "index",
       "owner": "WORKER",
+      "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
       "root": "DATA_DIR",
       "ownedPaths": [
         "index/*/indices/**",
@@ -755,6 +801,7 @@
       "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
       "encryptionNote": "Mostly counters, but the snapshot also writes last_path - the absolute path of the last user file the enumerator walked (MigrationProgressStore.java:89) - so it holds one user document path in the clear. Derived from the in-flight migration and deleted-and-recomputed on any problem, so it is deliberately unsealed and covered by OS disk encryption only.",
       "owner": "WORKER",
+      "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
       "root": "DATA_DIR",
       "ownedPaths": [
         "index/*/migration_progress.json"
@@ -786,6 +833,7 @@
       "encryption": "UNSEALED_GAP",
       "encryptionNote": "Plaintext SQLite. entity_overrides records the user's own merge/split decisions and entity_clusters holds entity surface forms mined from the user's documents (EntityClusterSchema.java:8,15,41). Worker-owned, but the Worker is a JVM - unlike the Rust shell rows there is no reachability bar, only that nothing seals it today.",
       "owner": "WORKER",
+      "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
       "root": "DATA_DIR",
       "ownedPaths": [
         "entity-clusters.db",
@@ -1202,6 +1250,7 @@
       "encryption": "NOT_APPLICABLE",
       "encryptionNote": "Signal files, not data files: the two index markers carry meaning by existing, and worker-fatal-reason holds one reason code - its only production writer passes the INDEX_CORRUPT constant (KnowledgeServer.java:758-759; WorkerFatalReasonMarker.java:27). No message text, no path, no user content.",
       "owner": "WORKER",
+      "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
       "root": "DATA_DIR",
       "ownedPaths": [
         "worker-fatal-reason",
@@ -1263,7 +1312,7 @@
       "id": "agent-history-transcripts",
       "pathVerification": "LITERAL",
       "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
-      "encryptionNote": "Plaintext Markdown holding the agent's final answer to the user plus the title, path and excerpt of every document it grounded that answer in (AgentHistoryIndexer.java:141-164) - user-derived content in the clear. It is a DERIVED projection of the sealed agent-runs terminal event and is re-derivable from it, and it must stay readable as an ordinary file because the Worker process ingests it BY PATH over the explicit-collection ingest API (:124) - sealing it would break the only thing it exists for. Covered by OS disk encryption only.",
+      "encryptionNote": "Plaintext Markdown holding the agent's final answer to the user plus the title, path and excerpt of every document it grounded that answer in (AgentHistoryIndexer.java:141-164) - user-derived content in the clear. It is a DERIVED projection of the sealed agent-runs terminal event and is re-derivable from it, and it must stay readable as an ordinary file because the Engine index half ingests it BY PATH over the explicit-collection ingest API (:124) - sealing it would break the only thing it exists for. Covered by OS disk encryption only.",
       "owner": "HEAD",
       "root": "DATA_DIR",
       "ownedPaths": [
@@ -1574,6 +1623,7 @@
       "encryption": "NOT_APPLICABLE",
       "encryptionNote": "Opt-in installed-test coordination only: transition point, generation ids and PID; no content or credentials.",
       "owner": "WORKER",
+      "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
       "root": "DATA_DIR",
       "ownedPaths": ["runtime/migration-barrier-reached.json", "runtime/migration-barrier-reached.pending", "runtime/migration-barrier-release"],
       "recoverability": "EPHEMERAL",
@@ -1597,6 +1647,7 @@
       "encryption": "NOT_APPLICABLE",
       "encryptionNote": "Opt-in installed-test coordination only: process ID, index path, component state, state timestamp and attempt count; no document content or credentials.",
       "owner": "WORKER",
+      "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
       "root": "DATA_DIR",
       "ownedPaths": ["runtime/index-start-initial-reached.json", "runtime/index-start-initial-reached.pending", "runtime/index-start-initial-release", "runtime/index-start-recovery-1-reached.json", "runtime/index-start-recovery-1-reached.pending", "runtime/index-start-recovery-1-release"],
       "recoverability": "EPHEMERAL",
@@ -1643,6 +1694,7 @@
       "encryption": "NOT_APPLICABLE",
       "encryptionNote": "Opt-in installed-test coordination only: a process ID, session input count, retirement status and success or failure reason; no document content, credentials or user settings. Normal product startup does not create these files.",
       "owner": "WORKER",
+      "note": "Lane F F-5: pre-merge owner identity retained because the installed updater compares it; index execution is in the Engine.",
       "root": "DATA_DIR",
       "ownedPaths": ["runtime/restored-a-native-lease-reached.json", "runtime/restored-a-native-lease-reached.pending", "runtime/restored-a-native-lease-release", "runtime/restored-a-native-lease-proof.json"],
       "recoverability": "EPHEMERAL",

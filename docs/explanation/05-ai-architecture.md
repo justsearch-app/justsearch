@@ -11,7 +11,7 @@ JustSearch implements a **Hybrid Inference Architecture** to provide advanced AI
 
 ## The Problem: VRAM Contention
 Modern local AI requires two distinct types of models:
-1.  **Embedding Model:** ONNX Runtime encoder assets selected from the model manifest. High-throughput, used for vector search and chunk embeddings in the Worker process.
+1.  **Embedding Model:** ONNX Runtime encoder assets selected from the model manifest. High-throughput, used for vector search and chunk embeddings in the Engine's index half.
 2.  **Generative LLM:** (e.g., `Qwen_Qwen3.5-9B-Q4_K_M.gguf`, the current packaged default). Latency-sensitive, used for Chat, Q&A, Summarization, and VDU (served by `llama-server.exe`). Models that emit `reasoning_content` support chain-of-thought reasoning (see §Reasoning Pipeline below).
 
 On an 8GB GPU, loading both simultaneously (or leaving both GPU-enabled) can cause OOM (Out Of Memory) errors or fallback to ultra-slow system RAM.
@@ -20,11 +20,11 @@ On an 8GB GPU, loading both simultaneously (or leaving both GPU-enabled) can cau
 
 JustSearch enforces a strict **Single-tenant GPU Policy** between the two GPU-consuming halves of the single Engine JVM (lane F stage A — the Head and the index half are composed in-process, not separate processes):
 * Online inference (`llama-server.exe`) is driven via `modules/app-inference` and `InferenceLifecycleManager`.
-* Indexing + the index half's ONNX Runtime encoders cooperate via the in-process `mainGpuActive` field on `GpuSchedulingGauge` (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`), read through `WorkerSignalBus.isMainGpuActive()`.
+* Indexing + the index half's ONNX Runtime encoders cooperate via the in-process `mainGpuActive` field on `GpuSchedulingGauge` (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`), read through the existing `WorkerSignalBus.isMainGpuActive()` class.
 
 ### The Runtime Authority (desired state, status, procedures)
 
-Since tempdoc 737, who runs on the GPU is governed by one Head-side authority
+Since tempdoc 737, who runs on the GPU is governed by one application-side authority
 (`io.justsearch.app.services.runtimestate`), not by callers switching modes
 directly:
 
@@ -51,21 +51,21 @@ directly:
 ### Modes (internal machinery)
 
 The `Mode` enum remains the internal FSM vocabulary of
-`InferenceLifecycleManager` beneath the authority; externally the Worker only
-ever sees the one-bit GPU lease (`main_gpu_active`).
+  `InferenceLifecycleManager` beneath the authority; externally the index half only
+ever sees the one-bit GPU lease state.
 
 | Mode | Active Model | Purpose | Process |
 | :--- | :--- | :--- | :--- |
-| **Indexing Mode** | Embedding Model | Vectorizing documents in background | Worker |
+| **Indexing Mode** | Embedding Model | Vectorizing documents in background | Engine index half |
 | **Online Mode** | Generative LLM | Interactive Chat, Q&A, Summarization, Vision | Main (llama-server) |
-| **Offline Mode** | none | No GPU work; background queues can accumulate | Main + Worker |
+| **Offline Mode** | none | No GPU work; background queues can accumulate | Engine + Brain |
 
 ### Transition Protocol
 
 When the user escalates to an Ask/agent turn in the unified "Search" window (tempdoc 687 — there is no separate Chat tab):
 1.  **Main:** Begins a mode transition via `ModeStateMachine` (validates not already transitioning, stores previous mode for rollback).
 2.  **Main:** Sets the in-process `GpuSchedulingGauge.mainGpuActive = true` (lane F stage A — an in-JVM field write, not a cross-process signal).
-3.  **Worker:** Unloads/suspends GPU-backed ORT encoder work as needed and skips embedding work while the flag is set.
+3.  **Index half:** Unloads/suspends GPU-backed ORT encoder work as needed and skips embedding work while the flag is set.
 4.  **Main:** Starts `llama-server.exe` (or **adopts** an already-running instance on the configured port).
 5.  **Main:** Polls `GET /health` until 200 OK (timeout configurable via `justsearch.inference.health_check_timeout_ms` system property, default 30000ms; progress logged every 10s during wait — tempdoc 369), then reads `GET /props` (best-effort) to learn the effective `n_ctx` and `model_alias`.
 6.  **Main:** Completes the transition to ONLINE via `ModeStateMachine`. On failure at any step, rolls back to the previous mode.
@@ -73,7 +73,7 @@ When the user escalates to an Ask/agent turn in the unified "Search" window (tem
 When the user closes Chat or minimizes the app:
 1.  **Main:** Kills `llama-server.exe`.
 2.  **Main:** Sets `GpuSchedulingGauge.mainGpuActive = false`.
-3.  **Worker:** Reloads Worker-side ORT encoders as needed and resumes backfill.
+3.  **Index half:** Reloads its ORT encoders as needed and resumes backfill.
 
 ## Components
 
@@ -177,17 +177,17 @@ Delegates to package-private collaborators: **`LlamaServerOps`** (process spawn/
 
         These are non-fatal warnings logged at WARN level to aid troubleshooting. System continues with potentially degraded behavior.
 
-### 3. Embedding Backend (Worker, ONNX Runtime)
+### 3. Embedding Backend (Engine index half, ONNX Runtime)
 *   **Class:** `io.justsearch.indexerworker.embed.EmbeddingService`
-*   **Backend:** ONNX Runtime; sessions built via the Worker composition root (`InferenceCompositionRoot.compose(...)`) and applied by `OrtSessionAssembler` in `modules/ort-common` — see the composition subsection below and register entry D-007.
+*   **Backend:** ONNX Runtime; sessions built via the index-half composition root (`InferenceCompositionRoot.compose(...)`) and applied by `OrtSessionAssembler` in `modules/ort-common` - see the composition subsection below and register entry D-007.
 *   **Default:** CPU-only (GPU offload is opt-in via `JUSTSEARCH_EMBED_GPU_ENABLED`).
-*   **GPU Coordination:** `IndexingLoop` unloads/reloads the embedding backend based on `WorkerSignalBus.isMainGpuActive()`.
+*   **GPU Coordination:** `IndexingLoop` unloads/reloads the embedding backend based on the in-process `WorkerSignalBus.isMainGpuActive()` flag.
 *   **Model File Selection:** `ModelManifest.loadOrDefault()` reads `model_manifest.json` from the model directory to determine which `.onnx` file to use for CPU vs GPU. External directories without a manifest fall back to convention (`model.onnx` CPU, `model_fp16.onnx` GPU).
 *   **Long-document memory:** Parent batch embedding uses pooled-only ONNX results, retaining a running sum per document instead of unused chunk vectors. Token windows are copied only for the current inference batch (at most eight); window counting is arithmetic. Parent backfill admits at most 512,000 characters per batch, or one whole oversized document bounded by extraction policy. Original token arrays and explicitly requested chunk-vector outputs still scale with input; this is not a constant-memory tokenizer.
 
 ### ONNX Runtime Infrastructure (`ort-common`)
 
-All ORT consumers (embedding, SPLADE, NER, BGE-M3, cross-encoder reranker, citation scorer) share a single session-construction pipeline in `modules/ort-common` (`io.justsearch.ort`). Tempdoc 397 collapsed six divergent construction paths onto the typed pipeline below; see [24-worker-inference-composition.md](24-worker-inference-composition.md) for the full explainer and register entry D-007 in `docs/reference/inference-runtime-register.md` for the decision rationale.
+All ORT consumers (embedding, SPLADE, NER, BGE-M3, cross-encoder reranker, citation scorer) share a single session-construction pipeline in `modules/ort-common` (`io.justsearch.ort`). Tempdoc 397 collapsed six divergent construction paths onto the typed pipeline below; see [24-engine-inference-composition.md](24-engine-inference-composition.md) for the full explainer and register entry D-007 in `docs/reference/inference-runtime-register.md` for the decision rationale.
 
 **Construction pipeline** (single production path, no customiser lambdas, no SPI discovery):
 
@@ -231,7 +231,7 @@ Production session option values are driven by `RuntimePolicy` + `ModelSessionPo
 
 Model file verification: `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path> -Pgpu=true`
 
-### 4. Reranker GPU Coordination (Worker-side, default enabled)
+### 4. Reranker GPU Coordination (index-half, default enabled)
 
 The cross-encoder reranker runs in the index half (360), sharing
 GPU arbitration with embedding, SPLADE, and NER via the (now in-process) signal bus.
@@ -239,10 +239,10 @@ GPU is enabled by default (`JUSTSEARCH_RERANK_GPU_ENABLED=true`).
 
 GPU arbitration:
 - **Startup initialization**: GPU session is created in `initDeferredModels()` with a warm-up inference to compile the ORT execution plan.
-- **Signal bus arbitration**: `selectSession()` checks `!signalBus.isMainGpuActive()` — same as all other Worker ORT consumers.
+- **Signal bus arbitration**: `selectSession()` checks `!signalBus.isMainGpuActive()` - same as all other index-half ORT consumers.
 - **VRAM release**: `releaseGpuSession()` frees the GPU session when Main process claims GPU (e.g., `llama-server` going online).
 - **Fallback**: Reranking continues on CPU session while GPU is released or unavailable.
-- **Head-side invocation**: The Head calls the index half's `rerank` port call, sending pre-built document texts (title + snippet). The Head has no ORT sessions.
+- **Application-side invocation**: The application half calls the index half's `rerank` port call, sending pre-built document texts (title + snippet). The application half has no ORT sessions.
 
 Defaults: `gpu_mem_mb=2048`, `max_seq_len=512`. At seq=512, GPU inference
 for 20 docs takes ~2.2s (vs ~42s on CPU at seq=2048).
@@ -399,7 +399,7 @@ To handle documents of any size, JustSearch implements a two-path summarization 
 RAG retrieval (`SearchServiceCalls#retrieveContext`) returns explicit metadata so clients can distinguish "semantic", "keyword-only", and fallback behavior:
 - `retrieval_mode`: `BM25` | `HYBRID` | `CHUNK_HYBRID` | `FULLTEXT_FALLBACK`
 - `retrieval_mode_reason`: allowlisted reason code explaining why a mode was chosen (or blocked); see `docs/reference/contracts/search-and-rag-reason-codes.md`
-- `context_truncated`: true when the Worker hit the retrieval budget
+- `context_truncated`: true when the index half hit the retrieval budget
 
 Chunk-level hybrid (`CHUNK_HYBRID`) uses the `chunk_vector` field and is coverage-gated: it is only used when chunk vectors are sufficiently backfilled (>= 95%). Readiness is surfaced via `/api/status` (`chunkVectorCoveragePercent`, `chunkVectorsReady`, etc.). A kill switch exists via `rag.chunk_vectors.enabled` (default true).
 
@@ -407,7 +407,7 @@ Optional quality boost (disabled by default): a cross-encoder chunk reranker can
 
 ### Token budgets (current)
 
-Every window-sized quantity in the Head is derived from **one** request-scoped record,
+Every window-sized quantity in the application half is derived from **one** request-scoped record,
 `ContextBudget` (`modules/core/src/main/java/io/justsearch/core/util/ContextBudget.java`). Each
 consumer builds one per request from the same two inputs — the live context window and the
 completion this turn reserves — and reads its derived accessors instead of carrying a literal of its
@@ -472,12 +472,12 @@ positive value does NOT mean the same thing for the two:
   number an operator typed, `AgentContextBudgets` reports the reduction at INFO, deduplicated per
   `(cap, window)` pair.
 
-**Retrieval shape.** The Head passes `inputBudget` to the Worker
-(`RetrieveContextRequest.max_context_tokens`) so the Worker can budget context during retrieval
-(avoids "Worker fetches 200K chars, Head truncates to 3K tokens" waste), and derives how many
+**Retrieval shape.** The application half passes `inputBudget` to the index half
+(`RetrieveContextRequest.max_context_tokens`) so retrieval can budget context
+(avoids fetching 200K chars and then truncating to 3K tokens), and derives how many
 passages to ask for from it: `inputBudget` divided by the fixed 500-token chunk size
 (`ChunkSplitter.DEFAULT_CHUNK_TOKENS`), bounded above by `justsearch.rag.top_k`. An
-explicit per-request `topK` still wins verbatim. The Head keeps a safety-net truncation step and
+explicit per-request `topK` still wins verbatim. The application half keeps a safety-net truncation step and
 resolves each citation to what that cut did with its passage, so a citation never claims a passage
 the prompt does not contain.
 
@@ -496,9 +496,9 @@ JustSearch enforces a strict **character cap** on retrieved context strings (def
 
 Implementation:
 
-- **Token-aware budgeter:** `TokenAwareBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/TokenAwareBudgeter.java`) is used when the Head provides `max_context_tokens > 0`.
+- **Token-aware budgeter:** `TokenAwareBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/TokenAwareBudgeter.java`) is used when the application half provides `max_context_tokens > 0`.
 - **Budgeter:** `ContextBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/ContextBudgeter.java`) counts **all** overhead (section headers + separators), not just raw document content.
-- **Worker retrieval:** `WorkerSearchService` uses `ContextBudgeter` when building the context returned by `retrieveContext` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java`).
+- **Index-half retrieval:** `WorkerSearchService` uses `ContextBudgeter` when building the context returned by `retrieveContext` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java`).
 - **Fallback retrieval:** when RAG returns empty/insufficient context, the fallback full-doc path is also budgeted via `ContextBudgeter` (`modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java`).
 
 Regression coverage:
@@ -618,21 +618,21 @@ Both mechanisms are warn-only (no blocking behavior) since legitimate model upgr
 
 ## Vision Support (VDU)
 Vision Document Understanding (VDU) enriches visual documents beyond baseline text extraction.
-Baseline scanned/image-text searchability is Worker-owned: structured Tika runs first, then bounded
+Baseline scanned/image-text searchability is owned by the index half: structured Tika runs first, then bounded
 Tika/Tesseract OCR can produce `extraction_method=OCR_TIKA` when the text layer is missing or weak.
 Successful OCR also records compact `visual_extraction_evidence`, including OCR language, optional
 Tesseract TSV confidence summary, fallback route, truncation, and OCR skip/guard reason when relevant.
 That evidence can queue VDU enrichment when baseline text exists but OCR/layout signals suggest richer
 visual understanding would help.
 *   **Flow:**
-    1.  Worker extracts with structured Tika. If extracted text is empty/garbage and the file is OCR-eligible, Worker extraction attempts bounded Tika/Tesseract OCR before VDU is considered.
+    1.  The index half extracts with structured Tika. If extracted text is empty/garbage and the file is OCR-eligible, index-half extraction attempts bounded Tika/Tesseract OCR before VDU is considered.
     2.  The system goes idle (the enrichment backfill runs on idle cycles) and/or the user triggers the "Process pending enrichment" operation (`core.trigger-offline-processing`).
     3.  Head/app-services selects pending docs and runs `VduBatchProcessor` → `VduProcessor`.
     4.  `VduProcessor` calls a Vision-capable model via `llama-server` (e.g., the configured chat model + `--mmproj`) with: “Transcribe the text in this image.”
-    5.  Worker persists successful non-empty VDU by overwriting `content`, re-deriving `content_preview` and `language`, regenerating chunks, and recording `extraction_method=VDU`.
+    5.  The index half persists successful non-empty VDU by overwriting `content`, re-deriving `content_preview` and `language`, regenerating chunks, and recording `extraction_method=VDU`.
     6.  Failed or completed-empty VDU preserves the best baseline text. The UI surfaces per-doc `vduStatus` + `textProvenance` in the Inspector Panel so users can see whether the current text came from Tika, OCR, or VDU.
 
-Worker status splits visual demand into `visualTextNeededCount` for missing baseline readable text and
+Index status splits visual demand into `visualTextNeededCount` for missing baseline readable text and
 `visualEnrichmentNeededCount` for documents where VDU is useful after baseline text exists. OCR blockers
 therefore degrade retrieval only when baseline text is still missing; VDU enrichment-only blockers degrade
 AI features instead.

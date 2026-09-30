@@ -271,9 +271,10 @@ with it the status surface) is constructed, and the sentinel thread runs. Concre
 | indexing loop | **not started**, and the reason is logged at ERROR — its only job is to write into a read-only runtime |
 | sentinel thread | runs |
 
-(Two rows are gone from this table rather than corrected: `createGrpcServer` + `start` and
-`signalBus.writePort`. Lane F stage A deleted the gRPC server, the memory-mapped port handoff and
-finally gRPC itself, so there is no second port to bind and nothing for the Head to discover.)
+(Historical migration note: two rows are gone from this table rather than corrected: `createGrpcServer`
+and `start`, plus `signalBus.writePort`. Lane F stage A deleted the gRPC server, the memory-mapped
+port handoff and finally the historical gRPC transport, so there is no second port to bind and nothing for
+the Engine to discover.)
 
 Search therefore keeps serving everything already indexed, ingestion stops, and the status surface
 says so explicitly: `schemaCompatState = BLOCKED_REBUILD_BRAKE` →
@@ -464,10 +465,13 @@ Without this gate, the enumerator starts immediately and the `IndexingLoop` proc
 
 Bootstrap and Green migration share the immutable bundled help source resolved from
 `ResolvedConfig.Paths.ssotPath()/docs/help`, labeled `justsearch-help`. Green includes its
-top-level Markdown files whenever the directory exists, independently of the startup-only
+top-level Markdown files whenever the directory exists and eval mode is off, independently of the startup-only
 `.help-ingested-version` marker. Missing physical help is skipped. This internal source is
 separate from operator collections and is never persisted as a watched root; its collection
-label accompanies file admission into the candidate generation.
+label accompanies file admission into the candidate generation. Normal configuration assembly
+retains the configuration loader's discovered SSOT path at auto-detect priority, below explicit
+configuration sources. A watched-root binding takes precedence over a configured collection
+on the same path, including a null watched label representing the default binding.
 
 Migration enumeration requires complete declared coverage. An absent or valid empty root registry
 with no configured roots completes with zero files; directory and single-file roots are supported.

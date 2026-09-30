@@ -176,7 +176,7 @@ Common lifecycle and orchestration events include:
 - `parameter_binding_error`
 - `circuit_breaker_during_baseline`
 - `step_started`
-- `output_heartbeat`
+- `output_heartbeat` (historical identifier; no producer is present in this checkout)
 - `step_finished`
 - `run_finished`
 - `run_reconciled`

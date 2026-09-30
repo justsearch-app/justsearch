@@ -166,6 +166,11 @@ tasks.withType<JacocoCoverageVerification>().configureEach {
       })
 }
 
+tasks.named<Test>("test") {
+  inputs.file(rootProject.file("governance/store-recoverability.v1.json"))
+    .withPropertyName("cliDataVersionStoreRegister").withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 testing {
   suites {
     val test by getting(JvmTestSuite::class) {
@@ -209,4 +214,3 @@ tasks.matching { it.name == "pmdIntegrationTest" }.configureEach {
   notCompatibleWithConfigurationCache(
       "Pmd.classpath UnionFileCollection serialization fails at Gradle 9.1.0")
 }
-

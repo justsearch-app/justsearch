@@ -303,6 +303,16 @@ class ContendedFileReadsTest {
   }
 
   private static final class RecordingFailureFiles implements AtomicFileWrites.FileAccess {
+    @Override
+    public void writeNewForced(Path path, byte[] content) throws IOException {
+      Files.write(path, content, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+    }
+
+    @Override
+    public void createLink(Path target, Path existing) throws IOException {
+      Files.createLink(target, existing);
+    }
+
     private final CountDownLatch entered;
     private final CountDownLatch release;
     private Path createdTemp;

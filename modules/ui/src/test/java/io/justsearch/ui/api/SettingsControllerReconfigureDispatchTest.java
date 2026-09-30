@@ -24,6 +24,7 @@ import io.justsearch.agent.api.registry.OperationDispatcher;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.SettingsService;
 import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.settings.CompositionV2;
 import io.justsearch.app.api.settings.LlmSettingsV2;
 import io.justsearch.app.api.settings.SettingsV2;
 import io.justsearch.app.api.settings.SettingsWitness;
@@ -238,6 +239,98 @@ final class SettingsControllerReconfigureDispatchTest {
   }
 
   @Test
+  void completedQueryReconfigureProjectsTypedAndDecodedNestedCompositionEvidence()
+      throws Exception {
+    OperationDispatcher dispatcher = mock(OperationDispatcher.class);
+    SettingsV2 input = withComposition(fullSettings(),
+        new CompositionV2("REFUSED", "request_value", 1L, 2L));
+    ContextFixture first = contextFixture(input);
+    ContextFixture decoded = contextFixture(input);
+    AtomicReference<Object> firstBody = new AtomicReference<>();
+    AtomicReference<Object> decodedBody = new AtomicReference<>();
+    doAnswer(call -> {
+      firstBody.set(call.getArgument(0));
+      return first.context;
+    }).when(first.context).json(any());
+    doAnswer(call -> {
+      decodedBody.set(call.getArgument(0));
+      return decoded.context;
+    }).when(decoded.context).json(any());
+    var liveData = new java.util.LinkedHashMap<>(responseData(input));
+    liveData.put("composition", new CompositionV2(
+        "IN_PLACE", "candidate_fits_after_source_release", 10L, 20L));
+    var decodedData = new java.util.LinkedHashMap<>(responseData(input));
+    decodedData.put("composition", Map.of(
+        "mode", "IN_PLACE", "reason", "candidate_fits_after_source_release",
+        "freeBytes", 10L, "footprintBytes", 20L));
+    when(dispatcher.dispatch(eq(RECONFIGURE), anyString(), any(InvocationProvenance.class),
+        eq(Optional.empty()), any(io.justsearch.core.context.EngineContext.class),
+        eq(input.operationKey())))
+        .thenReturn(OperationResult.success("Settings committed", liveData),
+            OperationResult.success("Settings committed", decodedData));
+
+    new SettingsController(null, Path.of("."), null, null, dispatcher, RECONFIGURE)
+        .handleUpdateSettingsV2(first.context);
+    new SettingsController(null, Path.of("."), null, null, dispatcher, RECONFIGURE)
+        .handleUpdateSettingsV2(decoded.context);
+
+    for (Object body : List.of(firstBody.get(), decodedBody.get())) {
+      SettingsV2 response = (SettingsV2) body;
+      assertEquals(new CompositionV2(
+          "IN_PLACE", "candidate_fits_after_source_release", 10L, 20L),
+          response.composition());
+      JsonNode wire = JSON.valueToTree(response);
+      assertTrue(wire.has("composition"));
+      for (String flat : List.of("mode", "reason", "freeBytes", "footprintBytes")) {
+        assertFalse(wire.has(flat));
+      }
+    }
+    ArgumentCaptor<String> arguments = ArgumentCaptor.forClass(String.class);
+    verify(dispatcher, times(2)).dispatch(eq(RECONFIGURE), arguments.capture(),
+        any(InvocationProvenance.class), eq(Optional.empty()),
+        any(io.justsearch.core.context.EngineContext.class),
+        eq(input.operationKey()));
+    for (String argument : arguments.getAllValues()) {
+      assertTrue(JSON.readTree(argument).path("settings").path("composition").isNull());
+    }
+  }
+
+  @Test
+  void queryCompositionRefusalExposesMeasuredReason() {
+    OperationDispatcher dispatcher = mock(OperationDispatcher.class);
+    SettingsV2 input = fullSettings();
+    ContextFixture fixture = contextFixture(input);
+    AtomicReference<Object> responseBody = new AtomicReference<>();
+    doAnswer(call -> {
+      responseBody.set(call.getArgument(0));
+      return fixture.context;
+    }).when(fixture.context).json(any());
+    when(dispatcher.dispatch(eq(RECONFIGURE), anyString(), any(InvocationProvenance.class),
+        eq(Optional.empty()), eq(fixture.engineContext), eq(input.operationKey())))
+        .thenReturn(OperationResult.failure("Query encoder composition was refused",
+            "COMPONENT_PREPARATION_REQUIRED",
+            Map.of("component", "encoders", "composition", Map.of(
+                "mode", "REFUSED", "reason", "candidate_exceeds_releasable_device_memory",
+                "freeBytes", 10L, "footprintBytes", 20L)), true));
+
+    new SettingsController(null, Path.of("."), null, null, dispatcher, RECONFIGURE)
+        .handleUpdateSettingsV2(fixture.context);
+
+    verify(fixture.context).status(503);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> response = (Map<String, Object>) responseBody.get();
+    assertEquals("encoders", response.get("component"));
+    assertEquals(new CompositionV2("REFUSED",
+        "candidate_exceeds_releasable_device_memory", 10L, 20L),
+        response.get("composition"));
+    JsonNode wire = JSON.valueToTree(response);
+    assertEquals("REFUSED", wire.path("composition").path("mode").asText());
+    for (String flat : List.of("mode", "reason", "freeBytes", "footprintBytes")) {
+      assertFalse(wire.has(flat));
+    }
+  }
+
+  @Test
   void missingWitnessPreparationRefusalIsHttp400() {
     OperationDispatcher dispatcher = mock(OperationDispatcher.class);
     SettingsV2 complete = fullSettings();
@@ -281,6 +374,13 @@ final class SettingsControllerReconfigureDispatchTest {
         "settingsMode", settings.settingsMode(), "witness", settings.witness(),
         "operationKey", settings.operationKey(), "state", settings.state(), "apiPort",
         settings.apiPort());
+  }
+
+  private static SettingsV2 withComposition(SettingsV2 settings, CompositionV2 composition) {
+    return new SettingsV2(settings.ui(), settings.llm(), settings.indexPaths(),
+        settings.settingsMode(), settings.witness(), settings.operationKey(), settings.state(),
+        settings.apiPort(), settings.restartScheduled(), settings.rerankerModelPath(),
+        settings.citationScorerModelPath(), composition);
   }
 
   private static ContextFixture contextFixture(SettingsV2 input) {

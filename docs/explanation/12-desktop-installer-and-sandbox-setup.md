@@ -38,7 +38,7 @@ For the decision rationale (NSIS over MSI/WiX, per-user install, download-on-dem
   - Provides a Tauri command for the UI to read the backend port (`api_port`).
   - Enforces deterministic single-instance behavior (via `tauri-plugin-single-instance`).
   - Checks the authenticated application-release feed, coordinates an orderly
-    Head/Worker shutdown, and launches a verified NSIS update only after
+    Engine shutdown, and launches a verified NSIS update only after
     explicit user consent.
 
 Entry point: `modules/shell/src-tauri/src/lib.rs`
@@ -51,14 +51,20 @@ Entry point: `modules/shell/src-tauri/src/lib.rs`
   - Uses an **ephemeral** port (`0`) by default in bundled/desktop mode.
   - Prints `JUSTSEARCH_API_PORT=<port>` to stdout for diagnostics; discovery reads the admitted runtime manifest.
 
-### 1.4 Knowledge Worker (background indexing + embeddings)
+There are two current Engine launch sites: the packaged Tauri shell (`spawn_headless_backend`)
+and the development runner (`spawnEngineChild`). Both launch `io.justsearch.ui.HeadlessApp`,
+which composes the application and index halves in one JVM. Their shared JVM flag set is
+covered by the launch-option test; the packaged path also supplies the production heap and
+desktop trust-boundary properties.
+
+### 1.4 Knowledge Server (Engine index half: background indexing + embeddings)
 
 - **Distribution**: none of its own. Item A13 deleted the `lib/worker/` staging: the index half ships as ordinary jars in the bundle’s single `lib/` (via `ui -> app-engine -> indexer-worker` on the Engine’s runtime classpath). Before A13 the bundle carried both, paying for onnxruntime_gpu, Lucene and Tika twice.
-- **Composition**: since lane F stage A item A6 the index half runs **inside the Head JVM**, composed by `EngineRoot` (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java`). Item A11 deleted `WorkerSpawner` and the worker child process it launched; item A13 deleted the distribution, the `IndexerWorker` entry point and the second AOT cache.
+- **Composition**: since lane F stage A item A6 the index half runs **inside the Engine JVM**, composed by `EngineRoot` (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java`). Item A11 deleted `WorkerSpawner` and the worker child process it launched; item A13 deleted the distribution, the `IndexerWorker` entry point and the second AOT cache.
 - **Logs**: the Engine log under the app data logs directory (see “Logs” below). Item A13 deleted the Worker’s own `logback.xml`; nothing writes `worker.log` any more.
 
 Embeddings (current):
-- Generated in the Worker via **ONNX Runtime** (not llama.cpp in-process):
+- Generated in the Engine's index half via **ONNX Runtime** (not llama.cpp in-process):
   - `EmbeddingService` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/embed/EmbeddingService.java`)
   - ORT session management: `SessionHandle` interface + `NativeSessionHandle` concrete impl, built via `OrtSessionAssembler` (`modules/ort-common/...`)
 - Requires an **ONNX embedding model** (e.g., gte-multilingual-base), discovered via `JUSTSEARCH_MODEL_PATH` or local “AI Home” locations.
@@ -117,7 +123,7 @@ See: `modules/shell/src-tauri/src/lib.rs` (the “Contract A: AI Home” section
 The most useful runtime logs in desktop mode are written under:
 
 - `<JUSTSEARCH_HOME>/logs/engine.log` — the one JVM log (item A13 deleted the Worker's own
-  logback config, so there is no separate `worker.log`)
+  logback config, so there is no second process log)
 - `<JUSTSEARCH_HOME>/logs/llama-server.log` (when Online inference is in use)
 
 The shell opens `engine.log` **before** spawning Java so startup failures are recorded.
@@ -142,14 +148,14 @@ unavailable optional AI does not prevent the reset.
 
 See: `modules/shell/src-tauri/src/lib.rs`
 
-### 4.2 HeadlessApp starts the Local API and Worker
+### 4.2 HeadlessApp starts the Local API and composes the index half
 
 At a high level:
 
 1. `HeadlessApp` loads persisted UI settings (if any).
 2. It starts core services (via `HeadAssembly`) and then creates `LocalApiServer`.
 3. It prints `JUSTSEARCH_API_PORT=<port>` to stdout.
-4. It attempts to start the Knowledge Server / Worker early; if the worker fails, the API still comes up and reports a deterministic error via `/api/status`.
+4. It attempts to start the Knowledge Server early; if the index half fails, the API still comes up and reports a deterministic error via `/api/status`.
 
 See:
 - `modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java`
@@ -193,11 +199,11 @@ are reused in place.
 3. Tauri verifies the installer signature while downloading. The shell then
    independently checks byte count, SHA-256, and executable shape.
 4. The shell holds Engine replacement and joins the old supervision loop.
-   When the Engine API is available, Head closes mutating admission and reports
+   When the Engine API is available, the application half closes mutating admission and reports
    active operation-lease blockers.
-   Worker stops ingest admission, drains accepted work, and checkpoints its
+   The index half stops ingest admission, drains accepted work, and checkpoints its
    SQLite queue.
-5. Head performs ordered shutdown and atomically writes a nonce-bound
+5. The Engine performs ordered shutdown and atomically writes a nonce-bound
    `upgrade/head-shutdown-receipt.v1.json`. The shell accepts `HEAD_STOPPED`
    only after the original child exits and the receipt proves a clean,
    graceful shutdown.
@@ -233,6 +239,8 @@ identity/format mismatches, missing stores and ambiguous predecessors fail befor
 sequence output. `package-installer-win.ps1` and `build-release-assets.ps1` require
 an explicit existing `-CompatibilityBaselinePath` for updater assembly, then pass
 the generator's `--compat-baseline`. Installer-only assembly needs no baseline.
+
+#### Retired compatibility owners (historical, no longer active)
 
 Intentionally retired owners live in the same register's disjoint
 `retiredDurableStores` list. Their exact historical tuple is emitted only when
@@ -279,7 +287,7 @@ On backend startup, `HeadlessApp` reads UI settings and maps them to canonical s
 
 - `justsearch.server.exe` (BYO llama-server path)
 - `justsearch.llm.model_path` (explicit model path override)
-- `justsearch.model.path` (embedding model path; later forwarded to the worker env)
+- `justsearch.model.path` (embedding model path; consumed by the Engine index half)
 - `llama.lib.path` (native llama library override)
 
 See: `modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java`
@@ -296,7 +304,7 @@ Current scope: **24 assets, 9.08 GB total**, including ONNX `.onnx` files (embed
 
 **Transport reliability.** Each asset gets up to 4 transport attempts, spaced ~3 s / 9 s / 27 s with jitter and escalating transport (BITS→curl, then curl, then curl on HTTP/1.1). Only transport-transient failures are retried — an HTTP 4xx (curl exit 22) or a SHA/size mismatch fails immediately. Round 16 measured why the spacing matters: connection resets arrived in bursts, and the old BITS→curl fallback fired within ~0.8 s of the failure it was answering, so it failed 82 % of the time. See tempdoc 823/824 (round-16 F1).
 
-### 6.2 Worker receives embedding model path
+### 6.2 Index-half embedding model path (historical Worker forwarding)
 
 Until lane F stage A item A11 the worker was a child process, and `WorkerSpawner` forwarded, at spawn time:
 
@@ -307,7 +315,7 @@ That spawner is deleted. In one JVM there is nothing to forward across: the same
 
 ### 6.3 Embedding runtime uses ONNX Runtime
 
-When an ONNX embedding model is present (e.g., gte-multilingual-base), the Worker loads it lazily via ONNX Runtime and generates embeddings. GPU acceleration is used when CUDA is available; otherwise embeddings are generated on CPU.
+When an ONNX embedding model is present (e.g., gte-multilingual-base), the Engine's index half loads it lazily via ONNX Runtime and generates embeddings. GPU acceleration is used when CUDA is available; otherwise embeddings are generated on CPU.
 
 See: `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/embed/EmbeddingService.java`, `modules/ort-common/`
 

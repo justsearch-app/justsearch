@@ -26,7 +26,7 @@ The former AI bridge design has been decomposed. Do not use this page as current
 - Architecture overview: [05-ai-architecture.md](05-ai-architecture.md)
 - Module ownership: [19-module-architecture.md](19-module-architecture.md)
 - Inference runtime register: [../reference/inference-runtime-register.md](../reference/inference-runtime-register.md)
-- Worker inference composition: [24-worker-inference-composition.md](24-worker-inference-composition.md)
+- Engine inference composition: [24-engine-inference-composition.md](24-engine-inference-composition.md)
 - Historical decision: [../decisions/0017-ai-bridge-module-decomposition.md](../decisions/0017-ai-bridge-module-decomposition.md)
 
 ## Historical Context

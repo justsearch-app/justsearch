@@ -13,6 +13,7 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.SystemAccess;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.index.MigrationProgressSnapshot;
@@ -2002,14 +2003,16 @@ public final class KnowledgeServerMigrationOps {
         for (Path root : collection.roots()) {
           if (root == null) throw new IOException("Null configured migration root");
           var source = new ResolvedConfig.FileSource(root, collection.name());
-          roots.compute(source.path(), (path, existing) -> existing == null || existing.collection() == null ? source : existing);
+          // A watched binding wins even when null denotes the default collection.
+          roots.putIfAbsent(source.path(), source);
         }
       }
     }
     for (Path root : roots.keySet()) requireMigrationRoot(root);
     // Startup's version marker is not a migration coverage authority.
     var help = collections == null ? null : collections.bundledHelp();
-    if (help != null && Files.isDirectory(help.path())) roots.put(help.path(), help);
+    if (!Boolean.parseBoolean(SystemAccess.sysProp("justsearch.eval.mode"))
+        && help != null && Files.isDirectory(help.path())) roots.put(help.path(), help);
     return List.copyOf(roots.values());
   }
 

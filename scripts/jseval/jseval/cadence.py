@@ -36,7 +36,7 @@ log = logging.getLogger(__name__)
 #: ``index.runtime.commit_count`` was already the all-paths commit counter there (fed from
 #: ``RuntimeSession.commitCount``); a second ``worker.index.commit_total`` would have been a
 #: fork of it. Note ``worker.commits.total`` is a DIFFERENT quantity — it counts only the
-#: IndexingLoop-attributed commits, not the commit timer, gRPC deletes or prune.
+#: IndexingLoop-attributed commits, not the commit timer, port deletes or prune.
 REOPEN_TOTAL = "index.runtime.reopen_count"
 COMMIT_COUNT = "index.runtime.commit_count"
 SEGMENTS_SINCE_REOPEN = "index.runtime.segments_since_reopen"

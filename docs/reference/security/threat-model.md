@@ -12,7 +12,7 @@ mechanically enforces it?"* It is a STRIDE-style threat model over the local-fir
 basis for the README's **"nothing leaves your machine"** claim. It is an NLnet-M2 deliverable.
 
 > **Scope.** JustSearch runs entirely on the user's machine: a desktop shell (Tauri webview), a loopback
-> HTTP API (Head), a Lucene-owning Worker, and a local inference server (`llama-server`). There is no
+> HTTP API, one Engine JVM whose index half owns Lucene, and a local inference server (`llama-server`). There is no
 > server-side component, no account, and no cloud processing of user documents. The guarantee here is
 > **privacy** (your files and queries stay local), **not** infallibility of AI answers — always check a
 > citation. See the project's `NON-GOALS` (at the repository root in the public release).
@@ -30,7 +30,7 @@ basis for the README's **"nothing leaves your machine"** claim. It is an NLnet-M
 |---|---|
 | **Webview ↔ Head** | The Tauri webview talks to the loopback HTTP API. Confined by CSP + Host/Origin/token checks. |
 | **Other local processes ↔ Head** | Any process (or a malicious web page the user visits) can attempt to reach `127.0.0.1:<port>`. The key inbound boundary. The decision of *where* that boundary is drawn — and what is deliberately inside it — is [ADR-0046: Local API trust boundary](../../decisions/0046-local-api-trust-boundary.md); this document is its threat analysis. |
-| **Head ↔ index half / Inference** | The Head and the index half share one Engine JVM and meet at direct in-process calls — no socket, no listener, no IPC (ADR-0049; the gRPC channel and the MMF bus are deleted). `llama-server` remains a separate process on loopback. Not network-exposed. |
+| **Head <-> index half / Inference** | The Head and the index half share one Engine JVM and meet at direct in-process calls - no socket, no listener, no IPC (ADR-0049; the retired gRPC channel and MMF bus no longer exist). `llama-server` remains a separate process on loopback. Not network-exposed. |
 | **Device ↔ Internet** | The only intended egress is the one-time model download. Everything else stays local. |
 
 ## The privacy guarantee and its mechanical anchors
