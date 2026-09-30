@@ -73,7 +73,7 @@ this mechanism exists to end.
 
 **Category:** performance | **Status:** Accepted
 
-**Trade-off:** Mutual exclusion between GPU workloads ensures VRAM safety on consumer 8GB GPUs. The Worker yields bulk embedding backfill whenever the Head has claimed the GPU for the generative model, so the two never contend for VRAM.
+**Trade-off:** Mutual exclusion between GPU workloads ensures VRAM safety on consumer 8GB GPUs. The Engine indexing loop yields bulk embedding backfill whenever the generative model has claimed the GPU, so the two workloads never contend for VRAM.
 
 **Impact:** While Online Mode holds the GPU, GPU-side embedding backfill is paused, so enrichment progress stalls for the duration. With CPU-side embeddings the practical impact is minor (slight CPU contention).
 
@@ -209,9 +209,9 @@ See [Agent System Architecture](../explanation/22-agent-system-architecture.md) 
 
 **Category:** reliability | **Status:** Resolved
 
-**Trade-off:** The Worker and inference JVMs use Panama FFM downcalls (NVML, Windows job objects, MMF signalling). Java 24+ makes restricted native access a warning today and an error in a future release; running without `--enable-native-access` traded a clean argv for a scheduled hard failure.
+**Historical trade-off:** The retired Worker and inference JVM paths used Panama FFM downcalls (NVML, Windows job objects, MMF signalling). Java 24+ makes restricted native access a warning today and an error in a future release; running without `--enable-native-access` traded a clean argv for a scheduled hard failure.
 
-**Impact:** Had it not been fixed, a JDK upgrade would have turned a startup warning into an `IllegalCallerException` at the first native downcall — Worker spawn failing at runtime, on end-user machines, with no local reproduction until the same JDK shipped.
+**Historical impact:** Had it not been fixed, a JDK upgrade would have turned a startup warning into an `IllegalCallerException` at the first native downcall - the retired Worker spawn path would have failed at runtime on end-user machines, with no local reproduction until the same JDK shipped.
 
 **Reassess when:** A new production JVM spawn site is added, or the JDK changes the default for restricted native access again.
 

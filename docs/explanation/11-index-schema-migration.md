@@ -271,9 +271,10 @@ with it the status surface) is constructed, and the sentinel thread runs. Concre
 | indexing loop | **not started**, and the reason is logged at ERROR — its only job is to write into a read-only runtime |
 | sentinel thread | runs |
 
-(Two rows are gone from this table rather than corrected: `createGrpcServer` + `start` and
-`signalBus.writePort`. Lane F stage A deleted the gRPC server, the memory-mapped port handoff and
-finally gRPC itself, so there is no second port to bind and nothing for the Head to discover.)
+(Historical migration note: two rows are gone from this table rather than corrected: `createGrpcServer`
+and `start`, plus `signalBus.writePort`. Lane F stage A deleted the gRPC server, the memory-mapped
+port handoff and finally the historical gRPC transport, so there is no second port to bind and nothing for
+the Engine to discover.)
 
 Search therefore keeps serving everything already indexed, ingestion stops, and the status surface
 says so explicitly: `schemaCompatState = BLOCKED_REBUILD_BRAKE` →

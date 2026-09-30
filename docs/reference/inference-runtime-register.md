@@ -64,7 +64,7 @@ Settled empirical facts. Each was an open question that got answered.
 
 ### F-001: ONNX GPU lazy session init causes first-query timeouts
 
-- **Answer:** First query after backend start exceeds the 5 s search deadline (a gRPC deadline when this was measured; the same budget is now enforced on the in-process port call) because the ONNX GPU session initializes lazily on first use.
+- **Answer (historical measurement):** First query after backend start exceeds the 5 s search deadline (a gRPC deadline when this was measured; the same budget is now enforced on the in-process port call) because the ONNX GPU session initializes lazily on first use.
 - **Evidence:** tempdoc 309 §35, §41. Observed across BGE-M3, SPLADE, GTE-ModernBERT.
 - **Conditions/caveats:** Only affects first query after cold start. Subsequent queries fast. Workaround: warmup query at startup.
 
@@ -363,7 +363,7 @@ Design choices in the current inference runtime, with rationale.
 
 ### D-007: Single-entry session construction via `OrtSessionAssembler` — SHIPPED (tempdoc 397)
 
-- **Explainer:** [docs/explanation/24-worker-inference-composition.md](../explanation/24-worker-inference-composition.md) — conceptual walkthrough of the pipeline (resolvers → composition root → assembler → handle → surface), policy record shape, and diagnostic endpoint.
+- **Explainer:** [docs/explanation/24-engine-inference-composition.md](../explanation/24-engine-inference-composition.md) - conceptual walkthrough of the pipeline (resolvers -> composition root -> assembler -> handle -> surface), policy record shape, and diagnostic endpoint.
 - **Choice:** All ORT session construction flows through `OrtSessionAssembler` in `modules/ort-common`. **Three external entry points** (post-§14.28 U1): `buildManager(Composition, GpuArbiter) → SessionHandle` for variant-driven composition-root calls; `verifyModelSession(env, modelPath, GpuSessionConfig) → OrtSession` for the `verifyModel` Gradle task; `probeModelNames(env, modelPath) → ProbedNames` for the short-lived probe session per-encoder `buildAssembly` factories use. Setter-to-policy mapping centralises on package-private `SessionOptionsApplier`, which walks `RuntimePolicy` + `ModelSessionPolicy` fields one-for-one.
 - **Rationale:** 394 item 4 revealed two call paths producing non-equivalent sessions under equal inputs. 397 made that class of bug type-unrepresentable via the §6 closure property: every ORT setter value reads a typed policy-record field; there is exactly one apply site (`SessionOptionsApplier`). Policy flows through typed records (`RuntimePolicy`, `ModelSessionPolicy`, `Composition`) resolved by pure functions (`RuntimePolicyResolver`, `ModelSessionPolicyResolver`).
 - **What enforces the boundary:** Java visibility + single-apply-site invariant + Gradle source-set scoping + ArchUnit rule.
@@ -661,10 +661,10 @@ picking up items here over inventing new experiments.
   NER; `llama-server --list-devices` total/free versus OS-reported memory (sizes the detection
   problem on UMA parts). Record the hardware inventory as the row key.
 - **Also open here:** whether `GPU_TOP_RUNG` (32768) needs a UMA/iGPU rung (prefill on an
-  8060S-class iGPU is ~5-10x slower than a 4070); WebGPU session lifecycle under the
-  `main_gpu_active` lease and co-residency with llama-server (F-010 budgets are CUDA-arena
-  numbers). Owner: 903 §6's opus chunk records what it could and could not measure; the vendor
-  rows stay open until hardware exists.
+  8060S-class iGPU is ~5-10x slower than a 4070); WebGPU session lifecycle under the in-process
+  `GpuSchedulingGauge.mainGpuActive` lease and co-residency with llama-server (F-010 budgets are
+  CUDA-arena numbers). Owner: 903 section 6's opus chunk records what it could and could not measure; the
+  vendor rows stay open until hardware exists.
 
 ## Future Work
 

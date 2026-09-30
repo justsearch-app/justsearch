@@ -112,8 +112,8 @@
       "region": "the Worker inference / ORT-session composition",
       "docs": [
         {
-          "path": "docs/explanation/24-worker-inference-composition.md",
-          "why": "how the Worker builds ORT sessions and wires the six encoder roles onto one typed composition pipeline (616 read-0x delivery)."
+          "path": "docs/explanation/24-engine-inference-composition.md",
+          "why": "how the Engine's index half builds ORT sessions and wires the six encoder roles onto one typed composition pipeline (616 read-0x delivery)."
         }
       ]
     },

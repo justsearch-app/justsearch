@@ -20,28 +20,28 @@ last_reviewed: 2026-09-07
 ## Status
 
 Accepted (2026-09-07). Supersedes [ADR-0001](0001-three-process-architecture.md) (three separate OS
-processes) and [ADR-0002](0002-grpc-mmf-hybrid-ipc.md) (gRPC + MMF hybrid IPC), which are the record
+processes) and [ADR-0002](0002-grpc-mmf-hybrid-ipc.md) (historical gRPC + MMF hybrid IPC), which are the record
 of the decision this replaces and are marked `superseded`.
 
 Implemented across lane F stage A (tempdoc 936, design `docs/design/lane-f-engine-jvm/design.md`).
 
 ## Context
 
-ADR-0001 split the product into Head (UI + API), Body (indexing + search) and Brain (inference).
-ADR-0002 gave the first two a gRPC channel plus a memory-mapped file for sub-millisecond signalling.
+The historical ADR-0001 split the product into Head (UI + API), Body (indexing + search) and Brain (inference).
+The historical ADR-0002 gave the first two a gRPC channel plus a memory-mapped file for sub-millisecond signalling.
 Both were reasonable in 2026-02 and both were re-examined when the cost of the boundary became
 measurable.
 
 **What the split actually bought, stated fairly.** Two things, and only two. *Recovery isolation*: a
-Worker OOM or wedge left the API answering, so the product could report its own failure. *Resource
+An OOM or wedge in the historical Worker left the API answering, so the product could report its own failure. *Resource
 partition*: two heaps and two thread pools by construction, so a runaway indexing batch could not
 starve the HTTP listener.
 
-**What it cost.** The Head and the Worker do not differ in the ways a process boundary is supposed
+**Historical split cost.** The Head and the Worker do not differ in the ways a process boundary is supposed
 to pay for. Same runtime (both JVM; Lucene 10 is pure Java over Panama), same failure domain (Java
 exceptions), and neither owns a scarce resource the other wants — the GPU is owned by the models,
 which sit on both sides. The boundary between them was therefore paid for in mechanism rather than
-in isolation: a memory-mapped signal bus with a suicide pact, an ephemeral-port handoff, a
+in isolation: a historical memory-mapped signal bus with a suicide pact, an ephemeral-port handoff, a
 config-snapshot tier at its own resolution ordinal, three argv builders, 49 RPCs, a circuit breaker,
 deadline categories, and a client stack that had to re-implement flow control the wire gave away
 for free. Every one of those had to be understood before an ordinary change could be made safely,
@@ -49,7 +49,7 @@ and several were found during the merge to have been silently broken for weeks �
 gauge with no producer, a hot-reload trigger nothing read, a config forwarding path nothing
 consumed.
 
-**The observation that decided it.** The Worker served both search *and* indexing, so the split
+**Historical observation that decided it.** The Worker served both search *and* indexing, so the split
 never isolated retrieval from indexing — the two things that actually contend. It isolated the API
 from the process that owns the index, which is a narrower property than the architecture's name
 suggested.
@@ -83,7 +83,7 @@ loop is *expected*, and containing it is worth a process — ADR-0048 decided th
 the merge makes it *more* valuable, not less, because a crash in the Engine is now a crash of
 everything.
 
-**Head never touches Lucene, still.** Sharing an address space does not license application code to
+**Historical Head boundary invariant.** Sharing an address space does not license application code to
 reach past a port into the index. That invariant survives ADR-0001 verbatim and is enforced from two
 sides: `IndexWriterOwnershipTest` keeps Lucene imports inside the two owner packages, and
 `LayeringEnforcementTest`'s rule 6b permits only `io.justsearch.app.engine..`,
@@ -95,14 +95,22 @@ streaming flow control and cancellation were requirements of the *work*, not of 
 are re-homed onto the port calls rather than deleted with the transport. This is the part of the
 merge most likely to be got wrong, because a direct method call appears to need none of them.
 
-## Consequences
+## Consequences (current Engine cost and historical split comparison)
 
 **Given up, deliberately, and this is the honest cost.** Recovery isolation is gone: an OOM in
 indexing now takes the API with it, where before the API survived to report it. Resource partition
 is gone: one heap, one set of pools, so a runaway batch can starve the HTTP listener in a way two
 JVMs made impossible. Supervision — crash detection, restart budget, cooldown — has no producer at
-the end of stage A and is stage B's work. These are real losses, not accounting entries, and the
+the end of stage A; that historical statement predates the shipped stage-B host supervisor. These are real losses, not accounting entries, and the
 mitigation is admission control plus per-operation budgets rather than a second address space.
+
+### Amendment 2026-09-30: stage-B host supervision is shipped
+
+The stage-A statement above that supervision had no producer and was stage-B work is historical.
+Stage B item B10 now runs the Engine under a host supervisor with crash and hang observation,
+restart budget, cooldown, and visible state. The implementation is
+`modules/shell/src-tauri/src/supervisor.rs:1-27,562-779`, wired by
+`modules/shell/src-tauri/src/lib.rs:1087-1301`.
 
 **Gained.** One config resolution, so two halves cannot disagree about their configuration; one log;
 one AOT cache and one distribution; one lifecycle to reason about. A large IPC substrate deleted —
@@ -112,6 +120,8 @@ rather than restated here so there is one count and not two. With it goes the cl
 merge kept surfacing: a producer writing somewhere no consumer reads. Trace context is current on the callee's thread by construction rather than by header
 propagation — with one exception worth naming, because it is the shape of what this merge gets
 wrong: a thread hand-off still loses it, so an executor that fans out must wrap its tasks.
+
+### Retired transport record (historical gRPC deletion)
 
 **gRPC is gone from the product.** It went in two steps. Items A9-A11 removed it from the
 Head↔index channel, which is what ADR-0002 was about. Item A14 then removed the remainder: the
@@ -150,7 +160,7 @@ every one of the four operation contracts, plus spawn, config and logging, exist
 once; the branch would carry both indefinitely and neither would be well tested.
 
 **Merge only search, keep indexing separate.** Rejected: it is the same JVM either way, since the
-Worker served both. Splitting search from indexing is a different decision with different evidence,
+historical index process served both. Splitting search from indexing is a different decision with different evidence,
 and this ADR does not make it.
 
 ## Reassessment triggers

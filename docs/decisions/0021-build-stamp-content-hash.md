@@ -2,7 +2,7 @@
 title: "ADR-0021: Build-Stamp Content-Hash Design"
 type: decision
 status: stable
-description: "Use SHA-256 content hash of the Worker distribution to detect stale JVM processes during development."
+description: "Use SHA-256 content hash of the Engine distribution to detect stale JVM processes during development."
 date: 2026-04-06
 probes: none - the build-stamp hash is verified by its own runtime staleness check, which fails at boot rather than at gate time.
 last_reviewed: 2026-09-02
@@ -13,7 +13,7 @@ last_reviewed: 2026-09-02
 ## Status
 Accepted — amended by lane F stage A item A13 (2026-09-07). The decision (SHA-256 content hash over a distribution's `lib/`, 16 hex chars, SNAPSHOT-content vs third-party-name+size) is unchanged; the *subject* moved. There is one JVM and one distribution now, so `generateBuildStamp` was re-homed from `modules/indexer-worker` (`build/install/indexer-worker/build-stamp.txt`) to `modules/ui` (`build/install/ui/build-stamp.txt`), still `finalizedBy` its module's `installDist`. Two consequences below are also resolved by A13: the `WorkerSpawner` injection step (item 3) is gone with that class, and the "Head process staleness is not detected" negative no longer holds — the stamp now describes the Engine's own distribution, which is what the dev-runner launches. The body below is left as written on 2026-04-06; read it against this note.
 
-## Context
+## Historical Context (pre-ADR-0049)
 
 During development, the Worker JVM may be running stale bytecode after a recompile. The developer discovers the mismatch only when new code doesn't behave as expected — which looks like a code bug, not a deployment issue. In the 366 tempdoc, this caused multiple debugging cycles where correctly implemented code appeared broken because the running JVM was serving stale classes.
 
@@ -27,7 +27,7 @@ The forces at play:
 - The stamp must capture uncommitted changes (git SHA alone is insufficient).
 - Multiple consumers need the stamp: MCP reload tool, jseval, `/api/status`.
 
-## Decision
+## Historical Decision (pre-ADR-0049)
 
 Use a SHA-256 content hash of the Worker distribution (`build/install/indexer-worker/lib/`), truncated to 16 hex characters:
 
@@ -38,7 +38,7 @@ Use a SHA-256 content hash of the Worker distribution (`build/install/indexer-wo
 5. **Reload integration**: The MCP reload tool compares the running stamp against the on-disk stamp. When JDWP hot-swap fails due to structural changes, the tool sets `structuralChangeDetected: true` and emits `"RESTART REQUIRED"`. On successful hot-swap, the stamp file is propagated to the Worker to prevent false positives.
 6. **jseval integration**: `_check_build_freshness()` runs between index reset and ingestion, comparing the running backend's stamp against the on-disk stamp file. Warns on mismatch (does not abort).
 
-## Consequences
+## Historical Consequences (pre-ADR-0049)
 
 **Positive:**
 - Gradle UP-TO-DATE correct — content-based hashing means the stamp only changes when JARs actually change, unlike timestamps which would change on every build.

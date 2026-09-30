@@ -47,7 +47,7 @@ The engine provides: parallel execution with configurable concurrency, dependenc
 
 - **~12,300 lines of Node.js** (including ~4,650 lines of tests) replace ~8,220 lines of PS1 (now thin wrappers, ~280 lines remaining). With 1,816 automated test checks where zero existed before.
 - **3 new npm devDependencies** (`koffi` ~8MB prebuilt binaries, `p-limit` 2.6KB, `toposort` 2.1KB).
-- **13 DAG runners implemented**, covering governance, gRPC resilience (soak + smoke), track-g, perf regression, BEIR gate, search-eval-rank, local agent gate, backfill report history, perf suite (inner), overnight benchmark autopilot, overnight RAG-AI queue, and agent live battery.
+- **13 DAG runners implemented (historical, superseded)**, covering governance, gRPC resilience (soak + smoke), track-g, perf regression, BEIR gate, search-eval-rank, local agent gate, backfill report history, perf suite (inner), overnight benchmark autopilot, overnight RAG-AI queue, and agent live battery.
 - **10 shared library modules** across `scripts/lib/orchestration/` and `scripts/lib/bench/`, eliminating 3-5× duplication of core primitives.
 - **Maintenance estimated at 5-10 days/year** (Node.js upgrades, new steps, CI environment changes, cache correctness).
 - **`onStepComplete` callbacks carry significant orchestration logic** for runners with inter-step data dependencies (artifact resolution, arg patching). This is imperative code inside a declarative framework — a known trade-off.

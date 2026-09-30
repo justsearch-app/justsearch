@@ -31,7 +31,7 @@ halves share objects.
 
 ### Explanation (Understanding the Architecture)
 - [System Overview](explanation/01-system-overview.md): The Engine JVM, the process boundaries that survive, and the module roles behind them.
-- [Process Coordination](explanation/02-process-coordination.md): Historical record of the Head/Worker process pair: MMF signalling, the suicide pact, and the indexing duty cycle. The duty cycle survives; the rest was deleted by ADR-0049.
+- [Process Coordination](explanation/02-process-coordination.md): How the Engine coordinates its in-process owners, native children, host supervision, signalling, and ordered shutdown.
 - [Knowledge Server](explanation/03-knowledge-server.md): Formatting logic, JobQueue, and Tika usage.
 - [Storage Engine](explanation/04-storage-engine.md): Lucene internals, schema (SSOT), and locking strategies.
 - [AI Architecture](explanation/05-ai-architecture.md): Hybrid Inference (CPU/GPU) and VRAM management.
@@ -44,13 +44,13 @@ halves share objects.
 - [Desktop Installer + Sandbox Setup (How it works today)](explanation/12-desktop-installer-and-sandbox-setup.md): NSIS installer, Tauri boot sequence, sandbox harness scripts.
 - [AI Setup + Verification (Current State)](explanation/13-ai-setup-and-verification.md): Current v1 setup, installer bundling, and verification workflows.
 - [Adapters-Lucene Deep Dive](explanation/18-adapters-lucene-deep-dive.md): HNSW search, SPLADE learned sparse retrieval, hybrid fusion, commit metadata system.
-- [Module Architecture & Dependency Governance](explanation/19-module-architecture.md): Gradle multi-project structure, dependency layers, and governance rules.
+- [Module Architecture & Dependency Governance](explanation/19-module-architecture.md): The Engine's three rings, composition root, Gradle modules, ports, and dependency enforcement.
 - [Benchmarking Architecture (Claims + Competitor Suite)](explanation/20-benchmarking-architecture.md): Claims vs lanes, bench harness schemas, competitor suite logic.
 - [Agent Analytics Pipeline](explanation/21-agent-analytics-pipeline.md): Behavioral tracking pipeline for hooks, session and cost analysis, skill-delivery evidence, and LLM-as-judge evaluation. The dashboard and process-hygiene scoring layers are retired.
 - [Agent System Architecture](explanation/22-agent-system-architecture.md): Agent loop, operation-substrate tool dispatch, token budget, durability, and MCP tool surface.
 - [23-runtime-manifest](explanation/23-runtime-manifest.md): Producer-published runtime manifest at <dataDir>/runtime/manifest.json and GET /api/runtime/manifest, projected from the Engine component registry.
 - [Search Pipeline Overview](explanation/23-search-pipeline-overview.md): End-to-end search pipeline: ingestion stages, query-time retrieval legs, fusion, correction, reranking, and response assembly.
-- [Worker Inference Composition](explanation/24-worker-inference-composition.md): How the index half builds ORT sessions and wires the six encoder roles onto a single typed composition pipeline.
+- [Engine Inference Composition](explanation/24-engine-inference-composition.md): How the Engine resolves installed model inputs, builds ORT sessions, and owns index and query inference generations.
 - [Service Lifecycle Pattern](explanation/25-service-lifecycle-pattern.md): Canonical pattern for long-lived resource owners in JustSearch. Identity is held by the consumer; each open period is a single-shot phase value with a clean AutoCloseable lifecycle. Restart is a consumer pattern (build new value, swap holder field, close old) — not a method on the value. Two forms: phase-typed (Form A) when multiple operating modes warrant compile-time distinction, single-shot single-class (Form B) when there's only one mode.
 - [The Extension Substrate](explanation/26-extension-substrate.md): How JustSearch is extended: one declaration model, one composer, four shared substrates, the host-owns-truth boundary, and trust-proportional isolation — the invariants every contributor (plugin, operation, resource, prompt, MCP tool, workflow, agent tool) shares.
 - [The Frontend Presentation Kernel](explanation/27-frontend-presentation-kernel.md): How the web frontend prevents presentation drift: single presentation authorities (tone, originator, layout, modality), a closed atom vocabulary, runtime-modality primitives, and catalog-projected gates — the Collapse > Generate > Gate prevention ladder that makes a re-authored badge/modal/transient unrepresentable rather than merely discouraged.
@@ -142,16 +142,16 @@ halves share objects.
 - [ADR-0018: VLM PDF Extraction via Chat Model](decisions/0018-vlm-pdf-extraction-via-chat-model.md): Use existing chat model's vision capability (Qwen 3.5 VLM) for PDF layout extraction instead of adding Docling as a Python sidecar.
 - [ADR-0019: CPU vs GPU Model Selection Strategy](decisions/0019-cpu-gpu-model-selection-strategy.md): Ship separate FP32 ONNX models for CPU use; use model_manifest.json to select CPU vs GPU variants at runtime.
 - [ADR-0020: Structured Metadata Fields as Filterable Facets](decisions/0020-structured-metadata-filterable-facets.md): Extend entity faceting to structured metadata with meta_ prefix, typed proto fields, and two-stage chunk retrieval.
-- [ADR-0021: Build-Stamp Content-Hash Design](decisions/0021-build-stamp-content-hash.md): Use SHA-256 content hash of the Worker distribution to detect stale JVM processes during development.
+- [ADR-0021: Build-Stamp Content-Hash Design](decisions/0021-build-stamp-content-hash.md): Use SHA-256 content hash of the Engine distribution to detect stale JVM processes during development.
 - [ADR-0022: RecordBuilder Annotation Processor for API Records](decisions/0022-recordbuilder-annotation-processor.md): Use io.soabase record-builder v52 to generate fluent builders for Java records in app-api, enabling additive field evolution.
 - [ADR-0023: API Responses Declare Runtime Context](decisions/0023-api-responses-declare-runtime-context.md): Any endpoint whose behavior varies by runtime mode must surface that mode in its response to prevent silent behavioral switches.
 - [ADR-0024: App Packaging: NSIS, Per-User Install, Download-on-Demand](decisions/0024-app-packaging-nsis-per-user-download.md): Use NSIS installer with per-user install to LocalAppData and post-install model download via Install AI flow.
-- [ADR-0025: Core DTO Dual-Type Layering (gRPC vs REST)](decisions/0025-core-dto-dual-type-layering.md): Maintain separate core DTOs (gRPC-aligned) and app-api records (REST-aligned) as intentional layering, not duplication.
+- [ADR-0025: Core DTO Dual-Type Layering (in-process ports vs REST)](decisions/0025-core-dto-dual-type-layering.md): Maintain separate core DTOs for in-process ports and app-api records for REST as intentional layering, not duplication.
 - [ADR-0027: MetricCatalog as the Telemetry Contract](decisions/0027-metric-catalog-as-telemetry-contract.md): Every metric the JustSearch processes emit flows through a typed `MetricCatalog`. Callsites build `MetricDefinition`s at module load, register them with `LocalTelemetry` at boot, and emit through compile-checked `Counter/Histogram/Gauge/ObservableCounter` instruments. The legacy `Telemetry.counter/timer/histogram/gauge/meter` surface is retired.
 - [ADR-0045: Public main history publication](decisions/0045-public-main-history-publication.md): Public main receives curated squash commits from pull requests while branch commits remain workspace history.
 - [ADR-0046: Local API trust boundary](decisions/0046-local-api-trust-boundary.md): The local HTTP API's trust boundary is the same-user native process: loopback bind, Host allowlist, MCP Origin validation, CORS pinned to the shell origin, and a per-boot session token on mutating routes. Same-user native processes are inside the boundary by construction.
 - [ADR-0047: Context window is a derived resource](decisions/0047-context-window-is-a-derived-resource.md): The LLM context window is derived at activation from a ladder of explicit rungs (32k on GPU, 8k on CPU, stepped down on a launch abort) rather than configured as a user preference, and every prompt-side budget is a fraction of the live window rather than a constant.
-- [ADR-0048: Extraction isolation and indexing pacing](decisions/0048-extraction-isolation-and-indexing-pacing.md): Untrusted parsing runs in a persistent child process pool rather than in the Worker JVM; foreground contention is answered with a duty cycle rather than a pause; Worker health is sampled internally rather than on the request thread; ingestion failures walk a bounded retry ladder to a visible terminal state; and NRT/commit cadence is decided by measurement, which rejected the first candidate.
+- [ADR-0048: Extraction isolation and indexing pacing](decisions/0048-extraction-isolation-and-indexing-pacing.md): Untrusted parsing runs in a persistent child process pool rather than in the Engine JVM; foreground contention is answered with a duty cycle rather than a pause; Engine health is sampled internally rather than on the request thread; ingestion failures walk a bounded retry ladder to a visible terminal state; and NRT/commit cadence is decided by measurement, which rejected the first candidate.
 - [ADR-0049: One Engine JVM, and the process boundaries that survive](decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md): The application half and the index half share one JVM and meet at catalogued ports; the boundaries that remain are llama-server and the extraction child pool, each justified by a differing runtime, failure domain or scarce resource.
 
 <!-- generated:end -->
@@ -161,6 +161,6 @@ halves share objects.
 *   **SSOT (Single Source of Truth):** We define schema in JSON, not code.
 *   **Zero-Shared-Nothing:** Application code *never* touches Lucene files — index I/O belongs to
     the index half, reached through a port (hard invariant 1, ADR-0049).
-*   **No internal wire:** there is no gRPC server and no port to discover. The index half is bound
+*   **No internal wire:** the internal transport is retired; there is no gRPC server and no port to discover. The index half is bound
     in-process by `EngineRoot`; only the Brain is reached over a socket.
 *   **Local-only HTTP:** The Local API binds to loopback (`127.0.0.1`). The browser UI discovers it via URL/env overrides or by probing a narrow port range and validating `/api/status`.

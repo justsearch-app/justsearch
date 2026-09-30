@@ -141,9 +141,11 @@ finalization. A managed SSE creator disconnect changes durable foreground work t
 normal server retirement does not cause that transition. Interactive one-shot work continues
 through a socket disconnect. This connection behavior does not establish restart survival.
 
-### Lifecycle schema v1 (minimum stable subset)
+### Lifecycle schema v2 (minimum stable subset)
 
-**Source of truth:** `modules/ui/src/test/java/io/justsearch/ui/api/LifecycleContractTest.java`
+**Sources of truth:** `modules/ui/src/test/java/io/justsearch/ui/api/LifecycleContractTest.java`,
+`modules/app-api/src/main/java/io/justsearch/app/api/lifecycle/LifecycleSnapshotV2.java`, and
+`SSOT/schemas/lifecycle-snapshot.v2.json`.
 
 > This subset is one of the three **Runtime Contract** public surfaces (tempdoc 654). Which
 > surfaces are promised (public-contract) vs reference-client vs internal, plus the version
@@ -151,32 +153,42 @@ through a socket disconnect. This connection behavior does not establish restart
 
 This contract test defines the minimum stable subset shared by:
 
-- `GET /api/health` (lifecycle gate; HTTP `200` for `READY|DEGRADED`, `503` otherwise)
-- `GET /api/status` (includes the minimum subset plus additional fields)
+- `GET /api/health` (lifecycle gate; HTTP `200` for a non-error lifecycle, `503` for
+  `LIFECYCLE_STATE_ERROR`)
+- `GET /api/status` (includes the schema-2 subset plus additional fields)
 
 Minimum stable fields:
 
-- `schema_version` (must be `1`)
+- `schema_version` (must be `2`)
 - `observed_at` (ISO-8601 timestamp)
-- `lifecycle.state`
-- `lifecycle.reason_code` (optional; allowlisted by `io.justsearch.app.api.lifecycle.LifecycleReasonCode`)
-- `components.{head,worker,inference}.state`
-- `components.{head,worker,inference}.reason_code` (optional; allowlisted)
+- `lifecycle.state` (`LIFECYCLE_STATE_STARTING|READY|DEGRADED|ERROR|STOPPING|STOPPED`)
+- `lifecycle.reason_code` and `lifecycle.message` (optional)
+- `components.{api,index,encoders,generative}.state`
+- `components.{api,index,encoders,generative}.reason_code` and `state_since`
+  (component state: `ABSENT|STARTING|READY|RELOADING|FAILED|UNAVAILABLE`)
 
-Minimal example (schema v1):
+Minimal example (schema v2):
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "observed_at": "2026-01-18T00:00:00Z",
-  "lifecycle": { "state": "READY" },
+  "lifecycle": { "state": "LIFECYCLE_STATE_READY" },
   "components": {
-    "head": { "state": "UP" },
-    "worker": { "state": "READY" },
-    "inference": { "state": "DEGRADED" }
+    "api": { "state": "READY", "reason_code": null, "state_since": "2026-01-18T00:00:00Z" },
+    "index": { "state": "READY", "reason_code": null, "state_since": "2026-01-18T00:00:00Z" },
+    "encoders": { "state": "READY", "reason_code": null, "state_since": "2026-01-18T00:00:00Z" },
+    "generative": { "state": "UNAVAILABLE", "reason_code": "inference.offline", "state_since": "2026-01-18T00:00:00Z" }
   }
 }
 ```
+
+`LifecycleProjection` derives the aggregate and the four component slots from one immutable
+Engine component snapshot. The runtime manifest and both health/status responses project that
+same observation. A component map endpoint is not shipped; `/api/debug/state`, `/api/health`,
+`/infra/capabilities`, and `/api/runtime/manifest` remain separate projections. Composition
+profiles (`full`, `bench`, `verification`), a request-time session gate with aging, pinned cursor
+readers, and a durable `index-and-return` acknowledgement variant are D2 design work, not current contracts.
 
 ### `/api/status` extended fields
 
@@ -193,17 +205,16 @@ branch weights (whole/chunk), `branch_chunk_min_weight_multiplier`, `title_boost
 always-zero `entity_boost` compatibility tombstone,
 and `query_classification_enabled`. jseval snapshots this at run start for eval provenance.
 
-**Encoder profiling (post tempdoc 357):** `EnrichmentCoverage` includes `EncoderProfile` sub-messages
-(field 11) for embed, splade, and ner. Each profile contains ORT call counts, sub-phase timing
-totals (tokenize, tensor, ort, extract/postProcess), and latency percentiles (p50/p95/p99).
-Data is always available when `--pipeline` is used — no separate `--profile` flag needed.
+**Encoder timing telemetry:** `StatusResponse.encoderProfiles` is a wire map of per-encoder ORT
+timing counters and percentiles when the index half reports them. This is runtime telemetry; it is
+not the unshipped D2 composition-profile feature and does not imply a `--profile` boot mode.
 
 **Health-event evidence (post tempdoc 419 C3 V1):** `/api/status` exposes additional fields used
 by the frontend's `deriveHealthEvents` taxonomy for evidence-rich rendering when a HealthEvent
 fires. The pattern is named-question, not generic-dashboard (419 C3 explicit non-goal).
 - `worker.core.recentJobQueueDepth: long[]` — 30-min RRD trend of `worker.job_queue.depth`
   (curated metric). Backs the sparkline next to firing `index-throughput-stalled` /
-  `index-throughput-degraded` events. Empty array when the worker-side RRD store hasn't
+  `index-throughput-degraded` events. Empty array when the index-half RRD store has not
   accumulated data in the window yet.
 - `gpu.recentUtilizationPercent: double[]`, `gpu.recentMemoryUtilizationPercent: double[]` —
   30-min trends of the curated GPU gauges from the head-side RRD store. Consumed by V2's
@@ -303,11 +314,15 @@ resource it emitted) are removed. The discipline-gate kernel itself is unaffecte
 read from the SARIF report (`tmp/governance-report.sarif`) and the gate runner's console output, not
 from an HTTP surface. Do not re-add the route.
 
-### Boot phases API (tempdoc 541)
+### Boot phases API (current handler contract; tempdoc 541 design history)
 
 **Source of truth:** `modules/ui/src/main/java/io/justsearch/ui/api/routes/BootRoutes.java` + FE consumer `modules/ui-web/src/shell-v0/components/BootPhasesPanel.ts`.
 
-`GET /api/boot/phases?process={head|worker|brain}` — Composition-substrate boot trace. Default discriminator is `head` if omitted.
+`GET /api/boot/phases?process={head|worker|brain}` - boot trace from the current handler. The default discriminator is `head` if omitted. These values are historical process labels retained by the route; the Engine is one JVM. `process=worker` returns `501 NOT_SUPPORTED`; `process=brain` is a projected inference trace.
+default discriminator is `head` if omitted. These discriminator values are historical process
+labels retained by the route; the Engine is one JVM. `process=worker` is accepted for compatibility
+and returns `501 NOT_SUPPORTED`, while `process=brain` is a projected inference trace rather than
+a separate process.
 
 **Head envelope** (200 once HeadAssembly construction completes):
 
@@ -330,25 +345,27 @@ from an HTTP surface. Do not re-add the route.
   } }
 ```
 
-- `phases` is the sealed once-per-process trace; `agent-tools-registration` is the LAZY entry that transitions `PENDING → READY/resolved` once Worker connects (synthesized at render time from `Memoized.isResolved()`; the sealed `BootTrace` is not mutated).
-- `rebuilds` is the post-boot ring buffer (capacity 20) of `worker-connect` events with READY/DEGRADED outcome reflecting current `CapabilityHealth`.
+- `phases` is the sealed Engine boot trace; `agent-tools-registration` is the LAZY entry rendered
+  from `Memoized.isResolved()` after registration (the sealed `BootTrace` is not mutated).
+- `rebuilds` is the post-boot ring buffer (capacity 20) of registration rebuild events.
 
-**Brain envelope** (200, co-resident projection from Head):
+**Brain envelope** (200, projected inference trace from the Engine):
 
 ```json
 { "boot": {
     "process": "brain",
     "projection": true,
-    "projectionNote": "Brain is co-resident with Head; this trace is projected from the ILM-construction window inside Head's ServicePhase. When Brain splits to its own JVM, projection becomes false.",
+    "projectionNote": "Brain is co-resident with the Engine; this trace is projected from the ILM-construction window inside the Engine service phase.",
     "bootStartedAtMs": ..., "bootCompletedAtMs": ..., "totalDurationMs": ...,
     "phases": [
       { "name": "ilm-construction", "outcome": "READY|DEGRADED", "reasonCode": "inference.not_configured" if Degraded, ... }
     ] } }
 ```
 
-`503` if HeadAssembly is still in pre-ServicePhase territory (BrainAssembly null).
+`503` if the Engine is still before the service phase (`BrainAssembly` is null).
 
-**Worker envelope**: returns `501 NOT_SUPPORTED` (reason: WorkerAssembly is the future tempdoc 546). Invalid discriminator returns `400 INVALID_REQUEST`.
+**Worker envelope**: returns `501 NOT_SUPPORTED` with `NOT_SUPPORTED` because the current code has
+no separate Worker boot assembly. Invalid discriminator returns `400 INVALID_REQUEST`.
 
 ### Operation Substrate API (tempdoc 429)
 
@@ -371,7 +388,7 @@ work identity is reattached rather than persisted as restart authority.
 Substrate endpoints:
 
 - `GET /infra/capabilities` — LSP-shape capability handshake. Returns `serverCapabilities` declaring the three primitive types (Operation/Resource/Prompt) with `dynamicRegistration`, `messageCatalogUrl`, `endpoint`, and `current` schema version. Includes monotonic `catalogVersion` (long) + `protocolVersion: "1.0"` and per-sub-API `contractVersions` (per tempdoc 521-followup §γ2/§ε1, `host.selection: "1.0"`, `host.ai: "1.0"`, plus all other `host.*` sub-interfaces). Existing fields (`schema_versions`, `prompt_templates`, `plugins`, `source`) preserved (additive change). Returns 503 if `appFacadeBootstrap.capabilitiesHandler()` hasn't completed initialization yet.
-- `GET /infra/capabilities/stream` (SSE) — Capability change stream. Initial `snapshot` event carries current `catalogVersion`; `capability_changed` events emit on broadcast; heartbeat ticks the FE's lastSeen every 30s. No replay buffer — disconnect/reconnect requires fresh snapshot.
+- GET /infra/capabilities/stream (SSE) - Capability change stream. Initial snapshot carries current catalogVersion; capability_changed events emit on broadcast; heartbeat runs independently of retired process signalling. No replay buffer; reconnect requires a fresh snapshot.
 - `GET /api/registry/operations` — Operation catalog (admin seeds + agent tools when knowledgeClient is wired). Returns `{$schema, schemaVersion, catalogVersion, namespace, primitive, entries[]}`. Each entry is a generated single-authority projection of the `UIOperationView` wire record (record → JSON Schema `operation-wire.v1.json` → {TS, Zod}, precise/required per tempdoc 560 §4c); `consumers` is a flat `{consumerId, audience}` list.
 - `core.copy-diagnostic-summary` — Head-local, LOW-risk/NONE-confirmation, USER-audience operation. It returns one transient `summary` string built by `DiagnosticsService` from an explicit typed allowlist (build/runtime-contract versions, platform, lifecycle reason codes, safe GPU capability, and parseable crash timestamp/process/exception type). It has no Worker or Inference capability requirement and uses `METADATA_ONLY` audit policy, so operation history records identity/outcome but never the summary payload.
 - `POST /api/operations/{id}/invoke` — Dispatch a catalog operation. Body: `{args?: object, idempotencyKey?: string, confirmationToken?: string}`. The optional key is a canonical UUIDv7. Matching public input returns the durable metadata receipt before preparation; changed input returns `409 CONFLICT` with `OPERATION_KEY_REUSED`. Invalid keys return `400 BAD_REQUEST`/`OPERATION_KEY_INVALID`; expired keys return `409 CONFLICT`/`OPERATION_KEY_EXPIRED`. Accepted responses include `structuredData.operationKey` and `operationRecordId`, including Engine-minted keys for unkeyed calls. Receipt access preserves provenance, plugin and hard-stop restrictions; it cannot start another effect or reuse a spent approval capsule.
@@ -711,6 +728,9 @@ Response fields (additive/optional-by-presence):
     top-K lists overlap less and the union can grow. Treat it as telemetry, not as "how many
     documents matched"; use `matchCount` for that.
 - `nextCursor` (TEXT mode pagination)
+- `cursor`/`nextCursor` use the current stateless `searchAfter` request path. A cursor does not
+  pin a Lucene reader or generation across requests; D2's proposed pinned-reader lifetime and
+  `cursor expired` eviction contract are not shipped.
 - `facets`, `facetsTruncated`
 - `entityFacetVariants`
 - `queryUnderstanding` (object: `appliedBoosts` map, `latencyMs`) — present when QU is enabled (363/366)
@@ -825,7 +845,7 @@ aggregator or scan SSE cancellation contract remains.
 
 Substrate endpoints:
 
-- `GET /api/health/events/stream` (SSE) — Persistent-state Conditions + recent Lifecycle Occurrences + Threshold rule outcomes (memory.pressure et al). Initial `snapshot` event carries `{catalogVersion, conditions[], occurrences[]}`; `delta` events emit on transitions (`condition-added` / `condition-modified` / `condition-removed` / `occurrence-appended`); `heartbeat` ticks every 15s with `{catalogVersion}`. Reconnect via `Last-Event-ID` carries the last observed `catalogVersion`; the controller compares to current and replays a fresh snapshot when significantly behind. No persistent replay buffer (V1 — V2 may add one per §"Out of scope").
+- GET /api/health/events/stream (SSE) - Health conditions and recent lifecycle occurrences; heartbeat runs independently of retired process signalling. Reconnect uses Last-Event-ID and can receive a fresh snapshot.
 - `GET /api/messages/health-events/{locale}` — i18n catalog for HealthEvent IDs (label / message / per-reason override / remediation / runbook keys per §A.7). ETag + `Cache-Control: max-age=3600` per the parameterized `MessageCatalogController` defaults (per tempdoc 434).
 - `GET /api/registry/resources` — already documented in the Operation Substrate API section above; after Phase 2 of tempdoc 430 it includes the `health.events` Resource entry with `subscriptionMode: "SSE_STREAM"`, `endpoint: "/api/health/events/stream"`, `kind: "health-event-stream"`.
 

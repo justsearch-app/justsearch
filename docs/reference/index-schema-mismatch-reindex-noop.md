@@ -38,9 +38,9 @@ In the browser UI (and via `POST /api/indexing/reindex`), a reindex can appear t
 
 ### What’s actually happening
 
-The reindex request *does* enqueue jobs. The worker then attempts to index the files but fails each job at write time because the **on-disk Lucene index was created with an older field schema** and is no longer compatible with the current code’s field mapping.
+The reindex request *does* enqueue jobs. The indexing loop then attempts to index the files but fails each job at write time because the **on-disk Lucene index was created with an older field schema** and is no longer compatible with the current code's field mapping.
 
-The “tell” is in the Engine log — since lane F stage A there is no separate `worker.log`; the index half logs into the one Engine log (dev: `modules/ui-web/.dev-data/logs/engine.log`, desktop: `%LOCALAPPDATA%/JustSearch/logs/engine.log`):
+The "tell" is in the Engine log - since lane F stage A there is no separate `worker.log` file (retired filename); the index half logs into the one Engine log (dev: `modules/ui-web/.dev-data/logs/engine.log`, desktop: `%LOCALAPPDATA%/JustSearch/logs/engine.log`):
 
 - Example failure:
   - `IllegalArgumentException: cannot change field "mime" from index options=NONE to inconsistent index options=DOCS`
@@ -66,25 +66,25 @@ What happens next is **explicitly policy-controlled** via `index.schema_mismatch
 
 - `FAIL_CLOSED`: fail startup and surface a deterministic “schema mismatch / migration required” error via `/api/status` (Head carries the Worker start error string). **[Superseded 2026-09-03, tempdoc 915]** This is no longer the production default — `ResolvedConfigBuilder.normalizeSchemaMismatchPolicy` now resolves production to `BLUE_GREEN_MIGRATE` (dev to `REBUILD_BACKUP_FIRST`), and the fingerprint detector now enforces (see `docs/explanation/11-index-schema-migration.md`); `FAIL_CLOSED` remains available as an explicit opt-in.
 - `REBUILD_BACKUP_FIRST` (convenient in dev): rename the index directory to a `.bak-*` backup and rebuild a fresh empty index (backup-first, guarded).
-- `BLUE_GREEN_MIGRATE` (availability-first): start Blue (existing active generation) in **read-only** mode for search, build Green in a fresh generation directory, then cut over by swapping `state.json` and restarting the Worker.
+- `BLUE_GREEN_MIGRATE` (availability-first): start Blue (existing active generation) in **read-only** mode for search, build Green in a fresh generation directory, then cut over by swapping `state.json` and restarting the index component.
 
 ### Current `BLUE_GREEN_MIGRATE` behavior (updated 2026-09-12)
 
 - **Build verification**:
-  - The Worker stamps Lucene commit metadata key `build_state` (`BUILDING|COMPLETE`).
+  - The index half stamps Lucene commit metadata key `build_state` (`BUILDING|COMPLETE`).
   - Cutover verifies `build_state=COMPLETE` and `index_fingerprint` (renamed from `index_schema_fp`,
     tempdoc 915) before swapping `state.json`.
 - **Cutover fence (`SWITCHING`)**:
-  - The Worker enters `SWITCHING` near the end of migration (a small “quiesce + buffer” window) and enforces a `SWITCHING` deadline; if it can’t drain, it marks the migration `FAILED` (no pointer swap).
+  - The index half enters `SWITCHING` near the end of migration (a small "quiesce + buffer" window) and enforces a `SWITCHING` deadline; if it cannot drain, it marks the migration `FAILED` (no pointer swap).
   - Failed indexing jobs do **not** block auto-cutover by default (failures are surfaced via status as `failed_count` / unhealthy).
     - Optional guardrail: set a failure budget to block auto-cutover and keep Blue active:
       - env: `JUSTSEARCH_INDEX_MIGRATION_CUTOVER_MAX_FAILED_JOBS`
       - sysprop: `-Dindex.migration.cutover.max_failed_jobs=<N>`
     - Nuance: “file not found” jobs are treated as **deletes**, not FAILED, to avoid counting benign races as failures.
-- **What is buffered during `SWITCHING` (durable, Worker-side)**:
+- **What is buffered during `SWITCHING` (durable, index-half-owned)**:
   - `submitBatch`, `deleteById`, `deleteByPath`
   - `syncDirectory(force=true)` is buffered as `SYNC_ROOT(root, force)`
-  - These are stored durably in `jobs.db` (`switch_buffer`) and replayed after the Worker restarts on the new active generation.
+  - These are stored durably in `jobs.db` (`switch_buffer`) and replayed after cutover completes on the new active generation.
 - **VDU mutations**: new update, mark and recovery calls refuse retryably unless they target
   the captured serving runtime and its existing IDLE active generation. They no longer
   create buffered VDU rows. Legacy VDU records remain readable and wait for eligible

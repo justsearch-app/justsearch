@@ -34,7 +34,7 @@ The wire shape is fixed at:
   `resumeToken`.
 - `frameKind` ∈ `{UPDATE, LIFECYCLE}` discriminates data frames from
   connection-management frames. Lifecycle subkind lives nested in
-  `payload.kind` (`connected` / `snapshot` / `heartbeat` / `reset` /
+  `payload.kind` (`connected` / `snapshot` / `heartbeat` (live SSE keepalive, not the retired process signal) / `reset` /
   `closing`).
 - `streamId` is a kind-prefixed slug (`<kind>:<id>` where `<kind>` ∈
   `{registry, surface, system}`). Stable across reconnects.
@@ -60,7 +60,7 @@ Language streams (`RagStreamingHandler`, agent token streams) are
 explicitly out of scope and keep their cancellation / ordering
 contracts independent.
 
-## Rationale
+## Rationale (historical pre-substrate behavior)
 
 Pre-substrate, every SSE controller invented its own wire shape. The
 four controllers shipping when slice 436 began had four distinct

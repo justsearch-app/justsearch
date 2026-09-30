@@ -175,7 +175,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0022](0022-recordbuilder-annotation-processor.md) | RecordBuilder annotation processor for API records | Accepted | 2026-04-07 |
 | [0023](0023-api-responses-declare-runtime-context.md) | API responses declare their runtime context | Accepted | 2026-03-30 |
 | [0024](0024-app-packaging-nsis-per-user-download.md) | App packaging: NSIS, per-user install, download-on-demand | Accepted | 2026-04-06 |
-| [0025](0025-core-dto-dual-type-layering.md) | Core DTO dual-type layering (gRPC vs REST) | Accepted | 2026-04-06 |
+| [0025](0025-core-dto-dual-type-layering.md) | Core DTO dual-type layering (in-process ports vs REST) | Accepted | 2026-04-06 |
 | [0026](0026-manual-ci-triggering.md) | Manual-Only CI Triggering | Accepted (narrowed by ADR-0044) | 2026-04-22 |
 | [0027](0027-metric-catalog-as-telemetry-contract.md) | MetricCatalog as the Telemetry Contract | Accepted | 2026-04-25 |
 | [0028](0028-scoped-reverse-path-lookup.md) | Scoped Reverse Path-Hash Lookup | Accepted (amended 2026-09-03) | 2026-04-26 |
