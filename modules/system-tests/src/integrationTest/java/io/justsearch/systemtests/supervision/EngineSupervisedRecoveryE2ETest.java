@@ -514,6 +514,41 @@ final class EngineSupervisedRecoveryE2ETest {
     });
   }
 
+  static void runHeldNativeControlledShutdown() throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
+        "D1-13 controlled shutdown requires retained CPU A and FP16 CUDA B model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/native-shutdown-" + UUID.randomUUID());
+    withModelCacheCleanup(repo, work, () -> {
+      runInstalledModelScenario(repo, work, "installer-before-marker", Map.of(),
+          "INSTALLER_ACTIVATION_FAULT_PASS");
+      var environment = new java.util.HashMap<>(inPlaceModelEnvironment());
+      environment.put("JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE", "1");
+      environment.put("JUSTSEARCH_RESTORED_A_NATIVE_CONTROLLED_SHUTDOWN", "1");
+      String output = runInstalledModelScenario(repo, work, "model-live-a-b-gap", environment,
+          "MODEL_LIVE_AB_NATIVE_CONTROLLED_SHUTDOWN_PASS");
+      var proof = markerPayload(output, "MODEL_LIVE_AB_NATIVE_CONTROLLED_SHUTDOWN_PASS");
+      var before = proof.path("before");
+      var restarted = proof.path("restarted");
+      assertEquals(before.path("pid").asLong(), proof.path("lease").path("pid").asLong(), output);
+      assertNotEquals(before.path("pid").asLong(), restarted.path("pid").asLong(), output);
+      assertNotEquals(before.path("instanceId").asText(), restarted.path("instanceId").asText(), output);
+      assertEquals(before.path("incarnation").asInt() + 1,
+          restarted.path("incarnation").asInt(), output);
+      assertEquals(1, restarted.path("lastExit").path("code").asInt(), output);
+      assertEquals("fatal_or_uncaught", restarted.path("lastExit").path("reason").asText(), output);
+      assertEquals("TRANSIENT", restarted.path("lastExit").path("class").asText(), output);
+      assertBooleanTrue(restarted.path("lastExit").path("counted"), output);
+      assertBooleanTrue(proof.path("hardStopDiagnostic").path("nativeUnquiesced"), output);
+      assertBooleanTrue(proof.path("hardStopDiagnostic").path("orderlyQuit"), output);
+      assertBooleanTrue(proof.path("hardStopDiagnostic").path("jvmHookAbsent"), output);
+      assertBooleanTrue(proof.path("leaseMarkerStableThroughDeath"), output);
+      assertBooleanTrue(proof.path("leaseProofAbsentThroughDeath"), output);
+      assertBooleanTrue(proof.path("releaseAbsentThroughDeath"), output);
+      System.out.println("LIFECYCLE_NATIVE_CONTROLLED_HARD_STOP_PASS D1-13 " + proof);
+    });
+  }
+
   static void runSeededInPlaceRecomposeFailureCancellation() throws Exception {
     Path repo = repositoryRoot();
     assumeTrue(hasRetainedInstallerModels(repo) && hasRetainedAlternateEmbedding(repo),
@@ -875,6 +910,8 @@ final class EngineSupervisedRecoveryE2ETest {
       long timeoutSeconds = 330L;
       if (scenario.startsWith("generative-recovery-") || scenario.contains("low-memory")
           || "model-live-a-b-accepted-cancel-crash".equals(scenario)
+          || "1".equals(extraEnvironment.get(
+              "JUSTSEARCH_RESTORED_A_NATIVE_CONTROLLED_SHUTDOWN"))
           || "model-live-a-b".equals(scenario)
               && "1".equals(extraEnvironment.get("JUSTSEARCH_WRITER_RECOVERY_WATCHER_DELETE"))) {
         timeoutSeconds = 720L;
@@ -1207,6 +1244,38 @@ final class EngineSupervisedRecoveryE2ETest {
       assertTrue(output.contains("fatal_or_uncaught"), output);
     } else if ("migration".equals(scenario)) {
       assertTrue(output.contains("MIGRATION_PASS"), output);
+      var migration = markerPayload(output, "MIGRATION_PASS");
+      var before = migration.path("before");
+      var promoted = migration.path("promoted");
+      String manifestInstance = promoted.path("manifest").path("instanceId").asText();
+      assertFalse(before.path("manifestInstanceId").asText().isBlank(), output);
+      assertEquals(before.path("manifestInstanceId").asText(),
+          before.path("supervisorInstanceId").asText(),
+          "the pre-migration manifest must describe the supervised Engine instance");
+      assertEquals(before.path("manifestPid").asLong(), before.path("supervisorPid").asLong(),
+          "the pre-migration manifest must describe the supervised Engine process");
+      assertFalse(manifestInstance.isBlank(), output);
+      assertEquals(before.path("manifestInstanceId").asText(), manifestInstance,
+          "live migration must preserve the real manifest instance across activation");
+      assertEquals(before.path("manifestPid").asLong(),
+          promoted.path("manifest").path("pid").asLong(),
+          "live migration must preserve the real Engine process across activation");
+      assertEquals(promoted.path("supervisor").path("pid").asLong(),
+          promoted.path("manifest").path("pid").asLong(),
+          "the live promoted manifest must still describe the supervised Engine process");
+      assertEquals(before.path("incarnation").asInt(),
+          promoted.path("supervisor").path("incarnation").asInt(),
+          "live migration must preserve the supervisor incarnation across activation");
+      assertEquals(promoted.path("supervisor").path("instanceId").asText(), manifestInstance,
+          "the live promoted manifest must still describe the supervised Engine instance");
+      assertEquals(manifestInstance, migration.path("afterRefusal").path("instanceId").asText(),
+          "migration settlement and refused rollback must preserve the real manifest instance");
+      assertEquals(promoted.path("supervisor").path("pid").asLong(),
+          migration.path("afterRefusal").path("pid").asLong(),
+          "migration settlement and refused rollback must preserve the Engine process");
+      assertEquals(promoted.path("supervisor").path("incarnation").asInt(),
+          migration.path("afterRefusal").path("incarnation").asInt(),
+          "migration settlement and refused rollback must preserve the Engine incarnation");
     } else if (nativeProjectionScenario) {
       assertTrue(output.contains("PASS native-mixed-after-pointer"), output);
       assertTrue(output.contains("STOP"), output);

@@ -3,6 +3,8 @@ package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -19,7 +21,10 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Stage-A checkpoint (re-review) — {@code awaitClosed} answers a question that has two answers.
@@ -42,6 +47,138 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @DisplayName("KnowledgeServer.awaitClosed — close completion is observable")
 final class KnowledgeServerCloseCompletionTest {
+
+  @ParameterizedTest(name = "issued Blue view remains usable at {0}")
+  @ValueSource(strings = {
+      "migration-before-live-green-open",
+      "migration-after-live-green-open",
+      "migration-green-drained",
+      "migration-before-switching",
+      "migration-switching-entered",
+      "migration-before-pointer-commit",
+      "migration-after-pointer-commit",
+      "migration-before-live-activation",
+      "migration-after-live-activation"
+  })
+  @Timeout(120)
+  void migrationPauseMatrixDoesNotCloseBlueBeneathAnIssuedQuery(
+      String point, @TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
+    var executors = new io.justsearch.core.execution.TestEngineExecutors();
+    var server = new KnowledgeServer(executors,
+        WorkerBootFixture.workerConfig(layout.dataDir()), null);
+    var barrier = new MigrationTransitionBarrier.Controlled(point);
+    server.installMigrationBarrierForTests(barrier);
+    var fallback = new java.util.concurrent.atomic.AtomicInteger();
+    KnowledgeServer.ServingLease blueQuery = null;
+    try {
+      server.start();
+      server.deferredModelInit.get(30, java.util.concurrent.TimeUnit.SECONDS);
+      blueQuery = server.captureServingView();
+      var blueRuntime = blueQuery.searchRuntime();
+      var compatibleOwner = blueQuery.encoderSet();
+      assertNotNull(compatibleOwner, "the actual query view must carry a concrete encoder owner");
+      var blueTextSearch = blueRuntime.textQueryOps();
+      assertNotNull(blueTextSearch, "the issued query must carry Blue's exact search surface");
+      assertEqualsZeroSearch(blueQuery);
+
+      var migration = server.indexGenerationManagerForTests().startFreshMigration(
+          "d1-8-acquisition-swap-matrix");
+      var liveStart = server.beginUnrecordedBuildingLiveAsync(
+          migration.building_generation(), fallback::incrementAndGet);
+      assertTrue(barrier.awaitReached(30, java.util.concurrent.TimeUnit.SECONDS),
+          "the real migration must reach the selected WP1 point");
+
+      assertSame(blueRuntime, blueQuery.searchRuntime());
+      assertSame(blueTextSearch, blueQuery.searchRuntime().textQueryOps());
+      assertSame(compatibleOwner, blueQuery.encoderSet());
+      assertEqualsZeroSearch(blueQuery);
+
+      boolean publicationWritePoint = point.equals("migration-before-pointer-commit")
+          || point.equals("migration-after-pointer-commit")
+          || point.equals("migration-before-live-activation")
+          || point.equals("migration-after-live-activation");
+      try (var captureExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+        java.util.concurrent.Future<KnowledgeServer.ServingLease> queuedCapture = null;
+        try {
+          if (publicationWritePoint) {
+            var attempting = new java.util.concurrent.CountDownLatch(1);
+            var captureThread = new AtomicReference<Thread>();
+            queuedCapture = captureExecutor.submit(() -> {
+              captureThread.set(Thread.currentThread());
+              attempting.countDown();
+              return server.captureServingView();
+            });
+            assertTrue(attempting.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            long blockedDeadline = System.nanoTime()
+                + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+            while (!queuedCapture.isDone()
+                && captureThread.get().getState() != Thread.State.WAITING
+                && System.nanoTime() < blockedDeadline) Thread.onSpinWait();
+            org.junit.jupiter.api.Assertions.assertEquals(
+                Thread.State.WAITING, captureThread.get().getState(),
+                "capture must park on the publication read lock held by the WP1 point");
+            assertFalse(queuedCapture.isDone(),
+                "capture must wait behind the atomic pointer/publication write section");
+          } else {
+            try (var pausedBlue = server.captureServingView()) {
+              assertSame(blueRuntime, pausedBlue.searchRuntime());
+              assertSame(blueTextSearch, pausedBlue.searchRuntime().textQueryOps());
+              assertSame(compatibleOwner, pausedBlue.encoderSet());
+              assertEqualsZeroSearch(pausedBlue);
+            }
+          }
+        } finally {
+          // A queued capture at a publication-write point cannot let ExecutorService.close()
+          // wait on itself when an assertion above fails.
+          barrier.release();
+        }
+
+        assertTrue(liveStart.get(30, java.util.concurrent.TimeUnit.SECONDS));
+        assertTrue(server.awaitMigrationCutoverExitForTests(
+            30, java.util.concurrent.TimeUnit.SECONDS));
+        org.junit.jupiter.api.Assertions.assertEquals(0, fallback.get());
+        if (queuedCapture != null) {
+          try (var greenAfterWrite = queuedCapture.get(
+              5, java.util.concurrent.TimeUnit.SECONDS)) {
+            assertNotSame(blueRuntime, greenAfterWrite.searchRuntime());
+            assertSame(compatibleOwner, greenAfterWrite.encoderSet());
+            assertEqualsZeroSearch(greenAfterWrite);
+          }
+        }
+      }
+
+      // Flow A intentionally reuses one compatible model/settings owner. The generation pairing
+      // witness is the exact runtime and query surface: issued Blue remains Blue while a new view
+      // resolves Green, and both remain usable until their own request lifetime ends.
+      assertSame(blueRuntime, blueQuery.searchRuntime());
+      assertSame(blueTextSearch, blueQuery.searchRuntime().textQueryOps());
+      assertSame(compatibleOwner, blueQuery.encoderSet());
+      assertEqualsZeroSearch(blueQuery);
+      try (var greenQuery = server.captureServingView()) {
+        assertNotSame(blueRuntime, greenQuery.searchRuntime());
+        assertNotSame(blueTextSearch, greenQuery.searchRuntime().textQueryOps());
+        assertSame(compatibleOwner, greenQuery.encoderSet());
+        assertEqualsZeroSearch(greenQuery);
+      }
+    } finally {
+      barrier.release();
+      if (blueQuery != null) blueQuery.close();
+      try {
+        server.close();
+      } finally {
+        executors.close();
+      }
+    }
+  }
+
+  private static void assertEqualsZeroSearch(KnowledgeServer.ServingLease query)
+      throws java.io.IOException {
+    org.junit.jupiter.api.Assertions.assertEquals(0,
+        query.searchRuntime().indexCountOps().countByFieldOrThrow(
+            io.justsearch.indexing.SchemaFields.DOC_ID, "d1-8-missing-document"));
+  }
 
   @Test
   void orderedShutdownRetainsRealNativeSessionUntilIssuedLeaseExits(@TempDir Path tempDir)

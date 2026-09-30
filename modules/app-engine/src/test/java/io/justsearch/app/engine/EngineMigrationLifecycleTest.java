@@ -4,15 +4,31 @@ package io.justsearch.app.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.indexerworker.server.KnowledgeServer;
+import io.justsearch.indexerworker.server.MigrationTransitionBarrier;
+import io.justsearch.indexerworker.services.CallContext;
+import io.justsearch.indexerworker.util.PathNormalizer;
+import io.justsearch.ipc.SearchRequest;
+import io.justsearch.ipc.SearchResponse;
 import io.justsearch.ipc.StatusResponse;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,9 +66,14 @@ final class EngineMigrationLifecycleTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   private EngineTestHarness engine;
+  private MigrationTransitionBarrier.Controlled migrationBarrier;
 
   @AfterEach
   void tearDown() {
+    if (migrationBarrier != null) {
+      migrationBarrier.release();
+      migrationBarrier = null;
+    }
     if (engine != null) {
       engine.close();
       engine = null;
@@ -100,7 +121,8 @@ final class EngineMigrationLifecycleTest {
     }
     assertTrue(liveGreen, "the current Engine must serve A while its new Green writer runs");
 
-    try (var heldBlue = engine.captureServingView()) {
+    var heldBlue = engine.captureServingView();
+    try {
       assertEquals(bluePath, heldBlue.activeGenerationPath(), "the lease must hold the actual Blue view");
       assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(),
           "requestCutover must be accepted");
@@ -114,6 +136,39 @@ final class EngineMigrationLifecycleTest {
       assertTrue(Files.isDirectory(bluePath), "Blue's directory must survive its held view");
       assertTrue(engine.awaitSearchable(marker, 60_000),
           "the promoted generation must serve search without restarting the Engine");
+
+      // Shutdown's bounded retirement probe is the contractually significant timeout branch.
+      // It must report the held owner without dropping the predecessor or closing beneath the
+      // issued lease. Running the private close phase directly keeps this a retirement test: a
+      // whole Engine close would also stop admission and make the later-release assertion
+      // impossible to distinguish from shutdown teardown.
+      try (var timeoutProbe = Executors.newSingleThreadExecutor()) {
+        long timeoutStarted = System.nanoTime();
+        var refused = timeoutProbe.submit(() -> closeRetiredServingViews(engineServer()));
+        ExecutionException timeout = assertThrows(
+            ExecutionException.class,
+            () -> refused.get(10, TimeUnit.SECONDS),
+            "the five-second retirement bound must report the held Blue lease");
+        long timeoutElapsed = System.nanoTime() - timeoutStarted;
+        assertTrue(timeoutElapsed >= TimeUnit.SECONDS.toNanos(5),
+            "retirement must hold the lease through its full five-second deadline; elapsed="
+                + TimeUnit.NANOSECONDS.toMillis(timeoutElapsed) + "ms");
+        assertTrue(timeout.getCause() instanceof IOException, timeout::toString);
+        assertTrue(
+            timeout.getCause().getMessage().contains("still owns resources"),
+            "the timeout must name retained retired-view ownership: " + timeout.getCause());
+      }
+      StatusResponse retained = engine.status();
+      assertEquals(activeBefore, retained.getMigration().getPreviousGenerationId(),
+          "a timed-out retirement must retain the exact predecessor reference");
+      assertTrue(Files.isDirectory(bluePath),
+          "a timed-out retirement must retain Blue's physical directory");
+      SearchResponse retainedBlue = heldBlue.services().searchService().search(
+          SearchRequest.newBuilder().setQuery(marker).setLimit(10).build(), CallContext.none());
+      assertTrue(retainedBlue.getResultsCount() > 0,
+          "the timed-out Blue owner must remain query-readable through its issued lease");
+    } finally {
+      heldBlue.close();
     }
 
     assertTrue(awaitPreviousRetired(engine.indexBase(), activeBefore, 60_000),
@@ -144,18 +199,22 @@ final class EngineMigrationLifecycleTest {
   void cutoverActivatesTheGenerationInProcess(@TempDir Path tempDir)
       throws Exception {
     Path dataDir = tempDir.resolve("data");
-    Path docsDir = dataDir.resolve("count-docs");
-    Files.createDirectories(docsDir);
+    Path blueDocs = dataDir.resolve("blue-count-docs");
+    Path greenDocs = dataDir.resolve("green-count-docs");
+    Files.createDirectories(blueDocs);
+    Files.createDirectories(greenDocs);
 
-    String markerA = "countmarkera" + System.nanoTime();
-    String markerB = "countmarkerb" + System.nanoTime();
-    Path fileA = docsDir.resolve("a.txt");
-    Path fileB = docsDir.resolve("b.txt");
-    Files.writeString(fileA, "hello " + markerA);
-    Files.writeString(fileB, "hello " + markerB);
-    writeWatchedRoots(dataDir, docsDir);
+    String commonMarker = "countcommon" + System.nanoTime();
+    Path fileA = blueDocs.resolve("a.txt");
+    Path fileB = blueDocs.resolve("b.txt");
+    Path fileC = greenDocs.resolve("c.txt");
+    Files.writeString(fileA, commonMarker + " blue a");
+    Files.writeString(fileB, commonMarker + " blue b");
+    Files.writeString(fileC, commonMarker + " green c");
 
-    engine = EngineTestHarness.start(dataDir);
+    migrationBarrier = new MigrationTransitionBarrier.Controlled(
+        "migration-before-switching");
+    engine = EngineTestHarness.start(dataDir, migrationBarrier);
     assertTrue(
         engine.client().submitBatch(List.of(fileA, fileB), TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
         "both files must be accepted for indexing");
@@ -163,22 +222,88 @@ final class EngineMigrationLifecycleTest {
 
     long blueCount = engine.status().getMigration().getActiveDocCount();
     assertEquals(2L, blueCount, "precondition: the serving generation holds both documents");
+    SearchWitness blueWitness = witness(awaitSearchResponse(commonMarker, 2, 60_000));
+    assertEquals(2L, blueWitness.totalHits(), "Blue's complete query signature must have two hits");
+    assertEquals(2, blueWitness.ids().size(), "Blue's result page must contain both exact ids");
+    List<String> expectedBlueIds = List.of(
+        PathNormalizer.normalizeKey(fileA), PathNormalizer.normalizeKey(fileB)).stream()
+        .sorted().toList();
+    assertEquals(expectedBlueIds, blueWitness.ids(),
+        "Blue's signature must be the two files explicitly indexed into A");
 
     String activeBefore = engine.status().getMigration().getActiveGenerationId();
-    assertTrue(engine.client().startMigration("count_divergence", TestEngineContexts.FOREGROUND).accepted(), "startMigration accepted");
+    GenerationWitness blueGeneration = new GenerationWitness(activeBefore, blueWitness);
+    // Publish the one-document migration source only after the Engine has captured its ordinary
+    // watcher roots. The migration enumerator re-reads this durable owner, while Blue cannot
+    // opportunistically ingest C and blur the two frozen response signatures.
+    writeWatchedRoots(dataDir, greenDocs);
+    var started = engine.client().startMigration(
+        "count_divergence", TestEngineContexts.FOREGROUND);
+    assertTrue(started.accepted(), "startMigration accepted");
+    assertTrue(migrationBarrier.awaitReached(180, TimeUnit.SECONDS),
+        "the before-SWITCHING barrier must witness completed enumeration and hold publication on A");
+    GenerationWitness greenGeneration = new GenerationWitness(started.buildingGenerationId(),
+        new SearchWitness(1L, List.of(PathNormalizer.normalizeKey(fileC))));
 
-    // Remove one source file so the generation the enumerator builds differs from the one being
-    // served. This is what makes the assertion below non-vacuous: with equal counts it would pass
-    // whether or not the Engine reopened.
-    Files.delete(fileB);
-    engine.restart();
+    var observedResponses = new ConcurrentLinkedQueue<SearchWitness>();
+    var keepSearching = new AtomicBoolean(true);
+    var firstResponse = new CountDownLatch(1);
+    try (var searches = Executors.newSingleThreadExecutor()) {
+      var searchLoop = searches.submit(() -> {
+        while (keepSearching.get()) {
+          try {
+            SearchResponse response = engine.client().search(
+                commonMarker, 10, TestEngineContexts.FOREGROUND);
+            SearchWitness observed = witness(response);
+            assertTrue(observed.equals(blueGeneration.response())
+                    || observed.equals(greenGeneration.response()),
+                "each response must be the complete A or B fixture signature: " + observed);
+            observedResponses.add(observed);
+          } finally {
+            firstResponse.countDown();
+          }
+          Thread.sleep(5);
+        }
+        return null;
+      });
+      try {
+        assertTrue(awaitFirstResponse(firstResponse, observedResponses, searchLoop, 30_000),
+            "the across-swap loop must observe Blue before cutover");
+        assertTrue(observedResponses.contains(blueWitness),
+            "the across-swap loop must establish Blue's complete response signature");
 
-    assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(), "requestCutover must be accepted");
+        migrationBarrier.release();
+        assertTrue(
+            awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 180_000),
+            "the cutover must promote the building generation");
+        assertTrue(awaitObservedHitCount(observedResponses, 1, searchLoop, 60_000),
+            "the same loop must observe Green's one-document answer after publication");
+      } finally {
+        keepSearching.set(false);
+        migrationBarrier.release();
+      }
+      searchLoop.get(30, TimeUnit.SECONDS);
+    }
+
+    SearchWitness greenWitness = witness(
+        engine.client().search(commonMarker, 10, TestEngineContexts.FOREGROUND));
+    assertEquals(1L, greenWitness.totalHits(), "Green's complete query signature must have one hit");
+    assertEquals(1, greenWitness.ids().size(), "Green's result page must contain its exact id");
+    assertEquals(greenGeneration.response(), greenWitness,
+        "Green must serve the exact file C identity fixed before the swap loop started");
+
+    assertFalse(observedResponses.isEmpty(), "the swap loop must retain every response witness");
     assertTrue(
-        awaitActiveGenerationChanged(engine.indexBase(), activeBefore, 180_000),
-        "the cutover must promote the building generation");
+        observedResponses.stream().allMatch(
+            response -> response.equals(blueGeneration.response())
+                || response.equals(greenGeneration.response())),
+        "every complete response must equal the frozen generation signature "
+            + blueGeneration + " or " + greenGeneration + ": " + observedResponses);
+    assertTrue(observedResponses.containsAll(List.of(blueWitness, greenWitness)),
+        "the retained response trace must include both generation signatures: "
+            + observedResponses);
 
-    StatusResponse live = engine.status();
+    StatusResponse live = awaitMigrationState("IDLE", 60_000);
     assertNotEquals(
         activeBefore,
         live.getMigration().getActiveGenerationId(),
@@ -446,5 +571,109 @@ final class EngineMigrationLifecycleTest {
       Thread.sleep(100);
     }
     return false;
+  }
+
+  private static boolean awaitObservedHitCount(
+      ConcurrentLinkedQueue<SearchWitness> observed, long expected,
+      java.util.concurrent.Future<?> searchLoop, long timeoutMs) throws Exception {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      propagateAsyncFailure(searchLoop);
+      if (observed.stream().anyMatch(response -> response.totalHits() == expected)) return true;
+      Thread.sleep(25);
+    }
+    propagateAsyncFailure(searchLoop);
+    return observed.stream().anyMatch(response -> response.totalHits() == expected);
+  }
+
+  private static boolean awaitFirstResponse(CountDownLatch firstResponse,
+      ConcurrentLinkedQueue<SearchWitness> observed, java.util.concurrent.Future<?> searchLoop,
+      long timeoutMs) throws Exception {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      propagateAsyncFailure(searchLoop);
+      if (firstResponse.await(25, TimeUnit.MILLISECONDS)) {
+        if (observed.isEmpty()) {
+          try {
+            searchLoop.get(5, TimeUnit.SECONDS);
+          } catch (java.util.concurrent.TimeoutException stillRunning) {
+            // The response completed and a later iteration is running; inspect retained evidence.
+          } catch (ExecutionException failure) {
+            rethrowAsync(failure);
+          }
+        }
+        propagateAsyncFailure(searchLoop);
+        return !observed.isEmpty();
+      }
+    }
+    propagateAsyncFailure(searchLoop);
+    return false;
+  }
+
+  private static void propagateAsyncFailure(java.util.concurrent.Future<?> task) throws Exception {
+    if (!task.isDone()) return;
+    try {
+      task.get();
+    } catch (ExecutionException failure) {
+      rethrowAsync(failure);
+    }
+  }
+
+  private static void rethrowAsync(ExecutionException failure) throws Exception {
+    Throwable cause = failure.getCause();
+    if (cause instanceof Error error) throw error;
+    if (cause instanceof RuntimeException runtime) throw runtime;
+    if (cause instanceof Exception checked) throw checked;
+    throw failure;
+  }
+
+  private SearchResponse awaitSearchResponse(String query, long expectedHits, long timeoutMs)
+      throws InterruptedException {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    SearchResponse last = SearchResponse.getDefaultInstance();
+    while (System.currentTimeMillis() < deadline) {
+      last = engine.client().search(query, 10, TestEngineContexts.FOREGROUND);
+      if (last.getTotalHits() == expectedHits) return last;
+      Thread.sleep(50);
+    }
+    return last;
+  }
+
+  /** IPC has no served-generation field, so use a complete, disjoint fixture response signature. */
+  private static SearchWitness witness(SearchResponse response) {
+    List<String> ids = response.getResultsList().stream().map(result -> result.getId()).sorted()
+        .toList();
+    assertEquals((long) ids.size(), ids.stream().distinct().count(),
+        "one response must not duplicate document ids");
+    assertEquals(response.getTotalHits(), ids.size(),
+        "the ten-result page must be the complete result set for this three-document fixture");
+    return new SearchWitness(response.getTotalHits(), ids);
+  }
+
+  private record SearchWitness(long totalHits, List<String> ids) {}
+
+  private record GenerationWitness(String generationId, SearchWitness response) {}
+
+  private KnowledgeServer engineServer() throws ReflectiveOperationException {
+    Field rootField = EngineTestHarness.class.getDeclaredField("root");
+    rootField.setAccessible(true);
+    EngineRoot root = (EngineRoot) rootField.get(engine);
+    Field serverField = EngineRoot.class.getDeclaredField("server");
+    serverField.setAccessible(true);
+    return (KnowledgeServer) serverField.get(root);
+  }
+
+  private static Void closeRetiredServingViews(KnowledgeServer server) throws Exception {
+    Method close = KnowledgeServer.class.getDeclaredMethod("closeRetiredServingViews");
+    close.setAccessible(true);
+    try {
+      close.invoke(server);
+      return null;
+    } catch (InvocationTargetException failure) {
+      Throwable cause = failure.getCause();
+      if (cause instanceof Exception checked) throw checked;
+      if (cause instanceof Error error) throw error;
+      throw failure;
+    }
   }
 }

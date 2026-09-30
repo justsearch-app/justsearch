@@ -181,6 +181,13 @@ export async function exerciseMigrationRestart(c) {
   requireThat(!c.output().includes(`Engine incarnation ${first.incarnation} exited`),
     'the recorded rebuild exited its serving Engine');
   console.log('MIGRATION_PASS', JSON.stringify({ blue, rebuildKey, settlement, retired,
+    before: {
+      manifestInstanceId: manifest.instanceId,
+      manifestPid: manifest.pid,
+      supervisorInstanceId: first.instanceId,
+      supervisorPid: first.pid,
+      incarnation: first.incarnation,
+    },
     promoted, rollbackResponse, afterRefusal, work }));
 }
 

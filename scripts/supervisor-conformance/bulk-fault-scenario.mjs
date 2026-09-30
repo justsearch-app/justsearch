@@ -2550,11 +2550,97 @@ async function exerciseLiveModelGapDecision(c) {
     }));
   }
   const nativeLeaseProbe = process.env.JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE === '1';
+  const controlledNativeShutdown =
+    process.env.JUSTSEARCH_RESTORED_A_NATIVE_CONTROLLED_SHUTDOWN === '1';
+  requireThat(!controlledNativeShutdown || nativeLeaseProbe,
+    'controlled native shutdown requires the real restored-A native lease probe');
   if (nativeLeaseProbe) {
     const reached = await waitFor('restored A issued a native CPU lease', 30000,
       () => readJson(path.join(data, 'runtime', 'restored-a-native-lease-reached.json')));
     requireThat(reached?.pid > 0 && reached.inputCount > 0,
       `restored A native lease probe did not hold a readable session: ${JSON.stringify(reached)}`);
+    if (controlledNativeShutdown) {
+      await semanticSampler?.stop();
+      const release = path.join(data, 'runtime', 'restored-a-native-lease-release');
+      const leaseProof = path.join(data, 'runtime', 'restored-a-native-lease-proof.json');
+      requireThat(!fs.existsSync(release),
+        'restored-A native lease was released before controlled shutdown admission');
+      requireThat(!fs.existsSync(leaseProof),
+        'restored-A native lease probe completed before controlled shutdown admission');
+      const supervisorFile = path.join(data, 'runtime', 'supervisor.v1.json');
+      const before = readJson(supervisorFile);
+      requireThat(before?.state === 'running' && reached.pid === before.pid
+        && manifest.pid === before.pid && manifest.instanceId === before.instanceId,
+      `held lease did not belong to the supervised manifest instance: ${JSON.stringify({
+        reached, manifest, before,
+      })}`);
+      const liveEngineLog = path.join(data, 'logs', 'engine.log');
+      requireThat(fs.existsSync(liveEngineLog), 'controlled shutdown has no live Engine log');
+      const shutdownLogOffset = fs.statSync(liveEngineLog).size;
+      const accepted = await request(apiPort, '/api/lifecycle/shutdown', {
+        method: 'POST', headers: sessionHeaders(manifest), body: '{}',
+      }, 30000);
+      requireThat(accepted.status === 202
+        && parseJson(accepted, 'controlled native shutdown').shutdownAccepted === true,
+      `controlled native shutdown was not accepted: HTTP ${accepted.status} ${accepted.text}`);
+      const restarted = await waitFor('supervisor restarts after native-unquiesced hard stop',
+        120000, () => {
+          const state = readJson(supervisorFile);
+          return state?.state === 'running' && state.runId === before.runId
+            && state.incarnation === before.incarnation + 1 ? state : null;
+        });
+      requireThat(!fs.existsSync(release),
+        'fixture released the native lease before the held process died');
+      requireThat(!fs.existsSync(leaseProof),
+        'restored-A native lease probe completed before the held process died');
+      const reachedAfterDeath = readJson(
+        path.join(data, 'runtime', 'restored-a-native-lease-reached.json'));
+      requireThat(JSON.stringify(reachedAfterDeath) === JSON.stringify(reached),
+        `held native lease marker changed before process death: ${JSON.stringify({
+          reached, reachedAfterDeath,
+        })}`);
+      requireThat(restarted.pid > 0 && restarted.pid !== before.pid
+        && restarted.instanceId && restarted.instanceId !== before.instanceId,
+      `supervisor did not publish a distinct successor: ${JSON.stringify(restarted)}`);
+      requireThat(restarted.restartCount === before.restartCount + 1
+        && restarted.lastExit?.incarnation === before.incarnation
+        && restarted.lastExit?.code === 1
+        && restarted.lastExit?.reason === 'fatal_or_uncaught'
+        && restarted.lastExit?.class === 'TRANSIENT'
+        && restarted.lastExit?.counted === true
+        && restarted.lastExit?.requestedReason == null,
+      `native-unquiesced exit was not counted as transient fatal recovery: ${JSON.stringify(restarted)}`);
+      const deathLog = await waitFor('native-unquiesced shutdown diagnostic', 30000, () => {
+        const file = path.join(work, 'state', 'runs', before.runId, 'incarnations',
+          String(before.incarnation), 'logs', 'engine.log');
+        if (!fs.existsSync(file)) return null;
+        const contents = fs.readFileSync(file);
+        requireThat(contents.length >= shutdownLogOffset,
+          `preserved Engine log is shorter than its pre-shutdown prefix: ${file}`);
+        const shutdownSlice = contents.subarray(shutdownLogOffset).toString('utf8');
+        return shutdownSlice.includes(
+          'Ordered shutdown complete (reason=quit, clean=false, errors=')
+          && shutdownSlice.includes('native-unquiesced')
+          ? { file, shutdownSlice } : null;
+      });
+      requireThat(!deathLog.shutdownSlice.includes('Shutting down HeadlessApp...'),
+        `ordinary JVM shutdown hook ran during controlled hard stop: ${deathLog.shutdownSlice}`);
+      // Exit code 1 alone is ambiguous. This production shutdown result proves NativeQuiescence was
+      // UNQUIESCED, and the absent JVM-hook log proves Runtime.halt skipped ordinary JVM shutdown.
+      console.log('MODEL_LIVE_AB_NATIVE_CONTROLLED_SHUTDOWN_PASS', JSON.stringify({
+        lease: reached, before, accepted: parseJson(accepted, 'controlled native shutdown'),
+        restarted, hardStopDiagnostic: {
+          file: deathLog.file,
+          nativeUnquiesced: deathLog.shutdownSlice.includes('native-unquiesced'),
+          orderlyQuit: deathLog.shutdownSlice.includes('Ordered shutdown complete (reason=quit'),
+          jvmHookAbsent: !deathLog.shutdownSlice.includes('Shutting down HeadlessApp...'),
+        },
+        leaseMarkerStableThroughDeath: JSON.stringify(reachedAfterDeath) === JSON.stringify(reached),
+        leaseProofAbsentThroughDeath: !fs.existsSync(leaseProof),
+        releaseAbsentThroughDeath: !fs.existsSync(release),
+      }));
+      return;
+    }
   }
   const semantic = await semanticSampler?.stop();
   if (semantic) requireThat(inPlaceSemanticViolations(semantic).length === 0,
