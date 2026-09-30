@@ -37,7 +37,16 @@ validated at startup/tests, and must resolve to exactly one registered `METHOD +
 The active lifecycle row is `POST /api/worker/restart`, a reference-client route retained as an
 HTTP 410 response for one release. Its replacement is
 `POST /api/engine/components/index/recover`; the row records `deprecatedSince` as
-`2026-09-29T00:00:00Z` and has no calendar `sunsetAt`. No other live HTTP route is deprecated.
+`2026-09-29T00:00:00Z` and has no calendar `sunsetAt`.
+
+### Removed endpoints
+
+| Removed endpoint | Replacement |
+|------------------|-------------|
+| `POST /api/inference/reload` | Accepted `core.reconfigure` operation with explicit inference refresh intent; the settings owner applies `RESTART_IF_ONLINE` |
+
+`POST /api/inference/reload` is removed and must not be restored as a standalone route. The settings
+refresh is submitted through the accepted `core.reconfigure` operation.
 
 For a deprecated route, every response—including an exception-mapped response—carries:
 

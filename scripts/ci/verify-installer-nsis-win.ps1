@@ -143,11 +143,31 @@ function Assert {
 function Get-HttpBody {
   param(
     [Parameter(Mandatory = $true)][System.Net.Http.HttpClient]$Client,
-    [Parameter(Mandatory = $true)][string]$Uri
+    [Parameter(Mandatory = $true)][string]$Uri,
+    [string]$SessionToken
   )
-  $resp = $Client.GetAsync($Uri).Result
+  $req = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Get, $Uri)
+  if (-not [string]::IsNullOrEmpty($SessionToken)) {
+    $null = $req.Headers.TryAddWithoutValidation("X-JustSearch-Session", $SessionToken)
+  }
+  try { $resp = $Client.SendAsync($req).Result } finally { $req.Dispose() }
   $body = $resp.Content.ReadAsStringAsync().Result
   return [pscustomobject]@{ StatusCode = [int]$resp.StatusCode; Body = $body; Headers = $resp.Headers }
+}
+
+function New-OperationKeyV7 {
+  $timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  if ($timestamp -lt 0 -or $timestamp -gt 281474976710655) { throw "UUIDv7 timestamp is outside the 48-bit range" }
+  $random = New-Object byte[] 10
+  $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $rng.GetBytes($random) } finally { $rng.Dispose() }
+  $randomA = (([int]$random[0] % 16) * 256) + [int]$random[1]
+  $randomTail = [BitConverter]::ToUInt64($random, 2) -band 0x0fffffffffffffff
+  $variant = 8 + (([int]$random[9] -shr 6) -band 0x03)
+  $timestampHex = "{0:x12}" -f $timestamp
+  $variantHex = "{0:x1}" -f $variant
+  $randomBHex = "{0:x15}" -f $randomTail
+  return ("{0}-{1}-7{2:x3}-{3}{4}-{5}" -f $timestampHex.Substring(0, 8), $timestampHex.Substring(8, 4), $randomA, $variantHex, $randomBHex.Substring(0, 3), $randomBHex.Substring(3, 12))
 }
 
 function Send-Options {
@@ -823,7 +843,13 @@ try {
 
       # (1) Settings persist -- tempdoc 804 sec B4.2's exact round-10 regression: prod=true must not
       # silently switch UiSettingsStore to in-memory just because no settings file exists yet.
-      $settingsResp = Send-JsonPost -Client $client -Uri ("http://127.0.0.1:$upgradePort/api/settings/v2") -Json "{}" -SessionToken $upgradeToken
+      $settingsUri = "http://127.0.0.1:$upgradePort/api/settings/v2"
+      $settingsGet = Get-HttpBody -Client $client -Uri $settingsUri -SessionToken $upgradeToken
+      Assert ($settingsGet.StatusCode -eq 200) "Upgrade-arrival leg FAILED: GET /api/settings/v2 returned $($settingsGet.StatusCode), expected 200. Body=$($settingsGet.Body)"
+      $settingsWitness = ($settingsGet.Body | ConvertFrom-Json).witness
+      Assert ($null -ne $settingsWitness) "Upgrade-arrival leg FAILED: GET /api/settings/v2 returned no witness. Body=$($settingsGet.Body)"
+      $settingsBody = @{ witness = $settingsWitness; operationKey = (New-OperationKeyV7) } | ConvertTo-Json -Compress
+      $settingsResp = Send-JsonPost -Client $client -Uri $settingsUri -Json $settingsBody -SessionToken $upgradeToken
       Assert ($settingsResp.StatusCode -eq 200) "Upgrade-arrival leg FAILED: POST /api/settings/v2 on a v0.1.0-shaped data dir (no settings file yet) returned $($settingsResp.StatusCode), expected 200 -- a 409 here means prod=true silently disabled settings persistence again (round 10's regression). Body=$($settingsResp.Body)"
       Add-Content -LiteralPath $evidenceFile -Value "INFO: Upgrade-arrival leg -- POST /api/settings/v2 persisted (200, not 409)."
 

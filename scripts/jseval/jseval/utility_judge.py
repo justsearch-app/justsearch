@@ -39,6 +39,8 @@ import warnings
 from pathlib import Path
 from typing import Callable
 
+from .operation_key import create_operation_key
+
 import httpx
 import numpy as np
 
@@ -566,7 +568,15 @@ class LocalSerialRater:
         return r.json()
 
     def _set_model_path(self, path) -> None:
-        r = httpx.post(f"{self._base}/api/settings/v2", json={"llm": {"modelPath": path}}, timeout=10.0)
+        settings_response = httpx.get(f"{self._base}/api/settings/v2", timeout=10.0)
+        settings_response.raise_for_status()
+        settings = settings_response.json()
+        witness = settings["witness"]
+        r = httpx.post(f"{self._base}/api/settings/v2", json={
+            "llm": {"modelPath": path},
+            "witness": witness,
+            "operationKey": create_operation_key(),
+        }, timeout=10.0)
         r.raise_for_status()
 
     def _current_variant_id(self) -> str:

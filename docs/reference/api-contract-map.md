@@ -50,6 +50,11 @@ message. Its route lifecycle metadata declares deprecation on 2026-09-29 and the
 replacement, without a calendar sunset. The former `core.restart-worker` operation
 is removed from the operation catalog.
 
+`POST /api/inference/reload` has been removed. Use the accepted `core.reconfigure`
+operation with the current witnessed settings and an explicit inference refresh intent; the
+settings owner applies the refresh with `RESTART_IF_ONLINE` (see
+[`05-ai-architecture.md`](../explanation/05-ai-architecture.md)).
+
 ### Pending tool approval display
 
 `GET /api/chat/approval?sessionId=<run>&callId=<call>` reads an existing live agent or
@@ -533,6 +538,14 @@ Resume contract notes:
 
 `POST /api/settings/v2`:
 
+- Requires a partial settings patch plus top-level `witness` copied from the latest
+  `GET /api/settings/v2` response at `$.witness`, and a fresh top-level `operationKey`.
+  The witness contains `acceptedRevision` and `lastCommittedOperationKey`. The key must be a
+  canonical lowercase UUIDv7 string: UUID version 7, RFC 4122 variant (`8`, `9`, `a`, or `b`
+  in the variant nibble), in the standard hyphenated form. Generate a new key for each logical
+  write; retries of that same write reuse the same key and witness.
+- Missing or invalid witness/key input is refused with HTTP 400 `INVALID_REQUEST` or
+  `OPERATION_KEY_INVALID`; stale witnesses are refused with HTTP 409 `VERSION_CONFLICT`.
 - Persists updated settings. Returns 409 `SETTINGS_READ_ONLY` when `settingsMode` is `in_memory` (eval mode) — saves are silently discarded in this mode without the 409.
 - `apiPort` is validated in the inclusive range `0..65535`; in a partial patch, null or omission preserves the incumbent value. The desired policy is resolved through the normal precedence chain, while the positive endpoint bound by the current process is observed separately in the runtime manifest (`head.apiPort`) and in `process.apiPort` within effective-config diagnostics.
 - A non-null `rerankerModelPath` or `citationScorerModelPath` sets that query role's desired directory; an empty string explicitly clears it. Omission or null preserves the prior path. A higher-priority process override masks a path change and causes a precommit refusal.
