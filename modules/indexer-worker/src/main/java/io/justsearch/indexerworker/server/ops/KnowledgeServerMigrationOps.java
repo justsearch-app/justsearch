@@ -1895,7 +1895,7 @@ public final class KnowledgeServerMigrationOps {
   private static ReplayDeleteOrder replayDeleteOrder(DrainSwitchBufferContext context,
       List<SwitchBufferCapableQueue.SwitchBufferOp> ops, boolean exactRead) {
     Map<SwitchBufferCapableQueue.SwitchBufferOp, Integer> positions = new HashMap<>();
-    Map<SwitchBufferCapableQueue.SwitchBufferOp, Integer> deletes = new java.util.LinkedHashMap<>();
+    Map<SwitchBufferCapableQueue.SwitchBufferOp, Integer> deletes = new LinkedHashMap<>();
     Map<String, Map<String, Integer>> exactDeletes = new HashMap<>();
     for (int index = 0; index < ops.size(); index++) {
       var op = ops.get(index);
