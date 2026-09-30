@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public final class EntityClusterStore implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(EntityClusterStore.class);
   private static final int BUSY_TIMEOUT_MS = 5000;
-  private static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 1;
 
   private final Path dbPath;
   private final ReentrantLock lock = new ReentrantLock();

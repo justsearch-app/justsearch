@@ -62,7 +62,7 @@ import tools.jackson.databind.json.JsonMapper;
 public final class DurableGrantStore {
 
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
-  static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 1;
 
   private final Object mutationLock = new Object();
   // The persisted read-model key is also the sole live key; no parallel per-kind indexes.

@@ -265,3 +265,76 @@ No Gradle, dev stack, Sandbox, installer, commit or push was run. Signed install
 proof at stage E remains open; WP2 2e's documented restore is a dependency of
 that proof, and the generated checklist records missing documentation as a gap.
 These tooling checks do not close the installed-round acceptance item.
+
+## 2026-09-30 root amendment to 2b.2
+
+The marker means this directory may contain data written by build X with store
+versions Y, rather than certifying that every store opened successfully. Write it
+under the instance lock before any versioned store opens or migrates, so a crash
+after partial migration still warns a later older build. Retain the maximum app
+version and each maximum store version, using the register-bound code constants;
+degraded startup does not affect this evidence. Corrupt or unreadable marker bytes
+are logged once, treated as absent for comparison, and atomically rewritten with
+this build's values without blocking boot. Newer-data warnings use the existing
+Health condition surface and name settings.v<old>.bak.json and .corrupt-* files.
+
+Implementation choice: the existing pack-version comparator discards prerelease
+precedence, so the marker compares numeric SemVer components and prerelease
+identifiers locally. Store numbers remain direct references to all 18 bound code
+constants; their visibility is public only to let the composition root read them
+without opening stores. The marker is unversioned derived metadata (register
+currentVersion 0), with unreadable-byte reconstruction rather than future-schema
+refusal. Health condition data.newer_build uses the same notice-only exemption as
+settings.reset_from_corrupt; no frontend mapping or new UI surface is required.
+
+## 2026-09-30 2b implementation and local proof
+
+2b.1 preserves original bytes through AtomicFileWrites.replaceStrict immediately
+before the writable legacy migration. An existing backup is retained; an invalid
+backup destination fails preservation without quarantining valid settings.
+2b.2 records all 18 register-bound constants (currently settings 5, operations 5,
+jobs 21), retains unknown store fields, and publishes data.newer_build on Health
+without changing readiness. Writable corrupt markers are rewritten; unreadable
+and unwritable markers log once and boot continues. The pre-store call remains
+after instance-lock acquisition and before SqliteOperationStore and resolveConfig.
+
+Local proof on codex/lane-f-wp2b, without a dev stack or publication:
+
+| Check | Result | Local evidence under tmp/wp2b/ |
+|---|---|---|
+| Backup negative control: remove preservation, then restore exact bytes | Missing-backup and preservation-failure regressions red (2/3); restored green (3/3) | backup-red-local-temp.log, backup-green.log and their XML directories |
+| Marker negative control: disable comparison, then restore exact bytes | Three newer-data notice regressions red (3/8); restored green (8/8) | marker-red.log, marker-green.log and their XML directories |
+| Existing settings classes: ContextLengthMigration, PersistenceMode, RecoveryEvidence, Revision | 8 + 44 + 5 + 13 passed | UiSettingsStore*Test.log and corresponding XML directories |
+| SettingsWriterArchitectureTest | 4 passed; UI main/test compilation passed transitively | settings-architecture.log and settings-architecture-xml/ |
+| Spotless in all eight touched Java modules | All BUILD SUCCESSFUL | spotless-*.log |
+| Recoverability, runtime closure, readiness vocabulary | 52 durable authorities; 3768 files, zero violations; all 62 codes have producers | store-recoverability.log, runtime-closure.log, reason-codes.log |
+| Release register projection tests | 19 passed | release-projection.log |
+
+Commands: every Gradle invocation first checked the grant file named in the
+assignment. All ran sequentially with -PskipWebBuild=true, --offline and
+-Dorg.gradle.java.installations.paths pointing to the installed JDK 21 and 25.
+GRADLE_USER_HOME and JVM temporary files were inside tmp/wp2b/. A cached wrapper
+and copied dependency cache avoided denied network access; an initial temp-dir
+cleanup failure was rerun in the worktree and is excluded from regression proof.
+
+```powershell
+# For each module: app-services, app-agent, app-api, app-engine,
+# app-observability, configuration, ui, worker-core
+./gradlew.bat :modules:<module>:spotlessApply -PskipWebBuild=true --offline
+# Common installed-JDK option described above was present on every successful run.
+./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreMigrationBackupTest -PskipWebBuild=true --offline
+./gradlew.bat :modules:app-engine:test --tests io.justsearch.app.engine.DataVersionMarkerTest -PskipWebBuild=true --offline
+./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest -PskipWebBuild=true --offline
+./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStorePersistenceModeTest -PskipWebBuild=true --offline
+./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRecoveryEvidenceTest -PskipWebBuild=true --offline
+./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.UiSettingsStoreRevisionTest -PskipWebBuild=true --offline
+./gradlew.bat :modules:ui:test --tests io.justsearch.ui.SettingsWriterArchitectureTest -PskipWebBuild=true --offline
+node scripts/ci/check-store-recoverability.mjs
+node scripts/ci/check-runtime-manifest-closure.mjs
+node scripts/ci/check-readiness-reason-codes.mjs
+node --test scripts/release/app-release-assets.test.mjs
+```
+
+No frontend files changed, so frontend typecheck/unit commands do not apply.
+These close the bounded 2b local checks; the separate installed downgrade round
+at 2c/E remains required on the release candidate. No commit or push was made.
