@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * The window-cutover forcing function (tempdoc 851; owner decision 2026-08-19).
+ * The window-cutover forcing function (tempdoc 851; owner decision 2026-08-19; deadline moved by
+ * owner decision 2026-09-30, see DEADLINE).
  *
  * Three search/chat windows existed at once. Two of them were "temporary until the cutover":
  * search-v2 (tempdoc 818) sat DEVELOPER/DEEPLINK for months with an ACTIVE cutover tempdoc whose
@@ -50,8 +51,12 @@ export const CUTOVER_MARKER_FILE = 'governance/window-cutover.done';
 /** The successor window's surface id. */
 export const SUCCESSOR_SURFACE_ID = 'core.search-v3-surface';
 
-/** On or after this date an incomplete Search v3 promotion is a build failure, not a warning. */
-export const DEADLINE = '2026-09-30';
+/**
+ * On or after this date an incomplete Search v3 promotion is a build failure, not a warning.
+ * Owner decision 2026-09-30 moved it from 2026-09-30: main was frozen for lane F from 2026-09-08,
+ * so tempdoc 852 could not progress. The new date follows the expected lane F merge.
+ */
+export const DEADLINE = '2026-11-30';
 
 /** The owner decision this gate carries, named in every failure message. */
 export const OWNER_DECISION_DATE = '2026-08-19';
