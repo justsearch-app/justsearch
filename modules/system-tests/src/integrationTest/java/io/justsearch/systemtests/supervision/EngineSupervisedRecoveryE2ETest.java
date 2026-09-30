@@ -428,10 +428,12 @@ final class EngineSupervisedRecoveryE2ETest {
       String output = runInstalledModelScenario(repo, work, "model-live-a-b", environment,
           "MODEL_LIVE_AB_WATCHER_DELETE_PASS");
       var evidence = markerPayload(output, "MODEL_LIVE_AB_WATCHER_DELETE_PASS");
+      var terminal = markerPayload(output, "MODEL_LIVE_AB_PASS");
       assertEquals("model-live-a-b", evidence.path("scenario").asText(), output);
       assertEquals("IN_PLACE", evidence.path("mode").asText(), output);
       String buildingGeneration = evidence.path("buildingGeneration").asText();
       assertFalse(buildingGeneration.isBlank(), output);
+      assertEquals(buildingGeneration, terminal.path("activeGeneration").asText(), output);
       var watcher = evidence.path("watcher");
       assertBooleanTrue(watcher.path("additionVisibleInA"), output);
       assertTrue(watcher.path("additionHitsInA").asInt() > 0, output);
@@ -491,6 +493,12 @@ final class EngineSupervisedRecoveryE2ETest {
       var nativeLease = markerPayload(output, "MODEL_LIVE_AB_RESTORED_NATIVE_LEASE");
       assertEquals("floor simulated by device-memory cap", result.path("floor").asText(), line);
       assertEquals("PROMOTED_WITH_GAPS", result.path("terminalReason").asText(), line);
+      String gapListHash = result.path("gapListHash").asText();
+      assertTrue(gapListHash.matches("[0-9a-f]{64}"), line);
+      assertFalse(result.path("sourceGeneration").asText().isBlank(), line);
+      assertFalse(result.path("promotedGeneration").asText().isBlank(), line);
+      assertNotEquals(result.path("sourceGeneration").asText(),
+          result.path("promotedGeneration").asText(), line);
       assertTrue(result.path("aVectorHits").asInt() > 0, line);
       assertTrue(result.path("bVectorHits").asInt() > 0, line);
       assertBooleanTrue(result.path("semantic").path("recoveredAfterRefusal"), line);
@@ -583,6 +591,20 @@ final class EngineSupervisedRecoveryE2ETest {
       assertTrue(floor.path("footprintBytes").asLong() > floor.path("freeBytes").asLong(), output);
       assertEquals(1, result.path("restartCount").asInt(), output);
       assertEquals("COMPLETE", result.path("terminalState").asText(), output);
+      assertTrue(result.path("countedExit").path("counted").asBoolean(), output);
+      var faulted = result.path("faulted");
+      var successor = result.path("successor");
+      assertTrue(faulted.path("pid").asLong() > 0, output);
+      assertTrue(successor.path("pid").asLong() > 0, output);
+      assertTrue(faulted.path("incarnation").asInt() > 0, output);
+      assertTrue(successor.path("incarnation").asInt() > 0, output);
+      assertFalse(faulted.path("instanceId").asText().isBlank(), output);
+      assertFalse(successor.path("instanceId").asText().isBlank(), output);
+      assertNotEquals(faulted.path("pid").asLong(), successor.path("pid").asLong(), output);
+      assertNotEquals(faulted.path("instanceId").asText(),
+          successor.path("instanceId").asText(), output);
+      assertNotEquals(faulted.path("incarnation").asInt(),
+          successor.path("incarnation").asInt(), output);
       assertEquals(result.path("settingsRevision").path("before").asLong() + 1,
           result.path("settingsRevision").path("after").asLong(), output);
       assertBooleanTrue(result.path("latestText"), output);

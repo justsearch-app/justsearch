@@ -218,15 +218,22 @@ final class KnowledgeServerDeviceMemoryLineTest {
   @Test
   void rejectedInPlaceCandidateRecomposesExactSourceQuerySelection(@TempDir Path dir)
       throws Exception {
-    InferenceSurface recoveredQuerySurface = selectedQuerySurface(dir);
-    InferenceSurface sourceQuerySurface = selectedMissingQuerySurface(recoveredQuerySurface);
+    InferenceSurface selectedQuerySurface = selectedQuerySurface(dir);
+    InferenceSurface sourceQuerySurface = selectedMissingQuerySurface(selectedQuerySurface);
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L), true,
             sourceQuerySurface);
         var composition = mockedComposition()) {
+      InferenceSurface recoveredQuerySurface = fixture.readyQuerySurface(selectedQuerySurface);
       composition.when(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
           any(), any(), any(), nullable(QueryRoleSelection.class)))
           .thenThrow(new IllegalStateException("B rejected"))
-          .thenReturn(recoveredQuerySurface);
+          .thenAnswer(ignored -> {
+            var restoring = fixture.componentRow.get();
+            assertEquals(ComponentState.RELOADING, restoring.state());
+            assertEquals("encoders.reloading", restoring.reasonCode());
+            assertEquals(1, restoring.recoveryAttempts());
+            return recoveredQuerySurface;
+          });
       var refusal = assertThrows(InvocationTargetException.class, fixture::composeCandidate)
           .getCause();
       assertTrue(refusal instanceof IllegalStateException);
@@ -244,6 +251,8 @@ final class KnowledgeServerDeviceMemoryLineTest {
       assertEquals(fixture.sourceQuerySelection, fixture.activeQuerySelection());
       assertEquals(Set.of(), fixture.activeQueryObservation().missingRoles(),
           "a selected-but-missing role retries its retained exact files");
+      assertEquals(ComponentState.READY, fixture.componentRow.get().state());
+      assertEquals(1, fixture.componentRow.get().recoveryAttempts());
       composition.verify(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
           any(), any(), any(), isNull()), times(1));
       composition.verify(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
@@ -490,14 +499,15 @@ final class KnowledgeServerDeviceMemoryLineTest {
           ComponentState.READY, null, Instant.now(), System.nanoTime(), null, null, null, 0,
           null));
       when(component.snapshot()).thenAnswer(ignored -> componentRow.get());
-      when(component.tryBeginRecovery(any(), nullable(String.class), nullable(String.class)))
+      when(component.tryBeginRecovery(any(), any(ComponentState.class), nullable(String.class),
+          nullable(String.class)))
           .thenAnswer(invocation -> {
             var expected = (EngineComponentSnapshot.Component) invocation.getArgument(0);
             if (!componentRow.compareAndSet(expected, new EngineComponentSnapshot.Component(
-                expected.spec(), ComponentState.STARTING, invocation.getArgument(1), Instant.now(),
+                expected.spec(), invocation.getArgument(1), invocation.getArgument(2), Instant.now(),
                 System.nanoTime(), expected.appliedVersion(), expected.desiredVersion(),
                 expected.lastCompose(), expected.recoveryAttempts() + 1,
-                invocation.getArgument(2)))) {
+                invocation.getArgument(3)))) {
               return Optional.empty();
             }
             return Optional.of(componentRow.get());
@@ -629,6 +639,30 @@ final class KnowledgeServerDeviceMemoryLineTest {
           mock(io.justsearch.ort.PolicySnapshot.class), List.of(),
           new InferenceSurface.ComponentObservation(Optional.of(digest), Set.of(), Set.of(),
               Optional.of(disabled)));
+    }
+
+    private InferenceSurface readyQuerySurface(InferenceSurface selected) {
+      EncoderConfigurationProjection projection = sourceGenerationSelection == null
+          ? EncoderConfigurationProjection.from(configuration)
+          : EncoderConfigurationProjection.from(configuration, sourceGenerationSelection);
+      var sessions = mock(io.justsearch.ort.SessionHandle.class);
+      var retired = new AtomicBoolean();
+      doAnswer(ignored -> {
+        retired.set(true);
+        return null;
+      }).when(sessions).close();
+      when(sessions.retirementStatus()).thenAnswer(ignored -> retired.get()
+          ? io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED
+          : io.justsearch.ort.SessionHandle.RetirementStatus.ACTIVE);
+      var assembly = new io.justsearch.reranker.RerankerAssembly(sessions,
+          new io.justsearch.reranker.RerankerShape(512, false),
+          mock(io.justsearch.reranker.RerankerTokenizer.class));
+      return new InferenceSurface(Optional.empty(), Optional.empty(), Optional.of(assembly),
+          Optional.empty(), Optional.empty(), Optional.empty(),
+          mock(io.justsearch.ort.PolicySnapshot.class), List.of(sessions),
+          new InferenceSurface.ComponentObservation(Optional.of(projection.digest()),
+              Set.of(io.justsearch.ort.EncoderRole.RERANKER), Set.of(),
+              selected.componentObservation().querySelection()));
     }
 
     @Override public void close() throws Exception {

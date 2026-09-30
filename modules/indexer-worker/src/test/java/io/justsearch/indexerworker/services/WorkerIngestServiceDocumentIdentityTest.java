@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -177,6 +178,104 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
       assertEquals("retainedafterjournalfailure",
           candidate.documentFieldOps().getDocumentField(refusedPath, SchemaFields.CONTENT));
     }
+  }
+
+  @Test
+  @DisplayName("pre-green same-runtime deletes journal B before applying each A effect once")
+  void sameRuntimePreGreenDeletesJournalBeforeServingEffects() throws Exception {
+    Path base = tempDir.resolve("same-runtime-generation-base");
+    var manager = new IndexGenerationManager(base);
+    String activeId = manager.initializeOrLoad().activeGenerationId();
+    String buildingId = manager.startMigration("same-runtime-delete-regression").building_generation();
+    jobQueue = new SqliteJobQueue(tempDir.resolve("same-runtime-jobs.db"));
+    jobQueue.open();
+    var schema = io.justsearch.adapters.lucene.runtime.IndexSchema
+        .fromCatalog(FieldCatalogDef.forChunkTesting(0));
+    runtime = schema.atPath(manager.resolveGenerationPathStrict(activeId))
+        .withExecutorRegistrations(testLuceneExecutors()).open();
+
+    String watchedPath = PathNormalizer.normalizeKey(tempDir.resolve("same-runtime-watched.txt"));
+    String directPath = PathNormalizer.normalizeKey(tempDir.resolve("same-runtime-direct.txt"));
+    String prefix = PathNormalizer.normalizeKey(tempDir.resolve("same-runtime-prefix"));
+    String prefixedPath = PathNormalizer.normalizeKey(
+        tempDir.resolve("same-runtime-prefix").resolve("child.txt"));
+    String collectionPath = PathNormalizer.normalizeKey(
+        tempDir.resolve("same-runtime-collection.txt"));
+    indexDocument(watchedPath, "00000000-0000-4000-8000-000000000090", "watcher", null);
+    indexDocument(directPath, "00000000-0000-4000-8000-000000000091", "direct", null);
+    indexDocument(prefixedPath, "00000000-0000-4000-8000-000000000092", "prefix", null);
+    indexDocument(collectionPath, "00000000-0000-4000-8000-000000000093", "collection", "pre-green");
+    runtime.commitOps().commitAndTrack();
+    runtime.commitOps().maybeRefreshBlocking();
+
+    var service = new WorkerIngestService(
+        jobQueue, null, null, IndexingPacing.unthrottled(), base,
+        manager.resolveGenerationPathStrict(activeId), runtime, runtime, null, 0L);
+    AtomicInteger watcherEffects = new AtomicInteger();
+    service.acceptWatcherDelete(watchedPath, () -> {
+      var journal = jobQueue.listSwitchBufferOpsStrictForGeneration(buildingId);
+      assertEquals(1, journal.size(), "the watcher effect must follow a durable B journal row");
+      assertEquals("DELETE", journal.getFirst().op());
+      watcherEffects.incrementAndGet();
+      runtime.indexingCoordinator().deleteByIdAndChunks(watchedPath);
+    });
+
+    DeleteByIdResponse directResult = service.deleteById(
+        DeleteByIdRequest.newBuilder().setDocId(directPath).build(), CallContext.none());
+    assertTrue(directResult.getSuccess(), directResult.getError());
+    var prefixResult = service.deleteByPath(
+        DeleteByPathRequest.newBuilder().setPath(prefix).build(), CallContext.none());
+    assertTrue(prefixResult.getError().isEmpty(), prefixResult.getError());
+    var collectionResult = service.deleteByCollection(
+        DeleteByCollectionRequest.newBuilder().setCollection("pre-green").build(),
+        CallContext.none());
+    assertTrue(collectionResult.getError().isEmpty(), collectionResult.getError());
+    assertEquals(1, collectionResult.getDeletedDocs(), "report the single serving-A deletion count");
+
+    runtime.commitOps().maybeRefreshBlocking();
+    assertEquals(1, watcherEffects.get(), "the watcher callback owns the one A-side delete");
+    assertNull(runtime.documentFieldOps().getDocumentField(watchedPath, SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField(directPath, SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField(prefixedPath, SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField(collectionPath, SchemaFields.CONTENT));
+
+    var journal = jobQueue.listSwitchBufferOpsStrictForGeneration(buildingId);
+    assertEquals(4, journal.size(), "each pre-green delete must retain one replay row for B");
+    assertEquals(List.of("DELETE", "DELETE", "DELETE_PREFIX", "DELETE_COLLECTION"),
+        journal.stream().map(io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp::op)
+            .toList());
+  }
+
+  @Test
+  @DisplayName("same-runtime journal failure refuses deletion before changing A")
+  void sameRuntimeJournalFailureLeavesServingDocumentIntact() throws Exception {
+    Path base = tempDir.resolve("same-runtime-journal-failure-base");
+    var manager = new IndexGenerationManager(base);
+    String activeId = manager.initializeOrLoad().activeGenerationId();
+    manager.startMigration("same-runtime-journal-failure");
+    jobQueue = new SqliteJobQueue(tempDir.resolve("same-runtime-journal-failure.db"));
+    jobQueue.open();
+    var schema = io.justsearch.adapters.lucene.runtime.IndexSchema
+        .fromCatalog(FieldCatalogDef.forChunkTesting(0));
+    runtime = schema.atPath(manager.resolveGenerationPathStrict(activeId))
+        .withExecutorRegistrations(testLuceneExecutors()).open();
+    String path = PathNormalizer.normalizeKey(tempDir.resolve("same-runtime-retained.txt"));
+    indexDocument(path, "00000000-0000-4000-8000-000000000094", "retained", null);
+    runtime.commitOps().commitAndTrack();
+    runtime.commitOps().maybeRefreshBlocking();
+    var service = new WorkerIngestService(
+        jobQueue, null, null, IndexingPacing.unthrottled(), base,
+        manager.resolveGenerationPathStrict(activeId), runtime, runtime, null, 0L);
+
+    try (var db = java.sql.DriverManager.getConnection(
+        "jdbc:sqlite:" + tempDir.resolve("same-runtime-journal-failure.db"));
+        var statement = db.createStatement()) {
+      statement.execute("DROP TABLE switch_buffer");
+    }
+    assertThrows(WorkerServiceException.class, () -> service.deleteById(
+        DeleteByIdRequest.newBuilder().setDocId(path).build(), CallContext.none()));
+    runtime.commitOps().maybeRefreshBlocking();
+    assertEquals("retained", runtime.documentFieldOps().getDocumentField(path, SchemaFields.CONTENT));
   }
 
   @AfterEach
@@ -565,6 +664,19 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
             0L);
     service.setDocumentIdentityStore(identityStore);
     return service;
+  }
+
+  private void indexDocument(
+      String path, String uid, String content, String collection) {
+    Map<String, Object> fields = new java.util.HashMap<>();
+    fields.put(SchemaFields.DOC_ID, path);
+    fields.put(SchemaFields.DOC_UID, uid);
+    fields.put(SchemaFields.PATH, path);
+    fields.put(SchemaFields.CONTENT, content);
+    if (collection != null) {
+      fields.put(SchemaFields.COLLECTION, collection);
+    }
+    runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
   }
 
   private static UpdatePathsRequest renameRequest(String oldPath, String newPath) {

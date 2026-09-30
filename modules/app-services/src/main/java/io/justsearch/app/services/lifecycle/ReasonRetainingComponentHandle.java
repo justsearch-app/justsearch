@@ -93,10 +93,20 @@ public final class ReasonRetainingComponentHandle implements ComponentHandle {
   @Override
   public Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
       EngineComponentSnapshot.Component expected, String reasonCode, String evidence) {
+    return tryBeginRecovery(expected, ComponentState.STARTING, reasonCode, evidence);
+  }
+
+  @Override
+  public Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
+      EngineComponentSnapshot.Component expected, ComponentState recoveryState,
+      String reasonCode, String evidence) {
     Objects.requireNonNull(expected, "expected");
+    if (recoveryState != ComponentState.STARTING && recoveryState != ComponentState.RELOADING) {
+      throw new IllegalArgumentException("recoveryState must be STARTING or RELOADING");
+    }
     boolean retained = ReasonRetention.retainHeld(expected.reasonCode(), reasonCode,
-        RegistryBackedCapability.healthOf(ComponentState.STARTING));
-    return delegate.tryBeginRecovery(expected,
+        RegistryBackedCapability.healthOf(recoveryState));
+    return delegate.tryBeginRecovery(expected, recoveryState,
         retained ? expected.reasonCode() : reasonCode,
         retained ? expected.evidence() : evidence);
   }

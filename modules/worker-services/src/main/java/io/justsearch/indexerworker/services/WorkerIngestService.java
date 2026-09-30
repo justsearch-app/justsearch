@@ -451,11 +451,14 @@ public final class WorkerIngestService {
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration == null) return;
     if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
-        || active == ingestLifecycle || !active.isAcceptingWrites()) {
+        || !active.isAcceptingWrites()) {
       throw WorkerServiceException.unavailable(
           "Serving projection is unavailable during migration; retry shortly");
     }
     switchBufferOps.journalDeleteForGeneration(candidateGeneration, normalizedId);
+    // Before Green opens, the caller's direct effect still owns A. Its mutation
+    // lease prevents handoff until that one effect finishes; B already has its journal row.
+    if (active == ingestLifecycle) return;
     active.indexingCoordinator().deleteByIdAndChunks(normalizedId);
     active.commitOps().commitAndTrack(reason);
   }
@@ -464,12 +467,13 @@ public final class WorkerIngestService {
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration == null) return;
     if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
-        || active == ingestLifecycle || !active.isAcceptingWrites()) {
+        || !active.isAcceptingWrites()) {
       throw WorkerServiceException.unavailable(
           "Serving projection is unavailable during migration; retry shortly");
     }
     String normalizedPrefix = resolveNormalizedPathPrefix(pathPrefix);
     switchBufferOps.journalDeletePrefixForGeneration(candidateGeneration, normalizedPrefix);
+    if (active == ingestLifecycle) return;
     active.indexingCoordinator().deleteByPathPrefix(normalizedPrefix);
     active.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_PATH);
   }
@@ -478,11 +482,12 @@ public final class WorkerIngestService {
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration == null) return null;
     if (!(searchLifecycle instanceof io.justsearch.adapters.lucene.runtime.RunningRuntime active)
-        || active == ingestLifecycle || !active.isAcceptingWrites()) {
+        || !active.isAcceptingWrites()) {
       throw WorkerServiceException.unavailable(
           "Serving projection is unavailable during migration; retry shortly");
     }
     switchBufferOps.journalDeleteCollectionForGeneration(candidateGeneration, collection);
+    if (active == ingestLifecycle) return null;
     int visibleDeleted = active.indexingCoordinator().deleteByCollection(collection);
     active.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_COLLECTION);
     return visibleDeleted;

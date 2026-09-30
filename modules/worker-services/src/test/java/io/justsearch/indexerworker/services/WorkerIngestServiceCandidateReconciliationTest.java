@@ -11,9 +11,12 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.adapters.lucene.runtime.CommitOps;
@@ -27,6 +30,9 @@ import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
+import io.justsearch.ipc.DeleteByCollectionRequest;
+import io.justsearch.ipc.DeleteByIdRequest;
+import io.justsearch.ipc.DeleteByPathRequest;
 import io.justsearch.ipc.SyncDirectoryRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.InOrder;
 
 final class WorkerIngestServiceCandidateReconciliationTest {
   @TempDir Path tempDir;
@@ -81,6 +88,77 @@ final class WorkerIngestServiceCandidateReconciliationTest {
 
     assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
     assertFalse(fixture.admission.replayCertain());
+  }
+
+  @Test
+  void sameRuntimePreGreenDeleteRefusesWhenServingRuntimeIsUnavailable() throws Exception {
+    Fixture fixture = sameRuntimeFixture(false);
+    String path = PathNormalizer.normalizeKey(tempDir.resolve("unavailable-delete.txt"));
+
+    assertThrows(
+        WorkerServiceException.class,
+        () -> fixture.service.deleteById(
+            DeleteByIdRequest.newBuilder().setDocId(path).build(), CallContext.none()));
+    verify(fixture.candidateWriter, never()).deleteByIdAndChunks(any());
+    verify(fixture.queue, never()).deleteByExactPath(any());
+    verify(fixture.queue, never()).putSwitchBufferForGeneration(any(), any(), any(), any());
+    assertTrue(fixture.admission.replayCertain(), "refusal before journal/effect keeps replay certain");
+  }
+
+  @Test
+  void sameRuntimePreGreenJournalsBeforeExactlyOneServingEffectForEachDelete() throws Exception {
+    Fixture fixture = sameRuntimeFixture(true);
+    String watched = PathNormalizer.normalizeKey(tempDir.resolve("strict-watcher-delete.txt"));
+    String direct = PathNormalizer.normalizeKey(tempDir.resolve("strict-direct-delete.txt"));
+    String prefix = PathNormalizer.normalizeKey(tempDir.resolve("strict-prefix-delete"));
+    String normalizedPrefix = IngestResponses.resolveNormalizedPathPrefix(prefix);
+    String collection = "strict-pre-green";
+    when(fixture.candidateWriter.deleteByCollection(collection)).thenReturn(1);
+
+    InOrder order = inOrder(fixture.queue, fixture.candidateWriter, fixture.servingCommit);
+    fixture.service.acceptWatcherDelete(watched, () ->
+        fixture.candidateWriter.deleteByIdAndChunks(watched));
+    var directResponse = fixture.service.deleteById(
+        DeleteByIdRequest.newBuilder().setDocId(direct).build(), CallContext.none());
+    var prefixResponse = fixture.service.deleteByPath(
+        DeleteByPathRequest.newBuilder().setPath(prefix).build(), CallContext.none());
+    var collectionResponse = fixture.service.deleteByCollection(
+        DeleteByCollectionRequest.newBuilder().setCollection(collection).build(),
+        CallContext.none());
+
+    assertTrue(directResponse.getSuccess(), directResponse.getError());
+    assertEquals("", prefixResponse.getError());
+    assertEquals("", collectionResponse.getError());
+    assertEquals(1, collectionResponse.getDeletedDocs());
+
+    order.verify(fixture.queue).putSwitchBufferForGeneration(
+        fixture.buildingGeneration, IngestResponses.switchBufferPathKey(watched), "DELETE", watched);
+    order.verify(fixture.candidateWriter).deleteByIdAndChunks(watched);
+    order.verify(fixture.queue).putSwitchBufferForGeneration(
+        fixture.buildingGeneration, IngestResponses.switchBufferPathKey(direct), "DELETE", direct);
+    order.verify(fixture.candidateWriter).deleteByIdAndChunks(direct);
+    order.verify(fixture.queue).deleteByExactPath(direct);
+    order.verify(fixture.servingCommit).commitAndTrack(
+        io.justsearch.adapters.lucene.runtime.CommitReason.GRPC_DELETE_BY_ID);
+    order.verify(fixture.queue).putSwitchBufferForGeneration(
+        fixture.buildingGeneration, IngestResponses.switchBufferPrefixKey(normalizedPrefix),
+        "DELETE_PREFIX", normalizedPrefix);
+    order.verify(fixture.candidateWriter).deleteByPathPrefix(prefix);
+    order.verify(fixture.queue).deleteByPathPrefix(prefix);
+    order.verify(fixture.servingCommit).commitAndTrack(
+        io.justsearch.adapters.lucene.runtime.CommitReason.GRPC_DELETE_BY_PATH);
+    order.verify(fixture.queue).putSwitchBufferForGeneration(
+        fixture.buildingGeneration, "collection:" + collection, "DELETE_COLLECTION", collection);
+    order.verify(fixture.candidateWriter).deleteByCollection(collection);
+    order.verify(fixture.servingCommit).commitAndTrack(
+        io.justsearch.adapters.lucene.runtime.CommitReason.GRPC_DELETE_BY_COLLECTION);
+
+    verify(fixture.candidateWriter, times(1)).deleteByIdAndChunks(watched);
+    verify(fixture.candidateWriter, times(1)).deleteByIdAndChunks(direct);
+    verify(fixture.candidateWriter, times(1)).deleteByPathPrefix(prefix);
+    verify(fixture.candidateWriter, times(1)).deleteByCollection(collection);
+    verify(fixture.servingCommit, times(3)).commitAndTrack(any());
+    verifyNoMoreInteractions(fixture.queue, fixture.candidateWriter, fixture.servingCommit);
   }
 
   @Test
@@ -226,6 +304,32 @@ final class WorkerIngestServiceCandidateReconciliationTest {
 
   private Fixture fixtureBeforeMigration() throws Exception {
     return fixture(false);
+  }
+
+  private Fixture sameRuntimeFixture(boolean acceptingWrites) throws Exception {
+    Path base = tempDir.resolve("same-runtime-unavailable-" + java.util.UUID.randomUUID());
+    var generations = new IndexGenerationManager(base);
+    var initial = generations.initializeOrLoad();
+    String building = generations.startMigration("same-runtime-unavailable-test").building_generation();
+    ReadPathOps reads = mock(ReadPathOps.class);
+    RunningRuntime runtime = mock(RunningRuntime.class);
+    when(runtime.isAcceptingWrites()).thenReturn(acceptingWrites);
+    IndexingCoordinator writer = mock(IndexingCoordinator.class);
+    when(runtime.indexingCoordinator()).thenReturn(writer);
+    CommitOps commit = mock(CommitOps.class);
+    when(runtime.commitOps()).thenReturn(commit);
+    SwitchBufferCapableQueue queue = mock(SwitchBufferCapableQueue.class);
+    when(queue.putSwitchBufferForGeneration(eq(building), any(), any(), any()))
+        .thenReturn(true);
+    var service = new WorkerIngestService(
+        queue, null, null, IndexingPacing.unthrottled(), base,
+        generations.resolveGenerationPathStrict(initial.activeGenerationId()),
+        runtime, runtime, null, 0L);
+    Object owner = new Object();
+    var admission = new WorkerMutationAdmission(owner);
+    service.setMutationAdmission(admission, owner);
+    return new Fixture(
+        service, queue, reads, writer, writer, commit, admission, owner, building, generations);
   }
 
   private Fixture fixture(boolean startMigration, String... indexedPaths) throws Exception {

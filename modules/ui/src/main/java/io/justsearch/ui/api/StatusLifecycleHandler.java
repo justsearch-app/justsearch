@@ -634,7 +634,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         .anyMatch(component -> "api".equals(component.spec().name())
             && component.state() == ComponentState.READY);
     boolean ready = apiReady && !sample.failed() && !stale
-        && sample.view().core() != null && sample.view().core().indexHealthy();
+        && workerControlAvailable(sample.view());
     if (ready && fresh && index.state() != ComponentState.ABSENT
         && index.state() != ComponentState.RELOADING) {
       return indexComponent.transitionIfUnchanged(before, ComponentState.READY, null, null);
@@ -648,6 +648,17 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           reason, evidence);
     }
     return before.equals(componentRegistry.snapshot());
+  }
+
+  private static boolean workerControlAvailable(WorkerOperationalView view) {
+    var core = view.core();
+    if (core == null) return false;
+    if (core.indexHealthy()) return true;
+    // The producer reports per-document failures as ERROR (or INDEXING while other units run).
+    // Keep that corpus diagnostic without declaring the live Worker control plane offline.
+    // Fatal loop failure has precedence and is reported as FAILED, which remains refused.
+    return ("ERROR".equals(core.indexState()) || "INDEXING".equals(core.indexState()))
+        && view.failure() != null && view.failure().failedJobs() > 0;
   }
 
   /**

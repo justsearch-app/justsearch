@@ -3675,7 +3675,8 @@ public final class KnowledgeServer implements Closeable {
     if (encoderComponent != null) {
       var before = encoderComponent.snapshot();
       admitted = encoderComponent.tryBeginRecovery(before,
-          io.justsearch.app.api.lifecycle.LifecycleReasonCode.COMPONENT_RECOVERING.code(),
+          io.justsearch.core.component.ComponentState.RELOADING,
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.ENCODERS_RELOADING.code(),
           "Mandatory active-A restoration after candidate refusal").orElse(null);
       if (admitted == null) {
         log.warn("Active A restoration lost atomic component admission");

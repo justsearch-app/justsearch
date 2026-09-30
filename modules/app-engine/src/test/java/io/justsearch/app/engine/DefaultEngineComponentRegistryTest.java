@@ -9,8 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.core.component.ComponentRecoveryAction;
+import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentSpec;
 import io.justsearch.core.component.ComponentSpec.ComposeCapability;
 import io.justsearch.core.component.ComponentState;
@@ -26,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -201,6 +206,39 @@ final class DefaultEngineComponentRegistryTest {
   }
 
   @Test
+  void reloadingRecoveryAdmissionPublishesStateAndCountTogetherAndReturnsItsExactObservation() {
+    var lock = new ReentrantReadWriteLock();
+    try (var registry = new DefaultEngineComponentRegistry(budget(), lock)) {
+      var handle = registry.register(spec("encoders", Set.of()));
+      handle.setAppliedVersion("applied-a");
+      handle.transition(ComponentState.UNAVAILABLE, "component.recovery_failed",
+          "native owner unavailable");
+      var expected = handle.snapshot();
+      long revision = registry.snapshot().revision();
+      var seen = new ArrayList<EngineComponentSnapshot>();
+      try (var ignored = registry.subscribe(snapshot -> {
+        assertFalse(lock.isWriteLockedByCurrentThread());
+        seen.add(snapshot);
+        if (snapshot.components().getFirst().state() == ComponentState.RELOADING) {
+          handle.transition(ComponentState.READY, null, "restored owner serves");
+        }
+      })) {
+        var admitted = handle.tryBeginRecovery(expected, ComponentState.RELOADING,
+            "encoders.reloading", "mandatory active-A restoration").orElseThrow();
+        assertEquals(2, seen.size());
+        assertEquals(revision + 1, seen.getFirst().revision());
+        assertEquals(admitted, seen.getFirst().components().getFirst());
+        assertEquals(ComponentState.RELOADING, admitted.state());
+        assertEquals(1, admitted.recoveryAttempts());
+        assertEquals("applied-a", admitted.appliedVersion());
+        assertEquals(ComponentState.READY, handle.snapshot().state());
+        assertFalse(handle.transitionIfUnchanged(admitted, ComponentState.UNAVAILABLE,
+            "component.recovery_failed", "obsolete recovery completion"));
+      }
+    }
+  }
+
+  @Test
   void recoveryAdmissionRejectsAChangedConfigurationWithoutSpendingAnAttempt() {
     try (var registry = new DefaultEngineComponentRegistry(budget())) {
       var handle = registry.register(spec("index", Set.of()));
@@ -209,10 +247,48 @@ final class DefaultEngineComponentRegistryTest {
       var expected = handle.snapshot();
       handle.setAppliedVersion("applied-b");
       var current = registry.snapshot();
-      assertTrue(handle.tryBeginRecovery(expected, "component.recovering", "stale retry").isEmpty());
+      assertTrue(handle.tryBeginRecovery(expected, ComponentState.RELOADING,
+          "encoders.reloading", "stale retry").isEmpty());
       assertEquals(current, registry.snapshot());
       assertEquals(0, handle.snapshot().recoveryAttempts());
     }
+  }
+
+  @Test
+  void recoveryAdmissionRejectsNonRecoveryStatesWithoutPublishingOrSpendingAnAttempt() {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var handle = registry.register(spec("encoders", Set.of()));
+      handle.transition(ComponentState.UNAVAILABLE, "component.recovery_failed",
+          "native owner unavailable");
+      var expected = handle.snapshot();
+      var before = registry.snapshot();
+      for (var invalid : List.of(ComponentState.ABSENT, ComponentState.READY,
+          ComponentState.FAILED, ComponentState.UNAVAILABLE)) {
+        assertThrows(IllegalArgumentException.class, () -> handle.tryBeginRecovery(expected,
+            invalid, "encoders.reloading", "invalid recovery admission"));
+        assertEquals(before, registry.snapshot());
+        assertEquals(0, handle.snapshot().recoveryAttempts());
+      }
+    }
+  }
+
+  @Test
+  void reasonRetainingHandleForwardsReloadingWithTheHeldPhysicalCause() {
+    var delegate = mock(ComponentHandle.class);
+    var expected = new EngineComponentSnapshot.Component(spec("encoders", Set.of()),
+        ComponentState.UNAVAILABLE, "index.schema_open_refused", Instant.now(), System.nanoTime(),
+        "applied-a", "desired-b", null, 2, "repair stored schema");
+    var admitted = new EngineComponentSnapshot.Component(expected.spec(), ComponentState.RELOADING,
+        expected.reasonCode(), Instant.now(), System.nanoTime(), expected.appliedVersion(),
+        expected.desiredVersion(), expected.lastCompose(), 3, expected.evidence());
+    when(delegate.tryBeginRecovery(expected, ComponentState.RELOADING,
+        expected.reasonCode(), expected.evidence())).thenReturn(Optional.of(admitted));
+
+    var handle = new ReasonRetainingComponentHandle(delegate);
+    assertSame(admitted, handle.tryBeginRecovery(expected, ComponentState.RELOADING,
+        "encoders.reloading", "mandatory active-A restoration").orElseThrow());
+    verify(delegate).tryBeginRecovery(expected, ComponentState.RELOADING,
+        expected.reasonCode(), expected.evidence());
   }
 
   @Test
@@ -228,7 +304,8 @@ final class DefaultEngineComponentRegistryTest {
       Runnable claim = () -> {
         try {
           assertTrue(start.await(5, TimeUnit.SECONDS));
-          if (handle.tryBeginRecovery(expected, "component.recovering", "generic retry").isPresent()) {
+          if (handle.tryBeginRecovery(expected, ComponentState.RELOADING,
+              "encoders.reloading", "mandatory active-A restoration").isPresent()) {
             accepted.incrementAndGet();
           }
         } catch (Throwable thrown) { failure.compareAndSet(null, thrown); }
@@ -243,7 +320,7 @@ final class DefaultEngineComponentRegistryTest {
       assertNull(failure.get());
       assertEquals(1, accepted.get());
       assertEquals(1, handle.snapshot().recoveryAttempts());
-      assertEquals(ComponentState.STARTING, handle.snapshot().state());
+      assertEquals(ComponentState.RELOADING, handle.snapshot().state());
       assertEquals("index.schema_open_refused", handle.snapshot().reasonCode());
       assertEquals("repair stored schema", handle.snapshot().evidence());
     }

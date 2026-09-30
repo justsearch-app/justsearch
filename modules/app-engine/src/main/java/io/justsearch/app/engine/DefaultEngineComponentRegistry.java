@@ -512,11 +512,21 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
     @Override
     public Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
         EngineComponentSnapshot.Component expected, String nextReasonCode, String nextEvidence) {
+      return tryBeginRecovery(expected, ComponentState.STARTING, nextReasonCode, nextEvidence);
+    }
+
+    @Override
+    public Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
+        EngineComponentSnapshot.Component expected, ComponentState recoveryState,
+        String nextReasonCode, String nextEvidence) {
       Objects.requireNonNull(expected, "expected");
+      if (recoveryState != ComponentState.STARTING && recoveryState != ComponentState.RELOADING) {
+        throw new IllegalArgumentException("recoveryState must be STARTING or RELOADING");
+      }
       optionalNonBlank(nextReasonCode, "reasonCode");
       optionalNonBlank(nextEvidence, "evidence");
       return mutateAndCapture(this, expected, null, handle -> {
-        handle.state = ComponentState.STARTING;
+        handle.state = recoveryState;
         handle.stateSince = Instant.now();
         handle.stateSinceMonotonicNanos = System.nanoTime();
         handle.reasonCode = nextReasonCode;

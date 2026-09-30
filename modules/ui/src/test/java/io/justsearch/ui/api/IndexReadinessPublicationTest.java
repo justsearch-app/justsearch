@@ -77,6 +77,56 @@ final class IndexReadinessPublicationTest {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"ERROR", "INDEXING"})
+  void terminalDocumentFailureKeepsWorkerControlAvailableAndDiagnostics(String state) {
+    try (var fixture = fixture()) {
+      when(fixture.client.getWorkerOperationalView(any())).thenReturn(failedUnitView(state));
+      var sampled = fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+      assertTrue(fixture.capability.available());
+      assertFalse(sampled.worker().core().indexHealthy());
+      assertEquals(state, sampled.worker().core().indexState());
+      assertEquals(1L, sampled.worker().failure().failedJobs());
+      assertEquals("PARSER_FAILED", sampled.worker().failure().lastFailedErrorMessage());
+      verify(fixture.client, times(1)).getWorkerOperationalView(any());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"FAILED", "IDLE", "SERVING", "UNAVAILABLE", "unknown"})
+  void failedUnitCannotMakeFatalOrUnknownUnhealthyStateAvailable(String state) {
+    try (var fixture = fixture()) {
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      when(fixture.client.getWorkerOperationalView(any())).thenReturn(failedUnitView(state));
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.UNAVAILABLE, fixture.components.handle("index").snapshot().state());
+      assertFalse(fixture.capability.available());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ERROR", "INDEXING"})
+  void unhealthyStateWithoutDocumentFailureEvidenceStillRefusesControl(String state) {
+    try (var fixture = fixture()) {
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      when(fixture.client.getWorkerOperationalView(any())).thenReturn(
+          WorkerOperationalViewBuilder.from(view(false))
+              .withCore(new CoreIndexView(false, 10, 0, state, 0, 0)));
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.UNAVAILABLE, fixture.components.handle("index").snapshot().state());
+      assertFalse(fixture.capability.available());
+    }
+  }
+
+  private static WorkerOperationalView failedUnitView(String state) {
+    var withCore = WorkerOperationalViewBuilder.from(view(false))
+        .withCore(new CoreIndexView(false, 10, "INDEXING".equals(state) ? 1 : 0, state, 0, 0));
+    return WorkerOperationalViewBuilder.from(withCore)
+        .withFailure(new io.justsearch.app.api.status.FailureTrackingView(
+            1, "malformed.pdf", "PARSER_FAILED", 1, 0, 0, java.util.Map.of("pdf", 1L)));
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"api", "contact", "health", "freshness"})
   void eachFailedConjunctionInputDemotesReady(String missing) {
     try (var fixture = fixture()) {

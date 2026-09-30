@@ -60,6 +60,23 @@ public interface ComponentHandle {
   Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
       EngineComponentSnapshot.Component expected, String reasonCode, String evidence);
 
+  /**
+   * Admits recovery with STARTING or RELOADING using the same atomic attempt claim. RELOADING
+   * preserves an incumbent serving view while its physical owner restores semantic service.
+   * Generic recovery continues to use the three-argument STARTING admission.
+   */
+  default Optional<EngineComponentSnapshot.Component> tryBeginRecovery(
+      EngineComponentSnapshot.Component expected, ComponentState recoveryState,
+      String reasonCode, String evidence) {
+    if (recoveryState != ComponentState.STARTING && recoveryState != ComponentState.RELOADING) {
+      throw new IllegalArgumentException("recoveryState must be STARTING or RELOADING");
+    }
+    if (recoveryState != ComponentState.STARTING) {
+      throw new UnsupportedOperationException("selected recovery state is not supported");
+    }
+    return tryBeginRecovery(expected, reasonCode, evidence);
+  }
+
   void setAppliedVersion(String digest);
 
   void setDesiredVersion(String digest);

@@ -764,11 +764,68 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     await waitFor('installed A has an active CPU citation scorer', 30000,
       () => readActiveCitation(apiPort, request));
   }
-  if (engineLogWindow) readEngineLogWindow(engineLogWindow, requireThat);
+  if (engineLogWindow) {
+    readEngineLogWindow(engineLogWindow, requireThat);
+    if (gapApproval) fs.writeFileSync(path.join(work, 'installer-gap-citation-window.json'),
+      JSON.stringify({ window: engineLogWindow, sourceCitation: installedACitation }, null, 2));
+  }
   const cudaABefore = gapApproval || gapRecomposeFailure
     ? await waitFor('installed A realizes CUDA before migration', 60000,
       () => readRealizedCudaEmbedding(apiPort, request))
     : null;
+  let gapSource;
+  if (gapApproval || gapCancellation || gapRecomposeFailure) {
+    // An accepted watcher DELETE is a valid final effect, not an approvable source gap.
+    // Admit the real malformed source through recorded ingestion before B is selected.
+    const gapFile = path.join(work, 'installer-root-b', `parser-gap-${operationKey}.pdf`);
+    fs.writeFileSync(gapFile, '%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n');
+    const hash = sha256(fs.readFileSync(gapFile));
+    const ingestKey = createOperationKey();
+    const submitted = await post(apiPort, '/api/knowledge/ingest', {
+      paths: [gapFile], idempotencyKey: ingestKey,
+    }, 30000);
+    const admission = parseJson(submitted, 'malformed source admission');
+    requireThat(submitted.status === 200 && admission.success
+      && admission.structuredData?.operationKey === ingestKey
+      && Number.isSafeInteger(admission.structuredData.operationRecordId),
+      `malformed A source was not accepted: ${submitted.text}`);
+    const failedA = await waitFor('A terminally classifies the malformed PDF before B capture',
+      120000, () => {
+        const parent = operationRows(operationPath, ingestKey)[0];
+        const children = readRows(operationPath, `SELECT operation_key FROM operations
+          WHERE kind = 'ingest' AND json_extract(identity_json, '$.mode') = 'ingest-child'
+          AND json_extract(identity_json, '$.parentOperationKey') = ?`, ingestKey);
+        requireThat(children.length <= 1, 'single malformed source produced multiple children');
+        const child = children.length === 1
+          ? operationRows(operationPath, children[0].operation_key)[0] : null;
+        const row = readRows(jobsPath, `SELECT path, state, scan_id, unit_revision,
+          planned_source_sha256, content_hash, last_outcome_class,
+          last_reason_code, last_retry_policy FROM jobs`)
+          .find(job => samePath(job.path, gapFile));
+        return parent?.state === 'FAILED'
+          && parent.id === admission.structuredData.operationRecordId
+          && child?.state === 'FAILED' && child.units_failed === 1
+          && row?.state === 'FAILED' && row.scan_id === child.operation_key
+          // Ordinary intake has no captured-walk membership or planned source hash.
+          // B must establish both independently when it captures this unchanged source.
+          && row.unit_revision && row.planned_source_sha256 == null && row.content_hash == null
+          && row.last_outcome_class === 'PARSER_FAILED'
+          && row.last_reason_code === 'PARSER_FAILED' && row.last_retry_policy === 'NONE'
+          ? { ...row, parentKey: parent.operation_key, childKey: child.operation_key } : null;
+      });
+    requireThat(sha256(fs.readFileSync(gapFile)) === hash,
+      'malformed source changed while A classified its accepted ingestion');
+    const control = await waitFor('A retains Worker control readiness after its terminal parser unit',
+      60000, async () => {
+        const response = await request(apiPort, '/api/health', {}, 10000);
+        const health = parseJson(response, 'A control readiness after parser unit');
+        return health.components?.index?.state === 'READY' ? health.components.index : null;
+      });
+    requireThat(readJson(path.join(indexBase, 'state.json'))?.active_generation === sourceGeneration,
+      'malformed source admission changed A before candidate dispatch');
+    gapSource = { path: gapFile, hash, ingestKey, failedA, control };
+    console.log('MODEL_LIVE_AB_GAP_SOURCE_FAILED_A', JSON.stringify(gapSource));
+  }
   // Add build load only after A has served a real vector result. These files hold
   // MIGRATING long enough for the native watcher edges and explicit pause.
   for (let i = 0; i < extraBuildFiles; i++) {
@@ -832,13 +889,14 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     // The deliberate A-recompose-failure case enters UNAVAILABLE; it is a different
     // acceptance path from the ordinary RELOADING refusal window.
     const semanticSampler = gapRecomposeFailure ? null
-      : sampleSemanticAvailability({ apiPort, post, request, marker, file, matchingHit });
+      : sampleSemanticAvailability({ apiPort, post, request, marker, file, matchingHit,
+        evidencePath: path.join(work, 'installer-gap-semantic-observations.json') });
     try {
       await exerciseLiveModelGapDecision({ work, data, indexBase, manifest, apiPort,
         operationKey, sourceGeneration, sourceManifest, marker, file, bRoot, dispatched,
         readJson, waitFor, request, post, requireThat, createOperationKey, matchingHit,
         reachedFile, releaseFile, migrationBarrier, operationPath, gapCancellation,
-        gapRecomposeFailure, semanticSampler, cudaABefore, engineLogWindow });
+        gapRecomposeFailure, semanticSampler, cudaABefore, engineLogWindow, gapSource });
     } finally {
       if (process.env.JUSTSEARCH_RESTORED_A_NATIVE_LEASE_PROBE === '1') {
         fs.writeFileSync(path.join(data, 'runtime', 'restored-a-native-lease-release'), 'release');
@@ -2112,7 +2170,8 @@ async function cancelReindexWithApproval({ apiPort, manifest, reindexKey,
 }
 
 /** Sample the real vector port through refusal and subsequent A restoration or B promotion. */
-function sampleSemanticAvailability({ apiPort, post, request, marker, file, matchingHit }) {
+function sampleSemanticAvailability({ apiPort, post, request, marker, file, matchingHit,
+  evidencePath }) {
   const started = performance.now();
   const observations = [];
   const unexpectedSamples = [];
@@ -2152,13 +2211,21 @@ function sampleSemanticAvailability({ apiPort, post, request, marker, file, matc
       // Default (hybrid) search must keep answering from its keyword legs while vectors refuse.
       const hybrid = await search(null);
       let encoders = null;
+      let encoderStateSince = null;
+      let healthObservedAt = null;
       try {
         const health = await request(apiPort, '/api/health', {}, 10000);
-        if (health.status === 200) encoders = JSON.parse(health.text)?.components?.encoders?.state ?? null;
+        if (health.status === 200) {
+          const body = JSON.parse(health.text);
+          encoders = body?.components?.encoders?.state ?? null;
+          encoderStateSince = body?.components?.encoders?.state_since ?? null;
+          healthObservedAt = body?.observed_at ?? null;
+        }
       } catch {
         encoders = null;
       }
-      observations.push({ at, outcome, hybrid, encoders });
+      observations.push({ at, observedAt: new Date().toISOString(), outcome, hybrid, encoders,
+        encoderStateSince, healthObservedAt });
       if (running) await new Promise(resolve => setTimeout(resolve, 250));
     }
   })();
@@ -2172,6 +2239,8 @@ function sampleSemanticAvailability({ apiPort, post, request, marker, file, matc
     await task;
     result = summarizeSemanticAvailability(observations, started, performance.now(),
       unexpectedSamples);
+    if (evidencePath) fs.writeFileSync(evidencePath,
+      JSON.stringify({ summary: result, observations }, null, 2) + '\n');
     return result;
   } };
 }
@@ -2261,20 +2330,30 @@ function besideSemanticViolations(semantic) {
   return violations;
 }
 
-/** A captured installer file disappears before B builds; A must regain native service at the wait. */
+/** A captured terminal parser gap waits for a hash-bound decision while A regains native service. */
 async function exerciseLiveModelGapDecision(c) {
   const { work, data, indexBase, manifest, apiPort, operationKey, sourceGeneration,
     sourceManifest, marker, file, bRoot, dispatched, readJson, waitFor, request, post,
     requireThat, createOperationKey, matchingHit, reachedFile, releaseFile,
     migrationBarrier, operationPath, gapCancellation, gapRecomposeFailure, semanticSampler,
-    cudaABefore, engineLogWindow } = c;
+    cudaABefore, engineLogWindow, gapSource } = c;
   const sourceModel = gapRecomposeFailure
     ? path.resolve(sourceManifest.models.embedding.id) : null;
   const hiddenSourceModel = sourceModel ? `${sourceModel}.recompose-held` : null;
-  const removed = path.join(work, 'installer-root-b', 'installer-1.txt');
+  requireThat(gapSource?.failedA?.last_reason_code === 'PARSER_FAILED',
+    'installer gap needs real terminal A extraction before candidate dispatch');
+  let capturedGap;
   try {
     const reached = await waitFor('installer capture closed before Green build', 180000,
-      () => readJson(reachedFile));
+      async () => {
+        const operation = operationRows(operationPath, operationKey)[0];
+        if (operation && ['FAILED', 'CANCELLED', 'COMPLETE'].includes(operation.state)) {
+          const response = await dispatched.settled;
+          requireThat(false, `candidate settled before capture: ${JSON.stringify({ operation,
+            response: response.response, transportError: response.error?.message })}`);
+        }
+        return readJson(reachedFile);
+      });
     const cut = snapshot({ operationPath, jobsPath: path.join(data, 'jobs.db'),
       indexBase, operationKey });
     requireThat(reached.phase === 'bulk-before-building-checkpoint'
@@ -2283,9 +2362,14 @@ async function exerciseLiveModelGapDecision(c) {
       && cut.walk.planned_units >= 2
       && cut.state.active_generation === sourceGeneration
       && cut.state.building_generation === `g-${operationKey}`
-      && fs.existsSync(removed),
+      && fs.existsSync(gapSource.path),
     `installer gap did not hold its captured source set: ${JSON.stringify({ reached, cut })}`);
-    fs.unlinkSync(removed);
+    capturedGap = cut.jobs.find(row => samePath(row.path, gapSource.path));
+    requireThat(capturedGap?.scan_id === operationKey && capturedGap.walk_seen_epoch != null
+      && capturedGap.planned_source_sha256 === gapSource.hash
+      && capturedGap.unit_revision !== gapSource.failedA.unit_revision
+      && sha256(fs.readFileSync(gapSource.path)) === gapSource.hash,
+    `installer gap did not capture the exact fresh malformed unit: ${JSON.stringify(capturedGap)}`);
   } finally {
     fs.writeFileSync(releaseFile, 'release');
   }
@@ -2349,6 +2433,36 @@ async function exerciseLiveModelGapDecision(c) {
           && outcome.result?.gaps?.some(gap => gap.unitId && gap.reason)
           ? { row, state, outcome } : null;
       });
+    const terminal = snapshot({ operationPath, jobsPath: path.join(data, 'jobs.db'),
+      indexBase, operationKey });
+    const parserReceipts = terminal.ledger.filter(row =>
+      row.unit_revision === capturedGap.unit_revision
+      && row.planned_source_sha256 === gapSource.hash && row.terminal_coverage === 'FAILED'
+      && row.outcome_class === 'PARSER_FAILED' && row.reason_code === 'PARSER_FAILED'
+      && row.retry_policy === 'NONE' && row.content_hash == null);
+    const terminalGap = terminal.jobs.find(row => samePath(row.path, gapSource.path));
+    const gapDecision = readOne(operationPath, `SELECT gaps_list_hash, gaps_accepted_at,
+      gaps_accepted_by FROM operations WHERE operation_key = ?`, operationKey);
+    const sourceReceipts = readRows(path.join(data, 'jobs.db'),
+      'SELECT key FROM switch_buffer WHERE generation = ?', `g-${operationKey}`)
+      .filter(row => row.key === `path:${capturedGap.path}`);
+    requireThat(parserReceipts.length === 1 && waiting.outcome.result.gaps.length === 1
+      && waiting.outcome.result.gaps[0].unitId === parserReceipts[0].path_hash
+      && waiting.outcome.result.gaps[0].reason === 'PARSER_FAILED'
+      && terminalGap?.state === 'FAILED'
+      && terminalGap.unit_revision === capturedGap.unit_revision
+      && terminalGap.planned_source_sha256 === gapSource.hash
+      && terminalGap.content_hash == null && sourceReceipts.length === 0
+      && gapDecision?.gaps_list_hash === waiting.outcome.result.gapListHash
+      && gapDecision.gaps_accepted_at == null
+      && sha256(fs.readFileSync(gapSource.path)) === gapSource.hash,
+    `installer approval is not bound to its exact terminal parser gap: ${JSON.stringify({
+      parserReceipts, gaps: waiting.outcome.result.gaps })}`);
+    fs.writeFileSync(path.join(work, 'installer-gap-source-proof.json'), JSON.stringify({
+      gapSource, capturedGap, terminalGap, parserReceipt: parserReceipts[0], gapDecision,
+      operationKey, gapListHash: waiting.outcome.result.gapListHash,
+      gaps: waiting.outcome.result.gaps,
+    }, null, 2));
     const settledBManifest = readJson(path.join(indexBase, 'indices', `g-${operationKey}`,
       '.justsearch-index-generation.json'));
     settledBCitation = citationIdentityFromManifest(
@@ -2538,6 +2652,30 @@ async function exerciseLiveModelGapDecision(c) {
       && state?.active_generation === `g-${operationKey}`
       && state?.migration_state === 'IDLE' ? { row, state } : null;
   });
+  const approval = await waitFor('exact prepared gap decision is durably complete', 30000, () => {
+    const row = operationRows(operationPath, acceptanceKey)[0];
+    return row?.state === 'COMPLETE' ? row : null;
+  });
+  const preparation = parseStoredJson(approval.preparation_payload,
+    'accepted gap preparation envelope').preparation;
+  const plan = preparationPlan(approval.preparation_payload);
+  const acceptedParent = readOne(operationPath, `SELECT gaps_list_hash, gaps_accepted_at,
+    gaps_accepted_by FROM operations WHERE operation_key = ?`, operationKey);
+  requireThat(approval.kind === 'accept-gaps' && approval.operation_ref === 'core.accept-gaps'
+    && approval.preparation_sealed === 0
+    && preparation?.replaySchema === 'recorded-gap-acceptance-v1'
+    && sameJson(parseStoredJson(preparation.argumentsJson, 'accepted gap arguments'), plan)
+    && sameJson(plan, { reindexKey: operationKey, gapListHash: acceptanceInput.gapListHash })
+    && acceptedParent?.gaps_list_hash === acceptanceInput.gapListHash
+    && acceptedParent.gaps_accepted_at != null && acceptedParent.gaps_accepted_by,
+  `installer gap decision lost its exact durable binding: ${JSON.stringify({
+    approval: { key: approval.operation_key, kind: approval.kind,
+      ref: approval.operation_ref, sealed: approval.preparation_sealed }, plan, acceptedParent })}`);
+  fs.writeFileSync(path.join(work, 'installer-gap-approval-proof.json'), JSON.stringify({
+    operationKey, acceptanceKey, plan, acceptedParent,
+    acceptance: { id: approval.id, kind: approval.kind, state: approval.state,
+      operation_ref: approval.operation_ref, preparation_sealed: approval.preparation_sealed },
+  }, null, 2));
   const bManifest = readJson(path.join(indexBase, 'indices', `g-${operationKey}`,
     '.justsearch-index-generation.json'));
   requireThat(bManifest?.models?.embedding?.id?.startsWith(bRoot)
@@ -2580,6 +2718,7 @@ async function exerciseLiveModelGapDecision(c) {
     aVectorHits: JSON.parse(aVector.text).results.length,
     bVectorHits: JSON.parse(bVector.text).results.length,
     gapListHash: waiting.outcome.result.gapListHash,
+    gapReason: 'PARSER_FAILED', gapSourceHash: gapSource.hash,
     terminalReason: promoted.row.failure_reason, ...(semantic ? { semantic } : {}) }));
 }
 
@@ -2624,11 +2763,13 @@ function citationIdentityFromManifest(manifest, label, requireThat) {
   return {
     modelPath: path.normalize(path.resolve(artifact.id)),
     sha256: artifact.sha256.toLowerCase(),
+    tokenizerSha256: sha256(fs.readFileSync(path.join(path.dirname(artifact.id), 'tokenizer.json'))),
   };
 }
 
 function sameCitationIdentity(left, right) {
-  return left.modelPath === right.modelPath && left.sha256 === right.sha256;
+  return left.modelPath === right.modelPath && left.sha256 === right.sha256
+    && left.tokenizerSha256 === right.tokenizerSha256;
 }
 
 function engineLogIdentity(stat) {
@@ -2675,12 +2816,19 @@ function readEngineLogWindow(window, requireThat) {
 function verifyCitationIdentityLog({ engineLogWindow, sourceCitation, settledBCitation,
   restoredCitation, promotedBCitation, requireThat }) {
   const contents = readEngineLogWindow(engineLogWindow, requireThat);
+  return verifyCitationIdentityMessages(contents,
+    [sourceCitation, settledBCitation, restoredCitation, promotedBCitation], requireThat);
+}
+
+/** Exact physical query-owner identity, after assembly, inside the caller's current-run window. */
+export function verifyCitationIdentityMessages(contents, expected, requireThat) {
   const messages = contents.split(/\r?\n/).filter(Boolean).flatMap(line => {
     try {
       const message = JSON.parse(line)?.message;
       return typeof message === 'string' ? [message] : [];
     } catch {
-      requireThat(!line.includes('Citation scorer generation selected:'),
+      requireThat(!line.includes('Citation scorer settings selected:')
+        && !line.includes('Citation scorer generation selected:'),
         `citation identity evidence was not valid Engine log JSON: ${line}`);
       return [];
     }
@@ -2689,15 +2837,15 @@ function verifyCitationIdentityLog({ engineLogWindow, sourceCitation, settledBCi
     /^Citation scorer wired: model=.*sha256=[0-9a-f]{16}\.\.\.$/i.test(message));
   requireThat(legacy.length === 0,
     `legacy truncated citation consumer SHA remained in the Engine log: ${JSON.stringify(legacy)}`);
-  const prefix = 'Citation scorer generation selected: model=';
+  const prefix = 'Citation scorer settings selected:';
   const tuples = messages.filter(message => message.startsWith(prefix)).map(message => {
-    const match = /^Citation scorer generation selected: model=(.+), sha256=([0-9a-f]{64})$/i
+    const match = /^Citation scorer settings selected: model=(.+), sha256=([0-9a-f]{64}), tokenizerSha256=([0-9a-f]{64})$/i
       .exec(message);
-    requireThat(match,
-      `citation generation identity was not an exact normalized path plus full SHA: ${message}`);
-    return { modelPath: match[1], sha256: match[2].toLowerCase() };
+    requireThat(match && path.isAbsolute(match[1]) && path.normalize(match[1]) === match[1],
+      `citation identity was not an exact normalized path plus full model/tokenizer SHA: ${message}`);
+    return { modelPath: match[1], sha256: match[2].toLowerCase(),
+      tokenizerSha256: match[3].toLowerCase() };
   });
-  const expected = [sourceCitation, settledBCitation, restoredCitation, promotedBCitation];
   if (tuples.length < expected.length) return null;
   requireThat(tuples.length === expected.length
     && tuples.every((tuple, index) => sameCitationIdentity(tuple, expected[index])),

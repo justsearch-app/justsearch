@@ -17,8 +17,6 @@ final class EngineLifecycleE2ETest {
   private record PendingScenario(String name, String owner, boolean requiresAi, String proof) {}
 
   private static final List<PendingScenario> PENDING = List.of(
-      new PendingScenario("generation-mutation-gap-cuts", "D1-8/D1-9", false,
-          "edit, removal, addition, supersession, gap decision and both pointer cuts"),
       new PendingScenario("reconfigure-beside-in-place", "D1-4/D1-12/D1-14", true,
           "beside and in-place reconfigure under the device ceiling"));
 
@@ -162,6 +160,6 @@ final class EngineLifecycleE2ETest {
           + " ai=" + scenario.requiresAi() + " proof=" + scenario.proof());
     }
     // Reduce this count only when an actual exercise*(c) scenario replaces a pending entry.
-    assertEquals(2, names.size());
+    assertEquals(1, names.size());
   }
 }

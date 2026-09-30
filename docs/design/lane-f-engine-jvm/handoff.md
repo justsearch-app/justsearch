@@ -7,16 +7,106 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 
 ## Active resume (2026-09-30)
 
+**Next clean handoff opportunity:** the D1 generation-gap/restoration checkpoint,
+before applying production D2. The user asked to identify this boundary and
+specified that no additional tests or validation are required solely for handoff.
+The existing four-case installed matrix, coherent stress/static suite and pending
+declaration check already establish this boundary. Preserve the private D2 drafts
+and their unfinished proof below; do not represent them as production changes.
+
 The user resumed autonomous execution of all remaining D1/D2/E/F, requested
 Luna/Sol subagents, and directed that routine work require no input. Continue
 in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`, branch
-`codex/lane-f-pr1`, tested base `9cb3e120777a5aa6f3e57c886496d423165b4a61`,
-runtime checkpoint `015b85d75467394319aebc7c81873f51467726ce`, followed by
-the lockfile-only security checkpoint `68601fbf4` and native receipt checkpoint
-`5490f6c6776ed700350fa9a863b898331e790d61` (pushed to draft PR727).
+`codex/lane-f-pr1`, current committed/pushed checkpoint
+`3ce0357dae4decf4a9274c882205fc76e0f214f9` (explicit retired predecessor owners).
 Checkpoint commits and pushes to draft PR727 remain authorized; merge remains
 separate at F. The worktree is HELD through 2026-10-04. Preserve main and the
 foreign untracked `modules/app-inference/logs/`.
+
+Current work is the D1 pre-Green delete, parser-unit control readiness, and
+mandatory A-restoration correction, followed by the remaining D1/D2/E/F queue.
+The parser-gap R6 case passes end to end in5m52s at
+`tmp/lane-f-generation-parser-gap-installed-r6.log`, `-xml/`, and `-summary.json`:
+one executed AI case, zero failures/errors/skips. Exact private fixture is
+`tmp/lane-f-takeover/lifecycle-gap-8348c1a2-0c09-4347-9640-da14527975ea/`,
+run `203757d8-7fc8-45fd-83f5-61b83a03f80a`. It proves the genuine captured
+PARSER_FAILED gap, native A restoration, distinct complete hash-bound acceptance,
+B promotion/vector service, held-A native lease retirement, and exact current-run
+A→B→A→B citation model/tokenizer identities. All195 vector refusals occur within
+RELOADING; all299 hybrid probes answer. The preceding R4/R5 red logs and fixtures
+remain preserved: R4 exposed STARTING during mandatory A restoration; R5 exposed
+an obsolete generation-log prefix after actual query ownership moved to settings
+selection. Generic STARTING and the semantic oracle remain unchanged; the
+citation parser retains strict tuple count/order, full hashes and original
+current-run offset/file-identity/rollover guards. Thirteen Node cases and actual
+R5-log replay pass. Focused checks pass95 recorded cases with archived XML/counts
+at `tmp/lane-f-restoration-control-focused-r2.log`; compile/install/Spotless/PMD
+pass at `tmp/lane-f-restoration-control-static-r1.log`.
+
+The fresh four-case generation matrix passes in23m52s at
+`tmp/lane-f-generation-transition-matrix-r3.log`, with archived XML/counts,
+four executed AI cases and zero failures/errors/skips. Independent Luna accepts
+the exact fresh fixtures, permitting removal only of generation-mutation-gap-cuts
+from PENDING. Reconfigure remains pending and full D1 remains open. Official
+health is ABSENT without foreign runs or inference orphans. The coherent
+stress/static checkpoint passes in13m58s at
+`tmp/lane-f-restoration-checkpoint-integrated-r1.log`, with archived XML/counts/
+skips:1873 suites,12398 recorded cases, zero failures/errors,33 existing skips.
+Affected modules execute freshly and unchanged modules reuse current results.
+Pre-Green mutation efficacy is proved by the
+red `tmp/lane-f-pre-green-strict-mutation-r1.log` and restored green nine-case
+`tmp/lane-f-pre-green-strict-restored-r4.log`.
+
+D2-5 is still private preparation, not production implementation. Eight draft
+sources under `tmp/lane-f-d2-draft/` plus13 real-Lucene private tests pass at
+`tmp/lane-f-d2-private-coverage-r4.log`, with command/source/library-hash/classpath/
+revision evidence beside it. They now include the actual FilterDirectory.sync
+stall, bounded close retaining resources until actual exit/retry, first-wave
+250ms deadline/future identity, terminal admission sealing, and preservation of
+an earlier successful durability certificate after later tragedy. An isolated
+wrong-order mutant is rejected by that last regression at
+`tmp/lane-f-d2-monotonicity-mutant-red.log`; the accepted source is untouched.
+Independent Sol accepts the private core and port design. The eight private port
+drafts compile at `tmp/lane-f-d2-port-draft-compile-r2.log`, with source hashes,
+classpath and revision evidence beside it. They remain unapplied. A separate
+refute-first review of the actual private port implementation is GO after exact
+synchronous failure mapping and cancellation checks on both sides of refresh.
+C2-backed production propagation and installed forced-kill acceptance remain unimplemented/unproved;
+do not claim D2-5 completion from private core proof.
+
+The three private port-test drafts compile and the already-started20-case run
+at `tmp/lane-f-d2-private-port-r2.log` executes18 green/2 red, zero skips. The
+candidate journal correctly uses `PROJECTION`, not the test's `UPSERT`; correct
+that fixture expectation. A real failed SQLite journal admission still escapes
+as IllegalStateException; map only that admission failure into the Worker error
+vocabulary before any A mutation. The earlier metadata-failure test now restores
+the good source only after proving no durable success, so owned close can retry.
+Private applyProjection now validates the captured active pointer directly
+instead of borrowing ordinary recorded ingestion's IDLE-only capture. This
+admits no-file writes during the pre-Green shared-A interval; its independent
+ownership review is pending. Production ordinary file admission remains unchanged.
+Strengthen the journal-before-A oracle beyond post-hoc receipt presence, then
+rerun implementation checks when resuming D2; no extra run is needed for handoff.
+Private sources are under `tmp/lane-f-d2-port-draft/` and tests under
+`tmp/lane-f-d2-port-draft-tests/`; the launcher is private verification scaffolding,
+not a repository test runner.
+
+Independent Luna proves a D1-17 help-source omission: startup help is not a
+watched/configured file root by default, live Green enumeration omits it, and the
+preserved version marker prevents later startup resubmission. Eval-mode installed
+proof cannot cover this. Investigate the canonical help directory as an existing
+collection-labelled file source; a bare unlabelled Path is insufficient. Keep the
+narrow unreachable legacy-cutover teardown separate from full D1-17 closure.
+The existing marker/startup and migration enumeration tests do not yet join these
+behaviors. Production-mode live activation plus restart proof remains required.
+
+Exact-checkpoint hosted CI run 36700317380 passes 12 jobs, including Windows
+native wrappers. Public claims alone is red for the separate Search v3 deadline
+and missing governed cutover evidence; preserve
+`tmp/lane-f-wp2-retirement-hosted-public-claims.log`. Do not create a marker or
+change the deadline to hide that program's missing proof. Signed installed
+predecessor-to-target proof still requires the external signing/AppControl
+environment; independent remaining implementation proceeds autonomously.
 
 The connected native endpoint uses the selective broad replay design committed
 at `2f62a59ea`; see D1's 2026-09-30 plan delta. The
