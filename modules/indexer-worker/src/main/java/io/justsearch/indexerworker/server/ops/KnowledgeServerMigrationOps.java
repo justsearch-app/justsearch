@@ -20,6 +20,10 @@ import io.justsearch.indexerworker.index.MigrationProgressStore;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferUpsert;
+import io.justsearch.app.api.indexing.AcceptedProjection;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
+import io.justsearch.indexerworker.services.ProjectionDocumentMapper;
 import io.justsearch.indexerworker.server.RecordedIngestionLifecycle;
 import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.WorkerIngestService;
@@ -719,16 +723,234 @@ public final class KnowledgeServerMigrationOps {
    * A native pointer-before-publication cut can leave scoped file mutations after B is committed.
    * Settle the accepted UPSERT receipts against their exact queue revision and B source identity;
    * replay exact DELETEs on B in accepted order, then durably commit and verify their absence.
-   * Conditional removal keeps a concurrent replacement row from being acknowledged. Broader
-   * operation kinds still fence boot because this path cannot prove their complete effects.
+   * Mixed projection and broad-delete snapshots certify B's final accepted effects without
+   * replaying destructive mutations. Conditional removal retains concurrent replacement rows.
    */
   public static boolean settleCommittedNativeFileWitnesses(
-      JobQueue queue, RunningRuntime active, String generation, Logger log) {
+      JobQueue queue, RunningRuntime active, String generation, List<String> ownedSources, Logger log) {
     if (!(queue instanceof SwitchBufferCapableQueue scoped) || active == null
-        || generation == null || generation.isBlank()) return false;
+        || generation == null || generation.isBlank() || ownedSources == null) return false;
     try {
       List<SwitchBufferCapableQueue.SwitchBufferOp> selected = scoped.listSwitchBufferOpsStrict()
           .stream().filter(op -> generation.equals(op.generation())).toList();
+      if (selected.stream().allMatch(op -> "UPSERT".equals(op.op()) || "DELETE".equals(op.op()))) {
+        return settleCommittedNativeFiles(queue, active, generation, log, selected);
+      }
+      // Native fallback can reopen a recorded generation whose promotion approved gaps. It does
+      // not thereby acquire the native pre-pointer source-completeness authority used below.
+      if (IndexGenerationManager.isRecordedGenerationIdentity(generation)) return false;
+      Set<String> sources = Set.copyOf(IndexGenerationManager.checkedProjectionSourceIds(ownedSources));
+      List<CommittedNativeEffect> effects = new ArrayList<>();
+      for (var op : selected) effects.add(decodeCommittedNativeEffect(op, sources));
+      active.commitOps().maybeRefreshBlocking();
+      for (int i = 0; i < effects.size(); i++) {
+        effects.set(i, observeCommittedProjection(active, effects.get(i)));
+      }
+      Set<CommittedNativeEffect> survivors = new LinkedHashSet<>();
+      Set<String> laterIds = new java.util.HashSet<>();
+      List<CommittedNativeEffect> laterBroadDeletes = new ArrayList<>();
+      List<Integer> deleteIndexes = new ArrayList<>();
+      for (int i = effects.size() - 1; i >= 0; i--) {
+        var effect = effects.get(i);
+        if (effect.upsert() && !laterIds.contains(effect.id())
+            && laterBroadDeletes.stream().noneMatch(deletion -> nativeDeleteMatches(deletion, effect))) {
+          survivors.add(effect);
+        }
+        if (effect.id() != null) laterIds.add(effect.id());
+        if ("DELETE_PREFIX".equals(effect.op().op()) || "DELETE_COLLECTION".equals(effect.op().op())) {
+          laterBroadDeletes.add(effect);
+          deleteIndexes.add(i);
+        } else if (effect.id() != null && !effect.upsert()) {
+          deleteIndexes.add(i);
+        }
+      }
+      Set<String> survivorIds = new java.util.HashSet<>();
+      for (var survivor : survivors) survivorIds.add(survivor.id());
+      // Complete every reader/queue proof before conditionally acknowledging any receipt.
+      for (int i = 0; i < effects.size(); i++) {
+        var effect = effects.get(i);
+        if (survivors.contains(effect)) {
+          if (!certifyCommittedSurvivor(scoped, active, effects, deleteIndexes, i)) return false;
+        } else if (effect.id() != null
+            && !survivorIds.contains(effect.id())
+            && active.indexCountOps().countByIdAndChunksStrict(effect.id()) != 0) {
+          return false;
+        }
+        if ("DELETE_PREFIX".equals(effect.op().op())
+            || "DELETE_COLLECTION".equals(effect.op().op())) {
+          if (!certifyCommittedDeleteScope(queue, active, effects, survivors, i)) return false;
+        }
+      }
+      if (scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) return false;
+      return scoped.listSwitchBufferOpsStrict().stream()
+          .noneMatch(op -> generation.equals(op.generation()));
+    } catch (IOException | RuntimeException unavailable) {
+      log.warn("Committed native mutation witnesses remain unresolved", unavailable);
+      return false;
+    }
+  }
+
+  /** A transient projection of the existing ordered journal, never a second persisted authority. */
+  private record CommittedNativeEffect(SwitchBufferCapableQueue.SwitchBufferOp op,
+      SwitchBufferUpsert file, AcceptedProjection projection, String id, String path,
+      String collection, boolean newerProjection) {
+    boolean upsert() {
+      return file != null || (projection != null
+          && (newerProjection || projection.kind() == AcceptedProjection.Kind.UPSERT));
+    }
+  }
+
+  private static CommittedNativeEffect decodeCommittedNativeEffect(
+      SwitchBufferCapableQueue.SwitchBufferOp op, Set<String> sources) {
+    if (op.key() == null || op.payload() == null || op.payload().isBlank()
+        || op.revision() == null || op.revision().isBlank()) {
+      throw new IllegalArgumentException("Incomplete committed journal receipt");
+    }
+    String id = null;
+    String path = null;
+    String collection = null;
+    SwitchBufferUpsert file = null;
+    AcceptedProjection projection = null;
+    String expectedKey;
+    switch (op.op()) {
+      case "UPSERT" -> {
+        file = SwitchBufferUpsert.decode(op.payload());
+        if (file.sourceSha256() == null) throw new IllegalArgumentException("Missing file witness");
+        id = file.path();
+        path = file.path();
+        collection = file.collection() == null || file.collection().isBlank() ? null : file.collection();
+        expectedKey = "path:" + id;
+      }
+      case "DELETE" -> {
+        id = op.payload();
+        expectedKey = "path:" + id;
+      }
+      case "DELETE_PREFIX" -> expectedKey = "prefix:" + op.payload();
+      case "DELETE_COLLECTION" -> {
+        if (!IngestCollectionPolicy.isDeletable(op.payload())) {
+          throw new IllegalArgumentException("Protected collection cannot certify deletion");
+        }
+        expectedKey = "collection:" + op.payload();
+      }
+      case "PROJECTION_SOURCE" -> {
+        if (!sources.contains(op.payload())) throw new IllegalArgumentException("Unowned projection source");
+        expectedKey = "projection-source:" + op.payload().length() + ":" + op.payload();
+      }
+      case "PROJECTION" -> {
+        projection = AcceptedProjection.decode(op.payload());
+        if (!sources.contains(projection.sourceId())) throw new IllegalArgumentException("Unowned projection");
+        id = projection.indexId();
+        expectedKey = projection.journalKey();
+        if (projection.kind() == AcceptedProjection.Kind.UPSERT) {
+          var fields = ProjectionDocumentMapper.toIndexDocument(projection).fields();
+          path = projectedTerm(fields.get(SchemaFields.PATH));
+          collection = projectedTerm(fields.get(SchemaFields.COLLECTION));
+        }
+      }
+      default -> throw new IllegalArgumentException("Unsupported committed mutation: " + op.op());
+    }
+    if (!expectedKey.equals(op.key())) throw new IllegalArgumentException("Committed journal key mismatch");
+    return new CommittedNativeEffect(op, file, projection, id, path, collection, false);
+  }
+
+  private static String projectedTerm(Object field) {
+    return field == null ? null : String.valueOf(field);
+  }
+
+  private static CommittedNativeEffect observeCommittedProjection(
+      RunningRuntime active, CommittedNativeEffect effect) throws IOException {
+    if (effect.projection() == null) return effect;
+    var fields = active.documentFieldOps();
+    String id = fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.DOC_ID);
+    if (id == null) return effect;
+    String source = fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.PROJECTION_SOURCE_ID);
+    String revision = fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.PROJECTION_SOURCE_REVISION);
+    if (!effect.id().equals(id) || !effect.projection().sourceId().equals(source) || revision == null) {
+      throw new IOException("Committed projection has unowned identity");
+    }
+    long observedRevision = Long.parseLong(revision);
+    if (observedRevision < 0 || !Long.toString(observedRevision).equals(revision)) {
+      throw new IOException("Committed projection has noncanonical revision evidence");
+    }
+    if (observedRevision <= effect.projection().sourceRevision()) return effect;
+    if (!JobQueue.IngestionLedgerTransition.isSha256(fields.getDocumentFieldOrThrow(
+        effect.id(), SchemaFields.PROJECTION_DIGEST))) {
+      throw new IOException("Committed newer projection has incomplete digest evidence");
+    }
+    // A newer source seed dominates this retained revision. Its actual scope is authoritative:
+    // an earlier broad delete cannot use this newer document as a later accepted exception.
+    return new CommittedNativeEffect(effect.op(), null, effect.projection(), effect.id(),
+        fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.PATH),
+        fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.COLLECTION), true);
+  }
+
+  private static boolean nativeDeleteMatches(CommittedNativeEffect deletion,
+      CommittedNativeEffect document) {
+    return switch (deletion.op().op()) {
+      case "DELETE" -> deletion.id().equals(document.id());
+      case "PROJECTION" -> !deletion.upsert() && deletion.id().equals(document.id());
+      case "DELETE_PREFIX" -> document.path() != null && document.path().startsWith(
+          io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(deletion.op().payload()));
+      case "DELETE_COLLECTION" -> deletion.op().payload().equals(document.collection());
+      default -> false;
+    };
+  }
+
+  private static boolean certifyCommittedSurvivor(SwitchBufferCapableQueue queue,
+      RunningRuntime active, List<CommittedNativeEffect> effects, List<Integer> deleteIndexes,
+      int index) throws IOException {
+    var effect = effects.get(index);
+    var fields = active.documentFieldOps();
+    if (!effect.id().equals(fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.DOC_ID))) return false;
+    if (effect.file() != null) {
+      if (!Objects.equals(effect.path(), fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.PATH))
+          || !Objects.equals(effect.collection(), fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.COLLECTION))) {
+        return false;
+      }
+      return queue.matchesAcceptedFileProjection(effect.id(), effect.file().unitRevision(),
+          effect.file().sourceSha256(), fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.SOURCE_SHA256));
+    }
+    if (effect.newerProjection()) {
+      for (int previous : deleteIndexes) {
+        if (previous >= index) continue;
+        if (nativeDeleteMatches(effects.get(previous), effect)) return false;
+      }
+      return true; // Strict source/identity/revision already verified by the observation above.
+    }
+    var projection = effect.projection();
+    return Long.toString(projection.sourceRevision()).equals(fields.getDocumentFieldOrThrow(
+            effect.id(), SchemaFields.PROJECTION_SOURCE_REVISION))
+        && projection.sourceId().equals(fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.PROJECTION_SOURCE_ID))
+        && projection.fieldsDigest().equals(fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.PROJECTION_DIGEST))
+        && Objects.equals(effect.path(), fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.PATH))
+        && Objects.equals(effect.collection(), fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.COLLECTION));
+  }
+
+  private static boolean certifyCommittedDeleteScope(JobQueue queue, RunningRuntime active,
+      List<CommittedNativeEffect> effects, Set<CommittedNativeEffect> survivors, int index) throws IOException {
+    var deletion = effects.get(index);
+    List<String> files = new ArrayList<>();
+    List<String> projections = new ArrayList<>();
+    for (int next = index + 1; next < effects.size(); next++) {
+      var survivor = effects.get(next);
+      if (!survivors.contains(survivor) || !nativeDeleteMatches(deletion, survivor)) continue;
+      if (survivor.file() != null) files.add(survivor.id());
+      else projections.add(survivor.id());
+    }
+    String scope = deletion.op().payload();
+    if ("DELETE_PREFIX".equals(deletion.op().op())) {
+      return !queue.hasNonterminalJobsByPathPrefixStrict(scope)
+          && active.indexCountOps().countPathPrefixExcludingAcceptedSurvivorsStrict(scope, files, projections) == 0;
+    }
+    return !queue.hasNonterminalJobsByCollectionStrict(scope)
+        && active.indexCountOps().countCollectionExcludingAcceptedSurvivorsStrict(scope, files, projections) == 0;
+  }
+
+  private static boolean settleCommittedNativeFiles(JobQueue queue, RunningRuntime active,
+      String generation, Logger log, List<SwitchBufferCapableQueue.SwitchBufferOp> selected) {
+    if (!(queue instanceof SwitchBufferCapableQueue scoped) || active == null
+        || generation == null || generation.isBlank()) return false;
+    try {
       // Refuse unsupported kinds before applying any partial replay on this boot attempt.
       if (selected.stream().anyMatch(op -> !"UPSERT".equals(op.op())
           && !"DELETE".equals(op.op()))) return false;
@@ -740,9 +962,9 @@ public final class KnowledgeServerMigrationOps {
       for (var op : selected) {
         if (op.payload() == null || op.payload().isBlank()) return false;
         if ("UPSERT".equals(op.op())) {
-          var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(op.payload());
+          var upsert = SwitchBufferUpsert.decode(op.payload());
           String indexed = active.documentFieldOps()
-              .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256);
+              .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
           if (!op.key().equals("path:" + upsert.path())
               || upsert.sourceSha256() == null
               || !scoped.matchesAcceptedFileProjection(upsert.path(), upsert.unitRevision(),
@@ -763,15 +985,15 @@ public final class KnowledgeServerMigrationOps {
         active.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
         active.commitOps().maybeRefreshBlocking();
         for (var op : selected) {
-          if ("DELETE".equals(op.op()) && active.documentFieldOps()
-              .getDocumentField(op.payload(), SchemaFields.DOC_ID) != null) return false;
+          if ("DELETE".equals(op.op()) && active.indexCountOps()
+              .countByIdAndChunksStrict(op.payload()) != 0) return false;
         }
       }
       if (!selected.isEmpty() && scoped.removeReplayedSwitchBufferOps(selected) != selected.size()) {
         return false;
       }
       return switchBufferEmptyStrict(queue, generation);
-    } catch (RuntimeException unavailable) {
+    } catch (IOException | RuntimeException unavailable) {
       log.warn("Committed native file witnesses remain unresolved", unavailable);
       return false;
     }
@@ -840,7 +1062,7 @@ public final class KnowledgeServerMigrationOps {
     }
     context.log().info("Draining {} buffered ops from durable switch buffer...", ops.size());
 
-    ArrayList<io.justsearch.indexerworker.queue.SwitchBufferUpsert> toEnqueue = new ArrayList<>();
+    ArrayList<SwitchBufferUpsert> toEnqueue = new ArrayList<>();
     boolean mutatedLucene = false;
     boolean allApplied = true;
     boolean firstCandidateProjectionObserved = false;
@@ -884,45 +1106,60 @@ public final class KnowledgeServerMigrationOps {
         }
         case "PROJECTION" -> {
           try {
-            var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(payload);
+            var projection = AcceptedProjection.decode(payload);
             if (op.generation() == null || op.generation().isBlank()
                 || !op.key().equals(projection.journalKey())
                 || context.ingestLifecycle() == null) {
               throw new IllegalStateException("Projection replay lacks its exact candidate or key");
             }
             var fields = context.ingestLifecycle().documentFieldOps();
-            String currentId = fields.getDocumentField(projection.indexId(), SchemaFields.DOC_ID);
-            String currentSource = fields.getDocumentField(
+            String currentId = fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.DOC_ID);
+            String currentSource = fields.getDocumentFieldOrThrow(
                 projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID);
-            String currentRevision = fields.getDocumentField(
+            String currentRevision = fields.getDocumentFieldOrThrow(
                 projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION);
+            if (currentId == null && (currentSource != null || currentRevision != null
+                || context.ingestLifecycle().indexCountOps()
+                    .countByIdAndChunksStrict(projection.indexId()) != 0)) {
+              throw new IllegalStateException("Projection replay cannot certify candidate absence");
+            }
             if (currentId != null && (!projection.indexId().equals(currentId)
                 || !projection.sourceId().equals(currentSource) || currentRevision == null)) {
               throw new IllegalStateException("Projection replay found an unowned candidate document");
             }
             long candidateRevision = currentRevision == null ? -1 : Long.parseLong(currentRevision);
-            if (candidateRevision > projection.sourceRevision()) break;
+            if (currentId != null && (candidateRevision < 0
+                || !Long.toString(candidateRevision).equals(currentRevision))) {
+              throw new IllegalStateException("Projection replay found noncanonical revision evidence");
+            }
+            if (candidateRevision > projection.sourceRevision()) {
+              if (!JobQueue.IngestionLedgerTransition.isSha256(fields.getDocumentFieldOrThrow(
+                  projection.indexId(), SchemaFields.PROJECTION_DIGEST))) {
+                throw new IllegalStateException("Newer projection lacks a complete digest witness");
+              }
+              break;
+            }
             if (candidateRevision == projection.sourceRevision()
-                && projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT) {
-              String digest = fields.getDocumentField(
+                && projection.kind() == AcceptedProjection.Kind.UPSERT) {
+              String digest = fields.getDocumentFieldOrThrow(
                   projection.indexId(), SchemaFields.PROJECTION_DIGEST);
               if (!projection.fieldsDigest().equals(digest)) {
                 throw new IllegalStateException("Equal projection revision has different fields");
               }
               break;
             }
-            if (projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
+            if (projection.kind() == AcceptedProjection.Kind.DELETE) {
               context.ingestLifecycle().indexingCoordinator()
                   .deleteByIdAndChunks(projection.indexId());
             } else {
               context.ingestLifecycle().indexingCoordinator().indexSingle(
-                  io.justsearch.indexerworker.services.ProjectionDocumentMapper
+                  ProjectionDocumentMapper
                       .toIndexDocument(projection));
             }
             mutatedLucene = true;
             // A delete of an already-absent document has no physical write to witness.
             appliedProjection = projection.kind()
-                == io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT;
+                == AcceptedProjection.Kind.UPSERT;
           } catch (Exception failure) {
             allApplied = false;
             context.log().warn("Buffered projection replay failed; retaining candidate journal key={}",
@@ -932,7 +1169,7 @@ public final class KnowledgeServerMigrationOps {
         case "UPSERT" -> {
           if (!payload.isBlank()) {
             try {
-              var upsert = io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(payload);
+              var upsert = SwitchBufferUpsert.decode(payload);
               if (op.generation() != null && !op.generation().isEmpty()
                   && upsert.sourceSha256() == null) {
                 throw new IllegalArgumentException("Scoped UPSERT has no exact source witness");
@@ -1323,7 +1560,7 @@ public final class KnowledgeServerMigrationOps {
   }
 
   private static boolean enqueueBufferedUpserts(DrainSwitchBufferContext context,
-      List<io.justsearch.indexerworker.queue.SwitchBufferUpsert> upserts) {
+      List<SwitchBufferUpsert> upserts) {
     boolean complete = true;
     int enqueued = 0;
     for (var upsert : upserts) {
@@ -1347,7 +1584,7 @@ public final class KnowledgeServerMigrationOps {
   }
 
   private static boolean verifyBufferedUpserts(DrainSwitchBufferContext context,
-      List<io.justsearch.indexerworker.queue.SwitchBufferUpsert> upserts) {
+      List<SwitchBufferUpsert> upserts) {
     if (context.ingestLifecycle() == null
         || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
     try {
@@ -1386,31 +1623,90 @@ public final class KnowledgeServerMigrationOps {
     try {
       context.ingestLifecycle().commitOps().maybeRefreshBlocking();
       var fields = context.ingestLifecycle().documentFieldOps();
-      for (var op : ops) {
+      for (int index = 0; index < ops.size(); index++) {
+        var op = ops.get(index);
         if (!"PROJECTION".equalsIgnoreCase(op.op())) continue;
         if (context.approvedGapVersions().contains(op)) continue;
-        var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(op.payload());
+        var projection = AcceptedProjection.decode(op.payload());
         if (!projection.journalKey().equals(op.key())) return false;
-        String currentRevision = fields.getDocumentField(
-            projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION);
-        if (currentRevision != null
-            && Long.parseLong(currentRevision) > projection.sourceRevision()) continue;
-        if (projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.DELETE) {
-          if (fields.getDocumentField(projection.indexId(), SchemaFields.DOC_ID) != null) return false;
-        } else if (!Long.toString(projection.sourceRevision()).equals(currentRevision)
-            || !projection.sourceId().equals(fields.getDocumentField(
-                projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID))
-            || !projection.fieldsDigest().equals(fields.getDocumentField(
-                projection.indexId(), SchemaFields.PROJECTION_DIGEST))) {
-          return false;
+        String currentId = fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.DOC_ID);
+        if (currentId == null) {
+          if (projection.kind() == AcceptedProjection.Kind.UPSERT) {
+            var mapped = ProjectionDocumentMapper.toIndexDocument(projection).fields();
+            String path = projectedTerm(mapped.get(SchemaFields.PATH));
+            String collection = projectedTerm(mapped.get(SchemaFields.COLLECTION));
+            if (!hasLaterProjectionDelete(context, ops, index, projection.indexId(), path, collection)) {
+              return false;
+            }
+          }
+          if (context.ingestLifecycle().indexCountOps()
+              .countByIdAndChunksStrict(projection.indexId()) != 0) return false;
+          continue;
         }
+        String currentSource = fields.getDocumentFieldOrThrow(
+            projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID);
+        String currentRevision = fields.getDocumentFieldOrThrow(
+            projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION);
+        String currentDigest = fields.getDocumentFieldOrThrow(
+            projection.indexId(), SchemaFields.PROJECTION_DIGEST);
+        if (!projection.indexId().equals(currentId) || !projection.sourceId().equals(currentSource)
+            || currentRevision == null) return false;
+        long observedRevision = Long.parseLong(currentRevision);
+        if (observedRevision < 0 || !Long.toString(observedRevision).equals(currentRevision)
+            || !JobQueue.IngestionLedgerTransition.isSha256(currentDigest)) return false;
+        String path = fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PATH);
+        String collection = fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.COLLECTION);
+        if (hasLaterProjectionDelete(context, ops, index, projection.indexId(), path, collection)) return false;
+        if (observedRevision > projection.sourceRevision()) continue;
+        if (projection.kind() == AcceptedProjection.Kind.DELETE
+            || observedRevision != projection.sourceRevision()
+            || !projection.fieldsDigest().equals(currentDigest)) return false;
+        var mapped = ProjectionDocumentMapper.toIndexDocument(projection).fields();
+        if (!Objects.equals(projectedTerm(mapped.get(SchemaFields.PATH)), path)
+            || !Objects.equals(projectedTerm(mapped.get(SchemaFields.COLLECTION)), collection)) return false;
       }
       return true;
-    } catch (RuntimeException unreadable) {
+    } catch (IOException | RuntimeException unreadable) {
       context.log().warn("Buffered projection evidence is unreadable; retaining replay versions",
           unreadable);
       return false;
     }
+  }
+
+  /** Only later, applied accepted deletes can explain the final absence of a projection. */
+  private static boolean hasLaterProjectionDelete(DrainSwitchBufferContext context,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> ops, int projectionIndex,
+      String id, String path, String collection) {
+    boolean matches = false;
+    for (int index = projectionIndex + 1; index < ops.size(); index++) {
+      var deletion = ops.get(index);
+      if (context.approvedGapVersions().contains(deletion)) continue;
+      String payload = deletion.payload();
+      switch (deletion.op().toUpperCase(Locale.ROOT)) {
+        case "DELETE" -> {
+          if (payload == null || payload.isBlank() || !("path:" + payload).equals(deletion.key())) {
+            throw new IllegalArgumentException("Buffered exact delete has an invalid key");
+          }
+          matches |= payload.equals(id);
+        }
+        case "DELETE_PREFIX" -> {
+          if (payload == null || payload.isBlank() || !("prefix:" + payload).equals(deletion.key())) {
+            throw new IllegalArgumentException("Buffered prefix delete has an invalid key");
+          }
+          matches |= path != null && path.startsWith(
+              io.justsearch.adapters.lucene.runtime.QueryFilterBuilder.normalizePathPrefix(payload));
+        }
+        case "DELETE_COLLECTION" -> {
+          if (!IngestCollectionPolicy.isDeletable(payload)
+              || !("collection:" + payload).equals(deletion.key())) {
+            throw new IllegalArgumentException("Buffered collection delete has an invalid scope");
+          }
+          matches |= payload.equals(collection);
+        }
+        default -> { }
+      }
+    }
+    return matches;
   }
 
   private static boolean isVduBufferKind(String kind) {

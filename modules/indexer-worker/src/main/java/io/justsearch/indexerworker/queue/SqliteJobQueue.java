@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
+import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionRetryLadder;
@@ -885,6 +886,64 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } catch (SQLException unavailable) {
       recordDbError();
       throw new IllegalStateException("Expected collection row is unreadable", unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /** Reads whether a non-terminal job remains under one literal normalized path prefix. */
+  @Override
+  public boolean hasNonterminalJobsByPathPrefixStrict(String pathPrefix) {
+    if (pathPrefix == null || pathPrefix.isBlank()) {
+      throw new IllegalArgumentException("Path-prefix scope must be non-blank");
+    }
+    String lower = PathNormalizer.normalizePathPrefix(pathPrefix);
+    if (lower == null || lower.isBlank()) {
+      throw new IllegalArgumentException("Path-prefix scope must normalize to non-blank");
+    }
+    String upper = upperBoundExclusive(lower);
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT 1 FROM jobs WHERE state IN ('PENDING', 'PROCESSING') "
+              + "AND path >= ? AND path < ? LIMIT 1")) {
+        query.setString(1, lower);
+        query.setString(2, upper);
+        try (ResultSet row = query.executeQuery()) {
+          return row.next();
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Non-terminal path-prefix scope is unreadable", unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /** Reads whether a non-terminal job remains in one collection, including legacy default rows. */
+  @Override
+  public boolean hasNonterminalJobsByCollectionStrict(String collection) {
+    if (collection == null || collection.isBlank()) {
+      throw new IllegalArgumentException("Collection scope must be non-blank");
+    }
+    String normalizedCollection = collection.trim();
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT 1 FROM jobs WHERE state IN ('PENDING', 'PROCESSING') "
+              + "AND COALESCE(NULLIF(TRIM(collection), ''), ?) = ? LIMIT 1")) {
+        query.setString(1, IngestCollectionPolicy.DEFAULT_COLLECTION);
+        query.setString(2, normalizedCollection);
+        try (ResultSet row = query.executeQuery()) {
+          return row.next();
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Non-terminal collection scope is unreadable", unavailable);
     } finally {
       lock.unlock();
     }

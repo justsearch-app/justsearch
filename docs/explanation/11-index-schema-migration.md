@@ -487,13 +487,15 @@ During blue-green migration, `IndexingLoop.canBatchEmbed` is conditionally enabl
 
 ## Cutover fence: `SWITCHING` + durable buffering
 
-The hardest correctness window is "right around cutover" (pointer swap + restart). During that window, we must not lose mutating operations.
+The hardest correctness window is pointer commitment and serving-view publication.
+During that window, accepted mutating operations must survive a crash.
 
 The Worker uses a cutover fence:
 
 - It enters a short **`SWITCHING`** state near the end of migration.
 - While in `SWITCHING`, file ingest, deletion and reconciliation mutations are **durably buffered** into `jobs.db.switch_buffer`.
-- After restart on the new active generation, the Worker replays buffered ops before resuming normal processing.
+- Before pointer commitment, ordered replay commits and verifies the candidate's accepted effects.
+- A restart after pointer commitment settles the retained receipt versions before publishing the successor or retiring its predecessor.
 
 File UPSERT payloads are versioned and preserve collection plus the admitting caller's coarse
 originator and transport. Pre-C1 raw path payloads remain readable with unknown attribution.
@@ -502,6 +504,27 @@ has an opaque revision (jobs schema16); after the covering commit, replay remove
 the snapshot's matching key/revision pairs in one queue transaction. New arrivals and
 same-key replacements remain, even with identical payloads and timestamps. Removal
 failure rolls back that deletion transaction and retains those versions for retry.
+
+Projection replay reads identity, source, canonical revision and digest through strict
+reader operations before writing. A missing stored identity requires a strict physical
+absence check; a reader failure cannot authorize replacing a newer projection. Final
+verification accepts projection absence only when a later applied exact, prefix or
+collection delete explains it. Delete keys must match their payloads, and approved-gap
+rows cannot supply that explanation because replay skipped them.
+
+For native boot with a committed predecessor, startup preserves the retained scoped
+rows for settlement under the producer pause and final mutation fence. Mixed projection,
+source-marker and broad-delete snapshots certify the committed generation's final
+effects without applying their deletes again. Later accepted file/projection survivors
+must have strict identity and scope evidence before broad queries may exclude them;
+file chunk exceptions require their real chunk identity and exact parent. Read-only
+queue scope checks reject live PENDING/PROCESSING work in a deleted scope. Unreadable
+or mismatched evidence retains the snapshot. Exact conditional cleanup follows proof
+of every effect and must leave that generation's receipt scope empty. The file-only
+UPSERT/exact-DELETE recovery path retains its existing replay contract. Legacy VDU and
+PRUNE compatibility paths do not inherit this mixed-snapshot certificate.
+The file-only path also uses strict source-hash reads and proves parent/chunk absence
+after the exact delete's covering commit and refresh; unreadable absence retains its receipt.
 
 New VDU update, mark and recovery calls refuse retryably with `UNAVAILABLE` unless
 the captured ingest runtime is the serving runtime and fresh authoritative state
@@ -539,6 +562,8 @@ Buffered operations include (current):
 
 - File ingest and deletes:
   - `submitBatch`, `deleteById`, `deleteByPath`
+- Broad deletion receipts: `DELETE_PREFIX` and `DELETE_COLLECTION`.
+- No-file projections and source completeness: `PROJECTION` and `PROJECTION_SOURCE`.
 - Watcher reconciliation:
   - `syncDirectory(force=true)` buffered as `SYNC_ROOT(root, force)`
   - `pruneMissing` buffered as `PRUNE_PREFIX(prefix)`

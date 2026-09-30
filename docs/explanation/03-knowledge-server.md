@@ -335,7 +335,13 @@ The structural pin `ingestionEventViewExportContractIsPinned` is unchanged — `
 
 ### Durable cutover buffer (`switch_buffer`)
 
-During schema migration cutover (`SWITCHING` state), the Worker durably buffers mutating ingest operations into `jobs.db.switch_buffer` (rather than relying on UI/client retries). On restart after cutover, the Worker replays buffered ops against the new generation.
+During schema migration, the Worker durably buffers mutating ingest operations into
+`jobs.db.switch_buffer`. Ordered candidate replay commits and verifies those effects
+before pointer commitment. After a committed native pointer crash, retained projection,
+source-marker and broad-delete receipts are certified under the final mutation fence
+before serving publication. Strict reader and queue evidence precede exact conditional
+cleanup; the file-only recovery path retains its existing replay contract. See
+[the cutover certificate](11-index-schema-migration.md#cutover-fence-switching--durable-buffering).
 
 Buffered UPSERT payload version 1 retains the absolute path, collection and admission provenance.
 Replay also accepts pre-C1 raw path payloads with unknown collection/provenance. Unknown versions

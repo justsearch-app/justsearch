@@ -20,6 +20,7 @@ import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
+import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.app.api.indexing.ProjectionSeedSource;
 import io.justsearch.indexing.api.IndexDocument;
@@ -197,7 +198,7 @@ final class SwitchBufferStrictReplayTest {
   }
 
   @Test
-  void noFileProjectionRequiresExactCandidateWitnessAfterCommitBeforeCleanup() {
+  void noFileProjectionRequiresExactCandidateWitnessAfterCommitBeforeCleanup() throws Exception {
     var projection = new AcceptedProjection("memory", "record-7", 5,
         AcceptedProjection.Kind.UPSERT, "{\"content\":\"accepted\"}");
     var version = new SwitchBufferCapableQueue.SwitchBufferOp(
@@ -213,13 +214,14 @@ final class SwitchBufferStrictReplayTest {
     when(runtime.indexingCoordinator()).thenReturn(indexing);
     when(runtime.commitOps()).thenReturn(commits);
     when(runtime.documentFieldOps()).thenReturn(fields);
-    when(fields.getDocumentField(projection.indexId(), SchemaFields.DOC_ID))
+    when(runtime.indexCountOps()).thenReturn(mock(IndexCountOps.class));
+    when(fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.DOC_ID))
         .thenAnswer(ignored -> written.get() ? projection.indexId() : null);
-    when(fields.getDocumentField(projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID))
+    when(fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID))
         .thenAnswer(ignored -> written.get() ? projection.sourceId() : null);
-    when(fields.getDocumentField(projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION))
+    when(fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION))
         .thenAnswer(ignored -> written.get() ? "5" : null);
-    when(fields.getDocumentField(projection.indexId(), SchemaFields.PROJECTION_DIGEST))
+    when(fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PROJECTION_DIGEST))
         .thenReturn(projection.fieldsDigest());
 
     assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
@@ -239,6 +241,7 @@ final class SwitchBufferStrictReplayTest {
     when(runtime.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
     when(runtime.commitOps()).thenReturn(mock(CommitOps.class));
     when(runtime.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+    when(runtime.indexCountOps()).thenReturn(mock(IndexCountOps.class));
 
     assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
     verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
@@ -256,6 +259,7 @@ final class SwitchBufferStrictReplayTest {
         .when(indexing).indexSingle(any(IndexDocument.class));
     when(runtime.indexingCoordinator()).thenReturn(indexing);
     when(runtime.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+    when(runtime.indexCountOps()).thenReturn(mock(IndexCountOps.class));
 
     assertFalse(KnowledgeServerMigrationOps.prepareSwitchReplayForPromotion(
         scopedContext("green")).isPresent());
@@ -490,7 +494,7 @@ final class SwitchBufferStrictReplayTest {
   }
 
   @Test
-  void committedNativePointerCertifiesCapturedH2WithoutRewritingPlannedH1() {
+  void committedNativePointerCertifiesCapturedH2WithoutRewritingPlannedH1() throws Exception {
     String h1 = "a".repeat(64);
     String h2 = "b".repeat(64);
     String path = tempDir.resolve("captured-native.txt").toAbsolutePath().toString();
@@ -505,16 +509,16 @@ final class SwitchBufferStrictReplayTest {
     var refreshed = new AtomicBoolean();
     when(runtime.documentFieldOps()).thenReturn(fields);
     when(runtime.commitOps()).thenReturn(commits);
-    when(fields.getDocumentField(path, SchemaFields.SOURCE_SHA256))
+    when(fields.getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256))
         .thenAnswer(ignored -> refreshed.get() ? h2 : h1);
     doAnswer(ignored -> { refreshed.set(true); return null; })
         .when(commits).maybeRefreshBlocking();
 
     assertTrue(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
-        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+        queue, runtime, "green", List.of(), LoggerFactory.getLogger(getClass())));
     var order = inOrder(commits, fields, queue);
     order.verify(commits).maybeRefreshBlocking();
-    order.verify(fields).getDocumentField(path, SchemaFields.SOURCE_SHA256);
+    order.verify(fields).getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256);
     order.verify(queue).matchesAcceptedFileProjection(path, "captured-unit", h1, h2);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
   }
@@ -532,12 +536,12 @@ final class SwitchBufferStrictReplayTest {
         .thenReturn(true);
     var fields = mock(DocumentFieldOps.class);
     when(runtime.documentFieldOps()).thenReturn(fields);
-    when(fields.getDocumentField(path, SchemaFields.SOURCE_SHA256))
+    when(fields.getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256))
         .thenReturn(hash);
     when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
 
     assertTrue(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
-        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+        queue, runtime, "green", List.of(), LoggerFactory.getLogger(getClass())));
     verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
   }
 
@@ -554,9 +558,10 @@ final class SwitchBufferStrictReplayTest {
     var commits = mock(CommitOps.class);
     when(runtime.commitOps()).thenReturn(commits);
     when(runtime.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
+    when(runtime.indexCountOps()).thenReturn(mock(IndexCountOps.class));
 
     assertTrue(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
-        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+        queue, runtime, "green", List.of(), LoggerFactory.getLogger(getClass())));
     verify(indexing).deleteByIdAndChunks("deleted");
     verify(queue).deleteByExactPath("deleted");
     verify(commits).commitAndTrack(any());
@@ -578,7 +583,7 @@ final class SwitchBufferStrictReplayTest {
     when(runtime.indexingCoordinator()).thenReturn(indexing);
 
     assertFalse(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
-        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+        queue, runtime, "green", List.of(), LoggerFactory.getLogger(getClass())));
     verify(indexing, never()).deleteByIdAndChunks("deleted");
     verify(queue, never()).deleteByExactPath("deleted");
     verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
@@ -591,7 +596,7 @@ final class SwitchBufferStrictReplayTest {
     when(queue.listSwitchBufferOpsStrict()).thenReturn(List.of(selected));
 
     assertFalse(KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
-        queue, runtime, "green", LoggerFactory.getLogger(getClass())));
+        queue, runtime, "green", List.of(), LoggerFactory.getLogger(getClass())));
     verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
   }
 

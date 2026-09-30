@@ -5823,7 +5823,8 @@ public final class KnowledgeServer implements Closeable {
       // The switch-buffer rows carry exact accepted unit revisions. Unrelated durable queue
       // backlog is neither part of their proof nor a reason to retain the predecessor forever.
       boolean settled = KnowledgeServerMigrationOps.settleCommittedNativeFileWitnesses(
-          jobQueue, active, state.active_generation(), log);
+          jobQueue, active, state.active_generation(),
+          expectedProjectionSourceIds(activeIndexPath, generationBootOwnership), log);
       if (settled) replaySettledGeneration = expectedActive;
       return settled;
     } catch (IOException | RuntimeException unavailable) {

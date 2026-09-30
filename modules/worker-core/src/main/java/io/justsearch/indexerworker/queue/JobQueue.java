@@ -461,6 +461,32 @@ public interface JobQueue extends Closeable {
   }
 
   /**
+   * Reports whether a strict path-prefix scope still has durable non-terminal work.
+   *
+   * <p>The scope is an observation for cleanup certification only. Implementations must refuse an
+   * invalid scope or an unreadable queue rather than treating either condition as empty.
+   *
+   * @param pathPrefix non-blank path prefix to inspect
+   * @return true when a PENDING or PROCESSING row lies under the prefix
+   */
+  default boolean hasNonterminalJobsByPathPrefixStrict(String pathPrefix) {
+    throw new UnsupportedOperationException("Strict path-prefix scope read is unavailable");
+  }
+
+  /**
+   * Reports whether a strict collection scope still has durable non-terminal work.
+   *
+   * <p>Null and blank values stored on legacy rows are the index default collection. The requested
+   * scope itself must be non-blank; invalid scopes and unreadable queues fail closed.
+   *
+   * @param collection non-blank collection scope to inspect
+   * @return true when a PENDING or PROCESSING row belongs to the collection
+   */
+  default boolean hasNonterminalJobsByCollectionStrict(String collection) {
+    throw new UnsupportedOperationException("Strict collection scope read is unavailable");
+  }
+
+  /**
    * Enqueues sized entries tagged with the directory scan that admitted them (tempdoc 812 D2).
    *
    * <p>The scan id is the same {@code ScanRootProgress.scan_id} the Head reads to subscribe to live

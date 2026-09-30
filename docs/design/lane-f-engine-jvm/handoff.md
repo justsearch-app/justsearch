@@ -10,13 +10,17 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 The user resumed autonomous execution of all remaining D1/D2/E/F, requested
 Luna/Sol subagents, and directed that routine work require no input. Continue
 in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`, branch
-`codex/lane-f-pr1`, base/head `9cb3e120777a5aa6f3e57c886496d423165b4a61`.
+`codex/lane-f-pr1`, tested base `9cb3e120777a5aa6f3e57c886496d423165b4a61`,
+runtime checkpoint `015b85d75467394319aebc7c81873f51467726ce`, followed by
+the lockfile-only security checkpoint `68601fbf4`.
 Checkpoint commits and pushes to draft PR727 remain authorized; merge remains
 separate at F. The worktree is HELD through 2026-10-04. Preserve main and the
 foreign untracked `modules/app-inference/logs/`.
 
-Current frozen module/script code-diff hash is
-`262547a9dbd0b9de715483941c509bf3fd78c7f1`. Root owns integration, the single
+The broader receipt core is ready for its authorized checkpoint on this branch;
+resolve Git HEAD before continuing. Its final proved module/script code-diff hash
+against security checkpoint `68601fbf4` is
+`ed3c701a3cbffd3644d180969b677bee1f3e2430`. Root owns integration, the single
 Gradle build and shared stack. Luna owns bounded exploration/tests; Sol independently
 refutes frozen sources. Both root and Sol confirmed the hash. Freeze compiled
 sources throughout the build and keep one writer per assigned file.
@@ -57,15 +61,74 @@ reread the receipt/ledger, unique PROMOTED-before-READY log, pointer, persisted 
 supervisor and A deletion. The final settings file independently binds revision 2
 to B, while its SQL accepted revision is 1.
 
-Required next action: commit explicit owned paths, push the authorized draft
-checkpoint and inspect exact-head hosted CI, then continue the next endpoint.
-Hosted proof has not yet passed. A checkpoint does not complete D1 or the lane.
+Exact-head CI run `36653736261` completed on checkpoint `015b85d75`: build,
+all three unit lanes, Windows-native, Rust/supervision, integration, licenses,
+secrets and the Python suite passed. Public claims failed solely on newly
+published `brace-expansion` advisories. Luna traced the failed hosted step;
+root refreshed the three affected npm lockfiles to patched 5.0.12. Local
+advisory enforcement, lockfile completeness and all three install dry runs pass.
+The isolated UI lock repair also restores the optional WASI dependency closure
+which host npm 11 pruned. Evidence is at `tmp/lane-f-sept30-public-claims.log`,
+`tmp/lane-f-sept30-hosted-015b85d75.json` and the `lane-f-sept30-*-lock-resolver`
+and `lane-f-sept30-npm-audit-final` logs. A new exact-head run remains required
+after the next coherent checkpoint; this does not close D1 or the lane.
+Security exact-head run `36655767730` passed advisory enforcement and the
+preceding public-claims checks, then reached a separate red forcing function:
+Search v3 promotion is incomplete on its 2026-09-30 deadline. The USER surface
+and `governance/window-cutover.done` belong to tempdoc 852's promotion program
+under owner decision 851. Retain the failure at
+`tmp/lane-f-sept30-security-public-claims-job.log` and
+`tmp/lane-f-sept30-window-cutover.log`; do not move the date, fabricate the
+completion marker, or promote that separate UI program within Lane F.
+This blocks full hosted acceptance, while independent Lane F work continues.
+
+The broader native endpoint is now in progress. Root adopted proof-only mixed
+snapshot certification with exact accepted-order dominance, strict reader scope
+counts in `IndexCountOps`, and read-only strict SQLite nonterminal scope checks.
+The existing file-only exact-delete behavior remains separate. Sol refuted
+projection/delete identity overlap, chunk-shaped projection fields, survivor
+PATH/COLLECTION binding and recorded-generation native fallback; D1 records the
+constraints. Corrected real-reader/SQLite regressions passed 111 focused cases
+at `tmp/lane-f-native-effects-focused-r2.log`; that is a superseded intermediate
+proof. Sol then found higher-revision digest/revision and protected-default-
+collection refusals, reproduced at `tmp/lane-f-native-certificate-refutation-red.log`.
+The corrections passed the native portion of the next 32-case run; its four
+remaining failures independently reproduce generic pre-pointer projection/delete
+ordering and strict-reader preflight defects (`tmp/lane-f-projection-final-order-red.log`,
+XML in the matching `-xml/` directory). Root corrected the narrow generic verifier
+and pre-mutation strict reads. The next 125-case run passed 124 but exposed one
+stale strict-field test mock, now updated without changing its expected behavior.
+Retained evidence is at `tmp/lane-f-native-effects-focused-r3.log` and the
+matching `-red-xml/` directory; final focused/static proof remains pending.
+
+Root refuted the proposed early-drain defect by reading its exact selector:
+after pointer commitment, `buildingIndexPath` is null, so best-effort drain
+selects only unscoped legacy rows. It cannot consume B-scoped receipts. Luna
+and Sol independently confirmed the correction. The unnecessary guard was
+removed; ordinary legacy recovery remains connected. A connected true-native
+crash fixture is being designed. The installed recorded
+PROMOTED proof above does not prove this native path. Compiled files remain frozen
+during each root-owned build. Continue through this endpoint and the full lane.
+
+Final core proof now passes 130 focused cases with zero failures/errors/skips in
+44 seconds (`tmp/lane-f-native-effects-focused-final-r3.log`, XML/counts in
+`tmp/lane-f-native-effects-focused-final-r3-xml/`). Compile, Spotless and PMD
+pass in 28 seconds at `tmp/lane-f-native-effects-static-final-r2.log`.
+The last file-only exact-delete regression proves an applied physical delete,
+retained receipt on strict-count IOException, then healthy zero-count retry and
+cleanup. Sol independently confirmed the final hash and found no remaining
+actionable issue. The obsolete four-argument settlement overload is retired;
+every caller supplies its owned source set. Regeneration, store recoverability,
+runtime manifest closure and documentation checks pass. No generated skill or
+Codex-copy changes resulted. `origin/main` remains an ancestor after a fresh fetch.
+These are local core proofs; full current-revision, hosted and connected native
+proof remain open. Luna is drafting the real producer/two-phase native crash test
+outside compiled sources. Root still owns the build and integration.
 
 Next product endpoint is broader native committed-pointer effects and old accepted-source
-recovery. The file-only fence is retained today. A bounded Luna/Sol map found accepted-order
-projection/delete dominance and active-B source-completion proof need care; root must
-settle the minimal design against the existing pre-pointer replay/commit/fence before
-implementation. Do not blindly reuse generic drain or add queue writes where committed
+recovery. The native mixed-snapshot design is adopted and implemented locally;
+connected proof and integrated acceptance remain open. Do not blindly reuse generic
+drain or add queue writes where committed
 B already owns the final effect. Remaining D1-4/16/17, D2, WP2 safety, the seven paired E
 groups and F remain binding. Signed Sandbox is externally blocked by unsigned installer
 policy and unavailable signing-provider allocation; do not bypass it or let it block
