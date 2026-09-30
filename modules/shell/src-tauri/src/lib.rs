@@ -769,11 +769,14 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         // untrusted bytes, and on Windows the platform default is not UTF-8, so losing this
         // changes how text is decoded — silently, and only for non-ASCII content.
         //
-        // SerialGC: small heap, no throughput need (the Head heap is >= 85 % empty at every
-        // phase, 917 Derisk 1). Lane F PR 0: TieredStopAtLevel=1 dropped and MetaspaceSize=128m
-        // added, because every full GC in the measured run was a Metaspace or CodeCache
-        // threshold (the C1-only 48 MiB code cache), not heap pressure, and C1-only also
-        // conflicted with the AOT cache below.
+        // UseG1GC: the Engine serves search while it indexes in the same heap, so it needs a
+        // low-pause collector; design section 8's decision table fixes G1 as the default and
+        // stage E compares collectors only if a response-time group fails. Stated explicitly
+        // because JVM ergonomics pick SerialGC on a small machine. (SerialGC was the Head-only
+        // first cut, right for a heap >= 85 % empty, 917 Derisk 1.) Lane F PR 0:
+        // TieredStopAtLevel=1 dropped and MetaspaceSize=128m added, because every full GC in the
+        // measured run was a Metaspace or CodeCache threshold (the C1-only 48 MiB code cache),
+        // not heap pressure, and C1-only also conflicted with the AOT cache below.
         // -XX:-UsePerfData: skip hsperfdata temp file (avoids Defender scan on Windows).
         //
         // This set is pinned from BOTH sides: scripts/dev/test-dev-runner-head-java-opts.mjs
@@ -782,7 +785,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         // deliberately carries no default -Xmx (tempdoc 730) — that is the one documented
         // divergence, because a dev machine's JVM default is fine and a packaged one's is not.
         .arg("-Xmx2g")
-        .arg("-XX:+UseSerialGC")
+        .arg("-XX:+UseG1GC")
         .arg("-XX:MetaspaceSize=128m")
         .arg("-XX:MaxDirectMemorySize=256m")
         .arg("-XX:+UseCompactObjectHeaders")

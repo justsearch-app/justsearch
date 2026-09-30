@@ -43,7 +43,7 @@ const { splitJvmOptions } = require('./lib/engine-java-launch.cjs');
  * tempdoc 730 Increment-4 and honours JUSTSEARCH_HEAD_HEAP). See PACKAGED_ONLY_FLAGS for the rest.
  */
 const SHARED_FLAGS = [
-  '-XX:+UseSerialGC',
+  '-XX:+UseG1GC',
   '-XX:MetaspaceSize=128m',
   '-XX:MaxDirectMemorySize=256m',
   '-XX:+UseCompactObjectHeaders',

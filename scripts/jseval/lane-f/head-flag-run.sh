@@ -114,7 +114,7 @@ stop_stack() {
 
 log "label=$label out=$out_abs port=$port head=$(git rev-parse --short HEAD)"
 git diff --stat -- scripts/dev/dev-runner.cjs modules/shell/src-tauri/src/lib.rs > "$out_abs/flag-diff-stat.txt"
-grep -n "UseSerialGC\|TieredStopAtLevel\|MetaspaceSize" scripts/dev/dev-runner.cjs modules/shell/src-tauri/src/lib.rs > "$out_abs/flag-sites.txt"
+grep -n "UseG1GC\|UseSerialGC\|TieredStopAtLevel\|MetaspaceSize" scripts/dev/dev-runner.cjs modules/shell/src-tauri/src/lib.rs > "$out_abs/flag-sites.txt"
 
 # --- sampler ---
 rm -f "$out_abs/rss.stop"

@@ -738,7 +738,7 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
     // deliberate divergence is -Xmx: lib.rs pins 2g because a packaged JVM's default (1/4 of
     // physical RAM) is wrong in both directions, while the dev-runner keeps NO default heap
     // (tempdoc 730 Increment-4) and honours JUSTSEARCH_HEAD_HEAP when set.
-    '-XX:+UseSerialGC -XX:MetaspaceSize=128m -XX:MaxDirectMemorySize=256m -XX:+UseCompactObjectHeaders -XX:-UsePerfData'
+    '-XX:+UseG1GC -XX:MetaspaceSize=128m -XX:MaxDirectMemorySize=256m -XX:+UseCompactObjectHeaders -XX:-UsePerfData'
       + ' -Dfile.encoding=UTF-8',
     headAotOpts,
     // Tempdoc 606 Piece 2b: the Head echoes this on /api/runtime/manifest so a
@@ -2110,7 +2110,8 @@ async function cmdStart(opts) {
         // ambient JUSTSEARCH_DEV_HOTRELOAD=true would otherwise survive a run where this decided
         // hot reload is off, and the Engine would report a reload capability the run record denies.
         JUSTSEARCH_DEV_HOTRELOAD: devHotReload.enabled ? 'true' : 'false',
-        // Head startup flags: SerialGC (small heap, no throughput need), MetaspaceSize=128m,
+        // Engine startup flags: G1 (design section 8 default; one heap serves search while it
+        // indexes), MetaspaceSize=128m,
         // -XX:-UsePerfData (skip hsperfdata file); tiered compilation left at its default
         // (lane F PR 0), so the set no longer forks on AOT-cache presence.
         // S1: Pass dev AOT cache flag when available.
