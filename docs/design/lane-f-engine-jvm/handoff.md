@@ -11,8 +11,10 @@ acceptance evidence. The brief does not narrow the remaining lane scope.
 before applying production D2. The user asked to identify this boundary and
 specified that no additional tests or validation are required solely for handoff.
 The existing four-case installed matrix, coherent stress/static suite and pending
-declaration check already establish this boundary. Preserve the private D2 drafts
-and their unfinished proof below; do not represent them as production changes.
+declaration check already establish this boundary. Runtime changes are committed
+at `ef636fa3a`; the boundary record is committed and pushed at `2202795ae`.
+Preserve the private D2 drafts and their unfinished proof below; do not represent
+them as production changes. No stack or Gradle build is running at this boundary.
 
 The user resumed autonomous execution of all remaining D1/D2/E/F, requested
 Luna/Sol subagents, and directed that routine work require no input. Continue
@@ -25,8 +27,9 @@ Checkpoint commits and pushes to draft PR727 remain authorized; merge remains
 separate at F. The worktree is HELD through 2026-10-04. Preserve main and the
 foreign untracked `modules/app-inference/logs/`.
 
-Current work is the D1 pre-Green delete, parser-unit control readiness, and
-mandatory A-restoration correction, followed by the remaining D1/D2/E/F queue.
+The D1 pre-Green delete, parser-unit control readiness, and mandatory A-restoration
+correction are committed. Current preparation is the private D2-5 durable-write
+slice, followed by the remaining D1/D2/E/F queue.
 The parser-gap R6 case passes end to end in5m52s at
 `tmp/lane-f-generation-parser-gap-installed-r6.log`, `-xml/`, and `-summary.json`:
 one executed AI case, zero failures/errors/skips. Exact private fixture is
@@ -76,13 +79,15 @@ synchronous failure mapping and cancellation checks on both sides of refresh.
 C2-backed production propagation and installed forced-kill acceptance remain unimplemented/unproved;
 do not claim D2-5 completion from private core proof.
 
-The three private port-test drafts compile and the already-started20-case run
-at `tmp/lane-f-d2-private-port-r2.log` executes18 green/2 red, zero skips. The
-candidate journal correctly uses `PROJECTION`, not the test's `UPSERT`; correct
-that fixture expectation. A real failed SQLite journal admission still escapes
-as IllegalStateException; map only that admission failure into the Worker error
-vocabulary before any A mutation. The earlier metadata-failure test now restores
-the good source only after proving no durable success, so owned close can retry.
+The three private port-test drafts compile and the fresh run at
+`tmp/lane-f-d2-private-port-r4.log` executes21 green, zero failures/skips, with
+exact source hashes/command/classpath/revision in `-evidence.json`. Earlier R2
+executes18 green/2 red and remains preserved: the candidate journal correctly
+uses `PROJECTION`, and a failed SQLite admission escaped as IllegalStateException.
+Both are corrected privately. The real SQLite delegate/coordinator spies prove
+one journal admission before one A mutation; journal failure is UNAVAILABLE with
+its SQL cause, before A effect. The metadata-failure test restores the good source
+only after proving no durable success, so owned close can retry.
 Private applyProjection now validates the captured active pointer directly
 instead of borrowing ordinary recorded ingestion's IDLE-only capture. This
 admits no-file writes during the pre-Green shared-A interval; independent Sol
@@ -92,8 +97,28 @@ candidate journal call, preserving its cause and leaving stale/conflict and A
 effect classification outside the catch. Sol's proposed strict-ordering test uses
 the real SQLite delegate and queue/coordinator spies to observe journal admission
 before the real A mutation is issued, without adding a production helper.
-Strengthen the journal-before-A oracle beyond post-hoc receipt presence, then
-rerun implementation checks when resuming D2; no extra run is needed for handoff.
+The Worker now precomputes the existing mapper once before journalling, preventing
+reserved identity/witness fields from leaving a poison B replay row. The fresh
+regression covers all five reserved names, INVALID_ARGUMENT with the existing
+mapper cause, empty B journal, and unchanged A NRT/committed state. It does not
+claim to dry-run every later coordinator schema/runtime refusal.
+
+The real C2 accepted-attempt draft now passes three cases at
+`tmp/lane-f-d2-private-attempt-r2.log` (5.714s, zero failures/skips), with exact
+source hashes captured before execution, command/classpath/revision and exit in
+`-evidence.json`; compile output is `tmp/lane-f-d2-private-attempt-compile-r2.log`.
+Real SQLite acceptance and the existing attempt runner supply the handle to the
+actual EngineKnowledgeClient and Worker port. Independent committed snapshots
+prove durable UPSERT/DELETE visibility while the row is RUNNING, before the body
+returns success and C2 records COMPLETE. Metadata commit failure produces
+UNAVAILABLE and FAILED/UNCAUGHT_EXCEPTION without committed success; reserved
+fields produce INVALID_ARGUMENT, FAILED, no B journal row and no A document.
+The preserved first run fails all three before projection because its fixture
+used a noncanonical source-tier string. Sol corrected only the fixture to use
+the existing EngineProvenance.internal constructor; no trust mapping changed.
+This focused rerun verifies that correction, not the handoff itself.
+Production and installed forced-kill proof remain open. No extra run is required
+solely for handoff.
 Private sources are under `tmp/lane-f-d2-port-draft/` and tests under
 `tmp/lane-f-d2-port-draft-tests/`; the launcher is private verification scaffolding,
 not a repository test runner.
@@ -106,6 +131,27 @@ collection-labelled file source; a bare unlabelled Path is insufficient. Keep th
 narrow unreachable legacy-cutover teardown separate from full D1-17 closure.
 The existing marker/startup and migration enumeration tests do not yet join these
 behaviors. Production-mode live activation plus restart proof remains required.
+
+Luna's selected help-source direction derives the immutable `justsearch-help`
+collection from `ResolvedConfig.Paths.ssotPath()/docs/help` after normal collection
+resolution. Bootstrap and Green must consume that same resolved source and retain
+its collection label through file admission; do not infer ownership from old jobs
+or persist it as an operator watched root. Missing physical help keeps the existing
+skip behavior. Before implementation, settle the existing reserved collection-name
+authority without introducing a configuration-to-app-api dependency. The marker
+continues to govern startup idempotency, not migration coverage.
+
+**Resume order at this boundary:** apply the reviewed private D2-5 core and port
+drafts only as a coherent production slice; relocate the private regressions into
+their owning modules and recut the superseded interrupt-on-close expectations
+without weakening resource/termination proof. Then perform the required production
+compile, affected-module/static and integrated checks, followed by live/real-model
+and installed immediate-kill acceptance. Private javac/JUnit proof cannot substitute
+for those tiers. Reconfigure and the D1 help-source/legacy-cutover residue still
+require their own acceptance. Root alone owns stack, Gradle, shared-state changes
+and publication; bounded Luna implementation and Sol refutation retain exact
+file/revision evidence. Do not resume unrelated historical WIP paragraphs below
+as current work.
 
 Exact-checkpoint hosted CI run 36700317380 passes 12 jobs, including Windows
 native wrappers. Public claims alone is red for the separate Search v3 deadline
