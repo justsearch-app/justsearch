@@ -39,6 +39,11 @@ public interface WorkerHost extends Closeable {
    */
   default void prepareStart() {}
 
+  /** Bundled file source from the exact configuration of the started index owner. */
+  default io.justsearch.configuration.resolved.ResolvedConfig.FileSource bundledHelpSource() {
+    return null;
+  }
+
   /**
    * Starts the index half and returns the client for it.
    *

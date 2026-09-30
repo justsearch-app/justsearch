@@ -3,7 +3,7 @@ package io.justsearch.app.api.knowledge;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
+import io.justsearch.configuration.InternalCollections;
 import java.util.Set;
 
 /**
@@ -40,7 +40,7 @@ public final class IngestCollectionPolicy {
    * default-excludes. Letting a caller tag documents with either would let arbitrary content
    * inherit an app-internal document's search posture.
    */
-  private static final Set<String> RESERVED = Set.of("justsearch-help", "agent-history");
+  private static final Set<String> RESERVED = InternalCollections.RESERVED;
 
   private IngestCollectionPolicy() {}
 
@@ -54,7 +54,7 @@ public final class IngestCollectionPolicy {
 
   /** True when {@code collection} names an app-internal corpus a caller must not write into. */
   public static boolean isReserved(String collection) {
-    return collection != null && RESERVED.contains(collection.trim().toLowerCase(Locale.ROOT));
+    return InternalCollections.isReserved(collection);
   }
 
   /**

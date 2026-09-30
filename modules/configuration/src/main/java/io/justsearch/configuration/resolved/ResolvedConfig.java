@@ -84,6 +84,10 @@ public record ResolvedConfig(
     Objects.requireNonNull(hybridSearch, "hybridSearch");
     Objects.requireNonNull(worker, "worker");
     Objects.requireNonNull(collections, "collections");
+    // Derive internal file coverage after operator collections and paths have been resolved.
+    collections = new Collections(collections.items(), paths.ssotPath() == null ? null
+        : new FileSource(paths.ssotPath().resolve("docs").resolve("help"),
+            io.justsearch.configuration.InternalCollections.HELP));
     Objects.requireNonNull(workerIndexer, "workerIndexer");
     Objects.requireNonNull(infraHealth, "infraHealth");
     resolutions = Map.copyOf(resolutions);
@@ -760,8 +764,19 @@ public record ResolvedConfig(
     }
   }
 
-  /** Named collection list with primary collection derivation. */
-  public record Collections(List<CollectionCfg> items) {
+  /** Immutable file coverage and its admission label; null collection is the index default. */
+  public record FileSource(Path path, String collection) {
+    public FileSource {
+      path = Objects.requireNonNull(path, "path").toAbsolutePath().normalize();
+    }
+  }
+
+  /** Operator collections and the separately resolved, non-watched bundled help source. */
+  public record Collections(List<CollectionCfg> items, FileSource bundledHelp) {
+    public Collections(List<CollectionCfg> items) {
+      this(items, null);
+    }
+
     public Collections {
       items = items != null ? List.copyOf(items) : List.of();
     }

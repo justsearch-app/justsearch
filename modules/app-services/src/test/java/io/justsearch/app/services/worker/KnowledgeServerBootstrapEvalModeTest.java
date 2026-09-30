@@ -70,7 +70,7 @@ final class KnowledgeServerBootstrapEvalModeTest {
     KnowledgeClient client = mock(KnowledgeClient.class);
 
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(config)) {
-      fixture.bootstrap().tryIngestHelpFiles(client, config);
+      fixture.bootstrap().tryIngestHelpFiles(client, config, helpSource(config.workingDirectory()));
     }
 
     assertFalse(
@@ -94,7 +94,7 @@ final class KnowledgeServerBootstrapEvalModeTest {
     KnowledgeClient client = mock(KnowledgeClient.class);
 
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(config)) {
-      fixture.bootstrap().tryIngestHelpFiles(client, config);
+      fixture.bootstrap().tryIngestHelpFiles(client, config, helpSource(config.workingDirectory()));
     }
 
     assertTrue(
@@ -127,7 +127,34 @@ final class KnowledgeServerBootstrapEvalModeTest {
     }
   }
 
+  @Test
+  void consumesHostResolvedSourceInsteadOfWorkingDirectory() throws Exception {
+    System.clearProperty(EVAL_MODE_PROP);
+    Path data = Files.createDirectory(tempDir.resolve("data"));
+    Path ssot = tempDir.resolve("external-ssot");
+    Path help = Files.createDirectories(ssot.resolve("docs/help"));
+    Path file = Files.writeString(help.resolve("welcome.md"), "# Help\n");
+    var resolved = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+        .putDefault("justsearch.ssot.path", ssot.toString()).build();
+    var host = mock(WorkerHost.class);
+    org.mockito.Mockito.when(host.bundledHelpSource()).thenReturn(resolved.collections().bundledHelp());
+    var config = configFor(data, tempDir.resolve("unrelated-working-directory"));
+    var client = mock(KnowledgeClient.class);
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(config, host)) {
+      fixture.bootstrap().tryIngestHelpFiles(client, config);
+    }
+    verify(client).submitBatch(org.mockito.ArgumentMatchers.eq(java.util.List.of(file)),
+        org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.eq("justsearch-help"), any());
+    assertTrue(Files.exists(data.resolve(".help-ingested-version")));
+  }
+
   /** Build a minimal KnowledgeServerConfig pointing at the temp directories. */
+  private static io.justsearch.configuration.resolved.ResolvedConfig.FileSource helpSource(Path workingDir) {
+    return io.justsearch.configuration.resolved.ResolvedConfig.builder()
+        .putDefault("justsearch.ssot.path", workingDir.resolve("SSOT").toString())
+        .build().collections().bundledHelp();
+  }
+
   private static KnowledgeServerConfig configFor(Path dataDir, Path workingDir) {
     return new KnowledgeServerConfig(
         /* isProduction */ false,
