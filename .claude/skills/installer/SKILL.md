@@ -264,6 +264,14 @@ sequence output. `package-installer-win.ps1` and `build-release-assets.ps1` requ
 an explicit existing `-CompatibilityBaselinePath` for updater assembly, then pass
 the generator's `--compat-baseline`. Installer-only assembly needs no baseline.
 
+Intentionally retired owners live in the same register's disjoint
+`retiredDurableStores` list. Their exact historical tuple is emitted only when
+inherited from the predecessor; unspecified missing owners still refuse.
+`worker-config-snapshot` retains its version0 compatibility identity while its
+old bytes remain untouched and unread. The target shell consumes that exact
+inherited retired id/version, then reconciles every active owner with the Engine.
+Retired rows never become active stores or Engine readiness attestations.
+
 The frontend never authenticates releases. `appUpdateState.ts` projects
 shell-owned status into Settings and the global update banner. The background
 path checks only; install requires the user to activate Settings or the desktop

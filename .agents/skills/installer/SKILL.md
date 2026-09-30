@@ -30,6 +30,9 @@ Tag updater assembly derives sequence and the full predecessor tag register toge
 with `derive-release-sequence.mjs --compat-baseline-out`. Both PowerShell wrappers
 require an existing explicit `-CompatibilityBaselinePath` for updater assembly;
 manual rehearsals must provide it. Never substitute the current target register.
+Retired owners require exact `retiredDurableStores` tuples in that same register.
+Only inherited retired rows enter compatibility; the target consumes their exact
+id/version before active-only reconciliation and preserves inert bytes untouched.
 
 ## Known Pitfalls
 

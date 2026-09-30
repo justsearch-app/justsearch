@@ -234,6 +234,69 @@ const predecessorDescriptor = (sequence, tag = sequence === 57 ? 'v0.4.0' : 'v0.
   schemaVersion: 1, channel: 'stable', target: 'windows-x86_64', version: tag.slice(1),
   sequence, compatibility: [{ ownerId: 'ui-settings',
   owner: 'HEAD', role: 'AUTHORED', formatVersion: 4, reconciliationStrategy: frozenStrategy }] });
+
+const retiredSnapshot = {
+  id: 'worker-config-snapshot',
+  owner: 'HEAD',
+  recoverability: 'DERIVED',
+  currentVersion: 0,
+  reconciliation: 'UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START',
+  byteDisposition: 'PRESERVE_INERT',
+  retiredAt: '2026-09-07',
+  decision: 'lane F stage A item A19 (tempdoc 936)',
+  note: 'Retired compatibility projection; existing bytes remain untouched and are never consumed.',
+};
+const inheritedRetiredRegister = {
+  durableStores: [predecessorRegister.durableStores[0]],
+  retiredDurableStores: [retiredSnapshot],
+};
+const inheritedRetiredDescriptor = (sequence, tag = 'v0.9.0') => ({
+  schemaVersion: 1,
+  channel: 'stable',
+  target: 'windows-x86_64',
+  version: tag.slice(1),
+  sequence,
+  compatibility: [
+    { ownerId: 'ui-settings', owner: 'HEAD', role: 'AUTHORED', formatVersion: 4,
+      reconciliationStrategy: frozenStrategy },
+    { ownerId: retiredSnapshot.id, owner: retiredSnapshot.owner, role: retiredSnapshot.recoverability,
+      formatVersion: retiredSnapshot.currentVersion, reconciliationStrategy: retiredSnapshot.reconciliation },
+  ],
+});
+
+{
+  const exactRawRegister = `${JSON.stringify(inheritedRetiredRegister)}\n`;
+  const result = await deriveReleaseSequence({
+    releases: [release('v0.9.0', { sequence: 112 })],
+    fetchAsset: async () => JSON.stringify(inheritedRetiredDescriptor(112)),
+    fetchCompatibilityBaseline: async () => exactRawRegister,
+  });
+  ok('predecessor descriptor validates active plus retired owners', result.sequence === 113);
+  ok('predecessor baseline preserves exact raw register bytes',
+    result.compatibilityBaseline.text === exactRawRegister);
+}
+
+await expectThrow('predecessor rejects an unknown retired owner', deriveReleaseSequence({
+  releases: [release('v0.9.0', { sequence: 112 })],
+  fetchAsset: async () => JSON.stringify({
+    ...inheritedRetiredDescriptor(112),
+    compatibility: [...inheritedRetiredDescriptor(112).compatibility, {
+      ownerId: 'unknown-retired-owner', owner: 'HEAD', role: 'DERIVED', formatVersion: 0,
+      reconciliationStrategy: 'REBUILD',
+    }],
+  }),
+  fetchCompatibilityBaseline: async () => JSON.stringify(inheritedRetiredRegister),
+}), /identity or format mismatch/);
+
+await expectThrow('predecessor rejects a retired version mismatch', deriveReleaseSequence({
+  releases: [release('v0.9.0', { sequence: 112 })],
+  fetchAsset: async () => JSON.stringify({
+    ...inheritedRetiredDescriptor(112),
+    compatibility: inheritedRetiredDescriptor(112).compatibility.map(row => row.ownerId === retiredSnapshot.id
+      ? { ...row, formatVersion: 1 } : row),
+  }),
+  fetchCompatibilityBaseline: async () => JSON.stringify(inheritedRetiredRegister),
+}), /identity or format mismatch/);
 {
   const fetched = [];
   const text = JSON.stringify({ durableStores: [...predecessorRegister.durableStores,

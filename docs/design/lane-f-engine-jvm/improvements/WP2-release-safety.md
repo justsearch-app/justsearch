@@ -163,3 +163,71 @@ refuses the missing `worker-config-snapshot` owner, which stages A/B intentional
 retired. Shared predecessor identities and versions otherwise match. This red
 preflight is an unresolved retirement contract, not release acceptance: preserve
 the missing-owner guard while designing exact explicit retirement evidence.
+
+### Explicit retired owner contract (implemented locally; installed proof open)
+
+Root selected this design after independent Sol refutation of the actual v0.3.0
+Shell and current target. The existing recoverability register gains a disjoint
+`retiredDurableStores` list: exact historical id, owner, recovery class, version,
+and reconciliation identity, plus `PRESERVE_INERT` byte disposition and the dated
+retirement decision. Its first row is `worker-config-snapshot`, HEAD, DERIVED,
+version0, `UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START`, retired by A19 on
+2026-09-07. The existing policy ledger remains historical rationale and points to
+this runtime authority; no second tuple ledger is created.
+
+Normal release descriptors remain active-only. A predecessor baseline may select
+an explicit retired row only when its full historical tuple and version match;
+that signed descriptor row retains the frozen identity and readable version0.
+Unspecified missing owners, tuple drift, overlap, duplicate ids and wrong versions
+still refuse. A retired owner absent from the predecessor is never appended.
+The published-predecessor acquisition validator must cross-check descriptor rows
+against active plus retired rows, so the first release retaining a legacy
+compatibility row can itself become a predecessor. Its exact raw tag register is
+still emitted; future generators use only that predecessor's active store set.
+
+Installed v0.3.0 persists only owner id/version in its upgrade intent and requires
+an exact42-row descriptor. Therefore no new descriptor field can carry target
+disposition through it. The target Shell reads its embedded retired list, consumes
+only exact inherited id/version with `PRESERVE_INERT`, then expands and reconciles
+all51 active owners. Head remains all-and-only active. Existing stale snapshot
+bytes are never opened, changed, removed, migrated or attested as a healthy active
+store. A fake READY active row, inference of retirement from absence, and a new
+descriptor disposition field were rejected for those ownership failures.
+
+Root owns the register, generator, predecessor validator and Rust integration.
+Bounded tests can be delegated after the seam is fixed. Required local proof:
+real v0.3 baseline yields42 exact compatibility rows; wrong/absent retirement and
+arbitrary missing ids refuse; non-inherited retirement is omitted; a future
+active51/retired1 tag accepts its inherited42 descriptor and emits exact raw bytes;
+Rust consumes only worker id/version0 and returns active51, refusing wrong version,
+unknown/duplicate/overlapping ids; Head's exact active-owner tests remain green.
+Installed signed v0.3-to-target proof is still required under E and the signing
+dependency remains explicit. This design adds no store, producer, public endpoint,
+operation registry, cleanup writer or snapshot resurrection.
+
+Local execution passes19 asset-generator cases,61 predecessor assertions,84 gate
+assertions and all93 Shell unit cases at
+`tmp/lane-f-wp2-retirement-{assets,predecessor,gate-tests}-r1.log` and
+`tmp/lane-f-wp2-retirement-rust-all.log`. The first focused Rust run failed because
+the new test retained its unrelated `preferences` mock owner; the test now derives
+active owners from the actual embedded register, preserving the rejection guard.
+Both the original red log and corrected36-case focused output are retained at
+`tmp/lane-f-wp2-retirement-rust-r{1,2}.log`.
+
+The actual raw v0.3 predecessor projection is captured in
+`tmp/lane-f-wp2-real-retirement-contract-proof-r1.log`, with its readable proof
+script beside it:42 exact inherited owners,51 active targets,10 target-only owners
+omitted, the frozen snapshot tuple, and a future descriptor/tag validation deriving43
+with exact raw bytes and51 active-only future baseline rows. This is local contract
+proof; it is not a signed installed update. The real register gate and11 Head
+upgrade-contract cases pass at `tmp/lane-f-wp2-retirement-register-r1.log` and
+`tmp/lane-f-pre-green-delete-focused-r1.log` with archived XML. Independent Sol
+review found no actionable source defect.
+
+Hosted wrapper checkpoint9d7451d37 ran its10 negative checks successfully, then
+failed because GitHub's dot-sourced pwsh wrapper inherited the last expected child
+exit1. The test script now explicitly exits0 only after every assertion and cleanup
+succeeds; its original hosted failure and matching local invocation are
+`tmp/lane-f-wp2-wrapper-hosted-native-failure.log` and
+`tmp/lane-f-wp2-wrapper-hosted-shell-regression.log`. This correction still needs a
+fresh hosted run. Required signed predecessor-to-target qualification remains open.

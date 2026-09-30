@@ -310,6 +310,10 @@ Owner-only steps (require repo permissions):
    > `-CompatibilityBaselinePath` when `-AssembleUpdaterAssets` is selected; manual updater
    > rehearsals must pass it explicitly. The current register supplies target formats, while
    > the predecessor tag register supplies the inherited installed owner set.
+   > An intentionally removed owner needs an exact `retiredDurableStores` contract
+   > in the target register. Only inherited retired tuples are projected, and the
+   > target consumes them before active-owner reconciliation. Existing inert bytes
+   > stay untouched; absence alone never authorizes retirement.
    >
    > This replaced `GITHUB_RUN_NUMBER`, which GitHub scopes to the workflow *file*: renaming,
    > moving, or delete-and-recreating `build-installer.yml` reset the counter to 1 and would have

@@ -36,6 +36,7 @@ import process from 'node:process';
 import { mkdir, rename, rm, writeFile, lstat } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { checkRetiredDurableStores } from './check-store-recoverability.mjs';
 
 /**
  * Floor for the zero-descriptor edge, and a hard lower bound on every derived value.
@@ -177,6 +178,8 @@ export async function deriveReleaseSequence({
 
 function validateCompatibilityBaseline(text, descriptor, tag) {
   const baseline = JSON.parse(text);
+  const retirementFailures = checkRetiredDurableStores(baseline);
+  if (retirementFailures.length) throw new Error(`Predecessor ${tag}: ${retirementFailures.join(' ')}`);
   if (!Array.isArray(baseline.durableStores) || baseline.durableStores.length === 0) {
     throw new Error(`Predecessor ${tag} compatibility baseline has no installed durable stores.`);
   }
@@ -190,6 +193,7 @@ function validateCompatibilityBaseline(text, descriptor, tag) {
     }
     byId.set(store.id, store);
   }
+  for (const store of baseline.retiredDurableStores ?? []) byId.set(store.id, store);
   if (!Array.isArray(descriptor.compatibility) || descriptor.compatibility.length === 0) {
     throw new Error(`Predecessor ${tag} descriptor has no compatibility evidence.`);
   }

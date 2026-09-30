@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  checkRetiredDurableStores,
   checkCorruptionPolicyVocabulary,
   checkCountRatchet,
   checkDurableStoreRegister,
@@ -58,6 +59,56 @@ const CATALOG = [
   { constant: 'CONVERSATIONS', dirName: 'conversations', recoverability: 'AUTHORED' },
   { constant: 'INDEX', dirName: 'index', recoverability: 'DERIVED' },
 ];
+
+const RETIRED_SNAPSHOT = {
+  id: 'worker-config-snapshot',
+  owner: 'HEAD',
+  recoverability: 'DERIVED',
+  currentVersion: 0,
+  reconciliation: 'UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START',
+  byteDisposition: 'PRESERVE_INERT',
+  retiredAt: '2026-09-07',
+  decision: 'lane F stage A item A19 (tempdoc 936)',
+  note: 'Retired compatibility projection; existing bytes remain untouched and are never consumed.',
+};
+
+test('retired durable rows are inert, complete, and disjoint from active owners', () => {
+  assert.deepEqual(checkRetiredDurableStores({
+    durableStores: [{ id: 'ui-settings' }],
+    retiredDurableStores: [RETIRED_SNAPSHOT],
+  }), []);
+});
+
+for (const [label, mutate, pattern] of [
+  ['overlaps an active id', register => ({
+    ...register,
+    retiredDurableStores: [{ ...RETIRED_SNAPSHOT, id: 'ui-settings' }],
+  }), /repeats or overlaps/],
+  ['duplicates a retired id', register => ({
+    ...register,
+    retiredDurableStores: [RETIRED_SNAPSHOT, { ...RETIRED_SNAPSHOT }],
+  }), /repeats or overlaps/],
+  ['uses a live byte disposition', register => ({
+    ...register,
+    retiredDurableStores: [{ ...RETIRED_SNAPSHOT, byteDisposition: 'DELETE' }],
+  }), /preserved inert bytes/],
+  ['has the wrong retirement date', register => ({
+    ...register,
+    retiredDurableStores: [{ ...RETIRED_SNAPSHOT, retiredAt: '2026-09' }],
+  }), /dated decision/],
+  ['uses an invalid historical version', register => ({
+    ...register,
+    retiredDurableStores: [{ ...RETIRED_SNAPSHOT, currentVersion: -1 }],
+  }), /historical tuple/],
+]) {
+  test(`retired durable row ${label} is rejected`, () => {
+    const failures = checkRetiredDurableStores(mutate({
+      durableStores: [{ id: 'ui-settings' }],
+      retiredDurableStores: [RETIRED_SNAPSHOT],
+    }));
+    assert.ok(failures.some(message => pattern.test(message)), failures.join(' | '));
+  });
+}
 
 test('checkParity passes for an exact mirror', () => {
   assert.deepEqual(
@@ -919,6 +970,9 @@ test('the REAL register passes both the vocabulary and the ratchet', () => {
     }),
     [],
   );
+  assert.deepEqual(checkRetiredDurableStores(real), []);
+  assert.ok(real.retiredDurableStores.some(row => row.id === 'worker-config-snapshot'));
+  assert.ok(!real.durableStores.some(row => row.id === 'worker-config-snapshot'));
   // The pin must describe the register it pins, not a number someone typed once — but only as a
   // floor/ceiling, never as an equality. A lane adding rows in parallel raises
   // `real.durableStores.length` above the pin, and that is the ratchet working, not drifting.

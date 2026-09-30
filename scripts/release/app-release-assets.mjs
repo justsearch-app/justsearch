@@ -12,6 +12,7 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { checkRetiredDurableStores } from '../ci/check-store-recoverability.mjs';
 
 const MINISIGN_ED25519_SPKI_PREFIX = Buffer.from(
   '302a300506032b6570032100',
@@ -71,6 +72,9 @@ export async function loadReleaseCompatibility(compatibilityRegisterPath, compat
   if (currentById.size !== compatibility.length) {
     throw new Error('compatibility register contains duplicate durable store ids');
   }
+  const retirementFailures = checkRetiredDurableStores(register);
+  if (retirementFailures.length) throw new Error(retirementFailures.join(' '));
+  const retiredById = new Map((register.retiredDurableStores ?? []).map(store => [store.id, store]));
   if (compatibilityBaselinePath) {
     const baseline = JSON.parse(await readFile(compatibilityBaselinePath, 'utf8'));
     if (!Array.isArray(baseline.durableStores) || baseline.durableStores.length === 0) {
@@ -83,14 +87,29 @@ export async function loadReleaseCompatibility(compatibilityRegisterPath, compat
         throw new Error(`compatibility baseline repeats durable store ${store.id}`);
       }
       seen.add(store.id);
-      const current = currentById.get(store.id);
+      let current = currentById.get(store.id);
       if (!current) {
-        throw new Error(`compatibility baseline store ${store.id} is missing from current register`);
+        const retired = retiredById.get(store.id);
+        if (!retired) {
+          throw new Error(`compatibility baseline store ${store.id} is missing from current register`);
+        }
+        if (store.currentVersion !== retired.currentVersion) {
+          throw new Error(`compatibility baseline store ${store.id} changes retired version`);
+        }
+        current = {
+          ownerId: retired.id, owner: retired.owner, role: retired.recoverability,
+          formatVersion: retired.currentVersion, readableSourceVersions: [retired.currentVersion],
+          reconciliationStrategy: retired.reconciliation,
+        };
       }
       if (store.owner !== current.owner
           || store.recoverability !== current.role
           || store.reconciliation !== current.reconciliationStrategy) {
         throw new Error(`compatibility baseline store ${store.id} changes identity`);
+      }
+      if (!Number.isSafeInteger(store.currentVersion) || store.currentVersion < 0
+          || !current.readableSourceVersions.includes(store.currentVersion)) {
+        throw new Error(`compatibility baseline store ${store.id} has an unreadable source version`);
       }
       return current;
     });

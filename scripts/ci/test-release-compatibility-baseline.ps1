@@ -68,3 +68,6 @@ try {
   Remove-Item -LiteralPath $resolved -Recurse -Force
 }
 Write-Host "test-release-compatibility-baseline: PASS ($checks checks)"
+# The final negative-control child intentionally exits 1. GitHub's pwsh wrapper
+# inherits that native exit code even after assertions pass; publish this script's result.
+exit 0

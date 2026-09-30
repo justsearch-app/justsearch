@@ -32,6 +32,19 @@
     }
   ],
   "knownCompatibilityGaps": [],
+  "retiredDurableStores": [
+    {
+      "id": "worker-config-snapshot",
+      "owner": "HEAD",
+      "recoverability": "DERIVED",
+      "currentVersion": 0,
+      "reconciliation": "UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START",
+      "byteDisposition": "PRESERVE_INERT",
+      "retiredAt": "2026-09-07",
+      "decision": "lane F stage A item A19 (tempdoc 936)",
+      "note": "The second JVM, ordinal-450 snapshot reader and Head writer were retired. Existing runtime/worker-config-snapshot.json bytes remain untouched and are never consumed; resolved configuration is now shared in memory. This row projects predecessor compatibility only and is not an active reconciliation owner."
+    }
+  ],
   "durableStores": [
     {
       "id": "ui-settings",

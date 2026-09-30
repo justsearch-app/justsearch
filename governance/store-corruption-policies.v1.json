@@ -45,6 +45,7 @@
         "store": "worker-config-snapshot",
         "lane": "lane F stage A item A19 (tempdoc 936)",
         "date": "2026-09-07",
+        "compatibilityAuthority": "governance/store-recoverability.v1.json retiredDurableStores",
         "whereItsBytesWent": "Nowhere — the file stopped being written and nothing reads it. It was <dataDir>/runtime/worker-config-snapshot.json, the Head's resolved configuration serialised for a SECOND JVM to load at config ordinal 450. Items A11/A13 deleted that JVM, so the store had one writer and no reader; A19 deleted the writer (HeadlessApp), the ordinal-450 tier, ResolvedConfig.toWorkerSnapshot/loadWorkerSnapshot and ResolvedConfigBuilder.contributeWorkerSnapshot/loadWorkerSnapshotFromSysprop/loadRawWorkerSnapshotFromSysprop. There is one ResolvedConfig in one JVM now, so there are no bytes to relocate: the data still exists, in memory, as the object both halves already share. An existing installation keeps a stale file on disk that nothing opens; it is inert, not orphaned state, and no migration is required."
       }
     ]

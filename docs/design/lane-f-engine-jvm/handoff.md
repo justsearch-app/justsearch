@@ -109,9 +109,12 @@ SWITCHING produces the prefix-only receipt. Preserve its native unsupported fenc
 and add a mixed-snapshot negative regression. This closes the speculative native
 PRUNE implementation queue; legacy compatibility remains with its existing owner.
 D2-5's recorded owner design reuses the runtime write barrier and retains
-dispatch serialization; C2 operation identity and transition visibility still
-need connecting before implementation; its concrete accepted C2 projection
-consumer remains unresolved, as recorded in D2's 2026-09-30 design consolidation.
+dispatch serialization. Its concrete in-lane consumer is now the existing
+non-dispatched C2 operation runner in the required durability test; no new
+product operation is implied. Executor-owned fixed-deadline commit waves replace
+caller-led execution. Independent Sol identified the close/barrier deadlock and
+the required central draining admission fence; D2 records both corrections.
+Production implementation and installed durability proof remain open.
 
 The coherent final stress/Spotless/PMD gate passes at
 `tmp/lane-f-native-checkpoint-integrated-r5.log` (2m38s): 1,873 XML suites,
@@ -128,6 +131,57 @@ Frozen module/script diff hash against `2f62a59ea` is
 after the reviewed R4 and R6 runs. Script lint, runtime closure, store gate/self-tests, documentation/index/skills,
 canonical links, module/config matrices and pre-commit privacy pass at
 `tmp/lane-f-native-*-checkpoint.log` and `-script-lint-final.log`.
+
+Reviewed native/refused recovery checkpoint
+`a544cf43714284682f2c38d9f03d9d8fb47dd7dd` is committed and pushed to draft
+PR727. Exact-head hosted CI36689969539 completed with twelve passing jobs,
+including native, Rust and integration; Public claims fails the unchanged
+Search v3 deadline under decision851/tempdoc852. The actual failed job log is
+`tmp/lane-f-native-checkpoint-hosted-public-claims-final.log`. No merge occurred.
+
+The next D1-16 generation transition matrix is in progress. R1 ran four actual
+installed standard-model cases in18m41s: watcher add/delete and both low-memory
+pointer cuts passed, while gap approval timed out waiting for Green drainage.
+Preserve `tmp/lane-f-generation-transition-matrix-r1.log` and its
+`-red-xml/` archive. Failed private fixture
+`tmp/lane-f-takeover/lifecycle-gap-bc2d12eb-33b5-46d3-946c-aee7fceba744/`
+shows migration FAILED on an unrecorded watcher mutation; do not lengthen the
+wait or remove the promotion fence without tracing that cause. Both pending
+harness rows remain. Its owned runner stopped cleanly and official health
+returned ABSENT with no foreign runs/inference orphan on2026-09-30.
+
+WP2's reviewed baseline wrapper checkpoint is committed and pushed at
+`9d7451d37e0839c03bb28810f4e159c48bd231ab`. Exact-head CI36695462439
+passed build/unit/Rust/integration and failed Windows-native after all10 wrapper
+checks passed: GitHub's dot-sourced shell inherited an expected negative child's
+exit1. The correction explicitly exits0 only after assertions and cleanup succeed;
+the matching hosted-shell regression passes. Public claims also remains red.
+
+The explicit retirement contract is locally implemented and independently
+reviewed. The existing register records the exact retired snapshot tuple and
+PRESERVE_INERT disposition; target Shell consumes the inherited id/version and
+reconciles all51 active owners. No snapshot writer or healthy active row returns.
+Proof passes19 asset cases,61 predecessor assertions,84 gate assertions,93 Shell
+cases and11 Head upgrade-contract cases. The real42-owner v0.3 predecessor and
+future active51/retired1 tag pass the exact-byte contract projection at
+`tmp/lane-f-wp2-real-retirement-contract-proof-r1.log`. Governing WP2 names all
+logs and original red controls. A fresh hosted revision and signed installed
+predecessor-to-target qualification remain required; signing/Sandbox access is
+still an external dependency. D1 runtime changes remain an uncommitted slice.
+
+Pre-Green exact/prefix/collection deletion now journals B first and uses the
+existing caller's single A effect when search and ingest share A. Focused
+regressions pass28 cases, then the strengthened collection oracle passes9;
+compile/installDist/Spotless/PMD pass at
+`tmp/lane-f-pre-green-delete-{focused-r1,focused-r2,static-r1}.log` with XML.
+The installed gap rerun at `tmp/lane-f-generation-gap-pre-green-r2.log` now
+promotes B correctly, exposing the old stimulus's invalid approval expectation:
+an accepted watcher DELETE is a valid final effect. Its original red XML and
+private `lifecycle-gap-170f6819-3c25-46cb-9086-9a8f0d001559/` evidence remain.
+Root is independently designing a genuine source-failure gap stimulus; no fence
+or assertion is waived. Both harness pending rows remain until the matrix passes.
+The failed run stopped cleanly; official health is ABSENT with no foreign run or
+inference orphan. All remaining D1/D2/E/F still governs autonomous continuation.
 
 Reviewed checkpoint `2f62a59ea51e3bfabe69bd9e0c9b1e87f7d224c8` is committed
 and pushed to existing draft PR727. Its code is the exact frozen hash above;

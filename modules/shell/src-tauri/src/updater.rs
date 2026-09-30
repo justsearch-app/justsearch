@@ -73,6 +73,16 @@ struct ReleaseStoreCompatibility {
 #[serde(rename_all = "camelCase")]
 struct LocalStoreRegister {
     durable_stores: Vec<LocalDurableStore>,
+    #[serde(default)]
+    retired_durable_stores: Vec<LocalRetiredDurableStore>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalRetiredDurableStore {
+    #[serde(flatten)]
+    store: LocalDurableStore,
+    byte_disposition: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1256,6 +1266,13 @@ fn target_reconciliation_owners(
     }
     let local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER)
         .map_err(|error| format!("Installed store register is invalid: {error}"))?;
+    target_reconciliation_owners_against(intent, local)
+}
+
+fn target_reconciliation_owners_against(
+    intent: &UpgradeIntent,
+    local: LocalStoreRegister,
+) -> Result<Vec<OwnerExpectation>, String> {
     let mut owners = std::collections::BTreeMap::new();
     for store in local.durable_stores {
         if store.id.trim().is_empty()
@@ -1263,10 +1280,20 @@ fn target_reconciliation_owners(
             return Err(format!("Installed store register repeats or omits an owner id: {}", store.id));
         }
     }
+    let mut retired = std::collections::HashMap::new();
+    for entry in local.retired_durable_stores {
+        let store = entry.store;
+        if store.id.trim().is_empty() || owners.contains_key(&store.id)
+            || entry.byte_disposition != "PRESERVE_INERT"
+            || retired.insert(store.id.clone(), store.current_version).is_some() {
+            return Err(format!("Installed retired store identity/disposition is invalid: {}", store.id));
+        }
+    }
     let mut inherited = std::collections::HashSet::new();
     for expected in &intent.owner_expectations {
         if !inherited.insert(&expected.owner_id)
-            || owners.get(&expected.owner_id) != Some(&expected.format_version) {
+            || (owners.get(&expected.owner_id) != Some(&expected.format_version)
+                && retired.get(&expected.owner_id) != Some(&expected.format_version)) {
             return Err(format!("Inherited owner does not match installed target: {}", expected.owner_id));
         }
     }
@@ -2517,6 +2544,65 @@ mod tests {
         let mut expected = all;
         expected.sort_by(|a, b| a.owner_id.cmp(&b.owner_id));
         assert_eq!(target_reconciliation_owners(&intent, "1.1.0").unwrap(), expected);
+    }
+
+    #[test]
+    fn target_reconciliation_consumes_only_exact_retired_inherited_version() {
+        let mut intent = test_intent(UpgradePhase::Reconciling);
+        intent.owner_expectations = current_store_compatibility().into_iter()
+            .map(|store| OwnerExpectation {
+                owner_id: store.owner_id, format_version: store.format_version,
+            }).collect();
+        intent.owner_expectations.push(OwnerExpectation {
+            owner_id: "worker-config-snapshot".into(), format_version: 0,
+        });
+        let active = target_reconciliation_owners(&intent, "1.1.0").unwrap();
+        let local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
+        assert_eq!(active.len(), local.durable_stores.len());
+        assert!(active.iter().all(|row| row.owner_id != "worker-config-snapshot"));
+        for store in local.durable_stores {
+            assert!(active.iter().any(|row| row.owner_id == store.id
+                && row.format_version == store.current_version));
+        }
+        intent.owner_expectations.last_mut().unwrap().format_version = 1;
+        assert!(target_reconciliation_owners(&intent, "1.1.0").unwrap_err()
+            .contains("worker-config-snapshot"));
+        intent.owner_expectations.last_mut().unwrap().format_version = 0;
+        intent.owner_expectations.push(intent.owner_expectations.last().unwrap().clone());
+        assert!(target_reconciliation_owners(&intent, "1.1.0").is_err());
+    }
+
+    #[test]
+    fn target_reconciliation_rejects_retired_overlap_and_changed_disposition() {
+        let intent = test_intent(UpgradePhase::Reconciling);
+        let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
+        local.retired_durable_stores[0].store.id = local.durable_stores[0].id.clone();
+        assert!(target_reconciliation_owners_against(&intent, local).unwrap_err()
+            .contains("retired store identity/disposition"));
+        let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
+        local.retired_durable_stores[0].byte_disposition = "DELETE".into();
+        assert!(target_reconciliation_owners_against(&intent, local).unwrap_err()
+            .contains("retired store identity/disposition"));
+        let mut raw: serde_json::Value = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
+        let retired = raw["retiredDurableStores"][0].clone();
+        raw["retiredDurableStores"].as_array_mut().unwrap().push(retired);
+        let local: LocalStoreRegister = serde_json::from_value(raw).unwrap();
+        assert!(target_reconciliation_owners_against(&intent, local).is_err());
+    }
+
+    #[test]
+    fn frozen_retired_descriptor_preserves_legacy_installed_owner_identity() {
+        let old: LocalStoreRegister = serde_json::from_str(r#"{"durableStores":[{
+            "id":"worker-config-snapshot", "owner":"HEAD", "recoverability":"DERIVED",
+            "currentVersion":0, "reconciliation":"UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START"
+        }]}"#).unwrap();
+        assert!(old.retired_durable_stores.is_empty());
+        let frozen = ReleaseStoreCompatibility {
+            owner_id: "worker-config-snapshot".into(), owner: "HEAD".into(), role: "DERIVED".into(),
+            format_version: 0, readable_source_versions: vec![0],
+            reconciliation_strategy: "UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START".into(),
+        };
+        validate_store_compatibility_against(old, &test_descriptor(vec![frozen])).unwrap();
     }
 
     #[test]
