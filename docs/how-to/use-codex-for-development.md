@@ -107,15 +107,15 @@ and reasoning effort. Do not select an ad hoc model for routine delegation.
 
 | Role | Model and effort | Use when |
 | --- | --- | --- |
-| `explorer` | `gpt-5.6-luna`, `high` | Bounded read-only discovery, ownership tracing, and primary-source evidence |
-| `worker` | `gpt-5.6-luna`, `high` | Intended behavior, owning code, and acceptance checks are already settled |
-| `complex_worker` | `gpt-5.6-sol`, `medium` | Root cause is ambiguous; work crosses module contracts; concurrency, lifecycle, security, or migration reasoning is material; or a bounded worker fails verification |
-| `reviewer` | `gpt-5.6-sol`, `high` | Independent refute-first review of correctness, security, regressions, and test sufficiency |
-| `companion` | `gpt-5.6-luna`, `xhigh` | Persistent read-only supporting-context helper; at most one per session; see below |
-| `archivist` | `gpt-5.6-luna`, `high` | Docs-only closure and handoff writer at completion, pause, or handoff; see below |
+| `explorer` | `gpt-6-luna`, `high` | Bounded read-only discovery, ownership tracing, and primary-source evidence |
+| `worker` | `gpt-6-luna`, `high` | Intended behavior, owning code, and acceptance checks are already settled |
+| `complex_worker` | `gpt-6.1-sol`, `medium` | Root cause is ambiguous; work crosses module contracts; concurrency, lifecycle, security, or migration reasoning is material; or a bounded worker fails verification |
+| `reviewer` | `gpt-6.1-sol`, `high` | Independent refute-first review of correctness, security, regressions, and test sufficiency |
+| `companion` | `gpt-6-luna`, `xhigh` | Persistent read-only supporting-context helper; at most one per session; see below |
+| `archivist` | `gpt-6-luna`, `high` | Docs-only closure and handoff writer at completion, pause, or handoff; see below |
 
 Project defaults route an unqualified or nested subagent to
-`gpt-5.6-luna` at `high` effort. Explicit role pins take precedence. A bounded
+`gpt-6-luna` at `high` effort. Explicit role pins take precedence. A bounded
 worker that discovers an escalation condition stops, returns the evidence, and
 lets the parent choose `complex_worker`; children do not silently upgrade their
 own model. Set `fork_turns` to `"none"` for a self-contained brief or to a

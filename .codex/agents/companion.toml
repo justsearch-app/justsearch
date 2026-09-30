@@ -1,6 +1,6 @@
 name = "companion"
 description = "Persistent read-only supporting-context specialist for the parent: consolidates module contracts, logs, and documentation deltas across several related questions and returns compact, revision-stamped, source-linked findings. Never an authority over architecture or acceptance. At most one per session."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "read-only"
 developer_instructions = """

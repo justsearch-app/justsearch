@@ -69,7 +69,7 @@ tracing* below). You install everything yourself:
     ```
     Sign in (re-done every boot — the sandbox is wiped), open the mapped folder
     as the project and **accept the trust prompt**: the staged
-    `.codex/config.toml` only loads for a trusted folder. It pins `gpt-5.6-sol`,
+    `.codex/config.toml` only loads for a trusted folder. It pins `gpt-6.1-sol`,
     sets `approval_policy = "never"` + `sandbox_mode = "danger-full-access"`
     (Windows Sandbox is the isolation boundary), and raises
     `project_doc_max_bytes` so the ~66 KB `AGENTS.md` is not silently cut at

@@ -652,7 +652,7 @@ def render_codex_config() -> str:
             "# Codex only loads this file once the mapped folder is TRUSTED -- accept the",
             "# trust prompt on first open (or `codex --cd <folder>` and confirm).",
             "",
-            "model = \"gpt-5.6-sol\"",
+            "model = \"gpt-6.1-sol\"",
             "",
             "# Windows Sandbox is the isolation boundary (same reasoning as the staged",
             "# .claude/settings.json bypassPermissions): no inner sandbox, no approval prompts.",
