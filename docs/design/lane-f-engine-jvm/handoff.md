@@ -145,7 +145,8 @@ D1 closure assertions `01a0f35a-ab44-78d0-93b6-3cc776dad953` (`lane-f-d1-close`,
 reconfigure fixes `01a0f2e5-978c-7492-9ab9-42adaeb5abbc` (`lane-f-reconf`, grant `gradle-reconf2`) for the
 [review](evidence/D1/reconfigure-review-2026-09-30.md): two blockers (CUDA realized after commitment;
 restoration Error bypasses recovery) and five should-fix; API fields move into a nested `composition`
-object. Gradle order: help2, wp2b, reconf2, d1close. Implementation `5ccfa74a8` is not merged.
+object. Gradle order: reconf2 (now), wp2b2 (WP2 2b review fixes: CLI boot bypasses the marker;
+create-once backup; [batch 2 review](evidence/batch2-review-2026-09-30.md)), d1close. Implementation `5ccfa74a8` is not merged.
 
 Done this session: D1-17 help source in Green (`1ac1407ef`, merged `63b83ffad`; integrated
 build green at `tmp/lane-f-help-integrated-compile-r2.log`, focused 212 tests at

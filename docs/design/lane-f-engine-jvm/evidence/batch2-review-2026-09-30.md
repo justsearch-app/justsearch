@@ -1,0 +1,17 @@
+# Batch 2 independent review (2026-09-30)
+
+Refute-first static review by Sol (gpt-6.1-sol) of 5a1318200 (WP2 2b), d5deddf40 (help fixes) and merges 871e688a7/172df0767. Verbatim. Fixes assigned to the WP2 2b session.
+
+- **BLOCKER — CLI boot bypasses the marker.** [LauncherEnvironment.java:188](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/app-launcher/src/main/java/io/justsearch/applauncher/LauncherEnvironment.java:188) opens and migrates `operations.db` after acquiring the instance lock, without recording `data-version.json`. `seed`, `reindex`, `verify`, `snapshot`, and smoke reach this path. A CLI migration followed by downgrade therefore leaves absent or stale high-water evidence. **Fix:** invoke an engine-owned marker hook through the permitted API/SPI seam before opening stores; log any notice. Extend [DataVersionMarkerTest.java:43](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/app-engine/src/test/java/io/justsearch/app/engine/DataVersionMarkerTest.java:43), which currently checks only HeadlessApp.
+
+- **SHOULD-FIX — backup publication can overwrite the first snapshot.** [UiSettingsStore.java:320](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java:320) checks existence, then atomically **replaces** the destination. Settings resolve independently of `DATA_DIR` ([same file:479](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java:479)); Engines with different data directories can share settings while holding different locks. If legacy bytes change between concurrent reads, the later publication can overwrite the first backup. **Fix:** serialize publication by settings-path ownership, or use genuinely atomic create-once publication; add a concurrent regression with differing candidate bytes.
+
+Sound notes:
+
+- HeadlessApp’s marker precedes the registered store opens, including normal/eval boot and supervisor/dead-Engine relaunch. Same-directory starts are excluded. Per-field maxima preserve downgrade→upgrade high-water values; marker writes use strict atomic replacement, and corrupt/read/write failures are nonfatal.
+- `data.newer_build` has a real producer and reaches the webview through Health SSE and [healthEventActivityRow.ts:203](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.ts:203). The amendment explicitly permits its readiness-mapping exemption.
+- Settings backups preserve original bytes and skip current-schema files. Normal rewrites/quarantine leave them intact; explicit factory reset deletes them. Backup-write failure aborts loading while preserving valid settings.
+- **B:** all three fixes address the reported causes; regressions assert null watched-binding precedence, eval exclusion with retained corpus, and discovered SSOT without overrides.
+- **C:** neither merge introduces another semantic conflict. Constant visibility remains within the permitted composition-root boundary; no Lucene access leaks into application code.
+
+Static review at `172df0767` only. No edits, Gradle, backend, or independently executed test proof.
