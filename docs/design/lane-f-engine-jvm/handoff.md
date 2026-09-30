@@ -27,7 +27,53 @@ launched it; a killed wrapper (30-minute auto-background cap, or Claude Code's
 memory-pressure reaper, now disabled in user settings from the next Claude Code
 start) does not stop the work. Resume with `codex exec resume <session id>` only
 after its log has stopped growing, never while the original process still writes.
-Serialize Gradle across workers with grant files under `tmp/grants/`. Root keeps Gradle, the dev stack, integration and commits.
+Root keeps Gradle, the dev stack, integration and commits.
+
+### Codex cost rules (owner, 2026-09-30; binding for every launch and resume)
+
+Measured: about $114 of Codex spend in the first four hours, of which about $90 came from
+sub-agents the Sol workers spawned under the stale `gpt-5.6-*` role pins. About 70% of spend
+was cached-input re-reads while workers polled for a Gradle grant.
+
+1. **No nested spawning.** Every `codex exec` and `codex exec resume` carries
+   `-c agents.enabled=false`, and every brief says "Do not spawn sub-agents; do the work
+   yourself." Probe on 2026-09-30: with the override Codex reported spawning unavailable and
+   created no child session (`01a0f3ad-4bae-...`); the control without it created one
+   (`01a0f3ad-7b8c-...` -> child `01a0f3ad-97e2-...`).
+3. **No idle waiting.** A worker never polls for a Gradle grant. Build-bound work is phased:
+   the worker edits, then ends with `READY FOR BUILD: <exact commands>` and exits. When Gradle
+   is free, root issues the grant and runs `codex exec resume <id> -c agents.enabled=false`
+   with "You hold the Gradle grant; run: ...". Launch a worker only while it has non-build work.
+   Brief template: `C:/Users/Elias/AppData/Local/Temp/cx/brief-rules.md` (copy its lines into
+   every brief).
+5. **Visibility and budget.** Every status report counts actual Codex sessions, children
+   included (`node C:/Users/Elias/AppData/Local/Temp/cx/codex-status.js`). After each worker
+   finishes, record its API-equivalent cost below from the session's final
+   `total_token_usage` at $/1M (uncached in / cached in / out): gpt-6.1-sol 2 / 0.10 / 10,
+   gpt-6-luna 0.10 / 0.01 / 0.50, gpt-5.6-sol 4 / 0.40 / 20, gpt-5.6-luna 0.20 / 0.02 / 1.20.
+   Note the Codex weekly `used_percent`; tell the owner if it passes 50% before the week resets.
+6. **Model tiering.** Luna (`gpt-6-luna`) for every read-only inventory, contract check, doc
+   edit and mechanical change. Sol (`gpt-6.1-sol`) only for design, non-trivial implementation
+   and refute-first review.
+
+Role pins: PR #735 moves `.codex/agents/*.toml` and `default_subagent_model` to
+`gpt-6.1-sol` / `gpt-6-luna`; owner merges it. Until then the override in rule 1 is what
+prevents stale-pin children.
+
+Per-worker cost ledger (self + children, API-equivalent):
+
+| Worker (session) | Model | Self | Children | Note |
+|---|---|---|---|---|
+| reconfigure impl + fixes (`01a0f2e5`) | gpt-6.1-sol | $6.81 | 6, $54.63 | children on gpt-5.6-sol |
+| D1 closure (`01a0f35a`) | gpt-6.1-sol | $2.34+ | 8, $35.77+ | running at 21:00 |
+| help source + fixes (`01a0f2bb`) | gpt-6.1-sol | $4.61 | 0 | grant polling heavy |
+| WP2 2b + fixes (`01a0f2ed`) | gpt-6.1-sol | $4.72+ | 1, $0.18 | running at 21:00 |
+| F-1/F-2 docs (`01a0f37a`) | gpt-6.1-sol | $1.63 | 6, $2.82 | |
+| F-3/4/5 (`01a0f39e`) | gpt-6.1-sol | $0.83+ | 1, $0.22 | running at 21:00 |
+| D1/D2 audit, reconciliation, 4 reviews | gpt-6.1-sol | $6.25 | 6, $7.57 | read-only |
+| E1, WP2 2c, callers, contract, sweep, 2e | mixed | $1.09 | 0 | |
+
+Codex weekly `used_percent`: 21 at 21:00 on 2026-09-30.
 
 ## Current state (2026-09-30)
 
