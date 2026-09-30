@@ -1,3 +1,7 @@
+# Lane F re-plan audit (2026-09-30)
+
+Independent read-only D1/D2 status audit by Sol (gpt-6.1-sol) at ca12f00e6, used by the handoff re-plan. Verbatim output.
+
 | Item and title | Status | Evidence: verified code; status record | What remains (≤20 words) | Size | Merge-critical? |
 |---|---|---|---|---|---|
 | D1-1 Component registry | ACCEPTED | `modules/app-engine/src/main/java/io/justsearch/app/engine/DefaultEngineComponentRegistry.java:25`; acceptance: `docs/design/lane-f-engine-jvm/stages/D1.md:5263` (doc-only) | None recorded. | — | YES — readiness and recovery use this authority. |

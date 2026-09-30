@@ -104,10 +104,26 @@ release note, every first-party client including MCP and CLI) or fix it.
 4. WP2 2b settings backup plus data-version marker (brief ready, needs the Gradle grant next).
 5. D1-4/12/14/16 reconfigure beside/in-place: design refutation first, then implementation.
 6. D1 acceptance reconciliation for the implemented-unproven items, then the D1-17 sweep and D1 close.
-7. Contract-change verification (above), E values (owner sets the E4 soak duration), E1-E7, F.
+7. Contract-change verification (above; Luna check running), E values (owner sets the E4
+   soak duration), E1-E7, F.
+8. AOT cache fidelity (needs Gradle): `modules/ui/build.gradle.kts:1070-1083` trains and
+   assembles the cache with neither the collector nor `UseCompactObjectHeaders`, while both
+   spawn sites run `-XX:+UseCompactObjectHeaders` and now `-XX:+UseG1GC`. A header-mode
+   mismatch can make the JVM ignore the cache. Verify with `-Xlog:aot` on an installed dist
+   whether the cache loads, and align the training flags with the spawn set.
 
-Search v3 deadline: moved to 2026-11-30 by owner decision 2026-09-30 in PR #729
-(branch `codex/sv3-deadline-extension`), which clears the red required `Public claims` check.
+Done this session: E1 instruments (`9919dde24`), WP2 2c downgrade tooling (`dacecd8ca`),
+Engine collector switched to explicit G1 at both spawn sites per design section 8
+(`bb399e495`; `test-dev-runner-head-java-opts` passes; Rust compile is hosted-only).
+
+Search v3 deadline: moved to 2026-11-30 by owner decision 2026-09-30; PR #729 merged as
+`ac1c93bf3` (with the brace-expansion lockfile fix for main) and merged into this branch at
+`f80fd1f69`. The required `Public claims` check is green again on main.
+
+Contract-change check (Luna, 2026-09-30): all three changes are design-authorized. Broken
+first-party callers: `scripts/jseval/jseval/utility_judge.py:568` and
+`scripts/ci/verify-installer-nsis-win.ps1:826` post settings without witness/key; API docs
+and CHANGELOG are stale. A Luna fix is running in `codex/lane-f-settings-callers`.
 
 ## Evidence and owner map
 
