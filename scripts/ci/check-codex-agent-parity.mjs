@@ -52,7 +52,7 @@ const checks = [
     assert.match(config, /required\s*=\s*true/);
     assert.match(config, /startup_timeout_sec\s*=\s*\d+/);
     assert.match(config, /tool_timeout_sec\s*=\s*\d+/);
-    assert.match(config, /^default_subagent_model\s*=\s*"gpt-5\.6-luna"/m);
+    assert.match(config, /^default_subagent_model\s*=\s*"gpt-6-luna"/m);
     assert.match(config, /^default_subagent_reasoning_effort\s*=\s*"high"/m);
     assert.doesNotMatch(config, /^cwd\s*=/m, 'project MCP must inherit Codex repository cwd; cwd=".." starts outside worktrees');
     assert.doesNotMatch(config, /(token|password|secret|pat)\s*=/i);
@@ -70,12 +70,12 @@ const checks = [
     const names = readdirSync(dir).filter((name) => name.endsWith('.toml')).sort();
     assert.deepEqual(names, ['archivist.toml', 'companion.toml', 'complex_worker.toml', 'explorer.toml', 'reviewer.toml', 'worker.toml']);
     const expectedRouting = {
-      'archivist.toml': { model: 'gpt-5.6-luna', effort: 'high', sandbox: 'workspace-write' },
-      'companion.toml': { model: 'gpt-5.6-luna', effort: 'xhigh', sandbox: 'read-only' },
-      'complex_worker.toml': { model: 'gpt-5.6-sol', effort: 'medium', sandbox: 'workspace-write' },
-      'explorer.toml': { model: 'gpt-5.6-luna', effort: 'high', sandbox: 'read-only' },
-      'reviewer.toml': { model: 'gpt-5.6-sol', effort: 'high', sandbox: 'read-only' },
-      'worker.toml': { model: 'gpt-5.6-luna', effort: 'high', sandbox: 'workspace-write' },
+      'archivist.toml': { model: 'gpt-6-luna', effort: 'high', sandbox: 'workspace-write' },
+      'companion.toml': { model: 'gpt-6-luna', effort: 'xhigh', sandbox: 'read-only' },
+      'complex_worker.toml': { model: 'gpt-6.1-sol', effort: 'medium', sandbox: 'workspace-write' },
+      'explorer.toml': { model: 'gpt-6-luna', effort: 'high', sandbox: 'read-only' },
+      'reviewer.toml': { model: 'gpt-6.1-sol', effort: 'high', sandbox: 'read-only' },
+      'worker.toml': { model: 'gpt-6-luna', effort: 'high', sandbox: 'workspace-write' },
     };
     for (const name of names) {
       const role = read(`.codex/agents/${name}`);

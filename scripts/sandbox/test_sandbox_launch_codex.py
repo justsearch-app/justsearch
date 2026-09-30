@@ -105,7 +105,7 @@ class CodexSettingsTests(unittest.TestCase):
         self.assertIn('sandbox_mode = "danger-full-access"', text)
         # The cap written is the constant asserted against.
         self.assertIn(f"project_doc_max_bytes = {CODEX_PROJECT_DOC_MAX_BYTES}", text)
-        self.assertIn('model = "gpt-5.6-sol"', text)
+        self.assertIn('model = "gpt-6.1-sol"', text)
         self.assertIn("[computer_use.windows]", text)
         self.assertIn('"JustSearch.exe"', text)
 

@@ -1,6 +1,6 @@
 name = "worker"
 description = "Implementation-focused JustSearch worker for a bounded change whose design, ownership, and acceptance checks are already settled."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = """
