@@ -464,10 +464,13 @@ Without this gate, the enumerator starts immediately and the `IndexingLoop` proc
 
 Bootstrap and Green migration share the immutable bundled help source resolved from
 `ResolvedConfig.Paths.ssotPath()/docs/help`, labeled `justsearch-help`. Green includes its
-top-level Markdown files whenever the directory exists, independently of the startup-only
+top-level Markdown files whenever the directory exists and eval mode is off, independently of the startup-only
 `.help-ingested-version` marker. Missing physical help is skipped. This internal source is
 separate from operator collections and is never persisted as a watched root; its collection
-label accompanies file admission into the candidate generation.
+label accompanies file admission into the candidate generation. Normal configuration assembly
+retains the configuration loader's discovered SSOT path at auto-detect priority, below explicit
+configuration sources. A watched-root binding takes precedence over a configured collection
+on the same path, including a null watched label representing the default binding.
 
 Migration enumeration requires complete declared coverage. An absent or valid empty root registry
 with no configured roots completes with zero files; directory and single-file roots are supported.
