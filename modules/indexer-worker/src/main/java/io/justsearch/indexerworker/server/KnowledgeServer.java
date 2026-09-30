@@ -305,6 +305,9 @@ public final class KnowledgeServer implements Closeable {
         servingViewMonitor.notifyAll();
       }
       cleanRetiredServingView(captured);
+      // An earlier view can be the last owner of a runtime also referenced by a later retired
+      // view. Its release must retry that later view's existing cleanup, not just its own.
+      retryRetiredServingViews();
     }
   }
   private volatile boolean closeStarted;
@@ -7982,6 +7985,15 @@ public final class KnowledgeServer implements Closeable {
 
   private void closeRetiredSource(ServingView old, EncoderSet successorEncoder,
       QueryRoleSet successorQuery) {
+    synchronized (servingViewMonitor) {
+      LuceneRuntime retiringRuntime = old.searchRuntime;
+      if (retiringRuntime != null && retiringRuntime != ingestLifecycle
+          && (referencesRuntime(servingView, retiringRuntime)
+              || retiredServingViews.stream().anyMatch(view -> view != old
+                  && referencesRuntime(view, retiringRuntime)))) {
+        throw new IllegalStateException("Retired generation still has another serving view");
+      }
+    }
     try {
       old.services.close();
       old.releaseModelSets();
@@ -7991,6 +8003,10 @@ public final class KnowledgeServer implements Closeable {
     } catch (IOException failure) {
       throw new IllegalStateException("Retired generation still owns resources", failure);
     }
+  }
+
+  private static boolean referencesRuntime(ServingView view, LuceneRuntime runtime) {
+    return view != null && (view.searchRuntime == runtime || view.ingestRuntime == runtime);
   }
 
   /**

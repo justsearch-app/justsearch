@@ -99,8 +99,8 @@ final class KnowledgeServerCloseCompletionTest {
           || point.equals("migration-after-pointer-commit")
           || point.equals("migration-before-live-activation")
           || point.equals("migration-after-live-activation");
+      java.util.concurrent.Future<KnowledgeServer.ServingLease> queuedCapture = null;
       try (var captureExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
-        java.util.concurrent.Future<KnowledgeServer.ServingLease> queuedCapture = null;
         try {
           if (publicationWritePoint) {
             var attempting = new java.util.concurrent.CountDownLatch(1);
@@ -147,6 +147,12 @@ final class KnowledgeServerCloseCompletionTest {
             assertEqualsZeroSearch(greenAfterWrite);
           }
         }
+      } finally {
+        // An assertion that capture bypassed the writer must still release the returned lease.
+        // Executor close above joins the task after the barrier's failure-safe release.
+        if (queuedCapture != null) {
+          queuedCapture.get(5, java.util.concurrent.TimeUnit.SECONDS).close();
+        }
       }
 
       // Flow A intentionally reuses one compatible model/settings owner. The generation pairing
@@ -162,6 +168,16 @@ final class KnowledgeServerCloseCompletionTest {
         assertSame(compatibleOwner, greenQuery.encoderSet());
         assertEqualsZeroSearch(greenQuery);
       }
+      assertNotNull(server.indexGenerationManagerForTests().readStateBestEffort()
+          .previous_generation(), "issued Blue must retain its predecessor capacity");
+      Path bluePath = blueRuntime.openedIndexPath();
+      assertTrue(java.nio.file.Files.exists(bluePath));
+      blueQuery.close();
+      blueQuery = null;
+      org.junit.jupiter.api.Assertions.assertNull(
+          server.indexGenerationManagerForTests().readStateBestEffort().previous_generation(),
+          "release of the earlier view must retry the later source cleanup and retire Blue");
+      assertFalse(java.nio.file.Files.exists(bluePath));
     } finally {
       barrier.release();
       if (blueQuery != null) blueQuery.close();

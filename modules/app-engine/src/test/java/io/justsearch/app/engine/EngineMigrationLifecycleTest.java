@@ -193,7 +193,7 @@ final class EngineMigrationLifecycleTest {
         "the marker must still be findable on the new active generation");
   }
 
-  /** Blue holds two documents; Green holds one, making live serving-view publication observable. */
+  /** Blue gains C through its active lexical projection; Green owns only C after publication. */
   @Test
   @DisplayName("cutover publishes Green's document count in the live Engine without a restart")
   void cutoverActivatesTheGenerationInProcess(@TempDir Path tempDir)
@@ -232,16 +232,21 @@ final class EngineMigrationLifecycleTest {
         "Blue's signature must be the two files explicitly indexed into A");
 
     String activeBefore = engine.status().getMigration().getActiveGenerationId();
-    GenerationWitness blueGeneration = new GenerationWitness(activeBefore, blueWitness);
     // Publish the one-document migration source only after the Engine has captured its ordinary
-    // watcher roots. The migration enumerator re-reads this durable owner, while Blue cannot
-    // opportunistically ingest C and blur the two frozen response signatures.
+    // watcher roots. Accepted build effects also project C lexically into A (D1's active-source
+    // projection), so the paused A signature is the known full set A+B+C, while B contains C.
     writeWatchedRoots(dataDir, greenDocs);
     var started = engine.client().startMigration(
         "count_divergence", TestEngineContexts.FOREGROUND);
     assertTrue(started.accepted(), "startMigration accepted");
     assertTrue(migrationBarrier.awaitReached(180, TimeUnit.SECONDS),
         "the before-SWITCHING barrier must witness completed enumeration and hold publication on A");
+    SearchWitness pausedBlueWitness = new SearchWitness(3L,
+        List.of(PathNormalizer.normalizeKey(fileA), PathNormalizer.normalizeKey(fileB),
+            PathNormalizer.normalizeKey(fileC)).stream().sorted().toList());
+    assertEquals(pausedBlueWitness, witness(awaitSearchResponse(commonMarker, 3, 60_000)),
+        "paused Blue must expose all three accepted lexical effects before the swap loop");
+    GenerationWitness blueGeneration = new GenerationWitness(activeBefore, pausedBlueWitness);
     GenerationWitness greenGeneration = new GenerationWitness(started.buildingGenerationId(),
         new SearchWitness(1L, List.of(PathNormalizer.normalizeKey(fileC))));
 
@@ -269,7 +274,7 @@ final class EngineMigrationLifecycleTest {
       try {
         assertTrue(awaitFirstResponse(firstResponse, observedResponses, searchLoop, 30_000),
             "the across-swap loop must observe Blue before cutover");
-        assertTrue(observedResponses.contains(blueWitness),
+        assertTrue(observedResponses.contains(blueGeneration.response()),
             "the across-swap loop must establish Blue's complete response signature");
 
         migrationBarrier.release();
@@ -299,7 +304,7 @@ final class EngineMigrationLifecycleTest {
                 || response.equals(greenGeneration.response())),
         "every complete response must equal the frozen generation signature "
             + blueGeneration + " or " + greenGeneration + ": " + observedResponses);
-    assertTrue(observedResponses.containsAll(List.of(blueWitness, greenWitness)),
+    assertTrue(observedResponses.containsAll(List.of(blueGeneration.response(), greenWitness)),
         "the retained response trace must include both generation signatures: "
             + observedResponses);
 
@@ -639,7 +644,7 @@ final class EngineMigrationLifecycleTest {
     return last;
   }
 
-  /** IPC has no served-generation field, so use a complete, disjoint fixture response signature. */
+  /** IPC has no served-generation field, so use a complete, distinct fixture response signature. */
   private static SearchWitness witness(SearchResponse response) {
     List<String> ids = response.getResultsList().stream().map(result -> result.getId()).sorted()
         .toList();

@@ -323,173 +323,157 @@ final class EngineNativePointerBootMutationTest {
     Path member = Files.writeString(watched.resolve("bulk.txt"), marker);
     writeWatchedRoots(data, watched);
 
-    String operationKey;
-    long operationId;
-    String sourceGeneration;
-    String targetGeneration;
-    CountDownLatch initialRestart = new CountDownLatch(1);
-    Epoch first = null;
+    AtomicReference<Epoch> liveOwner = new AtomicReference<>();
+    AtomicReference<String> recordedKey = new AtomicReference<>();
+    AtomicReference<PostPointerWitness> postPointerWitness = new AtomicReference<>();
+    TwoPhaseBarrier barrier = new TwoPhaseBarrier(transition -> {
+      Epoch owner = liveOwner.get();
+      var row = owner.operations().find(recordedKey.get()).orElseThrow();
+      var walk = journal(owner.server()).recordedWalk(recordedKey.get()).orElseThrow();
+      var progress = owner.operations().bulkReindexProgress(row.id()).orElseThrow();
+      postPointerWitness.set(new PostPointerWitness(
+          transition.sourceGeneration(), transition.buildingGeneration(),
+          row.state(), walk.sealedAt() != null, walk.revision(),
+          progress.phase(), progress.settlement().revision()));
+    });
+    CountDownLatch postPointerRestart = new CountDownLatch(1);
+    Epoch live = null;
     try {
-      first = open(data, models, null, null, initialRestart);
-      sourceGeneration = first.client().captureServingGeneration(TestEngineContexts.BACKGROUND);
-      operationKey = dispatchRecordedBulk(first, watched);
-      targetGeneration = "g-" + operationKey;
-      assertTrue(initialRestart.await(30, TimeUnit.SECONDS),
-          "accepted recorded bulk did not request its build restart");
-      SqliteOperationStore firstOperations = first.operations();
-      operationId = firstOperations.find(operationKey).orElseThrow().id();
-      assertTrue(await(() -> firstOperations.find(operationKey)
-          .flatMap(row -> firstOperations.bulkReindexProgress(row.id()))
-          .map(progress -> progress.phase() == BulkReindexProgress.Phase.BUILDING)
-          .orElse(false), WAIT_MS), "recorded bulk did not checkpoint BUILDING before handoff");
-      first.requestedRestartHandoff();
-      first.close();
-      first = null;
+      live = open(data, models, null, barrier, postPointerRestart);
+      liveOwner.set(live);
+      String operationKey = dispatchRecordedBulk(live, watched);
+      recordedKey.set(operationKey);
+      String targetGeneration = "g-" + operationKey;
+      long operationId = live.operations().find(operationKey).orElseThrow().id();
+      assertTrue(barrier.awaitBeforeSwitching(WAIT_MS),
+          "recorded candidate did not reach the held pre-SWITCHING transition");
+      assertEquals(1L, postPointerRestart.getCount(),
+          "recorded Green must open live before the forced post-pointer recovery");
+      assertEquals(OperationState.RUNNING,
+          live.operations().find(operationKey).orElseThrow().state());
+      var beforePointerWalk = journal(live.server()).recordedWalk(operationKey).orElseThrow();
+      assertNull(beforePointerWalk.sealedAt(),
+          "the queue must remain unsealed before the recorded promotion owner runs");
+      assertEquals(BulkReindexProgress.Phase.BUILDING,
+          live.operations().bulkReindexProgress(
+              live.operations().find(operationKey).orElseThrow().id()).orElseThrow().phase());
+      assertEquals(targetGeneration, live.client().getStatus(TestEngineContexts.BACKGROUND)
+          .getMigration().getServingIngestGenerationId(),
+          "the exact writable B must be live before cutover can leave A");
 
-      AtomicReference<Epoch> secondOwner = new AtomicReference<>();
-      AtomicReference<PostPointerWitness> postPointerWitness = new AtomicReference<>();
-      TwoPhaseBarrier barrier = new TwoPhaseBarrier(transition -> {
-        Epoch owner = secondOwner.get();
-        var row = owner.operations().find(operationKey).orElseThrow();
-        var walk = journal(owner.server()).recordedWalk(operationKey).orElseThrow();
-        var progress = owner.operations().bulkReindexProgress(row.id()).orElseThrow();
-        postPointerWitness.set(new PostPointerWitness(
-            transition.sourceGeneration(), transition.buildingGeneration(),
-            row.state(), walk.sealedAt() != null, walk.revision(),
-            progress.phase(), progress.settlement().revision()));
-      });
-      CountDownLatch postPointerRestart = new CountDownLatch(1);
-      Epoch second = null;
-      try {
-        second = open(data, models, null, barrier, postPointerRestart);
-        secondOwner.set(second);
-        assertTrue(barrier.awaitBeforeSwitching(WAIT_MS),
-            "recorded candidate did not reach the held pre-SWITCHING transition");
-        assertEquals(OperationState.RUNNING,
-            second.operations().find(operationKey).orElseThrow().state());
-        var beforePointerWalk = journal(second.server()).recordedWalk(operationKey).orElseThrow();
-        assertNull(beforePointerWalk.sealedAt(),
-            "the queue must remain unsealed before the recorded promotion owner runs");
-        assertEquals(BulkReindexProgress.Phase.BUILDING,
-            second.operations().bulkReindexProgress(
-                second.operations().find(operationKey).orElseThrow().id()).orElseThrow().phase());
-        assertEquals(targetGeneration, second.client().getStatus(TestEngineContexts.BACKGROUND)
-            .getMigration().getServingIngestGenerationId(),
-            "the exact writable B must be live before cutover can leave A");
+      barrier.releaseBeforeSwitching();
+      assertTrue(barrier.awaitAfterPointerCommit(WAIT_MS),
+          "recorded cutover did not reach the real post-pointer transition");
+      if (barrier.afterPointerObservationFailure() != null) {
+        throw new AssertionError("post-pointer same-thread witness failed",
+            barrier.afterPointerObservationFailure());
+      }
+      PostPointerWitness committed = postPointerWitness.get();
+      assertNotNull(committed);
+      assertEquals(targetGeneration, committed.activeGeneration());
+      assertNull(committed.buildingGeneration());
+      assertEquals(OperationState.RUNNING, committed.operationState(),
+          "the pointer cut precedes replay settlement and the terminal operation row");
+      assertTrue(committed.queueSealed());
+      assertEquals(BulkReindexProgress.Phase.SETTLED, committed.progressPhase());
+      assertEquals(committed.queueRevision(), committed.settlementRevision());
 
-        barrier.releaseBeforeSwitching();
-        assertTrue(barrier.awaitAfterPointerCommit(WAIT_MS),
-            "recorded cutover did not reach the real post-pointer transition");
-        if (barrier.afterPointerObservationFailure() != null) {
-          throw new AssertionError("post-pointer same-thread witness failed",
-              barrier.afterPointerObservationFailure());
+      barrier.cancelAfterPointerCommit();
+      assertTrue(postPointerRestart.await(30, TimeUnit.SECONDS),
+          "post-pointer ambiguity did not request recovery");
+      assertTrue(awaitCutoverExit(live.server(), 30, TimeUnit.SECONDS),
+          "the interrupted cutover owner did not exit before reopen");
+      assertEquals(OperationState.RUNNING,
+          live.operations().find(operationKey).orElseThrow().state(),
+          "the stopped post-pointer owner must leave terminal settlement to recovery");
+      live.requestedRestartHandoff();
+      live.close();
+      live = null;
+
+      var completionTrace = new CopyOnWriteArrayList<String>();
+      AtomicReference<Throwable> completionOracleFailure = new AtomicReference<>();
+      CompletionOracle completionOracle = (id, server) -> {
+        if (id != operationId) return;
+        Lock publicationRead = null;
+        boolean publicationHeld = false;
+        try {
+          ReentrantReadWriteLock publicationLock = privateField(server, KnowledgeServer.class,
+              "publicationLock", ReentrantReadWriteLock.class);
+          assertEquals(0, publicationLock.getWriteHoldCount(),
+              "completion must not run inside the publication write section");
+          assertFalse(publicationLock.isWriteLocked(),
+              "completion must observe a serving view already visible to independent readers");
+          publicationRead = publicationLock.readLock();
+          assertTrue(publicationRead.tryLock(),
+              "completion observation cannot wait for the publication owner");
+          publicationHeld = true;
+          Object servingView = privateField(server, KnowledgeServer.class,
+              "servingView", Object.class);
+          RunningRuntime ingestRuntime = privateField(servingView, servingView.getClass(),
+              "ingestRuntime", RunningRuntime.class);
+          RunningRuntime searchRuntime = privateField(servingView, servingView.getClass(),
+              "searchRuntime", RunningRuntime.class);
+          assertSame(searchRuntime, ingestRuntime,
+              "the preterminal serving view must bind search and writes to the same B runtime");
+          assertTrue(ingestRuntime.isAcceptingWrites(),
+              "the preterminal B runtime must still own writable admission");
+          assertEquals(targetGeneration,
+              ingestRuntime.openedIndexPath().getFileName().toString());
+          completionTrace.add("writerB");
+          CompletionSnapshot snapshot = readCompletionSnapshot(data, id, operationKey,
+              targetGeneration);
+          assertEquals("RUNNING", snapshot.operationState());
+          assertEquals("settled", snapshot.progressPhase());
+          assertTrue(snapshot.queueSealed());
+          assertEquals(snapshot.queueRevision(), snapshot.settlementRevision());
+          completionTrace.add("sealedQueue");
+          assertEquals(targetGeneration, replaySettledGeneration(server));
+          assertEquals(0, snapshot.replayRows());
+          completionTrace.add("replaySettled");
+        } catch (Throwable failure) {
+          completionOracleFailure.compareAndSet(null, failure);
+        } finally {
+          if (publicationHeld) publicationRead.unlock();
+          completionTrace.add("COMPLETE");
         }
-        PostPointerWitness committed = postPointerWitness.get();
-        assertNotNull(committed);
-        assertEquals(targetGeneration, committed.activeGeneration());
-        assertNull(committed.buildingGeneration());
-        assertEquals(OperationState.RUNNING, committed.operationState(),
-            "the pointer cut precedes replay settlement and the terminal operation row");
-        assertTrue(committed.queueSealed());
-        assertEquals(BulkReindexProgress.Phase.SETTLED, committed.progressPhase());
-        assertEquals(committed.queueRevision(), committed.settlementRevision());
-
-        barrier.cancelAfterPointerCommit();
-        assertTrue(postPointerRestart.await(30, TimeUnit.SECONDS),
-            "post-pointer ambiguity did not request recovery");
-        assertTrue(awaitCutoverExit(second.server(), 30, TimeUnit.SECONDS),
-            "the interrupted cutover owner did not exit before reopen");
-        assertEquals(OperationState.RUNNING,
-            second.operations().find(operationKey).orElseThrow().state(),
-            "the stopped post-pointer owner must leave terminal settlement to recovery");
-        second.requestedRestartHandoff();
-        second.close();
-        second = null;
-
-        var completionTrace = new CopyOnWriteArrayList<String>();
-        AtomicReference<Throwable> completionOracleFailure = new AtomicReference<>();
-        CompletionOracle completionOracle = (id, server) -> {
-          if (id != operationId) return;
-          Lock publicationRead = null;
-          boolean publicationHeld = false;
-          try {
-            ReentrantReadWriteLock publicationLock = privateField(server, KnowledgeServer.class,
-                "publicationLock", ReentrantReadWriteLock.class);
-            assertEquals(0, publicationLock.getWriteHoldCount(),
-                "completion must not run inside the publication write section");
-            assertFalse(publicationLock.isWriteLocked(),
-                "completion must observe a serving view already visible to independent readers");
-            publicationRead = publicationLock.readLock();
-            assertTrue(publicationRead.tryLock(),
-                "completion observation cannot wait for the publication owner");
-            publicationHeld = true;
-            Object servingView = privateField(server, KnowledgeServer.class,
-                "servingView", Object.class);
-            RunningRuntime ingestRuntime = privateField(servingView, servingView.getClass(),
-                "ingestRuntime", RunningRuntime.class);
-            RunningRuntime searchRuntime = privateField(servingView, servingView.getClass(),
-                "searchRuntime", RunningRuntime.class);
-            assertSame(searchRuntime, ingestRuntime,
-                "the preterminal serving view must bind search and writes to the same B runtime");
-            assertTrue(ingestRuntime.isAcceptingWrites(),
-                "the preterminal B runtime must still own writable admission");
-            assertEquals(targetGeneration,
-                ingestRuntime.openedIndexPath().getFileName().toString());
-            completionTrace.add("writerB");
-            CompletionSnapshot snapshot = readCompletionSnapshot(data, id, operationKey,
-                targetGeneration);
-            assertEquals("RUNNING", snapshot.operationState());
-            assertEquals("settled", snapshot.progressPhase());
-            assertTrue(snapshot.queueSealed());
-            assertEquals(snapshot.queueRevision(), snapshot.settlementRevision());
-            completionTrace.add("sealedQueue");
-            assertEquals(targetGeneration, replaySettledGeneration(server));
-            assertEquals(0, snapshot.replayRows());
-            completionTrace.add("replaySettled");
-          } catch (Throwable failure) {
-            completionOracleFailure.compareAndSet(null, failure);
-          } finally {
-            if (publicationHeld) publicationRead.unlock();
-            completionTrace.add("COMPLETE");
-          }
-        };
-        try (Epoch recovered = open(data, models, null, null, new CountDownLatch(1),
-            completionOracle)) {
-          assertTrue(await(() -> recovered.operations().find(operationKey)
-              .map(row -> row.state() == OperationState.COMPLETE).orElse(false), WAIT_MS),
-              "recovered B did not settle replay and write terminal success");
-          if (completionOracleFailure.get() != null) {
-            throw new AssertionError("preterminal completion oracle failed",
-                completionOracleFailure.get());
-          }
-          assertEquals(List.of("writerB", "sealedQueue", "replaySettled", "COMPLETE"),
-              completionTrace);
-          assertEquals(targetGeneration, recovered.client().getStatus(TestEngineContexts.BACKGROUND)
-              .getMigration().getServingIngestGenerationId());
-          assertEquals(targetGeneration, recovered.client().getStatus(TestEngineContexts.BACKGROUND)
-              .getMigration().getServingSearchGenerationId());
-          assertTrue(awaitFileSearch(recovered.client(), member, marker, true),
-              "the recovered B writer must also be the serving search generation");
-          assertTrue(journal(recovered.server())
-              .listSwitchBufferOpsStrictForGeneration(targetGeneration).isEmpty(),
-              "terminal success requires exact B replay settlement");
-          var completed = recovered.operations().find(operationKey).orElseThrow();
-          assertEquals("SUCCESS", completed.receipt().code());
-          var acknowledged = journal(recovered.server()).recordedWalk(operationKey).orElseThrow();
-          assertNotNull(acknowledged.sealedAt());
-          assertEquals(acknowledged.revision(), acknowledged.acknowledgedRevision());
-          assertEquals(acknowledged.revision(), recovered.operations()
-              .bulkReindexProgress(completed.id()).orElseThrow().settlement().revision());
+      };
+      try (Epoch recovered = open(data, models, null, null, new CountDownLatch(1),
+          completionOracle)) {
+        assertTrue(await(() -> recovered.operations().find(operationKey)
+            .map(row -> row.state() == OperationState.COMPLETE).orElse(false), WAIT_MS),
+            "recovered B did not settle replay and write terminal success");
+        if (completionOracleFailure.get() != null) {
+          throw new AssertionError("preterminal completion oracle failed",
+              completionOracleFailure.get());
         }
-      } finally {
-        barrier.cancelAll();
-        if (second != null) {
-          try { awaitCutoverExit(second.server(), 30, TimeUnit.SECONDS); }
-          finally { second.close(); }
-        }
+        assertEquals(List.of("writerB", "sealedQueue", "replaySettled", "COMPLETE"),
+            completionTrace);
+        assertEquals(targetGeneration, recovered.client().getStatus(TestEngineContexts.BACKGROUND)
+            .getMigration().getServingIngestGenerationId());
+        assertEquals(targetGeneration, recovered.client().getStatus(TestEngineContexts.BACKGROUND)
+            .getMigration().getServingSearchGenerationId());
+        assertTrue(awaitFileSearch(recovered.client(), member, marker, true),
+            "the recovered B writer must also be the serving search generation");
+        assertTrue(journal(recovered.server())
+            .listSwitchBufferOpsStrictForGeneration(targetGeneration).isEmpty(),
+            "terminal success requires exact B replay settlement");
+        var completed = recovered.operations().find(operationKey).orElseThrow();
+        assertEquals("SUCCESS", completed.receipt().code());
+        var acknowledged = journal(recovered.server()).recordedWalk(operationKey).orElseThrow();
+        assertNotNull(acknowledged.sealedAt());
+        assertEquals(acknowledged.revision(), acknowledged.acknowledgedRevision());
+        assertEquals(acknowledged.revision(), recovered.operations()
+            .bulkReindexProgress(completed.id()).orElseThrow().settlement().revision());
       }
     } finally {
-      if (first != null) first.close();
+      barrier.cancelAll();
+      if (live != null) {
+        try {
+          awaitCutoverExit(live.server(), 30, TimeUnit.SECONDS);
+          live.requestedRestartHandoff();
+        }
+        finally { live.close(); }
+      }
     }
   }
 
