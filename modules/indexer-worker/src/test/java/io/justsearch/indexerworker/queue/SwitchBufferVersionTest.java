@@ -520,6 +520,202 @@ final class SwitchBufferVersionTest {
   }
 
   @Test
+  void sealedCapturedFileCanCertifyBroadDeletionWithoutAcknowledgement() throws Exception {
+    Path db = tempDir.resolve("captured-file-deletion.db");
+    Path file = Files.writeString(tempDir.resolve("captured-file-deletion.txt"), "bytes")
+        .toAbsolutePath();
+    String h1 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    String operationKey = "captured-file-deletion";
+    try (var queue = new SqliteJobQueue(
+        db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginCapturedWalk(operationKey, "e".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", operationKey, walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), "docs"));
+      queue.closeRecordedWalkEnumeration(
+          operationKey, walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var claim = queue.pollPending(1).getFirst();
+      queue.markDoneTransitions(List.of(
+          new JobQueue.IngestionLedgerTransition(claim, null, h1)), successFull());
+      var sealed = queue.trySealRecordedWalk(operationKey);
+      assertNotNull(sealed.sealedAt());
+
+      String path = PathNormalizer.normalizeKey(file);
+      assertTrue(queue.matchesAcceptedCapturedFileDeletion(path, claim.unitRevision(), h1));
+      assertFalse(queue.matchesAcceptedCapturedFileDeletion(path, "wrong-unit", h1));
+      assertFalse(queue.matchesAcceptedCapturedFileDeletion(path, claim.unitRevision(), "f".repeat(64)));
+      assertEquals(0L, longValue(db,
+          "SELECT acknowledged_revision FROM ingestion_walk_progress WHERE operation_key = ?",
+          operationKey));
+      assertEquals(1L, longValue(db, "SELECT COUNT(*) FROM jobs WHERE path = ?", path),
+          "the certificate must not acknowledge or delete the retained captured row");
+
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "UPDATE ingestion_walk_sealed_units SET unit_revision = ? WHERE operation_key = ?")) {
+        statement.setString(1, "altered-sealed-unit");
+        statement.setString(2, operationKey);
+        assertEquals(1, statement.executeUpdate());
+      }
+      assertFalse(queue.matchesAcceptedCapturedFileDeletion(path, claim.unitRevision(), h1));
+
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "UPDATE ingestion_walk_sealed_units SET unit_revision = ? WHERE operation_key = ?")) {
+        statement.setString(1, claim.unitRevision());
+        statement.setString(2, operationKey);
+        assertEquals(1, statement.executeUpdate());
+      }
+      assertTrue(queue.acknowledgeRecordedWalk(operationKey, sealed.revision()));
+      assertFalse(queue.matchesAcceptedCapturedFileDeletion(path, claim.unitRevision(), h1),
+          "an acknowledged sealed walk is no longer an unacknowledged deletion certificate");
+      assertEquals(1L, longValue(db, "SELECT COUNT(*) FROM jobs WHERE path = ?", path),
+          "acknowledgement still must not be performed by the certificate");
+    }
+  }
+
+  @Test
+  void capturedFileDeletionCertificateRefusesMalformedOrMismatchedSealedReceipt() throws Exception {
+    Path db = tempDir.resolve("captured-file-deletion-receipt.db");
+    Path file = Files.writeString(tempDir.resolve("captured-file-deletion-receipt.txt"), "bytes")
+        .toAbsolutePath();
+    String hash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(file);
+    String operationKey = "captured-file-deletion-receipt";
+    try (var queue = new SqliteJobQueue(
+        db, ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginCapturedWalk(operationKey, "6".repeat(64), true);
+      queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", operationKey, walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file)), "docs");
+      queue.closeRecordedWalkEnumeration(
+          operationKey, walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var claim = queue.pollPending(1).getFirst();
+      queue.markDoneTransitions(List.of(
+          new JobQueue.IngestionLedgerTransition(claim, null, hash)), successFull());
+      var sealed = queue.trySealRecordedWalk(operationKey);
+      assertNotNull(sealed.sealedAt());
+      String path = PathNormalizer.normalizeKey(file);
+      String receipt;
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+          var statement = connection.prepareStatement(
+              "SELECT receipt_json FROM ingestion_walk_progress WHERE operation_key = ?")) {
+        statement.setString(1, operationKey);
+        try (var row = statement.executeQuery()) {
+          assertTrue(row.next());
+          receipt = row.getString(1);
+        }
+      }
+
+      updateReceipt(db, operationKey, "{");
+      assertThrows(JobQueue.RecordedWalkGapException.class,
+          () -> queue.matchesAcceptedCapturedFileDeletion(path, claim.unitRevision(), hash));
+      String mismatchedReceipt = receipt.replace("\"completedUnits\":1", "\"completedUnits\":2");
+      assertNotEquals(receipt, mismatchedReceipt);
+      updateReceipt(db, operationKey, mismatchedReceipt);
+      assertThrows(JobQueue.RecordedWalkGapException.class,
+          () -> queue.matchesAcceptedCapturedFileDeletion(path, claim.unitRevision(), hash));
+      assertEquals(0L, longValue(db,
+          "SELECT acknowledged_revision FROM ingestion_walk_progress WHERE operation_key = ?",
+          operationKey));
+      assertEquals(1L, longValue(db, "SELECT COUNT(*) FROM jobs WHERE path = ?", path));
+    }
+  }
+
+  @Test
+  void capturedFileDeletionCertificateRefusesUnsealedStreamingFailedAndPendingRows() throws Exception {
+    Path unsealedDb = tempDir.resolve("captured-file-deletion-unsealed.db");
+    Path unsealedFile = Files.writeString(tempDir.resolve("captured-file-deletion-unsealed.txt"), "bytes")
+        .toAbsolutePath();
+    String unsealedHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(unsealedFile);
+    try (var queue = new SqliteJobQueue(unsealedDb,
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginCapturedWalk("captured-file-deletion-unsealed", "1".repeat(64), true);
+      queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", "captured-file-deletion-unsealed", walk.enumerationEpoch(),
+          List.of(new JobQueue.EnqueueEntry(unsealedFile, Files.size(unsealedFile), null, unsealedHash)),
+          null);
+      queue.closeRecordedWalkEnumeration("captured-file-deletion-unsealed", walk.enumerationEpoch(),
+          JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var claim = queue.pollPending(1).getFirst();
+      assertEquals(unsealedHash, claim.plannedSourceSha256());
+      queue.markDoneTransitions(List.of(
+          new JobQueue.IngestionLedgerTransition(claim, null, unsealedHash)), successFull());
+      assertFalse(queue.matchesAcceptedCapturedFileDeletion(
+          PathNormalizer.normalizeKey(unsealedFile), claim.unitRevision(), unsealedHash));
+    }
+
+    Path streamingDb = tempDir.resolve("captured-file-deletion-streaming.db");
+    Path streamingFile = Files.writeString(tempDir.resolve("captured-file-deletion-streaming.txt"), "bytes")
+        .toAbsolutePath();
+    String streamingHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(streamingFile);
+    try (var queue = new SqliteJobQueue(streamingDb,
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginRecordedWalk("captured-file-deletion-streaming", "2".repeat(64), true);
+      queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", "captured-file-deletion-streaming", walk.enumerationEpoch(),
+          List.of(new JobQueue.EnqueueEntry(streamingFile, Files.size(streamingFile), null, streamingHash)),
+          null);
+      queue.closeRecordedWalkEnumeration("captured-file-deletion-streaming", walk.enumerationEpoch(),
+          JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var claim = queue.pollPending(1).getFirst();
+      assertEquals(streamingHash, claim.plannedSourceSha256());
+      queue.markDoneTransitions(List.of(
+          new JobQueue.IngestionLedgerTransition(claim, null, streamingHash)), successFull());
+      var sealed = queue.trySealRecordedWalk("captured-file-deletion-streaming");
+      assertTrue(sealed.sealedAt() != null);
+      assertFalse(sealed.capturedPlan());
+      assertFalse(queue.matchesAcceptedCapturedFileDeletion(
+          PathNormalizer.normalizeKey(streamingFile), claim.unitRevision(), streamingHash));
+    }
+
+    Path statesDb = tempDir.resolve("captured-file-deletion-states.db");
+    Path failedFile = Files.writeString(tempDir.resolve("captured-file-deletion-failed.txt"), "failed")
+        .toAbsolutePath();
+    Path pendingFile = Files.writeString(tempDir.resolve("captured-file-deletion-pending.txt"), "pending")
+        .toAbsolutePath();
+    String failedHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(failedFile);
+    String pendingHash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(pendingFile);
+    try (var queue = new SqliteJobQueue(statesDb,
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var walk = queue.beginCapturedWalk("captured-file-deletion-states", "3".repeat(64), true);
+      queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", "captured-file-deletion-states", walk.enumerationEpoch(),
+          List.of(new JobQueue.EnqueueEntry(failedFile, Files.size(failedFile), null, failedHash)),
+          null);
+      queue.closeRecordedWalkEnumeration("captured-file-deletion-states", walk.enumerationEpoch(),
+          JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var failed = queue.pollPending(1).getFirst();
+      assertEquals(PathNormalizer.normalizeKey(failedFile), failed.path().toString());
+      assertEquals(failedHash, failed.plannedSourceSha256());
+      assertTrue(queue.markClaimFailed(failed, terminalFailure(), null));
+      var sealed = queue.trySealRecordedWalk("captured-file-deletion-states");
+      assertTrue(sealed.sealedAt() != null);
+      assertTrue(sealed.capturedPlan());
+      assertTrue(queue.sealedRecordedWalkReceipt("captured-file-deletion-states").isPresent());
+      assertFalse(queue.matchesAcceptedCapturedFileDeletion(
+          failed.path().toString(), failed.unitRevision(), failedHash));
+
+      var pendingWalk = queue.beginCapturedWalk("captured-file-deletion-pending", "4".repeat(64), true);
+      queue.enqueueRecordedEntriesAndBufferForGeneration(
+          "green", "captured-file-deletion-pending", pendingWalk.enumerationEpoch(),
+          List.of(new JobQueue.EnqueueEntry(pendingFile, Files.size(pendingFile), null, pendingHash)), null);
+      queue.closeRecordedWalkEnumeration("captured-file-deletion-pending", pendingWalk.enumerationEpoch(),
+          JobQueue.WalkEnumerationOutcome.COMPLETE);
+      var pending = queue.pollPending(1).getFirst();
+      assertEquals(PathNormalizer.normalizeKey(pendingFile), pending.path().toString());
+      assertEquals(pendingHash, pending.plannedSourceSha256());
+      queue.returnUnfinishedClaims(List.of(pending));
+      assertFalse(queue.matchesAcceptedCapturedFileDeletion(
+          pending.path().toString(), pending.unitRevision(), pendingHash));
+    }
+  }
+
+  @Test
   void capturedH1H2MatchRequiresTheExactIndexedLedgerReceipt() throws Exception {
     Path db = tempDir.resolve("captured-h1-h2-missing-ledger.db");
     Path file = Files.writeString(
@@ -614,6 +810,11 @@ final class SwitchBufferVersionTest {
 
   private static IngestionOutcome successFull() {
     return IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+        IngestionRetryPolicy.NONE);
+  }
+
+  private static IngestionOutcome terminalFailure() {
+    return IngestionOutcome.of(IngestionOutcomeClass.PARSER_FAILED, "PARSER_FAILED",
         IngestionRetryPolicy.NONE);
   }
 
@@ -774,5 +975,27 @@ final class SwitchBufferVersionTest {
       statement.execute("PRAGMA user_version = 15");
     }
     return db;
+  }
+
+  private static long longValue(Path db, String sql, String argument) throws SQLException {
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+        var statement = connection.prepareStatement(sql)) {
+      statement.setString(1, argument);
+      try (var row = statement.executeQuery()) {
+        assertTrue(row.next());
+        return row.getLong(1);
+      }
+    }
+  }
+
+  private static void updateReceipt(Path db, String operationKey, String receipt)
+      throws SQLException {
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+        var statement = connection.prepareStatement(
+            "UPDATE ingestion_walk_progress SET receipt_json = ? WHERE operation_key = ?")) {
+      statement.setString(1, receipt);
+      statement.setString(2, operationKey);
+      assertEquals(1, statement.executeUpdate());
+    }
   }
 }

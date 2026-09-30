@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
@@ -356,8 +358,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
-  /** Administrative selectors are fixed SQL owned by the four callers below. */
+  /** Administrative selectors are fixed SQL owned by the queue's maintenance callers. */
   private int removeJobsAdministratively(String predicate, List<String> arguments, boolean sourceRemoved) throws SQLException {
+    return removeJobsAdministratively(predicate, arguments, sourceRemoved, Set.of());
+  }
+
+  /** Administrative removal with exact normalized survivor paths excluded before row handling. */
+  private int removeJobsAdministratively(String predicate, List<String> arguments,
+      boolean sourceRemoved, Set<String> excludedPaths) throws SQLException {
     return inTransaction(() -> {
       List<String> paths = new ArrayList<>();
       try (var query = connection.prepareStatement("SELECT path FROM jobs WHERE " + predicate)) {
@@ -366,6 +374,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
       int affected = 0;
       for (String path : paths) {
+        if (excludedPaths.contains(path)) continue;
         boolean recorded;
         WalkProgress progress = null;
         try (var query = connection.prepareStatement("SELECT scan_id, walk_seen_epoch FROM jobs WHERE path = ?")) {
@@ -922,6 +931,45 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  /** Reads a literal prefix while excluding exact certified replay paths. */
+  @Override
+  public boolean hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+      String pathPrefix, List<String> certifiedReplayPaths) {
+    if (pathPrefix == null || pathPrefix.isBlank()) {
+      throw new IllegalArgumentException("Path-prefix scope must be non-blank");
+    }
+    String lower = PathNormalizer.normalizePathPrefix(pathPrefix);
+    if (lower == null || lower.isBlank()) {
+      throw new IllegalArgumentException("Path-prefix scope must normalize to non-blank");
+    }
+    String upper = upperBoundExclusive(lower);
+    Set<String> excluded = normalizeSurvivorPaths(certifiedReplayPaths);
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT path FROM jobs "
+              + "WHERE path >= ? AND path < ?")) {
+        query.setString(1, lower);
+        query.setString(2, upper);
+        try (ResultSet rows = query.executeQuery()) {
+          while (rows.next()) {
+            String path = rows.getString("path");
+            if (excluded.contains(path)) continue;
+            return true;
+          }
+          return false;
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException(
+          "Path-prefix scope outside certified replay paths is unreadable", unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
   /** Reads whether a non-terminal job remains in one collection, including legacy default rows. */
   @Override
   public boolean hasNonterminalJobsByCollectionStrict(String collection) {
@@ -1282,7 +1330,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
           return indexedSourceSha256.equals(committed)
               && matchesCapturedFileProjection(row, path, unitRevision,
-                  sourceSha256, indexedSourceSha256);
+                  sourceSha256, indexedSourceSha256, false);
         }
       }
     } catch (SQLException unavailable) {
@@ -1293,16 +1341,56 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  @Override
+  public boolean matchesAcceptedCapturedFileDeletion(
+      String path, String unitRevision, String plannedSourceSha256) {
+    if (path == null || path.isBlank() || unitRevision == null || unitRevision.isBlank()
+        || !JobQueue.IngestionLedgerTransition.isSha256(plannedSourceSha256)) return false;
+    lock.lock();
+    try {
+      ensureOpen();
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT state, unit_revision, planned_source_sha256, content_hash, scan_id, "
+              + "walk_seen_epoch FROM jobs WHERE path = ?")) {
+        query.setString(1, path);
+        try (ResultSet row = query.executeQuery()) {
+          if (!row.next() || !STATE_DONE.equals(row.getString("state"))
+              || !unitRevision.equals(row.getString("unit_revision"))
+              || !plannedSourceSha256.equals(row.getString("planned_source_sha256"))) return false;
+          String committed = row.getString("content_hash");
+          if (!JobQueue.IngestionLedgerTransition.isSha256(committed)) return false;
+          var progress = SqliteIngestionWalkOps.find(connection, row.getString("scan_id"))
+              .orElse(null);
+          if (progress == null || progress.acknowledgedRevision() >= progress.revision()
+              || SqliteIngestionWalkOps.sealedReceipt(
+                  connection, progress.operationKey(), SqliteJobQueue::sha256).isEmpty()) {
+            return false;
+          }
+          return matchesCapturedFileProjection(row, path, unitRevision,
+              plannedSourceSha256, committed, true);
+        }
+      }
+    } catch (SQLException unavailable) {
+      recordDbError();
+      throw new IllegalStateException("Accepted captured file deletion evidence is unreadable",
+          unavailable);
+    } finally {
+      lock.unlock();
+    }
+  }
+
   /** The existing captured ledger owns H1-to-H2 settlement; streaming claims cannot use it. */
   private boolean matchesCapturedFileProjection(ResultSet job, String path, String unitRevision,
-      String plannedSourceSha256, String indexedSourceSha256) throws SQLException {
+      String plannedSourceSha256, String indexedSourceSha256, boolean requireSealed)
+      throws SQLException {
     long epoch = job.getLong("walk_seen_epoch");
     if (job.wasNull() || job.getString("scan_id") == null) return false;
     var progress = SqliteIngestionWalkOps.find(connection, job.getString("scan_id")).orElse(null);
     if (progress == null || !progress.capturedPlan()
         || progress.enumerationEpoch() != epoch
         || progress.enumerationOutcome() != JobQueue.WalkEnumerationOutcome.COMPLETE
-        || progress.manifestSha256() == null) return false;
+        || progress.manifestSha256() == null
+        || (requireSealed && progress.sealedAt() == null)) return false;
     String sql = """
         SELECT COUNT(*) FROM ingestion_ledger l
         WHERE l.operation_key = ? AND l.path_hash = ? AND l.unit_revision = ?
@@ -1861,7 +1949,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     try {
       ensureOpen();
       List<JobQueue.IngestionLedgerTransition> eligible = new ArrayList<>();
-      java.util.Set<IndexJob> seenClaims = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+      Set<IndexJob> seenClaims = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
       for (JobQueue.IngestionLedgerTransition transition : transitions) {
         if (transition == null) continue;
         if (transition.claim() != null && !seenClaims.add(transition.claim())) continue;
@@ -2524,6 +2612,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private static String normalizePath(Path path) {
     return PathNormalizer.normalizePath(path.toAbsolutePath().toString());
+  }
+
+  private static Set<String> normalizeSurvivorPaths(List<String> survivorPaths) {
+    if (survivorPaths == null || survivorPaths.isEmpty()) return Set.of();
+    Set<String> normalized = new HashSet<>();
+    for (String survivor : survivorPaths) {
+      if (survivor == null || survivor.isBlank()) {
+        throw new IllegalArgumentException("Accepted survivor path must be non-blank");
+      }
+      normalized.add(normalizePath(Path.of(survivor)));
+    }
+    return Set.copyOf(normalized);
   }
 
   private static String outcomeClassName(IngestionOutcome outcome) {
@@ -3251,6 +3351,33 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } catch (SQLException e) {
       log.error("Failed to delete jobs by path prefix: {}", pathPrefix, e);
       return -1;
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  /** Deletes a literal prefix while preserving exact accepted survivor paths. */
+  @Override
+  public int deleteByPathPrefixExcludingAcceptedSurvivors(
+      String pathPrefix, List<String> survivorPaths) {
+    if (pathPrefix == null || pathPrefix.isBlank()) {
+      throw new IllegalArgumentException("Path-prefix scope must be non-blank");
+    }
+    String normalized = PathNormalizer.normalizePathPrefix(pathPrefix);
+    if (normalized == null || normalized.isBlank()) {
+      throw new IllegalArgumentException("Path-prefix scope must normalize to non-blank");
+    }
+    Set<String> excluded = normalizeSurvivorPaths(survivorPaths);
+    String upper = upperBoundExclusive(normalized);
+    lock.lock();
+    try {
+      ensureOpen();
+      return removeJobsAdministratively(
+          "path >= ? AND path < ?", List.of(normalized, upper), true, excluded);
+    } catch (SQLException failure) {
+      recordDbError();
+      throw new IllegalStateException(
+          "Strict path-prefix deletion with accepted survivors failed", failure);
     } finally {
       unlockAfterChanges();
     }

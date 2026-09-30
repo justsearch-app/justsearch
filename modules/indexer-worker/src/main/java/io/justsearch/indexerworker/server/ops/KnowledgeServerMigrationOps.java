@@ -746,21 +746,12 @@ public final class KnowledgeServerMigrationOps {
       for (int i = 0; i < effects.size(); i++) {
         effects.set(i, observeCommittedProjection(active, effects.get(i)));
       }
-      Set<CommittedNativeEffect> survivors = new LinkedHashSet<>();
-      Set<String> laterIds = new java.util.HashSet<>();
-      List<CommittedNativeEffect> laterBroadDeletes = new ArrayList<>();
+      Set<CommittedNativeEffect> survivors = acceptedSurvivors(effects);
       List<Integer> deleteIndexes = new ArrayList<>();
-      for (int i = effects.size() - 1; i >= 0; i--) {
+      for (int i = 0; i < effects.size(); i++) {
         var effect = effects.get(i);
-        if (effect.upsert() && !laterIds.contains(effect.id())
-            && laterBroadDeletes.stream().noneMatch(deletion -> nativeDeleteMatches(deletion, effect))) {
-          survivors.add(effect);
-        }
-        if (effect.id() != null) laterIds.add(effect.id());
-        if ("DELETE_PREFIX".equals(effect.op().op()) || "DELETE_COLLECTION".equals(effect.op().op())) {
-          laterBroadDeletes.add(effect);
-          deleteIndexes.add(i);
-        } else if (effect.id() != null && !effect.upsert()) {
+        if ("DELETE_PREFIX".equals(effect.op().op()) || "DELETE_COLLECTION".equals(effect.op().op())
+            || (effect.id() != null && !effect.upsert())) {
           deleteIndexes.add(i);
         }
       }
@@ -894,6 +885,24 @@ public final class KnowledgeServerMigrationOps {
       case "DELETE_COLLECTION" -> deletion.op().payload().equals(document.collection());
       default -> false;
     };
+  }
+
+  private static Set<CommittedNativeEffect> acceptedSurvivors(List<CommittedNativeEffect> effects) {
+    Set<CommittedNativeEffect> survivors = new LinkedHashSet<>();
+    Set<String> laterIds = new java.util.HashSet<>();
+    List<CommittedNativeEffect> laterBroadDeletes = new ArrayList<>();
+    for (int i = effects.size() - 1; i >= 0; i--) {
+      var effect = effects.get(i);
+      if (effect.upsert() && !laterIds.contains(effect.id())
+          && laterBroadDeletes.stream().noneMatch(deletion -> nativeDeleteMatches(deletion, effect))) {
+        survivors.add(effect);
+      }
+      if (effect.id() != null) laterIds.add(effect.id());
+      if ("DELETE_PREFIX".equals(effect.op().op()) || "DELETE_COLLECTION".equals(effect.op().op())) {
+        laterBroadDeletes.add(effect);
+      }
+    }
+    return survivors;
   }
 
   private static boolean certifyCommittedSurvivor(SwitchBufferCapableQueue queue,
@@ -1062,7 +1071,19 @@ public final class KnowledgeServerMigrationOps {
     }
     context.log().info("Draining {} buffered ops from durable switch buffer...", ops.size());
 
-    ArrayList<SwitchBufferUpsert> toEnqueue = new ArrayList<>();
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> fileAuthorizingDeletes;
+    Map<SwitchBufferCapableQueue.SwitchBufferOp, List<String>> fileSurvivorExclusions;
+    ReplayDeleteOrder deleteOrder;
+    try {
+      deleteOrder = replayDeleteOrder(context, ops, exactRead);
+      fileAuthorizingDeletes = exactRead ? fileRelatedBroadDeletes(context, ops, deleteOrder) : Set.of();
+      fileSurvivorExclusions = replayFileSurvivorExclusions(context, ops, fileAuthorizingDeletes);
+    } catch (IOException | RuntimeException invalid) {
+      context.log().warn("Buffered file/delete receipts cannot certify replay", invalid);
+      return new ReplayOutcome(false, List.of());
+    }
+
+    ArrayList<SwitchBufferCapableQueue.SwitchBufferOp> toEnqueue = new ArrayList<>();
     boolean mutatedLucene = false;
     boolean allApplied = true;
     boolean firstCandidateProjectionObserved = false;
@@ -1080,7 +1101,7 @@ public final class KnowledgeServerMigrationOps {
       if (!"UPSERT".equals(kind) && !toEnqueue.isEmpty()) {
         if (!enqueueBufferedUpserts(context, toEnqueue)
             || (exactRead && (!awaitQueuedUpserts(context)
-                || !verifyBufferedUpserts(context, toEnqueue)))) {
+                || !verifyBufferedUpserts(context, toEnqueue, ops, deleteOrder, false)))) {
           context.log().warn("Buffered UPSERT did not settle before a later {}", kind);
           return new ReplayOutcome(false, List.of());
         }
@@ -1113,6 +1134,7 @@ public final class KnowledgeServerMigrationOps {
               throw new IllegalStateException("Projection replay lacks its exact candidate or key");
             }
             var fields = context.ingestLifecycle().documentFieldOps();
+            context.ingestLifecycle().commitOps().maybeRefreshBlocking();
             String currentId = fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.DOC_ID);
             String currentSource = fields.getDocumentFieldOrThrow(
                 projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID);
@@ -1171,10 +1193,12 @@ public final class KnowledgeServerMigrationOps {
             try {
               var upsert = SwitchBufferUpsert.decode(payload);
               if (op.generation() != null && !op.generation().isEmpty()
-                  && upsert.sourceSha256() == null) {
+                  && (upsert.sourceSha256() == null
+                      || !op.key().equals("path:" + upsert.path())
+                      || !Path.of(upsert.path()).toAbsolutePath().normalize().toString().equals(upsert.path()))) {
                 throw new IllegalArgumentException("Scoped UPSERT has no exact source witness");
               }
-              toEnqueue.add(upsert);
+              toEnqueue.add(op);
             } catch (Exception e) {
               allApplied = false;
               context
@@ -1206,9 +1230,18 @@ public final class KnowledgeServerMigrationOps {
         case "DELETE_PREFIX" -> {
           if (context.ingestLifecycle() != null && !payload.isBlank()) {
             try {
-              context.ingestLifecycle().indexingCoordinator().deleteByPathPrefix(payload);
+              List<String> survivors = fileSurvivorExclusions.getOrDefault(op, List.of());
+              if (survivors.isEmpty()) {
+                context.ingestLifecycle().indexingCoordinator().deleteByPathPrefix(payload);
+                if (context.jobQueue().deleteByPathPrefix(payload) < 0) {
+                  throw new IllegalStateException("Buffered prefix queue deletion failed");
+                }
+              } else {
+                context.ingestLifecycle().indexingCoordinator()
+                    .deleteByPathPrefixExcludingAcceptedSurvivors(payload, survivors);
+                context.jobQueue().deleteByPathPrefixExcludingAcceptedSurvivors(payload, survivors);
+              }
               mutatedLucene = true;
-              context.jobQueue().deleteByPathPrefix(payload);
             } catch (Exception e) {
               allApplied = false;
               context
@@ -1222,7 +1255,13 @@ public final class KnowledgeServerMigrationOps {
         }
         case "DELETE_COLLECTION" -> {
           try {
-            context.ingestLifecycle().indexingCoordinator().deleteByCollection(payload);
+            List<String> survivors = fileSurvivorExclusions.getOrDefault(op, List.of());
+            if (survivors.isEmpty()) {
+              context.ingestLifecycle().indexingCoordinator().deleteByCollection(payload);
+            } else {
+              context.ingestLifecycle().indexingCoordinator()
+                  .deleteByCollectionExcludingAcceptedSurvivors(payload, survivors);
+            }
             mutatedLucene = true;
           } catch (Exception e) {
             allApplied = false;
@@ -1492,8 +1531,7 @@ public final class KnowledgeServerMigrationOps {
 
     if (!toEnqueue.isEmpty()) {
       allApplied &= enqueueBufferedUpserts(context, toEnqueue)
-          && (!exactRead || (awaitQueuedUpserts(context)
-              && verifyBufferedUpserts(context, toEnqueue)));
+          && (!exactRead || awaitQueuedUpserts(context));
     }
 
     if (mutatedLucene && context.ingestLifecycle() != null) {
@@ -1513,8 +1551,13 @@ public final class KnowledgeServerMigrationOps {
       }
     }
 
+    if (allApplied && exactRead) {
+      allApplied = verifyBufferedUpserts(context, ops.stream()
+          .filter(op -> "UPSERT".equalsIgnoreCase(op.op())
+              && !context.approvedGapVersions().contains(op)).toList(), ops, deleteOrder, true);
+    }
     if (allApplied) {
-      allApplied = verifyBufferedProjections(context, ops);
+      allApplied = verifyBufferedProjections(context, ops, deleteOrder);
     }
 
     if (allApplied && ops.stream().anyMatch(op -> isVduBufferKind(op.op()))
@@ -1560,11 +1603,12 @@ public final class KnowledgeServerMigrationOps {
   }
 
   private static boolean enqueueBufferedUpserts(DrainSwitchBufferContext context,
-      List<SwitchBufferUpsert> upserts) {
+      List<SwitchBufferCapableQueue.SwitchBufferOp> upserts) {
     boolean complete = true;
     int enqueued = 0;
-    for (var upsert : upserts) {
+    for (var op : upserts) {
       try {
+        var upsert = SwitchBufferUpsert.decode(op.payload());
         if (upsert.sourceSha256() != null) {
           // A scoped file admission already owns a durable queue row and an exact source
           // witness. Re-enqueueing would mint a new revision and read later filesystem bytes.
@@ -1584,7 +1628,10 @@ public final class KnowledgeServerMigrationOps {
   }
 
   private static boolean verifyBufferedUpserts(DrainSwitchBufferContext context,
-      List<SwitchBufferUpsert> upserts) {
+      List<SwitchBufferCapableQueue.SwitchBufferOp> upserts,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps, ReplayDeleteOrder deleteOrder,
+      boolean finalEffects) {
+    if (upserts.isEmpty()) return true;
     if (context.ingestLifecycle() == null
         || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
     try {
@@ -1593,30 +1640,193 @@ public final class KnowledgeServerMigrationOps {
       context.log().warn("Buffered UPSERT reader could not refresh", unavailable);
       return false;
     }
-    for (var upsert : upserts) {
-      if (upsert.sourceSha256() == null) continue; // Historical unscoped cutover payload.
-      boolean settled;
-      String indexed;
-      try {
-        indexed = context.ingestLifecycle().documentFieldOps()
-            .getDocumentField(upsert.path(), SchemaFields.SOURCE_SHA256);
-        settled = queue.matchesAcceptedFileProjection(
+    try {
+      for (var op : upserts) {
+        var upsert = SwitchBufferUpsert.decode(op.payload());
+        if (upsert.sourceSha256() == null) continue; // Historical unscoped cutover payload.
+        boolean scoped = op.generation() != null && !op.generation().isBlank()
+            && op.generation().equals(context.replayGeneration());
+        if (scoped && hasLaterAcceptedDelete(context, deleteOrder, deleteOrder.positions().get(op),
+            upsert.path(), upsert.path(), upsert.collection(), op.generation())) {
+          // Live broad deletion may already have removed this exact admission on B. Await
+          // the queue before crossing the boundary, then prove final absence after all writes.
+          if (finalEffects && context.ingestLifecycle().indexCountOps()
+              .countByIdAndChunksStrict(upsert.path()) != 0) return false;
+          continue;
+        }
+        String indexed = context.ingestLifecycle().documentFieldOps()
+            .getDocumentFieldOrThrow(upsert.path(), SchemaFields.SOURCE_SHA256);
+        boolean settled = queue.matchesAcceptedFileProjection(
             upsert.path(), upsert.unitRevision(), upsert.sourceSha256(), indexed);
-      } catch (RuntimeException unavailable) {
-        context.log().warn("Buffered UPSERT projection evidence is unreadable", unavailable);
-        return false;
+        if (!settled) {
+          context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
+          return false;
+        }
       }
-      if (!settled) {
-        context.log().warn("Buffered UPSERT lacks its accepted target projection: {}", upsert.path());
-        return false;
+      return !finalEffects || certifyReplayFileDeleteScopes(context, orderedOps, deleteOrder);
+    } catch (IOException | RuntimeException unavailable) {
+      context.log().warn("Buffered UPSERT projection evidence is unreadable", unavailable);
+      return false;
+    }
+  }
+
+  /** A broad receipt used to supersede a file witness must prove its complete final scope. */
+  private static boolean certifyReplayFileDeleteScopes(DrainSwitchBufferContext context,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps, ReplayDeleteOrder deleteOrder) throws IOException {
+    String generation = context.replayGeneration();
+    if (generation == null || generation.isBlank()) return true;
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> authorizingDeletes =
+        fileRelatedBroadDeletes(context, orderedOps, deleteOrder);
+    if (authorizingDeletes.isEmpty()) return true;
+    List<CommittedNativeEffect> effects = replayAcceptedEffects(context, orderedOps);
+    var active = context.ingestLifecycle();
+    active.commitOps().maybeRefreshBlocking();
+    List<Integer> deleteIndexes = new ArrayList<>();
+    for (int index = 0; index < effects.size(); index++) {
+      var observed = observeCommittedProjection(active, effects.get(index));
+      effects.set(index, observed);
+      if ("DELETE_PREFIX".equals(observed.op().op())
+          || "DELETE_COLLECTION".equals(observed.op().op())
+          || (observed.id() != null && !observed.upsert())) deleteIndexes.add(index);
+    }
+    Set<CommittedNativeEffect> survivors = acceptedSurvivors(effects);
+    if (!(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) return false;
+    for (int index = 0; index < effects.size(); index++) {
+      var deletion = effects.get(index);
+      if (!authorizingDeletes.contains(deletion.op())) continue;
+      for (int next = index + 1; next < effects.size(); next++) {
+        var survivor = effects.get(next);
+        if (survivors.contains(survivor) && nativeDeleteMatches(deletion, survivor)
+            && !certifyCommittedSurvivor(queue, active, effects, deleteIndexes, next)) return false;
+      }
+      if (!certifyCommittedDeleteScope(context.jobQueue(), active, effects, survivors, index)) return false;
+      if ("DELETE_PREFIX".equals(deletion.op().op())) {
+        List<String> certifiedPaths = new ArrayList<>();
+        for (int next = index + 1; next < effects.size(); next++) {
+          var survivor = effects.get(next);
+          if (survivor.file() != null && survivors.contains(survivor)
+              && nativeDeleteMatches(deletion, survivor)) certifiedPaths.add(survivor.id());
+        }
+        // Captured settlement is acknowledged only after promotion. Its retained DONE row
+        // may witness an earlier accepted file that this deletion has strictly removed.
+        for (int previous = 0; previous < index; previous++) {
+          var removed = effects.get(previous);
+          if (removed.file() != null && nativeDeleteMatches(deletion, removed)
+              && active.indexCountOps().countByIdAndChunksStrict(removed.id()) == 0
+              && queue.matchesAcceptedCapturedFileDeletion(removed.id(),
+                  removed.file().unitRevision(), removed.file().sourceSha256())) {
+            certifiedPaths.add(removed.id());
+          }
+        }
+        if (context.jobQueue().hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+            deletion.op().payload(), certifiedPaths)) return false;
       }
     }
     return true;
   }
 
+  private static List<CommittedNativeEffect> replayAcceptedEffects(DrainSwitchBufferContext context,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps) {
+    var scopedOps = orderedOps.stream()
+        .filter(op -> context.replayGeneration().equals(op.generation())
+            && !context.approvedGapVersions().contains(op)).toList();
+    // Pre-pointer source ownership comes from validated ready markers in this exact snapshot.
+    Set<String> sources = new LinkedHashSet<>();
+    for (var op : scopedOps) {
+      if ("PROJECTION_SOURCE".equals(op.op())
+          && context.projectionSourceReady().test(op.payload())) sources.add(op.payload());
+    }
+    List<CommittedNativeEffect> effects = new ArrayList<>();
+    for (var op : scopedOps) {
+      switch (op.op()) {
+        case "UPSERT", "DELETE", "DELETE_PREFIX", "DELETE_COLLECTION", "PROJECTION_SOURCE", "PROJECTION" ->
+            effects.add(decodeCommittedNativeEffect(op, sources));
+        default -> { } // Other mutations never supply a scope exception.
+      }
+    }
+    return effects;
+  }
+
+  private static Map<SwitchBufferCapableQueue.SwitchBufferOp, List<String>> replayFileSurvivorExclusions(
+      DrainSwitchBufferContext context, List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps,
+      Set<SwitchBufferCapableQueue.SwitchBufferOp> authorizingDeletes) throws IOException {
+    if (authorizingDeletes.isEmpty()) return Map.of();
+    if (context.ingestLifecycle() == null
+        || !(context.jobQueue() instanceof SwitchBufferCapableQueue queue)) {
+      throw new IOException("Accepted survivor owner is unavailable");
+    }
+    var active = context.ingestLifecycle();
+    active.commitOps().maybeRefreshBlocking();
+    var effects = replayAcceptedEffects(context, orderedOps);
+    for (int index = 0; index < effects.size(); index++) {
+      effects.set(index, observeCommittedProjection(active, effects.get(index)));
+    }
+    var survivors = acceptedSurvivors(effects);
+    Map<SwitchBufferCapableQueue.SwitchBufferOp, List<String>> exclusions = new HashMap<>();
+    for (int index = 0; index < effects.size(); index++) {
+      var deletion = effects.get(index);
+      if (!authorizingDeletes.contains(deletion.op())) continue;
+      List<String> files = new ArrayList<>();
+      for (int next = 0; next < effects.size(); next++) {
+        var effect = effects.get(next);
+        if (!nativeDeleteMatches(deletion, effect)) continue;
+        if (effect.newerProjection()) {
+          throw new IOException("Broad replay cannot reconstruct a newer projection");
+        }
+        if (effect.projection() != null
+            && effect.projection().kind() == AcceptedProjection.Kind.UPSERT
+            && Long.toString(effect.projection().sourceRevision()).equals(active.documentFieldOps()
+                .getDocumentFieldOrThrow(effect.id(), SchemaFields.PROJECTION_SOURCE_REVISION))
+            && !certifyCommittedSurvivor(queue, active, effects, List.of(), next)) {
+          throw new IOException("Broad replay found an uncertified projection survivor");
+        }
+        if (next > index && effect.file() != null && survivors.contains(effect)) {
+          if (!certifyCommittedSurvivor(queue, active, effects, List.of(), next)) {
+            throw new IOException("Later file survivor lacks its exact accepted certificate");
+          }
+          files.add(effect.id());
+        }
+      }
+      exclusions.put(deletion.op(), List.copyOf(files));
+    }
+    return Map.copyOf(exclusions);
+  }
+
+  private static Set<SwitchBufferCapableQueue.SwitchBufferOp> fileRelatedBroadDeletes(
+      DrainSwitchBufferContext context, List<SwitchBufferCapableQueue.SwitchBufferOp> orderedOps,
+      ReplayDeleteOrder deleteOrder) {
+    String generation = context.replayGeneration();
+    if (generation == null || generation.isBlank()) return Set.of();
+    if (deleteOrder.deletes().keySet().stream().noneMatch(op -> generation.equals(op.generation())
+        && ("DELETE_PREFIX".equals(op.op()) || "DELETE_COLLECTION".equals(op.op())))) return Set.of();
+    List<SwitchBufferCapableQueue.SwitchBufferOp> scopedOps = orderedOps.stream()
+        .filter(op -> generation.equals(op.generation())
+            && !context.approvedGapVersions().contains(op)).toList();
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> authorizingDeletes = new LinkedHashSet<>();
+    for (int index = 0; index < scopedOps.size(); index++) {
+      var fileOp = scopedOps.get(index);
+      if (!"UPSERT".equals(fileOp.op())) continue;
+      var file = decodeCommittedNativeEffect(fileOp, Set.of());
+      int fileIndex = deleteOrder.positions().get(fileOp);
+      boolean finalSurvivor = !hasLaterAcceptedDelete(context, deleteOrder, fileIndex,
+          file.id(), file.path(), file.collection(), generation);
+      for (var indexedDeletion : deleteOrder.deletes().entrySet()) {
+        var deletion = indexedDeletion.getKey();
+        if (!generation.equals(deletion.generation())) continue;
+        if (!("DELETE_PREFIX".equals(deletion.op())
+            || "DELETE_COLLECTION".equals(deletion.op()))) continue;
+        if ((indexedDeletion.getValue() > fileIndex || finalSurvivor)
+            && nativeDeleteMatches(decodeCommittedNativeEffect(deletion, Set.of()), file)) {
+          authorizingDeletes.add(deletion);
+        }
+      }
+    }
+    return authorizingDeletes;
+  }
+
   /** Candidate journal rows clear only after exact reader-visible projection or absence. */
   private static boolean verifyBufferedProjections(DrainSwitchBufferContext context,
-      List<SwitchBufferCapableQueue.SwitchBufferOp> ops) {
+      List<SwitchBufferCapableQueue.SwitchBufferOp> ops, ReplayDeleteOrder deleteOrder) {
     if (ops.stream().noneMatch(op -> "PROJECTION".equalsIgnoreCase(op.op())
         && !context.approvedGapVersions().contains(op))) return true;
     if (context.ingestLifecycle() == null) return false;
@@ -1635,7 +1845,8 @@ public final class KnowledgeServerMigrationOps {
             var mapped = ProjectionDocumentMapper.toIndexDocument(projection).fields();
             String path = projectedTerm(mapped.get(SchemaFields.PATH));
             String collection = projectedTerm(mapped.get(SchemaFields.COLLECTION));
-            if (!hasLaterProjectionDelete(context, ops, index, projection.indexId(), path, collection)) {
+            if (!hasLaterAcceptedDelete(context, deleteOrder, index, projection.indexId(), path, collection,
+                op.generation())) {
               return false;
             }
           }
@@ -1656,7 +1867,8 @@ public final class KnowledgeServerMigrationOps {
             || !JobQueue.IngestionLedgerTransition.isSha256(currentDigest)) return false;
         String path = fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PATH);
         String collection = fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.COLLECTION);
-        if (hasLaterProjectionDelete(context, ops, index, projection.indexId(), path, collection)) return false;
+        if (hasLaterAcceptedDelete(context, deleteOrder, index, projection.indexId(), path, collection,
+            op.generation())) return false;
         if (observedRevision > projection.sourceRevision()) continue;
         if (projection.kind() == AcceptedProjection.Kind.DELETE
             || observedRevision != projection.sourceRevision()
@@ -1673,22 +1885,59 @@ public final class KnowledgeServerMigrationOps {
     }
   }
 
-  /** Only later, applied accepted deletes can explain the final absence of a projection. */
-  private static boolean hasLaterProjectionDelete(DrainSwitchBufferContext context,
-      List<SwitchBufferCapableQueue.SwitchBufferOp> ops, int projectionIndex,
-      String id, String path, String collection) {
-    boolean matches = false;
-    for (int index = projectionIndex + 1; index < ops.size(); index++) {
-      var deletion = ops.get(index);
+  /** Position maps project one frozen snapshot; they carry no independent receipt authority. */
+  private record ReplayDeleteOrder(
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, Integer> positions,
+      Map<SwitchBufferCapableQueue.SwitchBufferOp, Integer> deletes,
+      Map<String, Map<String, Integer>> exactDeletes) {}
+
+  private static ReplayDeleteOrder replayDeleteOrder(DrainSwitchBufferContext context,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> ops, boolean exactRead) {
+    Map<SwitchBufferCapableQueue.SwitchBufferOp, Integer> positions = new HashMap<>();
+    Map<SwitchBufferCapableQueue.SwitchBufferOp, Integer> deletes = new java.util.LinkedHashMap<>();
+    Map<String, Map<String, Integer>> exactDeletes = new HashMap<>();
+    for (int index = 0; index < ops.size(); index++) {
+      var op = ops.get(index);
+      positions.put(op, index);
+      if (context.approvedGapVersions().contains(op) || op.op() == null) continue;
+      switch (op.op()) {
+        case "DELETE", "DELETE_PREFIX", "DELETE_COLLECTION" -> {
+          if (exactRead && op.generation() != null && !op.generation().isBlank()
+              && op.generation().equals(context.replayGeneration())) {
+            decodeCommittedNativeEffect(op, Set.of());
+          }
+          if ("DELETE".equals(op.op())) {
+            String generation = op.generation() == null ? "" : op.generation();
+            exactDeletes.computeIfAbsent(generation, ignored -> new HashMap<>()).put(op.payload(), index);
+          } else {
+            deletes.put(op, index);
+          }
+        }
+        default -> { }
+      }
+    }
+    exactDeletes.replaceAll((generation, indexes) -> Map.copyOf(indexes));
+    return new ReplayDeleteOrder(Map.copyOf(positions), java.util.Collections.unmodifiableMap(deletes),
+        Map.copyOf(exactDeletes));
+  }
+
+  /** Only later, applied accepted deletes can explain the final absence of an admission. */
+  private static boolean hasLaterAcceptedDelete(DrainSwitchBufferContext context,
+      ReplayDeleteOrder deleteOrder, int projectionIndex,
+      String id, String path, String collection, String generation) {
+    int exactIndex = deleteOrder.exactDeletes().getOrDefault(generation == null ? "" : generation,
+        Map.of()).getOrDefault(id, -1);
+    boolean matches = exactIndex > projectionIndex;
+    for (var indexedDeletion : deleteOrder.deletes().entrySet()) {
+      if (indexedDeletion.getValue() <= projectionIndex) continue;
+      var deletion = indexedDeletion.getKey();
       if (context.approvedGapVersions().contains(deletion)) continue;
+      if (!Objects.equals(generation, deletion.generation())) continue;
+      if (deletion.revision() == null || deletion.revision().isBlank()) {
+        throw new IllegalArgumentException("Buffered delete has no exact revision");
+      }
       String payload = deletion.payload();
       switch (deletion.op().toUpperCase(Locale.ROOT)) {
-        case "DELETE" -> {
-          if (payload == null || payload.isBlank() || !("path:" + payload).equals(deletion.key())) {
-            throw new IllegalArgumentException("Buffered exact delete has an invalid key");
-          }
-          matches |= payload.equals(id);
-        }
         case "DELETE_PREFIX" -> {
           if (payload == null || payload.isBlank() || !("prefix:" + payload).equals(deletion.key())) {
             throw new IllegalArgumentException("Buffered prefix delete has an invalid key");

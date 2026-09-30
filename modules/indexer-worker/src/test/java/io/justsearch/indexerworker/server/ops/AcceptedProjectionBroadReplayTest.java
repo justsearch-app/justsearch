@@ -431,8 +431,8 @@ final class AcceptedProjectionBroadReplayTest extends LuceneExecutorTestBase {
 
       var prepared = prepare(queue, runtime);
       assertTrue(prepared.isEmpty());
-      assertFalse(hasDocument(runtime, projection.indexId()),
-          "replay applied the payload, but an invalid receipt key cannot certify its effect");
+      assertTrue(hasDocument(runtime, projection.indexId()),
+          "an invalid receipt key must refuse before applying its destructive payload");
       assertEquals(expected, queue.listSwitchBufferOpsStrictForGeneration(GENERATION));
     }
   }

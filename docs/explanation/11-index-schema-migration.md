@@ -512,6 +512,27 @@ verification accepts projection absence only when a later applied exact, prefix 
 collection delete explains it. Delete keys must match their payloads, and approved-gap
 rows cannot supply that explanation because replay skipped them.
 
+Scoped version-2 file receipts retain their exact journal positions. A validated
+later delete may supersede an older file claim; final strict parent/chunk absence
+must prove that claim's settled effect. Broad replay preserves only strictly
+certified later file survivors, using one shared query for mutation and final
+scope counting. Their exact queue revisions, indexed hashes, identities and
+scopes are checked before mutation. Real file chunks share the exclusion; an
+arbitrary projection with chunk-shaped fields cannot inherit it.
+
+Prefix replay deletes every other job in the literal scope through the existing
+administrative rules, then strictly checks all remaining states. A retained,
+sealed captured DONE row can certify an earlier accepted file removed by that
+prefix only with its exact generation receipt, strict parent/chunk absence,
+valid sealed receipt and ledger association, and outstanding post-promotion
+acknowledgment. This read certificate does not delete or acknowledge the row.
+Unrelated retained rows still block scope certification. Collection
+replay preserves the live Lucene-only contract and checks nonterminal work.
+Later projections restore from their durable payload after a blocking refresh.
+A newer physical projection matching the broad scope refuses before deletion,
+because its older retained receipt cannot establish that newer write's order.
+Strict read or mutation failure retains the complete snapshot for retry.
+
 For native boot with a committed predecessor, startup preserves the retained scoped
 rows for settlement under the producer pause and final mutation fence. Mixed projection,
 source-marker and broad-delete snapshots certify the committed generation's final

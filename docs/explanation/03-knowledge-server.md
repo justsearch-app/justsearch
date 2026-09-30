@@ -343,6 +343,16 @@ before serving publication. Strict reader and queue evidence precede exact condi
 cleanup; the file-only recovery path retains its existing replay contract. See
 [the cutover certificate](11-index-schema-migration.md#cutover-fence-switching--durable-buffering).
 
+Pre-pointer broad replay preserves only certified later file admissions and their
+real chunks. Prefix queue cleanup uses the same exact survivor paths across all
+states. Its final read also recognizes a strictly removed earlier captured file
+through the existing sealed ledger and receipt, while preserving its outstanding
+post-promotion acknowledgment. Unrelated retained rows still block cleanup;
+collection deletion keeps its Lucene-only live contract. The ordered
+file witness, strict final scope and complete reader evidence must settle before
+the receipt snapshot can be acknowledged. A newer physical projection whose
+write order is unknown causes refusal before destructive replay.
+
 Buffered UPSERT payload version 1 retains the absolute path, collection and admission provenance.
 Replay also accepts pre-C1 raw path payloads with unknown collection/provenance. Unknown versions
 or refused enqueues leave the durable buffer available for retry instead of acknowledging a loss.

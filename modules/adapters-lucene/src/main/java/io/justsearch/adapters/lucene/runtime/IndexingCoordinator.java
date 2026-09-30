@@ -152,6 +152,16 @@ public final class IndexingCoordinator {
     }
   }
 
+  /** Replays a broad delete while preserving strictly certified later file admissions. */
+  public void deleteByPathPrefixExcludingAcceptedSurvivors(String pathPrefix, List<String> fileIds) {
+    acquireReadLockTimed();
+    try {
+      dispatchLock.lock();
+      try { writeOps.get().deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, fileIds); }
+      finally { dispatchLock.unlock(); }
+    } finally { releaseWriteBarrierAndReport(); }
+  }
+
   /**
    * Tempdoc 811 (C-2a) pass-through. Direct delete, no RMW envelope — takes {@link #dispatchLock}.
    *
@@ -169,6 +179,16 @@ public final class IndexingCoordinator {
     } finally {
       releaseWriteBarrierAndReport();
     }
+  }
+
+  /** Collection counterpart of the accepted-file-preserving prefix replay. */
+  public int deleteByCollectionExcludingAcceptedSurvivors(String collection, List<String> fileIds) {
+    acquireReadLockTimed();
+    try {
+      dispatchLock.lock();
+      try { return writeOps.get().deleteByCollectionExcludingAcceptedSurvivors(collection, fileIds); }
+      finally { dispatchLock.unlock(); }
+    } finally { releaseWriteBarrierAndReport(); }
   }
 
   /**

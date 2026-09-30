@@ -138,6 +138,17 @@ public interface SwitchBufferCapableQueue extends JobQueue {
         && matchesAcceptedFileProjection(path, unitRevision, sourceSha256);
   }
 
+  /**
+   * Exact captured-plan evidence for a file already removed by a later broad replay receipt.
+   * This is read-only: the retained sealed walk row must remain available for its owner to
+   * acknowledge after the final pointer certificate.
+   */
+  default boolean matchesAcceptedCapturedFileDeletion(
+      String path, String unitRevision, String plannedSourceSha256) {
+    throw new UnsupportedOperationException(
+        "Exact captured file deletion evidence is unavailable");
+  }
+
   /** Atomically buffers sync; maintenance preserves an earlier admission's attribution. */
   boolean putSyncRoot(String key, SwitchBufferSyncRoot payload);
 

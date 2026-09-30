@@ -12,13 +12,52 @@ Luna/Sol subagents, and directed that routine work require no input. Continue
 in `F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify`, branch
 `codex/lane-f-pr1`, tested base `9cb3e120777a5aa6f3e57c886496d423165b4a61`,
 runtime checkpoint `015b85d75467394319aebc7c81873f51467726ce`, followed by
-the lockfile-only security checkpoint `68601fbf4`.
+the lockfile-only security checkpoint `68601fbf4` and native receipt checkpoint
+`5490f6c6776ed700350fa9a863b898331e790d61` (pushed to draft PR727).
 Checkpoint commits and pushes to draft PR727 remain authorized; merge remains
 separate at F. The worktree is HELD through 2026-10-04. Preserve main and the
 foreign untracked `modules/app-inference/logs/`.
 
-The broader receipt core is ready for its authorized checkpoint on this branch;
-resolve Git HEAD before continuing. Its final proved module/script code-diff hash
+The uncommitted connected native endpoint is now on a selective broad replay
+design; see D1's 2026-09-30 plan delta before resuming implementation. The
+intermediate connected in-process native restart passes at
+`tmp/lane-f-native-connected-r3.log` (3m21s), but its proof-only broad replay
+prototype was superseded after independent queue-side crash refutation.
+Root now owns selective Lucene replay with certified later file exclusions
+and one shared mutation/count query. Luna delivered the strict prefix queue
+mutation and all-state read. Collection remains Lucene-only. Final selective,
+connected, integrated and installed supervised proof is required for endpoint
+acceptance; checkpoints must explicitly retain any outstanding proof. The
+governing remaining queue is still all D1/D2/E/F.
+
+The final captured-settlement correction is locally reviewed and frozen at
+module/script diff hash `56a16d0b3d6033600d434b258f209d55a35f198a`
+against `5490f6c67`, independently matched by root and Sol. Focused proof passes
+156 recorded/executed cases, zero failures/errors/skips in 15s at
+`tmp/lane-f-captured-prefix-focused-r4.log` and its XML/counts archive.
+Compile, Spotless and PMD pass in 31s at
+`tmp/lane-f-captured-prefix-static-r2.log`. Connected native restart plus the
+recorded bulk coordinator pass 22 cases in 3m28s at
+`tmp/lane-f-captured-native-connected-r5.log` and its XML/counts archive.
+The first full stress run failed only one stale best-effort field mock in the
+recorded-refusal test; its complete 13m9s output and XML remain at
+`tmp/lane-f-captured-full-suite-r1.log` and `-red-xml/`. Two strict-reader mock
+names were corrected without changing assertions or production. The focused
+recorded-refusal class passes in 51s at
+`tmp/lane-f-captured-refusal-mock-focused.log` and `-xml/`.
+The final full stress/Spotless/PMD gate passes in 2m47s at
+`tmp/lane-f-captured-full-suite-r2.log`; its XML/counts/skips archive retains
+1,872 suites, 12,368 recorded cases, zero failures/errors and 33 existing skips
+(12,335 represented executions). Four tasks executed and 351 were up-to-date:
+fresh indexer execution plus unchanged-module result reuse, not a claim that
+every case re-executed in the final invocation. Regeneration, strict runtime
+manifest closure, store recoverability, canonical links, dependency/config
+matrices and privacy checks pass under `tmp/lane-f-captured-*` logs.
+Installed/supervised native proof remains pending; its owner-correct startup
+design is recorded in D1. No Gradle build or owned stack is currently running.
+
+The broader receipt core is committed at `5490f6c67` on this branch.
+Its final proved module/script code-diff hash
 against security checkpoint `68601fbf4` is
 `ed3c701a3cbffd3644d180969b677bee1f3e2430`. Root owns integration, the single
 Gradle build and shared stack. Luna owns bounded exploration/tests; Sol independently
@@ -124,6 +163,48 @@ Codex-copy changes resulted. `origin/main` remains an ancestor after a fresh fet
 These are local core proofs; full current-revision, hosted and connected native
 proof remain open. Luna is drafting the real producer/two-phase native crash test
 outside compiled sources. Root still owns the build and integration.
+
+The full affected indexer suite at `5490f6c67` passed in 2m28s:
+`tmp/lane-f-native-core-full-indexer.log` and its `-xml/` directory retain
+986 recorded cases, zero failures/errors, and 15 existing model/filesystem skips
+(971 executed). A new selector regression passed locally in seven recorded cases
+at `tmp/lane-f-native-legacy-selector-proof.log` and its `-xml/` directory;
+it proves legacy rows drain while committed-generation receipts stay retained.
+This test is the current uncommitted compiled-source delta. Exact-head CI
+[run 36661006537](https://github.com/justsearch-app/justsearch/actions/runs/36661006537)
+completed: twelve jobs passed; Public claims failed on the same separately owned
+Search v3 deadline gate. Snapshot and failed-job output are retained at
+`tmp/lane-f-native-core-hosted-final.json` and
+`tmp/lane-f-native-core-public-claims-job.log`. Full hosted acceptance remains red.
+
+Root and Sol refused the draft's impossible pre-switch B projection assertions:
+source enumeration records receipts; physical projection replay occurs later
+under the cutover fence. The corrected fixture must establish real watched files
+in A and B, prove non-vacuous broad effects without later exact-delete receipts,
+retain exact accepted-order suffixes, and require successful query traces. Remove
+the victims' backing files after the first owner closes, before reopening, so
+watcher deletes cannot mask broad effects and root reconciliation cannot recreate
+them. The ignored draft remains outside compiled sources until root integration.
+
+The full repository stress-enabled suite passed in 8m57s on the unchanged native
+production core plus the selector regression, before adding the connected fixture.
+`tmp/lane-f-native-core-full-suite.log` and its `-xml/` archive retain 1,870 suites,
+12,341 recorded cases, zero failures/errors, and 33 existing skips (12,308 run).
+Ten tasks executed, 24 came from cache, and 166 were up-to-date; this is integrated
+reuse plus fresh affected execution, not an assertion that every case re-executed.
+Root took fixture ownership after two substantive corrections and independently
+refuted Luna's confusion between pre-pointer replay and post-pointer cleanup.
+The fixture is now compiled as `EngineNativePointerBootMutationTest`; its first
+focused run is pending at `tmp/lane-f-native-connected-first.log`.
+
+That first run failed on the fixture's omitted initial client submission. The
+corrected second run passes the physical deletion/order setup but exposes an
+ordered file replay defect before pointer commitment: an older accepted file
+receipt is rejected before replay reaches its later broad delete. Both RED outputs
+and XML are retained under `tmp/lane-f-native-connected-{first,r2}` names.
+Root owns the narrow production correction; Luna writes bounded real-reader/
+SQLite tests and Sol refutes the design. Preserve strict final absence and exact
+queue authority; do not erase initial enumeration receipts to make the fixture pass.
 
 Next product endpoint is broader native committed-pointer effects and old accepted-source
 recovery. The native mixed-snapshot design is adopted and implemented locally;

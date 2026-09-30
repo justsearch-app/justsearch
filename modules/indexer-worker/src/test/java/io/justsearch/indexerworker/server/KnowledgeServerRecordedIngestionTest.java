@@ -717,7 +717,7 @@ final class KnowledgeServerRecordedIngestionTest {
             building, "path:" + file, "UPSERT", payload, 1, "v1")));
     org.mockito.Mockito.when(queue.jobStateCountsStrict()).thenReturn(
         new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
-    org.mockito.Mockito.when(sourceFields.getDocumentField(file.toString(),
+    org.mockito.Mockito.when(sourceFields.getDocumentFieldOrThrow(file.toString(),
         io.justsearch.indexing.SchemaFields.SOURCE_SHA256)).thenReturn(null);
     org.mockito.Mockito.when(queue.matchesAcceptedFileProjection(
         file.toString(), "accepted-revision", hash, null)).thenReturn(false);
@@ -786,7 +786,7 @@ final class KnowledgeServerRecordedIngestionTest {
         new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
     org.mockito.Mockito.when(queue.matchesAcceptedFileProjection(
         file.toString(), "accepted-revision", hash, hash)).thenReturn(true);
-    org.mockito.Mockito.when(fields.getDocumentField(file.toString(),
+    org.mockito.Mockito.when(fields.getDocumentFieldOrThrow(file.toString(),
         io.justsearch.indexing.SchemaFields.SOURCE_SHA256)).thenReturn(hash);
     org.mockito.Mockito.when(queue.removeReplayedSwitchBufferOps(List.of(version))).thenReturn(1);
     server.appServices = producer;

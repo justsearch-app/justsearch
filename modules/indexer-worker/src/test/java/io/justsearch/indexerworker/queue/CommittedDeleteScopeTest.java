@@ -1,11 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.queue;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.indexerworker.loop.SourceContentHash;
 import io.justsearch.indexerworker.util.PathNormalizer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -84,6 +87,71 @@ final class CommittedDeleteScopeTest {
   }
 
   @Test
+  void prefixDeleteExcludingAcceptedSurvivorPreservesOnlyThatPath() {
+    Path root = tempDir.resolve("survivor-scope");
+    Path survivor = root.resolve("survivor.txt");
+    Path removed = root.resolve("removed.txt");
+    Path secondRemoved = root.resolve("second-removed.txt");
+    queue.enqueue(List.of(survivor, removed, secondRemoved), "scope");
+
+    assertEquals(2, queue.deleteByPathPrefixExcludingAcceptedSurvivors(
+        root.toString(), List.of(survivor.toString())));
+    assertTrue(queue.hasNonterminalJobsByPathPrefixStrict(root.toString()));
+    assertFalse(queue.hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+        root.toString(), List.of(survivor.toString())));
+    assertEquals(1, queue.deleteByExactPath(survivor.toString()));
+    assertFalse(queue.hasNonterminalJobsByPathPrefixStrict(root.toString()));
+  }
+
+  @Test
+  void excludedPrefixDeletionRetainsLiteralSurvivorAndLeavesWildcardNeighbors() {
+    Path literalRoot = tempDir.resolve("folder_%");
+    Path survivor = literalRoot.resolve("survivor.txt");
+    Path wildcardSibling = tempDir.resolve("folderXanything").resolve("sibling.txt");
+    Path boundarySibling = tempDir.resolve("folder_%-neighbor").resolve("sibling.txt");
+    queue.enqueue(List.of(survivor, wildcardSibling, boundarySibling));
+
+    assertEquals(0, queue.deleteByPathPrefixExcludingAcceptedSurvivors(
+        literalRoot.toString(), List.of(survivor.toString())));
+    assertTrue(queue.hasNonterminalJobsByPathPrefixStrict(literalRoot.toString()));
+    assertFalse(queue.hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+        literalRoot.toString(), List.of(survivor.toString())));
+    assertEquals(1, queue.deleteByPathPrefix(literalRoot.toString()));
+    assertTrue(queue.hasNonterminalJobsByPathPrefixStrict(wildcardSibling.getParent().toString()));
+    assertTrue(queue.hasNonterminalJobsByPathPrefixStrict(boundarySibling.getParent().toString()));
+  }
+
+  @Test
+  void capturedUnacknowledgedRowsStillBlockExcludedScopeRead() throws Exception {
+    Path root = tempDir.resolve("captured-survivor");
+    Files.createDirectories(root);
+    Path captured = Files.writeString(root.resolve("captured.txt"), "captured bytes");
+    var opened = queue.beginCapturedWalk("captured-survivor", "a".repeat(64), true);
+    var entry = new JobQueue.EnqueueEntry(captured, Files.size(captured), null,
+        SourceContentHash.sha256(captured));
+    assertEquals(1, queue.enqueueRecordedEntries("captured-survivor", opened.enumerationEpoch(),
+        List.of(entry), "scope"));
+
+    assertEquals(1, queue.deleteByPathPrefixExcludingAcceptedSurvivors(root.toString(), List.of()));
+    assertTrue(queue.hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+        root.toString(), List.of()), "an unacknowledged captured row must remain blocking");
+  }
+
+  @Test
+  void allTerminalRowsStillBlockWhenTheyAreNotAcceptedSurvivors() throws Exception {
+    Path root = tempDir.resolve("terminal-scope");
+    Path done = root.resolve("done.txt");
+    Path failed = root.resolve("failed.txt");
+    queue.enqueue(List.of(done, failed));
+    setState(done, "DONE");
+    setState(failed, "FAILED");
+
+    assertTrue(queue.hasJobsByPathPrefixOutsideCertifiedReplayPaths(root.toString(), List.of()));
+    assertFalse(queue.hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+        root.toString(), List.of(done.toString(), failed.toString())));
+  }
+
+  @Test
   void collectionScopeMapsNullAndBlankLegacyRowsToDefault() throws Exception {
     Path nullCollection = tempDir.resolve("default-null.txt");
     Path blankCollection = tempDir.resolve("default-blank.txt");
@@ -120,6 +188,11 @@ final class CommittedDeleteScopeTest {
         () -> queue.hasNonterminalJobsByPathPrefixStrict(tempDir.toString()));
     assertThrows(IllegalStateException.class,
         () -> queue.hasNonterminalJobsByCollectionStrict("default"));
+    assertThrows(IllegalStateException.class,
+        () -> queue.hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+            tempDir.toString(), List.of()));
+    assertThrows(IllegalStateException.class,
+        () -> queue.deleteByPathPrefixExcludingAcceptedSurvivors(tempDir.toString(), List.of()));
   }
 
   private void setState(Path path, String state) throws SQLException {

@@ -474,6 +474,17 @@ public interface JobQueue extends Closeable {
   }
 
   /**
+   * Reports whether a literal prefix retains any row outside exact, already certified replay
+   * paths. The caller supplies paths whose replay evidence was checked independently; this read
+   * performs no acknowledgement or deletion. Invalid scopes and unreadable state fail closed.
+   */
+  default boolean hasJobsByPathPrefixOutsideCertifiedReplayPaths(
+      String pathPrefix, List<String> certifiedReplayPaths) {
+    throw new UnsupportedOperationException(
+        "Strict path-prefix scope read outside certified replay paths is unavailable");
+  }
+
+  /**
    * Reports whether a strict collection scope still has durable non-terminal work.
    *
    * <p>Null and blank values stored on legacy rows are the index default collection. The requested
@@ -1035,6 +1046,16 @@ public interface JobQueue extends Closeable {
    */
   default int deleteByPathPrefix(String pathPrefix) {
     return 0;
+  }
+
+  /**
+   * Deletes jobs under a literal prefix while preserving exact accepted survivor paths.
+   * Implementations must retain the ordinary administrative handling for every selected row.
+   */
+  default int deleteByPathPrefixExcludingAcceptedSurvivors(
+      String pathPrefix, List<String> survivorPaths) {
+    throw new UnsupportedOperationException(
+        "Strict path-prefix deletion with accepted survivors is unavailable");
   }
 
   /**

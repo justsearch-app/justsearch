@@ -28,12 +28,10 @@ import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.TermInSetQuery;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.util.Bits;
-import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -299,27 +297,7 @@ public final class IndexCountOps {
 
   private int countUnexpectedSurvivors(Query scope, List<String> fileIds,
       List<String> projectionIds) throws IOException {
-    var query = new BooleanQuery.Builder().add(scope, BooleanClause.Occur.FILTER);
-    var ids = new java.util.ArrayList<String>(fileIds);
-    ids.addAll(projectionIds);
-    if (!ids.isEmpty()) {
-      query.add(identityTerms(SchemaFields.DOC_ID, ids), BooleanClause.Occur.MUST_NOT);
-    }
-    if (!fileIds.isEmpty()) {
-      // A no-file projection may carry arbitrary parent/chunk fields. Its reserved projection:
-      // identity cannot masquerade as an actual Worker chunk in the permanent chunk: namespace.
-      var chunks = new BooleanQuery.Builder()
-          .add(identityTerms(SchemaFields.PARENT_DOC_ID, fileIds), BooleanClause.Occur.FILTER)
-          .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.FILTER)
-          .add(new PrefixQuery(new Term(SchemaFields.DOC_ID,
-              io.justsearch.indexing.chunking.ChunkIds.CHUNK_PREFIX)), BooleanClause.Occur.FILTER);
-      query.add(chunks.build(), BooleanClause.Occur.MUST_NOT);
-    }
-    return countQueryOrThrow(query.build());
-  }
-
-  private static Query identityTerms(String field, List<String> ids) {
-    return new TermInSetQuery(field, ids.stream().map(BytesRef::new).toList());
+    return countQueryOrThrow(QueryFilterBuilder.excludingAcceptedSurvivors(scope, fileIds, projectionIds));
   }
 
   /**

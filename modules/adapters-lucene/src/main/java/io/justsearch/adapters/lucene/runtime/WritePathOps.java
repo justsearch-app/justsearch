@@ -237,11 +237,16 @@ public final class WritePathOps {
    * accounting — caller may handle this differently.
    */
   void deleteByPathPrefix(String pathPrefix) {
+    deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, List.of());
+  }
+
+  void deleteByPathPrefixExcludingAcceptedSurvivors(String pathPrefix, List<String> fileIds) {
     // Normalize the prefix (case-insensitive on Windows, ensure trailing separator)
     String normalized = normalizePathPrefix(pathPrefix);
     try {
       // Use 'path' field for prefix matching (works for both parent docs and chunks)
-      Query query = new PrefixQuery(new Term(SchemaFields.PATH, normalized));
+      Query query = QueryFilterBuilder.excludingAcceptedSurvivors(
+          new PrefixQuery(new Term(SchemaFields.PATH, normalized)), fileIds, List.of());
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
       if (w == null) {
@@ -270,6 +275,10 @@ public final class WritePathOps {
    * @return the number of documents matched (and submitted for deletion)
    */
   int deleteByCollection(String collection) {
+    return deleteByCollectionExcludingAcceptedSurvivors(collection, List.of());
+  }
+
+  int deleteByCollectionExcludingAcceptedSurvivors(String collection, List<String> fileIds) {
     if (collection == null || collection.isBlank()) {
       throw new IllegalArgumentException("deleteByCollection requires a non-blank collection");
     }
@@ -278,7 +287,8 @@ public final class WritePathOps {
     if (w == null) {
       throw new IllegalStateException("IndexWriter not available (runtime not started or closed)");
     }
-    Query query = new TermQuery(new Term(SchemaFields.COLLECTION, collection));
+    Query query = QueryFilterBuilder.excludingAcceptedSurvivors(
+        new TermQuery(new Term(SchemaFields.COLLECTION, collection)), fileIds, List.of());
     int matched = 0;
     org.apache.lucene.search.SearcherManager mgr = snap.searcherManager();
     try {

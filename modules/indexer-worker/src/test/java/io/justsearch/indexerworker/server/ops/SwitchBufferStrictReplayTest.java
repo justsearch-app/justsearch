@@ -113,6 +113,27 @@ final class SwitchBufferStrictReplayTest {
   }
 
   @Test
+  void bestEffortBootDrainClearsLegacyRowsAndLeavesCommittedGenerationReceiptsUntouched() {
+    var legacy = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "path:legacy", "DELETE", "legacy", 1, "v1");
+    var committed = new SwitchBufferCapableQueue.SwitchBufferOp(
+        "green", "prefix:committed", "DELETE_PREFIX", "committed", 2, "v2");
+    when(queue.listSwitchBufferOps()).thenReturn(List.of(legacy, committed));
+    when(queue.removeReplayedSwitchBufferOps(List.of(legacy))).thenReturn(1);
+    var indexing = mock(IndexingCoordinator.class);
+    when(runtime.indexingCoordinator()).thenReturn(indexing);
+    when(runtime.commitOps()).thenReturn(mock(CommitOps.class));
+
+    KnowledgeServerMigrationOps.drainSwitchBufferBestEffort(context());
+
+    verify(indexing).deleteByIdAndChunks("legacy");
+    verify(queue).deleteByExactPath("legacy");
+    verify(queue).removeReplayedSwitchBufferOps(List.of(legacy));
+    verify(indexing, never()).deleteByPathPrefix("committed");
+    verify(queue, never()).deleteByPathPrefix("committed");
+  }
+
+  @Test
   void sourceSeedMustBeCompleteBeforeItsMarkerCanBeRetired() throws Exception {
     var projection = new AcceptedProjection("memory", "record-7", 4,
         AcceptedProjection.Kind.UPSERT, "{\"content\":\"old\"}");
@@ -450,7 +471,7 @@ final class SwitchBufferStrictReplayTest {
     when(queue.matchesAcceptedFileProjection(file.toString(), "accepted-revision", hash, hash))
         .thenReturn(true);
     var fields = mock(DocumentFieldOps.class);
-    when(fields.getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256)).thenReturn(hash);
+    when(fields.getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256)).thenReturn(hash);
     when(runtime.documentFieldOps()).thenReturn(fields);
     when(queue.removeReplayedSwitchBufferOps(List.of(selected))).thenReturn(1);
 
@@ -480,7 +501,7 @@ final class SwitchBufferStrictReplayTest {
     var refreshed = new AtomicBoolean();
     when(runtime.documentFieldOps()).thenReturn(fields);
     when(runtime.commitOps()).thenReturn(commits);
-    when(fields.getDocumentField(path, SchemaFields.SOURCE_SHA256))
+    when(fields.getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256))
         .thenAnswer(ignored -> refreshed.get() ? h2 : h1);
     doAnswer(ignored -> { refreshed.set(true); return null; })
         .when(commits).maybeRefreshBlocking();
@@ -488,7 +509,7 @@ final class SwitchBufferStrictReplayTest {
     assertTrue(KnowledgeServerMigrationOps.drainRefusedCandidateOnSource(scopedContext("green")));
     var order = inOrder(commits, fields, queue);
     order.verify(commits).maybeRefreshBlocking();
-    order.verify(fields).getDocumentField(path, SchemaFields.SOURCE_SHA256);
+    order.verify(fields).getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256);
     order.verify(queue).matchesAcceptedFileProjection(path, "captured-unit", h1, h2);
     order.verify(queue).removeReplayedSwitchBufferOps(List.of(selected));
   }
@@ -617,7 +638,7 @@ final class SwitchBufferStrictReplayTest {
     Files.writeString(file, "later unaccepted bytes");
 
     assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
-    verify(fields).getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256);
+    verify(fields).getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256);
     verify(queue, never()).enqueueEntries(anyList(), isNull());
     verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
   }
@@ -638,7 +659,7 @@ final class SwitchBufferStrictReplayTest {
     when(queue.removeReplayedSwitchBufferOps(List.of(version))).thenReturn(1);
     var fields = mock(DocumentFieldOps.class);
     when(runtime.documentFieldOps()).thenReturn(fields);
-    when(fields.getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256))
+    when(fields.getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256))
         .thenReturn(acceptedHash);
     Files.writeString(file, "unaccepted later bytes");
 
@@ -663,7 +684,7 @@ final class SwitchBufferStrictReplayTest {
     Files.delete(file);
 
     assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
-    verify(fields).getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256);
+    verify(fields).getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256);
     verify(queue, never()).enqueueEntries(anyList(), isNull());
     verify(queue, never()).removeReplayedSwitchBufferOps(anyList());
   }
@@ -699,7 +720,7 @@ final class SwitchBufferStrictReplayTest {
     when(queue.jobStateCountsStrict()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 1, 0));
     var fields = mock(DocumentFieldOps.class);
     when(runtime.documentFieldOps()).thenReturn(fields);
-    when(fields.getDocumentField(file.toString(), SchemaFields.SOURCE_SHA256)).thenReturn(hash);
+    when(fields.getDocumentFieldOrThrow(file.toString(), SchemaFields.SOURCE_SHA256)).thenReturn(hash);
 
     assertFalse(KnowledgeServerMigrationOps.drainSwitchBufferStrict(scopedContext("green")));
     verify(queue).matchesAcceptedFileProjection(file.toString(), "new-revision", hash, hash);
