@@ -250,7 +250,8 @@ fields remain schema errors. It no longer returns the direct migration
 
 - Use `justsearch.dev.ai_activate` when an investigation requires the online local AI runtime. It takes an optional `chatProfile?: "compact" | "standard"` (tempdoc 842) — activation is when llama-server spawns, so it's the switch point for changing chat model pair; measured switch cost is single-digit seconds either direction.
 - **The chat model is also runtime-configurable by explicit path — no installer pack-import or `-D` restart needed.**
-  `POST /api/settings/v2` with `{"llm":{"modelPath":"<gguf>","gpuLayers":99}}`, then `ai_activate`. An explicit
+  Read `GET /api/settings/v2` first, then `POST /api/settings/v2` with
+  `{"llm":{"modelPath":"<gguf>","gpuLayers":99},"witness":<GET response witness>,"operationKey":"<fresh canonical UUIDv7>"}`, then `ai_activate`. An explicit
   path is operator-owned and wins over the profile (tempdoc 842 precedence); prefer `chatProfile` unless you
   need a model outside the registry pairs.
 - Do not treat embedding readiness and online LLM readiness as the same thing. Embeddings are Worker-side; online chat/QA uses the app inference runtime.

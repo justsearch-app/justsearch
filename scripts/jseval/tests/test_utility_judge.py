@@ -13,6 +13,8 @@ the emitted `rater_kind` field.
 from __future__ import annotations
 
 import json
+import re
+import uuid
 from pathlib import Path
 
 import pytest
@@ -1079,14 +1081,17 @@ class _FakeHeadApi:
     INITIAL_MODEL = "Qwen_Qwen3.5-9B-Q4_K_M.gguf"
 
     def __init__(self):
-        self.settings = {"llm": {"modelPath": self.INITIAL_MODEL}}
+        self.settings = {
+            "llm": {"modelPath": self.INITIAL_MODEL},
+            "witness": {"acceptedRevision": 3, "lastCommittedOperationKey": "018cc251-f400-7000-8000-000000000001"},
+        }
         self.served_model_path = self.INITIAL_MODEL
         self.activate_calls = []
         self.fail_models_probe = False
         self.calls = []
 
     def get(self, url, timeout=None):
-        self.calls.append(("GET", url))
+        self.calls.append(("GET", url, self.settings.copy()))
         if url.endswith("/api/settings/v2"):
             return _FakeResp(self.settings)
         if url.endswith("/api/ai/runtime/status"):
@@ -1098,7 +1103,7 @@ class _FakeHeadApi:
         raise AssertionError(f"unexpected GET {url}")
 
     def post(self, url, json=None, timeout=None, headers=None):
-        self.calls.append(("POST", url))
+        self.calls.append(("POST", url, json))
         if url.endswith("/api/settings/v2"):
             llm = (json or {}).get("llm") or {}
             if "modelPath" in llm:
@@ -1123,6 +1128,25 @@ class TestLocalSerialRater:
         # `external_grader`'s `eg.httpx` are the same shared module object.
         monkeypatch.setattr(uj.httpx, "get", api.get)
         monkeypatch.setattr(uj.httpx, "post", api.post)
+
+    def test_settings_posts_use_latest_witness_and_uuid_v7_key(self, monkeypatch):
+        api = _FakeHeadApi()
+        self._patch(monkeypatch, api)
+
+        uj.LocalSerialRater("llama-grader", self._MODEL_PATH)._set_model_path(self._MODEL_PATH)
+
+        settings_get = next(call for call in api.calls if call[0] == "GET" and call[1].endswith("/api/settings/v2"))
+        settings_post = next(call for call in api.calls if call[0] == "POST" and call[1].endswith("/api/settings/v2"))
+        body = settings_post[2]
+        assert body["witness"] == settings_get[2]["witness"]
+        assert body["witness"] == {
+            "acceptedRevision": 3,
+            "lastCommittedOperationKey": "018cc251-f400-7000-8000-000000000001",
+        }
+        key = body["operationKey"]
+        assert re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", key)
+        parsed = uuid.UUID(key)
+        assert parsed.version == 7 and parsed.variant == uuid.RFC_4122
 
     def test_swaps_labels_and_restores(self, monkeypatch):
         api = _FakeHeadApi()

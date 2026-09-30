@@ -13,6 +13,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 
 ## [Unreleased]
 
+### Changed
+- `POST /api/settings/v2` writes now require the latest GET witness and a fresh canonical UUIDv7 operation key
+- `POST /api/worker/restart` returns HTTP 410; use `POST /api/engine/components/index/recover`
+
+### Removed
+- `/api/inference/reload`; inference refresh now uses the accepted `core.reconfigure` operation
+
 ## [0.3.0] - 2026-09-07
 
 ### Added
