@@ -1146,8 +1146,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public int enqueueEnumeratedFilesForGeneration(
-      String generation, List<JobQueue.EnqueueEntry> entries) {
-    return enqueueCandidateFileBatch(generation, entries, null, null, true);
+      String generation, List<JobQueue.EnqueueEntry> entries, String collection) {
+    return enqueueCandidateFileBatch(generation, entries, collection, null, true);
   }
 
   private record CandidateFileBatch(int covered, int enqueued) {}
@@ -1192,7 +1192,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           admitted = new ArrayList<>(witnessedEntries.size());
           for (JobQueue.EnqueueEntry entry : witnessedEntries) {
             if (enumerationSupersededByAcceptedMutation(
-                generation, normalizePath(entry.path()), entry.plannedSourceSha256())) {
+                generation, normalizePath(entry.path()), entry.plannedSourceSha256(), normalizedCollection)) {
               superseded++;
             } else {
               admitted.add(entry);
@@ -1252,11 +1252,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   /** The baseline walk cannot replace an accepted foreground mutation. */
   private boolean enumerationSupersededByAcceptedMutation(
-      String generation, String path, String sourceSha256)
+      String generation, String path, String sourceSha256, String sourceCollection)
       throws SQLException {
     List<String> deletedCollections = new ArrayList<>();
-    String collection = null;
-    boolean collectionKnown = false;
+    String collection = sourceCollection;
+    boolean collectionKnown = sourceCollection != null;
     try (PreparedStatement query = connection.prepareStatement(
         "SELECT key, op, payload FROM switch_buffer WHERE generation = ? "
             + "AND (key = ? OR op IN ('DELETE_PREFIX', 'DELETE_COLLECTION'))")) {

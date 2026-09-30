@@ -94,9 +94,9 @@ public interface SwitchBufferCapableQueue extends JobQueue {
    * mutation for the same candidate path wins over this baseline scan; the covered count includes
    * those superseded scan entries so enumeration completeness is still accountable.
    */
-  default int enqueueEnumeratedFilesForGeneration(String generation, List<EnqueueEntry> entries) {
-    throw new UnsupportedOperationException(
-        "Atomic migration enumeration admission is unavailable");
+  default int enqueueEnumeratedFilesForGeneration(
+      String generation, List<EnqueueEntry> entries, String collection) {
+    throw new UnsupportedOperationException("Atomic migration enumeration admission is unavailable");
   }
 
   /** Atomic generation-scoped file admission without recorded scan membership. */

@@ -54,7 +54,7 @@ final class HelpIngestMarkerRecoveryTest {
 
     try (var fixture =
         KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
-      fixture.bootstrap().tryIngestHelpFiles(client, configFor(dataDir, workingDir));
+      fixture.bootstrap().tryIngestHelpFiles(client, configFor(dataDir, workingDir), helpSource(workingDir));
     }
 
     verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any());
@@ -77,7 +77,7 @@ final class HelpIngestMarkerRecoveryTest {
 
     try (var fixture =
         KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
-      fixture.bootstrap().tryIngestHelpFiles(client, configFor(dataDir, workingDir));
+      fixture.bootstrap().tryIngestHelpFiles(client, configFor(dataDir, workingDir), helpSource(workingDir));
     }
 
     verify(client, times(1)).submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any());
@@ -95,7 +95,7 @@ final class HelpIngestMarkerRecoveryTest {
     // moment this assertion needs to still mean something.
     try (var fixture =
         KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
-      fixture.bootstrap().tryIngestHelpFiles(first, configFor(dataDir, workingDir));
+      fixture.bootstrap().tryIngestHelpFiles(first, configFor(dataDir, workingDir), helpSource(workingDir));
     }
     String current = Files.readString(dataDir.resolve(MARKER)).trim();
     assertEquals(1, org.mockito.Mockito.mockingDetails(first).getInvocations().size());
@@ -103,7 +103,7 @@ final class HelpIngestMarkerRecoveryTest {
     KnowledgeClient second = mock(KnowledgeClient.class);
     try (var fixture =
         KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
-      fixture.bootstrap().tryIngestHelpFiles(second, configFor(dataDir, workingDir));
+      fixture.bootstrap().tryIngestHelpFiles(second, configFor(dataDir, workingDir), helpSource(workingDir));
     }
 
     verify(second, never()).submitBatch(anyList(), anyBoolean(), anyString(), org.mockito.ArgumentMatchers.any());
@@ -118,6 +118,12 @@ final class HelpIngestMarkerRecoveryTest {
         Files.createDirectories(workingDir.resolve("SSOT").resolve("docs").resolve("help"));
     Files.writeString(helpDir.resolve("welcome.md"), "# Welcome\n");
     return workingDir;
+  }
+
+  private static io.justsearch.configuration.resolved.ResolvedConfig.FileSource helpSource(Path workingDir) {
+    return io.justsearch.configuration.resolved.ResolvedConfig.builder()
+        .putDefault("justsearch.ssot.path", workingDir.resolve("SSOT").toString())
+        .build().collections().bundledHelp();
   }
 
   private static KnowledgeServerConfig configFor(Path dataDir, Path workingDir) {

@@ -41,6 +41,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -215,7 +216,7 @@ public final class KnowledgeServerMigrationOps {
   }
 
   public record EnqueueContext(
-      List<Path> roots,
+      List<ResolvedConfig.FileSource> roots,
       JobQueue jobQueue,
       BooleanSupplier runningSupplier,
       Supplier<IndexGenerationManager> indexGenerationManagerSupplier,
@@ -1963,9 +1964,9 @@ public final class KnowledgeServerMigrationOps {
   }
 
   /** Loads complete declared coverage; an unreadable source cannot certify an empty migration. */
-  public static List<Path> loadMigrationRoots(
-      Path dataDir, List<ResolvedConfig.CollectionCfg> collections, ObjectMapper json) throws IOException {
-    Set<Path> roots = new LinkedHashSet<>();
+  public static List<ResolvedConfig.FileSource> loadMigrationRoots(
+      Path dataDir, ResolvedConfig.Collections collections, ObjectMapper json) throws IOException {
+    Map<Path, ResolvedConfig.FileSource> roots = new LinkedHashMap<>();
     Path rootsFile = dataDir.resolve("watched_roots.json");
     String content;
     try {
@@ -1991,19 +1992,25 @@ public final class KnowledgeServerMigrationOps {
         if (path == null || !path.isString() || path.asText().isBlank()) {
           throw new IOException("Invalid watched-roots path");
         }
-        roots.add(Path.of(path.asText()).toAbsolutePath().normalize());
+        String collection = object ? entry.path("collection").asText(null) : null;
+        var source = new ResolvedConfig.FileSource(Path.of(path.asText()), collection);
+        roots.put(source.path(), source);
       }
     }
     if (collections != null) {
-      for (ResolvedConfig.CollectionCfg collection : collections) {
+      for (ResolvedConfig.CollectionCfg collection : collections.items()) {
         for (Path root : collection.roots()) {
           if (root == null) throw new IOException("Null configured migration root");
-          roots.add(root.toAbsolutePath().normalize());
+          var source = new ResolvedConfig.FileSource(root, collection.name());
+          roots.compute(source.path(), (path, existing) -> existing == null || existing.collection() == null ? source : existing);
         }
       }
     }
-    for (Path root : roots) requireMigrationRoot(root);
-    return List.copyOf(roots);
+    for (Path root : roots.keySet()) requireMigrationRoot(root);
+    // Startup's version marker is not a migration coverage authority.
+    var help = collections == null ? null : collections.bundledHelp();
+    if (help != null && Files.isDirectory(help.path())) roots.put(help.path(), help);
+    return List.copyOf(roots.values());
   }
 
   private static void requireMigrationRoot(Path root) throws IOException {
@@ -2020,7 +2027,8 @@ public final class KnowledgeServerMigrationOps {
     }
   }
 
-  private static int acceptMigrationBatch(EnqueueContext context, List<JobQueue.EnqueueEntry> batch)
+  private static int acceptMigrationBatch(EnqueueContext context, List<JobQueue.EnqueueEntry> batch,
+      String collection)
       throws IOException {
     requireEnumerationRunning(context);
     IndexGenerationManager manager = context.indexGenerationManagerSupplier().get();
@@ -2028,14 +2036,15 @@ public final class KnowledgeServerMigrationOps {
     if (manager == null) {
       // Lightweight enumeration callers without a generation owner retain the ordinary queue
       // seam. A live migration always supplies its manager and must record the exact candidate.
-      accepted = context.jobQueue().enqueueEntries(batch);
+      accepted = collection == null ? context.jobQueue().enqueueEntries(batch)
+          : context.jobQueue().enqueueEntries(batch, collection);
     } else {
       IndexGenerationManager.State state = manager.readStateBestEffort();
       if (state == null || state.building_generation() == null
           || !(context.jobQueue() instanceof SwitchBufferCapableQueue scoped)) {
         throw new IOException("Migration enumeration has no atomic candidate admission");
       }
-      accepted = scoped.enqueueEnumeratedFilesForGeneration(state.building_generation(), batch);
+      accepted = scoped.enqueueEnumeratedFilesForGeneration(state.building_generation(), batch, collection);
     }
     context.migrationEnumeratorFilesEnqueued().addAndGet(accepted);
     if (accepted != batch.size()) throw new IOException("Incomplete migration batch admission");
@@ -2053,7 +2062,9 @@ public final class KnowledgeServerMigrationOps {
     ArrayList<JobQueue.EnqueueEntry> batch = new ArrayList<>(batchSize);
     long lastPersistMs = 0L;
 
-    for (Path root : context.roots()) {
+    for (ResolvedConfig.FileSource source : context.roots()) {
+      Path root = source.path();
+      boolean help = io.justsearch.configuration.InternalCollections.HELP.equals(source.collection());
       requireEnumerationRunning(context);
       while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
         IndexGenerationManager manager = context.indexGenerationManagerSupplier().get();
@@ -2071,13 +2082,14 @@ public final class KnowledgeServerMigrationOps {
       requireEnumerationRunning(context);
       requireMigrationRoot(root);
       context.log().info("Migration enumerator scanning root: {}", root);
-      try (Stream<Path> walk = Files.walk(root)) {
+      try (Stream<Path> walk = Files.walk(root, help ? 1 : Integer.MAX_VALUE)) {
         var iterator = walk.iterator();
         while (iterator.hasNext()) {
           Path path = iterator.next();
           requireEnumerationRunning(context);
           BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, java.nio.file.LinkOption.NOFOLLOW_LINKS);
           if (attributes.isDirectory()) continue;
+          if (help && !path.toString().endsWith(".md")) continue;
           if (!attributes.isRegularFile() || !Files.isReadable(path)) {
             throw new IOException("Unreadable migration file: " + path);
           }
@@ -2115,11 +2127,11 @@ public final class KnowledgeServerMigrationOps {
           requireEnumerationRunning(context);
           batch.add(new JobQueue.EnqueueEntry(path, attributes.size()));
           if (batch.size() >= batchSize) {
-            total += acceptMigrationBatch(context, batch);
+            total += acceptMigrationBatch(context, batch, source.collection());
           }
         }
       }
-      if (!batch.isEmpty()) total += acceptMigrationBatch(context, batch);
+      if (!batch.isEmpty()) total += acceptMigrationBatch(context, batch, source.collection());
       requireEnumerationRunning(context);
       context.migrationEnumeratorRootsDone().incrementAndGet();
 

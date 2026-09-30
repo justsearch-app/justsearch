@@ -40,13 +40,13 @@ final class MigrationEnumerationCompletenessTest {
   @Test
   void absentRegistryAndEmptyConfigurationAreAnEmptyMigration(@TempDir Path dataDir)
       throws Exception {
-    assertTrue(KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, List.of(), JSON).isEmpty());
+    assertTrue(KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(List.of()), JSON).isEmpty());
   }
 
   @Test
   void emptyRegistryAndConfigurationAreAnEmptyMigration(@TempDir Path dataDir) throws Exception {
     Files.writeString(dataDir.resolve("watched_roots.json"), "{\"schemaVersion\":1,\"roots\":[]}");
-    assertTrue(KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, List.of(), JSON).isEmpty());
+    assertTrue(KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(List.of()), JSON).isEmpty());
   }
 
   @Test
@@ -55,8 +55,8 @@ final class MigrationEnumerationCompletenessTest {
     Files.writeString(dataDir.resolve("watched_roots.json"),
         JSON.writeValueAsString(List.of(root.toString())));
 
-    assertEquals(List.of(root.toAbsolutePath().normalize()),
-        KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, List.of(), JSON));
+    assertEquals(List.of(new ResolvedConfig.FileSource(root, null)),
+        KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(List.of()), JSON));
   }
 
   @Test
@@ -68,15 +68,15 @@ final class MigrationEnumerationCompletenessTest {
     Files.writeString(dataDir.resolve("watched_roots.json"), registry);
 
     var collections = List.of(new ResolvedConfig.CollectionCfg("documents", List.of(configured)));
-    assertEquals(List.of(persisted.toAbsolutePath().normalize(), configured.toAbsolutePath().normalize()),
-        KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, collections, JSON));
+    assertEquals(List.of(new ResolvedConfig.FileSource(persisted, null), new ResolvedConfig.FileSource(configured, "documents")),
+        KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(collections), JSON));
   }
 
   @Test
   void malformedRegistryIsRejected(@TempDir Path dataDir) throws Exception {
     Files.writeString(dataDir.resolve("watched_roots.json"), "{not-json");
     assertThrows(IOException.class,
-        () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, List.of(), JSON));
+        () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(List.of()), JSON));
   }
 
   @Test
@@ -90,7 +90,7 @@ final class MigrationEnumerationCompletenessTest {
     for (String document : documents) {
       Files.writeString(dataDir.resolve("watched_roots.json"), document);
       assertThrows(IOException.class,
-          () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, List.of(), JSON),
+          () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(List.of()), JSON),
           document);
     }
   }
@@ -100,7 +100,7 @@ final class MigrationEnumerationCompletenessTest {
     Files.writeString(dataDir.resolve("watched_roots.json"),
         "{\"schemaVersion\":99,\"roots\":[]}");
     assertThrows(UnsupportedStoreVersionException.class,
-        () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, List.of(), JSON));
+        () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(List.of()), JSON));
   }
 
   @Test
@@ -108,7 +108,7 @@ final class MigrationEnumerationCompletenessTest {
     Path missing = dataDir.resolve("does-not-exist");
     var collections = List.of(new ResolvedConfig.CollectionCfg("documents", List.of(missing)));
     assertThrows(IOException.class,
-        () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, collections, JSON));
+        () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(collections), JSON));
   }
 
   @Test
@@ -123,7 +123,7 @@ final class MigrationEnumerationCompletenessTest {
       Assumptions.assumeFalse(Files.isReadable(root));
       var collections = List.of(new ResolvedConfig.CollectionCfg("documents", List.of(root)));
       assertThrows(IOException.class,
-          () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, collections, JSON));
+          () -> KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(collections), JSON));
     } finally {
       Files.setPosixFilePermissions(root, original);
     }
@@ -174,7 +174,7 @@ final class MigrationEnumerationCompletenessTest {
       queue.open();
       var counters = new Counters();
       var context = new KnowledgeServerMigrationOps.EnqueueContext(
-          List.of(file), queue, () -> true, () -> manager, counters.filesSeen,
+          List.of(new ResolvedConfig.FileSource(file, null)), queue, () -> true, () -> manager, counters.filesSeen,
           counters.filesEnqueued, counters.rootsDone, counters.lastPath,
           () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
       assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
@@ -219,7 +219,7 @@ final class MigrationEnumerationCompletenessTest {
       queue.open();
       var counters = new Counters();
       var context = new KnowledgeServerMigrationOps.EnqueueContext(
-          List.of(root), queue, () -> true, () -> manager, counters.filesSeen,
+          List.of(new ResolvedConfig.FileSource(root, null)), queue, () -> true, () -> manager, counters.filesSeen,
           counters.filesEnqueued, counters.rootsDone, counters.lastPath,
           () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
       assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
@@ -252,7 +252,7 @@ final class MigrationEnumerationCompletenessTest {
       Files.writeString(file, "replacement");
       var counters = new Counters();
       var context = new KnowledgeServerMigrationOps.EnqueueContext(
-          List.of(file), queue, () -> true, () -> manager, counters.filesSeen,
+          List.of(new ResolvedConfig.FileSource(file, null)), queue, () -> true, () -> manager, counters.filesSeen,
           counters.filesEnqueued, counters.rootsDone, counters.lastPath,
           () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
 
@@ -278,7 +278,7 @@ final class MigrationEnumerationCompletenessTest {
       assertEquals(1, queue.enqueueEntries(List.of(new JobQueue.EnqueueEntry(file, 6)), "books"));
       var counters = new Counters();
       var context = new KnowledgeServerMigrationOps.EnqueueContext(
-          List.of(file), queue, () -> true, () -> manager, counters.filesSeen,
+          List.of(new ResolvedConfig.FileSource(file, null)), queue, () -> true, () -> manager, counters.filesSeen,
           counters.filesEnqueued, counters.rootsDone, counters.lastPath,
           () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
       assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
@@ -308,7 +308,7 @@ final class MigrationEnumerationCompletenessTest {
           "g-building", "collection:books", "DELETE_COLLECTION", "books"));
       var counters = new Counters();
       var context = new KnowledgeServerMigrationOps.EnqueueContext(
-          List.of(file), queue, () -> true, () -> manager, counters.filesSeen,
+          List.of(new ResolvedConfig.FileSource(file, null)), queue, () -> true, () -> manager, counters.filesSeen,
           counters.filesEnqueued, counters.rootsDone, counters.lastPath,
           () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
 
@@ -479,7 +479,7 @@ final class MigrationEnumerationCompletenessTest {
     Path link = createSymbolicLinkOrSkip(data.resolve("link"), target);
     var collections = List.of(new ResolvedConfig.CollectionCfg("documents", List.of(link)));
     assertThrows(IOException.class,
-        () -> KnowledgeServerMigrationOps.loadMigrationRoots(data, collections, JSON));
+        () -> KnowledgeServerMigrationOps.loadMigrationRoots(data, new ResolvedConfig.Collections(collections), JSON));
     Counters counters = new Counters();
     assertThrows(IOException.class, () -> KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
         context(List.of(link), acceptingQueue(), counters, () -> true)));
@@ -521,7 +521,7 @@ final class MigrationEnumerationCompletenessTest {
   private static KnowledgeServerMigrationOps.EnqueueContext context(
       List<Path> roots, JobQueue queue, Counters counters, java.util.function.BooleanSupplier running) {
     return new KnowledgeServerMigrationOps.EnqueueContext(
-        roots,
+        roots.stream().map(path -> new ResolvedConfig.FileSource(path, null)).toList(),
         queue,
         running,
         () -> null,

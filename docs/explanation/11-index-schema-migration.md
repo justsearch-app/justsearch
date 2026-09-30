@@ -462,6 +462,13 @@ During blue-green migration, the migration enumerator (which walks the filesyste
 
 Without this gate, the enumerator starts immediately and the `IndexingLoop` processes jobs before the embedding provider is ready — resulting in most documents getting `PENDING` status instead of inline vectors (tempdoc 312: 35% coverage without latch → 99.7% with latch).
 
+Bootstrap and Green migration share the immutable bundled help source resolved from
+`ResolvedConfig.Paths.ssotPath()/docs/help`, labeled `justsearch-help`. Green includes its
+top-level Markdown files whenever the directory exists, independently of the startup-only
+`.help-ingested-version` marker. Missing physical help is skipped. This internal source is
+separate from operator collections and is never persisted as a watched root; its collection
+label accompanies file admission into the candidate generation.
+
 Migration enumeration requires complete declared coverage. An absent or valid empty root registry
 with no configured roots completes with zero files; directory and single-file roots are supported.
 The registry header/version uses the same format authority as the watched-roots store. Invalid

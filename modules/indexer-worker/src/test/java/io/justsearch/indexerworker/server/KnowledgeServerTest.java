@@ -754,7 +754,7 @@ class KnowledgeServerTest {
     // Build a minimal ResolvedConfig with empty collections
     io.justsearch.configuration.resolved.ResolvedConfig rc =
         io.justsearch.configuration.resolved.ResolvedConfig.builder().build();
-    return (List<Path>) method.invoke(server, rc);
+    return ((List<io.justsearch.configuration.resolved.ResolvedConfig.FileSource>) method.invoke(server, rc)).stream().map(io.justsearch.configuration.resolved.ResolvedConfig.FileSource::path).toList();
   }
 
   private static MigrationProgressSnapshot invokeMigrationProgressSnapshot(KnowledgeServer server)
@@ -769,7 +769,7 @@ class KnowledgeServerTest {
     Method method =
         KnowledgeServer.class.getDeclaredMethod("enqueueAllFilesUnderRoots", List.class);
     method.setAccessible(true);
-    return (int) method.invoke(server, roots);
+    return (int) method.invoke(server, roots.stream().map(path -> new io.justsearch.configuration.resolved.ResolvedConfig.FileSource(path, null)).toList());
   }
 
   // ==================== Server Factory Helpers ====================

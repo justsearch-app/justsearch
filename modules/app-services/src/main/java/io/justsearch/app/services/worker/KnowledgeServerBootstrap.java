@@ -1064,9 +1064,6 @@ public final class KnowledgeServerBootstrap implements Closeable {
     /** Version stamp for built-in help files. Bump when help content changes. */
     private static final String HELP_FILES_VERSION = "v2";
 
-    /** Collection tag for built-in help documents. */
-    private static final String HELP_COLLECTION = "justsearch-help";
-
     /**
      * Auto-ingests built-in help files if not already done for this version.
      *
@@ -1076,6 +1073,11 @@ public final class KnowledgeServerBootstrap implements Closeable {
     // Package-private for unit tests (KnowledgeServerBootstrapEvalModeTest).
     // Not intended as a stable API surface.
     void tryIngestHelpFiles(KnowledgeClient client, KnowledgeServerConfig config) {
+        tryIngestHelpFiles(client, config, workerHost.bundledHelpSource());
+    }
+
+    void tryIngestHelpFiles(KnowledgeClient client, KnowledgeServerConfig config,
+            io.justsearch.configuration.resolved.ResolvedConfig.FileSource helpSource) {
         try {
             // Skip help-file auto-ingest in eval mode so a "fresh" index truly starts empty.
             // The 5 bundled help docs would otherwise pollute baseline measurements
@@ -1099,11 +1101,11 @@ public final class KnowledgeServerBootstrap implements Closeable {
             }
 
             // Resolve help directory
-            Path helpDir = resolveHelpDir(config);
-            if (helpDir == null) {
+            if (helpSource == null || !Files.isDirectory(helpSource.path())) {
                 log.debug("Help files directory not found, skipping auto-ingestion");
                 return;
             }
+            Path helpDir = helpSource.path();
 
             // Collect .md files
             List<Path> helpFiles;
@@ -1120,29 +1122,15 @@ public final class KnowledgeServerBootstrap implements Closeable {
             }
 
             // Ingest with collection tag
-            client.submitBatch(helpFiles, true, HELP_COLLECTION, ENGINE_CONTEXT);
+            client.submitBatch(helpFiles, true, helpSource.collection(), ENGINE_CONTEXT);
             Files.writeString(marker, HELP_FILES_VERSION);
-            log.info("Ingested {} built-in help files (collection={})", helpFiles.size(), HELP_COLLECTION);
+            log.info("Ingested {} built-in help files (collection={})", helpFiles.size(), helpSource.collection());
 
         } catch (Exception e) {
             // Non-fatal: help file ingestion failure should not block startup
             log.warn("Failed to ingest help files: {}", e.getMessage());
             log.debug("Failed to ingest help files (stack trace)", e);
         }
-    }
-
-    /**
-     * Resolves the help files directory from the config's working directory.
-     *
-     * <p>The working directory is resolved by {@link KnowledgeServerConfig} using the
-     * SSOT discovery logic, so this works in both development and production.
-     */
-    private Path resolveHelpDir(KnowledgeServerConfig config) {
-        Path helpDir = config.workingDirectory().resolve("SSOT").resolve("docs").resolve("help");
-        if (Files.isDirectory(helpDir)) {
-            return helpDir;
-        }
-        return null;
     }
 
     /**

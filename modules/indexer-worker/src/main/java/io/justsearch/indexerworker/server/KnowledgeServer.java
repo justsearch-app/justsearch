@@ -7736,7 +7736,7 @@ public final class KnowledgeServer implements Closeable {
                       "Migration enumerator: models not ready after 120s, "
                           + "proceeding without inline embedding/SPLADE");
                 }
-                List<Path> roots = enumerateFiles ? loadMigrationRoots(rc) : List.of();
+                List<ResolvedConfig.FileSource> roots = enumerateFiles ? loadMigrationRoots(rc) : List.of();
                 migrationEnumeratorRootsTotal.set(roots.size());
                 int totalEnqueued = enumerateFiles ? enqueueAllFilesUnderRoots(roots) : 0;
                 List<String> expectedSources = expectedProjectionSourceIds();
@@ -7804,12 +7804,16 @@ public final class KnowledgeServer implements Closeable {
     migrationEnumeratorThread.start();
   }
 
-  private List<Path> loadMigrationRoots(ResolvedConfig rc) throws IOException {
-    return KnowledgeServerMigrationOps.loadMigrationRoots(
-        dataDir, rc.collections().items(), JSON);
+  public ResolvedConfig.FileSource bundledHelpSource() {
+    return startupConfiguration.collections().bundledHelp();
   }
 
-  private int enqueueAllFilesUnderRoots(List<Path> roots) throws IOException {
+  private List<ResolvedConfig.FileSource> loadMigrationRoots(ResolvedConfig rc) throws IOException {
+    return KnowledgeServerMigrationOps.loadMigrationRoots(
+        dataDir, rc.collections(), JSON);
+  }
+
+  private int enqueueAllFilesUnderRoots(List<ResolvedConfig.FileSource> roots) throws IOException {
     return KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
         new KnowledgeServerMigrationOps.EnqueueContext(
             roots,

@@ -586,6 +586,12 @@ public final class EngineRoot implements WorkerHost {
   }
 
   @Override
+  public io.justsearch.configuration.resolved.ResolvedConfig.FileSource bundledHelpSource() {
+    KnowledgeServer current = server;
+    return current == null ? null : current.bundledHelpSource();
+  }
+
+  @Override
   public WorkerHost.ServingLease captureServingView() {
     KnowledgeServer current = server;
     if (current == null) throw new IllegalStateException("Index serving owner is unavailable");
