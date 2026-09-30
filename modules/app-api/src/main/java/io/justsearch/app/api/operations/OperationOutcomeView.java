@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonValue;
+import io.justsearch.app.api.settings.CompositionV2;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.JsonNode;
@@ -32,10 +33,16 @@ public record OperationOutcomeView(@JsonProperty(required = true) State state, S
 
   /** Metadata receipt or a pending generation's gap list; never an arbitrary handler response. */
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public record Result(String code, String executionId, List<Gap> gaps, String gapListHash) {
+  public record Result(String code, String executionId, List<Gap> gaps, String gapListHash,
+      CompositionV2 composition) {
+    public Result(String code, String executionId, List<Gap> gaps, String gapListHash) {
+      this(code, executionId, gaps, gapListHash, null);
+    }
+
     public Result {
-      if (code != null) new OperationReceipt(code, executionId);
+      if (code != null) new OperationReceipt(code, executionId, composition);
       else if (executionId != null) throw new IllegalArgumentException("Execution id requires a receipt code");
+      else if (composition != null) throw new IllegalArgumentException("Composition requires a receipt code");
       gaps = gaps == null ? null : List.copyOf(gaps);
       if (gapListHash != null && (gaps == null || gaps.isEmpty()
           || !gapListHash.matches("[0-9a-f]{64}"))) {

@@ -105,29 +105,105 @@ export async function exerciseQueryReconfigure(c) {
   }
   let apiOutages = 0;
   let samples = 0;
+  const expectedReason = mode === 'BESIDE' ? 'candidate_fits_free_device_memory'
+    : 'candidate_fits_after_source_release';
+  const assertComposition = (composition, label) => requireThat(
+    composition?.mode === mode && composition.reason === expectedReason
+      && Number.isSafeInteger(composition.freeBytes) && composition.freeBytes >= 0
+      && Number.isSafeInteger(composition.footprintBytes) && composition.footprintBytes > 0,
+    `${label} omitted measured composition evidence: ${JSON.stringify(composition)}`);
+  const availabilityRounds = [];
   let barrierOperationKey = forcedOperationKey;
-  const observe = async (pending) => {
+  let heldA = null;
+  const observe = (label, issue) => {
     let settled = false;
-    pending.then(() => { settled = true; }, () => { settled = true; });
-    while (!settled) {
-      try {
-        const response = await request(apiPort, '/api/status', {}, 5000);
-        samples++;
-        if (response.status !== 200) apiOutages++;
-      } catch { samples++; apiOutages++; }
-      await new Promise(resolve => setTimeout(resolve, 25));
-    }
-    return pending;
+    const round = { label, samples: 0, outages: 0, samplingStartedAt: Date.now(),
+      postIssuedAt: null, settledAt: null };
+    const sampling = (async () => {
+      while (!settled) {
+        try {
+          const response = await request(apiPort, '/api/status', {}, 5000);
+          round.samples++;
+          if (response.status !== 200) round.outages++;
+        } catch { round.samples++; round.outages++; }
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+    })();
+    // Sampling has issued its first status request before this mutation request is issued.
+    round.postIssuedAt = Date.now();
+    const pending = issue();
+    pending.then(() => { settled = true; round.settledAt = Date.now(); }, () => {
+      settled = true;
+      round.settledAt = Date.now();
+    });
+    return {
+      pending,
+      complete: async () => {
+        try { return await pending; }
+        finally {
+          settled = true;
+          await sampling;
+          apiOutages += round.outages;
+          samples += round.samples;
+          availabilityRounds.push(round);
+        }
+      },
+    };
   };
   const apply = async (modelPath, label) => {
     const before = await settings();
     const operationKey = barrierOperationKey ?? createOperationKey();
-    const pending = request(apiPort, '/api/settings/v2', {
+    const observed = observe(label, () => request(apiPort, '/api/settings/v2', {
       method: 'POST', headers,
       body: JSON.stringify({ rerankerModelPath: modelPath,
         witness: before.witness, operationKey }),
-    }, 240000);
+    }, 240000));
     let degradation = null;
+    if (heldA != null) {
+      if (mode === 'IN_PLACE') {
+        const during = await waitFor('in-place RELOADING while issued A remains held', 120000,
+          async () => {
+            const value = await status();
+            return value.readiness?.engineComponents?.encoders?.state === 'RELOADING'
+              ? value : null;
+          });
+        const healthResponse = await request(apiPort, '/api/health', {}, 15000);
+        const health = read(healthResponse, 'in-place degraded health sample');
+        const lexicalResponse = await post(apiPort, '/api/knowledge/search',
+          { query: 'query reconfigure availability', limit: 10, mode: 'text' }, 30000);
+        const lexical = read(lexicalResponse, 'in-place degraded lexical query');
+        requireThat(!heldA.settled && health != null && [200, 503].includes(healthResponse.status)
+            && lexicalResponse.status === 200 && lexical.results?.length > 0,
+        `in-place issued A did not hold across degraded serving: ${JSON.stringify({
+          heldSettled: heldA.settled, healthStatus: healthResponse.status,
+          lexicalStatus: lexicalResponse.status })}`);
+        degradation = { observedAt: Date.now(), healthStatus: healthResponse.status,
+          lexicalResults: lexical.results.length,
+          encoders: during.readiness.engineComponents.encoders };
+      } else {
+        const published = await waitFor('B publication while issued A remains held', 120000,
+          async () => {
+            const value = await status();
+            return path.resolve(value.worker?.gpu?.rerankerModelPath ?? '').toLowerCase()
+                === path.resolve(modelPath).toLowerCase()
+              && value.readiness?.engineComponents?.encoders?.state === 'READY'
+              ? value : null;
+          });
+        requireThat(!heldA.settled,
+          `issued A completed before BESIDE B publication: ${JSON.stringify(published)}`);
+        degradation = { observedAt: Date.now(), issuedAAcrossPublication: true,
+          encoders: published.readiness.engineComponents.encoders };
+      }
+      const issuedAReleasedAt = Date.now();
+      fs.writeFileSync(heldA.releaseFile, `${issuedAReleasedAt}\n`);
+      const issuedOutcome = await heldA.outcome;
+      requireThat(!issuedOutcome.error && issuedOutcome.value.status === 200
+          && read(issuedOutcome.value, 'held A completion').results?.length > 0,
+      `issued A failed after release: ${issuedOutcome.error?.message ?? issuedOutcome.value?.text}`);
+      degradation.issuedA = { reached: heldA.reached, issuedAReleasedAt,
+        completedAt: Date.now(), completedAfterRelease: true };
+      heldA = null;
+    }
     if (barrierOperationKey != null) {
       const { reachedFile, releaseFile } = barrierFiles(data);
       const reached = await waitFor('in-place query preparation barrier', 120000,
@@ -137,39 +213,29 @@ export async function exerciseQueryReconfigure(c) {
           && reached.pid === first.pid,
       `in-place query barrier did not identify the encoder owner: ${JSON.stringify(reached)}`);
       const during = await status();
-      const healthResponse = await request(apiPort, '/api/health', {}, 15000);
-      const health = read(healthResponse, 'in-place degraded health sample');
-      const lexicalResponse = await post(apiPort, '/api/knowledge/search',
-        { query: 'query reconfigure availability', limit: 10, mode: 'text' }, 30000);
-      const lexical = read(lexicalResponse, 'in-place degraded lexical query');
-      requireThat(during.readiness?.engineComponents?.encoders?.state === 'RELOADING'
-          && health != null && [200, 503].includes(healthResponse.status)
-          && Array.isArray(lexical.results) && lexical.results.length > 0
-          && lexicalResponse.status === 200,
-      `in-place preparation did not preserve its degraded API: ${JSON.stringify({
-        encoders: during.readiness?.engineComponents?.encoders,
-        healthStatus: healthResponse.status, lexicalStatus: lexicalResponse.status })}`);
-      degradation = { reached, healthStatus: healthResponse.status,
-        lexicalResults: lexical.results.length,
+      requireThat(during.readiness?.engineComponents?.encoders?.state === 'RELOADING',
+        `composition barrier lost RELOADING: ${JSON.stringify(during.readiness)}`);
+      degradation.compositionBarrier = { reached,
         encoders: during.readiness.engineComponents.encoders };
       fs.writeFileSync(releaseFile, `${Date.now()}\n`);
       barrierOperationKey = null;
     }
-    const response = await observe(pending);
+    const response = await observed.complete();
     const result = read(response, label);
     requireThat(response.status === 200 && result.state === 'COMPLETE'
       && result.operationKey === operationKey
       && result.witness?.acceptedRevision === before.witness.acceptedRevision + 1,
     `${label} failed: HTTP ${response.status} ${response.text}`);
-    return { operationKey, before: before.witness, after: result.witness, degradation };
+    const composition = result.composition;
+    assertComposition(composition, label);
+    return { operationKey, before: before.witness, after: result.witness,
+      composition, degradation };
   };
 
-  const initial = await waitFor('realized CUDA reranker A', 90000, async () => {
-    try { return await runtime('runtime A'); } catch { return null; }
-  });
   const generation = readJson(path.join(indexBase, 'state.json'))?.active_generation;
   requireThat(typeof generation === 'string' && generation.length > 0,
     'query reconfigure lacks an active index generation');
+  const queryA = await query('model query A');
   const initialStatus = await status();
   const appliedA = initialStatus.readiness?.engineComponents?.encoders?.appliedVersion;
   const initialModel = path.join(a, 'model_fp16.onnx');
@@ -180,7 +246,21 @@ export async function exerciseQueryReconfigure(c) {
       && initialIdentity.sha256.length === 64,
     `initial A identity is not the retained CUDA reranker: ${JSON.stringify({
       readiness: initialStatus.readiness, gpu: initialStatus.worker?.gpu, initialIdentity })}`);
-  const queryA = await query('model query A');
+  const initial = await waitFor('realized CUDA reranker A', 90000, async () => {
+    try { return await runtime('runtime A'); } catch { return null; }
+  });
+  const issuedBarrier = barrierFiles(data, 'issued-a-search');
+  heldA = { settled: false, reached: null, releaseFile: issuedBarrier.releaseFile };
+  heldA.outcome = post(apiPort, '/api/knowledge/search',
+    { query: 'query reconfigure held lease', limit: 10, mode: 'text' }, 180000)
+    .then(value => ({ value }), error => ({ error }))
+    .then(outcome => { heldA.settled = true; return outcome; });
+  const heldReached = await waitFor('A query captured before query reconfigure', 30000,
+    () => readJson(issuedBarrier.reachedFile));
+  requireThat(heldReached?.query === 'query reconfigure held lease'
+      && heldReached.pid === first.pid && !heldA.settled,
+  `issued query did not retain A: ${JSON.stringify(heldReached)}`);
+  heldA.reached = heldReached;
   const toB = await apply(b, `${mode} A to B`);
   const statusB = await waitFor(`${mode} B publication`, 90000, async () => {
     try {
@@ -193,7 +273,6 @@ export async function exerciseQueryReconfigure(c) {
       return compose?.mode === mode ? { value, compose } : null;
     } catch { return null; }
   });
-  const realizedB = await runtime('runtime B');
   const selectedB = selectedRole(b, `${mode} B`);
   const appliedB = statusB.value.readiness.engineComponents.encoders.appliedVersion;
   requireThat(typeof appliedB === 'string' && appliedB !== appliedA
@@ -201,6 +280,7 @@ export async function exerciseQueryReconfigure(c) {
         === b.toLowerCase(),
     `${mode} B did not publish its distinct encoder path/version`);
   const queryB = await query('model query B');
+  const realizedB = await runtime('runtime B');
   const toA = await apply(a, `${mode} B to restored A`);
   const statusA = await waitFor(`${mode} restored A publication`, 90000, async () => {
     try {
@@ -208,7 +288,6 @@ export async function exerciseQueryReconfigure(c) {
       return value.readiness?.engineComponents?.encoders?.mode === mode ? value : null;
     } catch { return null; }
   });
-  const restoredA = await runtime('runtime restored A');
   const selectedA = selectedRole(a, `${mode} restored A`);
   const appliedRestoredA = statusA.readiness.engineComponents.encoders.appliedVersion;
   requireThat(appliedRestoredA === appliedA && initialIdentity.sha256 !== selectedB.sha256
@@ -218,6 +297,7 @@ export async function exerciseQueryReconfigure(c) {
     `${mode} did not restore A version or byte identity: ${JSON.stringify({
       appliedA, appliedB, appliedRestoredA, selectedA, selectedB })}`);
   const queryRestoredA = await query('model query restored A');
+  const restoredA = await runtime('runtime restored A');
 
   const beforeRefusal = await settings();
   const recoveryAttemptsBefore = statusA.readiness.engineComponents.encoders.recoveryAttempts;
@@ -238,19 +318,34 @@ export async function exerciseQueryReconfigure(c) {
       && hash(path.join(invalid, name)) !== retainedHashes[name]),
   'malformed candidate mutation escaped its private unlinked files');
   const refusalKey = createOperationKey();
-  const refused = await observe(request(apiPort, '/api/settings/v2', {
+  const refusalRequest = { rerankerModelPath: invalid,
+    witness: beforeRefusal.witness, operationKey: refusalKey };
+  const refusalObserved = observe(`${mode} refusal`, () => request(apiPort, '/api/settings/v2', {
     method: 'POST', headers,
-    body: JSON.stringify({ rerankerModelPath: invalid,
-      witness: beforeRefusal.witness, operationKey: refusalKey }),
+    body: JSON.stringify(refusalRequest),
   }, 120000));
+  const refused = await refusalObserved.complete();
   const refusedBody = read(refused, `${mode} refusal`);
   requireThat(refused.status >= 400 && refusedBody.state === 'FAILED',
     `${mode} invalid candidate was not refused: HTTP ${refused.status} ${refused.text}`);
+  assertComposition(refusedBody.composition, `${mode} refusal`);
   const afterRefusal = await settings();
   requireThat(JSON.stringify(afterRefusal.witness) === JSON.stringify(beforeRefusal.witness)
       && fs.readFileSync(path.join(data, 'ui', 'settings.json'), 'utf8') === witnessBytes,
     `${mode} refusal changed the committed settings witness`);
-  const afterRefusalRuntime = await runtime('runtime A after refusal');
+  const replayObserved = observe(`${mode} refusal replay`, () => request(
+    apiPort, '/api/settings/v2', {
+      method: 'POST', headers, body: JSON.stringify(refusalRequest),
+    }, 120000));
+  const replay = await replayObserved.complete();
+  const replayBody = read(replay, `${mode} refusal replay`);
+  assertComposition(replayBody.composition, `${mode} refusal replay`);
+  const afterReplay = await settings();
+  requireThat(replayBody.state === refusedBody.state && replayBody.operationKey === refusalKey
+      && JSON.stringify(replayBody.composition) === JSON.stringify(refusedBody.composition)
+      && JSON.stringify(afterReplay.witness) === JSON.stringify(beforeRefusal.witness)
+      && fs.readFileSync(path.join(data, 'ui', 'settings.json'), 'utf8') === witnessBytes,
+  `${mode} same-key refusal replay changed evidence or durable settings: ${replay.text}`);
   const afterRefusalStatus = await status();
   const afterRefusalEncoders = afterRefusalStatus.readiness?.engineComponents?.encoders;
   const expectedRecoveryAttempts = recoveryAttemptsBefore + (mode === 'IN_PLACE' ? 1 : 0);
@@ -263,15 +358,18 @@ export async function exerciseQueryReconfigure(c) {
     `${mode} refusal did not restore exact reranker A path/evidence: ${JSON.stringify({
       gpu: afterRefusalStatus.worker?.gpu, encoders: afterRefusalEncoders })}`);
   await query('model query A after refusal');
+  const afterRefusalRuntime = await runtime('runtime A after refusal');
   const finalSupervisor = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
   requireThat(apiOutages === 0 && samples > 0
+      && availabilityRounds.length === 4
+      && availabilityRounds.every(round => round.samples > 0 && round.outages === 0
+        && round.samplingStartedAt <= round.postIssuedAt
+        && round.postIssuedAt <= round.settledAt)
       && finalSupervisor?.pid === first.pid && finalSupervisor?.restartCount === first.restartCount
       && readJson(path.join(indexBase, 'state.json'))?.active_generation === generation,
   `${mode} changed API/process/generation continuity: ${JSON.stringify({
     apiOutages, samples, first, finalSupervisor, generation })}`);
-  const evidence = statusB.compose;
-  const expectedReason = mode === 'BESIDE' ? 'candidate_fits_free_device_memory'
-    : 'candidate_fits_after_source_release';
+  const evidence = toB.composition;
   requireThat(evidence.reason === expectedReason
       && Number.isSafeInteger(evidence.freeBytes) && evidence.freeBytes >= 0
       && Number.isSafeInteger(evidence.footprintBytes) && evidence.footprintBytes > 0
@@ -283,6 +381,7 @@ export async function exerciseQueryReconfigure(c) {
     selections: { initialA: initialIdentity, b: selectedB, restoredA: selectedA },
     recoveryAttempts: { beforeRefusal: recoveryAttemptsBefore,
       afterRefusal: afterRefusalEncoders.recoveryAttempts },
+    availabilityRounds,
     witnesses: { toB, toA, refusal: beforeRefusal.witness },
     realized: { a: initial, b: realizedB, restoredA, afterRefusal: afterRefusalRuntime },
     queries: { a: queryA, b: queryB, restoredA: queryRestoredA },

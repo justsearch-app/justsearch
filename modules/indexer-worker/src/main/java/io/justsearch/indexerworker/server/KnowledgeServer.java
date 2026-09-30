@@ -2274,7 +2274,7 @@ public final class KnowledgeServer implements Closeable {
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
       return failEncoderRecovery(request, "Encoder recovery interrupted", interrupted);
-    } catch (IOException | RuntimeException failure) {
+    } catch (IOException | RuntimeException | Error failure) {
       return failEncoderRecovery(request, "Encoder recovery failed", failure);
     }
   }
@@ -2398,7 +2398,9 @@ public final class KnowledgeServer implements Closeable {
             ? captureEncoderRecoveryReservation(expected) : retained;
         validateEncoderRecoveryReservation(captured, retained != null);
         if (captured.querySettings == null) InferenceCompositionRoot.validateCaptured(captured.plan);
-        validateQuerySelectionWitness(captured.queryObservation);
+        if (captured.querySettings == null || captured.querySettings.sourceRetired) {
+          validateQuerySelectionWitness(captured.queryObservation);
+        }
         encoderRecoveryReservation = captured;
         boolean began;
         try {
@@ -2419,7 +2421,9 @@ public final class KnowledgeServer implements Closeable {
         try {
           validateEncoderRecoveryReservation(captured, retained != null);
           if (captured.querySettings == null) InferenceCompositionRoot.validateCaptured(captured.plan);
+          if (captured.querySettings == null || captured.querySettings.sourceRetired) {
           validateQuerySelectionWitness(captured.queryObservation);
+        }
         } catch (IOException | RuntimeException changed) {
           if (retained == null && encoderRecoveryReservation == captured) {
             encoderRecoveryReservation = null;
@@ -2784,6 +2788,10 @@ public final class KnowledgeServer implements Closeable {
     }
     String evidence = failure == null || failure.getMessage() == null
         ? message : message + ": " + failure.getMessage();
+    var retained = encoderRecoveryReservation;
+    if (retained != null && retained.querySettings != null) {
+      evidence = retained.querySettings.queryRecoveryEvidence() + "; " + evidence;
+    }
     if (failure != null) log.warn(evidence, failure);
     var admitted = request.admitted().orElse(null);
     if (admitted == null) {
@@ -4663,6 +4671,7 @@ public final class KnowledgeServer implements Closeable {
       }
       prepared = new PreparedQueryRoleSettings(source, old, selection, desired, hardware,
           composition);
+      prepared.captureSource();
       if (composition.mode() == io.justsearch.core.component.ComposeEvidence.Mode.IN_PLACE) {
         prepared.beginInPlace();
       }
@@ -4674,11 +4683,20 @@ public final class KnowledgeServer implements Closeable {
         try { prepared.abort(failure); }
         catch (RuntimeException | Error restoreFailure) { failure.addSuppressed(restoreFailure); }
       } else source.close();
+      if (failure instanceof Error fatal) throw fatal;
+      if (failure instanceof java.util.concurrent.CancellationException cancelled) throw cancelled;
+      if (prepared != null) {
+        var refusal = new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(
+            io.justsearch.agent.api.registry.OperationResult.failure(
+                "Query model preparation refused: " + failure.getMessage(),
+                "COMPONENT_PREPARATION_REQUIRED", queryCompositionDetails(prepared.composition), true));
+        refusal.initCause(failure);
+        throw refusal;
+      }
       if (failure instanceof IOException checked) {
         throw new IllegalStateException("Query model preparation refused", checked);
       }
-      if (failure instanceof RuntimeException runtimeFailure) throw runtimeFailure;
-      throw (Error) failure;
+      throw (RuntimeException) failure;
     }
   }
 
@@ -4686,12 +4704,12 @@ public final class KnowledgeServer implements Closeable {
       io.justsearch.core.component.ComposeEvidence evidence) {
     var details = new java.util.LinkedHashMap<String, Object>();
     details.put("component", "encoders");
-    details.put("mode", evidence.mode().name());
-    details.put("reason", evidence.reason());
-    if (evidence.freeBytes() != null) details.put("freeBytes", evidence.freeBytes());
-    if (evidence.footprintBytes() != null) details.put("footprintBytes", evidence.footprintBytes());
+    details.put("composition", new io.justsearch.app.api.settings.CompositionV2(
+        evidence.mode().name(), evidence.reason(), evidence.freeBytes(), evidence.footprintBytes()));
     return details;
   }
+
+  long queryPreparationWarmupBudgetMillis() { return TimeUnit.SECONDS.toMillis(30); }
 
   /** One settings candidate's query lifetime; the producer stays on A until publication. */
   public final class PreparedQueryRoleSettings {
@@ -4712,6 +4730,9 @@ public final class KnowledgeServer implements Closeable {
     private EncoderConfigurationProjection sourceProjection;
     private InferenceSurface.ComponentObservation sourceObservation;
     private ResolvedConfig sourceConfiguration;
+    private boolean sourceRerankerGpu;
+    private Throwable preparationFailure;
+    private Throwable restorationFailure;
     private boolean sourceRetired;
     private boolean installed;
     private boolean aborted;
@@ -4735,7 +4756,8 @@ public final class KnowledgeServer implements Closeable {
     }
 
     private QueryRoleSet composeQuery(EncoderConfigurationProjection projection,
-        QueryRoleSelection selected, Set<io.justsearch.ort.EncoderRole> allowedMissing) {
+        QueryRoleSelection selected, Set<io.justsearch.ort.EncoderRole> allowedMissing,
+        boolean requireRerankerGpu) {
       InferenceSurface surface = InferenceCompositionRoot.composeQueryRoles(projection, selected,
           hardware, () -> !signalBus.isMainGpuActive(), ortSessionEvents);
       QueryRoleSet result = new QueryRoleSet(surface);
@@ -4750,14 +4772,61 @@ public final class KnowledgeServer implements Closeable {
           throw new IllegalStateException("Prepared query model did not become available: "
               + surface.componentObservation().missingRoles());
         }
+        if (selected.reranker().state() == QueryRoleSelection.State.SELECTED
+            && result.reranker() == null && !allowedMissing.contains(io.justsearch.ort.EncoderRole.RERANKER)) {
+          throw new IllegalStateException("Prepared reranker assembly is missing");
+        }
+        if (result.reranker() != null) realizeQueryDevice(result, requireRerankerGpu);
         return result;
       } catch (RuntimeException | Error failure) {
         try { result.close(); }
-        catch (RuntimeException closeFailure) {
+        catch (RuntimeException | Error closeFailure) {
           rejectedQuery = result;
           failure.addSuppressed(closeFailure);
         }
         throw failure;
+      }
+    }
+
+    private void captureSource() throws IOException {
+      sourceConfiguration = Objects.requireNonNull(startupConfiguration, "Active A configuration");
+      sourceObservation = old.queryRoleSet.surfaceForOwner().componentObservation();
+      sourceProjection = queryProjectionFor(sourceConfiguration, initialModelSelection, sourceObservation);
+      sourceRerankerGpu = old.queryRoleSet.surfaceForOwner().reranker()
+          .map(assembly -> assembly.sessions().isGpuAvailable()).orElse(false);
+    }
+
+    private void realizeQueryDevice(QueryRoleSet roles, boolean requireGpu) {
+      long budgetMs = queryPreparationWarmupBudgetMillis();
+      long started = System.nanoTime();
+      var executor = Objects.requireNonNull(deferredModelExecutor, "Model preparation executor");
+      var hold = roles.acquire();
+      var warmup = io.justsearch.core.execution.EngineFutures.supplyAsync(
+          () -> roles.reranker().rerank("query preparation", List.of("query preparation"), budgetMs),
+          executor, hold::close);
+      try {
+        var result = warmup.get(budgetMs, TimeUnit.MILLISECONDS);
+        if (result.skipCause() != io.justsearch.reranker.RerankSkipCause.NONE
+            || result.scores().size() != 1 || !Float.isFinite(result.scores().getFirst())
+            || System.nanoTime() - started > TimeUnit.MILLISECONDS.toNanos(budgetMs)) {
+          throw new IllegalStateException("Prepared query warm-up did not complete within its budget");
+        }
+        if (requireGpu && !roles.reranker().isGpuAvailable()) {
+          throw new IllegalStateException("Prepared CUDA query session did not realize CUDA");
+        }
+      } catch (java.util.concurrent.TimeoutException timeout) {
+        // Abandon the caller's wait, never the native lifetime. The actual-exit hook holds
+        // QueryRoleSet open; refused cleanup transfers to the existing recovery reservation.
+        warmup.cancel(false);
+        throw new IllegalStateException("Query warm-up exceeded its preparation budget", timeout);
+      } catch (InterruptedException interrupted) {
+        warmup.cancel(false);
+        Thread.currentThread().interrupt();
+        throw new java.util.concurrent.CancellationException("Query warm-up interrupted");
+      } catch (java.util.concurrent.ExecutionException failed) {
+        if (failed.getCause() instanceof Error fatal) throw fatal;
+        if (failed.getCause() instanceof RuntimeException runtime) throw runtime;
+        throw new IllegalStateException("Query warm-up failed", failed.getCause());
       }
     }
 
@@ -4776,7 +4845,7 @@ public final class KnowledgeServer implements Closeable {
         return fresh;
       } catch (RuntimeException | Error failure) {
         try { fresh.close(); }
-        catch (IOException | RuntimeException closeFailure) { failure.addSuppressed(closeFailure); }
+        catch (IOException | RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
         throw failure;
       }
     }
@@ -4789,13 +4858,15 @@ public final class KnowledgeServer implements Closeable {
         if (roles != null) view.attachQueryRoleSet(roles);
         return view;
       } catch (RuntimeException | Error failure) {
-        view.releaseModelSets();
+        try { view.releaseModelSets(); }
+        catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
         throw failure;
       }
     }
 
     private void compose(EncoderConfigurationProjection projection, QueryRoleSelection selected) {
-      query = composeQuery(projection, selected, Set.of());
+      query = composeQuery(projection, selected, Set.of(),
+          selected.reranker().targetEp() == io.justsearch.configuration.model.ExecutionProvider.CUDA);
       services = queryServices(configuration, projection, query);
       successor = queryView(services, query);
       observation = encoderCompositionObservation(old.encoderSet, query, configuration,
@@ -4809,10 +4880,7 @@ public final class KnowledgeServer implements Closeable {
 
     private void beginInPlace() throws IOException {
       // Freeze the actual A observation and its configuration before touching its sessions.
-      sourceConfiguration = Objects.requireNonNull(startupConfiguration, "Active A configuration");
       sourceObservation = requireRestorableQueryObservation(old.queryRoleSet);
-      sourceProjection = queryProjectionFor(sourceConfiguration, initialModelSelection,
-          sourceObservation);
       validateQuerySelectionWitness(sourceObservation);
       var fresh = queryServices(sourceConfiguration, sourceProjection, null);
       degraded = queryView(fresh, null);
@@ -4890,6 +4958,10 @@ public final class KnowledgeServer implements Closeable {
           || (recoveryStartContext != null && recoveryStartContext.recoveryAttempt())
           || expectedView().retiring || query == null || query.isClosed() || aborted) {
         throw new IllegalStateException("Prepared query owner lost its physical predecessor");
+      }
+      if (selection.reranker().targetEp() == io.justsearch.configuration.model.ExecutionProvider.CUDA
+          && query.reranker() != null && !query.reranker().isGpuAvailable()) {
+        throw new IllegalStateException("Prepared CUDA query device changed before commitment");
       }
       for (var role : List.of(selection.reranker(), selection.citation())) {
         if (role.state() == QueryRoleSelection.State.SELECTED
@@ -4973,10 +5045,9 @@ public final class KnowledgeServer implements Closeable {
     public void abort(Throwable cause) {
       if (installed || aborted) return;
       try { closeCandidate(); }
-      catch (RuntimeException cleanup) {
-        if (degraded == null) throw cleanup;
+      catch (RuntimeException | Error cleanup) {
         retainQueryRecovery(cause, cleanup);
-        cause.addSuppressed(cleanup);
+        if (cause != cleanup) cause.addSuppressed(cleanup);
         aborted = true;
         return;
       }
@@ -4986,9 +5057,9 @@ public final class KnowledgeServer implements Closeable {
               + cause.getMessage());
         }
         try { restoreSource(); }
-        catch (IOException | RuntimeException failure) {
+        catch (IOException | RuntimeException | Error failure) {
           retainQueryRecovery(cause, failure);
-          cause.addSuppressed(failure);
+          if (cause != failure) cause.addSuppressed(failure);
           // The existing recovery reservation now owns A restoration. Successful abort lets
           // the preparing thread release the component apply lease; the reservation fences B.
           aborted = true;
@@ -5035,12 +5106,13 @@ public final class KnowledgeServer implements Closeable {
         if (!old.queryRoleSet.isClosed()) old.queryRoleSet.close();
         validateQuerySelectionWitness(sourceObservation);
         restored = composeQuery(sourceProjection, sourceObservation.querySelection().orElseThrow(),
-            sourceObservation.missingRoles());
+            sourceObservation.missingRoles(), sourceRerankerGpu);
         try {
           restoredServices = queryServices(sourceConfiguration, sourceProjection, restored);
           restoredView = queryView(restoredServices, restored);
         } catch (RuntimeException | Error failure) {
-          restored.close();
+          try { restored.close(); }
+          catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
           throw failure;
         }
       }
@@ -5082,12 +5154,14 @@ public final class KnowledgeServer implements Closeable {
           if (publicationQuery != null) initialQueryRoleSet = publicationQuery;
           servingViewMonitor.notifyAll();
         }
-      } catch (IOException | RuntimeException failure) {
+      } catch (IOException | RuntimeException | Error failure) {
         if (publicationView != old && servingView != publicationView) {
-          publicationView.releaseModelSets();
+          try { publicationView.releaseModelSets(); }
+          catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
           try { publicationServices.close(); }
-          catch (IOException | RuntimeException closeFailure) { failure.addSuppressed(closeFailure); }
-          publicationQuery.close();
+          catch (IOException | RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
+          try { publicationQuery.close(); }
+          catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
         }
         throw failure;
       } finally {
@@ -5102,9 +5176,15 @@ public final class KnowledgeServer implements Closeable {
       }
     }
 
+    private String queryRecoveryEvidence() {
+      return "Query B refused: " + preparationFailure.getMessage()
+          + "; A restoration failed: " + restorationFailure.getMessage();
+    }
+
     private void retainQueryRecovery(Throwable refusal, Throwable restoration) {
-      String evidence = "Query B refused: " + refusal.getMessage()
-          + "; A restoration failed: " + restoration.getMessage();
+      preparationFailure = refusal;
+      restorationFailure = restoration;
+      String evidence = queryRecoveryEvidence();
       runtimeSwapLock.lock();
       try {
         var retained = new EncoderRecoveryReservation(old, producer, old.encoderSet,
@@ -5112,7 +5192,7 @@ public final class KnowledgeServer implements Closeable {
             sourceProjection, sourceObservation, sourceObservation.missingRoles(),
             sourceConfiguration, initialModelSelection, null);
         retained.querySettings = this;
-        retained.lexicalServices = degraded.services;
+        retained.lexicalServices = degraded == null ? old.services : degraded.services;
         retained.phase = EncoderRecoveryPhase.RETIRED;
         encoderRecoveryReservation = retained;
       } finally { runtimeSwapLock.unlock(); }

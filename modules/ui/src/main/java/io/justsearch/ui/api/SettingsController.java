@@ -8,6 +8,7 @@ import io.justsearch.agent.api.registry.OperationDispatcher;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.SettingsService;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.CompositionV2;
 import io.justsearch.app.api.settings.SettingsV2;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.telemetry.Telemetry;
@@ -87,7 +88,7 @@ public class SettingsController {
     boolean refreshInference = refreshHeader != null;
     final SettingsV2 incoming;
     try {
-      incoming = MAPPER.readValue(ctx.body(), SettingsV2.class);
+      incoming = withoutComposition(MAPPER.readValue(ctx.body(), SettingsV2.class));
     } catch (tools.jackson.core.JacksonException malformed) {
       writeRefusal(ctx, OperationResult.failure("Invalid settings format", "INVALID_REQUEST", Map.of(), false));
       return;
@@ -201,12 +202,27 @@ public class SettingsController {
     } else if ("RESTART_SOURCE_DRIFT".equals(code)) {
       payload.put("keys", refusal.errorDetails().get("keys"));
     } else if ("COMPONENT_PREPARATION_REQUIRED".equals(code)) {
-      for (String field : java.util.List.of("component", "components", "mode", "reason",
-          "freeBytes", "footprintBytes")) {
+      for (String field : java.util.List.of("component", "components")) {
         Object value = refusal.errorDetails().get(field);
         if (value != null) payload.put(field, value);
       }
+      CompositionV2 composition = composition(refusal.errorDetails().get("composition"));
+      if (composition != null) payload.put("composition", composition);
     }
     ctx.status(status).json(payload);
+  }
+
+  private static SettingsV2 withoutComposition(SettingsV2 settings) {
+    if (settings.composition() == null) return settings;
+    return new SettingsV2(settings.ui(), settings.llm(), settings.indexPaths(),
+        settings.settingsMode(), settings.witness(), settings.operationKey(), settings.state(),
+        settings.apiPort(), settings.restartScheduled(), settings.rerankerModelPath(),
+        settings.citationScorerModelPath());
+  }
+
+  private static CompositionV2 composition(Object value) {
+    if (value instanceof CompositionV2 composition) return composition;
+    if (value instanceof Map<?, ?>) return MAPPER.convertValue(value, CompositionV2.class);
+    return null;
   }
 }

@@ -162,11 +162,15 @@ final class SettingsCommitCoordinatorTest {
       assertEquals(OperationState.COMPLETE, result.record().state());
       assertTrue(preparedOwner.get());
       assertEquals(selection, settings.inspect().queryRoles());
-      assertEquals("IN_PLACE", result.response().structuredData().get("mode"));
-      assertEquals("candidate_fits_after_source_release",
-          result.response().structuredData().get("reason"));
-      assertEquals(10L, result.response().structuredData().get("freeBytes"));
-      assertEquals(20L, result.response().structuredData().get("footprintBytes"));
+      var evidence = assertInstanceOf(io.justsearch.app.api.settings.CompositionV2.class,
+          result.response().structuredData().get("composition"));
+      assertEquals("IN_PLACE", evidence.mode());
+      assertEquals("candidate_fits_after_source_release", evidence.reason());
+      assertEquals(10L, evidence.freeBytes());
+      assertEquals(20L, evidence.footprintBytes());
+      for (String flat : List.of("mode", "reason", "freeBytes", "footprintBytes")) {
+        assertFalse(result.response().structuredData().containsKey(flat));
+      }
     }
   }
 

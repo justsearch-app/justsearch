@@ -8,11 +8,22 @@
     "citationScorerModelPath" : {
       "type" : [ "string", "null" ]
     },
-    "footprintBytes" : {
-      "type" : [ "integer", "null" ]
-    },
-    "freeBytes" : {
-      "type" : [ "integer", "null" ]
+    "composition" : {
+      "type" : [ "object", "null" ],
+      "properties" : {
+        "footprintBytes" : {
+          "type" : [ "integer", "null" ]
+        },
+        "freeBytes" : {
+          "type" : [ "integer", "null" ]
+        },
+        "mode" : {
+          "type" : [ "string", "null" ]
+        },
+        "reason" : {
+          "type" : [ "string", "null" ]
+        }
+      }
     },
     "indexPaths" : {
       "type" : [ "array", "null" ],
@@ -43,13 +54,7 @@
         }
       }
     },
-    "mode" : {
-      "type" : [ "string", "null" ]
-    },
     "operationKey" : {
-      "type" : [ "string", "null" ]
-    },
-    "reason" : {
       "type" : [ "string", "null" ]
     },
     "rerankerModelPath" : {

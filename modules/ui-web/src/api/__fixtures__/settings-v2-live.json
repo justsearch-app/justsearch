@@ -32,8 +32,10 @@
   "restartScheduled" : null,
   "rerankerModelPath" : null,
   "citationScorerModelPath" : null,
-  "mode" : null,
-  "reason" : null,
-  "freeBytes" : null,
-  "footprintBytes" : null
+  "composition" : {
+    "mode" : "IN_PLACE",
+    "reason" : "candidate_fits_after_source_release",
+    "freeBytes" : 10,
+    "footprintBytes" : 20
+  }
 }

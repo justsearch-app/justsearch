@@ -888,10 +888,8 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
   private static OperationResult withCompositionEvidence(OperationResult response,
       io.justsearch.core.component.ComposeEvidence evidence) {
     var data = new LinkedHashMap<String, Object>(response.structuredData());
-    data.put("mode", evidence.mode().name());
-    if (evidence.reason() != null) data.put("reason", evidence.reason());
-    if (evidence.freeBytes() != null) data.put("freeBytes", evidence.freeBytes());
-    if (evidence.footprintBytes() != null) data.put("footprintBytes", evidence.footprintBytes());
+    data.put("composition", new io.justsearch.app.api.settings.CompositionV2(
+        evidence.mode().name(), evidence.reason(), evidence.freeBytes(), evidence.footprintBytes()));
     return new OperationResult(response.success(), response.message(), response.executionId(), data,
         response.errorCode(), response.errorDetails(), response.retryable());
   }

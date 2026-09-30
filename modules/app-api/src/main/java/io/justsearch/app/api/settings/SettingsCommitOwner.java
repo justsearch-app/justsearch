@@ -50,7 +50,7 @@ public interface SettingsCommitOwner {
     }
   }
 
-  /** Typed precommit refusal. Only its bounded code/execution id is persisted in the row. */
+  /** Typed precommit refusal. Its bounded code/execution id and optional composition are persisted. */
   final class Refused extends RuntimeException {
     private static final long serialVersionUID = 1L;
     private final OperationResult response;

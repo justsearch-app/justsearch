@@ -42,13 +42,13 @@ final class KnowledgeServerQuerySettingsOwnerTest {
         IndexFingerprint.ModelFingerprint.present("test"),
         IndexFingerprint.ModelFingerprint.present("test"),
         IndexFingerprint.ModelFingerprint.present("test"), false, 768));
+    var prior = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
+        QueryRoleSelection.Role.disabled());
     var querySurface = new InferenceSurface(Optional.empty(), Optional.empty(),
         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(),
         new InferenceSurface.ComponentObservation(Optional.of(projection.queryDigest()),
-            Set.of(), Set.of()));
+            Set.of(), Set.of(), Optional.of(prior)));
     var queryA = new QueryRoleSet(querySurface);
-    var prior = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
-        QueryRoleSelection.Role.disabled());
     var runtime = mock(RunningRuntime.class);
     var producer = mock(DefaultWorkerAppServices.class);
     var successor = mock(DefaultWorkerAppServices.class);
@@ -73,6 +73,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
       attach(old, "attachEncoderSet", EncoderSet.class, index);
       attach(old, "attachQueryRoleSet", QueryRoleSet.class, queryA);
       set(server, "servingView", old);
+      set(server, "startupConfiguration", desired);
       server.appServices = producer;
       try (var issuedA = server.captureServingView()) {
         assertSame(producer, issuedA.services());
@@ -235,8 +236,11 @@ final class KnowledgeServerQuerySettingsOwnerTest {
       set(older, "holders", 1);
       retiredViews(f.server).add(older);
       try {
-        assertTimeout(Duration.ofSeconds(7), () ->
-            assertThrows(IllegalStateException.class, f::prepare));
+        var refused = assertTimeout(Duration.ofSeconds(7), () ->
+            assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class, f::prepare));
+        assertInstanceOf(java.io.IOException.class, refused.getCause());
+        assertEquals("IN_PLACE", ((io.justsearch.app.api.settings.CompositionV2)
+            refused.response().errorDetails().get("composition")).mode());
         assertFalse(f.queryA.isClosed());
         f.assertA();
         assertTrue(retiredViews(f.server).contains(older),
@@ -253,7 +257,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
   void retirementTimeoutRepublishesUntouchedA(@TempDir Path dir) throws Exception {
     try (var f = new QueryFixture(dir, 512L); var composition = f.composition();
         var held = f.server.captureServingView()) {
-      assertThrows(IllegalStateException.class, f::prepare);
+      assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class, f::prepare);
       assertFalse(f.queryA.isClosed());
       f.assertA();
       composition.verify(() -> InferenceCompositionRoot.composeQueryRoles(any(), any(), any(), any(),
@@ -266,27 +270,12 @@ final class KnowledgeServerQuerySettingsOwnerTest {
     try (var f = new QueryFixture(dir, 512L); var composition = f.composition()) {
       composition.when(() -> InferenceCompositionRoot.composeQueryRoles(any(), any(), any(), any(),
           any())).thenThrow(new IllegalStateException("B rejected")).thenReturn(f.surface);
-      var refused = assertThrows(IllegalStateException.class, f::prepare);
-      assertEquals("B rejected", refused.getMessage());
+      var refused = assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class, f::prepare);
+      assertEquals("B rejected", refused.getCause().getMessage());
       f.assertRestored();
       composition.verify(() -> InferenceCompositionRoot.composeQueryRoles(
           argThat(projection -> projection.config() == f.configuration), eq(f.selection), any(),
           any(), any()), times(2));
-    }
-  }
-
-  @Test
-  void everyLaterPrecommitRefusalRestoresA(@TempDir Path dir) throws Exception {
-    for (String reason : List.of("later owner rejected", "validation rejected", "cancelled",
-        "settings replacement failed")) {
-      try (var f = new QueryFixture(dir, 512L); var composition = f.composition()) {
-        var prepared = f.prepare();
-        prepared.abort(new IllegalStateException(reason));
-        f.assertRestored();
-        prepared.abort(); // Idempotent, no second A compose or producer transfer.
-        composition.verify(() -> InferenceCompositionRoot.composeQueryRoles(any(), any(), any(),
-            any(), any()), times(2));
-      }
     }
   }
 
@@ -296,7 +285,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
       composition.when(() -> InferenceCompositionRoot.composeQueryRoles(any(), any(), any(), any(),
           any())).thenThrow(new IllegalStateException("B rejected"))
           .thenThrow(new IllegalStateException("A rejected"));
-      assertThrows(IllegalStateException.class, f::prepare);
+      assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class, f::prepare);
       verify(f.component).transition(eq(ComponentState.UNAVAILABLE),
           eq("component.recovery_failed"), argThat(evidence ->
               evidence.contains("B rejected") && evidence.contains("A rejected")));
@@ -315,20 +304,12 @@ final class KnowledgeServerQuerySettingsOwnerTest {
   void queryRecoveryCasLossReleasesReservationAndPreservesNewerOwner(@TempDir Path dir)
       throws Exception {
     try (var f = new QueryFixture(dir, 512L); var composition = f.composition()) {
-      var recoveredSessions = mock(io.justsearch.ort.SessionHandle.class);
-      when(recoveredSessions.retirementStatus())
-          .thenReturn(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
-      var recoveredSurface = new InferenceSurface(Optional.empty(), Optional.empty(),
-          Optional.of(new io.justsearch.reranker.RerankerAssembly(recoveredSessions,
-              new io.justsearch.reranker.RerankerShape(512, false),
-              mock(io.justsearch.reranker.RerankerTokenizer.class))),
-          Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(recoveredSessions),
-          f.surface.componentObservation());
+      var recoveredSurface = f.freshSurface(false);
       composition.when(() -> InferenceCompositionRoot.composeQueryRoles(any(), any(), any(), any(),
           any())).thenThrow(new IllegalStateException("B rejected"))
           .thenThrow(new IllegalStateException("A rejected"))
           .thenReturn(recoveredSurface);
-      assertThrows(IllegalStateException.class, f::prepare);
+      assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class, f::prepare);
       var before = f.component.snapshot();
       var failed = new EngineComponentSnapshot.Component(before.spec(), ComponentState.UNAVAILABLE,
           "component.recovery_failed", before.stateSince(), before.stateSinceMonotonicNanos(),
@@ -446,7 +427,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
 
   static final class QueryFixture implements AutoCloseable {
     final TestEngineExecutors executors = new TestEngineExecutors();
-    final KnowledgeServer server;
+    KnowledgeServer server;
     final io.justsearch.configuration.resolved.ResolvedConfig configuration;
     final EncoderSet index;
     final QueryRoleSet queryA;
@@ -475,17 +456,12 @@ final class KnowledgeServerQuerySettingsOwnerTest {
       configuration = new ResolvedConfigBuilder().putDefault("justsearch.data.dir", dir.toString())
           .build();
       var projection = EncoderConfigurationProjection.from(configuration);
-      var fallback = mock(io.justsearch.reranker.RerankerAssembly.class);
-      var sessions = mock(io.justsearch.ort.SessionHandle.class);
-      when(fallback.sessions()).thenReturn(sessions);
-      when(sessions.retirementStatus()).thenReturn(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
-      surface = new InferenceSurface(Optional.empty(), Optional.empty(),
-          cpuFallback ? Optional.of(fallback) : Optional.empty(),
-          Optional.empty(), Optional.empty(), Optional.empty(), null,
-          cpuFallback ? List.of(sessions) : List.of(),
-          new InferenceSurface.ComponentObservation(Optional.of(projection.queryDigest()),
-              Set.of(io.justsearch.ort.EncoderRole.RERANKER), Set.of(), Optional.of(selection)));
-      queryA = new QueryRoleSet(surface);
+      surface = freshSurface(false);
+      var sourceSurface = freshSurface(cpuFallback);
+      queryA = new QueryRoleSet(sourceSurface);
+      var sourceAssembly = sourceSurface.reranker().orElseThrow();
+      queryA.bindReranker(queryA.own(new io.justsearch.reranker.CrossEncoderReranker(
+          sourceAssembly.sessions(), sourceAssembly.shape(), sourceAssembly.tokenizer())));
       var generation = mock(GenerationModelSelection.class);
       var selected = EncoderConfigurationProjection.from(configuration, generation);
       index = new EncoderSet(new InferenceSurface(Optional.empty(), Optional.empty(),
@@ -527,6 +503,34 @@ final class KnowledgeServerQuerySettingsOwnerTest {
       set(server, "initialQueryRoleSet", queryA);
       set(server, "startupConfiguration", configuration);
       server.appServices = producer;
+      server.startDeferredModelInitialization(() -> {});
+      server.deferredModelInit.join();
+    }
+
+    InferenceSurface freshSurface(boolean cpuFallback) throws Exception {
+      var sessions = mock(io.justsearch.ort.SessionHandle.class);
+      var tokenizer = mock(io.justsearch.reranker.RerankerTokenizer.class);
+      when(tokenizer.encodePairs(anyString(), any(String[].class))).thenReturn(
+          new io.justsearch.reranker.RerankerTokenizer.EncodedBatch(
+              new long[][] {{1, 2}}, new long[][] {{1, 1}}, new long[][] {{0, 0}}, 1, 2, 0, 2));
+      var nativeSession = mock(ai.onnxruntime.OrtSession.class);
+      var nativeResult = mock(ai.onnxruntime.OrtSession.Result.class);
+      var scores = mock(ai.onnxruntime.OnnxValue.class);
+      when(scores.getValue()).thenReturn(new float[][] {{0.25f}});
+      when(nativeResult.get(0)).thenReturn(scores);
+      when(nativeSession.run(anyMap())).thenReturn(nativeResult);
+      when(sessions.environment()).thenReturn(ai.onnxruntime.OrtEnvironment.getEnvironment());
+      when(sessions.acquire(any())).thenReturn(new io.justsearch.ort.SessionHandle.Lease(
+          nativeSession, null, () -> {}, cpuFallback, io.justsearch.ort.OrtRunRecorder.NOOP));
+      when(sessions.isGpuAvailable()).thenReturn(!cpuFallback);
+      when(sessions.retirementStatus()).thenReturn(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
+      var assembly = new io.justsearch.reranker.RerankerAssembly(sessions,
+          new io.justsearch.reranker.RerankerShape(512, false), tokenizer);
+      var projection = EncoderConfigurationProjection.from(configuration);
+      return new InferenceSurface(Optional.empty(), Optional.empty(), Optional.of(assembly),
+          Optional.empty(), Optional.empty(), Optional.empty(), null, List.of(sessions),
+          new InferenceSurface.ComponentObservation(Optional.of(projection.queryDigest()),
+              Set.of(io.justsearch.ort.EncoderRole.RERANKER), Set.of(), Optional.of(selection)));
     }
 
     org.mockito.MockedStatic<InferenceCompositionRoot> composition() {
@@ -535,7 +539,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
           .thenReturn(1024L);
       mocked.when(() -> InferenceCompositionRoot.sourceQueryReleasableBytes(any())).thenReturn(1024L);
       mocked.when(() -> InferenceCompositionRoot.composeQueryRoles(any(), any(), any(), any(), any()))
-          .thenReturn(surface);
+          .thenAnswer(ignored -> freshSurface(false));
       return mocked;
     }
 

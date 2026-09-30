@@ -235,6 +235,9 @@ delete env.JUSTSEARCH_ISSUED_CITATION_BARRIER_ANSWER;
 delete env.JUSTSEARCH_QUERY_PUBLICATION_BARRIER;
 delete env.JUSTSEARCH_INDEX_START_BARRIERS;
 delete env.JUSTSEARCH_GENERATIVE_RECOVERY_BARRIER;
+if (queryReconfigureMode) {
+  env.JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY = 'query reconfigure held lease';
+}
 if (queryReconfigureMode === 'IN_PLACE') {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reconfigure';

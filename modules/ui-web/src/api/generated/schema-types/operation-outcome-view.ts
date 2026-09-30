@@ -18,6 +18,12 @@ export interface OperationOutcomeView {
   reason?: string;
   result?: {
     code?: string;
+    composition?: {
+      footprintBytes?: number | null;
+      freeBytes?: number | null;
+      mode?: string | null;
+      reason?: string | null;
+    };
     executionId?: string;
     gapListHash?: string;
     gaps?: ({
@@ -38,6 +44,12 @@ export const operationOutcomeViewSchema = z.strictObject({
   "reason": z.string().optional(),
   "result": z.strictObject({
     "code": z.string().optional(),
+    "composition": z.strictObject({
+      "footprintBytes": z.number().int().nullable().optional(),
+      "freeBytes": z.number().int().nullable().optional(),
+      "mode": z.string().nullable().optional(),
+      "reason": z.string().nullable().optional(),
+    }).optional(),
     "executionId": z.string().optional(),
     "gapListHash": z.string().optional(),
     "gaps": z.array(z.strictObject({

@@ -13,8 +13,12 @@ import { z } from 'zod';
 export interface SettingsV2 {
   apiPort?: number | null;
   citationScorerModelPath?: string | null;
-  footprintBytes?: number | null;
-  freeBytes?: number | null;
+  composition?: {
+    footprintBytes?: number | null;
+    freeBytes?: number | null;
+    mode?: string | null;
+    reason?: string | null;
+  } | null;
   indexPaths?: string[] | null;
   llm?: {
     contextWindow?: number | null;
@@ -24,9 +28,7 @@ export interface SettingsV2 {
     modelPath?: string | null;
     serverExecutable?: string | null;
   } | null;
-  mode?: string | null;
   operationKey?: string | null;
-  reason?: string | null;
   rerankerModelPath?: string | null;
   restartScheduled?: boolean | null;
   settingsMode?: string | null;
@@ -52,8 +54,12 @@ export interface SettingsV2 {
 export const settingsV2Schema = z.strictObject({
   "apiPort": z.number().int().nullable().optional(),
   "citationScorerModelPath": z.string().nullable().optional(),
-  "footprintBytes": z.number().int().nullable().optional(),
-  "freeBytes": z.number().int().nullable().optional(),
+  "composition": z.strictObject({
+    "footprintBytes": z.number().int().nullable().optional(),
+    "freeBytes": z.number().int().nullable().optional(),
+    "mode": z.string().nullable().optional(),
+    "reason": z.string().nullable().optional(),
+  }).nullable().optional(),
   "indexPaths": z.array(z.string()).nullable().optional(),
   "llm": z.strictObject({
     "contextWindow": z.number().int().nullable().optional(),
@@ -63,9 +69,7 @@ export const settingsV2Schema = z.strictObject({
     "modelPath": z.string().nullable().optional(),
     "serverExecutable": z.string().nullable().optional(),
   }).nullable().optional(),
-  "mode": z.string().nullable().optional(),
   "operationKey": z.string().nullable().optional(),
-  "reason": z.string().nullable().optional(),
   "rerankerModelPath": z.string().nullable().optional(),
   "restartScheduled": z.boolean().nullable().optional(),
   "settingsMode": z.string().nullable().optional(),

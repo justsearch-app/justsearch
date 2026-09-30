@@ -84,6 +84,7 @@ These edges exist only in test suites and should not be treated as production la
 - `:modules:app-engine` uses `testImplementation` on `:modules:app-agent`
 - `:modules:app-launcher` uses `testImplementation` on `:modules:gpu-bridge`
 - `:modules:dead-code-audit` uses `testImplementation` on `:modules:$m`
+- `:modules:indexer-worker` uses `testImplementation` on `:modules:app-services`
 - `:modules:system-tests` uses `testImplementation` on `:modules:app-services`, `:modules:indexer-worker`, `:modules:worker-services`
 
 ### A3. Build dependency graph (production)

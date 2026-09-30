@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.CompositionV2;
 import io.justsearch.app.api.settings.LlmSettingsV2;
 import io.justsearch.app.api.settings.SettingsV2;
 import io.justsearch.app.api.settings.UiSettingsV2;
@@ -139,5 +140,18 @@ class SettingsV2ProjectionTest {
     assertEquals(List.of("index-dir"), projected.indexPaths());
     assertThrows(UnsupportedOperationException.class, () -> projected.ui().excludePatterns().add("foreign"));
     assertThrows(UnsupportedOperationException.class, () -> projected.indexPaths().add("foreign"));
+  }
+
+  @Test
+  void compositionEvidenceIsResponseOnly() {
+    var incoming = new SettingsV2(null, null, null, null, null, null, null, null,
+        null, null, null, new CompositionV2("REFUSED", "request_value", 1L, 2L));
+
+    var normalized = SettingsPatch.normalize(incoming);
+    var projected = SettingsV2Projection.toSettingsV2(new UiSettings(),
+        UiSettingsStore.PersistenceMode.READ_WRITE);
+
+    assertNull(normalized.composition());
+    assertNull(projected.composition());
   }
 }

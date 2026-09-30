@@ -14,6 +14,7 @@ import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStoreException;
+import io.justsearch.app.api.settings.CompositionV2;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.core.context.EngineContext;
@@ -40,6 +41,8 @@ final class OperationSettingsRunnerTest {
       Set.of(OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE);
   private static final UiSettings CANDIDATE = new UiSettings();
   private static final String PRIOR_KEY = "0194f72c-0000-7000-8000-000000000001";
+  private static final CompositionV2 IN_PLACE_COMPOSITION = new CompositionV2(
+      "IN_PLACE", "candidate_fits_after_source_release", 10L, 20L);
 
   @TempDir Path temp;
 
@@ -477,10 +480,12 @@ final class OperationSettingsRunnerTest {
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void typedRefusalSurvivesThrownOrSwallowedHandlerFailure(boolean swallowed) throws Exception {
-    try (var store = store("typed-" + swallowed)) {
+    String storeName = "typed-" + swallowed;
+    var request = request(OperationKind.SETTINGS_APPLY);
+    try (var store = store(storeName)) {
       var owner = new FakeOwner(store, ApplyMode.TYPED_REFUSAL);
       var runner = runner(store, owner);
-      var attempt = runner.accept(request(OperationKind.SETTINGS_APPLY));
+      var attempt = runner.accept(request);
       var result = runner.start(attempt, handle -> {
         try { runner.applySettings(handle, witness(4), CANDIDATE); }
         catch (SettingsCommitOwner.Refused refused) { if (!swallowed) throw refused; }
@@ -488,10 +493,23 @@ final class OperationSettingsRunnerTest {
       });
       assertFalse(result.response().success());
       assertEquals("VERSION_CONFLICT", result.response().errorCode().orElseThrow());
-      assertEquals(Map.of("currentRevision", 5L), result.response().errorDetails());
+      assertEquals(Map.of("currentRevision", 5L, "composition", IN_PLACE_COMPOSITION),
+          result.response().errorDetails());
       assertEquals(Optional.of(false), result.response().retryable());
       assertEquals("VERSION_CONFLICT", result.record().failureReason());
       assertEquals(OperationState.FAILED, owner.releaseStates.getFirst());
+    }
+    try (var reopened = store(storeName)) {
+      var owner = new FakeOwner(reopened, ApplyMode.COMMIT);
+      var runner = runner(reopened, owner);
+      var effects = new java.util.concurrent.atomic.AtomicInteger();
+      var replay = runner.start(runner.accept(request), handle -> {
+        effects.incrementAndGet();
+        return OperationExecution.finished(OperationResult.success("wrong"));
+      });
+      assertEquals(0, effects.get());
+      assertEquals(Map.of("composition", IN_PLACE_COMPOSITION), replay.response().errorDetails());
+      assertEquals(IN_PLACE_COMPOSITION, reopened.outcome(request.key()).result().composition());
     }
   }
 
@@ -754,7 +772,8 @@ final class OperationSettingsRunnerTest {
       markerObservations.add(store.find(token.key()).orElseThrow().expectedSettingsRevision());
       switch (mode) {
         case TYPED_REFUSAL -> throw new Refused(OperationResult.failure("Revision changed", "VERSION_CONFLICT",
-            Map.of("currentRevision", token.expected().acceptedRevision() + 1), false));
+            Map.of("currentRevision", token.expected().acceptedRevision() + 1,
+                "composition", IN_PLACE_COMPOSITION), false));
         case NULL_RECEIPT -> control.committed(null);
         case NO_RECEIPT -> { /* Simulate a defective owner returning without a commitment verdict. */ }
         case SKIP_ADMISSION -> control.committed(new Receipt(token.key(),
