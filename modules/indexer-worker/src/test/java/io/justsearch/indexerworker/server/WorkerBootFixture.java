@@ -145,6 +145,10 @@ final class WorkerBootFixture {
     ResolvedConfigBuilder builder =
         new ResolvedConfigBuilder()
             .contributeBaseSources()
+            // Migration coverage must come from the fixture, not the repository's bundled help.
+            .put("justsearch.ssot.path", ResolvedConfigBuilder.ORDINAL_JVM_ARG, "test_fixture",
+                "isolated_ssot", extras.getOrDefault("justsearch.ssot.path",
+                    dataDir.resolve("SSOT").toAbsolutePath().toString()))
             .putDefault("justsearch.data.dir", dataDir.toAbsolutePath().toString())
             .putDefault("justsearch.index.base_path", indexBase.toAbsolutePath().toString())
             // Un-prefixed on purpose (ResolvedConfigBuilder:1544). Getting it wrong is silent: the

@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.lifecycle.Capability;
 import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.TestEngineComponents;
@@ -315,6 +316,9 @@ final class BootstrapPhysicalInitializationTest {
       var config = new KnowledgeServerConfig(false, dir, dir, dir,
           5_000L, 2_000L, 3, 2_000L, 1_000L, 300_000L, 100, 0L, 0);
       var host = mock(WorkerHost.class);
+      var resolved = ResolvedConfig.builder()
+          .putDefault("justsearch.ssot.path", dir.resolve("SSOT").toString()).build();
+      when(host.bundledHelpSource()).thenReturn(resolved.collections().bundledHelp());
       when(host.start(any(), any())).thenReturn(client);
       when(host.captureServingView()).thenAnswer(ignored -> new WorkerHost.ServingLease() {
         @Override

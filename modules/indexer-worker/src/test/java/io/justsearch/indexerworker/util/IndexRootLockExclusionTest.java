@@ -116,9 +116,12 @@ class IndexRootLockExclusionTest {
 
   private int probe(Path indexBase, boolean halt) throws Exception {
     Path output = directory.resolve("probe.log");
+    Path argFile = directory.resolve("probe-classpath.args");
+    Files.writeString(argFile, "-cp\n\"" + System.getProperty("java.class.path")
+        .replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n", java.nio.charset.StandardCharsets.UTF_8);
     String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
     var child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", executable).toString(),
-        "-cp", System.getProperty("java.class.path"), Probe.class.getName(), indexBase.toString(), halt ? "halt" : "close")
+        "@" + argFile.toAbsolutePath(), Probe.class.getName(), indexBase.toString(), halt ? "halt" : "close")
         .redirectErrorStream(true).redirectOutput(output.toFile()).start();
     try {
       assertTrue(child.waitFor(30, TimeUnit.SECONDS), "lock probe must exit");

@@ -114,9 +114,12 @@ class IndexRootLockFailureTest {
 
   private int probe() throws Exception {
     Path output = directory.resolve("failure-probe.log");
+    Path argFile = directory.resolve("failure-probe-classpath.args");
+    java.nio.file.Files.writeString(argFile, "-cp\n\"" + System.getProperty("java.class.path")
+        .replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n", java.nio.charset.StandardCharsets.UTF_8);
     String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
     var child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", executable).toString(),
-        "-cp", System.getProperty("java.class.path"), Probe.class.getName(), directory.toString())
+        "@" + argFile.toAbsolutePath(), Probe.class.getName(), directory.toString())
         .redirectErrorStream(true).redirectOutput(output.toFile()).start();
     try {
       assertTrue(child.waitFor(30, java.util.concurrent.TimeUnit.SECONDS));
