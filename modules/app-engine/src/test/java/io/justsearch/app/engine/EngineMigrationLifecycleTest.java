@@ -345,6 +345,7 @@ final class EngineMigrationLifecycleTest {
     assertFalse(activeBefore.isBlank(), "active_generation_id must be present");
 
     assertTrue(engine.client().startMigration("system_test_rollback", TestEngineContexts.FOREGROUND).accepted(), "startMigration accepted");
+    assertTrue(engine.awaitLiveGreen(60_000), "live Green preparation must complete before restart");
     engine.restart();
     assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(), "requestCutover must be accepted");
     assertTrue(
@@ -385,11 +386,9 @@ final class EngineMigrationLifecycleTest {
     // passed because there was nothing left to enumerate, and then "resume let it continue" could
     // not be true either. That is the wrong-reason failure mode the assertion was meant to catch.
     //
-    // So the pause is applied BEFORE the restart, while the state is MIGRATING (pauseMigration
-    // refuses only during SWITCHING — MigrationControlOps.java:130-136). The flag is then already
-    // in state.json when the enumerator and the cutover monitor start, which makes the assertions
-    // below deterministic rather than a race: the enumerator must not have finished, and the
-    // monitor must not have switched, because the pause gate is the first thing both consult
+    // Pause immediately after start is accepted, before waiting for asynchronous Green preparation.
+    // Then restart only after Green is published, verifying that the durable pause still holds its
+    // enumerator and cutover monitor. Both consult the pause gate before doing migration work
     // (KnowledgeServerMigrationOps.java:128-130 and :898).
     int fileCount = 24;
     for (int i = 0; i < fileCount; i++) {
@@ -404,6 +403,7 @@ final class EngineMigrationLifecycleTest {
     assertTrue(engine.client().startMigration("pause_resume_test", TestEngineContexts.FOREGROUND).accepted(), "startMigration accepted");
     assertTrue(engine.client().pauseMigration("system_test", TestEngineContexts.FOREGROUND), "pauseMigration must be accepted");
 
+    assertTrue(engine.awaitLiveGreen(60_000), "paused Green preparation must complete before restart");
     engine.restart();
 
     StatusResponse paused = engine.status();

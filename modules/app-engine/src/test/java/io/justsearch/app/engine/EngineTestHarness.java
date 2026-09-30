@@ -115,12 +115,16 @@ final class EngineTestHarness implements AutoCloseable {
    * SECOND index owner in this JVM (the index-base-path lock) can share the same config.
    */
   static void publishConfig(Path dataDir, Path indexBase, Map<String, String> extraConfig)
-      throws Exception {
+      throws java.io.IOException {
     Files.createDirectories(dataDir);
     Files.createDirectories(indexBase);
     ResolvedConfigBuilder builder =
         new ResolvedConfigBuilder()
             .contributeBaseSources()
+            // The corpus belongs to this fixture, including after a Green migration/restart.
+            .put("justsearch.ssot.path", ResolvedConfigBuilder.ORDINAL_JVM_ARG, "test_fixture",
+                "isolated_ssot", extraConfig.getOrDefault("justsearch.ssot.path",
+                    dataDir.resolve("SSOT").toAbsolutePath().toString()))
             .putDefault("justsearch.data.dir", dataDir.toAbsolutePath().toString())
             .putDefault("justsearch.index.base_path", indexBase.toAbsolutePath().toString());
     for (Map.Entry<String, String> entry : extraConfig.entrySet()) {
@@ -228,6 +232,20 @@ final class EngineTestHarness implements AutoCloseable {
 
   KnowledgeClient client() {
     return client;
+  }
+
+  /** Restart fixtures require the published Green owner, not merely the accepted async start. */
+  boolean awaitLiveGreen(long timeoutMs) throws Exception {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      try (var view = captureServingView()) {
+        if (!view.searchRuntime().openedIndexPath().equals(view.ingestRuntime().openedIndexPath())) {
+          return true;
+        }
+      }
+      Thread.sleep(50);
+    }
+    return false;
   }
 
   /** Hold the actual published Worker view across a cutover in lifetime tests. */

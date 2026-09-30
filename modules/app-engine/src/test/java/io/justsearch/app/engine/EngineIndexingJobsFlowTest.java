@@ -6,8 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
-import io.justsearch.configuration.resolved.ConfigStore;
-import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
@@ -58,15 +56,7 @@ final class EngineIndexingJobsFlowTest {
   void framesFlowFromTheChangeFeedAndCloseStopsThem(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
     Path indexBase = dataDir.resolve("index");
-    Files.createDirectories(dataDir);
-    Files.createDirectories(indexBase);
-    ConfigStore.setGlobal(
-        new ConfigStore(
-            new ResolvedConfigBuilder()
-                .contributeBaseSources()
-                .putDefault("justsearch.data.dir", dataDir.toAbsolutePath().toString())
-                .putDefault("justsearch.index.base_path", indexBase.toAbsolutePath().toString())
-                .build()));
+    EngineTestHarness.publishConfig(dataDir, indexBase, java.util.Map.of());
 
     root =
         new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),

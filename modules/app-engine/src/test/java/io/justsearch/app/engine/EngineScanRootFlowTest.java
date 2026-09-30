@@ -8,8 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.app.services.worker.CancelToken;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
-import io.justsearch.configuration.resolved.ConfigStore;
-import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
@@ -64,15 +62,7 @@ final class EngineScanRootFlowTest {
   void cancelStopsTheWalkWithinOneProgressTick(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
     Path indexBase = dataDir.resolve("index");
-    Files.createDirectories(dataDir);
-    Files.createDirectories(indexBase);
-    ConfigStore.setGlobal(
-        new ConfigStore(
-            new ResolvedConfigBuilder()
-                .contributeBaseSources()
-                .putDefault("justsearch.data.dir", dataDir.toAbsolutePath().toString())
-                .putDefault("justsearch.index.base_path", indexBase.toAbsolutePath().toString())
-                .build()));
+    EngineTestHarness.publishConfig(dataDir, indexBase, java.util.Map.of());
 
     // Big enough that the walk takes seconds, which is what makes "stopped early" measurable at
     // all: the cancel is raised by the CONSUMER, and after item A8 the consumer runs on the
