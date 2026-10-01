@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ARMS, ROOT, MAIN_REVISION, checkFixturePins, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, windowValidity, projectLoad, mergeLoadRecords, latestRecords, main } from './e-run.mjs';
+import { ARMS, ROOT, MAIN_REVISION, checkFixturePins, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, windowValidity, projectLoad, mergeLoadRecords, latestRecords, stageCompletionRates, compareStageRates, reprojectRecord, main } from './e-run.mjs';
 import { ingestAccepted } from './fixture-ingest.mjs';
 import { captureWorkload } from './admission-loop.mjs';
 
@@ -35,11 +35,17 @@ test('E2/E3 requires an explicit workload and rejects it elsewhere', () => {
     assert.throws(() => parseArgs(['e2-e3-load', '--arm', 'main', ...args]));
   assert.throws(() => parseArgs(['table', '--workload', 'agent-idle']));
 });
-const windowLoad = () => ({ durationSeconds: 1200, blockSeconds: 600, modes: ['hybrid', 'lexical'], concurrency: 1,
+const windowLoad = () => ({ expectedDocuments: 30000, durationSeconds: 1200, blockSeconds: 600, modes: ['hybrid', 'lexical'], concurrency: 1,
   startedAtMs: 100000, endedAtMs: 1300000, queryPoolHash: 'same-queries', searchP95: { hybrid: 100, lexical: 50 }, admissionExitCode: 0,
   samples: Array.from({ length: 241 }, (_, i) => ({ active: true, offsetSeconds: i * 5,
     observedAtMs: 100000 + i * 5000, indexedDocuments: i, chunkEmbeddingCompletedCount: i * 100,
-    chunkEmbeddingPendingCount: 50, pendingJobs: 0 })),
+    chunkEmbeddingPendingCount: 50, pendingJobs: 0,
+    raw: { worker: { core: { indexedDocuments: i }, enrichment: {
+      embeddingDocCount: 30000, embeddingCompletedCount: i * 100, embeddingPendingCount: 50,
+      spladeDocCount: 30000, spladeCompletedCount: i * 100, spladePendingCount: 50,
+      completedNerCount: i * 100, pendingNerCount: 50,
+      chunk: { chunkDocCount: 30000, chunkEmbeddingCompletedCount: i * 100, chunkEmbeddingPendingCount: 50 },
+    } } } })),
   requests: [{ mode: 'hybrid', status: 200, durationMs: 100 }, { mode: 'lexical', status: 200, durationMs: 50 }] });
 test('window completion invalidates indexing comparison; missing/stale/gapped samples cannot pass', () => {
   assert.equal(windowValidity(windowLoad()), true);
@@ -51,16 +57,129 @@ test('window completion invalidates indexing comparison; missing/stale/gapped sa
     const l = windowLoad(); mutate(l); assert.equal(windowValidity(l), undefined);
   }
 });
+test('stage order changes do not dilute a drained stage or count pre-start idle time', () => {
+  const main = windowLoad(), branch = windowLoad();
+  const configure = (load, start, duration) => {
+    for (const s of load.samples) {
+      const t = s.offsetSeconds, done = Math.max(0, Math.min(t - start, duration)) * 10;
+      const e = s.raw.worker.enrichment;
+      e.embeddingCompletedCount = done;
+      e.embeddingPendingCount = t >= start && t < start + duration ? 100 : 0;
+    }
+  };
+  configure(main, 0, 300); configure(branch, 600, 300);
+  const mr = stageCompletionRates(main), br = stageCompletionRates(branch);
+  assert.equal(mr.embed.rate, 10); assert.equal(br.embed.rate, 10);
+  assert.equal(br.embed.activeSeconds, 300);
+  assert.equal(br.embed.startObservedAtMs, 700000);
+  assert.equal(compareStageRates(br, mr).check, true);
+  br.embed.rate = 9; assert.equal(compareStageRates(br, mr).check, true);
+  br.embed.rate = 8.99; assert.equal(compareStageRates(br, mr).check, false);
+  br.embed.rate = 0; assert.equal(compareStageRates(br, mr).check, false);
+  delete br.embed.rate; assert.equal(compareStageRates(br, mr).check, undefined);
+});
+test('MAIN whole-document-first progress compares primary/embed/SPLADE and skips zero chunks/NER', () => {
+  const load = windowLoad();
+  for (const s of load.samples) {
+    s.chunkEmbeddingCompletedCount = 0;
+    s.raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount = 0;
+    s.raw.worker.enrichment.completedNerCount = 0;
+  }
+  const r = { ...record('main'), workload: 'agent-idle', gaps: {} };
+  projectLoad(r, load, [], values);
+  assert.equal(r.metrics.chunksPerSec, 0);
+  assert.equal(r.metrics.stageComparisons.chunk_embed.status, 'not-compared');
+  assert.equal(r.metrics.stageComparisons.ner.status, 'not-compared');
+  assert.equal(r.clauses['stage-completion-rates-under-foreground-load'], true);
+  assert.equal(r.clauses['chunks-per-second-under-foreground-load'], undefined);
+  const scripted = { ...structuredClone(r), workload: 'scripted-agent' };
+  projectLoad(scripted, load, [{ status: 200, durationMs: 200 }], values);
+  const merged = mergeLoadRecords({ 'agent-idle': r, 'scripted-agent': scripted });
+  const frozen = fillValues(document, { 'E1/main': record('main'), 'E2/main': merged });
+  const chunk = frozen.values.indexingProgressFraction.stagesByWorkload['agent-idle'].chunk_embed;
+  assert.equal(chunk.rate, 0); assert.equal(chunk.comparison, 'not-compared');
+  assert.equal(chunk.minimumRate, undefined);
+  const rates = stageCompletionRates(load);
+  for (const rate of Object.values(rates)) rate.rate = 0;
+  assert.equal(compareStageRates(rates, rates).check, undefined);
+  for (const s of load.samples) {
+    const e = s.raw.worker.enrichment;
+    e.embeddingCompletedCount = e.spladeCompletedCount = 0;
+    s.raw.worker.core.indexedDocuments = 0;
+  }
+  projectLoad(r, load, [], values);
+  assert.equal(r.clauses['stage-completion-rates-under-foreground-load'], undefined);
+});
+test('completed counter fallback is explicit and never replaces an invalid present counter', () => {
+  const load = windowLoad();
+  for (const s of load.samples) {
+    const e = s.raw.worker.enrichment;
+    delete e.embeddingCompletedCount;
+    e.embeddingPendingCount = 30000 - s.offsetSeconds * 10;
+  }
+  const rate = stageCompletionRates(load).embed;
+  assert.equal(rate.rate, 10);
+  assert.match(rate.completedSources[0], /expected - embeddingPendingCount/);
+  load.samples[0].raw.worker.enrichment.embeddingCompletedCount = null;
+  assert.equal(stageCompletionRates(load).embed.rate, undefined);
+});
+test('reproject is offline, preserves original scores/provenance and refuses missing raw files', () => {
+  assert.throws(() => parseArgs(['reproject']), /record/);
+  assert.throws(() => parseArgs(['table', '--record', 'record.json']), /record/);
+  assert.equal(parseArgs(['reproject', '--record', 'record.json']).record, 'record.json');
+  const scratch = fs.mkdtempSync(path.join(ROOT, 'tmp/e-reproject-'));
+  const file = path.join(scratch, 'record.json'), dir = path.join(scratch, 'agent-idle');
+  fs.mkdirSync(dir);
+  const bulk = path.join(dir, 'bulk-load.json'); fs.writeFileSync(bulk, JSON.stringify(windowLoad()));
+  const original = { ...record('main'), workload: 'agent-idle', raw: scratch, recordFile: file,
+    rawFiles: [bulk], endedAt: '2026-10-01T01:00:00Z', gaps: {}, commands: [{ label: 'original' }] };
+  fs.writeFileSync(file, JSON.stringify(original));
+  try {
+    const projected = reprojectRecord(file, values);
+    for (const key of ['id', 'pairIdentity', 'valuesHash', 'endedAt', 'commands']) assert.deepEqual(projected[key], original[key]);
+    assert.deepEqual(projected.measuredProjection.metrics, original.metrics);
+    assert.match(projected.reprojectionDriverHash, /^[a-f0-9]{64}$/);
+    assert.ok(projected.reprojectedAt);
+    assert.equal(projected.metrics.stageRates.chunk_embed.rate, 20);
+    fs.unlinkSync(bulk);
+    const before = fs.readFileSync(file, 'utf8');
+    assert.throws(() => reprojectRecord(file, values), /Missing retained raw/);
+    assert.equal(fs.readFileSync(file, 'utf8'), before);
+  } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+});
+test('new acquisition and reprojected baseline pair by actual protocol without replacing provenance', () => {
+  const mainLoads = {}, branchLoads = {};
+  for (const w of ['agent-idle', 'scripted-agent']) {
+    const r = { ...record('main'), workload: w, gaps: {}, machine: { host: 'same' },
+      commands: [{ mode: 'start', env: { JUSTSEARCH_HEAD_HEAP: '2g' } }] };
+    projectLoad(r, windowLoad(), w === 'scripted-agent' ? [{ status: 200, durationMs: 200 }] : [], values);
+    mainLoads[w] = r;
+  }
+  const mainMerged = mergeLoadRecords(mainLoads);
+  const v = fillValues(document, { 'E1/main': record('main'), 'E2/main': mainMerged }).values;
+  for (const w of ['agent-idle', 'scripted-agent']) {
+    const r = { ...structuredClone(mainLoads[w]), arm: 'branch', pairIdentity: 'new-acquisition-instrument-hash' };
+    projectLoad(r, windowLoad(), w === 'scripted-agent' ? [{ status: 200, durationMs: 200 }] : [], v);
+    branchLoads[w] = r;
+  }
+  const rows = () => tableVerdicts({ 'E2/main': mainMerged, 'E3/main': mainMerged,
+    'E2/branch': mergeLoadRecords(branchLoads), 'E3/branch': mergeLoadRecords(branchLoads) }, v);
+  assert.equal(rows().find(r => r.clause === 'stage-completion-rates-under-foreground-load').verdict, 'pass');
+  assert.equal(branchLoads['agent-idle'].pairIdentity, 'new-acquisition-instrument-hash');
+  branchLoads['agent-idle'].commands[0].env.JUSTSEARCH_HEAD_HEAP = '4g';
+  projectLoad(branchLoads['agent-idle'], windowLoad(), [], v);
+  assert.equal(rows().find(r => r.clause === 'stage-completion-rates-under-foreground-load').verdict, 'fail');
+});
 test('wire failures, actual idle refusals, and reason-coded scripted ceilings are measured', () => {
   const r = record('main'); r.workload = 'agent-idle'; r.gaps = {};
   const l = windowLoad(); projectLoad(r, l, [], values);
   assert.equal(r.metrics.chunksPerSec, 20);
   // Chunk work drained at 300 s while NER keeps the window valid: rate over 300 s, not 1200 s.
   const early = windowLoad();
-  for (const s of early.samples.slice(60)) { s.chunkEmbeddingPendingCount = 0; s.chunkEmbeddingCompletedCount = 6000; }
+  for (const s of early.samples.slice(60)) { s.chunkEmbeddingPendingCount = 0; s.chunkEmbeddingCompletedCount = 6000; s.raw.worker.enrichment.chunk.chunkEmbeddingPendingCount = 0; s.raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount = 6000; }
   const re = record('main'); re.workload = 'agent-idle'; re.gaps = {}; projectLoad(re, early, [], values);
   assert.equal(re.metrics.chunksPerSec, 20); assert.equal(re.metrics.chunkWorkDrainedInWindow, true);
-  const instant = windowLoad(); for (const s of instant.samples.slice(5)) s.chunkEmbeddingPendingCount = 0;
+  const instant = windowLoad(); for (const s of instant.samples.slice(5)) { s.chunkEmbeddingPendingCount = 0; s.raw.worker.enrichment.chunk.chunkEmbeddingPendingCount = 0; }
   const ri = record('main'); ri.workload = 'agent-idle'; ri.gaps = {}; projectLoad(ri, instant, [], values);
   assert.equal(ri.metrics.chunksPerSec, undefined, 'under 60 s of chunk work cannot be rated');
   assert.equal(r.clauses['idle-rejections'], true);
@@ -94,15 +213,15 @@ test('both workload records are required; E0 freezes workload-specific ceilings 
   assert.throws(() => fillValues(document, { 'E1/main': record('main'), 'E2/main': missing }), /Both valid/);
   const merged = mergeLoadRecords(loads);
   const filled = fillValues(document, { 'E1/main': record('main'), 'E2/main': merged });
-  assert.deepEqual(filled.values.indexingProgressFraction.minimumByWorkload, { 'agent-idle': 18, 'scripted-agent': 18 });
+  assert.equal(filled.values.indexingProgressFraction.stagesByWorkload['agent-idle'].chunk_embed.minimumRate, 18);
   assert.equal(filled.values.foregroundSearchP95Ceiling.ceilingByWorkload['agent-idle'].hybrid, 100 * 1.1);
   const branch = structuredClone(merged); branch.arm = 'branch';
   const pairs = { 'E2/main': merged, 'E3/main': merged, 'E2/branch': branch, 'E3/branch': branch };
   assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'foreground-p95').verdict, 'pass');
   branch.metrics.searchP95ByWorkload['scripted-agent'].lexical = 56;
   assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'foreground-p95').verdict, 'fail');
-  branch.metrics.chunksByWorkload['agent-idle'] = 17.9;
-  assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'chunks-per-second-under-foreground-load').verdict, 'fail');
+  branch.metrics.stagesByWorkload['agent-idle'].chunk_embed.rate = 17.9;
+  assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'stage-completion-rates-under-foreground-load').verdict, 'fail');
   branch.clauses['indexing-window-valid'] = false;
   assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'indexing-window-valid').verdict, 'fail');
 });
@@ -276,13 +395,14 @@ test('an unpinned quality gate exit zero is not a baseline pass', () => {
 });
 const record = (arm, groups = ['E2', 'E3']) => ({ arm, groups, id: `fixture-${arm}`, pairIdentity: 'same', valuesHash: 'fixed',
 
-  clauses: { 'indexing-window-valid': true, 'foreground-p95': true, 'agent-api-p95': true, 'chunks-per-second-under-foreground-load': true,
+  clauses: { 'indexing-window-valid': true, 'foreground-p95': true, 'agent-api-p95': true, 'stage-completion-rates-under-foreground-load': true,
     'idle-rejections': true, 'scripted-rejections': true, 'no-timeout-or-5xx': true },
   metrics: { searchP95: { hybrid: 100, lexical: 50 }, agentP95: 200, chunksPerSec: 20,
     searchP95ByWorkload: { 'agent-idle': { hybrid: 100, lexical: 50 }, 'scripted-agent': { hybrid: 100, lexical: 50 } },
-    chunksByWorkload: { 'agent-idle': 20, 'scripted-agent': 20 } } });
+    chunksByWorkload: { 'agent-idle': 20, 'scripted-agent': 20 },
+    stagesByWorkload: { 'agent-idle': { chunk_embed: { rate: 20 } }, 'scripted-agent': { chunk_embed: { rate: 20 } } } } });
 const bounds = { ...values, foregroundSearchP95Ceiling: { ceilingMs: { hybrid: 110, lexical: 55 } },
-  agentLoopApiP95Ceiling: { ceilingMs: 220 }, indexingProgressFraction: { minimumChunksPerSec: 18 } };
+  agentLoopApiP95Ceiling: { ceilingMs: 220 }, indexingProgressFraction: { stagesByWorkload: { 'agent-idle': { chunk_embed: { rate: 20 } }, 'scripted-agent': { chunk_embed: { rate: 20 } } } } };
 function pairRecords() {
   const m = record('main'), b = record('branch');
   return { 'E2/main': m, 'E3/main': m, 'E2/branch': b, 'E3/branch': b };
@@ -294,8 +414,8 @@ test('table numeric bounds include exact limits and reject regression', () => {
   assert.equal(clause(records, 'foreground-p95'), 'pass');
   records['E2/branch'].metrics.searchP95.hybrid = 110.01;
   assert.equal(clause(records, 'foreground-p95'), 'fail');
-  records['E3/branch'].metrics.chunksPerSec = 17.99;
-  assert.equal(clause(records, 'chunks-per-second-under-foreground-load'), 'fail');
+  records['E3/branch'].metrics.stagesByWorkload['agent-idle'].chunk_embed.rate = 17.99;
+  assert.equal(clause(records, 'stage-completion-rates-under-foreground-load'), 'fail');
 });
 test('table missing measurements, nonfinite numbers, and mismatched provenance cannot pass', () => {
   const records = pairRecords();
@@ -311,7 +431,7 @@ test('E0 fixes bounds from MAIN and rejects a refit after branch observations', 
   const filled = fillValues(document, records);
   assert.equal(filled.values.foregroundSearchP95Ceiling.ceilingMs.hybrid, 100 * 1.1);
   assert.equal(filled.values.agentLoopApiP95Ceiling.ceilingMs, 200 * 1.1);
-  assert.equal(filled.values.indexingProgressFraction.minimumChunksPerSec, 18);
+  assert.equal(filled.values.indexingProgressFraction.stagesByWorkload['agent-idle'].chunk_embed.minimumRate, 18);
   assert.equal(filled.values.foregroundSearchP95Ceiling.measuredAtE0, false);
   records['E1/branch'] = { ...record('branch'), failure: 'failed launch' };
   assert.throws(() => fillValues(document, records), /after any branch/);
@@ -319,7 +439,7 @@ test('E0 fixes bounds from MAIN and rejects a refit after branch observations', 
 test('E0 does not substitute baseline sanity or zero throughput for measured load', () => {
   assert.throws(() => fillValues(document, {}), /MAIN/);
   const records = { 'E1/main': record('main'), 'E2/main': { ...record('main'), workloadRecords: ['idle.json', 'scripted.json'] } };
-  records['E2/main'].metrics.chunksPerSec = 0;
+  for (const stage of Object.values(records['E2/main'].metrics.stagesByWorkload['agent-idle'])) stage.rate = 0;
   assert.throws(() => fillValues(document, records), /cannot invent/);
   assert.equal(document.values.foregroundSearchP95Ceiling.measuredAtE0, true);
 });

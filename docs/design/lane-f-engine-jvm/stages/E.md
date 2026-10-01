@@ -87,6 +87,17 @@ recovery exercise remains E7, with §16's artifact disposition.
 
 ### 0.1 Corrections found while running (appended per run)
 
+- **2026-10-01, E2/E3 MAIN idle `2026-10-01T07-51-03-944Z-ed7d2af6`:**
+  zero chunk completions despite primary/document-embedding/SPLADE progress
+  exposed pipeline-order bias in the chunk-only E3 gate. Section 2 now specifies
+  per-stage active intervals and offline reprojection with original provenance.
+  Local proof: `node --check` on e-run and its test; 34 focused e-run tests,
+  the 39 existing E1/E456 instrument tests, and two Python bulk-load tests pass.
+  Read-only projection of the retained idle snapshots finds positive primary,
+  embed, SPLADE and NER rates, zero chunks, and retains SPLADE's five-count dip.
+  Root still must reproject both completed MAIN records and explicitly fill E0;
+  no live acquisition, stack or build was run for this correction.
+
 - **2026-10-01, E2/E3 main `2026-10-01T06-33-01-961Z-ddc6c6d3`:** the first
   full-enrichment eval exhausted the 3,540-second invocation limit before the
   four-cell plan could finish. It also failed the intended during-bulk-indexing
@@ -133,7 +144,7 @@ is a new run, not an amendment.
 | foreground search p95 ceiling | split p95 plus ten percent | split side measured at E (E0.2) times 1.10, per mode (`hybrid`, `lexical` pinned); baseline sanity: hybrid p95 898 ms, lexical p95 160 ms after enrichment | `evidence/pr0/after/search-load-after-enrich.csv` via `analyze-head-run.cjs` |
 | agent-loop API p95 ceiling | same | split side at E times 1.10, measured by C1's `admission-loop.mjs` driver (one loop of search-and-chat calls per context) — the baseline has only one total (`agent_turn_ms=10750`) | `evidence/pr0/after/agent-turn.txt` |
 | admission rejection ceiling | zero with the agent idle; one percent under the scripted agent | as stated; counted by the harness's oracle on the wire, never inferred | 17.7 |
-| indexing-progress fraction | ninety percent of split | split side's docs/s and chunks/s at E under the same foreground load; baseline sanity: primary indexing 127.4 docs/s, embedding complete at 209.7 s on scifact | `evidence/baseline/scifact/summary.json` `ingest.pipeline_summary` |
+| indexing-progress fraction | ninety percent of split | split per-stage completed/s over stage-active intervals of at least 60 s under the same foreground load; baseline sanity: primary indexing 127.4 docs/s, embedding complete at 209.7 s on scifact | `evidence/baseline/scifact/summary.json` `ingest.pipeline_summary` |
 | warm-start budget | baseline index-ready plus five seconds | 7.6 s (`worker_ready_ms=7631` on warm restart) plus 5 s = **12.6 s** from the first cooldown's end to `index` ready | `evidence/pr0/after/restart-startup.txt` |
 | crash-to-API-restored | first cooldown plus the warm-start budget | 1 s (`cooldownIncrementMs`) plus 12.6 s = **13.6 s** to `api`; `index` within the same budget | `supervision-contract.v1.json:164` |
 | soak | owner sets duration before E4 (2026-09-24) | indexing, scripted agent and reconfigure workload; record continuous windows and total measured duration | E0.8 |
@@ -199,12 +210,47 @@ The `/api/status` sampler records raw snapshots every five seconds plus both
 window boundaries, including documents and `chunkEmbeddingCompletedCount`. Boundary snapshots retain
 actual observation timestamps; observations beyond six seconds from a boundary
 cannot validate the window.
-Chunks/s is the completed-embedding delta divided by the fixed 1,200-second
-foreground window, excluding startup, probe and shutdown. Every sample must show
+E3 records completion rates for `primary`, `embed`, `splade`, `chunk_embed` and
+`ner` from the raw `/api/status` counters in each sample. Primary uses
+`worker.core.indexedDocuments`; enrichment uses `embeddingCompletedCount`,
+`spladeCompletedCount`, `chunk.chunkEmbeddingCompletedCount` and `completedNerCount`.
+Only an absent completed field permits `expected - pending`; the record names
+that source. Primary is active while documents are below expected; other stages
+are active while their own pending count is positive. Each rate uses the delta
+from the first active sample through the first drained sample, or window end,
+and requires at least 60 seconds. It excludes pre-start and post-drain idle time.
+New captures retain the expected document count. Legacy primary expectations use
+the maximum observed raw primary/document-enrichment population, named in the record.
+Intermediate counter dips are retained; a negative endpoint delta cannot be rated.
+
+E0 stores each workload's split stage rates and 0.90 minimums for positive rates.
+BRANCH must meet every positive split stage rate; a zero branch rate fails that
+comparison and a missing branch rate is unmeasurable. Zero/missing split stage
+rates are explicitly not compared. No comparable stage is unmeasurable, never a
+pass. Docs/s and chunks/s remain descriptive metrics. Every sample must show
 bulk indexing/enrichment still active; early completion on either arm invalidates
 the window. Missing/stale/gapped counters cannot pass. RSS covers the foreground
 phase; the retained encoder probe follows the window and is supplemental, not part
-of the E2/E3 population. The analyzer reports the fixed-window metrics.
+of the E2/E3 population.
+
+2026-10-01 correction: MAIN completes whole-document embeddings before chunk
+embeddings; a chunk-only E3 gate mistakes pipeline order for lost throughput.
+
+Re-score a completed retained record without a stack:
+
+```powershell
+node scripts/jseval/lane-f/e-run.mjs reproject --record <record.json>
+```
+
+`reproject` refuses missing retained raw files and unfinished records. It preserves
+identity, revision, machine, commands, run IDs, pair identity, values hashes and
+original metrics/clauses in `measuredProjection`, then writes new scores with
+`reprojectedAt`, driver hash, projection values hash and raw-input hashes. It does
+not refit E0 or amend values.json; run `e0-values` explicitly after both MAIN
+records are re-scored. It reads values.json beside the record's owning group,
+or from an explicit `--repo-root`. The table compares recorded machine, launch
+pins, workload/query order and window protocol plus projection driver hash across
+re-scored MAIN and new BRANCH records; original acquisition hashes remain retained.
 
 Budget: 2,700 seconds per invocation (45 minutes), below the 3,540-second outer
 limit; reserve 60 seconds preamble, 780 startup/readiness, 1,500 corpus submission
@@ -213,7 +259,7 @@ additional seconds after a deadline. No enrichment-completion wait occurs.
 
 E0 requires both valid MAIN workload records. It freezes per-workload/per-mode
 search ceilings at MAIN p95 ? 1.10, scripted admission API p95 ? 1.10, and each
-workload's completed chunks/s ? 0.90. The table combines both records per arm,
+workload's positive per-stage completion rates times 0.90. The table combines both records per arm,
 links all four source records, checks their query-pool identities and frozen values,
 and cannot pass with one workload absent. `--dry-run` displays the bounded plan
 and budget without starting anything.
@@ -363,7 +409,7 @@ pinned surfaces still match main.
 |---|---|---|
 | E1 | search quality and workflow fixture | Run jseval quality comparison and the pinned fixture on both arms. Require baseline gate and SearchTrace shape, deterministic evidence/citation/cancellation equality, and only the three predeclared difference classes. |
 | E2 | search and agent response times during bulk indexing | Run idle-agent and scripted-agent loads on both arms while bulk indexing. Compare admitted search/API p95; count reason-coded rejections under the owner ceiling, with timeout/5xx as failure. |
-| E3 | indexing speed | Measure chunks/s under the same foreground loads on both arms; require the owner-set fraction of split while queries continue. |
+| E3 | indexing speed | Measure per-stage completed/s over active intervals of at least 60 seconds under the same foreground loads; require 0.90 of each positive split stage rate while queries continue. Zero/missing split stages are not compared; no comparable stage is unmeasurable. Keep docs/s and chunks/s as metrics. |
 | E4 | memory budget and no-crash soak | Sum Engine, llama-server and children commit charge against section 8 and split, report working set, measure live-after-GC trend and zero crashes across the owner-duration indexing/agent/reconfigure soak. |
 | E5 | crash recovery and children | Force an actual Engine death with a durable operation in flight. Compare crash-to-API restoration and checkpoint resume; require visible restarting, no orphaned child, correct adopt/stop behavior for each restart/quit/upgrade path. |
 | E6 | hang detection, graceful and forced | Exercise runnable-watcher/API-pool wedge and whole-JVM wedge on both arms under fixed hang settings; require request-channel and forced-kill recovery within the respective deadline plus budget. |

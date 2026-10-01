@@ -44,7 +44,7 @@ def run(args):
     corpus = Path(args.corpus_dir)
     count = _ensure_materialized('scifact', corpus, None)
     queries = _foreground_queries('scifact', 'bulk-load')
-    result = {'kind': 'lane-f-bulk-load.v1', 'workload': args.workload,
+    result = {'kind': 'lane-f-bulk-load.v1', 'workload': args.workload, 'expectedDocuments': count,
               'blockSeconds': args.block_seconds, 'modes': ['hybrid', 'lexical'],
               'concurrency': 1, 'queryPoolHash': hashlib.sha256(
                   json.dumps(queries, ensure_ascii=False).encode()).hexdigest(),
