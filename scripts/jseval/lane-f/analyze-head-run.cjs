@@ -110,9 +110,15 @@ for (const file of ['context-many.json', 'context-one.json', 'fairness.json', 'w
   // Explicit fixed-window cancellation is censored, never admitted latency.
   capture.requests = capture.requests?.filter(r => !r.windowBoundary || r.status >= 500);
   if (!capture.requests?.length) throw new Error(`Empty admission phase: ${file}`);
-  if (capture.requests.some((r) => !Number.isFinite(r.durationMs) || r.durationMs < 0 || r.error || r.status >= 500)) {
+  // A malformed record is a broken capture; an errored or 5xx call is a measured outcome of the arm
+  // (2026-10-01: main timed out a chat stream under load) and is reported, not thrown.
+  if (capture.requests.some((r) => !Number.isFinite(r.durationMs) || r.durationMs < 0)) {
     throw new Error(`Invalid admission call records: ${file}`);
   }
+  const failed = capture.requests.filter((r) => r.error || r.status >= 500);
+  const byOutcome = {};
+  for (const r of failed) byOutcome[r.error || `HTTP_${r.status}`] = (byOutcome[r.error || `HTTP_${r.status}`] ?? 0) + 1;
+  console.log(`- admission ${file} failed calls: ${failed.length} ${JSON.stringify(byOutcome)}`);
   console.log(`- admission ${file} terminal errors: ${JSON.stringify(agentMetrics(capture.requests).agentTerminalErrors)}`);
   for (const [label, calls] of [['all', capture.requests], ['admitted', capture.requests.filter(isAdmitted)]]) {
     if (!calls.length) throw new Error(`Empty admission ${label} phase: ${file}`);
