@@ -55,7 +55,7 @@ curl -s -m 30 -X POST "${hdr[@]}" -d '{}' "$base/api/ai/runtime/deactivate" > /d
 
 body=$(node -e 'const p=require("path");const r=process.argv[1];console.log(JSON.stringify({paths:[p.join(r,"docs","explanation"),p.join(r,"docs","reference")]}))' "$root_win")
 ingest_response=$(curl -fsS -m 120 -X POST "${hdr[@]}" -d "$body" "$base/api/knowledge/ingest") || exit 2
-printf '%s' "$ingest_response" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const r=JSON.parse(s);if(r.success!==true||!r.structuredData?.operationKey){console.error("Ingest operation refused:",r);process.exit(2)}' || exit 2
+printf '%s' "$ingest_response" | node scripts/jseval/lane-f/fixture-ingest.mjs || exit 2
 log "ingest: ${ingest_response:0:200}"
 # The enrichment wait is a PRECONDITION, not a progress message. The four-capture acceptance
 # had side A cycle 1 return READY False after the full 900s and capture anyway, on a partially

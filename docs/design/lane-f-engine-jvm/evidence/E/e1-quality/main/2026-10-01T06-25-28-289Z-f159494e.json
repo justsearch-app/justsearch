@@ -733,5 +733,85 @@
     "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-25-28-289Z-f159494e\\start-fixture-1-receipt.json",
     "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-25-28-289Z-f159494e\\start-quality-capability-ready.json",
     "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-25-28-289Z-f159494e\\start-quality-receipt.json"
-  ]
+  ],
+  "fixtureDecision": {
+    "rule": "E0.2",
+    "decision": "recapture",
+    "directory": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-driver\\docs\\design\\lane-f-engine-jvm\\evidence\\baseline\\fixture-pr0b\\side-a",
+    "recordedRevision": "f938c4eb2e9b487bd0965859108d239c30e8601f",
+    "mainRevision": "ac1c93bf32c2bba3e4a22462295acbc618f850bc",
+    "revisionSource": "PR 0b publication (#717), which records these captures and their unchanged pinned implementation",
+    "gitDiffArgs": [
+      "diff",
+      "--name-only",
+      "f938c4eb2e9b487bd0965859108d239c30e8601f",
+      "ac1c93bf32c2bba3e4a22462295acbc618f850bc",
+      "--",
+      "modules",
+      ":(exclude)modules/ui-web",
+      ":(exclude)modules/shell",
+      "contracts",
+      "SSOT",
+      "build.gradle.kts",
+      "settings.gradle.kts",
+      "gradle",
+      "build-logic",
+      "scripts/jseval/lane-f-workflow-fixture.v1.json",
+      "scripts/jseval/jseval/workflow_fixture.py",
+      "scripts/jseval/lane-f/fixture-pair.sh",
+      "scripts/jseval/lane-f/fixture-cycle.sh",
+      "docs/explanation",
+      "docs/reference"
+    ],
+    "changedFiles": [
+      "docs/explanation/21-agent-analytics-pipeline.md",
+      "docs/reference/contributing/agent-postmortems.md",
+      "docs/reference/contributing/agent-prompt-surface-governance.md",
+      "docs/reference/contributing/agent-workflow.md",
+      "docs/reference/contributing/common-workflows.md",
+      "docs/reference/contributing/development-philosophy.md"
+    ],
+    "reasons": [
+      "pinned-surfaces-changed",
+      "installed-build-mismatch-or-missing"
+    ],
+    "recordedBuildStamp": "8a048084ff68bc54",
+    "currentBuildStamp": "55ffe7744cc7e103",
+    "stampFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\modules\\indexer-worker\\build\\install\\indexer-worker\\build-stamp.txt",
+    "sameBuildAndPins": true,
+    "pins": {
+      "index.hybrid.candidate_limit_max": "5000",
+      "index.hybrid.chunk_collapse_limit_multiplier": "50",
+      "index.hybrid.leg_arbitration_enabled": "false",
+      "index.hybrid.leg_recall_complete_enabled": "false",
+      "index.vector.exhaustive_search": "true",
+      "justsearch.embed.gpu.enabled": "true",
+      "justsearch.llm.slots": "1",
+      "justsearch.ner.gpu_enabled": "true",
+      "justsearch.rerank.chunks.deadline_ms": "60000",
+      "justsearch.rerank.chunks.gpu.enabled": "false",
+      "justsearch.rerank.deadline_ms": "60000",
+      "justsearch.rerank.gpu.enabled": "true",
+      "justsearch.rerank.gpu_mem_mb": "4096",
+      "justsearch.rerank.top_k": "40",
+      "justsearch.splade.gpu_enabled": "true"
+    },
+    "recordedChatProfile": "compact",
+    "captures": [
+      {
+        "file": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-driver\\docs\\design\\lane-f-engine-jvm\\evidence\\baseline\\fixture-pr0b\\side-a\\capture-1.json",
+        "sha256": "e866c0cdfc870122fdc301232ac5d31ec9eca8f233e866c5a33a4b5ceb7ab5d7"
+      },
+      {
+        "file": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-driver\\docs\\design\\lane-f-engine-jvm\\evidence\\baseline\\fixture-pr0b\\side-a\\capture-2.json",
+        "sha256": "c7c80d48055ead12aba2ff4ddbd129787eb3fc78cb25b57d4db36c47bae22f0f"
+      },
+      {
+        "file": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-driver\\docs\\design\\lane-f-engine-jvm\\evidence\\baseline\\fixture-pr0b\\side-a\\capture-3.json",
+        "sha256": "f2d15bce6c677e2bad91453f5edb563805cf15560e5ffcc4e2d1549680372f76"
+      }
+    ],
+    "checkedAt": "2026-10-01T06:39:52.831Z",
+    "context": "Post-run E0.2 review of the fixture-ingest refusal; original run outcome and SciFact evidence preserved. Root must recapture the main fixture."
+  }
 }

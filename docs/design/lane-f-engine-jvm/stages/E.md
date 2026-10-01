@@ -87,7 +87,24 @@ recovery exercise remains E7, with §16's artifact disposition.
 
 ### 0.1 Corrections found while running (appended per run)
 
-*(empty — the runner appends one bullet per run whose procedure or value did not survive contact.)*
+- **2026-10-01, E1 main `2026-10-01T06-25-28-289Z-f159494e`:** the unconditional
+  fixture capture ignored E0.2 and then refused main's legacy ingest response
+  (`accepted=92`, empty `error`, nonempty `scanId`). The pin check now reads
+  `evidence/baseline/fixture-pr0b/pins.json` and the captures' recorded provenance.
+  This metadata projects PR 0b's published revision and fixture input surfaces;
+  effective configuration and sampling remain owned by the capture and fixture spec.
+  `git diff --name-only f938c4eb2 ac1c93bf3` over those surfaces identifies six
+  changed corpus documents; the installed main worker stamp `55ffe7744cc7e103`
+  also differs from the recorded `8a048084ff68bc54`. **Recapture required.**
+  The original main record retains its failed outcome and SciFact evidence and now
+  includes `fixtureDecision` with the exact command, changed paths, pins, stamps
+  and capture hashes. Future E1 records retain the same decision evidence before
+  launch. Legacy ingest acceptance requires a positive integer count, empty error
+  and nonempty scan ID; operation envelopes keep their existing refusal predicate
+  and cannot fall back to legacy fields. Focused proof:
+  `node --test scripts/jseval/lane-f/e-run.test.mjs` (23 tests), including both
+  E0.2 plan cases, build/pin mismatch and mixed-envelope refusal. Root's live
+  E1 main invocation remains required.
 
 ---
 
@@ -130,8 +147,11 @@ All jseval and lane-F instrument code comes from the driver tree; each arm's
 dev-runner owns its stack. Launches use G1, `-Xmx2g`, standard chat profile,
 fresh private data directories and `leaseDurationSec=3600`. The fixture uses
 MAIN's unchanged documentation corpus and the fixture-pair launch pins;
-three fresh fixture-cycle captures reproduce fixture-pair's capture sequence
-without its force-cleanup of an active stack. SciFact materialization is shared.
+E0.2's pin/build check selects main's three recorded PR 0b captures when valid,
+otherwise three fresh fixture-cycle captures reproduce fixture-pair's capture
+sequence without its force-cleanup of an active stack. Branch always captures
+fresh; when main reuses the compact PR 0b fixture, branch uses that same fixture
+profile. SciFact keeps its standard profile and shared materialization.
 
 ```powershell
 node scripts/jseval/lane-f/e-run.mjs e1-quality --arm main --dry-run
