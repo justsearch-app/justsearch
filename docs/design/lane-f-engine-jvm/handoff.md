@@ -126,6 +126,20 @@ Open before D1 closes: the installed standard-model round (in progress, groups o
 `:modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=true`), D1-6
 grep and baseline-shrink receipts, D1-17 legacy teardown, the library-gap-decision ui-check, exact-SHA hosted CI.
 
+## D1 closed (2026-10-01)
+
+D1 is closed at runtime revision `f7b4d5a21`: full suite 12,493 tests green at `51fff0a62`, all installed
+lifecycle and supervised recovery scenarios green on current revisions
+([installed round](evidence/D1/installed-round-2026-10-01.md)), hosted CI 36820295770 green on `f7b4d5a21`,
+independent [closure review](evidence/D1/closure-review-2026-10-01.md) and
+[confirmation](evidence/D1/closure-confirmation-2026-10-01.md). Authorized deferrals: D1-6 signed
+restart-required proof to E7; D2-owned portions post-merge. Production defects found and fixed while
+closing: Blue closed under an issued query, pre-walk ingest recovery race, help source omitted by Green,
+CLI boots skipping the data-version marker, reconfigure cleanup Error leaking the A holder.
+
+Next: stage E. Driver `scripts/jseval/lane-f/e-run.mjs` is being written (worktree `lane-f-e-driver`); the
+main arm is built in worktree `lane-f-e-main` at `ac1c93bf3`; values in `evidence/E/values.json`.
+
 ## Re-plan (owner-authorized 2026-09-30)
 
 Supersedes the WP3 order in [continuation-brief.md](continuation-brief.md) for everything
