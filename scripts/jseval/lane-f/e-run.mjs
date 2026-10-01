@@ -347,8 +347,10 @@ async function startOwned(command, context, bindings) {
   context.owned = { command, proc, runId: receipt.runId };
   context.record.runIds.push(receipt.runId);
   write(path.join(context.raw, `${command.label}-receipt.json`), receipt);
-  context.token = (await api(context, '/api/mcp/token')).token;
-  if (!context.token) throw new Error('No mutation token');
+  // A dev-mode stack (main's split arm) does not enforce the per-boot token and hands out none;
+  // proceed without it there. Any mutation the server does guard still fails loudly on the wire.
+  context.token = (await api(context, '/api/mcp/token')).token ?? null;
+  context.record.tokenEnforced = Boolean(context.token);
   await api(context, '/api/health');
   await api(context, '/api/debug/state');
   await api(context, '/api/runtime/manifest');
