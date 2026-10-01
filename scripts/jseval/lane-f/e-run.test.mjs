@@ -8,7 +8,9 @@ import { captureWorkload } from './admission-loop.mjs';
 import { activateChat, chatReady } from './e-start-ready.mjs';
 import { collect } from './e-run.mjs';
 
-const document = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'), 'utf8'));
+// The E0 document as it stood before the first fill (frozen 2026-10-01 at 47e9fe12e): tests exercise filling,
+// so they must not read the live values.json, which is filled once the main arm has run.
+const document = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/jseval/lane-f/test/fixtures/values-before-e0.json'), 'utf8'));
 const values = document.values;
 
 for (const arm of ['main', 'branch']) for (const group of ['e2-e3-load', 'e4-memory-soak', 'e5-crash', 'e6-hang']) {
