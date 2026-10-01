@@ -386,13 +386,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   /**
-   * observations.md inbox item #1 (2026-05-08): bypasses the broken
-   * worker→head RRD replication by feeding the worker-shipped recent-arrays
-   * (`recent_job_queue_depth` / `recent_docs_per_sec`, present on every
-   * {@code CoreStatus} in-process port response) directly into the {@code TimeseriesSnapshotHolder}s
-   * that back the `/api/metrics/worker.*` endpoints. The RRD-based ticks
-   * stay scheduled (harmless no-ops because the head's RRD never receives
-   * worker.* samples) — this callback is the live data source.
+   * Publishes recent queue-depth and document-rate arrays from the index operational view
+   * through the callback wired by {@code CoreApiAssembly}. That callback updates the
+   * TIMESERIES snapshot holders directly; it does not replicate samples into a gateway RRD.
    */
   private volatile java.util.function.BiConsumer<
           WorkerOperationalView, Boolean>

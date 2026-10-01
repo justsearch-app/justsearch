@@ -22,8 +22,8 @@
  *  - `catalog-membership-changed` is a delta shape (Envoy delta xDS
  *    pattern) for first-party catalog mutations.
  *  - Wire-version evolution (`contract-version-changed`) is intentionally
- *    absent — additive Protobuf contract evolution makes it structurally
- *    non-breaking mid-session.
+ *    absent from this module's four event kinds. Wire versions are reported
+ *    separately in the handshake's serverCapabilities.contract_versions.
  *  - Static + dynamic registration non-collision: V1 default is last-
  *    write-wins reconciliation with WARN log on duplicate `id`; LSP-
  *    strict enforcement is escalation when a real consumer surfaces.

@@ -1557,11 +1557,8 @@ public enum EnvRegistry {
     }
 
     /**
-     * Config keys checked for Head→Worker divergence after in-process port handshake (tempdoc 329).
-     *
-     * <p>If the Head's {@link #get()} value for any of these keys differs from the Worker's value,
-     * a WARN is logged. This turns silent misconfiguration (tempdoc 312 item 20) into a visible
-     * signal. The set focuses on keys that caused actual bugs or are critical for correctness.
+     * Keys projected into the index health response's effective configuration by
+     * {@code WorkerHealthService}. Each value comes from {@link #get()} in the Engine JVM.
      */
     public static final Set<EnvRegistry> CONFIG_DIVERGENCE_CHECK_KEYS = EnumSet.of(
         DATA_DIR,

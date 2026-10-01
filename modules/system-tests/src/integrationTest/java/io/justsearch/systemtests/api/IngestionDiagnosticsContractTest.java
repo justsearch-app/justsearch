@@ -134,9 +134,8 @@ class IngestionDiagnosticsContractTest {
     Files.writeString(docPath, "honesty marker " + marker);
     ingestSync(corpus.toAbsolutePath().toString());
     awaitLedgerHasOutcomeForSize(Files.size(docPath), SEARCHABLE_TIMEOUT);
-    // First search after backend boot loads the embedding ONNX model on the worker.
-    // Loading exceeds the 5s in-process port search deadline, which trips the circuit breaker;
-    // retry until the model is warm and search returns results.
+    // Wait for a searchable result within the test budget; startup can leave the index
+    // unavailable or a search can exceed its operation deadline.
     awaitSearchHit(marker, SEARCHABLE_TIMEOUT);
 
     String requestBody =
@@ -293,8 +292,8 @@ class IngestionDiagnosticsContractTest {
 
   /**
    * Polls {@code /api/knowledge/search} for the marker until at least one hit is returned.
-   * Tolerates 503 (circuit breaker open) and 504 (worker DEADLINE_EXCEEDED) responses while
-   * the embedding ONNX session warms up — these reliably resolve once the model is loaded.
+   * Tolerates 503 (service unavailable) and 504 (operation deadline exceeded) responses
+   * within the test's timeout budget.
    */
   private static JsonNode awaitSearchHit(String marker, Duration timeout) throws Exception {
     long deadline = System.currentTimeMillis() + timeout.toMillis();
@@ -319,10 +318,7 @@ class IngestionDiagnosticsContractTest {
           }
         }
       } catch (java.io.IOException ioe) {
-        // First search after backend boot races with the embedding ONNX session load:
-        // the worker exceeds its 5s in-process port deadline, HttpTimeoutException (extends
-        // IOException) bubbles up, and the next-3-failures circuit breaker opens. Both
-        // resolve once the model warms; keep polling.
+        // Retry HTTP I/O failures, including HttpTimeoutException, within the test budget.
         lastError = ioe;
       }
       Thread.sleep(POLL_INTERVAL.toMillis());

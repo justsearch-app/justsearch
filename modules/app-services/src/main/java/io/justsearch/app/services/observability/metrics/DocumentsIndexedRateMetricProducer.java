@@ -100,11 +100,9 @@ public final class DocumentsIndexedRateMetricProducer {
 
   /**
    * Publishes a snapshot built directly from a values array. Sibling of
-   * {@code JobQueueDepthMetricProducer.publishFromValues} — closes the same
-   * worker→head metric replication gap (observations.md inbox item #1,
-   * 2026-05-08) by reading the worker-shipped {@code recent_docs_per_sec}
-   * array out of the {@code CoreStatus} in-process port view instead of polling the
-   * (empty) head-side RRD.
+   * {@code JobQueueDepthMetricProducer.publishFromValues}: the status-view callback
+   * supplies the index component's {@code recent_docs_per_sec} array here, rather than
+   * querying or replicating samples into the gateway's RRD.
    */
   public void publishFromValues(double[] values) {
     if (values == null) return;

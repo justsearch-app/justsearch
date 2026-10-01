@@ -225,8 +225,8 @@ final class RuntimeSession implements AutoCloseable {
 
   /**
    * Tempdoc 406 Gap G: write-side drain flag. When true, {@link WritePathOps#guardWritable()}
-   * rejects new writes with ISE (the in-process port layer maps to UNAVAILABLE so callers retry on the
-   * upgraded holder reference). Set by {@link RunningRuntime#drainAndClose}.
+   * rejects new writes with {@link IllegalStateException}.
+   * Set by {@link RunningRuntime#drainAndClose}.
    */
   volatile boolean draining;
 

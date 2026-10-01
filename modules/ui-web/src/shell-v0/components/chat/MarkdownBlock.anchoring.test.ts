@@ -439,8 +439,8 @@ describe('847 T2b — the span guard (H4): a mark may not underline text it did 
     const spans = spansByKey(el).get(keyOf(s, 0)) ?? [];
     const text = spans.map((x) => x.textContent ?? '').join('');
     // The whole three-line sentence keeps its body: the run never leaves the one <p>.
-    expect(text).toContain('The Worker owns the Lucene index');
-    expect(text).toContain('process [1]');
+    expect(text).toContain('The index component owns Lucene');
+    expect(text).toContain('layer [1]');
     el.remove();
   });
 });

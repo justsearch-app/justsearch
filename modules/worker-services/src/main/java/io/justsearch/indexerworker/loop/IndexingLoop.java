@@ -1356,7 +1356,7 @@ public class IndexingLoop implements Closeable {
       externalCleanup.run();
 
       // Clear internal bookkeeping.
-      // JMM: these non-volatile fields are written here (port-call thread) and read by the new
+      // JMM: these non-volatile fields are written here by the caller and read by the new
       // loop thread created in start(). Thread.start() provides the happens-before guarantee
       // that makes all prior writes visible to the new thread. If start() is ever changed to
       // reuse an existing thread or executor, these fields must become volatile or be guarded.

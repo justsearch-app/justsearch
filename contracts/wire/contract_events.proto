@@ -13,12 +13,8 @@
 //   - reaction-outcome         (xDS-narrow; one-way observability emit
 //                               from consumers reporting reaction status)
 //
-// `contract-version-changed` is intentionally absent. Protobuf / protovalidate
-// additive-by-construction makes patch + minor wire bumps non-breaking
-// structurally; major bumps prohibited mid-session by slice 3a-1-8 Phase 6
-// rule. No consumer reaction is needed to a wire-version bump beyond "the
-// new validators apply to the next frame" (automatic). The wire-version
-// remains reported statically once per session via
+// `contract-version-changed` is absent from the four event variants below.
+// Wire versions are reported separately once per session via
 // serverCapabilities.contract_versions from the handshake (slice 3a-1-8
 // Phase 6 ship state).
 //

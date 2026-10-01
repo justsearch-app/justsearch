@@ -918,7 +918,7 @@ public record ResolvedConfig(
    *
    * <p>{@code maxBatchSize} / {@code maxQueueDepth} were removed by tempdoc 799 §N.2: both were
    * shadowed by {@code WorkerIngestService}'s hardcoded {@code MAX_BATCH_SIZE} / {@code
-   * MAX_QUEUE_DEPTH}, and in-process port batching is an internal transport concern rather than a user
+   * MAX_QUEUE_DEPTH}, and batch/queue bounds are internal operation limits rather than a user
    * preference. {@code maxContentLength} / {@code maxFileSize} are retained and wired — those are
    * genuine user-facing choices about which files to index.
    */

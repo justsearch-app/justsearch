@@ -310,7 +310,7 @@ class AnswerSegmentationTest {
               """
               The index component owns Lucene and the API gateway delegates every index read
               and write to it through ports, so no index handle ever exists in the API
-              process [1]. That boundary is enforced by an ArchUnit rule [2].
+              layer [1]. That boundary is enforced by an ArchUnit rule [2].
               """,
               List.of(
                   "The index component owns Lucene and the API gateway delegates every index read and"

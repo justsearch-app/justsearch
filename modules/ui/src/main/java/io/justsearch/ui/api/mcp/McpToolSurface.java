@@ -638,7 +638,7 @@ public final class McpToolSurface {
               // renders — RagContextOps never reads contextFormat off the wire, and ContextBudgeter
               // has no XML/PLAIN branch at all (it unconditionally emits "[n] label\n" +
               // content). Requesting XML here was a dead orphan (tempdoc 725 orphan #5): the param
-              // was serialized onto the gRPC request correctly, but nothing downstream consumed it,
+              // was carried in the request DTO, but nothing downstream consumed it,
               // so every caller has always received LABELED regardless of what it asked for.
               // Requesting the format that is actually delivered keeps this call site honest.
               RetrieveContextParams.ContextFormat.LABELED,
@@ -710,11 +710,12 @@ public final class McpToolSurface {
     // paths.
     //
     // Tempdoc 725 review fix: RemoteDocumentService.retrieveContextFallback (FULLTEXT_FALLBACK
-    // path, gRPC-failure catch) returns citations=List.of() with a non-blank context and
+    // path, port-call failure catch) returns citations=List.of() with a non-blank context and
     // populated sections()/docsUsed() — citations is a chunk-RAG-only concept the full-document
     // fallback never populates. Deriving N/M from citations().size() there always reads 0/0
     // above real evidence. When citations is empty but context is non-blank, derive counts from
     // ContextSection (sourceLabel/content/truncated/sectionIndex/chunkIndex) instead.
+    // C2-1: GRPC_FAILED remains the emitted fallback reason string for compatibility.
     long passages;
     long distinctDocs;
     if (result.citations().isEmpty() && !result.context().isBlank()) {

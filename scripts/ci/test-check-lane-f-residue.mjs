@@ -48,11 +48,33 @@ try {
   fs.mkdirSync(path.join(root, 'governance'));
   const allowlist = path.join(root, 'governance', 'lane-f-residue-allowlist.v1.json');
   const writeAllowlist = entries => fs.writeFileSync(allowlist, JSON.stringify({ version: 1, entries }));
-  const entry = { path: 'docs/*.md', term: 'heartbeat', category: 'c', reason: 'SSE stream liveness.' };
+  const entry = { path: 'docs/current.md', term: 'heartbeat', category: 'c', reason: 'SSE stream liveness.',
+    occurrenceCount: 1, anchors: ['heartbeat'] };
   const runChecker = () => spawnSync(process.execPath, [checker, '--root', root], { encoding: 'utf8' });
   fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\n');
   writeAllowlist([entry]);
   assert.equal(runChecker().status, 0, 'an allowlisted hit passes');
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\nheartbeat from another mechanism\n');
+  const appended = runChecker();
+  assert.equal(appended.status, 1, 'a new same-term line on an allowlisted path fails');
+  assert.match(appended.stdout, /UNANCHORED allowlist: docs\/current.md:2:/);
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat from another mechanism\n');
+  const replaced = runChecker();
+  assert.equal(replaced.status, 1, 'replacing reviewed text fails');
+  assert.match(replaced.stdout, /UNANCHORED allowlist:/);
+  assert.match(replaced.stdout, /STALE allowlist:/);
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'new preface\n\n  heartbeat  \n');
+  assert.equal(runChecker().status, 0, 'moving a matching line and changing indentation passes');
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\nheartbeat\n');
+  assert.equal(runChecker().status, 1, 'an extra identical occurrence still fails');
+  writeAllowlist([{ ...entry, occurrenceCount: 2, anchors: ['heartbeat', 'heartbeat'] }]);
+  assert.equal(runChecker().status, 0, 'reviewed duplicate occurrences pass');
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\n');
+  assert.match(runChecker().stdout, /matched 1\/2/, 'removing one reviewed duplicate is stale');
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat heartbeat\n');
+  writeAllowlist([{ ...entry, occurrenceCount: 2, anchors: ['heartbeat heartbeat', 'heartbeat heartbeat'] }]);
+  assert.equal(runChecker().status, 0, 'multiple term occurrences in one line are counted');
+  writeAllowlist([entry]);
   fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\nWorker process\n'); // lane F fixture
   const otherTerm = runChecker();
   assert.equal(otherTerm.status, 1, 'a different term on the same path still fails');
@@ -64,12 +86,33 @@ try {
   fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'Historical heartbeat\n');
   assert.equal(runChecker().status, 1, 'already-labelled history cannot keep an entry alive');
   fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\n');
-  writeAllowlist([{ ...entry, path: 'other/*.md' }]);
+  writeAllowlist([{ ...entry, path: 'other/current.md' }]);
   assert.equal(runChecker().status, 1, 'a nonmatching path fails');
   const scoped = spawnSync(process.execPath, [checker, '--root', root, '--paths', 'docs'], { encoding: 'utf8' });
   assert.equal(scoped.status, 1, 'a scoped scan still validates all allowlist entries');
   assert.match(scoped.stdout, /STALE allowlist:/);
-  for (const invalid of [ { ...entry, path: '**' }, { ...entry, path: '**/*.md' },
+  writeAllowlist([entry]);
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\nheartbeat from another mechanism\n');
+  const outOfScope = spawnSync(process.execPath, [checker, '--root', root, '--paths', 'other'], { encoding: 'utf8' });
+  assert.equal(outOfScope.status, 1, 'a scoped run cannot hide an unanchored occurrence');
+  assert.match(outOfScope.stdout, /UNANCHORED allowlist:/);
+  const bootstrapPath = 'modules/app-services/KnowledgeServerBootstrap.java';
+  fs.mkdirSync(path.join(root, 'modules', 'app-services'), { recursive: true });
+  const reviewedLine = '// Direct calls do not use a gRPC channel.'; // lane F fixture
+  const bootstrapEntry = { path: bootstrapPath, term: 'gRPC', category: 'd', // lane F fixture
+    reason: 'Negative transport guard.', occurrenceCount: 1, anchors: [reviewedLine] };
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\n');
+  fs.writeFileSync(path.join(root, bootstrapPath), reviewedLine + '\n');
+  writeAllowlist([entry, bootstrapEntry]);
+  assert.equal(runChecker().status, 0, 'a reviewed negative transport guard passes');
+  fs.appendFileSync(path.join(root, bootstrapPath), '// Search uses gRPC between the API and indexing JVMs.\n'); // lane F fixture
+  const reportedCounterexample = runChecker();
+  assert.equal(reportedCounterexample.status, 1, 'the reported transport counterexample fails');
+  assert.match(reportedCounterexample.stdout, /UNANCHORED allowlist: .*KnowledgeServerBootstrap.java:2:/);
+  for (const invalid of [ ...['**', '**/*.md', '*/**', 'docs/*.md', 'docs/?.md', 'docs/[a].md', 'docs/{a,b}.md']
+    .map(path => ({ ...entry, path })), { ...entry, occurrenceCount: 0 },
+    { ...entry, occurrenceCount: 2 }, { ...entry, anchors: [] }, { ...entry, anchors: [' heartbeat'] },
+    { ...entry, anchors: ['other text'] }, { ...entry, anchors: ['heartbeat\n'] },
     { ...entry, reason: '' }, { ...entry, category: 'b' }, { ...entry, term: 'unregistered-term' } ]) {
     assert.throws(() => validateAllowlist({ version: 1, entries: [invalid] }));
   }

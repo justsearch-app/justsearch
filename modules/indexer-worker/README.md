@@ -20,7 +20,7 @@ reintroduce them and do not reason from them:
 
 - **The worker child process and `WorkerSpawner`** (item A11).
 - **The gRPC server, its interceptors and the ephemeral port handoff** (item A9); then the rest of
-  in-process port — the `service` blocks, the infra-health service, and the `protoc-gen-grpc-java` generator
+  the gRPC protocol declarations — the `service` blocks, the infra-health service, and the `protoc-gen-grpc-java` generator
   (item A14). What survives of `indexing.proto` is its *message* half, used as DTOs at the ports.
 - **The memory-mapped signal bus** and both its ends (item A10).
 - **The suicide pact / heartbeat.** In one JVM there is no heartbeat to miss, so self-termination on

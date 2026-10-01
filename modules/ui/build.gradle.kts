@@ -972,12 +972,12 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
       // Module rationale:
       // - java.base: Core runtime (required)
       // - java.logging: SLF4J/Logback logging subsystem
-      // - java.naming: JNDI (used by some JDBC drivers, index service discovery)
+      // - java.naming: required by the Logback classic module (JNDI context support)
       // - java.net.http: HttpClient for AI pack downloads, health checks
       // - java.sql: SQLite job queue in Worker, JDBC drivers
       // - java.management: JMX ManagementFactory for heap/thread metrics
       // - jdk.management: com.sun.management.OperatingSystemMXBean for process metrics (JvmRuntimeGauges)
-      // - java.security.sasl: SASL authentication (in-process port, security providers)
+      // - java.security.sasl: required by the JDK java.naming module
       // - java.xml: XML parsing (config files, Tika metadata)
       // - java.desktop: AWT/Swing (image handling, clipboard in UI scenarios)
       // - jdk.httpserver: Lightweight HTTP server for local API
