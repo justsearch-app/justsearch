@@ -110,6 +110,22 @@ Read it only to resolve a specific uncertainty; the facts that still govern are 
   `codex/lane-f-e1` (worktree `.claude/worktrees/lane-f-e1`, Sol worker).
   E4 needs an owner-set soak duration before it runs.
 
+## Checkpoint 2026-10-01 (lane head `2babb36ce`, pushed to PR727)
+
+Integrated since the takeover and green together: D1-17 help source and its review fixes, settings callers,
+memory-aware in-place reconfigure (D1-4/12/14/16) with its review fixes, D1-8/D1-9 closure assertions and
+the Blue-lifetime production fix, WP2 2b/2c/2e, E1 instruments, G1 collector, stage F-1..F-5.
+Full integrated build and suite at `2babb36ce`: 1,879 suites, 12,482 tests, 0 failures, 0 errors, 33 existing
+skips (`tmp/lane-f-batch4-full-suite.log`, counts `tmp/lane-f-batch4-full-suite-counts.json`); 6 test tasks
+executed, 28 reused unchanged results. ui-web gates 27/27 at `860cf0fd0`. Earlier red runs and their XML are kept
+at `tmp/lane-f-batch2-full-suite-red-xml/` and `tmp/lane-f-batch3-red-xml/`. Independent reviews: batch 1-3 under
+`evidence/` (batch 3 left one SHOULD-FIX, fixed in `fcb99659f` line).
+
+Open before D1 closes: the installed standard-model round (in progress, groups of at most 30 minutes via
+`:modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=true`), D1-8f design gap (existing hooks cannot
+pause inside atomic acquisition; Flow A shares its encoder, so the pairing witness belongs to Flow B), D1-6
+grep and baseline-shrink receipts, D1-17 legacy teardown, the library-gap-decision ui-check, exact-SHA hosted CI.
+
 ## Re-plan (owner-authorized 2026-09-30)
 
 Supersedes the WP3 order in [continuation-brief.md](continuation-brief.md) for everything
