@@ -69,7 +69,8 @@ const names = Object.keys(phases);
 const roles = [...new Set(rows.map((row) => row.role))];
 const pairedSplit = process.argv.includes('--paired-split');
 const rootRole = roles.includes('head') && pairedSplit ? 'head' : 'engine';
-const allowedRoles = ['engine', 'llama-server', 'extraction-child', ...(pairedSplit ? ['head', 'worker'] : [])];
+// other-child: short-lived owned helpers in the E4 scoped sample (e4-rss-sampler.ps1).
+const allowedRoles = ['engine', 'llama-server', 'extraction-child', 'other-child', ...(pairedSplit ? ['head', 'worker'] : [])];
 if (!roles.includes(rootRole) || roles.some((role) => !allowedRoles.includes(role))) {
   throw new Error(`Invalid RSS role set: ${roles.join(',')}; expected engine with optional llama-server/extraction-child`);
 }

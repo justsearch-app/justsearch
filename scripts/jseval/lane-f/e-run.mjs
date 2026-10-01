@@ -127,9 +127,14 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
     ...(load ? ['--search-load', 'continuous', '--search-load-search-mode', mode, '--max-queries', '1'] : [])], pythonCwd);
   const samplers = label => [
     cmd(`rss-${label}`, 'powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
-      path.join(tools, 'head-rss-sampler.ps1'), '-Out', path.join(raw, label, 'head-rss.csv'),
-      '-Stop', path.join(raw, label, 'rss.stop'), '-IncludeSplitWorker',
-      ...(group === 'e4-memory-soak' ? ['-Scope', path.join(raw, label, 'process-scope.json'), '-Arm', arm] : [])], tree, { mode: 'background' }),
+      // E4 samples its owned-process scope with e4-rss-sampler.ps1, which tolerates a short-lived
+      // non-JVM child exiting between scope and tick; head-rss-sampler.ps1 stays byte-identical
+      // because it is part of E2's measured identity (2026-10-01).
+      ...(group === 'e4-memory-soak'
+        ? [path.join(tools, 'e4-rss-sampler.ps1'), '-Out', path.join(raw, label, 'head-rss.csv'),
+          '-Stop', path.join(raw, label, 'rss.stop'), '-Scope', path.join(raw, label, 'process-scope.json'), '-Arm', arm]
+        : [path.join(tools, 'head-rss-sampler.ps1'), '-Out', path.join(raw, label, 'head-rss.csv'),
+          '-Stop', path.join(raw, label, 'rss.stop'), '-IncludeSplitWorker'])], tree, { mode: 'background' }),
     cmd(`status-${label}`, 'bash', [path.join(tools, 'status-sampler.sh'), path.join(raw, label),
       '33221', path.join(raw, label, 'status.stop')], tree, { mode: 'background' }),
   ];
