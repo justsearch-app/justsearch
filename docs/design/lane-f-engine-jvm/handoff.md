@@ -121,9 +121,9 @@ executed, 28 reused unchanged results. ui-web gates 27/27 at `860cf0fd0`. Earlie
 at `tmp/lane-f-batch2-full-suite-red-xml/` and `tmp/lane-f-batch3-red-xml/`. Independent reviews: batch 1-3 under
 `evidence/` (batch 3 left one SHOULD-FIX, fixed in `fcb99659f` line).
 
+D1-8f: satisfied structurally ([disposition](evidence/D1/d1-8f-disposition-2026-10-01.md)).
 Open before D1 closes: the installed standard-model round (in progress, groups of at most 30 minutes via
-`:modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=true`), D1-8f design gap (existing hooks cannot
-pause inside atomic acquisition; Flow A shares its encoder, so the pairing witness belongs to Flow B), D1-6
+`:modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=true`), D1-6
 grep and baseline-shrink receipts, D1-17 legacy teardown, the library-gap-decision ui-check, exact-SHA hosted CI.
 
 ## Re-plan (owner-authorized 2026-09-30)
