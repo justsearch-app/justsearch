@@ -199,8 +199,13 @@ const env = {
   CI: '',
 };
 if (queryReconfigureMode) {
-  const sourceReranker = path.join(findRetainedModelsRoot(), 'onnx', 'reranker');
-  env.JUSTSEARCH_QUERY_RECONFIGURE_A = sourceReranker;
+  // Keep A on model discovery; an operator model-path override masks settings reconfigure.
+  env.JUSTSEARCH_MODELS_DIR = findRetainedModelsRoot();
+  delete env.JUSTSEARCH_RERANK_MODEL_PATH;
+  delete env.JUSTSEARCH_QUERY_RECONFIGURE_A;
+  env.JUSTSEARCH_GPU_ENABLED = 'true';
+  env.JUSTSEARCH_WORKER_DEADLINE_MS = '180000';
+  env.JUSTSEARCH_RERANK_MIN_HITS = '5';
   env.JUSTSEARCH_RERANK_ENABLED = 'true';
   env.JUSTSEARCH_RERANK_GPU_ENABLED = 'true';
   env.JUSTSEARCH_RERANK_GPU_MEM_MB = '1024';
@@ -213,7 +218,7 @@ if (queryReconfigureMode) {
   fs.mkdirSync(corpus, { recursive: true });
   for (let i = 0; i < 6; i++) {
     fs.writeFileSync(path.join(corpus, `rerank-${i}.txt`),
-      `query reconfigure availability candidate ${i} preserves ordinary search continuity`);
+      `query reconfigure availability candidate ${i} preserves ordinary search continuity; query reconfigure held lease`);
   }
   fs.mkdirSync(data, { recursive: true });
   fs.writeFileSync(path.join(data, 'watched_roots.json'), JSON.stringify({
@@ -221,6 +226,8 @@ if (queryReconfigureMode) {
   }));
   if (queryReconfigureMode === 'IN_PLACE') {
     env.JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB = '1';
+  } else {
+    delete env.JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB;
   }
 }
 delete env.JUSTSEARCH_OPERATION_FAULT_KEY;
@@ -722,7 +729,8 @@ try {
   } else if (queryReconfigureMode) {
     await exerciseQueryReconfigure({ mode: queryReconfigureMode, work, data, indexBase,
       modelsRoot: findRetainedModelsRoot(), apiPort, manifest, first, readJson, waitFor,
-      request, post, requireThat, createOperationKey, operationKey });
+      request, post, requireThat, requireOperationSuccess, jobStateFor,
+      createOperationKey, operationKey });
   } else if (queryRoleScenario) {
     await exerciseQueryRoleScenario({ scenario, work, data,
       modelsRoot: findRetainedModelsRoot(), apiPort, manifest, first, readJson,
