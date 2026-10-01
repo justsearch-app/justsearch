@@ -164,6 +164,26 @@ is a new run, not an amendment.
 
 ### Root driver (2026-10-01)
 
+2026-10-01 identity correction: `pairIdentity` now hashes the normalized acquisition
+plan, the executed/imported measurement-instrument bytes, corpus, machine,
+workload, heap and collector; scoring-only `e-run.mjs` edits, tests and unrelated
+instruments no longer invalidate a capture. `pairIdentityInputs` records the
+normalized plan and named file hashes. Startup/readiness acquisition lives in
+`e-start-ready.mjs`; in-process memory/fault acquisition stays in `e456-live.mjs`.
+Dependency inventory follows local JS/TS imports and Python imports (including
+function-local imports conservatively), with CLI registration derived from its
+own catalog. Scoring-only analysis commands retain their plan entries but their
+bytes are excluded. Arm paths/IDs, the split Worker environment, target selectors
+and scoring dispositions normalize away; common launch settings and workload
+parameters remain pinned. The arm's dev-runner is the subject launcher, analogous
+to its built application; its implementation may differ by arm, while its command
+and launch parameters remain in the normalized plan. Historical identities are
+retained unchanged by reprojection; this v2 identity applies to new acquisitions.
+E4 aggregates the identities of corresponding window slots across arms, preserving
+the distinct 55/55/10-minute acquisition plans.
+Local proof: the pair-identity Node tests compare all five groups on both arms,
+refute scoring/test/unrelated-file invalidation and detect instrument/argument changes.
+
 `scripts/jseval/lane-f/e-run.mjs` is the dependency-free Node driver. Run it
 from the driver worktree after root's `quick_health`/shared-lease preflight.
 It uses the already-built distributions in `lane-f-pr1-verify` (BRANCH) and
@@ -248,9 +268,9 @@ original metrics/clauses in `measuredProjection`, then writes new scores with
 `reprojectedAt`, driver hash, projection values hash and raw-input hashes. It does
 not refit E0 or amend values.json; run `e0-values` explicitly after both MAIN
 records are re-scored. It reads values.json beside the record's owning group,
-or from an explicit `--repo-root`. The table compares recorded machine, launch
-pins, workload/query order and window protocol plus projection driver hash across
-re-scored MAIN and new BRANCH records; original acquisition hashes remain retained.
+or from an explicit `--repo-root`. The table compares immutable acquisition pair
+identities across MAIN and BRANCH; reprojection never changes that identity or
+its explanatory inputs.
 
 Budget: 2,700 seconds per invocation (45 minutes), below the 3,540-second outer
 limit; reserve 60 seconds preamble, 780 startup/readiness, 1,500 corpus submission

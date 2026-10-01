@@ -13,6 +13,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { gcLogOption, hangPolicy, splitGap } from './e456-instruments.mjs';
+import { startOwned, verifySharedModels as checkSharedModels } from './e-start-ready.mjs';
+import { measurementIdentity } from './e-pair-identity.mjs';
 import { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies } from './e456-live.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -66,14 +68,7 @@ export function checkFixturePins(root = ROOT, revision = MAIN_REVISION, git = ar
     recordedBuildStamp: stamp, currentBuildStamp, stampFile, sameBuildAndPins, pins,
     recordedChatProfile: first.chatProfile, captures: captures.map(({ file, sha256 }) => ({ file, sha256 })) };
 }
-export function verifySharedModels(config) {
-  const models = config.keys?.find(entry => entry.key === 'justsearch.models.dir')?.value;
-  const sharedModels = path.resolve(ARMS.main, '../../../models');
-  if (typeof models !== 'string' || path.resolve(models).toLowerCase() !== sharedModels.toLowerCase()) {
-    throw new Error(`Shared models required: effective justsearch.models.dir=${models}, expected ${sharedModels}`);
-  }
-  return models;
-}
+export const verifySharedModels = config => checkSharedModels(config, path.resolve(ARMS.main, '../../../models'));
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (![...GROUPS, 'e0-values', 'e4-hang-values', 'table', 'reproject'].includes(command)) throw new Error('Unknown subcommand');
@@ -175,7 +170,7 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
     '--stop-file', path.join(raw, label, 'admission.stop')], tree, { mode: 'background' });
   const probe = label => cmd(`encoder-${label}`, 'bash', [path.join(tools, 'encoder-latency-probe.sh'),
     path.join(raw, label, 'encoder'), '3', '33221'], root);
-  const analyze = label => cmd(`analyze-${label}`, 'node', [path.join(tools, 'analyze-head-run.cjs'), path.join(raw, label), '--paired-split'], root);
+  const analyze = label => cmd(`analyze-${label}`, 'node', [path.join(tools, 'analyze-head-run.cjs'), path.join(raw, label), '--paired-split'], root, { identityRole: 'scoring' });
   const endSamples = label => ({ label: `end-samples-${label}`, mode: 'end-samples', directory: path.join(raw, label) });
   const instruments = label => ({ label: `instruments-${label}`, mode: 'instruments-start', directory: path.join(raw, label),
     arm, target: arm === 'main' ? 'Head + Worker under Head WorkerSpawner' : 'Engine under dev-runner supervisor',
@@ -198,7 +193,7 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
     fixtureDecision ??= checkFixturePins(root);
     commands = [start('quality'), evalRun('quality'), stop('quality'),
       cmd('relevance', 'python', ['-m', 'jseval', 'relevance-gate', '--dataset', 'beir/scifact',
-        '--data-dir', path.join(raw, 'quality'), '--report-out', path.join(raw, 'relevance-gate.json')], pythonCwd)];
+        '--data-dir', path.join(raw, 'quality'), '--report-out', path.join(raw, 'relevance-gate.json')], pythonCwd, { identityRole: 'scoring' })];
     const fixtureProfile = fixtureDecision.decision === 'reuse' ? fixtureDecision.recordedChatProfile : 'standard';
     const fixtureEnv = { ...env, JUSTSEARCH_CHAT_PROFILE: fixtureProfile,
       JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH: 'true', JUSTSEARCH_LLM_SLOTS: '1',
@@ -381,15 +376,6 @@ export function compareStageRates(stages, splitStages) {
   return { comparisons, check: checks.includes(false) ? false : checks.length && checks.every(c => c === true) ? true : undefined };
 }
 export function projectLoad(record, load, calls, values) {
-  // Projection changes do not retroactively change acquisition provenance. Compare the
-  // recorded machine, launch pins and traffic protocol across re-scored and new records.
-  const launch = record.commands?.find(c => c.mode === 'start')?.env ?? {};
-  const keys = ['JUSTSEARCH_HEAD_HEAP', 'UI_OPTS', 'JAVA_OPTS', 'JUSTSEARCH_CHAT_PROFILE'];
-  record.loadComparisonIdentity = hash(JSON.stringify({ machine: record.machine,
-    launch: Object.fromEntries(keys.map(k => [k, launch[k]])), workload: record.workload,
-    blockSeconds: load.blockSeconds, durationSeconds: load.durationSeconds, modes: load.modes,
-    concurrency: load.concurrency, queryPoolHash: load.queryPoolHash }));
-  record.projectionDriverHash = hash(fs.readFileSync(fileURLToPath(import.meta.url)));
   const valid = windowValidity(load);
   record.clauses['indexing-window-valid'] = valid;
   if (valid !== true) record.gaps['indexing-window-valid'] = valid === false
@@ -444,10 +430,6 @@ export function mergeLoadRecords(workloads) {
   merged.id = present.map(r => r.id).join(', ');
   merged.workloadRecords = present.map(r => r.recordFile);
   merged.pairIdentity = hash(JSON.stringify(list.map(r => r?.pairIdentity)));
-  merged.loadComparisonIdentity = list.every(r => r?.loadComparisonIdentity)
-    ? hash(JSON.stringify(list.map(r => r.loadComparisonIdentity))) : undefined;
-  merged.projectionDriverHash = list.every(r => r?.projectionDriverHash === present[0].projectionDriverHash)
-    ? present[0].projectionDriverHash : undefined;
   merged.metrics = { searchP95: {}, searchP95ByWorkload: {}, chunksByWorkload: {}, queryPoolByWorkload: {}, stagesByWorkload: {} };
   for (const r of present) {
     merged.metrics.stagesByWorkload[r.workload] = r.metrics.stageRates;
@@ -487,11 +469,7 @@ export function tableVerdicts(records, values) {
           if (arms[0].workloadRecords || arms[1].workloadRecords) checks.push(m && b ? m === b : undefined);
         }
       }
-      const loadPair = group === 'E2' || group === 'E3';
-      checks.push(loadPair && arms.every(r => r.loadComparisonIdentity)
-        ? arms[0].loadComparisonIdentity === arms[1].loadComparisonIdentity
-          && Boolean(arms[0].projectionDriverHash) && arms[0].projectionDriverHash === arms[1].projectionDriverHash
-        : arms[0].pairIdentity === arms[1].pairIdentity, arms[0].valuesHash === arms[1].valuesHash);
+      checks.push(arms[0].pairIdentity === arms[1].pairIdentity, arms[0].valuesHash === arms[1].valuesHash);
     }
     const disposition = arms[0]?.dispositions?.[clause];
     const result = verdict(disposition?.status === 'unmeasurable-on-split' ? [...checks, undefined] : checks);
@@ -572,6 +550,11 @@ export function latestRecords(root) {
     const merged = structuredClone(list.at(-1));
     merged.id = list.map(r => r.id).join(', ');
     merged.windowRecords = list.map(r => r.recordFile);
+    // Each slot has its own acquisition plan (55/55/10 minutes). Compare the same
+    // slots across arms, rather than requiring unlike durations to share an identity.
+    merged.pairIdentityInputs = { kind: 'lane-f-e4-window-identities.v1', windows: Object.fromEntries(
+      ['1', '2', '3'].map(w => [w, windows[arm][w]?.pairIdentity ?? null])) };
+    merged.pairIdentity = hash(JSON.stringify(merged.pairIdentityInputs));
     merged.metrics.peakCommitMB = list.every(r => finite(r.metrics.peakCommitMB))
       ? Math.max(...list.map(r => r.metrics.peakCommitMB)) : undefined;
     for (const clause of CLAUSES.E4) {
@@ -582,7 +565,7 @@ export function latestRecords(root) {
     merged.metrics.worstPauseMs = list.every(r => finite(r.metrics.worstPauseMs)) ? Math.max(...list.map(r => r.metrics.worstPauseMs)) : undefined;
     const durationChecks = ['1', '2', '3'].map(w => windows[arm][w]?.clauses['window-duration']);
     durationChecks.push(list.every(r => r.valuesHash === merged.valuesHash
-      && r.pairIdentity === merged.pairIdentity && r.revision === merged.revision));
+      && r.revision === merged.revision));
     merged.clauses['owner-duration'] = durationChecks.includes(false) ? false
       : durationChecks.every(c => c === true) ? true : undefined;
     if (list.some(r => r.failure)) merged.failure = list.filter(r => r.failure).map(r => r.failure).join('; ');
@@ -664,61 +647,6 @@ function execute(command, context) {
   }, Math.max(1, Math.min(context.deadline - Date.now(), (command.budgetSeconds ?? 3540) * 1000)));
   complete.finally(() => clearTimeout(timer));
   return { child, complete, stdout: () => stdout, expired: () => expired };
-}
-
-async function api(context, endpoint) {
-  const url = `http://127.0.0.1:33221${endpoint}`;
-  const response = await fetch(url, { headers: { Host: '127.0.0.1:33221' }, signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw new Error(`${endpoint}: HTTP ${response.status}`);
-  const body = await response.json();
-  const rawFile = endpoint === '/api/mcp/token' ? undefined
-    : path.join(context.raw, `${context.sequence++}-${endpoint.replaceAll('/', '_')}.json`);
-  context.record.commands.push({ label: endpoint, method: 'GET', url, headers: { Host: '127.0.0.1:33221' },
-    status: response.status, observedAt: new Date().toISOString(), rawFile, tokenResponseRetained: false });
-  if (rawFile) write(rawFile, body);
-  return body;
-}
-async function startOwned(command, context, bindings) {
-  const proc = execute(command, context);
-  const receipt = await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Start receipt deadline')), 180000);
-    proc.child.stdout.on('data', () => {
-      for (const line of proc.stdout().split(/\r?\n/)) {
-        let value; try { value = JSON.parse(line); } catch { continue; }
-        if (value.runId && value.ok !== false) { clearTimeout(timer); resolve(value); }
-        else if (value.ok === false) { clearTimeout(timer); reject(new Error(JSON.stringify(value.error))); }
-      }
-    });
-    proc.complete.then(({ code }) => { clearTimeout(timer); reject(new Error(`Start exited ${code} before receipt`)); });
-  });
-  bindings.runId = receipt.runId;
-  context.owned = { command, proc, runId: receipt.runId };
-  context.dataDir = command.args[command.args.indexOf('--data-dir') + 1];
-  context.tree = command.cwd;
-  context.record.runIds.push(receipt.runId);
-  write(path.join(context.raw, `${command.label}-receipt.json`), receipt);
-  // A dev-mode stack (main's split arm) does not enforce the per-boot token and hands out none;
-  // proceed without it there. Any mutation the server does guard still fails loudly on the wire.
-  context.token = (await api(context, '/api/mcp/token')).token ?? null;
-  context.record.tokenEnforced = Boolean(context.token);
-  // /api/health answers 503 until the index is ready; wait for readiness, bounded.
-  const readyBy = Date.now() + 300000;
-  for (;;) {
-    try { await api(context, '/api/health'); break; } catch (error) {
-      if (!/HTTP 503/.test(String(error.message)) || Date.now() > readyBy) throw error;
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-  }
-  await api(context, '/api/debug/state');
-  context.manifest = await api(context, '/api/runtime/manifest');
-  const config = await api(context, '/api/debug/effective-config');
-  context.record.sharedModels = verifySharedModels(config);
-  const ready = await execute({ label: `capability-ready-${command.label}`, executable: 'python',
-    args: [path.join(ROOT, 'scripts/jseval/lane-f/capability-ready.py'),
-      '--base-url', 'http://127.0.0.1:33221', '--timeout', '300',
-      '--output', path.join(context.raw, `${command.label}-capability-ready.json`)],
-    cwd: command.cwd, env: command.env }, context).complete;
-  if (ready.code !== 0) throw new Error(`Capability readiness failed for ${command.label}; see ${ready.receipt.stderrFile}`);
 }
 
 function collect(context) {
@@ -900,20 +828,17 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   const groups = { 'e1-quality': ['E1'], 'e2-e3-load': ['E2', 'E3'], 'e4-memory-soak': ['E4'], 'e5-crash': ['E5'], 'e6-hang': ['E6'] }[options.command];
   const machine = { hostname: os.hostname(), platform: os.platform(), release: os.release(), arch: os.arch(),
     cpu: os.cpus().map(c => c.model), ramBytes: os.totalmem(), node: process.version };
-  const instrumentFiles = filesUnder(path.join(ROOT, 'scripts/jseval/lane-f')).filter(f => !/\.(pyc|log)$/.test(f));
-  const driverFiles = ['scripts/jseval/lane-f/e-run.mjs', 'scripts/jseval/lane-f/capability-ready.py',
-    'scripts/jseval/jseval/bulk_load.py',
-    'scripts/supervisor-conformance/jdwp-fault.mjs', 'scripts/supervisor-conformance/verified-crash.mjs']
-    .map(file => path.join(ROOT, file));
-  const corpusFiles = ['docs/explanation', 'docs/reference'].flatMap(dir => filesUnder(path.join(ARMS.main, dir)));
-  const pairIdentity = hash(JSON.stringify({ machine, instruments: instrumentFiles.map(f => [path.relative(ROOT, f), hash(fs.readFileSync(f))]),
-    driver: driverFiles.map(f => [path.basename(f), hash(fs.readFileSync(f))]),
-    corpus: corpusFiles.map(f => [path.relative(ARMS.main, f), hash(fs.readFileSync(f))]),
-    workload: options.workload ?? options.command, heap: values.heap, collector: values.collector }));
+  const corpusFiles = ['docs/explanation', 'docs/reference'].flatMap(dir => filesUnder(path.join(ARMS.main, dir))).sort();
+  const { pairIdentity, pairIdentityInputs } = measurementIdentity(plan, {
+    sourceRoot: ROOT, outputRoot: root, armTree: options.armTree ? path.resolve(options.armTree) : ARMS[options.arm],
+    arm: options.arm, group: options.command, raw, invocation: id, session: `lane-f-e-${id}`,
+    machine, corpus: corpusFiles.map(f => [path.relative(ARMS.main, f), hash(fs.readFileSync(f))]),
+    workload: options.workload ?? options.command, heap: values.heap, collector: values.collector,
+  });
   const destination = path.join(root, EVIDENCE, options.command, options.arm);
   const recordFile = path.join(destination, `${id}.json`);
   const record = { kind: 'lane-f-e-run.v1', id, groups, arm: options.arm, window: options.window, workload: options.workload,
-    startedAt: new Date().toISOString(), machine, pairIdentity, valuesHash: hash(fs.readFileSync(valuesFile)),
+    startedAt: new Date().toISOString(), machine, pairIdentity, pairIdentityInputs, valuesHash: hash(fs.readFileSync(valuesFile)),
     recordFile, raw, runIds: [], commands: [], metrics: {}, clauses: {}, gaps: {},
     fixtureDecision,
     additionalArtifacts: [] };
@@ -960,7 +885,7 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
       }
       for (const arg of command.args.filter(a => /\.(csv|tsv|json)$/.test(a) && a.startsWith(raw))) fs.mkdirSync(path.dirname(arg), { recursive: true });
       if (command.mode === 'start') {
-        await startOwned(command, context, bindings);
+        await startOwned(command, context, bindings, execute, path.resolve(ARMS.main, '../../../models'));
         continue;
       }
       if (command.mode === 'background') {
