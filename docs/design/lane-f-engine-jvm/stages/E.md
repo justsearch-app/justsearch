@@ -4,7 +4,7 @@ stage: E
 created: 2026-09-09
 base: be47faa40
 status: "runbook, written during stage C planning; instruments and values re-verified at stage start (17.6)"
-updated: 2026-09-27
+updated: 2026-10-01
 ---
 
 # Lane F stage E — gate run: runbook
@@ -87,6 +87,20 @@ recovery exercise remains E7, with §16's artifact disposition.
 
 ### 0.1 Corrections found while running (appended per run)
 
+- **2026-10-01, E2/E3 main `2026-10-01T06-33-01-961Z-ddc6c6d3`:** the first
+  full-enrichment eval exhausted the 3,540-second invocation limit before the
+  four-cell plan could finish. It also failed the intended during-bulk-indexing
+  comparison. Section 2 now replaces those four restarts with one fixed window
+  per workload, using jseval's existing ingestion/search/status owners rather
+  than a new persistent controller. E0 and the table require both workload
+  records, with completed chunk embeddings measured only over the load window.
+  Local proof: `node --check` on the four changed JavaScript files;
+  `node --test scripts/jseval/lane-f/e-run.test.mjs scripts/jseval/lane-f/test/e1-instruments.test.mjs scripts/jseval/lane-f/e456-instruments.test.mjs`
+  (68 tests); from `scripts/jseval`,
+  `python -m unittest discover -s tests -p test_bulk_load.py` (2 tests).
+  These are fake-wire/local harness checks; root's two workload invocations per
+  arm and the resulting E0/table measurements remain required.
+
 - **2026-10-01, E1 main `2026-10-01T06-25-28-289Z-f159494e`:** the unconditional
   fixture capture ignored E0.2 and then refused main's legacy ingest response
   (`accepted=92`, empty `error`, nonempty `scanId`). The pin check now reads
@@ -156,10 +170,12 @@ profile. SciFact keeps its standard profile and shared materialization.
 ```powershell
 node scripts/jseval/lane-f/e-run.mjs e1-quality --arm main --dry-run
 node scripts/jseval/lane-f/e-run.mjs e1-quality --arm main
-node scripts/jseval/lane-f/e-run.mjs e2-e3-load --arm main
+node scripts/jseval/lane-f/e-run.mjs e2-e3-load --arm main --workload agent-idle
+node scripts/jseval/lane-f/e-run.mjs e2-e3-load --arm main --workload scripted-agent
 node scripts/jseval/lane-f/e-run.mjs e0-values --arm main
 node scripts/jseval/lane-f/e-run.mjs e1-quality --arm branch
-node scripts/jseval/lane-f/e-run.mjs e2-e3-load --arm branch
+node scripts/jseval/lane-f/e-run.mjs e2-e3-load --arm branch --workload agent-idle
+node scripts/jseval/lane-f/e-run.mjs e2-e3-load --arm branch --workload scripted-agent
 # Run each following invocation separately for --arm main and --arm branch:
 node scripts/jseval/lane-f/e-run.mjs e4-memory-soak --arm main --window 1
 node scripts/jseval/lane-f/e-run.mjs e4-memory-soak --arm main --window 2
@@ -168,6 +184,45 @@ node scripts/jseval/lane-f/e-run.mjs e5-crash --arm main
 node scripts/jseval/lane-f/e-run.mjs e6-hang --arm main
 node scripts/jseval/lane-f/e-run.mjs table
 ```
+
+E2/E3 requires `--workload agent-idle|scripted-agent`: two invocations per arm,
+each with one fresh data directory and one capability-ready stack. The driver runs
+`python -m jseval.bulk_load` from its source tree. It materializes SciFact through
+jseval, submits the watched root without an enrichment wait, bounds watcher startup
+to 60 seconds, then runs hybrid for 600 seconds followed by lexical for 600 seconds.
+Both arms use the same query pool/order, restarting at query zero per mode, with
+one search request in flight. The scripted workload runs admission-loop throughout
+that same window. An explicit block/end-of-window cancellation is recorded as censored;
+it contributes no admitted latency. Request timeouts and 5xx remain failures.
+
+The `/api/status` sampler records raw snapshots every five seconds plus both
+window boundaries, including documents and `chunkEmbeddingCompletedCount`. Boundary snapshots retain
+actual observation timestamps; observations beyond six seconds from a boundary
+cannot validate the window.
+Chunks/s is the completed-embedding delta divided by the fixed 1,200-second
+foreground window, excluding startup, probe and shutdown. Every sample must show
+bulk indexing/enrichment still active; early completion on either arm invalidates
+the window. Missing/stale/gapped counters cannot pass. RSS covers the foreground
+phase; the retained encoder probe follows the window and is supplemental, not part
+of the E2/E3 population. The analyzer reports the fixed-window metrics.
+
+Budget: 2,700 seconds per invocation (45 minutes), below the 3,540-second outer
+limit; reserve 60 seconds preamble, 780 startup/readiness, 1,500 corpus submission
+and load, 120 probe, 30 analysis, 60 stop and 150 slack. Cleanup has up to 30
+additional seconds after a deadline. No enrichment-completion wait occurs.
+
+E0 requires both valid MAIN workload records. It freezes per-workload/per-mode
+search ceilings at MAIN p95 ? 1.10, scripted admission API p95 ? 1.10, and each
+workload's completed chunks/s ? 0.90. The table combines both records per arm,
+links all four source records, checks their query-pool identities and frozen values,
+and cannot pass with one workload absent. `--dry-run` displays the bounded plan
+and budget without starting anything.
+
+PR 0's `search-load-during-enrich.csv` was produced by `head-flag-run.sh`'s
+`search_load 60` immediately after ingest and before `wait_pipeline_complete`,
+not by a jseval run option. The existing jseval `run --search-load continuous`
+also starts traffic before `prepare_corpus`, but waits for enrichment before
+returning; that unbounded completion dependency is superseded here.
 
 Every subcommand accepts `--repo-root <path>` to resolve instruments, jseval,
 values, corpus cache and output evidence in that checkout while executing the
