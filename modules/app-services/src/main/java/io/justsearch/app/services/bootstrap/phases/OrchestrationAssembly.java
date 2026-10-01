@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
  * Tempdoc 519 §10 final-push: extracted from {@code HeadAssembly.buildOrchestrationHandles}
  * (~70 LOC of LIFO-teardown lambda assembly). The bootstrap now calls
  * {@link #build} with the relevant collaborators; this static helper owns the lambda
- * wrapping (thread interrupt+join, gRPC shutdown+awaitTermination, listener
+ * wrapping (thread interrupt+join, listener
  * removal coupled to manager close, etc.).
  *
  * <p>All parameters may be null; {@link OrchestrationHandles} records null fields for

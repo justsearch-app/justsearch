@@ -44,7 +44,7 @@ import java.lang.annotation.Target;
  *
  * <p>Located in the dep-free {@code modules/core-contracts} module since
  * tempdoc 400 §22 Issue A: previous home {@code modules/ipc-common} pulled in
- * gRPC which made the annotations unreachable from {@code modules/ort-common},
+ * the retired gRPC dependency which made the annotations unreachable from {@code modules/ort-common},
  * {@code modules/worker-core}, and {@code modules/app-launcher} test sources.
  */
 @Retention(RetentionPolicy.RUNTIME)

@@ -24,7 +24,7 @@ class IndexWriterOwnershipTest {
    */
   private static final String[] LUCENE_OWNER_PACKAGES = {
     "io.justsearch.adapters.lucene..", // Primary Lucene adapter (index read/write)
-    "io.justsearch.indexerworker..", // Worker process owns Lucene lifecycle
+    "io.justsearch.indexerworker..", // index component owns Lucene lifecycle
   };
 
   private static final DescribedPredicate<JavaConstructorCall> TARGETS_INDEX_WRITER =
@@ -63,7 +63,7 @@ class IndexWriterOwnershipTest {
           .as("only adapters-lucene and indexer-worker may depend on Lucene classes")
           .because(
               "Lucene is an implementation detail of the index layer; "
-                  + "non-owner modules must use gRPC or service abstractions");
+                  + "non-owner modules must use in-process port or service abstractions");
 
   @Test
   void luceneOwnerAllowlistSizeIsControlled() {

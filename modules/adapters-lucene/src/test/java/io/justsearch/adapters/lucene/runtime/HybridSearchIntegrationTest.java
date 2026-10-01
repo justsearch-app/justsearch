@@ -403,7 +403,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
   /**
    * Tempdoc 821 §P: the HYBRID entry points must forward the caller's syntax to their text leg.
    *
-   * <p>This is the headline production path and the one the gRPC-level tests cannot reach (with no
+   * <p>This is the headline production path and the one the in-process port-level tests cannot reach (with no
    * embedding service every request degrades to {@code Bm25Only}), so hardcoding SIMPLE at
    * {@code HybridSearchOps}' two text-leg lambdas would pass the whole suite otherwise.
    *

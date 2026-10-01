@@ -211,7 +211,7 @@ class IndexerWorkerGuardrailsTest {
   // was considered but dropped. Peer classes outside the search-execution
   // scope (CitationMatchOps for citation embeddings; WorkerHealthService for
   // readiness probes; RagContextOps for RAG embeddings; WorkerSearchService for
-  // gRPC-level wiring) legitimately depend on EmbeddingProvider/SPLADE/BGE-M3
+  // in-process port-level wiring) legitimately depend on EmbeddingProvider/SPLADE/BGE-M3
   // for their own concerns. The narrower rules above (planner / responder no IO)
   // enforce what tempdoc 517's design actually requires — namely that the
   // captured-once invariant holds for SearchInputs consumers — without

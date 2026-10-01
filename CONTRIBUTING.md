@@ -68,7 +68,7 @@ package the desktop application for Linux, mount models, or require a GPU.
 - A JVM to launch the Gradle wrapper. The checked-in Daemon JVM criteria selects and, when necessary,
   auto-provisions Temurin JDK 25 for the build, independent of the wrapper client's ambient Java. Keeping
   `JAVA_HOME` and `PATH` on JDK 25 is still recommended so direct `java`/`javac` use and non-Gradle tooling
-  agree; the dev-runner also resolves a suitable JDK explicitly for the Head and Worker processes.
+  agree; the dev-runner also resolves a suitable JDK explicitly for the Engine JVM.
 - Node.js 20+ (for the `modules/ui-web` frontend) — `scripts/setup/bootstrap-node-win.ps1` can install it for you
 - Python 3.13+ for the repository's Python-backed checks and evaluation tooling
 - Rust stable only when working on the optional Tauri shell under `modules/shell`; its absence does

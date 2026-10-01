@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Per tempdoc 430 §A.10 Phase 6 (rev 3.7 spec) + §B.T (rev-3.6 §B.S patterns
  * applied upfront): the tap reads compatibility / queue-db / failure fields directly
- * from the gRPC-projected worker view the head already receives. Two emission modes:
+ * from the port-projected worker view the head already receives. Two emission modes:
  *
  * <ul>
  *   <li><strong>Conditions</strong> via {@link ConditionStore} + {@code CONDITION_*}
@@ -308,7 +308,7 @@ public final class WorkerSnapshotTap {
    *
    * @param view the worker's current operational view (may be a fallback view if the
    *     worker is unavailable)
-   * @param stale {@code true} when the head failed to refresh the view via gRPC
+   * @param stale {@code true} when the head failed to refresh the view via an in-process port
    *     (cached or fallback view); {@code false} when the view reflects a successful
    *     RPC. Sourced from {@code StatusLifecycleHandler.workerRpcStale}.
    */

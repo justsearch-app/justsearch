@@ -17,7 +17,7 @@
  *     subject="WorkerHandshake"
  *     reason="WorkerOffline"
  *     i18nKey="health.workerHandshake.offline"
- *     details="Worker process did not respond within 5s."
+ *     details="index component did not respond within 5s."
  *   ></jf-status-card>
  */
 

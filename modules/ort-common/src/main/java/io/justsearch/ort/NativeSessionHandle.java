@@ -48,11 +48,9 @@ import org.slf4j.LoggerFactory;
  */
 // Tempdoc 400 LR6-b: this class is covered by an invariant chain (single-
 // construction via package-private Builder + assembler callpath, §14.27 /
-// §14.28 U1) but ort-common does not depend on ipc-common (which owns the
-// @BuildContract annotation), so we document the invariant here in a
-// comment rather than as an annotation. Moving the annotation classes to a
-// truly foundational module (or adding ipc-common to ort-common — rejected
-// because ipc-common pulls gRPC) is deferred.
+// §14.28 U1). This class documents that invariant without an annotation.
+// @BuildContract now lives in core-contracts, which ort-common already
+// has as a compile-only dependency; no ipc-common dependency is needed.
 public final class NativeSessionHandle implements SessionHandle {
 
   private static final Logger log = LoggerFactory.getLogger(NativeSessionHandle.class);

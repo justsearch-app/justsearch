@@ -225,10 +225,10 @@ public final class SearchOrchestrator {
    * {@code OperationalMetrics.recordSearch(...)} lives (worker-internal search-count/latency
    * telemetry surfaced on {@code /api/status}), so calling only capture/plan/execute keeps
    * this pass invisible to it — a synthetic boot-time call must not appear as the user's
-   * first "real" search. It is also below the gRPC boundary entirely: this method is called
+   * first "real" search. It is also below the in-process port boundary entirely: this method is called
    * directly by {@code KnowledgeServer} in-process, so it never reaches the Head's
    * app-services feedback layer (feature snapshots, dispositions, GPL triples), which only
-   * runs against gRPC search responses that actually cross the wire.
+   * runs against search responses returned through the port.
    *
    * @return {@code true} if the warm-up pass ran, {@code false} if it was skipped because the
    *     index has zero documents (nothing to search yet)

@@ -40,21 +40,12 @@ import tools.jackson.databind.ObjectMapper;
  * A6). Polls {@link KnowledgeServerBootstrap#checkHealth()} and triggers deferred auxiliary
  * initialization on ERROR→READY recovery transitions.
  *
- * <p>Item A11 note: this class survives the Worker's deletion as a process because two of its
- * three jobs are not process-shaped — the health poll that drives the worker component's
- * READY/LOST transitions on {@code /api/health}, and generic component recovery. What it lost is every
- * channel/port/process-shaped path: the post-resume reconnect, and the escalation from a lost
- * worker to a respawn. A lost worker component now reports itself lost and stays that way until
- * the user restarts the Engine — stage A §10 records that as a deliberate loss until stage B.
+ * <p>The monitor observes the Engine index component and admits component recovery through
+ * the sealed composition-root bindings. It does not discover ports or spawn an index process.
  *
- * <p>Tempdoc 630 (latency-hardening): this periodic loop doubles as the Head-side <b>resume
- * detector</b>. Because it wakes every {@code pollIntervalMs}, an inter-tick wall-clock gap far
- * larger than that interval means the process was frozen — the machine suspended and resumed (see
- * {@link ResumeDetector}). On a detected resume the monitor <b>eagerly</b> reconnects the gRPC
- * channel and re-registers watchers + reconciles, instead of waiting for the reactive recovery
- * (first post-wake RPC reconnects; periodic sync eventually re-walks). Done before {@link
- * KnowledgeServerBootstrap#checkHealth()} so the first post-wake tick checks a fresh channel rather
- * than flipping the capability to DEGRADED on a stale one.
+ * <p>The periodic loop also detects suspend/resume through {@link ResumeDetector}: an
+ * inter-tick wall-clock gap larger than the polling interval causes watcher re-registration
+ * and reconciliation before the next health observation.
  *
  * <p>Physical recovery is component-shaped. The composition root seals one binding for every
  * registered component before this monitor starts. Timer and operator requests share one executor
@@ -135,9 +126,9 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   private volatile Consumer<RecoveryOccurrence> onRecoveryOccurrence = occurrence -> {};
   /**
    * Review F4: set by {@link #close()} before the executor is shut down, so an attempt that has not
-   * yet spawned stands down instead of racing the ordered shutdown. Without it, a recovery attempt
-   * running (or queued) while {@code performOrderedShutdown} walks past the monitor could spawn a
-   * Worker JVM after the coordinator had already closed the bootstrap — an orphan nothing owns.
+   * yet begun stands down instead of racing the ordered shutdown. Without it, a recovery attempt
+   * running (or queued) while {@code performOrderedShutdown} walks past the monitor could rebuild
+   * an index component after the coordinator had closed the bootstrap, leaving an unowned resource.
    */
   private volatile boolean closed;
   private final AtomicBoolean startClaimed = new AtomicBoolean();

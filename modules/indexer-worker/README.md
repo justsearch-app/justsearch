@@ -20,7 +20,7 @@ reintroduce them and do not reason from them:
 
 - **The worker child process and `WorkerSpawner`** (item A11).
 - **The gRPC server, its interceptors and the ephemeral port handoff** (item A9); then the rest of
-  gRPC — the `service` blocks, the infra-health service, and the `protoc-gen-grpc-java` generator
+  the gRPC protocol declarations — the `service` blocks, the infra-health service, and the `protoc-gen-grpc-java` generator
   (item A14). What survives of `indexing.proto` is its *message* half, used as DTOs at the ports.
 - **The memory-mapped signal bus** and both its ends (item A10).
 - **The suicide pact / heartbeat.** In one JVM there is no heartbeat to miss, so self-termination on
@@ -193,7 +193,7 @@ retrieval and fusion all happen on the calling thread's budget.
 deep health — serving state, queue depth, discovered/active models. It is reached through
 `WorkerAppServices.healthService()`, which the composition root wraps as `WorkerHealthCalls` for
 `EngineKnowledgeClient` (`modules/app-engine/.../EngineKnowledgeClient.java:348`); the HTTP surface
-over it is `GET /api/knowledge/status`. There is no gRPC `Health/Check` to call.
+over it is `GET /api/knowledge/status`. There is no in-process port `Health/Check` to call.
 
 **Logs.** One file: `<justsearch.data.dir>/logs/engine.log` (`modules/ui/src/main/resources/logback.xml`
 — item A13 deleted this module's own logback config). Everything goes to the file appender; only

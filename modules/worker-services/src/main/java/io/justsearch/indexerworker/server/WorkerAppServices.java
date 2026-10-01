@@ -130,7 +130,7 @@ public interface WorkerAppServices extends Closeable {
   /**
    * Wires a supplier for the {@link io.justsearch.ort.PolicySnapshot} built at boot by
    * {@code InferenceCompositionRoot.compose} (tempdoc 397 §14.28 U4). Returned via the
-   * {@code GetSessionPolicies} gRPC rpc; Head's {@code /api/debug/session-policies}
+   * {@code getSessionPolicies} port operation; the gateway's {@code /api/debug/session-policies}
    * endpoint reads this instead of re-resolving its own ConfigStore + HardwareProfile.
    */
   default void wirePolicySnapshotSupplier(

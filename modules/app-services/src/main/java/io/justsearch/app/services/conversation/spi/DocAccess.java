@@ -50,7 +50,7 @@ public final class DocAccess implements ContextInjector {
   /** Default fetch timeout. Matches the legacy {@code SummaryController.timeout}. */
   static final Duration DEFAULT_FETCH_TIMEOUT = Duration.ofSeconds(10);
 
-  /** Soft character cap on injected content — mirrors the Worker's gRPC transport cap. */
+  /** Soft character cap on injected content — mirrors the Worker's operation result-size cap. */
   static final int MAX_CONTENT_CHARS = 200_000;
 
   /**

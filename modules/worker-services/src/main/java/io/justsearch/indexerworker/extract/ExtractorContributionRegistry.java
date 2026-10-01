@@ -12,11 +12,10 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
- * The Worker-process composer for content-extractor contributions (tempdoc 560 §4.4/§6) — the
- * content extractor as a real first consumer of the extension substrate, alongside the Head's
- * MCP-host. The Worker cannot import the Head's {@code ContributionRegistry} (Head/Worker process
- * boundary), so it reuses the same four-substrate <em>pattern</em> in Worker-domain types — exactly
- * as the MCP-host is the Head's composer of the same pattern. Two real loaders, one pattern.
+ * The index-half composer for content-extractor contributions (tempdoc 560 §4.4/§6). It uses
+ * the same four-substrate pattern as the API gateway's MCP host. The module boundary keeps the
+ * index half independent of the gateway's {@code ContributionRegistry}, so each composer uses
+ * domain-owned types inside the Engine JVM. Two real loaders, one pattern.
  *
  * <p>It composes {@link ContentExtractorProvider}s as installable contributions and is itself a
  * {@link ContentExtractorProvider}, dispatching each file to the contribution that handles it. The

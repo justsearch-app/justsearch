@@ -691,7 +691,7 @@ final class InferenceHandlers {
   /**
    * Counts documents with pending embedding status.
    *
-   * <p>Uses Knowledge Server gRPC to query the index. Falls back to 0 if unavailable.
+   * <p>Uses Knowledge Server in-process port to query the index. Falls back to 0 if unavailable.
    */
   private int countPendingEmbeddings(EngineContext engineContext) {
     KnowledgeServerBootstrap server = knowledgeServer;
@@ -709,7 +709,7 @@ final class InferenceHandlers {
   /**
    * Counts documents with pending VDU status.
    *
-   * <p>Uses Knowledge Server gRPC to query the index. Falls back to 0 if unavailable.
+   * <p>Uses Knowledge Server in-process port to query the index. Falls back to 0 if unavailable.
    */
   private int countPendingVdu(EngineContext engineContext) {
     KnowledgeServerBootstrap server = knowledgeServer;

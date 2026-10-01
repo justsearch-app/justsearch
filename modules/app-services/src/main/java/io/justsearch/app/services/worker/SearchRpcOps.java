@@ -74,7 +74,7 @@ final class SearchRpcOps {
     }
 
     /**
-     * Performs a search query using a fully-specified gRPC {@link SearchRequest}.
+     * Performs a search query using a fully-specified in-process port {@link SearchRequest}.
      *
      * <p>This is used by the Head HTTP API to forward structured filters/facets/projection to the
      * Worker.
@@ -127,11 +127,10 @@ final class SearchRpcOps {
     // ========== Document Fetching ==========
 
     /**
-     * Fetches document content from the Worker via gRPC.
+     * Fetches document content from the Worker via an in-process port.
      *
-     * <p>This method allows the Main process to retrieve document content without directly
-     * accessing the Lucene index, avoiding MMapDirectory/write.lock conflicts between the Main and
-     * Worker processes.
+     * <p>This method lets the API gateway retrieve document content through the index port.
+     * Index handles and Lucene I/O remain owned by the Engine index half.
      *
      * @param docIds list of document IDs to fetch
      * @return response containing document content and metadata
@@ -175,7 +174,7 @@ final class SearchRpcOps {
     }
 
     /**
-     * Fetches a slice of extracted/indexed document text from the Worker via gRPC.
+     * Fetches a slice of extracted/indexed document text from the Worker via an in-process port.
      *
      * <p>Unlike {@link #fetchDocuments(List, EngineContext)}, this does not apply a fixed-size trim; instead it
      * pages by (offsetChars, maxChars) with a server-side cap.
@@ -195,7 +194,7 @@ final class SearchRpcOps {
     // ========== RAG Context ==========
 
     /**
-     * Retrieves relevant context for Q&amp;A using RAG (chunk search) via gRPC.
+     * Retrieves relevant context for Q&amp;A using RAG (chunk search) via an in-process port.
      *
      * <p>The Worker searches for relevant chunks using BM25 on the chunk_content field, falling
      * back to full document search if no chunks are indexed.
@@ -210,7 +209,7 @@ final class SearchRpcOps {
     }
 
     /**
-     * Retrieves relevant context for Q&amp;A using RAG (chunk search) via gRPC with token budget.
+     * Retrieves relevant context for Q&amp;A using RAG (chunk search) via an in-process port with token budget.
      *
      * <p>The Worker searches for relevant chunks using BM25 on the chunk_content field, falling
      * back to full document search if no chunks are indexed.

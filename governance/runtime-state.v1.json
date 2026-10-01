@@ -18,7 +18,7 @@
       "name": "RuntimeGpuLease",
       "tempdoc": 737,
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeGpuLease.java",
-      "note": "Lane F F-5: Engine GPU lease state is a passive mirror of Mode (CHAT/WORKER/NONE). WORKER is the retained indexing holder wire identity; renaming it to INDEXING requires the Java producer and status projection to change together and is a Java follow-up. No separate process or MMF write is implied. Sized admission remains future work."
+      "note": "F-5: Engine GPU lease state is a passive mirror of Mode (CHAT/INDEXING/NONE). RuntimeGpuLease.Holder.INDEXING names indexing work in the Engine JVM; RuntimeStatus and the /api/status leaseHolder projection publish INDEXING. TRANSITIONING preserves the last holder. Sized admission remains future work."
     },
     {
       "name": "RuntimeReconciler",

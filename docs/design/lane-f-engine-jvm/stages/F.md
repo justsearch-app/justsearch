@@ -138,6 +138,12 @@ lines that present them as current. The script `scripts/ci/check-lane-f-residue.
 encodes the term list and the labelling rule and prints unlabelled hits; it is the checkpoint
 proof, run once at F's end and recorded.
 
+2026-10-01 amendment (owner F-1 assignment): reviewed exact-path × term dispositions in
+`governance/lane-f-residue-allowlist.v1.json` also label legitimate vocabulary, guards/fixtures,
+historical comparisons and C2-1 compatibility identities; occurrence counts and trimmed-line
+anchors bind each exemption to reviewed text, and any wildcard, new occurrence or stale anchor fails.
+This central projection avoids hundreds of inline labels while retaining the same review authority.
+
 ---
 
 ## 3. Checklist items

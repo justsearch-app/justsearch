@@ -116,7 +116,7 @@ configurations.configureEach {
 }
 
 // Dev hot-reload: push bytecode + signal the Worker after successful recompilation.
-// Chain: compile → HotSwapPush (updates bytecode via JDWP) → MMF signal (restarts services).
+// Chain: compile → HotSwapPush (updates bytecode via JDWP) → owned reload trigger (rebuilds services).
 // Only fires when JUSTSEARCH_DEV_HOTRELOAD=true and compileJava actually runs (not UP-TO-DATE).
 // Usage: JUSTSEARCH_DEV_HOTRELOAD=true ./gradlew -t :modules:worker-services:classes
 tasks.named<JavaCompile>("compileJava") {

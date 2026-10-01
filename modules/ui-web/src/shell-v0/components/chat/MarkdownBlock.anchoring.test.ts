@@ -108,30 +108,30 @@ const SHAPES: Shape[] = [
     id: 'E-bullet-dash',
     markdown:
       'Key properties of the index:\n\n' +
-      '- The index is written only by the Worker process [1].\n' +
-      '- The Head delegates all index IO over gRPC [2].\n' +
+      '- The index is written only by the index component [1].\n' +
+      '- The API gateway delegates all index IO through ports [2].\n' +
       '- Search analysis is locale invariant by construction [3].',
     // ONE key for the whole block — `BreakIterator` never breaks before a `- ` marker (S0 §Mechanism).
     keys: [
-      'Key properties of the index:\n\n- The index is written only by the Worker process [1].\n' +
-        '- The Head delegates all index IO over gRPC [2].\n' +
+      'Key properties of the index:\n\n- The index is written only by the index component [1].\n' +
+        '- The API gateway delegates all index IO through ports [2].\n' +
         '- Search analysis is locale invariant by construction [3].',
     ],
     anchors: [0],
-    clampedAway: { 0: 'The index is written only by the Worker process' },
+    clampedAway: { 0: 'The index is written only by the index component' },
   },
   {
     id: 'F-bullet-star-bold',
     markdown:
       'Key properties:\n\n' +
-      '* **Ownership**: the index is written only by the Worker process [1].\n' +
-      '* **Transport**: the Head delegates all index IO over gRPC [2].',
+      '* **Ownership**: the index is written only by the index component [1].\n' +
+      '* **Transport**: the Head delegates all index IO through ports [2].',
     keys: [
-      'Key properties:\n\n* **Ownership**: the index is written only by the Worker process [1].\n' +
-        '* **Transport**: the Head delegates all index IO over gRPC [2].',
+      'Key properties:\n\n* **Ownership**: the index is written only by the index component [1].\n' +
+        '* **Transport**: the Head delegates all index IO through ports [2].',
     ],
     anchors: [0],
-    clampedAway: { 0: 'the index is written only by the Worker process' },
+    clampedAway: { 0: 'the index is written only by the index component' },
   },
   {
     id: 'G-nested-list',
@@ -213,14 +213,14 @@ const SHAPES: Shape[] = [
       'To enable the flag:\n\n' +
       '1. Set the flag in the configuration file [1].\n\n' +
       '```json\n{ "citations": { "enabled": true } }\n```\n\n' +
-      '2. Restart the Worker process so the change is applied [2].',
+      '2. Restart JustSearch so the change is applied [2].',
     keys: [
       'To enable the flag:\n\n1.',
       'Set the flag in the configuration file [1].',
       // The fence key: its FIRST token is the info string, which is a class attribute in the DOM and
       // not text — so the prefix match is zero and tier 3 (no mark) is the right outcome.
       '```json\n{ "citations": { "enabled": true } }\n```\n\n2.',
-      'Restart the Worker process so the change is applied [2].',
+      'Restart JustSearch so the change is applied [2].',
     ],
     anchors: [0, 1, 3],
   },
@@ -243,10 +243,10 @@ const SHAPES: Shape[] = [
   },
   {
     id: 'N-cjk-bullets',
-    markdown: '索引的关键属性：\n\n- 索引只由工作进程写入 [1]。\n- 主进程通过 gRPC 委托所有索引读写 [2]。',
-    keys: ['索引的关键属性：\n\n- 索引只由工作进程写入 [1]。', '- 主进程通过 gRPC 委托所有索引读写 [2]。'],
+    markdown: '索引的关键属性：\n\n- 索引只由索引组件写入 [1]。\n- API 网关通过进程内端口委托所有索引读写 [2]。',
+    keys: ['索引的关键属性：\n\n- 索引只由索引组件写入 [1]。', '- API 网关通过进程内端口委托所有索引读写 [2]。'],
     anchors: [0, 1],
-    clampedAway: { 0: '索引只由工作进程写入' },
+    clampedAway: { 0: '索引只由索引组件写入' },
   },
   {
     id: 'O-japanese-numbered',
@@ -298,10 +298,10 @@ const SHAPES: Shape[] = [
     markdown:
       'Two rules apply:\n\n' +
       '- See [the architecture overview](docs/explanation/01-system-overview.md) for details [1].\n' +
-      '- The Head delegates all index IO over gRPC [2].',
+      '- The API gateway delegates all index IO through ports [2].',
     keys: [
       'Two rules apply:\n\n- See [the architecture overview](docs/explanation/01-system-overview.md) ' +
-        'for details [1].\n- The Head delegates all index IO over gRPC [2].',
+        'for details [1].\n- The API gateway delegates all index IO through ports [2].',
     ],
     anchors: [0],
     clampedAway: { 0: 'the architecture overview' },
@@ -312,12 +312,12 @@ const SHAPES: Shape[] = [
     // boundary as "a newline in the flattened text" and this shape was its false positive — the real
     // ancestor comparison must NOT clamp here, or a legitimately soft-wrapped sentence loses its body.
     markdown:
-      'The Worker owns the Lucene index and the Head delegates every index read\n' +
-      'and write to it over gRPC, so no index handle ever exists in the Head\n' +
-      'process [1]. That boundary is enforced by an ArchUnit rule [2].',
+      'The index component owns Lucene and the API gateway delegates every index read\n' +
+      'and write to it through ports, so no index handle ever exists in the API\n' +
+      'layer [1]. That boundary is enforced by an ArchUnit rule [2].',
     keys: [
-      'The Worker owns the Lucene index and the Head delegates every index read\n' +
-        'and write to it over gRPC, so no index handle ever exists in the Head\nprocess [1].',
+      'The index component owns Lucene and the API gateway delegates every index read\n' +
+        'and write to it through ports, so no index handle ever exists in the API\nlayer [1].',
       'That boundary is enforced by an ArchUnit rule [2].',
     ],
     anchors: [0, 1],
@@ -439,8 +439,8 @@ describe('847 T2b — the span guard (H4): a mark may not underline text it did 
     const spans = spansByKey(el).get(keyOf(s, 0)) ?? [];
     const text = spans.map((x) => x.textContent ?? '').join('');
     // The whole three-line sentence keeps its body: the run never leaves the one <p>.
-    expect(text).toContain('The Worker owns the Lucene index');
-    expect(text).toContain('process [1]');
+    expect(text).toContain('The index component owns Lucene');
+    expect(text).toContain('layer [1]');
     el.remove();
   });
 });

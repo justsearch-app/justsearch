@@ -24,7 +24,7 @@ public interface ExcludesService {
    * Apply (or preview) exclude patterns. When {@code dryRun=true}, walks the
    * configured roots and counts matches per pattern without mutating the
    * index. When {@code dryRun=false}, deletes already-indexed documents whose
-   * paths match the configured globs (delegated to the Worker via gRPC; no
+   * paths match the configured globs (delegated to the Worker via an in-process port; no
    * Lucene/queue DB IO in Head).
    *
    * @param dryRun true for preview-excludes (LOW); false for apply-excludes

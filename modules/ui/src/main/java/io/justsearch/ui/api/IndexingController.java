@@ -331,7 +331,7 @@ public class IndexingController {
    * <p>Notes:
    * - Patterns come from the resolved {@code justsearch.ui.exclude_patterns} (settings.json at
    *   ordinal 300; env var / {@code -D} still win at 400 / 500).
-   * - Deletion is delegated to the Worker via gRPC (no Lucene/queue DB IO in Head).
+   * - Deletion is delegated to the Worker via an in-process port (no Lucene/queue DB IO in Head).
    * - This is explicit, user-triggered cleanup; it does not run automatically in the background.
    */
   public void handleApplyExcludes(Context ctx) {

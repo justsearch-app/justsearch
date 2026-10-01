@@ -26,12 +26,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Lifecycle:
  * <ul>
- *   <li>{@link #start} — opens the gRPC stream. Returns a future that completes
+ *   <li>{@link #start} — opens the in-process subscription. Returns a future that completes
  *       once the initial snapshot frame has been delivered to listeners.</li>
  *   <li>{@link #subscribe} — registers a listener. New listeners are NOT
  *       replayed the snapshot — they begin receiving deltas from "now". For
  *       initial-state hydration, listeners use {@link #latestSnapshot}.</li>
- *   <li>{@link #stop} — cancels the gRPC stream + clears listeners.</li>
+ *   <li>{@link #stop} — cancels the in-process subscription + clears listeners.</li>
  * </ul>
  *
  * <p>Reconnect handling: if the flow fails, the bridge re-issues the subscribe call on a bounded
@@ -170,7 +170,7 @@ public final class RemoteIndexingJobsBridge {
   }
 
   /**
-   * Opens the gRPC stream. Returns a future completed once the snapshot frame
+   * Opens the in-process subscription. Returns a future completed once the snapshot frame
    * has been delivered to listeners. Callers can register listeners before
    * calling start and will receive the snapshot via the regular delta path.
    *
@@ -220,7 +220,7 @@ public final class RemoteIndexingJobsBridge {
   }
 
   /**
-   * Stops listener fan-out. Subsequent frames arriving on the gRPC stream are
+   * Stops listener fan-out. Subsequent frames arriving on the in-process subscription are
    * dropped without being delivered to listeners or mutating cached state.
    *
    * <p>Lane F stage A item A6: the flow now hands back a

@@ -20,7 +20,7 @@ import com.tngtech.archunit.lang.ArchRule;
  *
  * <p>The structural enforcement here: any class that depends on
  * {@code PathResolutionStore.lookup} or its SQLite implementation directly must be one of the
- * known approved callers (the controller handler, the gRPC handler that exposes the RPC, and
+ * known approved callers (the controller handler, the service handler that exposes the RPC, and
  * the wiring sites in {@code DefaultWorkerAppServices} / {@code KnowledgeServer}). Any other
  * class touching those classes fails this test, surfacing the contract change before merge.
  *
@@ -50,7 +50,7 @@ final class LibraryResolveHashOnlyCallerPin {
    *       {@code InfraContext}.
    *   <li>{@code InfraContext} — passes the store reference between modules.
    *   <li>{@code SqlitePathResolutionStore} — the implementation itself.
-   *   <li>{@code KnowledgeClient} — Head-side gRPC client wrapper for the lookup RPC.
+   *   <li>{@code KnowledgeClient} — Head-side in-process port client wrapper for the lookup RPC.
    *   <li>{@code IndexingService} — interface declares the {@code resolvePathHash} method
    *       so {@code IndexingController} can call it.
    * </ul>
@@ -93,7 +93,7 @@ final class LibraryResolveHashOnlyCallerPin {
           .haveFullyQualifiedName(
               "io.justsearch.indexerworker.path.PathResolutionStore")
           .as(
-              "Only the approved callers (POST /api/library/resolve-hash handler, the gRPC "
+              "Only the approved callers (POST /api/library/resolve-hash handler, the in-process port "
                   + "LookupPathByHash handler, the IndexingLoop admission recorder, and the "
                   + "wiring sites) may depend on PathResolutionStore. Adding a new caller "
                   + "requires updating LibraryResolveHashOnlyCallerPin.APPROVED_CALLERS with "

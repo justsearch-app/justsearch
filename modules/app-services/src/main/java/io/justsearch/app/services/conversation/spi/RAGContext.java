@@ -731,7 +731,7 @@ public final class RAGContext implements ContextInjector {
     }
   }
 
-  /** True when a throwable (or any cause) is a local budget expiry or a gRPC DEADLINE_EXCEEDED. */
+  /** True when a throwable (or any cause) is a local budget expiry or an in-process port DEADLINE_EXCEEDED. */
   private static boolean isDeadline(Throwable t) {
     for (Throwable c = t; c != null; c = c.getCause()) {
       if (c instanceof java.util.concurrent.TimeoutException) {

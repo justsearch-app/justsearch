@@ -320,7 +320,7 @@ public interface IndexingService {
    * Outcome of an index GC invocation. Carries the worker-side counts so the
    * Operation handler's structured-output map (and the REST controller's response
    * body) can surface marked / pruned deltas — both are already populated by the
-   * worker's gRPC response (see {@code MigrationOps.runIndexGc}); the prior
+   * worker's in-process port response (see {@code MigrationOps.runIndexGc}); the prior
    * {@code boolean} return shape was dropping them at the service boundary.
    *
    * <p>Per slice 484 §3.6 / observations.md `core.index-gc` closure.
@@ -565,7 +565,7 @@ public interface IndexingService {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
-  /** Resets index state on the Worker via gRPC. Used by profiling reset. Returns true on success. */
+  /** Resets index state on the Worker via an in-process port. Used by profiling reset. Returns true on success. */
   default boolean resetIndex(EngineContext engineContext) {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }

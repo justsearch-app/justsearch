@@ -23,7 +23,7 @@ package io.justsearch.reranker;
  *
  * <p>This enum is deliberately reranker-local: the wire vocabulary the Head consumes
  * ({@code CrossEncoderSkipReason}) is owned head-side, and the Worker's rerank RPC maps this cause
- * onto it at the gRPC boundary, so the inference component carries no wire strings.
+ * onto it at the in-process port boundary, so the inference component carries no wire strings.
  */
 public enum RerankSkipCause {
   /** Not a skip — the cross-encoder scored the documents (or there were none to score). */

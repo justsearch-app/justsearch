@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * <p>Manages the complete lifecycle:
  * <ol>
  *   <li>Loads configuration</li>
- *   <li>Opens signal bus</li>
+ *   <li>Owns the shared GPU-scheduling gauge and energy poller</li>
  *   <li>Starts the index half through the {@link WorkerHost} — since lane F stage A item A6 that is
  *       {@code EngineRoot}, composing it in this JVM. Item A11 deleted the other implementation,
  *       which spawned a worker process</li>
@@ -101,10 +101,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
         new java.util.concurrent.atomic.AtomicLong(0);
 
     /**
-     * Lane F item A5: the one in-process GPU-scheduling gauge. {@code main_gpu_active} is written
+     * Lane F item A5: the one in-process GPU-scheduling gauge. Chat activity is written
      * from the inference mode-change listener ({@code InferenceWiring.wireGpuStatusBroadcast}) and
-     * {@code energy_reduced} from {@link #energyPoller}; while the Worker is still a separate
-     * process both writers ALSO publish the matching MMF byte, which is the half deleted at A10.
+     * energy state from {@link #energyPoller}.
      * The composition rule ("yield GPU-heavy backfill when either holds") lives in the gauge.
      */
     private final io.justsearch.core.scheduling.GpuSchedulingGauge gpuScheduling =
@@ -321,8 +320,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             }
 
             // 3. Verify health, transition to READY and run the ready-initialization sequence.
-            // Unchanged from the spawned path on purpose: /api/health's worker component keeps its
-            // exact WORKER_* vocabulary, which design §6 re-cuts at D1, not here.
+            // Readiness and failure narration use the current index/component reason codes.
             awaitHealthyAndComplete();
         } catch (Exception e) {
             transitionWorkerDown(
@@ -350,10 +348,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * {@code healthCheckRetryBudgetMs}; if the budget elapses without success,
      * {@link KnowledgeServerHealthMonitor} takes over.
      *
-     * <p>Lane F item A6 extracted this from {@code start()} so the in-process host and the legacy
-     * spawned process shared one readiness path; item A11 deleted the spawned one, and this stayed
-     * where it was — the WORKER_* reason codes and the auxiliary-service sequence are the worker
-     * component's contract on {@code /api/health}, not a property of how it was started.
+     * <p>The bound index component must become healthy within the start budget. Success runs
+     * ready initialization; failure is narrated through the current index/component reason codes.
      *
      */
     private void awaitHealthyAndComplete() throws InterruptedException {
@@ -374,11 +370,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
                 log.info("Knowledge Server is READY");
             }
         } else {
-            // Tempdoc 837 §3.1: the start-time health budget elapsed — the worker NEVER started.
-            // Review F7: this site is reachable DURING a recovery arc — the attempt's worker
-            // spawns and answers but never reaches healthy — and it was the one worker-down
-            // site without a suppression guard. The rule now lives in transitionWorkerDown, so
-            // this call is unconditional and the funnel decides.
+            // The index component did not become healthy within the start budget. This can
+            // happen during recovery too; transitionWorkerDown decides whether the active
+            // recovery arc owns narration and suppresses this failure transition.
             transitionWorkerDown(
                 LifecycleReasonCode.INDEX_FAILED,
                 "Health check failed after " + healthCheckElapsedMs + "ms");
@@ -861,10 +855,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
     void transitionWorkerDown(LifecycleReasonCode generic, String detail) {
         WorkerDown down = workerDownCode(generic, detail);
         if (narrationSuppressed()) {
-            // Review F7: suppression was applied at three of the four worker-down sites and
-            // missed the health-budget branch, which is reachable mid-recovery (the attempt's worker
-            // spawns and answers gRPC but never becomes healthy) and flapped the arc out of
-            // RECOVERING. Any future site inherits the rule instead of having to remember it.
+            // A retry or index-component recovery owns narration, including when its
+            // replacement component does not become healthy within the start budget.
+            // Keep this rule in the transition funnel for every failure site.
             log.debug(
                 "Suppressing worker-down narration ({}): a retry or recovery arc owns it",
                 down.code().code());
@@ -974,9 +967,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             return ShutdownOutcome.FAILED;
         }
 
-        // Stop the energy poll before the signal bus goes: its transitional MMF write would
-        // otherwise race the unmap. The poller is restartable, and the last polled state survives,
-        // so a physical replacement resumes without an UNKNOWN window.
+        // Stop the energy-state poller before client and index-component teardown.
         try {
             energyPoller.close();
         } catch (Exception e) {

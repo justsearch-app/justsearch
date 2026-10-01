@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Controller for Knowledge Server search endpoints.
  *
- * <p>Provides HTTP API endpoints that delegate to the Knowledge Server via gRPC.
+ * <p>Provides HTTP API endpoints that delegate to the Knowledge Server via an in-process port.
  * This enables the UI to search content indexed by the background worker process.
  */
 public class KnowledgeSearchController {

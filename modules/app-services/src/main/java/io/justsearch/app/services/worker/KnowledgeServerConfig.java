@@ -63,7 +63,7 @@ public record KnowledgeServerConfig(
     private static final long DEFAULT_DEADLINE_MS = 15_000;
     private static final long DEFAULT_PORT_DISCOVERY_TIMEOUT_MS = 15_000;
     private static final int DEFAULT_MAX_RETRIES = 3;
-    private static final long DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS = 5000;
+    private static final long DEFAULT_INDEX_SHUTDOWN_TIMEOUT_MS = 5000;
     private static final long DEFAULT_PID_VALIDATION_TIMEOUT_MS = 5000;
     /** Default stability window: 5 minutes. Worker must run this long to reset restart counter. */
     private static final long DEFAULT_STABILITY_WINDOW_MS = 300_000;
@@ -97,7 +97,7 @@ public record KnowledgeServerConfig(
                 DEFAULT_MAX_RETRIES);
         long shutdownTimeout = parseLong(
                 envOrProperty("JUSTSEARCH_WORKER_SHUTDOWN_TIMEOUT_MS", "justsearch.worker.shutdown_timeout_ms"),
-                DEFAULT_WORKER_SHUTDOWN_TIMEOUT_MS);
+                DEFAULT_INDEX_SHUTDOWN_TIMEOUT_MS);
         long pidValidationTimeout = parseLong(
                 envOrProperty("JUSTSEARCH_WORKER_PID_VALIDATION_TIMEOUT_MS", "justsearch.worker.pid_validation_timeout_ms"),
                 DEFAULT_PID_VALIDATION_TIMEOUT_MS);

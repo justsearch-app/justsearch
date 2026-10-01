@@ -11,7 +11,7 @@ import java.util.List;
  *
  * <p>Called at Worker startup to discover ONNX models at standard filesystem locations and
  * explicit-path overrides from resolved config. Results are cached and reported via the
- * {@code HealthCheckResponse.onnx_models} gRPC field so the Head process can display feature
+ * {@code HealthCheckResponse.onnx_models} DTO field so the API gateway can display feature
  * status without independently re-walking the filesystem.
  */
 public final class WorkerModelDiscovery {

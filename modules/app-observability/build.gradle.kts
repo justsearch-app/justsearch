@@ -43,7 +43,6 @@ dependencies {
   // Lane F C2: one Engine-owned durable acceptance store, reached through app-api.
   runtimeOnly(libs.sqlite.jdbc)
 
-  // gRPC
 
 }
 

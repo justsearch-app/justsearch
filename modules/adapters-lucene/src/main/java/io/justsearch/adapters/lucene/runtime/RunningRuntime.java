@@ -188,8 +188,8 @@ public final class RunningRuntime implements LuceneRuntime {
    * Tempdoc 406 Gap G: drains in-flight writes, performs a final commit, then closes.
    *
    * <p>Sets the {@code draining} flag so new writes via {@link IndexingCoordinator} are
-   * rejected with ISE (the gRPC layer maps to UNAVAILABLE so callers retry on the upgraded
-   * holder reference — see the Pattern F supplier migration in tempdoc 406 Phase 4a).
+   * rejected with {@link IndexRuntimeIOException.Reason#DRAINING}. {@link WritePathOps}
+   * rejects writes with {@link IllegalStateException} while draining.
    * Acquires {@link RuntimeSession#writeBarrier}'s write lock with the supplied timeout —
    * blocks until all in-flight writes (which hold the read lock) complete, eliminating the
    * race window where a writer could pass the {@code draining} check then crash on a null

@@ -48,7 +48,7 @@ function log(prefix, data) {
 function cleanDataDir(dir) {
   // Preserve user config + Lucene index + watched roots + AI models/packs/policy between dev runs.
   // Note: the API endpoint `/api/indexing/roots` is backed by `watched_roots.json`
-  // (see RemoteKnowledgeClient), so if we delete it we can end up with:
+  // (see KnowledgeClient / WatchedRootsStore), so if we delete it we can end up with:
   //   - non-zero indexedDocuments (index still present)
   //   - empty roots list in the UI library (roots file gone)
   const keep = new Set([

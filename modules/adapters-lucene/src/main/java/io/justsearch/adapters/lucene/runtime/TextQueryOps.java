@@ -196,7 +196,7 @@ public final class TextQueryOps {
    * Builds a fuzzy Lucene query for zero-hit retry (typo correction).
    *
    * <p>Analyzes the query text into tokens using the index analyzer, then resolves the closest
-   * indexed term for each token within the specified edit distance. Used by the gRPC search service
+   * indexed term for each token within the specified edit distance. Used by the in-process port search service
    * when the primary query returns 0 hits and corrections are enabled.
    *
    * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.

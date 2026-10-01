@@ -29,7 +29,7 @@ import tools.jackson.databind.ObjectMapper;
  * <p>The index-rebuild half is
  * {@code DocumentIdentityBootImportTest.blueUidIsImportedBeforePausedMigrationReindexesIntoGreen},
  * which drives a real Worker through a Blue→Green migration and reads the surviving {@code doc_uid}
- * back off the production gRPC search response — the exact value this projection keys on.
+ * back off the production in-process port search response — the exact value this projection keys on.
  */
 class LabelStoreRegenerationKeepsUidKeysTest {
 

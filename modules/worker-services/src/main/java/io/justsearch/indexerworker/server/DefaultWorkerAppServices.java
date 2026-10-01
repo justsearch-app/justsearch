@@ -480,7 +480,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.detailedTracing =
         !"none".equalsIgnoreCase(resolvedConfig.index().tracingLevel());
     // Tempdoc 410 §13 Slice B — publish the operator-resolved IngestionSkipPolicy before any
-    // ingestion path can call it. WorkerScanOps and WorkerIngestionAuthority fire during gRPC
+    // ingestion path can call it. WorkerScanOps and WorkerIngestionAuthority fire during in-process port
     // handling that always happens after this constructor returns, so installing here is safe.
     io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(
         extractionConfiguration.ingestionSkipPolicy());
@@ -607,7 +607,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             ctx.migrationSwitchingMaxDurationMs());
 
     // Tempdoc 419 / T5.3 (ADR-0028): wire the scoped reverse-lookup store. KnowledgeServer
-    // constructed it; we just inject so the LookupPathByHash gRPC handler returns real data.
+    // constructed it; we just inject so the LookupPathByHash service handler returns real data.
     this.ingestService.setPathResolutionStore(ctx.pathResolutionStore());
     this.ingestService.setDocumentIdentityStore(ctx.documentIdentityStore());
     this.ingestService.setMutationAdmission(mutationAdmission, mutationOwnerToken);
@@ -1580,7 +1580,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
    * Selects an extraction sandbox based on {@link EnvRegistry#EXTRACTION_SANDBOX_MODE}.
    *
    * <p>Tempdoc 885 item 14: the default is {@code auto} — PDF/Office/archive/image files are
-   * parsed in a persistent child process, everything else in the Worker JVM. {@code in_process}
+   * parsed in a persistent child process, everything else in the Engine JVM. {@code in_process}
    * and {@code process} force one side. There is no longer a "process mode requires an operator
    * command" precondition: that precondition is exactly why the sandbox tempdoc 410 shipped was
    * unreachable, and the command is now built in-process by {@link ExtractionSandboxCommand}.

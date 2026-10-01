@@ -329,7 +329,7 @@ final class MultiplexedSseWriterTest {
     List<String> sent = captureSentFrames(client);
     heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
 
-    RuntimeException boom = new RuntimeException("boom — simulates e.g. a gRPC-backed snapshot failure");
+    RuntimeException boom = new RuntimeException("boom — simulates e.g. an in-process port-backed snapshot failure");
     List<MultiplexedSseWriter.ChannelSource> sources =
         List.of(
             new MultiplexedSseWriter.ChannelSource(chA, () -> Map.of("v", "a")), // succeeds, subscribes

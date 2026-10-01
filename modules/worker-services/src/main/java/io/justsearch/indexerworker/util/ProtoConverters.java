@@ -10,7 +10,7 @@ import io.justsearch.ipc.SearchSort;
 import java.util.List;
 
 /**
- * Utility methods for converting gRPC proto messages to runtime types.
+ * Utility methods for converting proto messages to runtime types.
  *
  * <p>Extracted from WorkerSearchService for reusability and testability.
  */
@@ -21,9 +21,9 @@ public final class ProtoConverters {
   }
 
   /**
-   * Converts a gRPC SearchSort to RuntimeSearchSort.
+   * Converts a proto SearchSort to RuntimeSearchSort.
    *
-   * @param sort the gRPC sort (may be null)
+   * @param sort the proto sort (may be null)
    * @return RuntimeSearchSort, defaults to RELEVANCE if null
    */
   public static RuntimeSearchSort toRuntimeSort(SearchSort sort) {
@@ -42,9 +42,9 @@ public final class ProtoConverters {
   }
 
   /**
-   * Converts a gRPC SearchFilters to RuntimeSearchFilters.
+   * Converts a proto SearchFilters to RuntimeSearchFilters.
    *
-   * @param filtersMsg the gRPC filters (may be null)
+   * @param filtersMsg the proto filters (may be null)
    * @return RuntimeSearchFilters, or null if input is null
    */
   public static RuntimeSearchFilters toRuntimeFilters(SearchFilters filtersMsg) {

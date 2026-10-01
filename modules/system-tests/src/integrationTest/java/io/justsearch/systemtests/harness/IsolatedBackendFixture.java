@@ -84,7 +84,7 @@ public final class IsolatedBackendFixture {
   // process.isAlive() check below, and the enclosing budgets
   // (modules/system-tests/build.gradle.kts) are sized to keep this one binding.
   private static final long HEALTH_TIMEOUT_MS = 240_000L;
-  private static final long WORKER_READY_TIMEOUT_MS = 90_000L;
+  private static final long INDEX_READY_TIMEOUT_MS = 90_000L;
   private static final long POLL_INTERVAL_MS = 200L;
   private static final long STOP_GRACE_MS = 5_000L;
   private static final int CLEANUP_ATTEMPTS = 3;
@@ -102,7 +102,7 @@ public final class IsolatedBackendFixture {
    * deliberately left this fixture blind. Once this appears in the body, the Head has stopped
    * trying, so every remaining millisecond of the health budget is spent waiting for nothing.
    */
-  private static final List<String> TERMINAL_WORKER_REASONS =
+  private static final List<String> TERMINAL_INDEX_REASONS =
       List.of("component.recovery_exhausted");
 
   private final String ownerLabel = resolveOwnerLabel();
@@ -380,7 +380,7 @@ public final class IsolatedBackendFixture {
   }
 
   private void awaitWorkerReady(int observedPort) throws InterruptedException {
-    long deadline = System.currentTimeMillis() + WORKER_READY_TIMEOUT_MS;
+    long deadline = System.currentTimeMillis() + INDEX_READY_TIMEOUT_MS;
     URI uri = URI.create("http://localhost:" + observedPort + "/api/health");
     HttpRequest req =
         HttpRequest.newBuilder(uri).timeout(java.time.Duration.ofSeconds(5)).GET().build();
@@ -406,7 +406,7 @@ public final class IsolatedBackendFixture {
       Thread.sleep(POLL_INTERVAL_MS);
     }
     throw new IllegalStateException(
-        "components.index.state did not reach READY within " + WORKER_READY_TIMEOUT_MS
+        "components.index.state did not reach READY within " + INDEX_READY_TIMEOUT_MS
             + "ms. Last /api/health body: " + lastBody);
   }
 
@@ -461,7 +461,7 @@ public final class IsolatedBackendFixture {
     if (body == null) {
       return;
     }
-    for (String terminal : TERMINAL_WORKER_REASONS) {
+    for (String terminal : TERMINAL_INDEX_REASONS) {
       if (body.contains(terminal)) {
         throw new IllegalStateException(
             "Worker recovery is terminal ("

@@ -23,24 +23,20 @@ import org.slf4j.LoggerFactory;
  * Periodic producer that builds {@link TimeseriesSnapshot} payloads for the
  * {@code core.metric-worker-job-queue-depth} TIMESERIES Resource — slice 3a.1.4 Phase 5.
  *
- * <p>Reads the head's existing {@link RrdMetricStore} (the same store
- * {@code TimeSeriesController} queries) for the {@code worker.job_queue.depth} metric
- * over a 30-minute window, sampled every 30 seconds. Wraps the result into a
- * {@link TimeseriesSnapshot} and broadcasts via the
- * {@link JobQueueDepthMetricChangeRegistry}.
+ * <p>The status-view tap in {@code StatusLifecycleHandler} passes the index component's
+ * recent queue-depth array to the callback wired by {@code CoreApiAssembly}. That callback
+ * converts the values to doubles and calls {@link #publishFromValues(double[])}. The producer
+ * wraps them in a 30-minute {@link TimeseriesSnapshot} with a 30-second sample interval,
+ * updates the holder and broadcasts changes through {@link JobQueueDepthMetricChangeRegistry}.
  *
  * <p>Mirrors the slice 440 {@code RuntimeContextConfigBridge} pattern: holder is updated
  * unconditionally, broadcast suppressed when the snapshot doesn't actually differ from
  * the previous one (no-op suppress to avoid wasted SSE traffic).
  *
- * <p>Cross-process design (per slice 3a.1.4 §B.10): the head's RRD store already
- * accumulates {@code worker.job_queue.depth} samples (worker pushes telemetry via gRPC;
- * head's OTel adapter records into RRD). No new worker→head streaming RPC is introduced;
- * the producer reuses the existing pipeline.
- *
- * <p>Tick cadence: 30 seconds, matching the metric's sample-interval. The producer's
- * first tick fires after 30 seconds of process uptime to give the RRD a chance to
- * accumulate at least one sample.
+ * <p>A separate optional {@link #tick()} queries the supplied {@link RrdMetricStore} for
+ * {@code worker.job_queue.depth}. It returns without publishing when the store or query
+ * result is unavailable. {@link #start()} schedules that tick every 30 seconds, with the
+ * first tick 30 seconds after scheduling. The status-array projection needs no RRD replication.
  */
 public final class JobQueueDepthMetricProducer {
 
@@ -49,7 +45,7 @@ public final class JobQueueDepthMetricProducer {
   /** Metric name in the head's RrdMetricStore (mirrors WorkerOpsMetricCatalog.JOB_QUEUE_DEPTH). */
   private static final String METRIC_NAME = "worker.job_queue.depth";
 
-  /** Window length: 30 minutes (matches the React Sparkline UX baseline + slice 419 trends). */
+  /** Window length: 30 minutes (slice 419 trends). */
   private static final Duration WINDOW = Duration.ofMinutes(30);
 
   /** Sample interval: 30 seconds (matches the RRD's primary archive cadence). */
@@ -129,12 +125,8 @@ public final class JobQueueDepthMetricProducer {
 
   /**
    * Publishes a snapshot built directly from a values array (instead of querying the
-   * head's RRD). Used by the head-side worker-view tap to bypass the broken worker→head
-   * RRD replication pipeline (observations.md inbox item #1, 2026-05-08): the worker
-   * already ships its 30-min job-queue-depth window inline as part of every
-   * {@code CoreStatus} gRPC response (`recent_job_queue_depth`), so the head can publish
-   * the metric snapshot directly from the gRPC-projected view without needing OTel
-   * worker→head metric replication.
+   * supplied RRD). The status-view callback projects the index component's
+   * {@code recent_job_queue_depth} array here, without metric replication into another store.
    *
    * <p>No-op when {@code values} is null. Otherwise builds a snapshot using the same
    * window / sample-interval / unit constants as {@link #tick()}, dedupes against the

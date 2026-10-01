@@ -160,7 +160,7 @@ public record RuntimeManifest(
   public record ShutdownHandoff(String state, String reason, String changedAt) {}
 
   /**
-   * Worker process surface — nullable. Becomes non-null on the second manifest write,
+   * index component surface — nullable. Becomes non-null on the second manifest write,
    * after {@code connectKnowledgeServer} resolves (either successfully or with a
    * spawn failure).
    *

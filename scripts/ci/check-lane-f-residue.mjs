@@ -43,14 +43,39 @@ function retiredRanges(text) {
   return ranges;
 }
 
-export function findResidue(file, text) {
+const allowlistPath = 'governance/lane-f-residue-allowlist.v1.json';
+
+export function validateAllowlist(data) {
+  if (data.version !== 1 || !Array.isArray(data.entries)) throw new Error('Invalid residue allowlist version/entries');
+  const keys = new Set();
+  for (const entry of data.entries) {
+    if (typeof entry.path !== 'string' || !entry.path || /[*?\[\]{}:]/.test(entry.path)
+        || entry.path.startsWith('/') || entry.path.includes('..')
+        || entry.path.includes('\\') || !terms.concat('gRPC', 'SupervisionPolicy').includes(entry.term) // lane F vocabulary
+        || !['b', 'c', 'd'].includes(entry.category) || typeof entry.reason !== 'string'
+        || !entry.reason.trim() || (entry.category === 'b' && !entry.reason.includes('C2-1'))
+        || !Number.isSafeInteger(entry.occurrenceCount) || entry.occurrenceCount < 1
+        || !Array.isArray(entry.anchors) || entry.anchors.length !== entry.occurrenceCount
+        || entry.anchors.some(anchor => typeof anchor !== 'string' || !anchor.trim()
+          || anchor !== anchor.trim() || /[\r\n]/.test(anchor) || !anchor.includes(entry.term))) {
+      throw new Error(`Invalid residue allowlist entry: ${JSON.stringify(entry)}`);
+    }
+    const key = `${entry.path}\0${entry.term}`;
+    if (keys.has(key)) throw new Error(`Duplicate residue allowlist entry: ${entry.path} / ${entry.term}`);
+    keys.add(key);
+  }
+  return data.entries;
+}
+
+// One candidate per unlabelled term occurrence; shared by review projections and enforcement.
+export function findCandidates(file, text) {
   file = file.replaceAll('\\', '/');
   const basename = path.posix.basename(file);
   const legacyFixture = /legacy/i.test(basename)
     && (/(?:^|\/)(?:test|tests|fixtures?)(?:\/|$)/i.test(file)
       || /(?:^|[-_.])(?:tests?|fixtures?)(?:[-_.]|$)/i.test(basename)
       || /(?:Test|Fixture)s?(?:[A-Z._-]|$)/.test(basename));
-  if (/^docs\/(?:tempdocs\/|design\/lane-f-engine-jvm\/)/.test(file) || legacyFixture) return [];
+  if (file === allowlistPath || /^docs\/(?:tempdocs\/|design\/lane-f-engine-jvm\/)/.test(file) || legacyFixture) return [];
   const historicalDecision = /^docs\/decisions\/00(?:01|02)[^/]*\.md$/.test(file);
   const frontmatter = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text);
   const decisionBodyStart = frontmatter?.[0].length ?? 0;
@@ -77,17 +102,53 @@ export function findResidue(file, text) {
     const positions = candidates.flatMap(term => {
       const positionsForTerm = [];
       for (let from = 0, index; (index = currentLine.indexOf(term, from)) !== -1; from = index + term.length) positionsForTerm.push(offset + index);
-      return positionsForTerm;
+      return positionsForTerm.map(position => ({ term, position }));
     });
     if (positions.length && !label.test(line) && !gitHistory.test(line)
         && !headings.some(h => h.labelled)
-        && !(historicalDecision && offset >= decisionBodyStart)
-        && positions.some(position => !ranges.some(([start, end]) => position >= start && position <= end))) {
-      hits.push(`${file}:${index + 1}: ${line.trimEnd()}`);
+        && !(historicalDecision && offset >= decisionBodyStart)) {
+      const unlabelled = positions.filter(({ position }) => !ranges.some(([start, end]) => position >= start && position <= end));
+      for (const { term } of unlabelled) {
+        hits.push({ term, anchor: line.trim(), line: index + 1, text: line.trimEnd() });
+      }
     }
     offset += line.length + 1;
   }
   return hits;
+}
+
+export function findResidue(file, text, allowlist = [], matched = new Map()) {
+  file = file.replaceAll('\\', '/');
+  const entries = new Map(allowlist.filter(entry => entry.path === file).map(entry => [entry.term, entry]));
+  const unresolved = new Map();
+  for (const hit of findCandidates(file, text)) {
+    const entry = entries.get(hit.term);
+    if (entry) {
+      const consumed = matched.get(entry) ?? new Map();
+      matched.set(entry, consumed);
+      const count = consumed.get(hit.anchor) ?? 0;
+      const reviewed = entry.anchors.filter(anchor => anchor === hit.anchor).length;
+      if (count < reviewed) {
+        consumed.set(hit.anchor, count + 1);
+        continue;
+      }
+    }
+    const previous = unresolved.get(hit.line);
+    unresolved.set(hit.line, {
+      text: `${file}:${hit.line}: ${hit.text}`,
+      unanchored: Boolean(entry) || previous?.unanchored,
+    });
+  }
+  return [...unresolved.values()].map(hit => (hit.unanchored ? 'UNANCHORED allowlist: ' : '') + hit.text);
+}
+
+export function staleAllowlist(allowlist, matched) {
+  return allowlist.flatMap(entry => {
+    const consumed = matched.get(entry);
+    const count = consumed ? [...consumed.values()].reduce((sum, value) => sum + value, 0) : 0;
+    return count === entry.occurrenceCount ? []
+      : [`STALE allowlist: ${entry.path} / ${entry.term}: matched ${count}/${entry.occurrenceCount} reviewed occurrences: ${entry.reason}`];
+  });
 }
 
 function main(args) {
@@ -114,13 +175,22 @@ function main(args) {
   } catch {
     files = walk(root);
   }
-  const hits = [...new Set(files)].sort().filter(file => !paths.length || paths.some(p => file === p || file.startsWith(p.replace(/\/$/, '') + '/'))).flatMap(file => {
+  const absoluteAllowlist = path.join(root, allowlistPath);
+  const allowlist = fs.existsSync(absoluteAllowlist)
+    ? validateAllowlist(JSON.parse(fs.readFileSync(absoluteAllowlist, 'utf8'))) : [];
+  const matched = new Map();
+  const hits = [];
+  // Scan every file even for --paths, so stale entries cannot hide behind a scoped run.
+  for (const file of [...new Set(files)].sort()) {
     const absolute = path.join(root, file);
-    if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) return [];
+    if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) continue;
     const bytes = fs.readFileSync(absolute);
-    if (bytes.includes(0)) return [];
-    return findResidue(file, bytes.toString('utf8'));
-  });
+    if (bytes.includes(0)) continue;
+    const found = findResidue(file, bytes.toString('utf8'), allowlist, matched);
+    const inScope = !paths.length || paths.some(p => file === p || file.startsWith(p.replace(/\/$/, '') + '/'));
+    hits.push(...found.filter(hit => inScope || hit.startsWith('UNANCHORED allowlist:')));
+  }
+  hits.push(...staleAllowlist(allowlist, matched));
   for (const hit of hits) console.log(hit);
   process.exitCode = hits.length ? 1 : 0;
 }

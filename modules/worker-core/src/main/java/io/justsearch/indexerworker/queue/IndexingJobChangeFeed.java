@@ -11,7 +11,7 @@ import java.util.function.Consumer;
  * Slice 445 substrate boundary: a typed, snapshot-then-deltas feed of mutations
  * on the indexing job collection. The {@link SqliteJobQueue} concrete
  * implementation lives in {@code indexer-worker} (uses Xerial SQLite-specific
- * commit hooks); this interface is the seam against which the gRPC layer in
+ * commit hooks); this interface is the seam against which the in-process port layer in
  * {@code worker-services} subscribes.
  *
  * <p>Per slice 445 §A.3 (lean scope, verification commit {@code 044b21ab3}):

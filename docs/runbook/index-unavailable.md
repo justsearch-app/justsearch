@@ -34,7 +34,7 @@ The system overview defines corruption and schema mismatch in an essential index
 
 ## Diagnostics
 
-1. Check `/api/status` and `/api/debug/state`. Record the lane F retained `WORKER_CONTROL_PLANE` and `INDEX_SERVING` states and their dotted reason codes.
+1. Check `/api/status` and `/api/debug/state`. Record the lane F retained `INDEX_CONTROL_PLANE` and `INDEX_SERVING` states and their dotted reason codes.
 
 2. Check `/api/health` and `/api/health/events/stream` for the lifecycle envelope and condition detail. Treat the PascalCase event reason as a projection; use the dotted status reason when selecting the response above.
 

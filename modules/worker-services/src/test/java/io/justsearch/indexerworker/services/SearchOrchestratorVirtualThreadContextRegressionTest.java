@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  * A bare {@code Context.current()} silently misses {@code retrievalSpan} — because
  * {@code retrievalSpan} is created via {@code setParent(parentCtx).startSpan()}
  * and never made current in the outer thread — which causes per-leg branch spans
- * to parent to gRPC root instead of {@code search/retrieval}. End-to-end
+ * to parent to operation root instead of {@code search/retrieval}. End-to-end
  * verification proved this in tempdoc §23.2 defect 2: 12 {@code search/branch}
  * spans across 4 HYBRID queries carried 12 distinct {@code trace_id} values, zero
  * matching the 4 parent {@code search/retrieval} trace_ids.

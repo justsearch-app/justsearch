@@ -150,10 +150,10 @@ public final class KnowledgeHttpApiAdapter {
   }
 
   /**
-   * 360: No-op — reranker lifecycle moved to Worker process. Retained for API compatibility with
+   * 360: No-op — reranker lifecycle moved to index component. Retained for API compatibility with
    * HeadAssembly shutdown sequence.
    */
   public void closeReranker() {
-    // No-op: reranker now lives in the Worker process and is closed by KnowledgeServer
+    // No-op: reranker now lives in the index component and is closed by KnowledgeServer
   }
 }

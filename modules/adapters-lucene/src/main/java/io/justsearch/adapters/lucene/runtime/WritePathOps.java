@@ -806,8 +806,7 @@ public final class WritePathOps {
     // Tempdoc 406 Phase 4b (A1): replaced state-machine check with snapshot/writer
     // null check. WritePathOps is only reachable through RunningRuntime, which by
     // construction has an open writer. Snapshot null means the runtime was closed.
-    // Tempdoc 406 Gap G: also reject writes during drain — caller should retry on the
-    // upgraded holder reference (UNAVAILABLE on the gRPC layer).
+    // Also reject writes during drain with IllegalStateException.
     if (session.draining) {
       throw new IllegalStateException(
           "Runtime is draining; retry on the new instance via the supplier holder");

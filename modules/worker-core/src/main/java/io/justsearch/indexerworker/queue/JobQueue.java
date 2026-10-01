@@ -1129,7 +1129,7 @@ public interface JobQueue extends Closeable {
    * Slice 445: optional change-feed for the indexing-jobs collection. Backs the
    * {@code core.indexing-jobs} TABULAR Resource via SSE_STREAM. Implementations
    * that can't expose per-row mutations (e.g., in-memory test queues) return
-   * {@link Optional#empty()} and the gRPC handler degrades to UNIMPLEMENTED.
+   * {@link Optional#empty()} and the service handler degrades to UNIMPLEMENTED.
    */
   default Optional<IndexingJobChangeFeed> indexingJobChangeFeed() {
     return Optional.empty();

@@ -972,12 +972,12 @@ val createHeadlessRuntime by tasks.registering(Exec::class) {
       // Module rationale:
       // - java.base: Core runtime (required)
       // - java.logging: SLF4J/Logback logging subsystem
-      // - java.naming: JNDI (used by some JDBC drivers, gRPC service discovery)
+      // - java.naming: required by the Logback classic module (JNDI context support)
       // - java.net.http: HttpClient for AI pack downloads, health checks
       // - java.sql: SQLite job queue in Worker, JDBC drivers
       // - java.management: JMX ManagementFactory for heap/thread metrics
       // - jdk.management: com.sun.management.OperatingSystemMXBean for process metrics (JvmRuntimeGauges)
-      // - java.security.sasl: SASL authentication (gRPC, security providers)
+      // - java.security.sasl: required by the JDK java.naming module
       // - java.xml: XML parsing (config files, Tika metadata)
       // - java.desktop: AWT/Swing (image handling, clipboard in UI scenarios)
       // - jdk.httpserver: Lightweight HTTP server for local API
@@ -2165,7 +2165,7 @@ fun JavaExec.applyHeadlessEvalContract() {
   // AI env vars declared in HEADLESS_AI_ENV_VARS but not hardcoded above.
   // Mirrors the runHeadless task (line 1828) so keys like
   // JUSTSEARCH_INDEX_TRACING_LEVEL (400 Layer 2) and JUSTSEARCH_LLM_* reach
-  // the Worker JVM in eval mode. Hardcoded keys in envValues take precedence
+  // the Engine JVM in eval mode. Hardcoded keys in envValues take precedence
   // via LinkedHashMap insertion semantics (first write wins only when using
   // putIfAbsent — Map.set overwrites, so only forward missing keys).
   for (aiVar in HEADLESS_AI_ENV_VARS) {

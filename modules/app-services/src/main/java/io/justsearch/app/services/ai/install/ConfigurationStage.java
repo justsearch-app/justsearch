@@ -77,7 +77,7 @@ final class ConfigurationStage {
   static final String LLM_SETTINGS = "llm_settings";
   static final String ONNX_SETTINGS = "onnx_settings";
   static final String ORT_NATIVE_PATH = "ort_native_path";
-  static final String WORKER_RESTART = "worker_restart";
+  static final String CONFIGURATION_APPLIED = "worker_restart";
 
   private final List<Step> steps;
   private final BooleanSupplier cancelRequested;
@@ -114,7 +114,7 @@ final class ConfigurationStage {
             // longer happens. The phase ID stays `restart_worker`: it is the machine key a caller
             // reads, and renaming it would be a contract change rather than a copy fix.
             new Step(
-                WORKER_RESTART,
+                CONFIGURATION_APPLIED,
                 "restart_worker",
                 "Applied — restart JustSearch to use the new configuration",
                 true,

@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The Head process's loopback-only HTTP API server (Javalin). Binds 127.0.0.1 only and delegates all
- * index IO to the Worker via gRPC — it never touches Lucene directly (the two hard invariants).
+ * index IO to the Worker via an in-process port — it never touches Lucene directly (the two hard invariants).
  *
  * <p><b>Structure (tempdoc 583).</b> This class is a thin composer, not a god-class: it wires
  * collaborators and registers routes, but does not itself construct the bulk of the controller graph.
@@ -808,7 +808,7 @@ public class LocalApiServer {
 
   /**
    * Tempdoc 406 — POST /api/admin/runtime/reload. Triggers a holder swap on the
-   * Worker's ingest runtime via gRPC. Optional JSON body: {@code {"reason":"<tag>"}}.
+   * Worker's ingest runtime via an in-process port. Optional JSON body: {@code {"reason":"<tag>"}}.
    * Returns {@code {"swapDurationMs": N}}. Operator-only; no per-route auth — the
    * endpoint inherits loopback-only safety from the Javalin bind to {@code 127.0.0.1}
    * at line 582 ({@code app.start("127.0.0.1", bindPort)}). See CLAUDE.md hard rule

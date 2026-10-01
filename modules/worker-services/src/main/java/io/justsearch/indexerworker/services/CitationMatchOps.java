@@ -191,7 +191,7 @@ final class CitationMatchOps {
    * supplied text would leave the other silently re-fetching chunks.
    *
    * @param passageTexts literal text per source — either empty, or exactly as long as {@code
-   *     chunkDocIds} (validated at the gRPC boundary); a blank entry means "look this one up"
+   *     chunkDocIds} (validated at the in-process port boundary); a blank entry means "look this one up"
    * @return a fully-built MatchCitationsResponse for all paths (success, fallback, error)
    */
   MatchCitationsResponse execute(

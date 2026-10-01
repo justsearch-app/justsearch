@@ -1282,7 +1282,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         #
         # `fixtures_variant="indexing"` is the whole reason this is a dedicated isolated step. Under
         # the default fixture the worker reports indexState "SERVING" — a fallback state the progress
-        # projection deliberately refuses to read (indexingProgress.WORKER_REPORTED_INDEX_STATES) —
+        # projection deliberately refuses to read (indexingProgress.INDEX_REPORTED_STATES) —
         # so the panel is correctly invisible on every other step. The `indexing` variant supplies a
         # live INDEXING worker with a real backlog (ui_fixtures._status_body), which is what puts the
         # aggregate card on screen.

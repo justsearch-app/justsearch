@@ -23,6 +23,13 @@ describe('generated statusResponseSchema (564 faithfulness)', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts the INDEXING GPU lease holder projected by the Engine', () => {
+    const fixture = structuredClone(statusFixture);
+    fixture.inference.leaseHolder = 'INDEXING';
+    const result = statusResponseSchema.parse(fixture);
+    expect(result.inference?.leaseHolder).toBe('INDEXING');
+  });
+
   it('exposes the six engine-component states as a distinct generated vocabulary', () => {
     const expected = ['ABSENT', 'STARTING', 'READY', 'RELOADING', 'FAILED', 'UNAVAILABLE'];
 

@@ -59,7 +59,7 @@ import org.mockito.quality.Strictness;
 final class GplFetchDocumentsByteBudgetTest {
 
   private static final int GPL_BATCH_SIZE = 50;
-  private static final int WORKER_CONTENT_CAP_CHARS =
+  private static final int INDEX_CONTENT_CAP_CHARS =
       GrpcMessageLimits.MAX_DOCUMENT_CONTENT_CHARS;
 
   @TempDir Path tempDir;
@@ -123,7 +123,7 @@ final class GplFetchDocumentsByteBudgetTest {
     when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(GPL_BATCH_SIZE), org.mockito.ArgumentMatchers.eq(GPL_BATCH_SIZE), any())).thenReturn(emptyPage);
 
     // Every document is exactly at the worker's cap — the worst case the budget exists for.
-    String maximalContent = "x".repeat(WORKER_CONTENT_CAP_CHARS);
+    String maximalContent = "x".repeat(INDEX_CONTENT_CAP_CHARS);
     List<List<String>> requests = new ArrayList<>();
     when(knowledgeClient.fetchDocuments(any(), any()))
         .thenAnswer(
@@ -171,7 +171,7 @@ final class GplFetchDocumentsByteBudgetTest {
     long ceiling = GrpcMessageLimits.MAX_INBOUND_MESSAGE_BYTES;
     for (List<String> request : requests) {
       long worstCaseBytes =
-          (long) request.size() * WORKER_CONTENT_CAP_CHARS * 3L + (long) request.size() * 8_192L;
+          (long) request.size() * INDEX_CONTENT_CAP_CHARS * 3L + (long) request.size() * 8_192L;
       assertTrue(
           worstCaseBytes < ceiling,
           "a request of "
