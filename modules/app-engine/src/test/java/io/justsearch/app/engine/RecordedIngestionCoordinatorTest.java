@@ -111,6 +111,212 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  @Test
+  void servicePublicationAfterShutdownResumesPreWalkChildOnceAcrossBothStoreReopens() throws Exception {
+    OperationRecord originalParent;
+    OperationRecord originalChild;
+    RecordedRootPlan frozen;
+    var producerCalls = new AtomicInteger();
+    try (Fixture old = new Fixture(temp, 1)) {
+      old.attachment.close();
+      old.attachment = old.coordinator.attach(old.queue, Optional::empty, () -> true);
+      old.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+        producerCalls.incrementAndGet();
+        throw new AssertionError("writer readiness must precede enumeration");
+      });
+      var request = old.request();
+      var accepted = old.accept(request);
+      try (var work = old.admission.admit(request.context(), false)) {
+        var started = old.runner.start(accepted, handle -> old.coordinator.execute(handle, work.context()));
+        old.attachment.servicesPublished();
+        originalParent = old.operations.find(request.key()).orElseThrow();
+        originalChild = old.operations.findIngestChild(request.key(), old.plan).orElseThrow();
+        frozen = old.plan;
+        assertEquals(OperationState.RUNNING, originalParent.state());
+        assertEquals(OperationState.RUNNING, originalChild.state());
+        assertEquals(1, originalParent.attempts());
+        assertEquals(1, originalChild.attempts());
+        assertTrue(originalChild.checkpointCursor() == null);
+        assertTrue(old.queue.recordedWalk(originalChild.key()).isEmpty());
+        assertEquals(0, producerCalls.get());
+        old.admission.beginClosing();
+        old.runner.beginClosing();
+        old.coordinator.stopProducers(1_000);
+        assertFalse(started.completion().toCompletableFuture().isDone());
+      }
+      old.attachment.close();
+      assertEquals(0, old.admission.activeWorkCount());
+      assertTrue(old.runner.awaitDrained(java.time.Duration.ZERO));
+      assertEquals(originalParent, old.operations.find(originalParent.key()).orElseThrow());
+      assertEquals(originalChild, old.operations.find(originalChild.key()).orElseThrow());
+      assertTrue(old.queue.recordedWalk(originalChild.key()).isEmpty());
+    }
+
+    var writerReady = new AtomicBoolean();
+    var admission = new EngineAdmissionController(2, 2, 1);
+    var authority = OperationAuthority.load(temp.resolve("authority"));
+    try (var operations = new SqliteOperationStore(temp.resolve("operations.db"))) {
+      var runner = new OperationAttemptRunnerImpl(operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
+          null, new RecordedIngestPlanResolver());
+      var recovered = new RecordedIngestionCoordinator(operations, runner, admission, authority);
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
+        queue.open();
+        try (var attachment = recovered.attach(queue,
+            () -> writerReady.get() ? Optional.of(GENERATION) : Optional.empty(), () -> true)) {
+          var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
+          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+            assertEquals(frozen, plan);
+            assertEquals(originalChild.key(), key);
+            assertEquals(1L, epoch, "recovery starts the first physical enumeration");
+            assertEquals("ingest-progress:1:" + queue.recordedWalk(key).orElseThrow().revision(),
+                operations.find(key).orElseThrow().checkpointCursor(),
+                "walk-start evidence must be durable before the producer can issue effects");
+            assertEquals(1, producerCalls.incrementAndGet());
+            return producerExit;
+          });
+          attachment.servicesPublished();
+          assertEquals(originalChild, operations.find(originalChild.key()).orElseThrow(),
+              "unready recovery must retain the never-created child without spending an attempt");
+          assertEquals(originalParent, operations.find(originalParent.key()).orElseThrow());
+          assertTrue(queue.recordedWalk(originalChild.key()).isEmpty());
+          writerReady.set(true);
+          attachment.servicesPublished();
+          attachment.servicesPublished();
+          recovered.maintain();
+          assertEquals(1, producerCalls.get());
+          assertEquals(originalChild.id(), operations.findIngestChild(originalParent.key(), frozen).orElseThrow().id());
+          assertEquals(2, operations.find(originalChild.key()).orElseThrow().attempts(), "one budgeted boot resume");
+          assertEquals(2, operations.find(originalParent.key()).orElseThrow().attempts(), "one budgeted boot resume");
+          producerExit.complete(JobQueue.WalkEnumerationOutcome.COMPLETE);
+          recovered.maintain();
+          assertEquals(OperationState.COMPLETE, operations.find(originalChild.key()).orElseThrow().state());
+          assertEquals(OperationState.COMPLETE, operations.find(originalParent.key()).orElseThrow().state());
+          assertEquals(2, operations.find(originalChild.key()).orElseThrow().attempts());
+          assertEquals(2, operations.find(originalParent.key()).orElseThrow().attempts());
+          var receipt = queue.recordedWalk(originalChild.key()).orElseThrow();
+          assertEquals(1L, receipt.enumerationEpoch());
+          assertEquals(receipt.revision(), receipt.acknowledgedRevision());
+          assertEquals(0, admission.activeWorkCount());
+        }
+      }
+    }
+
+    // A second process recovery trusts the terminal receipt and cannot enumerate again.
+    try (var operations = new SqliteOperationStore(temp.resolve("operations.db"))) {
+      var runner = new OperationAttemptRunnerImpl(operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
+          null, new RecordedIngestPlanResolver());
+      var recovered = new RecordedIngestionCoordinator(operations, runner,
+          new EngineAdmissionController(2, 2, 1), authority);
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
+        queue.open();
+        try (var attachment = recovered.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
+          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+            producerCalls.incrementAndGet();
+            throw new AssertionError("terminal recovery cannot enumerate again");
+          });
+          attachment.servicesPublished();
+          recovered.maintain();
+          assertEquals(1, producerCalls.get());
+          assertEquals(OperationState.COMPLETE, operations.find(originalParent.key()).orElseThrow().state());
+          assertEquals(OperationState.COMPLETE, operations.find(originalChild.key()).orElseThrow().state());
+          assertEquals(2, operations.find(originalParent.key()).orElseThrow().attempts());
+          assertEquals(2, operations.find(originalChild.key()).orElseThrow().attempts());
+          assertEquals(1L, queue.recordedWalk(originalChild.key()).orElseThrow().enumerationEpoch());
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"missing-checkpointed-walk", "missing-unit-walk", "missing-receipted-walk", "mismatched-plan", "decreased-completed", "decreased-failed"})
+  void recoveryCannotRecreateOrEnumerateContradictoryChildEvidence(String fault) throws Exception {
+    OperationRecord originalParent;
+    OperationRecord originalChild;
+    try (Fixture old = new Fixture(temp, 1)) {
+      originalParent = old.accept(old.request()).accepted();
+      assertTrue(old.operations.start(originalParent.id()));
+      originalChild = old.operations.acceptIngestChild(originalParent.key(), OperationKeys.generate(CLOCK),
+          old.operations.acceptedPreparation(originalParent.id()).orElseThrow(), old.plan).record();
+      assertTrue(old.operations.start(originalChild.id()));
+      var walk = old.queue.beginRecordedWalk(originalChild.key(),
+          CanonicalOperationArguments.digest(old.plan.toReplayPayload()), true);
+      if (fault.equals("missing-unit-walk") || fault.equals("missing-receipted-walk")) {
+        Path file = old.plan.roots().getFirst().path().resolve("retained.txt");
+        old.queue.enqueueRecordedEntries(originalChild.key(), walk.enumerationEpoch(),
+            List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+        if (fault.equals("missing-receipted-walk")) {
+          old.fixtureClaimOwner.set(true);
+          var claim = old.queue.pollPending(1).getFirst();
+          old.queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, "a".repeat(64))),
+              io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                  io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+                  io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+          old.queue.closeRecordedWalkEnumeration(originalChild.key(), walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+          old.queue.trySealRecordedWalk(originalChild.key());
+          assertTrue(old.queue.sealedRecordedWalkReceipt(originalChild.key()).isPresent());
+          // Leave only receipt evidence, so a guard checking jobs alone cannot pass.
+          try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+              var delete = connection.prepareStatement("DELETE FROM jobs WHERE scan_id = ?")) {
+            delete.setString(1, originalChild.key());
+            assertEquals(1, delete.executeUpdate());
+          }
+        }
+      } else {
+        assertTrue(old.operations.checkpoint(originalChild.id(), "ingest-progress:1:" + walk.revision(),
+            fault.equals("decreased-completed") ? 1 : 0, fault.equals("decreased-failed") ? 1 : 0));
+      }
+      if (fault.startsWith("missing-")) {
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+            var delete = connection.prepareStatement("DELETE FROM ingestion_walk_progress WHERE operation_key = ?")) {
+          delete.setString(1, originalChild.key());
+          assertEquals(1, delete.executeUpdate());
+        }
+      } else if (fault.equals("mismatched-plan")) {
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+            var update = connection.prepareStatement("UPDATE ingestion_walk_progress SET plan_hash = ? WHERE operation_key = ?")) {
+          update.setString(1, "b".repeat(64));
+          update.setString(2, originalChild.key());
+          assertEquals(1, update.executeUpdate());
+        }
+      }
+    }
+    try (var operations = new SqliteOperationStore(temp.resolve("operations.db"))) {
+      var runner = new OperationAttemptRunnerImpl(operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
+          null, new RecordedIngestPlanResolver());
+      var admission = new EngineAdmissionController(2, 2, 1);
+      var recovered = new RecordedIngestionCoordinator(operations, runner, admission,
+          OperationAuthority.load(temp.resolve("authority")));
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
+        queue.open();
+        try (var attachment = recovered.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
+          var producerCalls = new AtomicInteger();
+          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+            producerCalls.incrementAndGet();
+            throw new AssertionError("contradictory evidence cannot authorize enumeration");
+          });
+          attachment.servicesPublished();
+          recovered.maintain();
+          assertEquals(0, producerCalls.get());
+          var child = operations.find(originalChild.key()).orElseThrow();
+          var parent = operations.find(originalParent.key()).orElseThrow();
+          assertEquals(OperationState.FAILED, child.state());
+          assertEquals(RecordedIngestionSettlement.UNAVAILABLE, child.receipt().code());
+          assertEquals(OperationState.FAILED, parent.state());
+          assertEquals(RecordedIngestionSettlement.UNAVAILABLE, parent.receipt().code());
+          assertEquals(originalChild.id(), child.id());
+          assertEquals(originalParent.id(), parent.id());
+          assertEquals(0, admission.activeWorkCount());
+          if (fault.startsWith("missing-")) assertTrue(queue.recordedWalk(child.key()).isEmpty());
+          else assertEquals(1L, queue.recordedWalk(child.key()).orElseThrow().enumerationEpoch());
+          assertEquals(JobQueue.RecordedClaimDecision.DENY, recovered.recordedClaimDecision(child.key()));
+        }
+      }
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void acceptedForegroundParentRequiresLiveOwnerProofForBackgroundInvocation(boolean detached) throws Exception {

@@ -746,25 +746,39 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         || policy instanceof RecordedIngestRecoveryDecision.Refused
         || (parentRow.attempts() >= OperationAttemptRunner.MAX_DURABLE_ATTEMPTS
             && !parents.containsKey(parentRow.key()));
+    final boolean createIfMissing;
     try {
-      var progress = physical.queue.recordedWalk(row.key()).orElseThrow(
-          () -> new JobQueue.RecordedWalkGapException("Recorded child progress disappeared"));
-      if (!hash.equals(progress.planHash())) throw new JobQueue.RecordedWalkGapException("Child plan mismatch");
-      if (refused && progress.enumerationClosedAt() == null) {
-        permissions.remove(row.key());
-        physical.queue.closeRecordedWalkEnumeration(row.key(), progress.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.FAILED);
-      }
-      if (recordedRefusal(parentRow) != null && progress.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE) {
-        permissions.remove(row.key());
-        physical.queue.retireRefusedRecordedWalk(row.key(), hash);
-      }
-      physical.queue.trySealRecordedWalk(row.key());
-      if (physical.queue.sealedRecordedWalkReceipt(row.key()).isPresent() || refused) {
-        permissions.remove(row.key());
-        var settlement = recordedRefusal(parentRow) == null ? physical.settlement.reconcile(row, hash, true)
-            : physical.settlement.reconcileRefused(row, hash);
-        if (settlement instanceof Reconciliation.CheckpointAndWait) advanced = true;
-        return settlement;
+      var observed = physical.queue.recordedWalk(row.key());
+      createIfMissing = observed.isEmpty();
+      if (createIfMissing) {
+        // Acceptance/start precede writer readiness and the first physical walk. Only a child
+        // with no confirmed walk activity may cross that gap; beginRecordedWalk also refuses
+        // retained queue/receipt evidence transactionally before creating its first epoch.
+        if (row.checkpointCursor() != null || row.unitsCompleted() != 0 || row.unitsFailed() != 0 || refused) {
+          throw new JobQueue.RecordedWalkGapException("Recorded child progress disappeared");
+        }
+      } else {
+        var progress = observed.orElseThrow();
+        if (!hash.equals(progress.planHash()) || progress.completedUnits() < row.unitsCompleted()
+            || progress.failedUnits() < row.unitsFailed()) {
+          throw new JobQueue.RecordedWalkGapException("Child progress contradicted its operation");
+        }
+        if (refused && progress.enumerationClosedAt() == null) {
+          permissions.remove(row.key());
+          physical.queue.closeRecordedWalkEnumeration(row.key(), progress.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.FAILED);
+        }
+        if (recordedRefusal(parentRow) != null && progress.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE) {
+          permissions.remove(row.key());
+          physical.queue.retireRefusedRecordedWalk(row.key(), hash);
+        }
+        physical.queue.trySealRecordedWalk(row.key());
+        if (physical.queue.sealedRecordedWalkReceipt(row.key()).isPresent() || refused) {
+          permissions.remove(row.key());
+          var settlement = recordedRefusal(parentRow) == null ? physical.settlement.reconcile(row, hash, true)
+              : physical.settlement.reconcileRefused(row, hash);
+          if (settlement instanceof Reconciliation.CheckpointAndWait) advanced = true;
+          return settlement;
+        }
       }
     } catch (JobQueue.RecordedWalkGapException unavailable) {
       permissions.remove(row.key());
@@ -780,7 +794,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       return physical.queue.hasIssuedRecordedClaims(row.key()) ? new Reconciliation.Wait()
           : failed(RecordedIngestionSettlement.EXHAUSTED);
     }
-    return new Reconciliation.Resume(handle -> installChild(parent, row, handle, binding.plan(), false, false));
+    return new Reconciliation.Resume(handle -> installChild(parent, row, handle, binding.plan(), false, createIfMissing));
   }
 
   private void drive(Parent parent, Attached physical, Set<String> openChildParents, boolean unknownChild) {
@@ -998,6 +1012,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
             var progress = physical.queue.beginRecordedWalk(row.key(), planHash(child.plan), child.createIfMissing);
             child.createIfMissing = false;
             child.epoch = progress.enumerationEpoch();
+            // Persist evidence that the walk began before publishing any producer effects.
+            // Recovery can then distinguish lost progress from accepted pre-walk work.
+            child.handle.checkpoint("ingest-progress:1:" + progress.revision(),
+                progress.completedUnits(), progress.failedUnits());
             child.cancellation = new CancelToken();
             if (parent.cancelled) {
               child.cancellation.cancel("parent cancelled before producer publication");
