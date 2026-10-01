@@ -1,0 +1,513 @@
+{
+  "kind": "lane-f-e-run.v1",
+  "id": "2026-10-01T06-33-01-961Z-ddc6c6d3",
+  "groups": [
+    "E2",
+    "E3"
+  ],
+  "arm": "main",
+  "startedAt": "2026-10-01T06:33:01.971Z",
+  "machine": {
+    "hostname": "DESKTOP-FA00PO7",
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "cpu": [
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K"
+    ],
+    "ramBytes": 34028519424,
+    "node": "v24.12.0"
+  },
+  "pairIdentity": "c62ca4c438a5408402c9d897299272955eb41807d7fe45c0898ac08f6646dd64",
+  "valuesHash": "5d0e0c6fb2b1a153795470f64f7dbcbe8bfe2cea55ae6fc4d5b62fb7c49d1350",
+  "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3.json",
+  "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3",
+  "runIds": [
+    "e3d22936-b814-4f8f-a595-ed74447ed221"
+  ],
+  "commands": [
+    {
+      "label": "revision",
+      "executable": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:33:01.978Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\0-revision.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\0-revision.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:33:01.998Z"
+    },
+    {
+      "label": "dirty",
+      "executable": "git",
+      "args": [
+        "status",
+        "--porcelain"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:33:02.002Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\1-dirty.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\1-dirty.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:33:02.052Z"
+    },
+    {
+      "label": "runner-status",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "status",
+        "--active",
+        "--json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:33:02.059Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\2-runner-status.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\2-runner-status.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:33:02.102Z"
+    },
+    {
+      "label": "machine",
+      "executable": "node",
+      "args": [
+        "-e",
+        "const os=require(\"node:os\");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:33:02.109Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\3-machine.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\3-machine.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:33:02.148Z"
+    },
+    {
+      "label": "gpu",
+      "executable": "nvidia-smi",
+      "args": [
+        "--query-gpu=name,uuid,memory.total,driver_version",
+        "--format=csv"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:33:02.152Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\4-gpu.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\4-gpu.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:33:02.200Z"
+    },
+    {
+      "label": "start-agent-idle-hybrid",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "start",
+        "--json",
+        "--skip-build",
+        "--clean",
+        "none",
+        "--data-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\tmp\\lane-f-e\\2026-10-01T06-33-01-961Z-ddc6c6d3\\agent-idle-hybrid",
+        "--api-port",
+        "33221",
+        "--session-id",
+        "lane-f-e-2026-10-01T06-33-01-961Z-ddc6c6d3",
+        "--lease-duration-sec",
+        "3600",
+        "--chat-profile",
+        "standard"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "mode": "start",
+      "requestsAfterReceipt": [
+        "/api/mcp/token",
+        "/api/health",
+        "/api/status",
+        "/api/debug/state",
+        "/api/runtime/manifest",
+        "/api/debug/effective-config"
+      ],
+      "startedAt": "2026-10-01T06:33:02.207Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\5-start-agent-idle-hybrid.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\5-start-agent-idle-hybrid.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T07:32:10.362Z"
+    },
+    {
+      "label": "/api/mcp/token",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/mcp/token",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T06:33:04.517Z",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/health",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/health",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T06:33:08.539Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\6-_api_health.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/debug/state",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/debug/state",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T06:33:08.691Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\7-_api_debug_state.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/runtime/manifest",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/runtime/manifest",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T06:33:08.697Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\8-_api_runtime_manifest.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/debug/effective-config",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/debug/effective-config",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T06:33:08.705Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\9-_api_debug_effective-config.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "capability-ready-start-agent-idle-hybrid",
+      "executable": "python",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\capability-ready.py",
+        "--base-url",
+        "http://127.0.0.1:33221",
+        "--timeout",
+        "300",
+        "--output",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\start-agent-idle-hybrid-capability-ready.json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:33:08.715Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\10-capability-ready-start-agent-idle-hybrid.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\10-capability-ready-start-agent-idle-hybrid.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:33:17.859Z"
+    },
+    {
+      "label": "rss-agent-idle-hybrid",
+      "executable": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\head-rss-sampler.ps1",
+        "-Out",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\agent-idle-hybrid\\head-rss.csv",
+        "-Stop",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\agent-idle-hybrid\\rss.stop",
+        "-IncludeSplitWorker"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "mode": "background",
+      "startedAt": "2026-10-01T06:33:17.867Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\11-rss-agent-idle-hybrid.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\11-rss-agent-idle-hybrid.stderr",
+      "code": null,
+      "signal": "SIGTERM",
+      "endedAt": "2026-10-01T07:32:02.004Z"
+    },
+    {
+      "label": "status-agent-idle-hybrid",
+      "executable": "bash",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\status-sampler.sh",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\agent-idle-hybrid",
+        "33221",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\agent-idle-hybrid\\status.stop"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "mode": "background",
+      "startedAt": "2026-10-01T06:33:17.871Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\12-status-agent-idle-hybrid.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\12-status-agent-idle-hybrid.stderr",
+      "code": null,
+      "signal": "SIGTERM",
+      "endedAt": "2026-10-01T07:32:02.063Z"
+    },
+    {
+      "label": "agent-idle-hybrid",
+      "executable": "python",
+      "args": [
+        "-m",
+        "jseval",
+        "run",
+        "--dataset",
+        "scifact",
+        "--modes",
+        "lexical,hybrid",
+        "--embedding",
+        "--splade",
+        "--ce",
+        "--pipeline",
+        "--base-url",
+        "http://127.0.0.1:33221",
+        "--corpus-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\corpus\\scifact",
+        "--output-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\agent-idle-hybrid\\eval-results",
+        "--timeline",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\agent-idle-hybrid\\timeline.tsv",
+        "--search-load",
+        "continuous",
+        "--search-load-search-mode",
+        "hybrid",
+        "--max-queries",
+        "1"
+      ],
+      "cwd": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:33:17.879Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\13-agent-idle-hybrid.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\13-agent-idle-hybrid.stderr",
+      "code": null,
+      "signal": "SIGTERM",
+      "endedAt": "2026-10-01T07:32:01.995Z"
+    },
+    {
+      "label": "stop-agent-idle-hybrid",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "stop",
+        "--json",
+        "--run",
+        "e3d22936-b814-4f8f-a595-ed74447ed221",
+        "--session-id",
+        "lane-f-e-2026-10-01T06-33-01-961Z-ddc6c6d3"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "mode": "stop",
+      "startedAt": "2026-10-01T07:32:02.004Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\14-stop-agent-idle-hybrid.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\14-stop-agent-idle-hybrid.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T07:32:12.982Z"
+    }
+  ],
+  "metrics": {},
+  "clauses": {},
+  "gaps": {
+    "foreground-p95": "Named instrument did not produce a validated measurement for this clause",
+    "agent-api-p95": "Named instrument did not produce a validated measurement for this clause",
+    "idle-rejections": "Named instrument did not produce a validated measurement for this clause",
+    "scripted-rejections": "Named instrument did not produce a validated measurement for this clause",
+    "no-timeout-or-5xx": "Named instrument did not produce a validated measurement for this clause",
+    "chunks-per-second-under-foreground-load": "Named instrument did not produce a validated measurement for this clause"
+  },
+  "additionalArtifacts": [],
+  "revision": "ac1c93bf32c2bba3e4a22462295acbc618f850bc",
+  "tokenEnforced": false,
+  "sharedModels": "F:\\justsearch-public\\models",
+  "failure": "agent-idle-hybrid exited null; see F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\13-agent-idle-hybrid.stderr",
+  "endedAt": "2026-10-01T07:32:12.982Z",
+  "rawFiles": [
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\0-revision.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\0-revision.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\1-dirty.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\1-dirty.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\10-capability-ready-start-agent-idle-hybrid.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\10-capability-ready-start-agent-idle-hybrid.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\11-rss-agent-idle-hybrid.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\11-rss-agent-idle-hybrid.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\12-status-agent-idle-hybrid.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\12-status-agent-idle-hybrid.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\13-agent-idle-hybrid.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\13-agent-idle-hybrid.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\14-stop-agent-idle-hybrid.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\14-stop-agent-idle-hybrid.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\2-runner-status.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\2-runner-status.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\3-machine.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\3-machine.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\4-gpu.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\4-gpu.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\5-start-agent-idle-hybrid.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\5-start-agent-idle-hybrid.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\6-_api_health.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\7-_api_debug_state.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\8-_api_runtime_manifest.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\9-_api_debug_effective-config.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\agent-idle-hybrid\\head-rss.csv",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\agent-idle-hybrid\\status-series.csv",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\start-agent-idle-hybrid-capability-ready.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T06-33-01-961Z-ddc6c6d3\\start-agent-idle-hybrid-receipt.json"
+  ]
+}
