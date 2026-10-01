@@ -137,9 +137,10 @@ also injects a one-shot service-close IOException and checks both causes. Candid
 recovery ownership are asserted before shutdown. The test-only finally releases the capture solely
 to permit fixture shutdown retry on a red revision; it runs after the asserted ordered close.
 
-Status: implemented, not compiled/formatted/tested. The 2026-10-01 owner instruction supersedes
-all earlier grant-file polling instructions: no Gradle command is authorized until the orchestrator
-explicitly grants it. No Gradle, installed Engine or dev stack was started for this correction.
+Status: formatting, compilation, focused tests, red/green proof, PMD and the full indexer-worker
+suite are verified in the granted run below. The 2026-10-01 owner instruction supersedes all
+earlier grant-file polling instructions: Gradle requires an explicit orchestrator grant. No installed
+Engine or dev stack was started for this correction.
 
 Required granted sequence (one command at a time):
 
@@ -152,6 +153,54 @@ Required granted sequence (one command at a time):
 Red/green: temporarily replace only `closeCandidate()` with its lane-head implementation, run
 `./gradlew.bat :modules:indexer-worker:test --tests 'io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.besideCleanupError*' -PskipWebBuild=true`,
 restore the fixed method and run the same focused command. The first case must fail holder drain
-and shutdown completion; the second must also reveal the lost earlier cleanup cause. Neither
-red nor green has run yet. The original method is saved in the worktree's ignored
+and shutdown completion; the second must also reveal the lost earlier cleanup cause. Both
+red and green were demonstrated in the granted run below. The original method is saved in the worktree's ignored
 `tmp/query-capture-cleanup-red/closeCandidate-before.java.txt` for that reversible check.
+
+
+### 2026-10-01: granted verification on merged lane head fcb99659f
+
+The owner explicitly granted the following sequential Gradle checks, including the entire
+indexer-worker test task once. No sub-agents, dev stack, installed Engine, commit or push was
+used. Gradle and Java temporary files remained in the worktree-local caches. All test counts
+below are taken from the JUnit XML, not console summaries. PMD counts are from its XML.
+
+| Step | Command | Result |
+|---|---|---|
+| 1 | `./gradlew.bat :modules:indexer-worker:spotlessApply -PskipWebBuild=true --offline` | PASS; no source formatting diff |
+| 2 | `./gradlew.bat :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava -PskipWebBuild=true --offline` | PASS; existing compiler warnings |
+| 3 | `./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest -PskipWebBuild=true --offline` | PASS: 28 tests (15 owner, 9 device, 4 transaction), zero failures/errors/skips |
+| 4 | `./gradlew.bat :modules:indexer-worker:test --tests 'io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.besideCleanupError*' -PskipWebBuild=true --offline` | EXPECTED RED: 2 tests, 2 failures, zero errors/skips; only closeCandidate temporarily reverted |
+| 5 | `./gradlew.bat :modules:indexer-worker:test --tests 'io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.besideCleanupError*' -PskipWebBuild=true --offline` | GREEN: 2 tests, zero failures/errors/skips; fixed method restored |
+| 6 | `./gradlew.bat :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest -PskipWebBuild=true --offline` | BLOCKED before analysis: uncached dynamic Bouncy Castle version metadata |
+| 7 | `./gradlew.bat :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest -PskipWebBuild=true` | BLOCKED before analysis: sandbox network denied (getsockopt) |
+| 8 | `./gradlew.bat :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest -PskipWebBuild=true --offline` | PASS: main/test each zero violations and zero analysis errors |
+| 9 | `./gradlew.bat :modules:indexer-worker:test -PskipWebBuild=true --offline` | PASS: 1,063 tests in 131 XML suites; 1,048 passed, 15 skipped, zero failures/errors |
+
+The offline PMD retry used Maven version metadata generated only for artifacts already present
+in the ignored worktree-local temporary Maven cache. No published dependency, lockfile, rule,
+baseline or validation changed. Every Gradle invocation ran separately under the explicit grant.
+
+Red proof: the old method leaves A holders=1, ordered close throws "Index serving view still has
+active holders; owner retained", the shutdown latch remains incomplete, and B cleanup is not
+retried. The second regression independently catches loss of the earlier service-close IOException.
+The green revision retains both causes and physical B ownership, releases A, and completes actual
+ordered close with candidate cleanup retry. The other merged exact-runtime lease-release fix
+remained intact throughout the red/green mutation; the restored production source matches HEAD.
+
+Saved XML and summaries: `tmp/query-capture-proof/{focused,red,green,full}/`;
+PMD XML: `tmp/query-capture-proof/pmd-{main,test}.xml`;
+console logs: `tmp/query-capture-{spotless,compile,focused,red,green,pmd,pmd-online,pmd-cache,full}.log`.
+
+
+Full-suite gaps: 12 embedding integration cases skip after the existing BeforeAll model discovery
+finds no model files; 3
+MigrationEnumerationCompletenessTest cases abort on filesystem assumptions (POSIX permissions
+unavailable and symbolic-link creation lacking Windows privilege). Default Gradle tag exclusions
+for stress/evidence/experiment remain in force. Installed CUDA scenarios were not run, as directed.
+No skip or exclusion was introduced or changed by this correction.
+
+Final checks: `git diff --check` passes; the requested
+`LC_ALL=C.UTF-8 git diff | grep -P '^\+.*[^\x00-\x7F]'` prints nothing.
+Production/test files are unchanged from tested HEAD `fcb99659fa9f7b98c5754597aec01d908ab92409`;
+only this evidence report remains modified. No design deviation was needed.
