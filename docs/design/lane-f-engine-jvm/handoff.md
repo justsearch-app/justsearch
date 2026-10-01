@@ -176,6 +176,20 @@ an ORT consumer-accounting producer exists. Local suite green at `7c709a1af` (2 
 14/14 green at `af4320d0e`. Overnight queue: `tmp/q-night.txt` with `tmp/lane-f-e-queue.mjs <file> --continue`
 (logs a failure and goes on); restart `tmp/gpu-mem-sampler.ps1` first (supplementary VRAM evidence).
 
+**Evening 2026-10-01: first paired branch results (lane `f5bdbd739`).** E0 is frozen from main
+(`47e9fe12e`). Main E1/E2 records pair with branch E1/E2. Branch E1 passes. **Branch E2/E3 fail badly:**
+agent-idle hybrid p95 9,802 ms vs main 259 ms, primary indexing 5.7 vs 18.3 docs/s; scripted-agent hybrid
+17.7 s vs 1.55 s, agent p95 17.4 s vs 5.6 s. Cause found: with the standard chat model active the branch Engine
+runs embed/SPLADE on CPU ("GPU session released (yielding VRAM to main inference)", "GPU not active") while ~2.7
+GB VRAM is free (branch java ~0.8 GB, llama ~7.5 GB, 9.6/12.3 GB used); main keeps all encoders on CUDA.
+Diagnosis + fix in progress (Sol, worktree `lane-f-gpu-yield`, session `01a0f924-c5d0-76c3-8a40-c329e3e317ee`,
+output `C:/Users/Elias/AppData/Local/Temp/cx/gpuyield.out`; edit-only, root builds). **Branch collector defect:**
+E5 branch failed "Managed child identity/configuration unavailable: <child id>" every sample (e456-live.mjs
+sampleOnce managed-child check); the manifest is deleted at shutdown, so inspect it on a live branch stack.
+Branch E4/E6 fail fast on the same check until fixed. Overnight: `tmp/q-night2.txt` then chained
+`tmp/q-night3.txt` (main E4 w3, main E5, table) via `tmp/lane-f-e-chain.mjs`. After both fixes: rebuild the
+branch and rerun every branch group (E1, E2 x2, E4 x3, E5, E6), then `e4-hang-values`, E6 and `table`.
+
 **Run discipline (from 12:53 local, queue `tmp/q-full2.txt`).** Tooling is frozen while the queue runs: any
 edit to an instrument the plan executes (including `scripts/jseval/jseval/*` modules it imports) changes pair
 identity and invalidates already-captured main records. E2-E6 activate the standard chat model on both arms
