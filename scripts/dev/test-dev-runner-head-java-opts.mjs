@@ -191,7 +191,23 @@ function main() {
   // deepEqual on sorted arrays already rejects a duplicate (it lengthens the array), so the
   // "exactly once" property the old loop asserted per flag is subsumed rather than dropped.
 
-  console.log('test-dev-runner-head-java-opts: OK (dev-runner set exact; lib.rs set exact)');
+  // 7. The AOT cache is trained with the runtime's layout-affecting flags. JDK 25 maps a cache only
+  //    when these equal the running JVM's; a cache trained without UseCompactObjectHeaders was
+  //    refused by the Engine that runs with it, which then started with no cache (2026-10-01).
+  const ktsPath = path.join(repoRoot, 'modules', 'ui', 'build.gradle.kts');
+  const kts = fs.readFileSync(ktsPath, 'utf8');
+  const listMatch = kts.match(/val aotTrainingJvmFlags = listOf\(([^)]*)\)/);
+  assert.ok(listMatch, 'modules/ui/build.gradle.kts must declare aotTrainingJvmFlags');
+  const trainingFlags = [...listMatch[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  const LAYOUT_FLAGS = SHARED_FLAGS.filter((f) => /^-XX:[+-](Use\w*GC|UseCompactObjectHeaders)$/.test(f));
+  assert.deepEqual([...trainingFlags].sort(), [...LAYOUT_FLAGS].sort(),
+    'AOT training must pass exactly the collector and object-header flags both spawn sites run with');
+  const aotLaunches = (kts.match(/ProcessBuilder\(java,(?:(?!ProcessBuilder)[\s\S])*?"-XX:AOTMode=/g) || []);
+  assert.equal(aotLaunches.length, 4, 'record and create, for the packaged and the dev cache');
+  assert.ok(aotLaunches.every((l) => l.includes('*aotTrainingJvmFlags.toTypedArray()')),
+    'every AOT record/create launch passes aotTrainingJvmFlags');
+
+  console.log('test-dev-runner-head-java-opts: OK (dev-runner set exact; lib.rs set exact; AOT training flags match)');
 }
 
 main();

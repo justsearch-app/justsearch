@@ -1040,6 +1040,14 @@ val copyJavawToRuntime by tasks.registering {
 
 val aotCacheDir = layout.buildDirectory.dir("aot-cache")
 
+// The cache is mapped only when its layout-affecting flags equal the running JVM's. JDK 25 refused
+// a cache trained without -XX:+UseCompactObjectHeaders under an Engine that runs with it ("The AOT
+// cache's UseCompactObjectHeaders setting (disabled) does not equal the current
+// UseCompactObjectHeaders setting (enabled)", checked 2026-10-01) and started with no cache at all.
+// Both spawn sites (lib.rs, dev-runner.cjs) pass these, so training and assembly pass them too;
+// scripts/dev/test-dev-runner-head-java-opts.mjs pins the three together.
+val aotTrainingJvmFlags = listOf("-XX:+UseG1GC", "-XX:+UseCompactObjectHeaders")
+
 val generateHeadAotCache by tasks.registering {
   group = "distribution"
   description = "Generate JDK 25 AOT cache for the Head process"
@@ -1067,7 +1075,7 @@ val generateHeadAotCache by tasks.registering {
 
     // Step 1: Training run — record class loading into .aotconf
     logger.lifecycle("AOT training (Head): recording class loading...")
-    val r1 = ProcessBuilder(java,
+    val r1 = ProcessBuilder(java, *aotTrainingJvmFlags.toTypedArray(),
         "-XX:AOTMode=record", "-XX:AOTConfiguration=${confFile.absolutePath}",
         "--sun-misc-unsafe-memory-access=warn", "-cp", cp,
         "io.justsearch.ui.AotTraining")
@@ -1076,7 +1084,7 @@ val generateHeadAotCache by tasks.registering {
 
     // Step 2: Assembly — create .aot cache from .aotconf
     logger.lifecycle("AOT assembly (Head): creating cache...")
-    val r2 = ProcessBuilder(java,
+    val r2 = ProcessBuilder(java, *aotTrainingJvmFlags.toTypedArray(),
         "-XX:AOTMode=create", "-XX:AOTConfiguration=${confFile.absolutePath}",
         "-XX:AOTCache=${cacheFile.absolutePath}",
         "--sun-misc-unsafe-memory-access=warn", "-cp", cp,
@@ -1130,7 +1138,7 @@ val generateDevHeadAotCache by tasks.registering {
     val cp = libJars.joinToString(sep) { it.absolutePath }
 
     logger.lifecycle("Dev AOT training (Head): recording class loading...")
-    val r1 = ProcessBuilder(java,
+    val r1 = ProcessBuilder(java, *aotTrainingJvmFlags.toTypedArray(),
         "-XX:AOTMode=record", "-XX:AOTConfiguration=${confFile.absolutePath}",
         "--sun-misc-unsafe-memory-access=warn", "-cp", cp,
         "io.justsearch.ui.AotTraining")
@@ -1138,7 +1146,7 @@ val generateDevHeadAotCache by tasks.registering {
     if (r1 != 0) throw GradleException("Dev AOT training (Head) failed with exit code $r1")
 
     logger.lifecycle("Dev AOT assembly (Head): creating cache...")
-    val r2 = ProcessBuilder(java,
+    val r2 = ProcessBuilder(java, *aotTrainingJvmFlags.toTypedArray(),
         "-XX:AOTMode=create", "-XX:AOTConfiguration=${confFile.absolutePath}",
         "-XX:AOTCache=${cacheFile.absolutePath}",
         "--sun-misc-unsafe-memory-access=warn", "-cp", cp,
