@@ -5073,26 +5073,37 @@ public final class KnowledgeServer implements Closeable {
     }
 
     private void closeCandidate() {
-      RuntimeException cleanup = null;
-      try { if (successor != null) successor.releaseModelSets(); }
-      catch (RuntimeException failure) { cleanup = failure; }
-      try { if (services != null) services.close(); }
-      catch (IOException | RuntimeException failure) {
-        if (cleanup == null) cleanup = new IllegalStateException("Query successor close failed", failure);
-        else cleanup.addSuppressed(failure);
+      Throwable cleanup = null;
+      try {
+        try { if (successor != null) successor.releaseModelSets(); }
+        catch (RuntimeException | Error failure) { cleanup = failure; }
+        try { if (services != null) services.close(); }
+        catch (IOException | RuntimeException | Error failure) {
+          if (cleanup == null) cleanup = failure instanceof Error ? failure
+              : new IllegalStateException("Query successor close failed", failure);
+          else if (cleanup != failure) cleanup.addSuppressed(failure);
+        }
+        try { if (query != null) query.close(); }
+        catch (RuntimeException | Error failure) {
+          if (cleanup == null) cleanup = failure;
+          else if (cleanup != failure) cleanup.addSuppressed(failure);
+        }
+        try { if (rejectedQuery != null) rejectedQuery.close(); }
+        catch (RuntimeException | Error failure) {
+          if (cleanup == null) cleanup = failure;
+          else if (cleanup != failure) cleanup.addSuppressed(failure);
+        }
+      } finally {
+        // A's capture must leave even when native B cleanup fails. Retain candidate owners so
+        // recovery or ordered shutdown can retry them after draining issued serving views.
+        try { source.close(); }
+        catch (RuntimeException | Error failure) {
+          if (cleanup == null) cleanup = failure;
+          else if (cleanup != failure) cleanup.addSuppressed(failure);
+        }
       }
-      try { if (query != null) query.close(); }
-      catch (RuntimeException failure) {
-        if (cleanup == null) cleanup = failure;
-        else cleanup.addSuppressed(failure);
-      }
-      try { if (rejectedQuery != null) rejectedQuery.close(); }
-      catch (RuntimeException failure) {
-        if (cleanup == null) cleanup = failure;
-        else cleanup.addSuppressed(failure);
-      }
-      source.close();
-      if (cleanup != null) throw cleanup;
+      if (cleanup instanceof Error fatal) throw fatal;
+      if (cleanup != null) throw (RuntimeException) cleanup;
     }
 
     private void restoreSource() throws IOException {

@@ -114,3 +114,44 @@ File line counts (added/deleted; new files included separately from git diff --s
 | `modules/ui/src/test/java/io/justsearch/ui/api/SettingsV2ContractTest.java` | 6 | 1 |
 | `scripts/supervisor-conformance/query-reconfigure.mjs` | 141 | 42 |
 | `scripts/supervisor-conformance/real-writer-recovery.mjs` | 3 | 0 |
+
+
+### 2026-10-01: BESIDE cleanup Error and captured A shutdown drain
+
+Review correction against lane head `5b4560d8c045bd4346916c067fddc85311ee3cad`:
+`PreparedQueryRoleSettings.closeCandidate()` previously skipped its captured A lease release
+when native candidate cleanup threw an Error. Ordered close drains serving holders before
+retrying the retained recovery candidate, so that capture prevented the retry from being reached.
+
+The existing owner now releases `source` in a finally, collects RuntimeException/Error cleanup
+failures without losing earlier failures, and leaves candidate ownership intact for the existing
+recovery reservation. The settings commitment point and producer transfer are unchanged; no
+new durable writer or lifecycle authority is introduced. Errors are retained in recovery rather
+than discarded, including when an earlier service-close IOException is the primary failure.
+
+Two regressions in `KnowledgeServerQuerySettingsOwnerTest` use the existing physical BESIDE
+fixture, a one-shot SessionHandle.close LinkageError, and actual KnowledgeServer ordered close:
+`besideCleanupErrorReleasesCapturedAAndOrderedShutdownRetriesCandidate` checks capture drain,
+candidate retry and the terminal shutdown latch; `besideCleanupErrorPreservesEarlierServiceFailureAndCandidate`
+also injects a one-shot service-close IOException and checks both causes. Candidate identity and
+recovery ownership are asserted before shutdown. The test-only finally releases the capture solely
+to permit fixture shutdown retry on a red revision; it runs after the asserted ordered close.
+
+Status: implemented, not compiled/formatted/tested. The 2026-10-01 owner instruction supersedes
+all earlier grant-file polling instructions: no Gradle command is authorized until the orchestrator
+explicitly grants it. No Gradle, installed Engine or dev stack was started for this correction.
+
+Required granted sequence (one command at a time):
+
+```text
+./gradlew.bat :modules:indexer-worker:spotlessApply -PskipWebBuild=true
+./gradlew.bat :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava -PskipWebBuild=true
+./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest -PskipWebBuild=true
+```
+
+Red/green: temporarily replace only `closeCandidate()` with its lane-head implementation, run
+`./gradlew.bat :modules:indexer-worker:test --tests 'io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.besideCleanupError*' -PskipWebBuild=true`,
+restore the fixed method and run the same focused command. The first case must fail holder drain
+and shutdown completion; the second must also reveal the lost earlier cleanup cause. Neither
+red nor green has run yet. The original method is saved in the worktree's ignored
+`tmp/query-capture-cleanup-red/closeCandidate-before.java.txt` for that reversible check.
