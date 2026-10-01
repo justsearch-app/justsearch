@@ -31,8 +31,12 @@ final class EngineResourcePolicyTest {
       assertTrue(entry.cap() > 0);
       assertNull(entry.count(), "Loading policy alone must not invent a live producer");
       assertEquals(entry.kind().equals("search-cursors") || entry.kind().equals("pinned-readers")
-          ? "D2" : entry.kind().equals("attempted-configurations")
-              ? "EngineComponentRegistry.applyLock" : "D1", entry.awaitingProducer());
+          ? "D2" : switch (entry.kind()) {
+            case "attempted-configurations" -> "EngineComponentRegistry.applyLock";
+            case "representation-generations" -> "IndexGenerationManager.retainedGenerationCount";
+            case "co-resident-encoders" -> "KnowledgeServer.retainedEncoderCount";
+            default -> throw new AssertionError(entry.kind());
+          }, entry.awaitingProducer());
     }
     assertEquals(4, policy.retained().snapshot().stream()
         .filter(s -> s.kind().equals("search-cursors")).findFirst().orElseThrow().perContextCap());

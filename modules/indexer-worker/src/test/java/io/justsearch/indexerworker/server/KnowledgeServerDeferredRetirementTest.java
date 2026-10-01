@@ -78,6 +78,10 @@ final class KnowledgeServerDeferredRetirementTest {
           attach.invoke(bView, bOwner);
           retiredServingViews(server).add(aView);
           selected.set(server, bView);
+          assertEquals(2, server.retainedEncoderCount(), "Held retired A and serving B are distinct sets");
+          var refused = assertThrows(IllegalStateException.class, () -> invoke(server,
+              "requireEncoderCapacity", new Class<?>[] {boolean.class}, true));
+          assertTrue(refused.getMessage().contains("co-resident-encoders cap=2"));
 
           assertSame(aPolicies, invoke(server, "policySnapshotFor",
               new Class<?>[] {WorkerAppServices.class}, aServices));
@@ -92,6 +96,7 @@ final class KnowledgeServerDeferredRetirementTest {
           release.setAccessible(true);
           release.invoke(bView);
           bOwner.close();
+          assertEquals(1, server.retainedEncoderCount());
         } finally {
           issuedA.close();
         }

@@ -35,19 +35,45 @@ public final class RetainedStateBudget {
     entry.live = true;
   }
 
+  /** Project an owner's existing accounting; never maintain a second permit counter for it. */
+  public synchronized void connect(String kind, java.util.function.Supplier<Integer> count) {
+    Entry entry = entry(kind);
+    if (entry.live) throw new IllegalStateException("producer already active: " + kind);
+    entry.producer = Objects.requireNonNull(count, "count");
+    entry.live = true;
+  }
+
+  public synchronized int cap(String kind) {
+    return entry(kind).cap;
+  }
+
   public synchronized Optional<Permit> tryAcquire(String kind) {
     Entry entry = entry(kind);
     if (!entry.live) throw new IllegalStateException("producer is not connected: " + kind);
+    if (entry.producer != null) throw new IllegalStateException("owner enforces projected kind: " + kind);
     if (entry.count == entry.cap) return Optional.empty();
     entry.count++;
     return Optional.of(new Permit(entry));
   }
 
-  public synchronized List<Snapshot> snapshot() {
-    return entries.entrySet().stream().map(e -> new Snapshot(e.getKey(), e.getValue().cap,
-        e.getValue().perContextCap,
-        e.getValue().live ? Integer.valueOf(e.getValue().count) : null,
-        e.getValue().live ? null : e.getValue().stage)).toList();
+  public List<Snapshot> snapshot() {
+    List<java.util.function.Supplier<Snapshot>> projections;
+    synchronized (this) {
+      projections = entries.entrySet().stream().map(e -> {
+        Entry entry = e.getValue();
+        String kind = e.getKey();
+        var producer = entry.producer;
+        Integer count = entry.live ? Integer.valueOf(entry.count) : null;
+        String awaiting = entry.live ? null : entry.stage;
+        return (java.util.function.Supplier<Snapshot>) () -> {
+          Integer actual = producer == null ? count : producer.get();
+          return new Snapshot(kind, entry.cap, entry.perContextCap, actual,
+              awaiting);
+        };
+      }).toList();
+    }
+    // Owner callbacks take their lifecycle locks; do not call them under the budget monitor.
+    return projections.stream().map(java.util.function.Supplier::get).toList();
   }
 
   private Entry entry(String kind) {
@@ -64,6 +90,7 @@ public final class RetainedStateBudget {
     private final String stage;
     private int count;
     private boolean live;
+    private java.util.function.Supplier<Integer> producer;
 
     private Entry(int cap, Integer perContextCap, String stage) {
       this.cap = cap;

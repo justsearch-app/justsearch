@@ -79,6 +79,23 @@ keeps reranker and citation handles out of the index set, while the index set ow
 and the selected sparse role. This lifecycle split stays inside one Engine JVM. (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java:209-257`,
 `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/InferenceSurface.java:106-140`)
 
+The retained-state register (`governance/retained-state.v1.json`) caps each native role domain at
+two resident sets. `KnowledgeServer.retainedEncoderCount()` projects the maximum of distinct
+unclosed index-role and query-role owners, deduplicating serving, prepared, recovery and retired
+references. A split index/query generation counts as one; BESIDE preparation and a retired owner
+awaiting lease drain count as two. Composition refuses a third set with
+`Retained-state co-resident-encoders cap=2` before opening its sessions. A refused native close
+keeps its slot until the exact owner closes successfully; uncertain initialization reports an
+unknown count. The count ceiling complements the existing device-memory admission check.
+
+`IndexGenerationManager.retainedGenerationCount()` projects physical representation directories
+under the index root using the same filter as build admission. Active, candidate, abandoned and
+incompletely deleted predecessor directories consume the two slots. Promotion preserves the
+predecessor slot until physical retirement completes. Diagnostic corruption backups are excluded.
+`EngineRoot` connects both owner projections to `RetainedStateBudget`, validates the packaged
+caps against the supported lifecycle, and preserves unknown observations before an owner exists.
+Cursor and pinned-reader accounting remain assigned to D2.
+
 ## Registry and runtime boundaries
 
 The D1 `EngineComponentRegistry` is the shipped process-level lifecycle and readiness authority.

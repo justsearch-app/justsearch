@@ -452,6 +452,14 @@ public final class EngineRoot implements WorkerHost {
       DefaultEngineProcessResources processResources) {
     this.processResources = Objects.requireNonNull(processResources, "processResources");
     this.resources = processResources.policy();
+    resources.retained().connect("representation-generations", () -> {
+      KnowledgeServer owner = server;
+      return owner == null ? null : owner.retainedGenerationCount();
+    });
+    resources.retained().connect("co-resident-encoders", () -> {
+      KnowledgeServer owner = server;
+      return owner == null ? null : owner.retainedEncoderCount();
+    });
     this.admission = processResources.admission();
     this.executors = processResources.executors();
     this.components = processResources.components();
@@ -510,6 +518,8 @@ public final class EngineRoot implements WorkerHost {
     try {
       started = serverFactory.create(gpuScheduling, executors, recordedIngestion,
           indexComponent, encoderComponent, exactConfiguration);
+      started.bindRetainedStatePolicy(resources.retained().cap("representation-generations"),
+          resources.retained().cap("co-resident-encoders"));
     } catch (RuntimeException | Error constructorFailure) {
       // The exact pre-construction input remains available for a counted initial recovery.
       throw constructorFailure;

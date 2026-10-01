@@ -41,6 +41,15 @@ final class EngineRootAuthorityTest {
     try {
       assertSame(authority, root.authority());
       var client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+      org.mockito.Mockito.verify(server).bindRetainedStatePolicy(2, 2);
+      when(server.retainedGenerationCount()).thenReturn(2);
+      when(server.retainedEncoderCount()).thenReturn(2);
+      assertEquals(2, retainedCount(root, "representation-generations"));
+      assertEquals(2, retainedCount(root, "co-resident-encoders"));
+      when(server.retainedGenerationCount()).thenReturn(1);
+      when(server.retainedEncoderCount()).thenReturn(1);
+      assertEquals(1, retainedCount(root, "representation-generations"));
+      assertEquals(1, retainedCount(root, "co-resident-encoders"));
       var field = KnowledgeClient.class.getDeclaredField("watchedRootsState");
       field.setAccessible(true);
       assertSame(authority.roots(), field.get(client));
@@ -52,5 +61,12 @@ final class EngineRootAuthorityTest {
       root.close();
       root.executors().close();
     }
+  }
+  private static Integer retainedCount(EngineRoot root, String kind) {
+    var row = root.retainedState().snapshot().stream().filter(s -> s.kind().equals(kind))
+        .findFirst().orElseThrow();
+    org.junit.jupiter.api.Assertions.assertNull(row.awaitingProducer());
+    assertEquals(2, row.cap());
+    return row.count();
   }
 }
