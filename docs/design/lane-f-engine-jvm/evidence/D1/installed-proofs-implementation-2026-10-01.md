@@ -34,7 +34,8 @@ closure items remain outside this assignment.
 - §16 delayed retry: the existing ordinary BESIDE/IN_PLACE lifecycle test now
   performs A→B/k1→C/k2 with three different ONNX byte identities, delayed k1
   replay, and a new key with B's stale witness. It requires k1's exact recorded
-  response and HTTP 409 `VERSION_CONFLICT`, respectively. Each probe separately
+  outcome fields (state, witness, key and composition) and HTTP 409
+  `VERSION_CONFLICT`, respectively. Each probe separately
   verifies C's path, applied encoder version, READY state, settings witness,
   settings bytes and generation. It then restores A and retains the original
   malformed-candidate/refusal-replay and availability assertions. Evidence:
@@ -143,3 +144,76 @@ Keep these local reports/logs until the orchestrator captures installed evidence
 and reconciles closure. The private Gradle home is regenerable scratch and can
 be removed after evidence capture; it must not be committed. Installed scenario
 execution and final D1 closure remain unverified in this worktree.
+
+## Delayed replay contract correction at 51fff0a62
+
+The orchestrator reports installed passes for both IN_PLACE crash cuts, native
+recovery, parser-gap restoration timing and the supervised recovery set. The
+ordinary query fixture failed in its BESIDE delayed-k1 assertion. The harness
+was wrong: it compared the complete initial settings response with the replay,
+although replay promises the recorded operation outcome rather than a saved
+settings projection. No production Java or API contract change is needed.
+
+Contract and implementation evidence at the tested base:
+
+- `docs/design/lane-f-engine-jvm/stages/C2.md:1595` requires same-key replay of
+  the recorded outcome without execution; `:1630` and `:1640` define keyed
+  outcome metadata. `:1759` explicitly requires delayed k1 to answer complete
+  with C still applied and a stale new key to receive version conflict.
+- `docs/reference/api-contract-map.md:478` limits outcome results to bounded
+  receipt metadata; `:575` says the receipt retains composition for same-key
+  replay. `:565` requires original key/witness reuse for a retry; `:567` requires
+  HTTP 409 `VERSION_CONFLICT` for a stale witness.
+- `modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java:758`
+  prepares the initial settings response and `:766` creates the owner receipt.
+  `:824` supplies that receipt to the operation runner at commit.
+- `modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java:800`
+  distinguishes first-response observations from the durable commitment.
+  `:951` converts the response to bounded `OperationReceipt`; `:945` routes
+  existing operations through `receiptResponse`; `:971` reconstructs state,
+  original key, committed witness and recorded composition from the row.
+- `modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationReceipt.java:9`
+  explicitly excludes rich handler responses from operations.db.
+  `modules/ui/src/main/java/io/justsearch/ui/api/SettingsController.java:124`
+  dispatches the keyed reconfigure; `:135` and `:151` convert its outcome to
+  SettingsV2 without re-projecting current or historical settings. Absent
+  settings fields therefore serialize as null on receipt replay.
+
+The retained installed fixture is
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-takeover/query-reconfigure-31fca5bf-0d7a-41c8-a968-91112790f6ea/`;
+the orchestrator log is `../lane-f-pr1-verify/tmp/lane-f-proofs-p1.log` relative
+to this worktree. Read-only inspection of a scratch copy of operations.db
+confirms k1 (`01a0f5de-73dc-7b38-a493-9254596e8999`) is COMPLETE, expected
+revision 0, with SUCCESS and BESIDE composition matching the replay (freeBytes
+10616561664, footprintBytes 1181116007). k2
+(`01a0f5de-9429-7dd0-abc4-328ea11fc576`) is COMPLETE at expected revision 1.
+The retained settings file has revision 2, k2's committed key and selected C
+model bytes. The original database was never modified. The failure happened
+before the stale-key probe; this evidence does not claim that probe passed live.
+
+The corrected harness compares exactly state, witness, operationKey and
+composition against k1's initial response using structural equality (JSON field
+order is immaterial). It still separately requires unchanged C READY state,
+runtime path, applied version, witness, persisted settings bytes and generation
+after each probe. The stale-key check correctly asserts the public HTTP/code
+contract without requiring an acceptance row or full settings response on
+preparation refusal. C publication now requires a nonempty string version,
+the initial settings GET must carry k2's witness, and successful applies must
+carry their own lastCommittedOperationKey.
+
+The mock now supplies full settings fields on the initial response and null
+settings fields on replay, with reordered witness/composition fields. Both
+BESIDE and IN_PLACE pass. Eleven negative controls reject reapplication, wrong
+replay witness/state/key/composition, changed C version or generation despite
+an honest replay, accepted stale witness, wrong conflict code, changed C version
+despite a correct conflict, and missing C version. `node --check` passes for
+both touched scripts; `node --test scripts/supervisor-conformance/query-reconfigure.test.mjs`
+passes **14 tests, 0 failures/skips**. `git diff --check` passes.
+
+No Gradle, Engine or installed scenario was run for this correction. The
+corrected installed result remains pending; rerun the two-round method (its
+26-minute method ceiling stays within the 30-minute invocation limit):
+
+```powershell
+.\gradlew.bat :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=true --tests "*EngineLifecycleE2ETest.ordinaryQueryReconfigureProvesBesideAndForcedInPlaceWithoutRestart"
+```

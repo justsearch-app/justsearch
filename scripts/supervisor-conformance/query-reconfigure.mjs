@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { barrierFiles } from './barrier-files.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import identity from '../dev/lib/process-identity.cjs';
@@ -234,6 +235,7 @@ export async function exerciseQueryReconfigure(c) {
     const result = read(response, label);
     requireThat(response.status === 200 && result.state === 'COMPLETE'
       && result.operationKey === operationKey
+      && result.witness?.lastCommittedOperationKey === operationKey
       && result.witness?.acceptedRevision === before.witness.acceptedRevision + 1,
     `${label} failed: HTTP ${response.status} ${response.text}`);
     const composition = result.composition;
@@ -406,7 +408,8 @@ export async function exerciseQueryReconfigure(c) {
   const statusC = await waitFor(`${mode} C publication`, 90000, async () => {
     const value = await status();
     const encoders = value.readiness?.engineComponents?.encoders;
-    return encoders?.state === 'READY' && encoders.appliedVersion !== appliedA
+    return encoders?.state === 'READY' && typeof encoders.appliedVersion === 'string'
+      && encoders.appliedVersion.length > 0 && encoders.appliedVersion !== appliedA
       && encoders.appliedVersion !== appliedB
       && path.resolve(value.worker?.gpu?.rerankerModelPath ?? '').toLowerCase() === modelC.toLowerCase()
       ? value : null;
@@ -417,6 +420,8 @@ export async function exerciseQueryReconfigure(c) {
     'C did not select its distinct model bytes');
   await query('model query C');
   const beforeDelayed = await settings();
+  requireThat(isDeepStrictEqual(beforeDelayed.witness, toC.after),
+    `C settings did not retain k2's committed witness: ${JSON.stringify(beforeDelayed.witness)}`);
   const cBytes = fs.readFileSync(path.join(data, 'ui', 'settings.json'), 'utf8');
   const assertCUnchanged = async label => {
     const value = await status();
@@ -424,7 +429,7 @@ export async function exerciseQueryReconfigure(c) {
     requireThat(value.readiness?.engineComponents?.encoders?.state === 'READY'
       && value.readiness.engineComponents.encoders.appliedVersion === appliedC
       && path.resolve(value.worker?.gpu?.rerankerModelPath ?? '').toLowerCase() === modelC.toLowerCase()
-      && JSON.stringify(currentSettings.witness) === JSON.stringify(beforeDelayed.witness)
+      && isDeepStrictEqual(currentSettings.witness, beforeDelayed.witness)
       && fs.readFileSync(path.join(data, 'ui', 'settings.json'), 'utf8') === cBytes
       && readJson(path.join(indexBase, 'state.json'))?.active_generation === generation,
     `${label} changed C/settings/applied version/generation`);
@@ -434,7 +439,11 @@ export async function exerciseQueryReconfigure(c) {
       rerankerModelPath: b, witness: toB.before, operationKey: toB.operationKey }) }, 120000));
   const delayed = await delayedObserved.complete();
   const delayedBody = read(delayed, 'delayed k1 replay');
-  requireThat(delayed.status === 200 && JSON.stringify(delayedBody) === JSON.stringify(toB.result),
+  // The durable receipt retains outcome metadata, not the first response's settings projection.
+  const recordedOutcome = value => ({ state: value.state, witness: value.witness,
+    operationKey: value.operationKey, composition: value.composition });
+  requireThat(delayed.status === 200
+      && isDeepStrictEqual(recordedOutcome(delayedBody), recordedOutcome(toB.result)),
     `delayed k1 did not return its recorded outcome: ${delayed.text}`);
   await assertCUnchanged('delayed k1 replay');
   const staleKey = createOperationKey();
