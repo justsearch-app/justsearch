@@ -1302,10 +1302,694 @@
   "valuesHash": "032117f8428a296d7f721daa422f765bf369d43e3a8a7b655b17a31f9e68ddc3",
   "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a.json",
   "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a",
-  "runIds": [],
-  "commands": [],
-  "metrics": {},
-  "clauses": {},
-  "gaps": {},
-  "additionalArtifacts": []
+  "runIds": [
+    "861f636e-5c1b-4621-b916-7efab3a71808"
+  ],
+  "commands": [
+    {
+      "label": "revision",
+      "executable": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T12:43:43.609Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\0-revision.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\0-revision.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T12:43:43.630Z"
+    },
+    {
+      "label": "dirty",
+      "executable": "git",
+      "args": [
+        "status",
+        "--porcelain"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T12:43:43.633Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\1-dirty.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\1-dirty.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T12:43:43.735Z"
+    },
+    {
+      "label": "runner-status",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "status",
+        "--active",
+        "--json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T12:43:43.742Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\2-runner-status.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\2-runner-status.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T12:43:43.787Z"
+    },
+    {
+      "label": "machine",
+      "executable": "node",
+      "args": [
+        "-e",
+        "const os=require(\"node:os\");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T12:43:43.794Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\3-machine.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\3-machine.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T12:43:43.832Z"
+    },
+    {
+      "label": "gpu",
+      "executable": "nvidia-smi",
+      "args": [
+        "--query-gpu=name,uuid,memory.total,driver_version",
+        "--format=csv"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T12:43:43.836Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\4-gpu.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\4-gpu.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T12:43:43.882Z"
+    },
+    {
+      "label": "start-soak",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "start",
+        "--json",
+        "--skip-build",
+        "--clean",
+        "none",
+        "--data-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\tmp\\lane-f-e\\2026-10-01T12-43-42-828Z-7b91111a\\soak",
+        "--api-port",
+        "33221",
+        "--session-id",
+        "lane-f-e-2026-10-01T12-43-42-828Z-7b91111a",
+        "--lease-duration-sec",
+        "3600",
+        "--chat-profile",
+        "standard"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "mode": "start",
+      "requestsAfterReceipt": [
+        "/api/mcp/token",
+        "/api/health",
+        "/api/status",
+        "/api/debug/state",
+        "/api/runtime/manifest",
+        "/api/debug/effective-config"
+      ],
+      "startedAt": "2026-10-01T12:43:43.890Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\5-start-soak.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\5-start-soak.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T13:39:25.032Z"
+    },
+    {
+      "label": "/api/mcp/token",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/mcp/token",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T12:43:46.266Z",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/health",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/health",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T12:43:50.288Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\6-_api_health.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/debug/state",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/debug/state",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T12:43:50.454Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\7-_api_debug_state.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/runtime/manifest",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/runtime/manifest",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T12:43:50.462Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\8-_api_runtime_manifest.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/debug/effective-config",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/debug/effective-config",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T12:43:50.468Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\9-_api_debug_effective-config.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "capability-ready-start-soak",
+      "executable": "python",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\capability-ready.py",
+        "--base-url",
+        "http://127.0.0.1:33221",
+        "--timeout",
+        "300",
+        "--output",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\start-soak-capability-ready.json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T12:43:50.478Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\10-capability-ready-start-soak.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\10-capability-ready-start-soak.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T12:43:59.792Z"
+    },
+    {
+      "label": "activate-start-soak",
+      "method": "POST",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/activate",
+      "headers": {
+        "Host": "127.0.0.1:33221",
+        "Content-Type": "application/json"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\11-activate-start-soak-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\11-activate-start-soak-response.json",
+      "observedAt": "2026-10-01T12:43:59.792Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-soak",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\12-activate-start-soak-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\12-activate-start-soak-response.json",
+      "observedAt": "2026-10-01T12:43:59.983Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-soak",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\13-activate-start-soak-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\13-activate-start-soak-response.json",
+      "observedAt": "2026-10-01T12:44:02.170Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-soak",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\14-activate-start-soak-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\14-activate-start-soak-response.json",
+      "observedAt": "2026-10-01T12:44:04.303Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-soak",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\15-activate-start-soak-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\15-activate-start-soak-response.json",
+      "observedAt": "2026-10-01T12:44:06.450Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-soak",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\16-activate-start-soak-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\16-activate-start-soak-response.json",
+      "observedAt": "2026-10-01T12:44:08.600Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-soak",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\17-activate-start-soak-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\17-activate-start-soak-response.json",
+      "observedAt": "2026-10-01T12:44:10.764Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "rss-soak",
+      "executable": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\head-rss-sampler.ps1",
+        "-Out",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\head-rss.csv",
+        "-Stop",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\rss.stop",
+        "-IncludeSplitWorker",
+        "-Scope",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\process-scope.json",
+        "-Arm",
+        "main"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "mode": "background",
+      "startedAt": "2026-10-01T12:44:12.034Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\18-rss-soak.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\18-rss-soak.stderr",
+      "code": 1,
+      "signal": null,
+      "endedAt": "2026-10-01T12:44:12.585Z"
+    },
+    {
+      "label": "status-soak",
+      "executable": "bash",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\status-sampler.sh",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak",
+        "33221",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\status.stop"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "mode": "background",
+      "startedAt": "2026-10-01T12:44:12.038Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\19-status-soak.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\19-status-soak.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T13:39:14.698Z"
+    },
+    {
+      "label": "admission-soak",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\admission-loop.mjs",
+        "--capture-workload",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak",
+        "--base-url",
+        "http://127.0.0.1:33221",
+        "--stop-file",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\admission.stop"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "mode": "background",
+      "startedAt": "2026-10-01T12:44:12.046Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\20-admission-soak.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\20-admission-soak.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T13:39:13.778Z"
+    },
+    {
+      "label": "soak-cycle-1",
+      "executable": "python",
+      "args": [
+        "-m",
+        "jseval",
+        "run",
+        "--dataset",
+        "scifact",
+        "--modes",
+        "lexical,hybrid",
+        "--embedding",
+        "--splade",
+        "--ce",
+        "--pipeline",
+        "--base-url",
+        "http://127.0.0.1:33221",
+        "--corpus-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\corpus\\scifact",
+        "--output-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\eval-results",
+        "--timeline",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\timeline.tsv",
+        "--search-load",
+        "continuous",
+        "--search-load-search-mode",
+        "hybrid",
+        "--max-queries",
+        "1",
+        "--reset"
+      ],
+      "cwd": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "mode": "soak",
+      "minutes": 55,
+      "startedAt": "2026-10-01T12:44:12.054Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\21-soak-cycle-1.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\21-soak-cycle-1.stderr",
+      "code": null,
+      "signal": "SIGTERM",
+      "endedAt": "2026-10-01T13:39:12.557Z"
+    },
+    {
+      "label": "stop-soak",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "stop",
+        "--json",
+        "--run",
+        "861f636e-5c1b-4621-b916-7efab3a71808",
+        "--session-id",
+        "lane-f-e-2026-10-01T12-43-42-828Z-7b91111a"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T12-43-42-828Z-7b91111a/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "mode": "stop",
+      "startedAt": "2026-10-01T13:39:13.698Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\22-stop-soak.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\22-stop-soak.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T13:39:28.159Z"
+    }
+  ],
+  "metrics": {
+    "measuredMinutes": 55,
+    "memory": {
+      "samples": [],
+      "complete": false,
+      "sampledMs": 0
+    },
+    "heapTrends": [],
+    "summedHeapTrend": {
+      "status": "unmeasurable",
+      "reason": "No arm JVM series"
+    },
+    "searchP95": {},
+    "agentOffered": 1266,
+    "agentAdmitted": 1265,
+    "agentTerminalErrors": {
+      "INVALID_TERMINAL": 1
+    },
+    "agentP95": 6080.280400000047,
+    "chunksByWorkload": {
+      "soak": 0.47157880946214537
+    },
+    "chunksPerSec": 0.47157880946214537,
+    "completedSoakCycles": 0
+  },
+  "clauses": {
+    "zero-crashes": false,
+    "no-timeout-or-5xx": false
+  },
+  "gaps": {
+    "component-commit-budget": "Observed JVM heap/direct/metaspace launch limits; the total private-bytes envelope is the paired split sum, not a synthetic total ceiling.",
+    "agentTerminalErrors": "{\"INVALID_TERMINAL\":1}",
+    "machine-wide-commit-vs-main": "Named instrument did not produce a validated measurement for this clause",
+    "working-set": "Named instrument did not produce a validated measurement for this clause",
+    "live-after-GC-trend": "Named instrument did not produce a validated measurement for this clause",
+    "owner-duration": "Named instrument did not produce a validated measurement for this clause",
+    "index-agent-reconfigure-workload": "Named instrument did not produce a validated measurement for this clause"
+  },
+  "additionalArtifacts": [],
+  "revision": "ac1c93bf32c2bba3e4a22462295acbc618f850bc",
+  "tokenEnforced": false,
+  "sharedModels": "F:\\justsearch-public\\models",
+  "failure": "Instrument failed: rss-soak",
+  "endedAt": "2026-10-01T13:39:28.168Z",
+  "rawFiles": [
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\0-revision.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\0-revision.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\1-dirty.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\1-dirty.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\10-capability-ready-start-soak.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\10-capability-ready-start-soak.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\11-activate-start-soak-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\11-activate-start-soak-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\12-activate-start-soak-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\12-activate-start-soak-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\13-activate-start-soak-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\13-activate-start-soak-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\14-activate-start-soak-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\14-activate-start-soak-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\15-activate-start-soak-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\15-activate-start-soak-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\16-activate-start-soak-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\16-activate-start-soak-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\17-activate-start-soak-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\17-activate-start-soak-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\18-rss-soak.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\18-rss-soak.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\19-status-soak.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\19-status-soak.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\2-runner-status.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\2-runner-status.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\20-admission-soak.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\20-admission-soak.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\21-soak-cycle-1.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\21-soak-cycle-1.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\22-stop-soak.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\22-stop-soak.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\3-machine.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\3-machine.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\4-gpu.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\4-gpu.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\5-start-soak.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\5-start-soak.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\6-_api_health.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\7-_api_debug_state.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\8-_api_runtime_manifest.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\9-_api_debug_effective-config.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\gc\\jvm-16920-2026-10-01_14-43-44.log",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\gc\\jvm-17280-2026-10-01_14-43-44.log",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\gc\\jvm-20740-2026-10-01_14-43-46.log",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\gc\\jvm-8360-2026-10-01_14-43-44.log",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\admission.stop",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\head-events.log",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\head-rss.csv",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\instruments.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\rss.stop",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\status-series.csv",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\status.stop",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\soak\\workload.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\start-soak-capability-ready.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T12-43-42-828Z-7b91111a\\start-soak-receipt.json"
+  ]
 }
