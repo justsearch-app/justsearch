@@ -97,6 +97,8 @@ log = logging.getLogger(__name__)
 @click.option("--search-load", "search_load_mode", type=click.Choice(["continuous"]), default=None,
               help="Tempdoc 885: as --search-load-qpm but back-to-back with one request in "
                    "flight (the continuous MCP-style agent loop).")
+@click.option("--search-load-search-mode", type=click.Choice(["hybrid", "lexical"]), default="hybrid",
+              help="Pin foreground search mode for paired stage E measurements.")
 @click.option("--first-search-probe", "first_search_probe", is_flag=True, default=False,
               help="Tempdoc 885 item 19: after every batch of --first-search-probe-files newly "
                    "indexed documents, issue ONE search and record its latency SEPARATELY from "
@@ -120,16 +122,19 @@ log = logging.getLogger(__name__)
          "a single flaky projection without losing other signals.",
 )
 @click.pass_context
-def cmd_run(ctx, dataset, modes, base_url, output_dir, top_k, embedding, splade, query_syntax, lambdamart, cross_encoder, allow_errors, max_queries, context_coverage, thresholds, history_db, corpus_dir, skip_ingest, pipeline, timeline_path, start_backend, llm, qu, filter_norm, clean, reset, cpu, allow_degraded, index_cache_flag, pin_index_selector_key, config_path, duplicate_prevalence_input_spec, warmup_count, search_load_qpm, search_load_mode, first_search_probe, first_search_probe_files, settle_index, json_flag, skip_projections):
+def cmd_run(ctx, dataset, modes, base_url, output_dir, top_k, embedding, splade, query_syntax, lambdamart, cross_encoder, allow_errors, max_queries, context_coverage, thresholds, history_db, corpus_dir, skip_ingest, pipeline, timeline_path, start_backend, llm, qu, filter_norm, clean, reset, cpu, allow_degraded, index_cache_flag, pin_index_selector_key, config_path, duplicate_prevalence_input_spec, warmup_count, search_load_qpm, search_load_mode, search_load_search_mode, first_search_probe, first_search_probe_files, settle_index, json_flag, skip_projections):
     """Execute an evaluation run."""
     if json_flag:
         ctx.obj["json"] = True
     from .. import cadence as cadence_mod
     from .. import search_load as search_load_mod
+    from dataclasses import replace
     try:
         search_load_spec = search_load_mod.resolve_spec(
             search_load_qpm, search_load_mode == "continuous",
         )
+        if search_load_spec is not None:
+            search_load_spec = replace(search_load_spec, search_mode=search_load_search_mode)
         first_search_probe_spec = cadence_mod.resolve_probe_spec(
             first_search_probe, first_search_probe_files,
         )

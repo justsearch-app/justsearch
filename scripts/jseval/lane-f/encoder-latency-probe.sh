@@ -20,7 +20,9 @@ while IFS=$'\t' read -r qid qtext; do
   [ -n "$qid" ] || continue
   for ((r = 0; r < reps; r++)); do
     body=$(node -e 'console.log(JSON.stringify({query:process.argv[1],limit:10,debug:true}))' "$qtext")
-    code=$(curl -s -o "$out/last.json" -w '%{http_code}' -m 60 -X POST -H "Host: 127.0.0.1:$port" -H "Content-Type: application/json" -d "$body" "$base/api/knowledge/search")
+    token_hdr=()
+    if [[ -n ${JUSTSEARCH_SESSION_TOKEN:-} ]]; then token_hdr=(-H "X-JustSearch-Session: $JUSTSEARCH_SESSION_TOKEN"); fi
+    code=$(curl -s -o "$out/last.json" -w '%{http_code}' -m 60 -X POST -H "Host: 127.0.0.1:$port" -H "Content-Type: application/json" "${token_hdr[@]}" -d "$body" "$base/api/knowledge/search")
     node -e '
       const [qid, rep, code, p] = process.argv.slice(1);
       let j; try { j = JSON.parse(require("fs").readFileSync(p, "utf8")); } catch { console.log([qid, rep, code, "", "", "", "", ""].join(",")); process.exit(0); }

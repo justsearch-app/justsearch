@@ -66,7 +66,8 @@ const names = Object.keys(phases);
 // The current sampler already calls the merged HeadlessApp JVM 'engine'. Old split
 // 'head'/'worker' CSVs are incompatible; accepting them would hide missing Engine data.
 const roles = [...new Set(rows.map((row) => row.role))];
-if (!roles.includes('engine') || roles.some((role) => !['engine', 'llama-server', 'extraction-child'].includes(role))) {
+const allowedRoles = ['engine', 'llama-server', 'extraction-child', ...(process.argv.includes('--paired-split') ? ['worker'] : [])];
+if (!roles.includes('engine') || roles.some((role) => !allowedRoles.includes(role))) {
   throw new Error(`Invalid RSS role set: ${roles.join(',')}; expected engine with optional llama-server/extraction-child`);
 }
 if (!names.length) {
@@ -99,7 +100,7 @@ for (const f of fs.readdirSync(dir).filter((f) => /^search-load.*\.csv$/.test(f)
 
 // admission-loop.mjs writes <arm>.json with requests[].durationMs (caller timing).
 // Report all calls plus admitted calls separately so quick 429s cannot hide slow work.
-for (const file of ['context-many.json', 'context-one.json', 'fairness.json']) {
+for (const file of ['context-many.json', 'context-one.json', 'fairness.json', 'workload.json']) {
   const fp = path.join(dir, file);
   if (!fs.existsSync(fp)) continue;
   const capture = JSON.parse(fs.readFileSync(fp, 'utf8'));

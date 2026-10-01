@@ -1086,12 +1086,45 @@ function readCapture(directory, name) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
+// Sequential stage E traffic reuses this instrument's wire decoding and timings.
+export async function captureWorkload(directory, baseUrl, stopFile) {
+  const connection = await liveConnection(directory, baseUrl, undefined, 'workload');
+  const start = process.hrtime.bigint();
+  const deadline = Date.now() + 55 * 60 * 1000;
+  const capture = { arm: 'workload', captureKind: 'stage-e-workload', requests: [] };
+  while (!fs.existsSync(stopFile) && Date.now() < deadline) {
+    const controller = new AbortController();
+    const timeoutState = { timedOut: false };
+    const timer = setTimeout(() => { timeoutState.timedOut = true; controller.abort(); }, ARM_TIMEOUT_MS);
+    try {
+      const sequence = capture.requests.length;
+      const contextId = 'lane-f-e-workload';
+      const search = newRow(`search-${sequence}`, contextId, 'search', start);
+      await runSearch(connection.baseUrl, connection.token, search, controller.signal, start, timeoutState);
+      capture.requests.push(search);
+      if (!fs.existsSync(stopFile)) {
+        const chat = newRow(`chat-${sequence}`, contextId, 'chat', start);
+        const started = await startChat(connection.baseUrl, connection.token, chat,
+          `lane-f-e-${randomUUID()}`, controller.signal, start, timeoutState);
+        await started.completion;
+        capture.requests.push(chat);
+      }
+    } finally {
+      clearTimeout(timer);
+      writeCapture(directory, capture);
+    }
+  }
+  capture.offered = capture.requests.length;
+  capture.durationMs = elapsedMs(start);
+  writeCapture(directory, capture);
+}
+
 function captureOptions(argv, commandFlag) {
   const options = {};
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (!value || ![commandFlag, '--base-url', '--token-file'].includes(flag)
+    if (!value || ![commandFlag, '--base-url', '--token-file', '--stop-file'].includes(flag)
         || options[flag] !== undefined) {
       throw new Error('INVALID_CAPTURE_ARGUMENTS');
     }
@@ -1104,6 +1137,12 @@ function captureOptions(argv, commandFlag) {
 }
 
 async function main() {
+  if (process.argv.includes('--capture-workload')) {
+    const options = captureOptions(process.argv.slice(2), '--capture-workload');
+    if (!options['--stop-file']) throw new Error('--stop-file required');
+    await captureWorkload(options['--capture-workload'], options['--base-url'], options['--stop-file']);
+    return;
+  }
   if (process.argv.length === 3 && process.argv[2] === '--self-test') {
     await selfTest();
     return;

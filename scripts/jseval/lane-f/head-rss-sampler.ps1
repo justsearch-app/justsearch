@@ -5,19 +5,22 @@
 param(
   [string]$Out = "tmp/head-rss.csv",
   [string]$Stop = "tmp/head-rss.stop",
-  [int]$IntervalSec = 2
+  [int]$IntervalSec = 2,
+  [switch]$IncludeSplitWorker
 )
 "ts,role,pid,workingSetMB,privateMB,cpuSec,threads" | Out-File -Encoding ascii $Out
 while (-not (Test-Path $Stop)) {
   $procs = @(Get-CimInstance Win32_Process)
   $engineIds = @($procs | Where-Object { $_.Name -eq 'java.exe' -and $_.CommandLine -match 'HeadlessApp' } | ForEach-Object { $_.ProcessId })
+  $workerIds = @($procs | Where-Object { $IncludeSplitWorker -and $_.Name -eq 'java.exe' -and $_.CommandLine -match 'io.justsearch.indexerworker.IndexerWorker' } | ForEach-Object { $_.ProcessId })
   $ts = Get-Date -Format o
   foreach ($p in $procs) {
     $cl = $p.CommandLine
     $role = $null
     if ($engineIds -contains $p.ProcessId) { $role = 'engine' }
+    elseif ($workerIds -contains $p.ProcessId) { $role = 'worker' }
     elseif ($p.Name -eq 'llama-server.exe') { $role = 'llama-server' }
-    elseif ($engineIds -contains $p.ParentProcessId -and $cl -match 'ExtractionSandboxChild') { $role = 'extraction-child' }
+    elseif (($engineIds -contains $p.ParentProcessId -or $workerIds -contains $p.ParentProcessId) -and $cl -match 'ExtractionSandboxChild') { $role = 'extraction-child' }
     if (-not $role) { continue }
     $gp = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue
     if (-not $gp) { continue }
