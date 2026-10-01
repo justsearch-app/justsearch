@@ -27,6 +27,14 @@ const write = (file, value) => {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 };
 const finite = x => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+export function verifySharedModels(config) {
+  const models = config.keys?.find(entry => entry.key === 'justsearch.models.dir')?.value;
+  const sharedModels = path.resolve(ARMS.main, '../../../models');
+  if (typeof models !== 'string' || path.resolve(models).toLowerCase() !== sharedModels.toLowerCase()) {
+    throw new Error(`Shared models required: effective justsearch.models.dir=${models}, expected ${sharedModels}`);
+  }
+  return models;
+}
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (![...GROUPS, 'e0-values', 'table'].includes(command)) throw new Error('Unknown subcommand');
@@ -37,7 +45,7 @@ export function parseArgs(argv) {
       if (result.dryRun) throw new Error('Duplicate --dry-run');
       result.dryRun = true;
     } else {
-      const key = { '--arm': 'arm', '--window': 'window' }[flag];
+      const key = { '--arm': 'arm', '--window': 'window', '--repo-root': 'repoRoot' }[flag];
       const value = rest[++i];
       if (!key || !value || value.startsWith('--') || result[key]) throw new Error(`Invalid option ${flag}`);
       result[key] = value;
@@ -64,6 +72,8 @@ export function buildPlan(options, values, root = ROOT) {
   const pythonCwd = path.join(root, 'scripts/jseval');
   const env = {
     PYTHONPATH: pythonCwd, PYTHONUTF8: '1',
+    // Trust only the selected owner-assigned arm in child processes; no global Git config edits.
+    GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'safe.directory', GIT_CONFIG_VALUE_0: tree,
     JUSTSEARCH_HEAD_HEAP: values.heap.packaged.replace('-Xmx', ''),
     UI_OPTS: '-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC',
     JAVA_OPTS: '-Djustsearch.eval.mode=true',
@@ -74,7 +84,7 @@ export function buildPlan(options, values, root = ROOT) {
     '--clean', 'none', '--data-dir', path.join(tree, 'tmp/lane-f-e', '${invocation}', label),
     '--api-port', '33221', '--session-id', '${session}', '--lease-duration-sec', '3600',
     '--chat-profile', 'standard'], tree, { mode: 'start',
-      requestsAfterReceipt: ['/api/mcp/token', '/api/health', '/api/debug/state', '/api/runtime/manifest', '/api/debug/effective-config'] });
+      requestsAfterReceipt: ['/api/mcp/token', '/api/health', '/api/status', '/api/debug/state', '/api/runtime/manifest', '/api/debug/effective-config'] });
   const stop = label => cmd(`stop-${label}`, 'node', [runner, 'stop', '--json', '--run', '${runId}',
     '--session-id', '${session}'], tree, { mode: 'stop' });
   const evalRun = (label, load = false, mode = 'hybrid') => cmd(label, 'python', ['-m', 'jseval', 'run',
@@ -101,8 +111,8 @@ export function buildPlan(options, values, root = ROOT) {
   const preamble = [cmd('revision', 'git', ['rev-parse', 'HEAD']),
     cmd('dirty', 'git', ['status', '--porcelain']),
     cmd('runner-status', 'node', [runner, 'status', '--active', '--json']),
-    cmd('machine', 'powershell', ['-NoProfile', '-Command',
-      'Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,TotalVisibleMemorySize,TotalVirtualMemorySize | ConvertTo-Json']),
+    cmd('machine', 'node', ['-e',
+      'const os=require("node:os");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))']),
     cmd('gpu', 'nvidia-smi', ['--query-gpu=name,uuid,memory.total,driver_version', '--format=csv'])];
   if (group === 'e0-values') return [{ mode: group, label: group }];
   if (group === 'table') return [cmd('fixture-gate', 'bash', [path.join(tools, 'fixture-gate.sh'),
@@ -361,7 +371,14 @@ async function startOwned(command, context, bindings) {
   }
   await api(context, '/api/debug/state');
   await api(context, '/api/runtime/manifest');
-  await api(context, '/api/debug/effective-config');
+  const config = await api(context, '/api/debug/effective-config');
+  context.record.sharedModels = verifySharedModels(config);
+  const ready = await execute({ label: `capability-ready-${command.label}`, executable: 'python',
+    args: [path.join(ROOT, 'scripts/jseval/lane-f/capability-ready.py'),
+      '--base-url', 'http://127.0.0.1:33221', '--timeout', '300',
+      '--output', path.join(context.raw, `${command.label}-capability-ready.json`)],
+    cwd: command.cwd, env: command.env }, context).complete;
+  if (ready.code !== 0) throw new Error(`Capability readiness failed for ${command.label}; see ${ready.receipt.stderrFile}`);
 }
 
 function collect(context) {
@@ -451,6 +468,7 @@ function collect(context) {
 
 export async function main(argv = process.argv.slice(2), root = ROOT) {
   const options = parseArgs(argv);
+  root = path.resolve(options.repoRoot ?? root);
   const valuesFile = path.join(root, EVIDENCE, 'values.json');
   const document = read(valuesFile), values = document.values;
   const plan = buildPlan(options, values, root);
@@ -503,8 +521,10 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   const machine = { hostname: os.hostname(), platform: os.platform(), release: os.release(), arch: os.arch(),
     cpu: os.cpus().map(c => c.model), ramBytes: os.totalmem(), node: process.version };
   const instrumentFiles = filesUnder(path.join(root, 'scripts/jseval/lane-f'));
+  const driverFiles = ['e-run.mjs', 'capability-ready.py'].map(file => path.join(ROOT, 'scripts/jseval/lane-f', file));
   const corpusFiles = ['docs/explanation', 'docs/reference'].flatMap(dir => filesUnder(path.join(ARMS.main, dir)));
   const pairIdentity = hash(JSON.stringify({ machine, instruments: instrumentFiles.map(f => [path.relative(root, f), hash(fs.readFileSync(f))]),
+    driver: driverFiles.map(f => [path.basename(f), hash(fs.readFileSync(f))]),
     corpus: corpusFiles.map(f => [path.relative(ARMS.main, f), hash(fs.readFileSync(f))]), env: plan.find(c => c.env)?.env }));
   const destination = path.join(root, EVIDENCE, options.command, options.arm);
   const recordFile = path.join(destination, `${id}.json`);
@@ -562,6 +582,7 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
         continue;
       }
       const result = await execute(command, context).complete;
+      if (result.code !== 0) throw new Error(`${command.label} exited ${result.code}; see ${result.receipt.stderrFile}`);
       if (command.label === 'runner-status') {
         const status = JSON.parse(result.stdout);
         if (status.runId) throw new Error(`Shared stack occupied by ${status.runId}; no takeover`);
@@ -570,7 +591,7 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
       } else if (command.label === 'revision') {
         record.revision = result.stdout.trim();
         if (options.arm === 'main' && !record.revision.startsWith('ac1c93bf3')) throw new Error('MAIN revision differs from owner pin');
-      } else if (result.code !== 0) throw new Error(`${command.label} exited ${result.code}`);
+      }
       if (command.mode === 'stop') { context.owned = null; delete bindings.runId; context.token = null; }
     }
     collect(context);
