@@ -73,10 +73,16 @@ Per-worker cost ledger (self + children, API-equivalent):
 | F-3/4/5 (`01a0f39e`) | gpt-6.1-sol | $1.88 | 1, $0.55 | done; merged `82b5fa129` |
 | D1/D2 audit, reconciliation, 4 reviews | gpt-6.1-sol | $6.25 | 6, $7.57 | read-only |
 | E1, WP2 2c, callers, contract, sweep, 2e | mixed | $1.09 | 0 | |
+| D1 closure proofs: hosted fixes, harness, pre-walk race, retained state, proofs (`01a0f52b`..`01a0f597`) | gpt-6.1-sol | $13.58 | 0 | 2026-10-01; all merged |
+| E driver, readiness, fixture reuse, E2-E3 redesign, per-stage E3, pair identity (`01a0f5ff`, `01a0f61c`, `01a0f62a`, `01a0f662`) | gpt-6.1-sol | $4.23 | 0 | 2026-10-01; merged |
+| E4-E6 instruments design + implementation (`01a0f61a`) | gpt-6.1-sol | $3.08 | 0 | 2026-10-01; merged `f360f7b2e` |
+| F-1 residue sweep + review fixes (`01a0f673`) | gpt-6.1-sol | $2.76 | 0 | 2026-10-01; merged `6c9c24d5b` |
+| F-1 residue refute-first review (`01a0f68e`) | gpt-6.1-sol | $0.78 | 0 | read-only; 5 findings, all fixed |
 
-Codex weekly `used_percent`: 21 at 22:20 on 2026-09-30. Total API-equivalent today: $136.14.
+Codex weekly `used_percent`: 21 at 22:20 on 2026-09-30; 25 at 11:40 on 2026-10-01. Total API-equivalent
+since takeover: $175.40 (no live sessions at that reading).
 
-## Current state (2026-09-30)
+## State at takeover (2026-09-30; the dated sections below supersede it where they differ)
 
 The narrative evidence ledger through `ca12f00e6` moved verbatim to
 [handoff-history-2026-09-21-to-30.md](handoff-history-2026-09-21-to-30.md).
@@ -137,8 +143,35 @@ restart-required proof to E7; D2-owned portions post-merge. Production defects f
 closing: Blue closed under an issued query, pre-walk ingest recovery race, help source omitted by Green,
 CLI boots skipping the data-version marker, reconfigure cleanup Error leaking the A holder.
 
-Next: stage E. Driver `scripts/jseval/lane-f/e-run.mjs` is being written (worktree `lane-f-e-driver`); the
-main arm is built in worktree `lane-f-e-main` at `ac1c93bf3`; values in `evidence/E/values.json`.
+## Stage E and F state (2026-10-01, lane head `a604f70af`)
+
+**E tooling.** Driver `scripts/jseval/lane-f/e-run.mjs` with E4-E6 instruments (`e456-*.mjs`,
+`scripts/supervisor-conformance/{verified-crash,jdwp-fault}.mjs`), bulk load (`scripts/jseval/jseval/bulk_load.py`),
+and measurement-based pair identity (`e-pair-identity.mjs`). Main arm: worktree `lane-f-e-main` at `ac1c93bf3`.
+Decisions made while running it (each recorded in `stages/E.md` §2):
+- E2/E3 measure **during** bulk indexing: one invocation per workload, a fixed 20-minute window (hybrid then
+  lexical), the window invalid if indexing finishes inside it. The first design waited for full enrichment and
+  passed the 59-minute run limit on main.
+- E3 rates each indexing stage (primary, embed, SPLADE, chunk, NER) over its own active interval: main embeds
+  whole documents before chunks, so chunk rate alone was order dependent (main recorded 0 chunks/s).
+- Pair identity hashes the normalized plan and the bytes of the instruments it executes, not scoring code; every
+  checkout path normalizes to one placeholder (the branch arm is the tooling root). `reproject` re-scores a
+  record from its raw files without changing its identity.
+- GC logging uses a quoted `-Xlog` file name; an escaped drive colon stops JDK 25 from starting.
+**Runs.** Records before the pair-identity change do not pair and are kept only as history. E1 main recaptured
+(`2026-10-01T08-53-13-317Z-c51decb0`). The full paired queue (`tmp/q-full.txt`: main E2 x2, E4 x3, e0-values,
+branch E1, E2 x2, E4 x3, e4-hang-values, E5 and E6 on both arms, table) runs serially from
+`tmp/lane-f-e-queue.mjs`; log `tmp/lane-f-e-queue-q-full.log`. To stop it, create
+`tmp/lane-f-e-queue-q-full.stop` (it exits between items). **Never kill the runner**: its e-run child dies with
+the pipe and leaves an owned stack (stop such a stack with `dev-runner.cjs stop --run <id> --session-id
+lane-f-e-<invocation>` from the arm's tree).
+**F.** F-1 exits 0 at `a604f70af`: 1,373 hits dispositioned (rewrites, renames, and a reviewed allowlist
+`governance/lane-f-residue-allowlist.v1.json` whose entries are exact paths with per-occurrence line anchors),
+[dispositions](evidence/F/residue-dispositions-2026-10-01.md), [review fixes](evidence/F/residue-refutation-2026-10-01.md).
+F-5 lease holder `WORKER` -> `INDEXING` on `/api/status`. Residue branch verified: build and tests green, ui-web
+6,637 unit tests and 27/27 gates, wire gate, docs-validate, lint. Remaining F: F-6, F-7 (needs E's table), F-8;
+pruning the 36 stale `io.grpc` rows of `gradle/verification-metadata.xml` (no dependency remains; needs Gradle);
+AOT cache training flags lack G1 and compact headers.
 
 ## Re-plan (owner-authorized 2026-09-30)
 
