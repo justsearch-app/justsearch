@@ -23,7 +23,7 @@
       "countedBy": "harness oracle on the wire; timeout or 5xx is failure"
     },
     "indexingProgressFraction": {
-      "rule": "branch chunks/s >= 0.90 x split under the same foreground load",
+      "rule": "per workload, compare primary, embed, splade, chunk_embed and ner completed/s over each stage active interval within the foreground window (at least 60 s); branch >= 0.90 x split for each stage with positive split rate; zero/missing split rates are not compared; no comparable stage is unmeasurable",
       "measuredAtE0": true,
       "baselineSanity": {
         "primaryDocsPerSec": 127.4,

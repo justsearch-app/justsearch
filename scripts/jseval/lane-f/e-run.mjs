@@ -76,7 +76,7 @@ export function verifySharedModels(config) {
 }
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
-  if (![...GROUPS, 'e0-values', 'e4-hang-values', 'table'].includes(command)) throw new Error('Unknown subcommand');
+  if (![...GROUPS, 'e0-values', 'e4-hang-values', 'table', 'reproject'].includes(command)) throw new Error('Unknown subcommand');
   const result = { command, dryRun: false };
   for (let i = 0; i < rest.length; i++) {
     const flag = rest[i];
@@ -85,7 +85,7 @@ export function parseArgs(argv) {
       result.dryRun = true;
     } else {
       const key = { '--arm': 'arm', '--window': 'window', '--repo-root': 'repoRoot', '--arm-tree': 'armTree',
-        '--fault': 'fault', '--debug-port': 'debugPort', '--workload': 'workload' }[flag];
+        '--fault': 'fault', '--debug-port': 'debugPort', '--workload': 'workload', '--record': 'record' }[flag];
       const value = rest[++i];
       if (!key || !value || value.startsWith('--') || result[key]) throw new Error(`Invalid option ${flag}`);
       result[key] = value;
@@ -106,6 +106,7 @@ export function parseArgs(argv) {
   if (command === 'e2-e3-load' ? !['agent-idle', 'scripted-agent'].includes(result.workload) : result.workload !== undefined) {
     throw new Error('--workload agent-idle|scripted-agent required only for E2/E3');
   }
+  if (command === 'reproject' ? !result.record || result.arm : result.record !== undefined) throw new Error('--record <record.json> required only for reproject; omit --arm');
   return result;
 }
 
@@ -261,7 +262,7 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
 const CLAUSES = {
   E1: ['baseline-quality', 'SearchTrace-shape', 'workflow-evidence-citations-cancellation', 'allowed-differences'],
   E2: ['indexing-window-valid', 'foreground-p95', 'agent-api-p95', 'idle-rejections', 'scripted-rejections', 'no-timeout-or-5xx'],
-  E3: ['indexing-window-valid', 'chunks-per-second-under-foreground-load'],
+  E3: ['indexing-window-valid', 'stage-completion-rates-under-foreground-load'],
   E4: ['component-commit-budget', 'machine-wide-commit-vs-main', 'working-set', 'live-after-GC-trend',
     'zero-crashes', 'owner-duration', 'index-agent-reconfigure-workload'],
   E5: ['actual-death-durable-operation', 'crash-to-api', 'crash-to-index', 'checkpoint-resume',
@@ -299,7 +300,96 @@ export function windowValidity(load) {
   }
   return true;
 }
+export const INDEX_STAGES = ['primary', 'embed', 'splade', 'chunk_embed', 'ner'];
+const E3_RATE_CLAUSE = 'stage-completion-rates-under-foreground-load';
+/** Raw wire counters are the authority; completed fields take precedence over projections. */
+export function stageCompletionRates(load) {
+  const samples = load.samples ?? [];
+  const docPopulations = samples.flatMap(s => {
+    const w = s.raw?.worker;
+    return [w?.core?.indexedDocuments, w?.enrichment?.embeddingDocCount, w?.enrichment?.spladeDocCount,
+      ...(w?.enrichment?.completeness ?? []).filter(c => ['embed', 'splade', 'ner'].includes(c.stageId)).map(c => c.expected)];
+  }).filter(finite);
+  const expectedDocuments = finite(load.expectedDocuments) ? load.expectedDocuments
+    : docPopulations.length ? Math.max(...docPopulations) : undefined;
+  const expectedSource = finite(load.expectedDocuments) ? 'load.expectedDocuments'
+    : 'maximum observed raw primary/document-enrichment population (legacy capture)';
+  const fields = {
+    embed: ['embeddingCompletedCount', 'embeddingPendingCount', 'embeddingDocCount'],
+    splade: ['spladeCompletedCount', 'spladePendingCount', 'spladeDocCount'],
+    chunk_embed: ['chunkEmbeddingCompletedCount', 'chunkEmbeddingPendingCount', 'chunkDocCount'],
+    ner: ['completedNerCount', 'pendingNerCount', undefined],
+  };
+  return Object.fromEntries(INDEX_STAGES.map(stage => {
+    const sources = new Set();
+    const rows = samples.map(s => {
+      const w = s.raw?.worker, e = w?.enrichment;
+      let completed, pending, expected;
+      if (stage === 'primary') {
+        completed = w?.core?.indexedDocuments; expected = expectedDocuments;
+        sources.add('raw.worker.core.indexedDocuments');
+      } else {
+        const [doneKey, pendingKey, expectedKey] = fields[stage];
+        const owner = stage === 'chunk_embed' ? e?.chunk : e;
+        pending = owner?.[pendingKey];
+        expected = expectedKey ? owner?.[expectedKey] : e?.completeness?.find(c => c.stageId === stage)?.expected;
+        if (!finite(expected) && stage !== 'chunk_embed') expected = expectedDocuments;
+        if (owner && Object.hasOwn(owner, doneKey)) {
+          completed = owner[doneKey]; sources.add(`raw.worker.enrichment.${stage === 'chunk_embed' ? 'chunk.' : ''}${doneKey}`);
+        } else {
+          completed = finite(expected) && finite(pending) && expected >= pending ? expected - pending : undefined;
+          sources.add(`expected - ${pendingKey} (completed field absent)`);
+        }
+      }
+      const active = stage === 'primary' ? finite(completed) && finite(expected) ? completed < expected : undefined
+        : finite(pending) ? pending > 0 : undefined;
+      return { time: s.observedAtMs, completed, active };
+    });
+    const result = { completedSources: [...sources], expectedDocuments, expectedSource };
+    if (!rows.length || rows.some(r => !finite(r.time) || !finite(r.completed) || r.active === undefined))
+      return [stage, { ...result, reason: 'missing-stage-counter-or-time' }];
+    if (rows.some((r, i) => i && r.time <= rows[i - 1].time))
+      return [stage, { ...result, reason: 'time-regression' }];
+    result.counterRegressions = rows.flatMap((r, i) => i && r.completed < rows[i - 1].completed
+      ? [{ observedAtMs: r.time, from: rows[i - 1].completed, to: r.completed }] : []);
+    const start = rows.findIndex(r => r.active);
+    if (start < 0) return [stage, { ...result, reason: 'no-active-interval' }];
+    const drained = rows.findIndex((r, i) => i > start && !r.active);
+    const last = drained < 0 ? rows.length - 1 : drained;
+    const seconds = (rows[last].time - rows[start].time) / 1000;
+    const delta = rows[last].completed - rows[start].completed;
+    return [stage, { ...result, activeSeconds: seconds, completedDelta: delta,
+      startObservedAtMs: rows[start].time, endObservedAtMs: rows[last].time,
+      drainedInWindow: drained >= 0, rate: seconds >= 60 && delta >= 0 ? delta / seconds : undefined,
+      reason: seconds < 60 ? 'active-interval-under-60-seconds' : delta < 0 ? 'negative-completion-delta'
+        : delta === 0 ? 'no-completions-in-window' : undefined }];
+  }));
+}
+export function compareStageRates(stages, splitStages) {
+  const comparisons = {}, checks = [];
+  for (const stage of INDEX_STAGES) {
+    const main = splitStages?.[stage]?.rate;
+    if (!finite(main) || main <= 0) {
+      comparisons[stage] = { status: 'not-compared', reason: finite(main) ? 'split-did-not-progress' : 'split-rate-unmeasurable' };
+      continue;
+    }
+    const branch = stages?.[stage]?.rate, minimum = main * .9;
+    const check = finite(branch) ? branch >= minimum && branch > 0 : undefined;
+    comparisons[stage] = { status: check === true ? 'pass' : check === false ? 'fail' : 'unmeasurable', splitRate: main, branchRate: branch, minimum };
+    checks.push(check);
+  }
+  return { comparisons, check: checks.includes(false) ? false : checks.length && checks.every(c => c === true) ? true : undefined };
+}
 export function projectLoad(record, load, calls, values) {
+  // Projection changes do not retroactively change acquisition provenance. Compare the
+  // recorded machine, launch pins and traffic protocol across re-scored and new records.
+  const launch = record.commands?.find(c => c.mode === 'start')?.env ?? {};
+  const keys = ['JUSTSEARCH_HEAD_HEAP', 'UI_OPTS', 'JAVA_OPTS', 'JUSTSEARCH_CHAT_PROFILE'];
+  record.loadComparisonIdentity = hash(JSON.stringify({ machine: record.machine,
+    launch: Object.fromEntries(keys.map(k => [k, launch[k]])), workload: record.workload,
+    blockSeconds: load.blockSeconds, durationSeconds: load.durationSeconds, modes: load.modes,
+    concurrency: load.concurrency, queryPoolHash: load.queryPoolHash }));
+  record.projectionDriverHash = hash(fs.readFileSync(fileURLToPath(import.meta.url)));
   const valid = windowValidity(load);
   record.clauses['indexing-window-valid'] = valid;
   if (valid !== true) record.gaps['indexing-window-valid'] = valid === false
@@ -309,19 +399,11 @@ export function projectLoad(record, load, calls, values) {
   record.metrics.loadWindow = { startedAtMs: load.startedAtMs, endedAtMs: load.endedAtMs,
     durationSeconds: load.durationSeconds, queryPoolHash: load.queryPoolHash };
   const samples = load.samples ?? [], first = samples[0], last = samples.at(-1);
+  record.metrics.stageRates = valid === true ? stageCompletionRates(load) : {};
   if (valid === true) {
-    // The window stays valid while any enrichment (for example NER) is pending, but chunk
-    // embedding can finish inside it on the faster arm. Rate chunks only over the interval in
-    // which chunk work was still pending, ending at the first sample that observed it drained,
-    // so an early finish is not diluted over idle seconds.
-    const chunkActive = s => s.chunkEmbeddingPendingCount > 0 || s.pendingJobs > 0;
-    const drained = samples.findIndex(s => !chunkActive(s));
-    const end = drained === -1 ? last : samples[drained];
-    const seconds = (end.observedAtMs - first.observedAtMs) / 1000;
-    record.metrics.chunkActiveSeconds = seconds;
-    record.metrics.chunkWorkDrainedInWindow = drained !== -1;
-    record.metrics.chunksPerSec = seconds >= 60
-      ? (end.chunkEmbeddingCompletedCount - first.chunkEmbeddingCompletedCount) / seconds : undefined;
+    record.metrics.chunkActiveSeconds = record.metrics.stageRates.chunk_embed.activeSeconds;
+    record.metrics.chunkWorkDrainedInWindow = record.metrics.stageRates.chunk_embed.drainedInWindow;
+    record.metrics.chunksPerSec = record.metrics.stageRates.chunk_embed.rate;
     record.metrics.docsPerSec = (last.indexedDocuments - first.indexedDocuments) / 1200;
     record.metrics.chunksByWorkload = { [record.workload]: record.metrics.chunksPerSec };
   }
@@ -347,8 +429,13 @@ export function projectLoad(record, load, calls, values) {
     record.clauses['scripted-rejections'] = wire.length ? wire.filter(c => c.status === 429).every(legalRejection)
       && record.metrics.wireRejections / wire.length <= values.admissionRejectionCeiling.scriptedAgentFraction : undefined;
   }
-  record.clauses['chunks-per-second-under-foreground-load'] = valid === false ? false
-    : valid === true && finite(record.metrics.chunksPerSec) ? true : undefined;
+  delete record.clauses['chunks-per-second-under-foreground-load'];
+  delete record.gaps['chunks-per-second-under-foreground-load'];
+  const split = values.indexingProgressFraction.stagesByWorkload?.[record.workload];
+  const compared = compareStageRates(record.metrics.stageRates, record.arm === 'main' ? record.metrics.stageRates : split);
+  record.metrics.stageComparisons = compared.comparisons;
+  record.clauses[E3_RATE_CLAUSE] = valid === false ? false : valid === true ? compared.check : undefined;
+  if (record.clauses[E3_RATE_CLAUSE] !== true) record.gaps[E3_RATE_CLAUSE] = JSON.stringify(compared.comparisons);
 }
 export function mergeLoadRecords(workloads) {
   const list = ['agent-idle', 'scripted-agent'].map(w => workloads[w]);
@@ -357,8 +444,13 @@ export function mergeLoadRecords(workloads) {
   merged.id = present.map(r => r.id).join(', ');
   merged.workloadRecords = present.map(r => r.recordFile);
   merged.pairIdentity = hash(JSON.stringify(list.map(r => r?.pairIdentity)));
-  merged.metrics = { searchP95: {}, searchP95ByWorkload: {}, chunksByWorkload: {}, queryPoolByWorkload: {} };
+  merged.loadComparisonIdentity = list.every(r => r?.loadComparisonIdentity)
+    ? hash(JSON.stringify(list.map(r => r.loadComparisonIdentity))) : undefined;
+  merged.projectionDriverHash = list.every(r => r?.projectionDriverHash === present[0].projectionDriverHash)
+    ? present[0].projectionDriverHash : undefined;
+  merged.metrics = { searchP95: {}, searchP95ByWorkload: {}, chunksByWorkload: {}, queryPoolByWorkload: {}, stagesByWorkload: {} };
   for (const r of present) {
+    merged.metrics.stagesByWorkload[r.workload] = r.metrics.stageRates;
     merged.metrics.queryPoolByWorkload[r.workload] = r.metrics.loadWindow?.queryPoolHash;
     merged.metrics.searchP95ByWorkload[r.workload] = r.metrics.searchP95;
     merged.metrics.chunksByWorkload[r.workload] = r.metrics.chunksPerSec;
@@ -395,8 +487,11 @@ export function tableVerdicts(records, values) {
           if (arms[0].workloadRecords || arms[1].workloadRecords) checks.push(m && b ? m === b : undefined);
         }
       }
-      checks.push(arms[0].pairIdentity === arms[1].pairIdentity,
-        arms[0].valuesHash === arms[1].valuesHash);
+      const loadPair = group === 'E2' || group === 'E3';
+      checks.push(loadPair && arms.every(r => r.loadComparisonIdentity)
+        ? arms[0].loadComparisonIdentity === arms[1].loadComparisonIdentity
+          && Boolean(arms[0].projectionDriverHash) && arms[0].projectionDriverHash === arms[1].projectionDriverHash
+        : arms[0].pairIdentity === arms[1].pairIdentity, arms[0].valuesHash === arms[1].valuesHash);
     }
     const disposition = arms[0]?.dispositions?.[clause];
     const result = verdict(disposition?.status === 'unmeasurable-on-split' ? [...checks, undefined] : checks);
@@ -425,15 +520,10 @@ export function tableVerdicts(records, values) {
     };
     if (group === 'E2' && clause === 'agent-api-p95') evaluate = b => finite(b.metrics?.agentP95)
       && finite(values.agentLoopApiP95Ceiling.ceilingMs) ? b.metrics.agentP95 <= values.agentLoopApiP95Ceiling.ceilingMs : undefined;
-    if (group === 'E3' && clause === 'chunks-per-second-under-foreground-load') evaluate = b => {
-      const workloadBounds = values.indexingProgressFraction.minimumByWorkload;
-      if (workloadBounds) {
-        const checks = Object.entries(workloadBounds).map(([load, bound]) => finite(b.metrics?.chunksByWorkload?.[load]) && finite(bound)
-          ? b.metrics.chunksByWorkload[load] >= bound : undefined);
-        return checks.some(x => x === false) ? false : checks.length === 2 && checks.every(x => x === true) ? true : undefined;
-      }
-      return finite(b.metrics?.chunksPerSec) && finite(values.indexingProgressFraction.minimumChunksPerSec)
-        ? b.metrics.chunksPerSec >= values.indexingProgressFraction.minimumChunksPerSec : undefined;
+    if (group === 'E3' && clause === E3_RATE_CLAUSE) evaluate = b => {
+      const checks = ['agent-idle', 'scripted-agent'].map(w => compareStageRates(
+        b.metrics?.stagesByWorkload?.[w], values.indexingProgressFraction.stagesByWorkload?.[w]).check);
+      return checks.includes(false) ? false : checks.every(c => c === true) ? true : undefined;
     };
     if (group === 'E4' && clause === 'machine-wide-commit-vs-main') evaluate = (b, m) =>
       finite(b.metrics?.peakCommitMB) && finite(m.metrics?.peakCommitMB) ? b.metrics.peakCommitMB <= m.metrics.peakCommitMB : undefined;
@@ -508,11 +598,11 @@ export function fillValues(document, records) {
   if (load.clauses?.['indexing-window-valid'] !== true || load.workloadRecords?.length !== 2
     || [...CLAUSES.E2, ...CLAUSES.E3].some(c => load.clauses[c] !== true)) throw new Error('Both valid MAIN workload windows required');
   const metrics = load.metrics;
-  if (!['agent-idle', 'scripted-agent'].every(w => finite(metrics.chunksByWorkload?.[w]) && metrics.chunksByWorkload[w] > 0
+  if (!['agent-idle', 'scripted-agent'].every(w => INDEX_STAGES.some(stage => finite(metrics.stagesByWorkload?.[w]?.[stage]?.rate) && metrics.stagesByWorkload[w][stage].rate > 0)
     && ['hybrid', 'lexical'].every(m => finite(metrics.searchP95ByWorkload?.[w]?.[m]) && metrics.searchP95ByWorkload[w][m] > 0))
     || !['hybrid', 'lexical'].every(mode => finite(metrics.searchP95?.[mode]) && metrics.searchP95[mode] > 0)
-    || !finite(metrics.agentP95) || metrics.agentP95 <= 0 || !finite(metrics.chunksPerSec) || metrics.chunksPerSec <= 0) {
-    throw new Error('MAIN lacks measured E0 search/API p95 or chunks/s; cannot invent bounds');
+    || !finite(metrics.agentP95) || metrics.agentP95 <= 0) {
+    throw new Error('MAIN lacks measured E0 search/API p95 or positive stage rates; cannot invent bounds');
   }
   const next = structuredClone(document);
   const v = next.values;
@@ -526,10 +616,14 @@ export function fillValues(document, records) {
     [w, Object.fromEntries(Object.entries(modes).map(([m, x]) => [m, x * 1.1]))]));
   v.agentLoopApiP95Ceiling.measuredMs = metrics.agentP95;
   v.agentLoopApiP95Ceiling.ceilingMs = metrics.agentP95 * 1.1;
-  v.indexingProgressFraction.measuredChunksPerSec = metrics.chunksPerSec;
-  v.indexingProgressFraction.minimumChunksPerSec = metrics.chunksPerSec * 0.9;
-  if (metrics.chunksByWorkload) v.indexingProgressFraction.minimumByWorkload =
-    Object.fromEntries(Object.entries(metrics.chunksByWorkload).map(([label, rate]) => [label, rate * .9]));
+  for (const obsolete of ['measuredChunksPerSec', 'minimumChunksPerSec', 'minimumByWorkload']) delete v.indexingProgressFraction[obsolete];
+  v.indexingProgressFraction.stagesByWorkload = Object.fromEntries(['agent-idle', 'scripted-agent'].map(w =>
+    [w, Object.fromEntries(INDEX_STAGES.map(stage => {
+      const measured = metrics.stagesByWorkload[w][stage];
+      return [stage, { ...measured, minimumRate: finite(measured?.rate) && measured.rate > 0 ? measured.rate * .9 : undefined,
+        comparison: finite(measured?.rate) && measured.rate > 0 ? 'compared' : 'not-compared' }];
+    }))]));
+  v.indexingProgressFraction.sourceRecords = load.workloadRecords;
   next.e0 = { qualityRun: quality.id, loadRun: load.id, fixedAt: new Date().toISOString() };
   return next;
 }
@@ -687,7 +781,7 @@ function collect(context) {
       && calls.filter(c => c.status === 429).length / calls.length <= context.values.admissionRejectionCeiling.scriptedAgentFraction : undefined;
     r.clauses['idle-rejections'] = loads.length ? loads.filter(s => s.search_load && !s.search_load.errors).length === loads.length : undefined;
   }
-  if (r.groups.includes('E3') && !r.workload) r.clauses['chunks-per-second-under-foreground-load'] = finite(r.metrics.chunksPerSec) ? true : undefined;
+  // Legacy unbounded load records have no validated per-stage population.
   if (r.groups.includes('E4')) {
     const completedCycles = r.commands.filter(c => /^soak-cycle-/.test(c.label) && c.code === 0);
     const workload = completedCycles.length && loads.length && calls.length
@@ -700,11 +794,45 @@ function collect(context) {
 
 }
 
+/** Re-score only retained E2/E3 wire evidence. Never refit E0 or alter launch provenance. */
+export function reprojectRecord(file, values, dryRun = false) {
+  const original = read(file);
+  if (!original.endedAt || !original.groups?.includes('E2') || !original.groups?.includes('E3')
+    || !['agent-idle', 'scripted-agent'].includes(original.workload)) throw new Error('Complete E2/E3 workload record required');
+  const directory = path.join(original.raw, original.workload);
+  const bulk = path.join(directory, 'bulk-load.json');
+  const workload = path.join(directory, 'workload.json');
+  const required = [...(original.rawFiles ?? []), bulk, ...(original.workload === 'scripted-agent' ? [workload] : [])];
+  const missing = required.filter(f => !fs.existsSync(f) || !fs.statSync(f).isFile());
+  if (!required.length || missing.length) throw new Error(`Missing retained raw files: ${missing.join(', ')}`);
+  const projected = structuredClone(original);
+  projected.measuredProjection ??= { metrics: original.metrics, clauses: original.clauses, gaps: original.gaps };
+  projected.projectionHistory = [...(original.projectionHistory ?? []),
+    { at: original.reprojectedAt ?? original.endedAt, driverHash: original.reprojectionDriverHash,
+      metrics: original.metrics, clauses: original.clauses, gaps: original.gaps }];
+  projected.metrics = {}; projected.clauses = {}; projected.gaps = {};
+  const calls = original.workload === 'scripted-agent' ? read(workload).requests ?? [] : [];
+  projectLoad(projected, read(bulk), calls, values);
+  projected.reprojectedAt = new Date().toISOString();
+  projected.reprojectionDriverHash = hash(fs.readFileSync(fileURLToPath(import.meta.url)));
+  projected.reprojectionValuesHash = hash(JSON.stringify(values));
+  projected.reprojectionRawHashes = Object.fromEntries([bulk, ...(original.workload === 'scripted-agent' ? [workload] : [])]
+    .map(f => [f, hash(fs.readFileSync(f))]));
+  if (!dryRun) write(file, projected);
+  return projected;
+}
+
 export async function main(argv = process.argv.slice(2), root = ROOT) {
   const options = parseArgs(argv);
   root = path.resolve(options.repoRoot ?? root);
-  const valuesFile = path.join(root, EVIDENCE, 'values.json');
+  const valuesFile = options.command === 'reproject' && !options.repoRoot
+    ? path.resolve(path.dirname(options.record), '../../values.json') : path.join(root, EVIDENCE, 'values.json');
   const document = read(valuesFile), values = document.values;
+  if (options.command === 'reproject') {
+    const result = reprojectRecord(path.resolve(options.record), values, options.dryRun);
+    console.log(JSON.stringify({ recordFile: result.recordFile, reprojectedAt: result.reprojectedAt, metrics: result.metrics, clauses: result.clauses }, null, 2));
+    return;
+  }
   const fixtureDecision = options.command === 'e1-quality' ? checkFixturePins(root) : undefined;
   const plan = buildPlan(options, values, root, fixtureDecision);
   if (options.dryRun) {
