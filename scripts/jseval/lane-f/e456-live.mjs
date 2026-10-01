@@ -34,6 +34,32 @@ async function run(executable, args, timeout = 15000) {
     child.once('close', (code, signal) => { clearTimeout(timer); resolve({ code, signal, stdout, stderr }); });
   });
 }
+// MAIN gates core.restart-worker behind a typed confirmation: the invoke answers 428
+// CONFIRMATION_REQUIRED with a pendingId, the operator approves it (POST /api/authorizations/approve
+// {pendingId}) for a consent capsule bound to that (operation, args), and the same invocation is
+// re-sent with confirmationToken. The harness is the operator of its own owned stack, so it performs
+// that approval itself and records the exchange as evidence (2026-10-01: E5 main failed on the 428).
+export async function invokeOperatorConfirmed(context, operationId, body, timeoutMs = 30000) {
+  const endpoint = `/api/operations/${operationId}/invoke`;
+  const headers = { Host: '127.0.0.1:33221', 'Content-Type': 'application/json' };
+  if (context.token) headers['X-JustSearch-Session'] = context.token;
+  const first = await fetch(`http://127.0.0.1:33221${endpoint}`, { method: 'POST', headers,
+    body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
+  const text = await first.text();
+  if (first.ok) return JSON.parse(text);
+  let gate; try { gate = JSON.parse(text); } catch { gate = undefined; }
+  if (first.status !== 428 || gate?.errorClass !== 'CONFIRMATION_REQUIRED' || !gate.pendingId) {
+    throw new Error(`${endpoint}: HTTP ${first.status}: ${text.slice(0, 300)}`);
+  }
+  const approval = await requestLive(context, '/api/authorizations/approve', { pendingId: gate.pendingId, allowAlways: false }, timeoutMs);
+  if (!approval?.capsule) throw new Error(`${endpoint}: approval for ${gate.pendingId} returned no capsule`);
+  const result = await requestLive(context, endpoint, { ...body, confirmationToken: approval.capsule }, timeoutMs);
+  const r = context.record;
+  if (r) (r.metrics.operatorApprovals ??= []).push({ operationId, pendingId: gate.pendingId,
+    gateBehavior: gate.gateBehavior, riskTier: gate.riskTier, approvedAt: new Date().toISOString() });
+  return result;
+}
+
 export async function requestLive(context, endpoint, body, timeoutMs = 3000) {
   const url = `http://127.0.0.1:33221${endpoint}`;
   const headers = { Host: '127.0.0.1:33221' };
@@ -516,7 +542,7 @@ export async function childPathExperiment(context, reason) {
       const runner = require(path.join(context.tree, 'scripts/dev/dev-runner.cjs')).__test;
       await runner.writeShutdownRequestFile(collector.data, { reason: 'restart', deadlineEpochMs: Date.now() + 15000 });
     } else {
-      await requestLive(context, '/api/operations/core.restart-worker/invoke', { args: {}, idempotencyKey: createOperationKey() }, 30000);
+      await invokeOperatorConfirmed(context, 'core.restart-worker', { args: {}, idempotencyKey: createOperationKey() });
     }
     await until(deadline, 'Requested restart readiness', async () => {
       const manifest = await requestLive(context, '/api/runtime/manifest');
