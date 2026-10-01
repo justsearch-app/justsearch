@@ -27,3 +27,7 @@ fixtures stay in the `lane-f-pr1-verify` worktree under `tmp/` through lane acce
 | `capturedEditReplays...`, `failedInPlaceARecompose...`, `generativeSecondOwnerFailure...`, `committedPointerBoot...` | `a38dc2883` | PASSED | `tmp/lane-f-installed-g4c.log`, `-g4c-xml/` |
 
 All installed lifecycle and supervised recovery scenarios pass on the current revisions above; no scenario is left on older-revision proof.
+
+D1-11 UI check at `a38dc2883`: `jseval ui-shot library-gap-decision --fixtures` renders the gap list
+(two named units with reasons), "Accept gaps and activate" and "Cancel rebuild"; axe 0 violations,
+console 0 errors, overflow none (`tmp/lane-f-ui-gap-decision/library-gap-decision.{png,measure.json}`).
