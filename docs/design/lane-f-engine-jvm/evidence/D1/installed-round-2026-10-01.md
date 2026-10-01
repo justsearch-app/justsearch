@@ -19,11 +19,11 @@ fixtures stay in the `lane-f-pr1-verify` worktree under `tmp/` through lane acce
 | `...lowMemoryInPlaceChangingInputRecoversBeforePointer`, `...AfterPointerBeforeSettings` | `30f5ca540` | PASSED | `tmp/lane-f-installed-g3.log`, `-g3-xml/` |
 | `EngineSupervisedRecoveryE2ETest.supervisedIndexRecoveryUsesTheRetainedStandardEmbedding` [lock-index-release, lock-index-exhaustion] (D1-7) | `30f5ca540` | PASSED (96 s, 129 s) | `tmp/lane-f-installed-recovery.log`, `-recovery-xml/` |
 | `...supervisedRecoveryUsesTheCorrectExitAndReopensDurableState` [writer, migration, processing] | `30f5ca540` | PASSED | same |
-| same [lock-ingest] | `30f5ca540` | FAILED once (`INGEST_UNIT_STATE_UNAVAILABLE`), then PASSED on two later executed runs; passed on hosted CI at `2babb36ce` | fixture `tmp/lane-f-takeover/writer-junit-cfe8f1f8-*`; reruns `tmp/lane-f-lock-ingest-rerun.log`, `tmp/lane-f-lock-ingest-ai-r1.log`; diagnosis in progress |
+| same [lock-ingest] | `30f5ca540` | FAILED once: real pre-walk recovery race ([diagnosis](../C2/lock-ingest-prewalk-race-2026-10-01.md)); fixed in the pre-walk recovery commit merged at `a38dc2883` | fixture `tmp/lane-f-takeover/writer-junit-cfe8f1f8-*` |
+| supervised recovery set [writer, migration, lock-ingest, processing] | `a38dc2883` | PASSED | `tmp/lane-f-lock-ingest-after-fix.log`, `-xml/` |
+| `nativeCompleteSource...`, three `recordedLiveStart...` cuts | `67437bd35` | PASSED | `tmp/lane-f-installed-g4a.log`, `-g4a-xml/` |
+| `capturedEditReplays...` | `67437bd35` | FAILED: harness snapshot raced predecessor retirement | fixed at `9bb93fb38` |
+| `semanticAvailability...` (BESIDE, IN_PLACE), `acceptedWriteDuringInPlaceBuild...`, `refusedAcceptedInPlaceCancellationCrash...` | `9bb93fb38` | PASSED | `tmp/lane-f-installed-g4b.log`, `-g4b-xml/` |
+| `capturedEditReplays...`, `failedInPlaceARecompose...`, `generativeSecondOwnerFailure...`, `committedPointerBoot...` | `a38dc2883` | PASSED | `tmp/lane-f-installed-g4c.log`, `-g4c-xml/` |
 
-Not yet re-run in this round (proved earlier at older revisions, see the reconciliation):
-`nativeCompleteSourceSurvivesMixedReceiptsAndSupervisedPointerCrash`,
-`recordedLiveStart*`, `capturedEditReplays*`, `semanticAvailability*`,
-`acceptedWriteDuringInPlaceBuildKeepsTheSameEngine`, `refusedAcceptedInPlaceCancellationCrash*`,
-`failedInPlaceARecomposeCancelsBAndRestoresA`, `generativeSecondOwnerFailure*`,
-`committedPointerBootReconcilesPersistedRootChangesBeforePublication`.
+All installed lifecycle and supervised recovery scenarios pass on the current revisions above; no scenario is left on older-revision proof.
