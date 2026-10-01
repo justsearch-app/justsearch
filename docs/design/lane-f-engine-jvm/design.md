@@ -2674,4 +2674,69 @@ items are decided; what remains of each is an edit outside this lane.
   register (11).
 ## 19. Report-back
 
-Not started. Filled per `00-program-overview.md` when the lane closes.
+### Cross-lane requests
+
+| Request | Report-back |
+|---|---|
+| Product-doc owner edits: README disclosure wording and threat-model OTLP promise. | The decisions are recorded in §18; the edits remain outside this lane ([stage F checklist](stages/F.md#f-7--the-report-back-design-19)). |
+| Inference lane: host contract with priority and aging. | Carried as an expected cross-lane request in §18 and F-7 ([stage F checklist](stages/F.md#f-7--the-report-back-design-19)). |
+| Lane D: field register. | Carried as an expected cross-lane request in §18 and F-7 ([stage F checklist](stages/F.md#f-7--the-report-back-design-19)). |
+
+### PRs
+
+| PR / change | Record |
+|---|---|
+| #708 | PR 0: Engine flags, fixture and baseline; commit `0824e3654`. |
+| #717 | PR 0b: fixture determinism pins; commit `f938c4eb2`. |
+| #718 | PR 1 was opened as draft at the B checkpoint. Stage B records 13 hosted jobs green at `84b8c0b6f`; later lane work is recorded in the in-lane follow-ups below ([stage B](stages/B.md), [hosted evidence](evidence/B/hosted-ci.md)). |
+| #729 | Search v3 deadline moved to 2026-11-30; merged as `ac1c93bf3`, then merged into the lane at `f80fd1f69` ([handoff](handoff.md#stage-e-and-f-state-2026-10-01-lane-head-a604f70af)). |
+| #735 | Codex role pins; open, owner merges ([handoff](handoff.md#codex-cost-rules-owner-2026-09-30-binding-for-every-launch-and-resume)). |
+| In-lane follow-ups | E driver `148e9ebe5`; E4–E6 instruments `09b4b5064`; E2/E3 redesign `8a0c23fdb`; F-1/F-5 `47cdea384` and merge `6c9c24d5b`; D1 closure `f4193cfdd`; F-6 `0bb525c61`. These subjects and merge points are in `git log origin/main..HEAD` ([stage E/F handoff](handoff.md#stage-e-and-f-state-2026-10-01-lane-head-a604f70af)). |
+
+### Items done, deviated and skipped by stage
+
+| Stage | Report |
+|---|---|
+| A | A1–A20 landed; checkpoint complete and merged to `origin/main` ([stage A](stages/A.md), [A20 evidence](evidence/A/a20-suite-and-gates.md)). |
+| B | B1–B17 accepted. Signed dead-Engine installer proof moved to E ([stage B](stages/B.md), [B17 evidence](evidence/B/b17-recovery-proofs.md)). |
+| C1 | Complete, including the later MCP quota correction and R10 integrated/hosted proof ([stage C1](stages/C1.md), [reconciliation](evidence/C1/acceptance-reconciliation.md)). |
+| C2 | Accepted. The pre-walk recovery correction is implemented and locally verified; installed replay remains orchestrator-owned ([stage C2](stages/C2.md), [correction record](evidence/C2/prewalk-recovery-2026-10-01.md)). |
+| D1 | Closed 2026-10-01 with current local, installed and hosted proof. D1-6 signed restart-required proof is deferred to E7; D2-owned work is post-merge by owner decision ([stage D1](stages/D1.md), [closure confirmation](evidence/D1/closure-confirmation-2026-10-01.md)). |
+| D2 | Deferred to post-merge work on `main` by the 2026-09-30 re-plan; D2 acceptance is not claimed complete ([handoff](handoff.md#re-plan-owner-authorized-2026-09-30), [stage D2](stages/D2.md)). `evidence/D2/` is not present. |
+| E | In progress. E1 main recapture and partial E2–E4 main records exist; the paired table and final verdict are not recorded. The floor machine is unclaimed ([handoff](handoff.md#stage-e-and-f-state-2026-10-01-lane-head-a604f70af), [E values](evidence/E/values.json)). |
+| F | F-1 residue dispositions and F-5 lease rename are recorded; F-6 checks pass. F-7 is this report. F-8 remains ([F-1 dispositions](evidence/F/residue-dispositions-2026-10-01.md), [F-6 checks](evidence/F/f6-checks-2026-10-01.md), [stage F](stages/F.md)). |
+
+### Evidence
+
+Hashes below are `git hash-object` values for the linked files.
+
+| Directory | Key evidence and blob hash |
+|---|---|
+| [`evidence/A/`](evidence/A/) | [`a20-suite-and-gates.md`](evidence/A/a20-suite-and-gates.md) — `6428060e48c41cf75b480d5802d3142b5ca3e63c` |
+| [`evidence/B/`](evidence/B/) | [`integrated-verification.md`](evidence/B/integrated-verification.md) — `927f1978c9391b8f6bb726c1096df8ad443aa491`; [`b17-recovery-proofs.md`](evidence/B/b17-recovery-proofs.md) — `07f636e89b7102b25f09977bcd1441cf2c8fa315` |
+| [`evidence/C1/`](evidence/C1/) | [`acceptance-reconciliation.md`](evidence/C1/acceptance-reconciliation.md) — `4860d10e39645066926c4b0a44828786a693027b` |
+| [`evidence/C2/`](evidence/C2/) | [`prewalk-recovery-2026-10-01.md`](evidence/C2/prewalk-recovery-2026-10-01.md) — `39f6eacfa50fdf1a82ab9de549d580384b5ddcfa` |
+| `evidence/D2/` | Directory and evidence files not recorded. D2 is post-merge work ([handoff](handoff.md#re-plan-owner-authorized-2026-09-30)). |
+| [`evidence/D1/`](evidence/D1/) | [`closure-confirmation-2026-10-01.md`](evidence/D1/closure-confirmation-2026-10-01.md) — `36954d2459a1ec2533f377d0cd1d772ec1caac4b`; [`installed-round-2026-10-01.md`](evidence/D1/installed-round-2026-10-01.md) — `cda1df1af33bd8cc44d58a961cde3c3813881e3d` |
+| [`evidence/E/`](evidence/E/) | [`values.json`](evidence/E/values.json) — `2b3181fb0bfc8e0053a855e4055c63c5fbe6aca1`; [`e1-quality/main/index.json`](evidence/E/e1-quality/main/index.json) — `d1111a69f37946e198f043e051d44403aa2284fa`; [`e2-e3-load/main/index.json`](evidence/E/e2-e3-load/main/index.json) — `84cfc8e5c0d1b7010a9586d80099e7028a3c8fdf`; [`e4-memory-soak/main/index.json`](evidence/E/e4-memory-soak/main/index.json) — `f210c812a904bed8eae900e1a5b621481ced62b4` |
+| [`evidence/F/`](evidence/F/) | [`residue-dispositions-2026-10-01.md`](evidence/F/residue-dispositions-2026-10-01.md) — `ba0898e4e724c7d43740d95ec67cb9a77d375f1a`; [`residue-refutation-2026-10-01.md`](evidence/F/residue-refutation-2026-10-01.md) — `757abcfea5a5907a073f6ad69a002c5548b920a9`; [`f6-checks-2026-10-01.md`](evidence/F/f6-checks-2026-10-01.md) — `baa782dd6a308aa88c9469a08fb9c0dbc0ee21e8` |
+
+### Measurements (stage E table, pending)
+
+**Pending:** insert `evidence/E/table.md` verbatim when recorded. It must include the collector and hang parameters and section 16's bounded conclusion: a paired run supports only the tested machine, corpus and workload; the supported-floor claim waits for a floor run or a restated floor, and the soak conclusion names its duration, workload and covered failure scenarios ([section 16](#16-what-must-be-measured-and-the-gate-for-flipping-the-default), [E runbook](stages/E.md#8-the-record-evidencee)).
+
+Recorded choices: G1 is the collector; both Engine spawn sites explicitly use `-XX:+UseG1GC` (`bb399e495`). Hang detection is set as interval × miss count ≥ 3 × the worst observed E4 safepoint pause, with interval ≥ 10 s. The measured pause and resulting values are not recorded in `evidence/E/values.json`; the paired table is the destination. `floorMachine.claimed` is `false`, so a floor-machine result is not recorded ([E values](evidence/E/values.json), [stage E/F handoff](handoff.md#stage-e-and-f-state-2026-10-01-lane-head-a604f70af)).
+
+### Residue routed
+
+F-1 reviewed 1,373 hits: 246 rewrites, 116 compatibility labels, 953 reviewed/allowed vocabulary and history hits, and 58 fixture/guard hits. The exact-path, occurrence-count and trimmed-line-anchor policy is in [`governance/lane-f-residue-allowlist.v1.json`](../../../governance/lane-f-residue-allowlist.v1.json) (blob `cabdbfda1480aa5c7ee7fff0dd3f542d40ee4fca`). The result, refutation and F-6 check are [`residue-dispositions-2026-10-01.md`](evidence/F/residue-dispositions-2026-10-01.md), [`residue-refutation-2026-10-01.md`](evidence/F/residue-refutation-2026-10-01.md) and [`f6-checks-2026-10-01.md`](evidence/F/f6-checks-2026-10-01.md). Thirty-six stale `io.grpc` verification-metadata rows are routed to root for pruning; they do not establish a current dependency ([dispositions](evidence/F/residue-dispositions-2026-10-01.md)).
+
+### What the next lane must know
+
+- Linux recovery result is not recorded; E makes other-OS recovery conditional on the corresponding claim ([handoff re-plan](handoff.md#re-plan-owner-authorized-2026-09-30), [E runbook](stages/E.md#0-decisions-and-corrections-this-runbook-records)).
+- The floor machine was not claimed: `floorMachine.claimed=false` ([E values](evidence/E/values.json)).
+- The signed installer round is outstanding: E7 and WP2 2c installed downgrade are blocked on signing/AppControl ([handoff](handoff.md#re-plan-owner-authorized-2026-09-30), [E runbook](stages/E.md#7-the-dead-engine-upgrade-round-e7)).
+- D2 is post-merge work on `main` ([handoff re-plan](handoff.md#re-plan-owner-authorized-2026-09-30)).
+- Module names `worker-services`, `indexer-worker` and `worker-core` remain; C2-1 keeps five `owner: "WORKER"` labels for installed-updater compatibility ([stage F checklist](stages/F.md#9-what-is-allowed-to-remain-labelled-and-nothing-else), [F-1 dispositions](evidence/F/residue-dispositions-2026-10-01.md)).
+- The 36 stale `io.grpc` rows in `gradle/verification-metadata.xml` remain for root's dependency-verification cleanup ([F-1 dispositions](evidence/F/residue-dispositions-2026-10-01.md)).
+- AOT cache training flags still lack G1 and compact headers; the handoff records the installed-cache verification as outstanding ([handoff](handoff.md#stage-e-and-f-state-2026-10-01-lane-head-a604f70af)).
