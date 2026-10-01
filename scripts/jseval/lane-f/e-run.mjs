@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { gcLogOption, hangPolicy, splitGap } from './e456-instruments.mjs';
@@ -29,6 +29,43 @@ const write = (file, value) => {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 };
 const finite = x => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+export const MAIN_REVISION = 'ac1c93bf32c2bba3e4a22462295acbc618f850bc';
+
+/** E0.2: compare content, never ancestry, and retain the exact pin-check evidence. */
+export function checkFixturePins(root = ROOT, revision = MAIN_REVISION, git = args => {
+  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true });
+  if (result.status !== 0) throw new Error(`Fixture pin check failed: ${result.stderr || result.error}`);
+  return result.stdout.trim();
+}, stampFile = path.join(ARMS.main, 'modules/indexer-worker/build/install/indexer-worker/build-stamp.txt')) {
+  const spec = read(path.join(root, 'scripts/jseval/lane-f-workflow-fixture.v1.json'));
+  const baseline = read(path.join(root, 'docs/design/lane-f-engine-jvm/evidence/baseline/fixture-pr0b/pins.json'));
+  if (!baseline?.recordedRevision || !baseline.pinnedSurfaces?.length) throw new Error('Missing PR 0b pinned surfaces');
+  const directory = path.join(root, baseline.directory);
+  const captures = [1, 2, 3].map(n => {
+    const file = path.join(directory, `capture-${n}.json`);
+    return { file, sha256: hash(fs.readFileSync(file)), provenance: read(file).provenance };
+  });
+  const first = captures[0].provenance;
+  const stamp = first?.['worker.buildStamp'];
+  const pins = first?.pins;
+  if (!stamp || !pins || !Object.keys(pins).length) throw new Error('PR 0b lacks recorded build or pins');
+  const sameBuildAndPins = captures.every(c => c.provenance?.['worker.buildStamp'] === stamp
+    && JSON.stringify(c.provenance?.pins) === JSON.stringify(pins)
+    && c.provenance?.chatProfile === first.chatProfile
+    && Object.keys(c.provenance?.sampling ?? {}).length === Object.keys(spec.sampling).length
+    && Object.entries(spec.sampling).every(([key, value]) => c.provenance?.sampling?.[key] === value));
+  const args = ['diff', '--name-only', baseline.recordedRevision, revision, '--', ...baseline.pinnedSurfaces];
+  const changedFiles = git(args).split(/\r?\n/).filter(Boolean);
+  const currentBuildStamp = fs.existsSync(stampFile) ? fs.readFileSync(stampFile, 'utf8').trim() : null;
+  const decision = sameBuildAndPins && changedFiles.length === 0 && currentBuildStamp === stamp ? 'reuse' : 'recapture';
+  return { rule: 'E0.2', decision, directory, recordedRevision: baseline.recordedRevision,
+    mainRevision: revision, revisionSource: baseline.revisionSource, gitDiffArgs: args, changedFiles,
+    reasons: [...(!sameBuildAndPins ? ['capture-build-or-pins-mismatch'] : []),
+      ...(changedFiles.length ? ['pinned-surfaces-changed'] : []),
+      ...(currentBuildStamp !== stamp ? ['installed-build-mismatch-or-missing'] : [])],
+    recordedBuildStamp: stamp, currentBuildStamp, stampFile, sameBuildAndPins, pins,
+    recordedChatProfile: first.chatProfile, captures: captures.map(({ file, sha256 }) => ({ file, sha256 })) };
+}
 export function verifySharedModels(config) {
   const models = config.keys?.find(entry => entry.key === 'justsearch.models.dir')?.value;
   const sharedModels = path.resolve(ARMS.main, '../../../models');
@@ -70,7 +107,7 @@ export function parseArgs(argv) {
 }
 
 /** A reviewable process plan; placeholders are resolved only after the owned start receipt. */
-export function buildPlan(options, values, root = ROOT) {
+export function buildPlan(options, values, root = ROOT, fixtureDecision) {
   const arm = options.arm ?? 'main';
   const tree = options.armTree ? path.resolve(options.armTree) : ARMS[arm];
   const group = options.command;
@@ -153,10 +190,12 @@ export function buildPlan(options, values, root = ROOT) {
     '${mainFixture}', '${branchFixture}', '${fixtureReport}'], root), { mode: group, label: group }];
   let commands;
   if (group === 'e1-quality') {
+    fixtureDecision ??= checkFixturePins(root);
     commands = [start('quality'), evalRun('quality'), stop('quality'),
       cmd('relevance', 'python', ['-m', 'jseval', 'relevance-gate', '--dataset', 'beir/scifact',
         '--data-dir', path.join(raw, 'quality'), '--report-out', path.join(raw, 'relevance-gate.json')], pythonCwd)];
-    const fixtureEnv = { ...env,
+    const fixtureProfile = fixtureDecision.decision === 'reuse' ? fixtureDecision.recordedChatProfile : 'standard';
+    const fixtureEnv = { ...env, JUSTSEARCH_CHAT_PROFILE: fixtureProfile,
       JUSTSEARCH_INDEX_VECTOR_EXHAUSTIVE_SEARCH: 'true', JUSTSEARCH_LLM_SLOTS: '1',
       JUSTSEARCH_RERANK_DEADLINE_MS: '60000', JUSTSEARCH_RERANK_CHUNKS_DEADLINE_MS: '60000',
       JUSTSEARCH_RERANK_TOP_K: '40', JUSTSEARCH_RERANK_GPU_MEM_MB: '4096',
@@ -166,10 +205,14 @@ export function buildPlan(options, values, root = ROOT) {
       JUSTSEARCH_HYBRID_RERANK_POOL_RECALL_COMPLETE: 'false',
       JUSTSEARCH_FIXTURE_CORPUS_ROOT: ARMS.main,
     };
-    for (let n = 1; n <= values.noisePairGate.capturesPerSide; n++) {
-      commands.push({ ...start(`fixture-${n}`), env: fixtureEnv },
+    if (arm === 'main' && fixtureDecision.decision === 'reuse') {
+      commands.push({ label: 'fixture-reuse', mode: 'fixture-reuse', ...fixtureDecision });
+    } else for (let n = 1; n <= values.noisePairGate.capturesPerSide; n++) {
+      const fixtureStart = start(`fixture-${n}`);
+      fixtureStart.args[fixtureStart.args.indexOf('--chat-profile') + 1] = fixtureProfile;
+      commands.push({ ...fixtureStart, env: fixtureEnv },
         cmd(`fixture-${n}`, 'bash', [path.join(tools, 'fixture-cycle.sh'), path.join(raw, 'fixture', `capture-${n}.json`),
-          'standard', '33221'], root, { env: fixtureEnv }), stop(`fixture-${n}`));
+          fixtureProfile, '33221'], root, { env: fixtureEnv }), stop(`fixture-${n}`));
     }
   } else if (group === 'e2-e3-load') {
     commands = [];
@@ -521,9 +564,10 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   root = path.resolve(options.repoRoot ?? root);
   const valuesFile = path.join(root, EVIDENCE, 'values.json');
   const document = read(valuesFile), values = document.values;
-  const plan = buildPlan(options, values, root);
+  const fixtureDecision = options.command === 'e1-quality' ? checkFixturePins(root) : undefined;
+  const plan = buildPlan(options, values, root, fixtureDecision);
   if (options.dryRun) {
-    console.log(JSON.stringify({ options, limitSeconds: 3540, leaseDurationSec: 3600, commands: plan }, null, 2));
+    console.log(JSON.stringify({ options, fixtureDecision, limitSeconds: 3540, leaseDurationSec: 3600, commands: plan }, null, 2));
     return;
   }
   const records = latestRecords(root);
@@ -596,6 +640,7 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   const record = { kind: 'lane-f-e-run.v1', id, groups, arm: options.arm, window: options.window,
     startedAt: new Date().toISOString(), machine, pairIdentity, valuesHash: hash(fs.readFileSync(valuesFile)),
     recordFile, raw, runIds: [], commands: [], metrics: {}, clauses: {}, gaps: {},
+    fixtureDecision,
     additionalArtifacts: [] };
   const context = { raw, record, values, deadline: Date.now() + 3540000, sequence: 0, background: [], root };
   const bindings = { invocation: id, session: `lane-f-e-${id}` };
@@ -607,6 +652,16 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     for (const template of plan) {
       if (Date.now() >= context.deadline) throw new Error('Invocation deadline');
       const command = resolveCommand(template, bindings);
+      if (command.mode === 'fixture-reuse') {
+        for (const capture of command.captures) {
+          if (hash(fs.readFileSync(capture.file)) !== capture.sha256) throw new Error('PR 0b capture changed after pin check');
+          const target = path.join(raw, 'fixture', path.basename(capture.file));
+          fs.mkdirSync(path.dirname(target), { recursive: true });
+          fs.copyFileSync(capture.file, target);
+        }
+        record.commands.push({ ...command, copiedAt: new Date().toISOString() });
+        continue;
+      }
       if (command.mode === 'instruments-start') {
         context.collector = await new LiveCollector(context, command).start(); continue;
       }

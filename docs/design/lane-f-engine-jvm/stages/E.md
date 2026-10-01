@@ -87,7 +87,24 @@ recovery exercise remains E7, with §16's artifact disposition.
 
 ### 0.1 Corrections found while running (appended per run)
 
-*(empty — the runner appends one bullet per run whose procedure or value did not survive contact.)*
+- **2026-10-01, E1 main `2026-10-01T06-25-28-289Z-f159494e`:** the unconditional
+  fixture capture ignored E0.2 and then refused main's legacy ingest response
+  (`accepted=92`, empty `error`, nonempty `scanId`). The pin check now reads
+  `evidence/baseline/fixture-pr0b/pins.json` and the captures' recorded provenance.
+  This metadata projects PR 0b's published revision and fixture input surfaces;
+  effective configuration and sampling remain owned by the capture and fixture spec.
+  `git diff --name-only f938c4eb2 ac1c93bf3` over those surfaces identifies six
+  changed corpus documents; the installed main worker stamp `55ffe7744cc7e103`
+  also differs from the recorded `8a048084ff68bc54`. **Recapture required.**
+  The original main record retains its failed outcome and SciFact evidence and now
+  includes `fixtureDecision` with the exact command, changed paths, pins, stamps
+  and capture hashes. Future E1 records retain the same decision evidence before
+  launch. Legacy ingest acceptance requires a positive integer count, empty error
+  and nonempty scan ID; operation envelopes keep their existing refusal predicate
+  and cannot fall back to legacy fields. Focused proof:
+  `node --test scripts/jseval/lane-f/e-run.test.mjs` (23 tests), including both
+  E0.2 plan cases, build/pin mismatch and mixed-envelope refusal. Root's live
+  E1 main invocation remains required.
 
 ---
 
@@ -130,8 +147,11 @@ All jseval and lane-F instrument code comes from the driver tree; each arm's
 dev-runner owns its stack. Launches use G1, `-Xmx2g`, standard chat profile,
 fresh private data directories and `leaseDurationSec=3600`. The fixture uses
 MAIN's unchanged documentation corpus and the fixture-pair launch pins;
-three fresh fixture-cycle captures reproduce fixture-pair's capture sequence
-without its force-cleanup of an active stack. SciFact materialization is shared.
+E0.2's pin/build check selects main's three recorded PR 0b captures when valid,
+otherwise three fresh fixture-cycle captures reproduce fixture-pair's capture
+sequence without its force-cleanup of an active stack. Branch always captures
+fresh; when main reuses the compact PR 0b fixture, branch uses that same fixture
+profile. SciFact keeps its standard profile and shared materialization.
 
 ```powershell
 node scripts/jseval/lane-f/e-run.mjs e1-quality --arm main --dry-run
@@ -148,6 +168,46 @@ node scripts/jseval/lane-f/e-run.mjs e5-crash --arm main
 node scripts/jseval/lane-f/e-run.mjs e6-hang --arm main
 node scripts/jseval/lane-f/e-run.mjs table
 ```
+
+Every subcommand accepts `--repo-root <path>` to resolve instruments, jseval,
+values, corpus cache and output evidence in that checkout while executing the
+driver and its `capability-ready.py` helper from their source worktree. This
+allows root to exercise unmerged driver changes without copying files. Both
+driver sources are included in the paired instrument identity.
+
+After each owned start, the driver waits up to five minutes for health and
+then up to five minutes for jseval's exact capability preflight:
+`derive_intended_engines('lexical,hybrid', cross_encoder=True)` and
+`assert_capabilities` from `jseval/preflight.py`. The latter reads and flattens
+`/api/status`, requiring `rerankerModelPath`; it deliberately does not require
+the lazy dense/SPLADE presence signals or CUDA initialization. Every attempt's
+verdict is retained in `<start-label>-capability-ready.json`. This gate runs
+before any measurement, including all fresh fixture starts, on either arm.
+The captured effective config must resolve `justsearch.models.dir` to the shared
+main checkout's `models` directory. The driver records the verified value.
+Git trust is limited to the assigned arm in child-process environment; machine
+facts use Node's OS API because Windows CIM is unavailable in the sandbox.
+
+**2026-10-01 supervised readiness-fix window:** two of three permitted real
+invocations were attempted, both before any measurement. Invocation
+`2026-10-01T06-21-13-044Z-82616ed8` failed because sandbox-account Git ownership
+rejection produced an empty revision, previously mislabeled as a pin mismatch.
+Process-scoped trust and immediate nonzero-command checking fix that diagnosis.
+Invocation `2026-10-01T06-22-16-797Z-ada7f994` reached startup but was denied
+write access to `F:/justsearch-public/tmp/dev-runner/active.lock.json` (EPERM).
+No stack was started; subsequent runner status reported `NO_ACTIVE_RUN`.
+No third invocation was spent repeating this filesystem restriction. Root must
+run with access to the existing shared runner state; redirecting that state
+would bypass shared-stack ownership. Raw outputs and per-clause missing-evidence
+records are in `lane-f-pr1-verify` under the paths described below. All four E1
+clauses remain unvalidated. The earlier main capture
+`2026-10-01T06-16-16-201Z-158dff46/9-_api_debug_effective-config.json` confirms
+`F:/justsearch-public/models`; live branch confirmation remains outstanding.
+Local regression evidence: `node --test scripts/jseval/lane-f/e-run.test.mjs`
+(19 cases) and, with `PYTHONPATH=scripts/jseval`,
+`python scripts/jseval/lane-f/capability-ready.test.py` (3 cases), retained in
+the driver tree at `tmp/lane-f-e-readiness-tests.txt` and
+`tmp/lane-f-e-capability-tests.txt`. No Gradle or commits were performed.
 
 Every subcommand accepts `--dry-run`, which prints the process plan without
 launching programs, contacting an API or writing evidence. E0 refuses to

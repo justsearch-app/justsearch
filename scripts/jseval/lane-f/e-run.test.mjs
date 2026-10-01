@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ARMS, ROOT, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, main } from './e-run.mjs';
+import { ARMS, ROOT, MAIN_REVISION, checkFixturePins, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, main } from './e-run.mjs';
+import { ingestAccepted } from './fixture-ingest.mjs';
 import { captureWorkload } from './admission-loop.mjs';
 
 const document = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'), 'utf8'));
@@ -29,7 +30,7 @@ test('strict options and required window', () => {
 });
 for (const arm of ['main', 'branch']) {
   test(`quality command construction ${arm}`, () => {
-    const plan = buildPlan(parseArgs(['e1-quality', '--arm', arm]), values);
+    const plan = buildPlan(parseArgs(['e1-quality', '--arm', arm]), values, ROOT, { decision: 'recapture' });
     const starts = plan.filter(c => c.mode === 'start');
     assert.equal(starts.length, 4);
     for (const start of starts) {
@@ -54,6 +55,72 @@ for (const arm of ['main', 'branch']) {
     assert.ok(plan.filter(c => c.label.startsWith('rss-')).every(c => c.args.includes('-IncludeSplitWorker')));
   });
 }
+
+test('E0.2 pin check records content diff and requires matching capture pins and installed build', () => {
+  const scratch = fs.mkdtempSync(path.join(ROOT, 'tmp/e-fixture-pins-'));
+  const spec = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/jseval/lane-f-workflow-fixture.v1.json'), 'utf8'));
+  const metadataPath = 'docs/design/lane-f-engine-jvm/evidence/baseline/fixture-pr0b/pins.json';
+  const baseline = JSON.parse(fs.readFileSync(path.join(ROOT, metadataPath), 'utf8'));
+  const specFile = path.join(scratch, 'scripts/jseval/lane-f-workflow-fixture.v1.json');
+  fs.mkdirSync(path.dirname(specFile), { recursive: true });
+  fs.writeFileSync(specFile, JSON.stringify(spec));
+  fs.mkdirSync(path.dirname(path.join(scratch, metadataPath)), { recursive: true });
+  fs.copyFileSync(path.join(ROOT, metadataPath), path.join(scratch, metadataPath));
+  const directory = path.join(scratch, baseline.directory);
+  fs.mkdirSync(directory, { recursive: true });
+  for (const n of [1, 2, 3]) fs.copyFileSync(path.join(ROOT, baseline.directory, `capture-${n}.json`), path.join(directory, `capture-${n}.json`));
+  const stampFile = path.join(scratch, 'build-stamp.txt');
+  const stamp = JSON.parse(fs.readFileSync(path.join(directory, 'capture-1.json'))).provenance['worker.buildStamp'];
+  fs.writeFileSync(stampFile, stamp);
+  const check = changed => checkFixturePins(scratch, MAIN_REVISION, args => {
+    assert.deepEqual(args, ['diff', '--name-only', baseline.recordedRevision, MAIN_REVISION, '--', ...baseline.pinnedSurfaces]);
+    return changed;
+  }, stampFile);
+  try {
+    const reuse = check('');
+    assert.equal(reuse.decision, 'reuse');
+    assert.equal(reuse.sameBuildAndPins, true);
+    assert.equal(reuse.captures.length, 3);
+    assert.ok(reuse.captures.every(c => /^[a-f0-9]{64}$/.test(c.sha256)));
+    const recapture = check('contracts/wire/knowledge.proto\ndocs/reference/runtime-contract.md\n');
+    assert.equal(recapture.decision, 'recapture');
+    assert.deepEqual(recapture.changedFiles, ['contracts/wire/knowledge.proto', 'docs/reference/runtime-contract.md']);
+    fs.writeFileSync(stampFile, 'different-build');
+    assert.equal(check('').decision, 'recapture');
+    fs.unlinkSync(stampFile);
+    assert.equal(check('').decision, 'recapture');
+    fs.writeFileSync(stampFile, stamp);
+    const file = path.join(directory, 'capture-3.json');
+    const capture = JSON.parse(fs.readFileSync(file));
+    capture.provenance.pins['justsearch.llm.slots'] = '2';
+    fs.writeFileSync(file, JSON.stringify(capture));
+    assert.equal(check('').sameBuildAndPins, false);
+    assert.equal(check('').decision, 'recapture');
+  } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+});
+
+for (const decision of ['reuse', 'recapture']) test(`dry-run plan E0.2 ${decision} preserves SciFact and selects fixture work`, () => {
+  const fixture = { decision, recordedChatProfile: 'compact', directory: '/recorded/side-a', captures: [] };
+  const mainPlan = buildPlan(parseArgs(['e1-quality', '--arm', 'main', '--dry-run']), values, ROOT, fixture);
+  assert.equal(mainPlan.filter(c => c.mode === 'start').length, decision === 'reuse' ? 1 : 4);
+  assert.equal(mainPlan.some(c => c.mode === 'fixture-reuse'), decision === 'reuse');
+  assert.equal(mainPlan.filter(c => /^fixture-\d+$/.test(c.label)).length, decision === 'reuse' ? 0 : 3);
+  const other = buildPlan(parseArgs(['e1-quality', '--arm', 'main']), values, ROOT, { decision: decision === 'reuse' ? 'recapture' : 'reuse', recordedChatProfile: 'compact' });
+  assert.deepEqual(mainPlan.find(c => c.label === 'quality'), other.find(c => c.label === 'quality'));
+  const branch = buildPlan(parseArgs(['e1-quality', '--arm', 'branch', '--dry-run']), values, ROOT, fixture);
+  assert.equal(branch.filter(c => /^fixture-\d+$/.test(c.label)).length, 3);
+  assert.ok(branch.filter(c => /^fixture-\d+$/.test(c.label)).every(c => c.args[2] === (decision === 'reuse' ? 'compact' : 'standard')));
+});
+
+test('ingest accepts legacy main but an operation refusal cannot fall back to legacy fields', () => {
+  const legacy = { accepted: 92, error: '', scanId: 'scan-123' };
+  assert.equal(ingestAccepted(legacy), true);
+  assert.equal(ingestAccepted({ success: true, structuredData: { operationKey: 'op-123' } }), true);
+  for (const response of [null, {}, { ...legacy, accepted: 0 }, { ...legacy, accepted: '92' },
+    { ...legacy, scanId: '' }, { ...legacy, error: 'refused' }, { ...legacy, errorCode: 'REFUSED' },
+    { ...legacy, success: false }, { ...legacy, success: true }, { ...legacy, structuredData: {} },
+    { success: false, structuredData: { operationKey: 'refused-op' } }]) assert.equal(ingestAccepted(response), false);
+});
 test('soak windows come from values, without a continuous two-hour claim', () => {
   assert.deepEqual(['1', '2', '3'].map(window => buildPlan(parseArgs(['e4-memory-soak', '--arm', 'main', '--window', window]), values)
     .find(c => c.mode === 'soak').minutes), [55, 55, 10]);
