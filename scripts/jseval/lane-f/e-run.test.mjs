@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ARMS, ROOT, MAIN_REVISION, checkFixturePins, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, main } from './e-run.mjs';
+import { ARMS, ROOT, MAIN_REVISION, checkFixturePins, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, windowValidity, projectLoad, mergeLoadRecords, latestRecords, main } from './e-run.mjs';
 import { ingestAccepted } from './fixture-ingest.mjs';
 import { captureWorkload } from './admission-loop.mjs';
 
@@ -15,7 +15,7 @@ test('shared model gate rejects missing and arm-local model directories', () => 
   assert.throws(() => verifySharedModels({}), /Shared models required/);
   for (const tree of Object.values(ARMS)) assert.throws(() => verifySharedModels(config(path.join(tree, 'models'))), /Shared models required/);
 });
-for (const command of ['e1-quality', 'e2-e3-load', 'e5-crash', 'e6-hang']) {
+for (const command of ['e1-quality', 'e5-crash', 'e6-hang']) {
   test(`parse ${command}`, () => assert.deepEqual(parseArgs([command, '--arm', 'main', '--dry-run']),
     { command, arm: 'main', dryRun: true }));
 }
@@ -27,6 +27,117 @@ test('strict options and required window', () => {
     ['e4-memory-soak', '--arm', 'main', '--window', '4'], ['table', '--window', '1'],
     ['table', '--dry-run', '--dry-run'], ['table', '--unknown', 'value']]) assert.throws(() => parseArgs(argv));
   assert.equal(parseArgs(['e4-memory-soak', '--arm', 'branch', '--window', '3']).window, '3');
+});
+test('E2/E3 requires an explicit workload and rejects it elsewhere', () => {
+  for (const arm of ['main', 'branch']) for (const workload of ['agent-idle', 'scripted-agent'])
+    assert.equal(parseArgs(['e2-e3-load', '--arm', arm, '--workload', workload]).workload, workload);
+  for (const args of [[], ['--workload', 'other'], ['--workload', 'agent-idle', '--workload', 'scripted-agent']])
+    assert.throws(() => parseArgs(['e2-e3-load', '--arm', 'main', ...args]));
+  assert.throws(() => parseArgs(['table', '--workload', 'agent-idle']));
+});
+const windowLoad = () => ({ durationSeconds: 1200, blockSeconds: 600, modes: ['hybrid', 'lexical'], concurrency: 1,
+  startedAtMs: 100000, endedAtMs: 1300000, queryPoolHash: 'same-queries', searchP95: { hybrid: 100, lexical: 50 }, admissionExitCode: 0,
+  samples: Array.from({ length: 241 }, (_, i) => ({ active: true, offsetSeconds: i * 5,
+    observedAtMs: 100000 + i * 5000, indexedDocuments: i, chunkEmbeddingCompletedCount: i * 100,
+    chunkEmbeddingPendingCount: 50, pendingJobs: 0 })),
+  requests: [{ mode: 'hybrid', status: 200, durationMs: 100 }, { mode: 'lexical', status: 200, durationMs: 50 }] });
+test('window completion invalidates indexing comparison; missing/stale/gapped samples cannot pass', () => {
+  assert.equal(windowValidity(windowLoad()), true);
+  const finished = windowLoad(); finished.samples[100].active = false;
+  assert.equal(windowValidity(finished), false);
+  for (const mutate of [l => l.samples.pop(), l => l.samples[2].error = '503',
+    l => l.samples.splice(3, 3), l => l.samples[4].chunkEmbeddingCompletedCount = 0,
+    l => l.endedAtMs += 10000]) {
+    const l = windowLoad(); mutate(l); assert.equal(windowValidity(l), undefined);
+  }
+});
+test('wire failures, actual idle refusals, and reason-coded scripted ceilings are measured', () => {
+  const r = record('main'); r.workload = 'agent-idle'; r.gaps = {};
+  const l = windowLoad(); projectLoad(r, l, [], values);
+  assert.equal(r.metrics.chunksPerSec, 20);
+  // Chunk work drained at 300 s while NER keeps the window valid: rate over 300 s, not 1200 s.
+  const early = windowLoad();
+  for (const s of early.samples.slice(60)) { s.chunkEmbeddingPendingCount = 0; s.chunkEmbeddingCompletedCount = 6000; }
+  const re = record('main'); re.workload = 'agent-idle'; re.gaps = {}; projectLoad(re, early, [], values);
+  assert.equal(re.metrics.chunksPerSec, 20); assert.equal(re.metrics.chunkWorkDrainedInWindow, true);
+  const instant = windowLoad(); for (const s of instant.samples.slice(5)) s.chunkEmbeddingPendingCount = 0;
+  const ri = record('main'); ri.workload = 'agent-idle'; ri.gaps = {}; projectLoad(ri, instant, [], values);
+  assert.equal(ri.metrics.chunksPerSec, undefined, 'under 60 s of chunk work cannot be rated');
+  assert.equal(r.clauses['idle-rejections'], true);
+  l.requests[0] = { status: 429, code: 'ADMISSION_ENGINE_LIMIT', retrySafe: true, retryAfter: '1' };
+  projectLoad(r, l, [], values); assert.equal(r.clauses['idle-rejections'], false);
+  l.requests[0] = { status: 503 };
+  projectLoad(r, l, [], values); assert.equal(r.clauses['no-timeout-or-5xx'], false);
+  l.requests[0] = { error: 'timeout' };
+  projectLoad(r, l, [], values); assert.equal(r.clauses['no-timeout-or-5xx'], false);
+  r.workload = 'scripted-agent';
+  projectLoad(r, windowLoad(), [{ status: 200, durationMs: 20 }], values);
+  assert.equal(r.clauses['agent-api-p95'], true);
+  const boundary = windowLoad(); boundary.requests.push({ windowBoundary: true, error: 'WINDOW_BOUNDARY_CANCELLED' });
+  projectLoad(r, boundary, [{ status: 200, durationMs: 20 }], values);
+  assert.equal(r.clauses['no-timeout-or-5xx'], true);
+  boundary.requests.at(-1).error = 'TIMED_OUT';
+  projectLoad(r, boundary, [{ status: 200, durationMs: 20 }], values);
+  assert.equal(r.clauses['no-timeout-or-5xx'], false);
+  projectLoad(r, windowLoad(), [{ status: 429, code: 'ADMISSION_ENGINE_LIMIT', retrySafe: true, retryAfter: '1' }], values);
+  assert.equal(r.clauses['scripted-rejections'], false);
+});
+test('both workload records are required; E0 freezes workload-specific ceilings and throughput', () => {
+  const loads = {};
+  for (const w of ['agent-idle', 'scripted-agent']) {
+    const r = { ...record('main'), workload: w, recordFile: `${w}.json`, gaps: {} };
+    projectLoad(r, windowLoad(), w === 'scripted-agent' ? [{ status: 200, durationMs: 200 }] : [], values);
+    loads[w] = r;
+  }
+  const missing = mergeLoadRecords({ 'agent-idle': loads['agent-idle'] });
+  assert.equal(missing.clauses['indexing-window-valid'], undefined);
+  assert.throws(() => fillValues(document, { 'E1/main': record('main'), 'E2/main': missing }), /Both valid/);
+  const merged = mergeLoadRecords(loads);
+  const filled = fillValues(document, { 'E1/main': record('main'), 'E2/main': merged });
+  assert.deepEqual(filled.values.indexingProgressFraction.minimumByWorkload, { 'agent-idle': 18, 'scripted-agent': 18 });
+  assert.equal(filled.values.foregroundSearchP95Ceiling.ceilingByWorkload['agent-idle'].hybrid, 100 * 1.1);
+  const branch = structuredClone(merged); branch.arm = 'branch';
+  const pairs = { 'E2/main': merged, 'E3/main': merged, 'E2/branch': branch, 'E3/branch': branch };
+  assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'foreground-p95').verdict, 'pass');
+  branch.metrics.searchP95ByWorkload['scripted-agent'].lexical = 56;
+  assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'foreground-p95').verdict, 'fail');
+  branch.metrics.chunksByWorkload['agent-idle'] = 17.9;
+  assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'chunks-per-second-under-foreground-load').verdict, 'fail');
+  branch.clauses['indexing-window-valid'] = false;
+  assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'indexing-window-valid').verdict, 'fail');
+});
+test('E0 reloads both workload sources and binds their values hash for later table reads', async () => {
+  const scratch = fs.mkdtempSync(path.join(ROOT, 'tmp/e-load-records-'));
+  const evidence = path.join(scratch, 'docs/design/lane-f-engine-jvm/evidence/E');
+  fs.mkdirSync(evidence, { recursive: true });
+  fs.writeFileSync(path.join(evidence, 'values.json'), JSON.stringify(document));
+  const save = (r, directory) => {
+    const dir = path.join(evidence, directory, 'main'); fs.mkdirSync(dir, { recursive: true });
+    r.recordFile = path.join(dir, `${r.id}.json`);
+    fs.writeFileSync(r.recordFile, JSON.stringify(r));
+    const index = path.join(dir, 'index.json');
+    const entries = fs.existsSync(index) ? JSON.parse(fs.readFileSync(index)).runs : [];
+    fs.writeFileSync(index, JSON.stringify({ runs: [...entries, { record: r.recordFile }] }));
+  };
+  try {
+    save({ ...record('main', ['E1']), id: 'quality', startedAt: '2026-10-01T00:00:00Z' }, 'e1-quality');
+    for (const w of ['agent-idle', 'scripted-agent']) {
+      const r = { ...record('main'), id: w, workload: w, gaps: {}, revision: 'main-pin', startedAt: '2026-10-01T01:00:00Z' };
+      projectLoad(r, windowLoad(), w === 'scripted-agent' ? [{ status: 200, durationMs: 200 }] : [], values);
+      save(r, 'e2-e3-load');
+    }
+    assert.equal(latestRecords(scratch)['E2/main'].workloadRecords.length, 2);
+    await main(['e0-values', '--repo-root', scratch]);
+    const merged = latestRecords(scratch)['E2/main'];
+    assert.equal(merged.failure, undefined);
+    assert.equal(merged.clauses['indexing-window-valid'], true);
+    for (const file of merged.workloadRecords) {
+      const r = JSON.parse(fs.readFileSync(file));
+      assert.equal(r.executedValuesHash, 'fixed');
+      assert.equal(r.valuesHash, merged.valuesHash);
+      assert.match(r.valuesHash, /^[a-f0-9]{64}$/);
+    }
+  } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 });
 for (const arm of ['main', 'branch']) {
   test(`quality command construction ${arm}`, () => {
@@ -45,14 +156,20 @@ for (const arm of ['main', 'branch']) {
     assert.ok(plan.filter(c => c.mode === 'stop').every(c => c.args.includes('--run') && !c.args.includes('--active')));
     assert.ok(plan.every(c => !JSON.stringify(c).includes('gradlew')));
   });
-  test(`load uses both foreground modes and normal agent workload ${arm}`, () => {
-    const plan = buildPlan(parseArgs(['e2-e3-load', '--arm', arm]), values);
-    const evals = plan.filter(c => c.executable === 'python');
-    assert.equal(evals.length, 4);
-    assert.deepEqual(evals.map(c => c.args[c.args.indexOf('--search-load-search-mode') + 1]), ['hybrid', 'lexical', 'hybrid', 'lexical']);
-    assert.equal(plan.filter(c => c.label.startsWith('admission-')).length, 2);
-    assert.ok(plan.filter(c => c.label.startsWith('admission-')).every(c => c.args.includes('--capture-workload')));
-    assert.ok(plan.filter(c => c.label.startsWith('rss-')).every(c => c.args.includes('-IncludeSplitWorker')));
+  for (const workload of ['agent-idle', 'scripted-agent']) test(`bounded load plan ${arm}/${workload}`, () => {
+    const plan = buildPlan(parseArgs(['e2-e3-load', '--arm', arm, '--workload', workload]), values);
+    assert.equal(plan.filter(c => c.mode === 'start').length, 1);
+    assert.equal(plan.filter(c => c.mode === 'stop').length, 1);
+    const load = plan.find(c => c.label === `bulk-${workload}`);
+    assert.equal(load.args[1], 'jseval.bulk_load');
+    assert.equal(load.args[load.args.indexOf('--workload') + 1], workload);
+    assert.equal(load.args[load.args.indexOf('--block-seconds') + 1], '600');
+    assert.equal(load.window.enrichmentWait, false);
+    assert.deepEqual(load.window.modes, ['hybrid', 'lexical']);
+    assert.equal(load.cwd, path.join(ROOT, 'scripts/jseval'));
+    assert.ok(!load.args.includes('--pipeline'));
+    assert.ok(plan.some(c => c.label === `encoder-${workload}`));
+    assert.ok(plan.some(c => c.label === `analyze-${workload}`));
   });
 }
 
@@ -133,8 +250,14 @@ test('dry run prints plans only, including paired fixture comparison', async () 
   try {
     for (const arm of ['main', 'branch']) await main(['e1-quality', '--arm', arm, '--dry-run']);
     await main(['table', '--dry-run']);
+    for (const arm of ['main', 'branch']) for (const workload of ['agent-idle', 'scripted-agent'])
+      await main(['e2-e3-load', '--arm', arm, '--workload', workload, '--dry-run']);
   } finally { console.log = prior; }
-  assert.equal(output.length, 3);
+  assert.equal(output.length, 7);
+  for (const plan of output.slice(3).map(JSON.parse)) {
+    assert.equal(plan.loadBudgetSeconds, 2700);
+    assert.equal(plan.commands.filter(c => c.mode === 'start').length, 1);
+  }
   assert.ok(JSON.parse(output[2]).commands.some(c => c.label === 'fixture-gate'));
   const after = fs.existsSync(path.join(ROOT, 'tmp/lane-f-e')) ? fs.readdirSync(path.join(ROOT, 'tmp/lane-f-e')) : null;
   assert.deepEqual(after, before);
@@ -152,8 +275,12 @@ test('an unpinned quality gate exit zero is not a baseline pass', () => {
     checks: [{ name: 'ndcg10-no-regression', status: 'ok' }] }), true);
 });
 const record = (arm, groups = ['E2', 'E3']) => ({ arm, groups, id: `fixture-${arm}`, pairIdentity: 'same', valuesHash: 'fixed',
-  clauses: { 'foreground-p95': true, 'agent-api-p95': true, 'chunks-per-second-under-foreground-load': true },
-  metrics: { searchP95: { hybrid: 100, lexical: 50 }, agentP95: 200, chunksPerSec: 20 } });
+
+  clauses: { 'indexing-window-valid': true, 'foreground-p95': true, 'agent-api-p95': true, 'chunks-per-second-under-foreground-load': true,
+    'idle-rejections': true, 'scripted-rejections': true, 'no-timeout-or-5xx': true },
+  metrics: { searchP95: { hybrid: 100, lexical: 50 }, agentP95: 200, chunksPerSec: 20,
+    searchP95ByWorkload: { 'agent-idle': { hybrid: 100, lexical: 50 }, 'scripted-agent': { hybrid: 100, lexical: 50 } },
+    chunksByWorkload: { 'agent-idle': 20, 'scripted-agent': 20 } } });
 const bounds = { ...values, foregroundSearchP95Ceiling: { ceilingMs: { hybrid: 110, lexical: 55 } },
   agentLoopApiP95Ceiling: { ceilingMs: 220 }, indexingProgressFraction: { minimumChunksPerSec: 18 } };
 function pairRecords() {
@@ -180,7 +307,7 @@ test('table missing measurements, nonfinite numbers, and mismatched provenance c
   assert.equal(tableVerdicts({}, bounds).find(r => r.group === 'E7').verdict, 'unmeasurable');
 });
 test('E0 fixes bounds from MAIN and rejects a refit after branch observations', () => {
-  const records = { 'E1/main': record('main', ['E1']), 'E2/main': record('main') };
+  const records = { 'E1/main': record('main', ['E1']), 'E2/main': { ...record('main'), workloadRecords: ['idle.json', 'scripted.json'] } };
   const filled = fillValues(document, records);
   assert.equal(filled.values.foregroundSearchP95Ceiling.ceilingMs.hybrid, 100 * 1.1);
   assert.equal(filled.values.agentLoopApiP95Ceiling.ceilingMs, 200 * 1.1);
@@ -191,7 +318,7 @@ test('E0 fixes bounds from MAIN and rejects a refit after branch observations', 
 });
 test('E0 does not substitute baseline sanity or zero throughput for measured load', () => {
   assert.throws(() => fillValues(document, {}), /MAIN/);
-  const records = { 'E1/main': record('main'), 'E2/main': record('main') };
+  const records = { 'E1/main': record('main'), 'E2/main': { ...record('main'), workloadRecords: ['idle.json', 'scripted.json'] } };
   records['E2/main'].metrics.chunksPerSec = 0;
   assert.throws(() => fillValues(document, records), /cannot invent/);
   assert.equal(document.values.foregroundSearchP95Ceiling.measuredAtE0, true);

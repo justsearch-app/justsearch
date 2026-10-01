@@ -1087,30 +1087,35 @@ function readCapture(directory, name) {
 }
 
 // Sequential stage E traffic reuses this instrument's wire decoding and timings.
-export async function captureWorkload(directory, baseUrl, stopFile) {
+export async function captureWorkload(directory, baseUrl, stopFile, endAtMs) {
+  if (endAtMs !== undefined && (!Number.isFinite(endAtMs) || endAtMs <= Date.now())) throw new Error('Invalid workload deadline');
   const connection = await liveConnection(directory, baseUrl, undefined, 'workload');
   const start = process.hrtime.bigint();
-  const deadline = Date.now() + 55 * 60 * 1000;
+  const deadline = endAtMs ?? Date.now() + 55 * 60 * 1000;
   const capture = { arm: 'workload', captureKind: 'stage-e-workload', requests: [] };
   while (!fs.existsSync(stopFile) && Date.now() < deadline) {
     const controller = new AbortController();
     const timeoutState = { timedOut: false };
+    const boundary = endAtMs === undefined ? undefined : setTimeout(() => controller.abort(), Math.max(1, deadline - Date.now()));
     const timer = setTimeout(() => { timeoutState.timedOut = true; controller.abort(); }, ARM_TIMEOUT_MS);
     try {
       const sequence = capture.requests.length;
       const contextId = 'lane-f-e-workload';
       const search = newRow(`search-${sequence}`, contextId, 'search', start);
       await runSearch(connection.baseUrl, connection.token, search, controller.signal, start, timeoutState);
+      if (endAtMs !== undefined && Date.now() >= deadline && !timeoutState.timedOut && controller.signal.aborted && search.error === 'TRANSPORT_FAILURE') search.windowBoundary = true;
       capture.requests.push(search);
-      if (!fs.existsSync(stopFile)) {
+      if (!fs.existsSync(stopFile) && Date.now() < deadline) {
         const chat = newRow(`chat-${sequence}`, contextId, 'chat', start);
         const started = await startChat(connection.baseUrl, connection.token, chat,
           `lane-f-e-${randomUUID()}`, controller.signal, start, timeoutState);
         await started.completion;
+        if (endAtMs !== undefined && Date.now() >= deadline && !timeoutState.timedOut && controller.signal.aborted && chat.error === 'TRANSPORT_FAILURE') chat.windowBoundary = true;
         capture.requests.push(chat);
       }
     } finally {
       clearTimeout(timer);
+      clearTimeout(boundary);
       writeCapture(directory, capture);
     }
   }
@@ -1124,7 +1129,7 @@ function captureOptions(argv, commandFlag) {
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (!value || ![commandFlag, '--base-url', '--token-file', '--stop-file'].includes(flag)
+    if (!value || ![commandFlag, '--base-url', '--token-file', '--stop-file', '--end-at-ms'].includes(flag)
         || options[flag] !== undefined) {
       throw new Error('INVALID_CAPTURE_ARGUMENTS');
     }
@@ -1140,7 +1145,8 @@ async function main() {
   if (process.argv.includes('--capture-workload')) {
     const options = captureOptions(process.argv.slice(2), '--capture-workload');
     if (!options['--stop-file']) throw new Error('--stop-file required');
-    await captureWorkload(options['--capture-workload'], options['--base-url'], options['--stop-file']);
+    await captureWorkload(options['--capture-workload'], options['--base-url'], options['--stop-file'],
+      options['--end-at-ms'] === undefined ? undefined : Number(options['--end-at-ms']));
     return;
   }
   if (process.argv.length === 3 && process.argv[2] === '--self-test') {

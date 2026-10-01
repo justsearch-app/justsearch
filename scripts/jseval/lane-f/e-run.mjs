@@ -85,7 +85,7 @@ export function parseArgs(argv) {
       result.dryRun = true;
     } else {
       const key = { '--arm': 'arm', '--window': 'window', '--repo-root': 'repoRoot', '--arm-tree': 'armTree',
-        '--fault': 'fault', '--debug-port': 'debugPort' }[flag];
+        '--fault': 'fault', '--debug-port': 'debugPort', '--workload': 'workload' }[flag];
       const value = rest[++i];
       if (!key || !value || value.startsWith('--') || result[key]) throw new Error(`Invalid option ${flag}`);
       result[key] = value;
@@ -102,6 +102,9 @@ export function parseArgs(argv) {
     || Number(result.debugPort) < 1024 || Number(result.debugPort) > 65535)) throw new Error('--debug-port 1024..65535 is E6 only');
   if (command === 'e4-memory-soak' ? !['1', '2', '3'].includes(result.window) : result.window !== undefined) {
     throw new Error('--window 1|2|3 required only for E4');
+  }
+  if (command === 'e2-e3-load' ? !['agent-idle', 'scripted-agent'].includes(result.workload) : result.workload !== undefined) {
+    throw new Error('--workload agent-idle|scripted-agent required only for E2/E3');
   }
   return result;
 }
@@ -142,7 +145,8 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
     if (arm === 'main') env.JUSTSEARCH_JVM_OPTS += ` ${debug}`;
     else env.JAVA_OPTS += ` ${debug}`;
   }
-  const cmd = (label, executable, args, cwd = tree, extra = {}) => ({ label, executable, args, cwd, env, ...extra });
+  const cmd = (label, executable, args, cwd = tree, extra = {}) => ({ label, executable, args, cwd, env,
+    ...(group === 'e2-e3-load' ? { budgetSeconds: 60 } : {}), ...extra });
   const start = label => cmd(`start-${label}`, 'node', [runner, 'start', '--json', '--skip-build',
     '--clean', 'none', '--data-dir', path.join(tree, 'tmp/lane-f-e', '${invocation}', label),
     '--api-port', '33221', '--session-id', '${session}', '--lease-duration-sec', '3600',
@@ -215,13 +219,17 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
           fixtureProfile, '33221'], root, { env: fixtureEnv }), stop(`fixture-${n}`));
     }
   } else if (group === 'e2-e3-load') {
-    commands = [];
-    for (const workload of ['agent-idle', 'scripted-agent']) for (const mode of ['hybrid', 'lexical']) {
-      const label = `${workload}-${mode}`;
-      commands.push(start(label), ...samplers(label),
-      ...(workload === 'scripted-agent' ? [admission(label)] : []), evalRun(label, true, mode),
-      endSamples(label), probe(label), analyze(label), stop(label));
-    }
+    const label = options.workload;
+    commands = [start(label), ...samplers(label).filter(c => c.label.startsWith('rss-')).map(c => ({ ...c, budgetSeconds: 2700 })),
+      cmd(`bulk-${label}`, 'python', ['-m', 'jseval.bulk_load',
+        '--base-url', 'http://127.0.0.1:33221',
+        '--corpus-dir', path.join(root, 'tmp/lane-f-e/corpus/scifact'),
+        '--output-dir', path.join(raw, label), '--workload', label,
+        '--admission-script', path.join(tools, 'admission-loop.mjs'), '--block-seconds', '600'],
+        path.join(ROOT, 'scripts/jseval'), { budgetSeconds: 1500,
+          window: { modes: ['hybrid', 'lexical'], blockSeconds: 600, concurrency: 1,
+            statusIntervalSeconds: 5, enrichmentWait: false } }),
+      endSamples(label), { ...probe(label), budgetSeconds: 120 }, { ...analyze(label), budgetSeconds: 30 }, stop(label)];
   } else if (group === 'e4-memory-soak') {
     commands = [start('soak'), instruments('soak'), ...samplers('soak'), admission('soak'),
       { ...evalRun('soak', true), mode: 'soak', minutes: values.soak.windows[Number(options.window) - 1].minutes },
@@ -252,8 +260,8 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
 
 const CLAUSES = {
   E1: ['baseline-quality', 'SearchTrace-shape', 'workflow-evidence-citations-cancellation', 'allowed-differences'],
-  E2: ['foreground-p95', 'agent-api-p95', 'idle-rejections', 'scripted-rejections', 'no-timeout-or-5xx'],
-  E3: ['chunks-per-second-under-foreground-load'],
+  E2: ['indexing-window-valid', 'foreground-p95', 'agent-api-p95', 'idle-rejections', 'scripted-rejections', 'no-timeout-or-5xx'],
+  E3: ['indexing-window-valid', 'chunks-per-second-under-foreground-load'],
   E4: ['component-commit-budget', 'machine-wide-commit-vs-main', 'working-set', 'live-after-GC-trend',
     'zero-crashes', 'owner-duration', 'index-agent-reconfigure-workload'],
   E5: ['actual-death-durable-operation', 'crash-to-api', 'crash-to-index', 'checkpoint-resume',
@@ -270,6 +278,109 @@ export function qualityGateVerdict(report) {
   if (!finite(report.current) || !finite(report.baseline) || !finite(report.floor)) return undefined;
   return report.checks?.some(c => c.name === 'ndcg10-no-regression' && c.status === 'ok') ? true : undefined;
 }
+export function windowValidity(load) {
+  if (!load || load.durationSeconds !== 1200 || load.blockSeconds !== 600
+    || JSON.stringify(load.modes) !== JSON.stringify(['hybrid', 'lexical']) || load.concurrency !== 1) return undefined;
+  const samples = load.samples ?? [];
+  if (samples.some(s => s.active === false)) return false;
+  if (samples.length < 2 || samples.some(s => s.error || s.active !== true
+    || !finite(s.chunkEmbeddingCompletedCount) || !finite(s.indexedDocuments))) return undefined;
+  if (samples[0].offsetSeconds !== 0 || samples.at(-1).offsetSeconds !== 1200) return undefined;
+  if (!finite(samples[0].observedAtMs) || !finite(samples.at(-1).observedAtMs)
+    || Math.abs(samples[0].observedAtMs - load.startedAtMs) > 6000
+    || Math.abs(samples.at(-1).observedAtMs - load.endedAtMs) > 6000) return undefined;
+  if (!finite(load.startedAtMs) || !finite(load.endedAtMs)
+    || Math.abs(load.endedAtMs - load.startedAtMs - 1200000) > 6000) return undefined;
+  for (let i = 1; i < samples.length; i++) {
+    if (samples[i].offsetSeconds <= samples[i - 1].offsetSeconds
+      || samples[i].offsetSeconds - samples[i - 1].offsetSeconds > 12
+      || samples[i].chunkEmbeddingCompletedCount < samples[i - 1].chunkEmbeddingCompletedCount
+      || samples[i].indexedDocuments < samples[i - 1].indexedDocuments) return undefined;
+  }
+  return true;
+}
+export function projectLoad(record, load, calls, values) {
+  const valid = windowValidity(load);
+  record.clauses['indexing-window-valid'] = valid;
+  if (valid !== true) record.gaps['indexing-window-valid'] = valid === false
+    ? 'INVALID: indexing completed before the fixed load window ended'
+    : 'Missing, stale, discontinuous, or incomplete fixed-window samples';
+  record.metrics.searchP95 = load.searchP95 ?? {};
+  record.metrics.loadWindow = { startedAtMs: load.startedAtMs, endedAtMs: load.endedAtMs,
+    durationSeconds: load.durationSeconds, queryPoolHash: load.queryPoolHash };
+  const samples = load.samples ?? [], first = samples[0], last = samples.at(-1);
+  if (valid === true) {
+    // The window stays valid while any enrichment (for example NER) is pending, but chunk
+    // embedding can finish inside it on the faster arm. Rate chunks only over the interval in
+    // which chunk work was still pending, ending at the first sample that observed it drained,
+    // so an early finish is not diluted over idle seconds.
+    const chunkActive = s => s.chunkEmbeddingPendingCount > 0 || s.pendingJobs > 0;
+    const drained = samples.findIndex(s => !chunkActive(s));
+    const end = drained === -1 ? last : samples[drained];
+    const seconds = (end.observedAtMs - first.observedAtMs) / 1000;
+    record.metrics.chunkActiveSeconds = seconds;
+    record.metrics.chunkWorkDrainedInWindow = drained !== -1;
+    record.metrics.chunksPerSec = seconds >= 60
+      ? (end.chunkEmbeddingCompletedCount - first.chunkEmbeddingCompletedCount) / seconds : undefined;
+    record.metrics.docsPerSec = (last.indexedDocuments - first.indexedDocuments) / 1200;
+    record.metrics.chunksByWorkload = { [record.workload]: record.metrics.chunksPerSec };
+  }
+  const wire = [...(load.requests ?? []), ...calls];
+  record.metrics.windowBoundaryRequests = wire.filter(c => c.windowBoundary).length;
+  const rejectionCodes = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT']);
+  const legalRejection = c => rejectionCodes.has(c.code) && c.retrySafe === true && /^[1-9]\d*$/.test(c.retryAfter);
+  record.metrics.wireRejections = wire.filter(c => c.status === 429).length;
+  record.metrics.wireOffered = wire.length;
+  record.clauses['no-timeout-or-5xx'] = wire.length ? wire.every(c => c.windowBoundary && ['TRANSPORT_FAILURE', 'WINDOW_BOUNDARY_CANCELLED'].includes(c.error) && !(c.status >= 500) || !c.error
+    && ((c.status >= 200 && c.status < 300) || c.status === 429 && legalRejection(c))
+    && (!c.streamed || c.terminal?.doneCount === 1 && c.terminal?.errorCount === 0 && c.terminal?.eof))
+    && !(load.samples ?? []).some(s => s.error)
+    && (record.workload !== 'scripted-agent' || load.admissionExitCode === 0 && calls.length > 0) : undefined;
+  record.clauses['foreground-p95'] = ['hybrid', 'lexical'].every(m => finite(load.searchP95?.[m])) ? true : undefined;
+  const admitted = calls.filter(c => !c.windowBoundary && !c.error && c.status >= 200 && c.status < 300 && finite(c.durationMs));
+  record.metrics.agentP95 = admitted.length
+    ? admitted.map(c => c.durationMs).sort((a, b) => a - b)[Math.ceil(admitted.length * .95) - 1] : undefined;
+  if (record.workload === 'agent-idle') record.clauses['idle-rejections'] = wire.length
+    ? record.metrics.wireRejections <= values.admissionRejectionCeiling.agentIdle : undefined;
+  else {
+    record.clauses['agent-api-p95'] = admitted.length ? true : undefined;
+    record.clauses['scripted-rejections'] = wire.length ? wire.filter(c => c.status === 429).every(legalRejection)
+      && record.metrics.wireRejections / wire.length <= values.admissionRejectionCeiling.scriptedAgentFraction : undefined;
+  }
+  record.clauses['chunks-per-second-under-foreground-load'] = valid === false ? false
+    : valid === true && finite(record.metrics.chunksPerSec) ? true : undefined;
+}
+export function mergeLoadRecords(workloads) {
+  const list = ['agent-idle', 'scripted-agent'].map(w => workloads[w]);
+  const present = list.filter(Boolean);
+  const merged = structuredClone(present.at(-1));
+  merged.id = present.map(r => r.id).join(', ');
+  merged.workloadRecords = present.map(r => r.recordFile);
+  merged.pairIdentity = hash(JSON.stringify(list.map(r => r?.pairIdentity)));
+  merged.metrics = { searchP95: {}, searchP95ByWorkload: {}, chunksByWorkload: {}, queryPoolByWorkload: {} };
+  for (const r of present) {
+    merged.metrics.queryPoolByWorkload[r.workload] = r.metrics.loadWindow?.queryPoolHash;
+    merged.metrics.searchP95ByWorkload[r.workload] = r.metrics.searchP95;
+    merged.metrics.chunksByWorkload[r.workload] = r.metrics.chunksPerSec;
+    for (const mode of ['hybrid', 'lexical']) if (finite(r.metrics.searchP95?.[mode]))
+      merged.metrics.searchP95[mode] = Math.max(merged.metrics.searchP95[mode] ?? 0, r.metrics.searchP95[mode]);
+  }
+  merged.metrics.agentP95 = workloads['scripted-agent']?.metrics.agentP95;
+  merged.metrics.chunksPerSec = list.every(r => finite(r?.metrics.chunksPerSec))
+    ? Math.min(...list.map(r => r.metrics.chunksPerSec)) : undefined;
+  merged.clauses = {};
+  merged.gaps = {};
+  for (const clause of new Set([...CLAUSES.E2, ...CLAUSES.E3])) {
+    const applicable = clause === 'idle-rejections' ? [list[0]]
+      : ['scripted-rejections', 'agent-api-p95'].includes(clause) ? [list[1]] : list;
+    merged.gaps[clause] = applicable.map(r => r?.gaps?.[clause]).filter(Boolean).join('; ') || undefined;
+    const checks = applicable.map(r => r?.clauses[clause]);
+    merged.clauses[clause] = checks.includes(false) ? false : checks.every(x => x === true) ? true : undefined;
+  }
+  if (present.some(r => r.failure)) merged.failure = present.filter(r => r.failure).map(r => r.failure).join('; ');
+  if (present.some(r => r.valuesHash !== merged.valuesHash || r.revision !== merged.revision)) merged.failure = 'Workload provenance mismatch';
+  return merged;
+}
 export function tableVerdicts(records, values) {
   const output = [];
   const pair = (group, clause, evaluate) => {
@@ -278,6 +389,12 @@ export function tableVerdicts(records, values) {
     if (evaluate && arms.every(Boolean)) checks.push(evaluate(arms[1], arms[0]));
     if (arms.some(r => r?.failure)) checks.push(false);
     if (arms.every(Boolean)) {
+      if (group === 'E2' || group === 'E3') {
+        for (const w of ['agent-idle', 'scripted-agent']) {
+          const m = arms[0].metrics?.queryPoolByWorkload?.[w], b = arms[1].metrics?.queryPoolByWorkload?.[w];
+          if (arms[0].workloadRecords || arms[1].workloadRecords) checks.push(m && b ? m === b : undefined);
+        }
+      }
       checks.push(arms[0].pairIdentity === arms[1].pairIdentity,
         arms[0].valuesHash === arms[1].valuesHash);
     }
@@ -286,12 +403,20 @@ export function tableVerdicts(records, values) {
     output.push({ group, clause, verdict: result === 'unmeasurable' && disposition ? 'unmeasurable-on-split' : result,
       disposition,
       sources: arms.map(r => r?.id ?? 'missing').join(' / '),
-      sourceRecords: arms.map(r => r?.recordFile),
+      sourceRecords: arms.flatMap(r => r?.workloadRecords ?? [r?.recordFile]),
       reason: arms.map(r => r?.gaps?.[clause]).filter(Boolean).join('; ') || 'paired clause and frozen values' });
   };
   for (const [group, clauses] of Object.entries(CLAUSES)) for (const clause of clauses) {
     let evaluate;
     if (group === 'E2' && clause === 'foreground-p95') evaluate = b => {
+      if (values.foregroundSearchP95Ceiling.ceilingByWorkload) {
+        const checks = ['agent-idle', 'scripted-agent'].flatMap(w => ['hybrid', 'lexical'].map(m => {
+          const observed = b.metrics?.searchP95ByWorkload?.[w]?.[m];
+          const bound = values.foregroundSearchP95Ceiling.ceilingByWorkload[w]?.[m];
+          return finite(observed) && finite(bound) ? observed <= bound : undefined;
+        }));
+        return checks.includes(false) ? false : checks.every(c => c === true) ? true : undefined;
+      }
       const bounds = values.foregroundSearchP95Ceiling.ceilingMs;
       return verdict(['hybrid', 'lexical'].map(mode => finite(b.metrics?.searchP95?.[mode]) && finite(bounds?.[mode])
         ? b.metrics.searchP95[mode] <= bounds[mode] : undefined)) === 'pass' ? true
@@ -300,12 +425,12 @@ export function tableVerdicts(records, values) {
     };
     if (group === 'E2' && clause === 'agent-api-p95') evaluate = b => finite(b.metrics?.agentP95)
       && finite(values.agentLoopApiP95Ceiling.ceilingMs) ? b.metrics.agentP95 <= values.agentLoopApiP95Ceiling.ceilingMs : undefined;
-    if (group === 'E3') evaluate = b => {
+    if (group === 'E3' && clause === 'chunks-per-second-under-foreground-load') evaluate = b => {
       const workloadBounds = values.indexingProgressFraction.minimumByWorkload;
       if (workloadBounds) {
         const checks = Object.entries(workloadBounds).map(([load, bound]) => finite(b.metrics?.chunksByWorkload?.[load]) && finite(bound)
           ? b.metrics.chunksByWorkload[load] >= bound : undefined);
-        return checks.some(x => x === false) ? false : checks.length === 4 && checks.every(x => x === true) ? true : undefined;
+        return checks.some(x => x === false) ? false : checks.length === 2 && checks.every(x => x === true) ? true : undefined;
       }
       return finite(b.metrics?.chunksPerSec) && finite(values.indexingProgressFraction.minimumChunksPerSec)
         ? b.metrics.chunksPerSec >= values.indexingProgressFraction.minimumChunksPerSec : undefined;
@@ -335,16 +460,23 @@ export function sourceDirt(porcelain) {
 export function latestRecords(root) {
   const records = {};
   const windows = { main: {}, branch: {} };
+  const workloads = { main: {}, branch: {} };
   for (const file of filesUnder(path.join(root, EVIDENCE)).filter(f => path.basename(f) === 'index.json')) {
     for (const entry of read(file).runs ?? []) {
       const record = read(entry.record);
       if (record.groups.includes('E4') && (!windows[record.arm][record.window]
         || windows[record.arm][record.window].startedAt < record.startedAt)) windows[record.arm][record.window] = record;
+      if (record.groups.includes('E2') && record.workload && (!workloads[record.arm][record.workload]
+        || workloads[record.arm][record.workload].startedAt < record.startedAt)) workloads[record.arm][record.workload] = record;
       for (const group of record.groups) if (!records[`${group}/${record.arm}`]
         || records[`${group}/${record.arm}`].startedAt < record.startedAt) records[`${group}/${record.arm}`] = record;
     }
   }
   for (const arm of ['main', 'branch']) {
+    if (Object.keys(workloads[arm]).length) {
+      const merged = mergeLoadRecords(workloads[arm]);
+      records[`E2/${arm}`] = records[`E3/${arm}`] = merged;
+    }
     const list = Object.values(windows[arm]);
     if (!list.length) continue;
     const merged = structuredClone(list.at(-1));
@@ -373,8 +505,12 @@ export function fillValues(document, records) {
   const quality = records['E1/main'];
   const load = records['E2/main'];
   if (!quality || !load || quality.failure || load.failure) throw new Error('Successful MAIN E1-E3 records required');
+  if (load.clauses?.['indexing-window-valid'] !== true || load.workloadRecords?.length !== 2
+    || [...CLAUSES.E2, ...CLAUSES.E3].some(c => load.clauses[c] !== true)) throw new Error('Both valid MAIN workload windows required');
   const metrics = load.metrics;
-  if (!['hybrid', 'lexical'].every(mode => finite(metrics.searchP95?.[mode]) && metrics.searchP95[mode] > 0)
+  if (!['agent-idle', 'scripted-agent'].every(w => finite(metrics.chunksByWorkload?.[w]) && metrics.chunksByWorkload[w] > 0
+    && ['hybrid', 'lexical'].every(m => finite(metrics.searchP95ByWorkload?.[w]?.[m]) && metrics.searchP95ByWorkload[w][m] > 0))
+    || !['hybrid', 'lexical'].every(mode => finite(metrics.searchP95?.[mode]) && metrics.searchP95[mode] > 0)
     || !finite(metrics.agentP95) || metrics.agentP95 <= 0 || !finite(metrics.chunksPerSec) || metrics.chunksPerSec <= 0) {
     throw new Error('MAIN lacks measured E0 search/API p95 or chunks/s; cannot invent bounds');
   }
@@ -386,6 +522,8 @@ export function fillValues(document, records) {
   }
   v.foregroundSearchP95Ceiling.measuredMs = metrics.searchP95;
   v.foregroundSearchP95Ceiling.ceilingMs = Object.fromEntries(Object.entries(metrics.searchP95).map(([k, x]) => [k, x * 1.1]));
+  v.foregroundSearchP95Ceiling.ceilingByWorkload = Object.fromEntries(Object.entries(metrics.searchP95ByWorkload ?? {}).map(([w, modes]) =>
+    [w, Object.fromEntries(Object.entries(modes).map(([m, x]) => [m, x * 1.1]))]));
   v.agentLoopApiP95Ceiling.measuredMs = metrics.agentP95;
   v.agentLoopApiP95Ceiling.ceilingMs = metrics.agentP95 * 1.1;
   v.indexingProgressFraction.measuredChunksPerSec = metrics.chunksPerSec;
@@ -429,7 +567,7 @@ function execute(command, context) {
     expired = true;
     // The registered supervisor is stopped by its owned lifecycle, never by a PID kill.
     if (command.mode !== 'start') child.kill();
-  }, Math.max(1, context.deadline - Date.now()));
+  }, Math.max(1, Math.min(context.deadline - Date.now(), (command.budgetSeconds ?? 3540) * 1000)));
   complete.finally(() => clearTimeout(timer));
   return { child, complete, stdout: () => stdout, expired: () => expired };
 }
@@ -533,7 +671,10 @@ function collect(context) {
         q.httpStatus === 200 && typeof q['trace.effectiveMode'] === 'string'
         && typeof q['trace.decisionKind'] === 'string' && q['trace.stageIds']?.length > 0)) : undefined;
   }
-  if (r.groups.includes('E2')) {
+  if (r.groups.includes('E2') && r.workload) {
+    const file = path.join(context.raw, r.workload, 'bulk-load.json');
+    if (fs.existsSync(file)) projectLoad(r, read(file), calls, context.values);
+  } else if (r.groups.includes('E2')) {
     r.clauses['no-timeout-or-5xx'] = calls.length && loads.length
       ? calls.every(c => !c.error && ((c.status >= 200 && c.status < 300) || c.status === 429)
         && (!c.streamed || (c.terminal?.doneCount === 1 && c.terminal?.errorCount === 0 && c.terminal?.eof)))
@@ -546,7 +687,7 @@ function collect(context) {
       && calls.filter(c => c.status === 429).length / calls.length <= context.values.admissionRejectionCeiling.scriptedAgentFraction : undefined;
     r.clauses['idle-rejections'] = loads.length ? loads.filter(s => s.search_load && !s.search_load.errors).length === loads.length : undefined;
   }
-  if (r.groups.includes('E3')) r.clauses['chunks-per-second-under-foreground-load'] = finite(r.metrics.chunksPerSec) ? true : undefined;
+  if (r.groups.includes('E3') && !r.workload) r.clauses['chunks-per-second-under-foreground-load'] = finite(r.metrics.chunksPerSec) ? true : undefined;
   if (r.groups.includes('E4')) {
     const completedCycles = r.commands.filter(c => /^soak-cycle-/.test(c.label) && c.code === 0);
     const workload = completedCycles.length && loads.length && calls.length
@@ -567,7 +708,7 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   const fixtureDecision = options.command === 'e1-quality' ? checkFixturePins(root) : undefined;
   const plan = buildPlan(options, values, root, fixtureDecision);
   if (options.dryRun) {
-    console.log(JSON.stringify({ options, fixtureDecision, limitSeconds: 3540, leaseDurationSec: 3600, commands: plan }, null, 2));
+    console.log(JSON.stringify({ options, fixtureDecision, limitSeconds: 3540, loadBudgetSeconds: options.command === 'e2-e3-load' ? 2700 : undefined, leaseDurationSec: 3600, commands: plan }, null, 2));
     return;
   }
   const records = latestRecords(root);
@@ -587,6 +728,11 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     // MAIN established these bounds: bind its existing reference records to the frozen file.
     const valuesHash = hash(fs.readFileSync(valuesFile));
     for (const r of new Set(Object.values(records))) if (r.arm === 'main' && ['E1', 'E2', 'E3'].some(g => r.groups.includes(g))) {
+      for (const file of r.workloadRecords ?? []) {
+        const source = read(file); source.executedValuesHash ??= source.valuesHash;
+        source.valuesHash = valuesHash; write(file, source);
+      }
+      if (r.workloadRecords) continue;
       r.executedValuesHash ??= r.valuesHash;
       r.valuesHash = valuesHash; write(r.recordFile, r);
     }
@@ -611,7 +757,7 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     const rows = tableVerdicts(records, values);
     const text = ['# Stage E paired verdicts', '', '| Group | Clause | Verdict | MAIN / BRANCH run | Reason |',
       '|---|---|---|---|---|', ...rows.map(r => `| ${r.group} | ${r.clause} | ${r.verdict} | ${r.sourceRecords.map((file, i) =>
-        file ? `[${i === 0 ? 'MAIN' : 'BRANCH'}](${path.relative(path.join(root, EVIDENCE), file).replaceAll('\\', '/')})` : 'missing').join(' / ')} | ${r.reason} |`), '',
+        file ? `[${path.basename(path.dirname(file)).toUpperCase()}](${path.relative(path.join(root, EVIDENCE), file).replaceAll('\\', '/')})` : 'missing').join(' / ')} | ${r.reason} |`), '',
       ...Object.keys(CLAUSES).map(group => `${group}: **${verdict(rows.filter(r => r.group === group).map(r => r.verdict === 'pass' ? true : r.verdict === 'fail' ? false : undefined))}**`), '',
       'E7 is operator-driven and externally blocked on signing. Unmeasurable is not a waiver.',
       'One-sided feature acceptance: [D1](../../stages/D1.md) and [D2](../../stages/D2.md).', ''].join('\n');
@@ -628,21 +774,22 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     cpu: os.cpus().map(c => c.model), ramBytes: os.totalmem(), node: process.version };
   const instrumentFiles = filesUnder(path.join(ROOT, 'scripts/jseval/lane-f')).filter(f => !/\.(pyc|log)$/.test(f));
   const driverFiles = ['scripts/jseval/lane-f/e-run.mjs', 'scripts/jseval/lane-f/capability-ready.py',
+    'scripts/jseval/jseval/bulk_load.py',
     'scripts/supervisor-conformance/jdwp-fault.mjs', 'scripts/supervisor-conformance/verified-crash.mjs']
     .map(file => path.join(ROOT, file));
   const corpusFiles = ['docs/explanation', 'docs/reference'].flatMap(dir => filesUnder(path.join(ARMS.main, dir)));
   const pairIdentity = hash(JSON.stringify({ machine, instruments: instrumentFiles.map(f => [path.relative(ROOT, f), hash(fs.readFileSync(f))]),
     driver: driverFiles.map(f => [path.basename(f), hash(fs.readFileSync(f))]),
     corpus: corpusFiles.map(f => [path.relative(ARMS.main, f), hash(fs.readFileSync(f))]),
-    workload: options.command, heap: values.heap, collector: values.collector }));
+    workload: options.workload ?? options.command, heap: values.heap, collector: values.collector }));
   const destination = path.join(root, EVIDENCE, options.command, options.arm);
   const recordFile = path.join(destination, `${id}.json`);
-  const record = { kind: 'lane-f-e-run.v1', id, groups, arm: options.arm, window: options.window,
+  const record = { kind: 'lane-f-e-run.v1', id, groups, arm: options.arm, window: options.window, workload: options.workload,
     startedAt: new Date().toISOString(), machine, pairIdentity, valuesHash: hash(fs.readFileSync(valuesFile)),
     recordFile, raw, runIds: [], commands: [], metrics: {}, clauses: {}, gaps: {},
     fixtureDecision,
     additionalArtifacts: [] };
-  const context = { raw, record, values, deadline: Date.now() + 3540000, sequence: 0, background: [], root };
+  const context = { raw, record, values, deadline: Date.now() + (options.command === 'e2-e3-load' ? 2700000 : 3540000), sequence: 0, background: [], root };
   const bindings = { invocation: id, session: `lane-f-e-${id}` };
   const index = path.join(destination, 'index.json');
   write(recordFile, record); // Even failed/aborted branch starts prevent a later E0 refit.

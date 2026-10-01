@@ -106,6 +106,8 @@ for (const file of ['context-many.json', 'context-one.json', 'fairness.json', 'w
   const fp = path.join(dir, file);
   if (!fs.existsSync(fp)) continue;
   const capture = JSON.parse(fs.readFileSync(fp, 'utf8'));
+  // Explicit fixed-window cancellation is censored, never admitted latency.
+  capture.requests = capture.requests?.filter(r => !r.windowBoundary || r.status >= 500);
   if (!capture.requests?.length) throw new Error(`Empty admission phase: ${file}`);
   if (capture.requests.some((r) => !Number.isFinite(r.durationMs) || r.durationMs < 0 || r.error || r.status >= 500)) {
     throw new Error(`Invalid admission call records: ${file}`);
@@ -137,4 +139,14 @@ if (fs.existsSync(statusPath)) {
     const delta = series[i].chunks - series[i - 1].chunks;
     console.log(`- ${series[i].ts}: chunks/s ${delta < 0 ? 'RESET' : fmt(delta / seconds, 3)}`);
   }
+}
+
+const bulkPath = path.join(dir, 'bulk-load.json');
+if (fs.existsSync(bulkPath)) {
+  const load = JSON.parse(fs.readFileSync(bulkPath, 'utf8'));
+  const first = load.samples[0], last = load.samples.at(-1);
+  console.log(`- fixed foreground window: ${load.durationSeconds}s; indexing active throughout: ${load.samples.every(s => s.active === true && !s.error)}`);
+  console.log(`- completed chunk embeddings/s: ${(last.chunkEmbeddingCompletedCount - first.chunkEmbeddingCompletedCount) / load.durationSeconds}`);
+  console.log(`- documents/s: ${(last.indexedDocuments - first.indexedDocuments) / load.durationSeconds}`);
+  console.log(`- search admitted p95 ms: ${JSON.stringify(load.searchP95)}`);
 }
