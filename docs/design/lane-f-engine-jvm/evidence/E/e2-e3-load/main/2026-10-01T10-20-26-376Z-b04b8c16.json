@@ -1,0 +1,1649 @@
+{
+  "kind": "lane-f-e-run.v1",
+  "id": "2026-10-01T10-20-26-376Z-b04b8c16",
+  "groups": [
+    "E2",
+    "E3"
+  ],
+  "arm": "main",
+  "workload": "scripted-agent",
+  "startedAt": "2026-10-01T10:20:26.738Z",
+  "machine": {
+    "hostname": "DESKTOP-FA00PO7",
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "cpu": [
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K"
+    ],
+    "ramBytes": 34028519424,
+    "node": "v24.12.0"
+  },
+  "pairIdentity": "e089268ef72c83685299054f8f9ee9ae99d42e90519d472adbf2940e683a2923",
+  "pairIdentityInputs": {
+    "collector": {
+      "choice": "G1",
+      "compareOnlyIf": "E2 response-time group fails",
+      "pinnedAt": "bb399e495 (both spawn sites, explicit -XX:+UseG1GC)"
+    },
+    "corpus": [
+      [
+        "docs\\explanation\\01-system-overview.md",
+        "2e52d8fee7ceca5d77b3246f7a0e6a2d1f476aa1fd9ce816bfbb5012de2e939e"
+      ],
+      [
+        "docs\\explanation\\02-process-coordination.md",
+        "90a84dba06a63169f1bf86483006352cb2730bb6bef4dc874a39aa434aee3f33"
+      ],
+      [
+        "docs\\explanation\\03-knowledge-server.md",
+        "1250d63ad21cd1c39b94eccc4dcc7f7dbe2c5f181db4404968d060c003b82df4"
+      ],
+      [
+        "docs\\explanation\\04-storage-engine.md",
+        "486f84b0f88394e577868de5a4e75b533b0e0b106c7d499c089a3f94a924423e"
+      ],
+      [
+        "docs\\explanation\\05-ai-architecture.md",
+        "9d78cd3ab75ad50db22b2415a77998a88ac9b7be597e9885a10f1f618dc4f404"
+      ],
+      [
+        "docs\\explanation\\06-configuration-ssot.md",
+        "20bed26c78672a976ef6e433ce6824653e21338d194e7784517ca864c396f4d5"
+      ],
+      [
+        "docs\\explanation\\07-ui-host-architecture.md",
+        "c9616438096b0141ea9c9ae2046f28af3e234624a275c7b7f521504eb5bb1de3"
+      ],
+      [
+        "docs\\explanation\\08-observability.md",
+        "a40660781900618adeecd55d5392aa00d4abc55840c2a676915da31695186ae7"
+      ],
+      [
+        "docs\\explanation\\09-testing-strategy.md",
+        "620ba4380b6aea8cc0412b584b90e9e536976bcb304c491c4fa59b077672a85e"
+      ],
+      [
+        "docs\\explanation\\10-ui-ux-design.md",
+        "a5d7c9e7a8c7bed553861802ebbea8bc5ef28b77673e43dbe64fb2a862b9b950"
+      ],
+      [
+        "docs\\explanation\\11-index-schema-migration.md",
+        "738addd9a4cf3339d2edc375e568ef6096375440e9a75567b72d60deebde7153"
+      ],
+      [
+        "docs\\explanation\\12-desktop-installer-and-sandbox-setup.md",
+        "65d30cf8d861634c66b37868e306ea64fcf809dd6cb26ae7fffe8aa83722dd43"
+      ],
+      [
+        "docs\\explanation\\13-ai-setup-and-verification.md",
+        "45a89b6020a63045015c35d88824251fb7831b1ee4b273ad04afea52291154bd"
+      ],
+      [
+        "docs\\explanation\\14-ai-pack-spec.md",
+        "6dae104d0c11b84b0b2aab7b6dd7efaf31c955ecf5dc2e6cd903dc8c0eabaad2"
+      ],
+      [
+        "docs\\explanation\\15-enterprise-policy.md",
+        "10902c0214205987c9a75a1407b9c385fa639cd2e5e3bcffa0457a7011048eab"
+      ],
+      [
+        "docs\\explanation\\16-gpu-booster-pack.md",
+        "4f21c4a7216beb0681c671474a024113bbef328737aa4e14ea8f4ce887161346"
+      ],
+      [
+        "docs\\explanation\\17-ai-bridge-deep-dive.md",
+        "a8e351bcc42abda69bdc4be27e32fe85ba1a4dbde696397c57ad3ceb7eefbf0f"
+      ],
+      [
+        "docs\\explanation\\18-adapters-lucene-deep-dive.md",
+        "c850a2cb58347dd787635ccf06e87bfa86cf26ac75cad4a1822efcc853ff2579"
+      ],
+      [
+        "docs\\explanation\\19-module-architecture.md",
+        "6082a7d355a8af9e03aed992565d0f7b5f724ebfd5ba2a0a184398184323a6cc"
+      ],
+      [
+        "docs\\explanation\\20-benchmarking-architecture.md",
+        "da7f25499edab1f2da6ff6d65268371cbab6bc92527e9b84108edb9674561209"
+      ],
+      [
+        "docs\\explanation\\21-agent-analytics-pipeline.md",
+        "ea59fb8e5554b23ef2716d62d24207a1717392c9fadb983d702015962972fc60"
+      ],
+      [
+        "docs\\explanation\\22-agent-system-architecture.md",
+        "4beec236c293572f751af78c4555535903aca276c9da620c3931853adf964d71"
+      ],
+      [
+        "docs\\explanation\\23-runtime-manifest.md",
+        "5ef6c7b5c9a3f10cb55092e6650dcd0e5dc90024d8f4fc2c73670f1dbe17cc4e"
+      ],
+      [
+        "docs\\explanation\\23-search-pipeline-overview.md",
+        "a959eb1d38d199892c2c39496939e49c5686c91c346f8cf420813e9dc57c66c0"
+      ],
+      [
+        "docs\\explanation\\23-search-pipeline-overview.svg",
+        "6f8270527b50f194eab9a5e1f65272c57b4dc74331109b172eb0494ea14f41a4"
+      ],
+      [
+        "docs\\explanation\\24-worker-inference-composition.md",
+        "dad66eeedb9c4e98f0a2899ed3554e22d4cad8d716c53f6202ed77e392e6251a"
+      ],
+      [
+        "docs\\explanation\\25-service-lifecycle-pattern.md",
+        "46e711f3cdbd5c90c467806197d559afa8e6b300139458784ec114837a23894f"
+      ],
+      [
+        "docs\\explanation\\26-extension-substrate.md",
+        "ee8cc1183f0251cf6ce3eb1ba81e506f20fa9da67911010ad412058ea0f281ce"
+      ],
+      [
+        "docs\\explanation\\27-frontend-presentation-kernel.md",
+        "493e049d1d804ba41ca814c49aee58236d0e77d9db83c403969c3e643e759c28"
+      ],
+      [
+        "docs\\explanation\\28-runtime-contract.md",
+        "8bb1e91b1cd42104217f02299aa8823ccdad662c52259d0a38fe35cc873f7d2c"
+      ],
+      [
+        "docs\\reference\\api-contract-map.md",
+        "1be777670d141323575407b34c7d8ccecdbdd3d4ab5737946e769ef3058be3f4"
+      ],
+      [
+        "docs\\reference\\architectural-risks.md",
+        "cd863e68a214a9ebcc8400c91629467de51b652d5febaa668b05a801fe88e5b8"
+      ],
+      [
+        "docs\\reference\\architecture\\module-deps.md",
+        "000d107ebbff7e81ef7a08038c0898c649201b04ebac86ab49ba26bd30a7f493"
+      ],
+      [
+        "docs\\reference\\benchmarks\\agent-utility.md",
+        "224f8085250a8389c1a90700b3f548065f69a7c303c1e44e76836a70ea053ffb"
+      ],
+      [
+        "docs\\reference\\benchmarks\\methodology.md",
+        "47a20cae81d6ff11dbbcf9e6bef7f3d4932a46d7ecda35471b57810609cd13f5"
+      ],
+      [
+        "docs\\reference\\benchmarks\\scorecard.md",
+        "44209b47e6ab55ef48c722adc6669566623fa63559e226565b57f28aa9a06b00"
+      ],
+      [
+        "docs\\reference\\configuration\\config-lifecycle-policy.md",
+        "1b45debaa843d655a5afed4623ed2a9829af4872c0371d2debb73685ec50d098"
+      ],
+      [
+        "docs\\reference\\configuration\\environment-variables.md",
+        "33f56c889d1e79a900fad430c0f209a969c58b46543508efe12d38031d2652c4"
+      ],
+      [
+        "docs\\reference\\configuration\\runtime-config-ownership-matrix.md",
+        "e4ff9c76fb2e419a4d6d89117e6423bf1f652f032a441c56eaa864299a8fa4cf"
+      ],
+      [
+        "docs\\reference\\contracts\\api-evolution.md",
+        "03d9278e23bde4fe4efd5bdc50a3270062eb4230597f3784589b03df78125457"
+      ],
+      [
+        "docs\\reference\\contracts\\composition-substrate-slots.v1.md",
+        "9db4bfa73868dd277324ff8ca2d7c97951465167a9bdd800032a45fdec764f9b"
+      ],
+      [
+        "docs\\reference\\contracts\\health-readiness-contract.v1.md",
+        "0853108824e050beff7ac01b4b2b777e467e3dd95cb08b097d50239c30b725cb"
+      ],
+      [
+        "docs\\reference\\contracts\\rpc-retry-ownership-policy.v1.md",
+        "709051e5453ef93b2ec99c30352b526d4a20fbd759fab48e638b16b398d766c7"
+      ],
+      [
+        "docs\\reference\\contracts\\search-and-rag-reason-codes.md",
+        "94de3e1b838b5d807a9120997bb04b5344d007d3b8ab5356ad3fe601bce650ab"
+      ],
+      [
+        "docs\\reference\\contracts\\search-execution-spans.md",
+        "aecdf16a1b06658ec1daea1f16a76cbdaaeaf0daa12c46c50bba35a8b6153341"
+      ],
+      [
+        "docs\\reference\\contracts\\search-pipeline-invariants.md",
+        "133c0d91c54a4a591ab6aa2a171939d8f0e6b3bc126ed7dbc9c68fedca78457c"
+      ],
+      [
+        "docs\\reference\\contracts\\workflow-telemetry-contract.v1.md",
+        "956de1c8cc1a1e31c4144acf241929bbad07703f3a8a42a8b97be52eb30aea72"
+      ],
+      [
+        "docs\\reference\\contributing\\agent-guide.md",
+        "9741f56d31c67e325576d7b5cc3a1ba76901b855f0c100c7378a6bba7a0e1fc0"
+      ],
+      [
+        "docs\\reference\\contributing\\agent-postmortems.md",
+        "cf3af072c836e9c0d543f2044dfaa523ea2ca0e14eed8776640761400c8729f5"
+      ],
+      [
+        "docs\\reference\\contributing\\agent-prompt-surface-governance.md",
+        "099f7d880a2185f9732a5adeaf63110206ec5b1d6e96e1d08743ca766e19ee45"
+      ],
+      [
+        "docs\\reference\\contributing\\agent-workflow.md",
+        "f702a60f3341dc862785193ac92932f540bd114f7dcc39a7ca14cf426e95272c"
+      ],
+      [
+        "docs\\reference\\contributing\\common-workflows.md",
+        "75829cd682717b1125e1c46d465dad67d648b874724f852614b49e9ddc161e16"
+      ],
+      [
+        "docs\\reference\\contributing\\composition-substrate-retraction.md",
+        "e7bf9bd337865e1885b7a2d0455f520d5b3381b9b4ee2ffc87e5dd632fb06f0c"
+      ],
+      [
+        "docs\\reference\\contributing\\conflict-ledger.md",
+        "b25d71e6a3c675f1abcf2281af64d39eba14e4e9618d4488b9533249544dd78a"
+      ],
+      [
+        "docs\\reference\\contributing\\cross-component-checklist.md",
+        "c6efdfe3e6c4064a5ab2e8309d92f14723d9a069f5ec596ed8adab234486110f"
+      ],
+      [
+        "docs\\reference\\contributing\\development-philosophy.md",
+        "d27061a9c25d8f614d5862e517827a1d3081c245d52226dac7b0dd07019e5ea0"
+      ],
+      [
+        "docs\\reference\\contributing\\discipline-gate-kernel.md",
+        "e00d4170af625a0f2f4dc7938f9f430e0951056cc6d81c2710f6866216b15f7b"
+      ],
+      [
+        "docs\\reference\\contributing\\logging-conventions.md",
+        "fc8c585cf5d88b82cbc4d6f53f44e6a2ab8250cdcf46f79b210daf04d8bb696f"
+      ],
+      [
+        "docs\\reference\\contributing\\mcp-dev-tools.md",
+        "f1e810d77b1a9df26aaca8f898492658a4949583c6a618168ec96c1a7a9319cf"
+      ],
+      [
+        "docs\\reference\\contributing\\reliability-budget.md",
+        "73c84ad72ec43f8c18498f05af6827f67b4f7895ed12b422557084171629cba2"
+      ],
+      [
+        "docs\\reference\\contributing\\slice-execution.md",
+        "6f22517c7042a1bd76e02361c8bb3b26ab75d4155dcc164d90ee048803987059"
+      ],
+      [
+        "docs\\reference\\contributing\\smoke-test-health-event-substrate.md",
+        "e94e54ec852653144c2f1931940561ce68df9b0530373edfa88c46a98a97e28f"
+      ],
+      [
+        "docs\\reference\\contributing\\testing-quality.md",
+        "1acfcb751a1c58ef8541520e74253ed3f46eafc090b476211bf136a4cbb10ba5"
+      ],
+      [
+        "docs\\reference\\contributing\\writing-docs-for-ai.md",
+        "4394a82c015242b1c12c572abc96bc16ddbf1b640ee3c9d487b1fa70641091fc"
+      ],
+      [
+        "docs\\reference\\future-knowledge-extraction.md",
+        "4fb57ff21c1f1db521f1cda0108efa6e739c7ae7d170018eec20a5f4d69ab4db"
+      ],
+      [
+        "docs\\reference\\glossary.md",
+        "f6d32cb992abcaeee03aadc685f55db64350ea91bd4172c79f1a86d40de9701f"
+      ],
+      [
+        "docs\\reference\\index-schema-mismatch-reindex-noop.md",
+        "dae65d8cf4a3740acd473c9f319a7094adeaba534e24049fa549ba1e5b1a9784"
+      ],
+      [
+        "docs\\reference\\inference-runtime-register.md",
+        "30372d00d7e4824ba82337f4af89c935ca7306e3211ad72127d739df59d1e28e"
+      ],
+      [
+        "docs\\reference\\jseval-pipeline-reference.md",
+        "d64824f7f46d09113c74fb241251e1fc89ba2dd377a9951c5e9b45d5908e00d4"
+      ],
+      [
+        "docs\\reference\\legal\\ai-runtime-and-model-redistribution.md",
+        "4dab161d68f55751567b04b239fa5926c6e08688703bd4cce415d5435f9ff8e2"
+      ],
+      [
+        "docs\\reference\\mcp-production-server.md",
+        "f9b57187a3d05966ae1b3f44147c477aac6ec0c69450e2d3ab7f17c29e1d5f70"
+      ],
+      [
+        "docs\\reference\\model-inventory.md",
+        "6edb09e692683efc9229aa78eaaa2a7fe4a793a0d1d95fb3158b22bea7d7df91"
+      ],
+      [
+        "docs\\reference\\observability-scoped-fix-playbook.md",
+        "26d4d92721ec66c5fee4e8de712a697a2c32ff278798e4dbaf0d912515e9a20e"
+      ],
+      [
+        "docs\\reference\\performance\\indexing-throughput.md",
+        "d36e7b60657605ecb8e95c86cfe189215a8083002ec48837aa15082541fc7b4c"
+      ],
+      [
+        "docs\\reference\\platform-lifecycle-policy.md",
+        "a27c1d9c8f0bc1c175d073ed4ebca8e83b245cf53de2aada01f573a27ed56946"
+      ],
+      [
+        "docs\\reference\\runtime-contract.md",
+        "ba4f59c0a0c18189575bd6a526fd27c6374d8fb5c1377bb9f802c1601528dfe9"
+      ],
+      [
+        "docs\\reference\\search-quality-register.md",
+        "31a4a93e7c9febb1a3e6df47789cde81779c357c110438f9abf0eebb8403aec8"
+      ],
+      [
+        "docs\\reference\\search-ui-behavior.md",
+        "4723f71bf79994b8b83c901028cbeeaccf5071d67806c73bc3b73ba64419b509"
+      ],
+      [
+        "docs\\reference\\secondary-views-behavior.md",
+        "182c4a47965853037bb83fab23925388937d25e3768a45b972105310349e560d"
+      ],
+      [
+        "docs\\reference\\security\\threat-model.md",
+        "d6ff3431588d370bb30c862161915c24f57991fddae848226c41ab610c4eae51"
+      ],
+      [
+        "docs\\reference\\ui-user-readiness.md",
+        "200f2be43b857ef4599ae34f132a7dbebb3c1c5de4bf80a747b78a4e788d07f2"
+      ],
+      [
+        "docs\\reference\\ui\\extension-substrate-conventions.md",
+        "edc2c7bcbdd38e1a45ee55fbfec68fdce2839525269d92822c6feacd71e51212"
+      ],
+      [
+        "docs\\reference\\ui\\frontend-kernel\\kernel\\00-primitives.md",
+        "46cc4afb898a00d09ba0b558c3640073583464cd1c77dc9fad9d4ce962033827"
+      ],
+      [
+        "docs\\reference\\ui\\frontend-kernel\\kernel\\01-runtime-contracts.md",
+        "0728151bff9c1e02bf53af59be1ccfdc6fe251ef2767355a81e44b2b8907bb2e"
+      ],
+      [
+        "docs\\reference\\ui\\frontend-kernel\\kernel\\02-shell-store-layout.md",
+        "b9f1becedd3bca785165d38adc52813607e037d5ff70ed73b32bc59e54d987e5"
+      ],
+      [
+        "docs\\reference\\ui\\frontend-kernel\\kernel\\03-platform-stack.md",
+        "6f12cb89ce918a5c8d8a797e99fc3eb62cd938eacb016c5b5a2c613813515ff7"
+      ],
+      [
+        "docs\\reference\\ui\\frontend-kernel\\kernel\\04-shape-governance.md",
+        "2e5c400f49b017db5c77770ca2c1aa1a4cdff347ab7de924ccd9cc440577ce55"
+      ],
+      [
+        "docs\\reference\\ui\\frontend-kernel\\kernel\\05-contract-substrate.md",
+        "73c1f108b1b0fa6d892affdd58e4af8ab353e97b63143cc2b773e2525967d344"
+      ],
+      [
+        "docs\\reference\\ui\\frontend-kernel\\kernel\\05-streaming-envelope.md",
+        "5c3af1d1104c1a2986e02a73e73b510af8de2af13b585018e7717f86718194ff"
+      ],
+      [
+        "docs\\reference\\ui\\frontend-kernel\\kernel\\06-declarative-presentation.md",
+        "b25538c0bfdc94340e4a913c140d6ec113475ea4582e968b5256b4f3d1dbf144"
+      ],
+      [
+        "docs\\reference\\ui\\frontend-substrate-state.md",
+        "b5a15f31c72f9e8b11e6f0c12860404ed7734c015789ea5f26419d6c2e04e230"
+      ],
+      [
+        "docs\\reference\\ui\\simple-vs-detailed-mode.md",
+        "d4881b21148d487f0cc088ebbe3d62fb1253071c6e3688946e83a0cc54459a1f"
+      ]
+    ],
+    "heap": {
+      "confirmIn": "E4",
+      "packaged": "-Xmx2g"
+    },
+    "instruments": {
+      "scripts/jseval/jseval/__init__.py": [
+        "33fed79bd903510926568f1cbfac6785576b9602f60ef671561245e6ce6270dd"
+      ],
+      "scripts/jseval/jseval/_paths.py": [
+        "ae7a4b590f7cfe450d97deb41a7f5d23fd61a207f0a992a0d275786b7792457e"
+      ],
+      "scripts/jseval/jseval/agent_behavioral.py": [
+        "9910651c2d7ada130abcf8d83dad1aabab9593e293ab161ff9b47545d1ff082e"
+      ],
+      "scripts/jseval/jseval/agent_manifest.py": [
+        "02d28635669122d9658b2aab863b7372721528bdcc372dbc5f97179d2220c226"
+      ],
+      "scripts/jseval/jseval/agent_utility_observations.py": [
+        "46f9dd584d8d12e29a3a94a1624a3dd27d77e9b8b62503716db37e73ee80f948"
+      ],
+      "scripts/jseval/jseval/ann_proof.py": [
+        "4bdbd3b9be037fb7e6ea2f5045d9e168bf7bb470e1d8c72af9383ae7a5518906"
+      ],
+      "scripts/jseval/jseval/artifacts.py": [
+        "9383a93c30cbc1bb245de7d619e67f1e0c4d622380e28029b846aa90da38608c"
+      ],
+      "scripts/jseval/jseval/backend.py": [
+        "aa210483407c87ec047c13e60d2f500b2555a7175e5f4575010a4d1e774a358e"
+      ],
+      "scripts/jseval/jseval/bisection.py": [
+        "6c8b6e52058c586e3bb7220f7a77ed2830e01249a44c2a58edce996ed2d61236"
+      ],
+      "scripts/jseval/jseval/bulk_load.py": [
+        "c9eebe17bc8ba925090eaf530ab67ebf15ca51b02198469e3c6c0ebbb69da814"
+      ],
+      "scripts/jseval/jseval/cadence.py": [
+        "126ae069fb7906b7caa5e0181a01c2dd037482baf81ffe8953345d93b291ec70"
+      ],
+      "scripts/jseval/jseval/ce_coverage.py": [
+        "be05a56f0c2e8fbe9da4f38bd566542e3e2e0bcaab891823bd516337278f8a63"
+      ],
+      "scripts/jseval/jseval/chunk_completeness.py": [
+        "8eb1eaa88acea501ce18cdbab26a3396abcd62773fcaefacff175a35a11b6d39"
+      ],
+      "scripts/jseval/jseval/commands/__init__.py": [
+        "081b6ac7143d52a357d48270c34aee73653486f6a6e060d8277cb10847c12b50"
+      ],
+      "scripts/jseval/jseval/commands/_common.py": [
+        "68916bae78f7b783609c9a9c9ddd496c9ca46efa2296dfcc7bcb8cd0d67ed23d"
+      ],
+      "scripts/jseval/jseval/commands/run.py": [
+        "8d7df4d17cf53a701409773af34c4ca6e5492de354238801a33d67a9851282e3"
+      ],
+      "scripts/jseval/jseval/comparability.py": [
+        "c8c5f9d05e85c249716dee811580fc18fe209d58ba926bcccdea95bfc79e0f51"
+      ],
+      "scripts/jseval/jseval/compare_runs.py": [
+        "2d3a1870c852857112bcb0e5f9e51fb86b038a99614c8fcd9c42fceb2fc56cca"
+      ],
+      "scripts/jseval/jseval/context_coverage.py": [
+        "7c6f80361fed5a642871fce724a9af751628e92548982f34806361b0bb393bb4"
+      ],
+      "scripts/jseval/jseval/corpora.py": [
+        "3936be36a4e3272b64ed528f74919919115de330f83ba3e7e10b37a5865a49aa"
+      ],
+      "scripts/jseval/jseval/corpus_comparators.py": [
+        "ac883affa9c839791dd69872a7b5c710a149b25e1ddc724528354d9faaacb9d1"
+      ],
+      "scripts/jseval/jseval/corpus_fetch.py": [
+        "34d80f291d2cf6b9f53c5e364f210d625fd727ac576f91a3459235389960ac8d"
+      ],
+      "scripts/jseval/jseval/corpus_generate.py": [
+        "17d1af331a56e4cd09931df44aad58ed8a95c8b05671bd38b515cfec1f4ba3c1"
+      ],
+      "scripts/jseval/jseval/corpus_identity.py": [
+        "416161093d01cf2386bb95840ad92b174d9d06da7ce10da0ab02ecf9ec4c75b8"
+      ],
+      "scripts/jseval/jseval/dataset_cache.py": [
+        "1ae54af60e3271d9fd3cb5b9ee8e812ff10a6345b0c6ceeb6aedce66ce920953"
+      ],
+      "scripts/jseval/jseval/diff_gate.py": [
+        "e0569995850e97596e2ded424c28d3a40f0642859427a7f00a0116957c8eef50"
+      ],
+      "scripts/jseval/jseval/duplicate_prevalence.py": [
+        "8fb5d3b9339129d80f36cfd5193b90e89c95c2eaf7e7544c79b7d70542bb151d"
+      ],
+      "scripts/jseval/jseval/duplicate_prevalence_enron.py": [
+        "1327bfd51cf082b709adbbbce96c3069a84ec0fa21a3bbde7ff35561e426d865"
+      ],
+      "scripts/jseval/jseval/duplicate_prevalence_production.py": [
+        "b35566b68b21f5094915ebba5bfe0371a6442bf61cb3961859efb65f52df64c9"
+      ],
+      "scripts/jseval/jseval/encoder_latency.py": [
+        "f086ab34f3b8263dd94af687999f92660a2b5680857e7cac6e2ebdebb038306e"
+      ],
+      "scripts/jseval/jseval/entity_bank.py": [
+        "57b57d2f30b7a9fee57ed0c5850d9b42459d17a254d6d0ac947ee4e574c7eaed"
+      ],
+      "scripts/jseval/jseval/env_fingerprint.py": [
+        "01aff112045d4c2f1d61e02110805e30032139c56846d6f5bb425b733bdcdb45"
+      ],
+      "scripts/jseval/jseval/exposure_contrast.py": [
+        "245e2439642777230dfd65d0ce2874a7a1914e3276624029f5a6a420a762dd67"
+      ],
+      "scripts/jseval/jseval/history.py": [
+        "f30979c660ce71d5a89eead4a8421e4d05a3bd83902ff5ea0945c9560dbb6da7"
+      ],
+      "scripts/jseval/jseval/index_cache.py": [
+        "d0db9aa3c99e8d8e60aefba1cd77d7688afbe757398f61450fcbd6f3f6911fee"
+      ],
+      "scripts/jseval/jseval/index_identity.py": [
+        "3094ed43b101e5acaf1a4641b0d2392f196e32be9a5374a911afc35ae02da43a"
+      ],
+      "scripts/jseval/jseval/ingest.py": [
+        "0df981b5113becdf983221c2afb56d46a03fe8b0cf422e271d43994ea68b56b9"
+      ],
+      "scripts/jseval/jseval/manifest.py": [
+        "d90e55908062512b28a21816a9256544054933fa84953d2a661ad2b57705568d"
+      ],
+      "scripts/jseval/jseval/materialize.py": [
+        "f344970f7ca1af5d2701c3ba7bd255a78e763679489b64ef3cd3afdbf4aeb2cc"
+      ],
+      "scripts/jseval/jseval/metric_families.py": [
+        "f2f88417b5191d2d12e12bb61c1740be0f41cdf2ae03e8cfbe002c71fea2c112"
+      ],
+      "scripts/jseval/jseval/metrics_reader.py": [
+        "dc2c2f2c360decc75f033752d3a526fb499d29b707530bc2ea7e57f57be0fc32"
+      ],
+      "scripts/jseval/jseval/perf_gate.py": [
+        "7553cb79bde59d12dc908e193d2d57bc081c9d6874500b340f23299834029913"
+      ],
+      "scripts/jseval/jseval/preflight.py": [
+        "31f1cd7102861fe6d33cbcd036eda4e4177efc9a828d01b6d60385f7368edbe3"
+      ],
+      "scripts/jseval/jseval/projections/__init__.py": [
+        "d023e73f09b467fd2558e04d8d43ecbb419a7a5a4249cb74ff43cbe0c14c252f"
+      ],
+      "scripts/jseval/jseval/projections/base.py": [
+        "edb36283ac7b4b462c99fe0e561be64fc47f5c0066562e58d9b76335a1fe923f"
+      ],
+      "scripts/jseval/jseval/projections/staged_recall_accounting.py": [
+        "20bacf2ab238da61fad698aa2d9f9add8712d19def0f73b30b6ceb817f34ca5e"
+      ],
+      "scripts/jseval/jseval/provenance.py": [
+        "90db03a4f0ac84207a3d28880f50f6052c6196b87c0e47b2b5314123402595f6"
+      ],
+      "scripts/jseval/jseval/raw_corpus_manifest.py": [
+        "85e0f001dcf233c14b8feaf5587d6baff3f49be49d31b5bea8e42bdd723ed1cc"
+      ],
+      "scripts/jseval/jseval/readiness.py": [
+        "3b6246dff713a7dfc6d020865783e65954c33fa266fe70030d40f7a4e2e5bcaa"
+      ],
+      "scripts/jseval/jseval/release.py": [
+        "bfeb495e77a1f7fb151a7e8e74e728a9159e67fff60dac752ec0cdfde047f8d3"
+      ],
+      "scripts/jseval/jseval/result_identity.py": [
+        "b25d2a9a5e162b63812e44c1a31a56e7b0141211743abb7ad9f1a1b8a2ee84b9"
+      ],
+      "scripts/jseval/jseval/retriever.py": [
+        "0749aae5693ce73ef071d10faf3faa45207a11eca14a3816ae3234da469439ba"
+      ],
+      "scripts/jseval/jseval/run.py": [
+        "b9ac55b3ae755e397a5a76313018ec3b70c9fbf6b09b314f27fd3ccde8362d07"
+      ],
+      "scripts/jseval/jseval/run_config.py": [
+        "c96ba65c65e7902ed5b4c790f4508469b1a518e3e46104f10b375cd901b48f98"
+      ],
+      "scripts/jseval/jseval/run_register.py": [
+        "a80d6f4626cfae4a2b83c398903a54f16c15285e384ea0f2c873c0906c6ce4f9"
+      ],
+      "scripts/jseval/jseval/scoring.py": [
+        "473fccc13c9008d3af98aec4ffd40aef2770b51a46eff0d8620e8a170f7b0902"
+      ],
+      "scripts/jseval/jseval/search_load.py": [
+        "29cb4beccd12325598624fb8f248e4f019bb55a8eb232962dda373a965459205"
+      ],
+      "scripts/jseval/jseval/timeline.py": [
+        "f8ecc66991b4404d3a3edf0ffacdd09298c9505e5e0cd06addb3c5e85979265e"
+      ],
+      "scripts/jseval/jseval/trec.py": [
+        "d3111e0a4c0c4f96a06e335539bb430c736a09f416782b703afb1edb2de14f4a"
+      ],
+      "scripts/jseval/jseval/types.py": [
+        "155f6f973aeda0a28a3857724e4228a7c1ffc8f295d337b52018c36710f94cd2"
+      ],
+      "scripts/jseval/jseval/utility_comparison.py": [
+        "103c0c56383de62dde5f3f51d2c89981a376d7417535c950e33998457e242300"
+      ],
+      "scripts/jseval/lane-f-workflow-fixture.v1.json": [
+        "0100354b62dbe249a096cf1c638c07781a2b338dc6bf0cb73df84a0ed078f665"
+      ],
+      "scripts/jseval/lane-f/admission-loop.mjs": [
+        "856244b59625f0fd84679cc9880b0ab855df6bd29d28b7b47932ffdcea0dfe4a"
+      ],
+      "scripts/jseval/lane-f/capability-ready.py": [
+        "88e330e7e27e40d81ea38009726c7340cb0dddecd264cbc6bc0c935f09d9beef"
+      ],
+      "scripts/jseval/lane-f/e-start-ready.mjs": [
+        "620fe26957de8b1706604fa23f0d3e54de4e5f6e2f49e0c19acaf749ba8db738"
+      ],
+      "scripts/jseval/lane-f/encoder-latency-probe.sh": [
+        "f7e957bc7ef2133c5ef1d8f6b3212ae67257eed34b5a1b9d578bad4a458f5fec"
+      ],
+      "scripts/jseval/lane-f/head-rss-sampler.ps1": [
+        "a19bfc1654b16672db9c32ddddd977dc99686c34a3f9e419e45ee424ec096590"
+      ]
+    },
+    "kind": "lane-f-measurement-identity.v2",
+    "machine": {
+      "arch": "x64",
+      "cpu": [
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K"
+      ],
+      "hostname": "DESKTOP-FA00PO7",
+      "node": "v24.12.0",
+      "platform": "win32",
+      "ramBytes": 34028519424,
+      "release": "10.0.26200"
+    },
+    "plan": [
+      {
+        "args": [
+          "rev-parse",
+          "HEAD"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "git",
+        "label": "revision",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "status",
+          "--porcelain"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "git",
+        "label": "dirty",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "status",
+          "--active",
+          "--json"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "runner-status",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "-e",
+          "const os=require(\"node:os\");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "machine",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "--query-gpu=name,uuid,memory.total,driver_version",
+          "--format=csv"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "nvidia-smi",
+        "label": "gpu",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "start",
+          "--json",
+          "--skip-build",
+          "--clean",
+          "none",
+          "--data-dir",
+          "<TREE>/tmp/lane-f-e/<INVOCATION>/scripted-agent",
+          "--api-port",
+          "33221",
+          "--session-id",
+          "<SESSION>",
+          "--lease-duration-sec",
+          "3600",
+          "--chat-profile",
+          "standard"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "start-scripted-agent",
+        "mode": "start"
+      },
+      {
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "<TREE>/scripts/jseval/lane-f/head-rss-sampler.ps1",
+          "-Out",
+          "<RAW>/scripted-agent/head-rss.csv",
+          "-Stop",
+          "<RAW>/scripted-agent/rss.stop",
+          "-IncludeSplitWorker"
+        ],
+        "budgetSeconds": 2700,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "powershell",
+        "label": "rss-scripted-agent",
+        "mode": "background"
+      },
+      {
+        "args": [
+          "-m",
+          "jseval.bulk_load",
+          "--base-url",
+          "http://127.0.0.1:33221",
+          "--corpus-dir",
+          "<TREE>/tmp/lane-f-e/corpus/scifact",
+          "--output-dir",
+          "<RAW>/scripted-agent",
+          "--workload",
+          "scripted-agent",
+          "--admission-script",
+          "<TREE>/scripts/jseval/lane-f/admission-loop.mjs",
+          "--block-seconds",
+          "600"
+        ],
+        "budgetSeconds": 1500,
+        "cwd": "<TREE>/scripts/jseval",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "python",
+        "label": "bulk-scripted-agent",
+        "mode": "command",
+        "window": {
+          "blockSeconds": 600,
+          "concurrency": 1,
+          "enrichmentWait": false,
+          "modes": [
+            "hybrid",
+            "lexical"
+          ],
+          "statusIntervalSeconds": 5
+        }
+      },
+      {
+        "args": [],
+        "directory": "<RAW>/scripted-agent",
+        "env": {},
+        "executable": null,
+        "label": "end-samples-scripted-agent",
+        "mode": "end-samples"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/jseval/lane-f/encoder-latency-probe.sh",
+          "<RAW>/scripted-agent/encoder",
+          "3",
+          "33221"
+        ],
+        "budgetSeconds": 120,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "bash",
+        "label": "encoder-scripted-agent",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/jseval/lane-f/analyze-head-run.cjs",
+          "<RAW>/scripted-agent",
+          "--paired-split"
+        ],
+        "budgetSeconds": 30,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "analyze-scripted-agent",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "stop",
+          "--json",
+          "--run",
+          "<RUN>",
+          "--session-id",
+          "<SESSION>"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "stop-scripted-agent",
+        "mode": "stop"
+      }
+    ],
+    "workload": "scripted-agent"
+  },
+  "valuesHash": "032117f8428a296d7f721daa422f765bf369d43e3a8a7b655b17a31f9e68ddc3",
+  "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16.json",
+  "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16",
+  "runIds": [
+    "9985b192-16de-4cd4-867d-b2070220e2ea"
+  ],
+  "commands": [
+    {
+      "label": "revision",
+      "executable": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-01T10:20:26.746Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\0-revision.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\0-revision.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:20:26.766Z"
+    },
+    {
+      "label": "dirty",
+      "executable": "git",
+      "args": [
+        "status",
+        "--porcelain"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-01T10:20:26.770Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\1-dirty.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\1-dirty.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:20:26.857Z"
+    },
+    {
+      "label": "runner-status",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "status",
+        "--active",
+        "--json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-01T10:20:26.880Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\2-runner-status.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\2-runner-status.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:20:26.936Z"
+    },
+    {
+      "label": "machine",
+      "executable": "node",
+      "args": [
+        "-e",
+        "const os=require(\"node:os\");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-01T10:20:26.947Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\3-machine.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\3-machine.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:20:26.994Z"
+    },
+    {
+      "label": "gpu",
+      "executable": "nvidia-smi",
+      "args": [
+        "--query-gpu=name,uuid,memory.total,driver_version",
+        "--format=csv"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-01T10:20:26.999Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\4-gpu.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\4-gpu.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:20:27.057Z"
+    },
+    {
+      "label": "start-scripted-agent",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "start",
+        "--json",
+        "--skip-build",
+        "--clean",
+        "none",
+        "--data-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\tmp\\lane-f-e\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent",
+        "--api-port",
+        "33221",
+        "--session-id",
+        "lane-f-e-2026-10-01T10-20-26-376Z-b04b8c16",
+        "--lease-duration-sec",
+        "3600",
+        "--chat-profile",
+        "standard"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "mode": "start",
+      "requestsAfterReceipt": [
+        "/api/mcp/token",
+        "/api/health",
+        "/api/status",
+        "/api/debug/state",
+        "/api/runtime/manifest",
+        "/api/debug/effective-config"
+      ],
+      "startedAt": "2026-10-01T10:20:27.065Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\5-start-scripted-agent.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\5-start-scripted-agent.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:41:12.940Z"
+    },
+    {
+      "label": "/api/mcp/token",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/mcp/token",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T10:20:29.720Z",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/health",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/health",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T10:20:33.740Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\6-_api_health.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/debug/state",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/debug/state",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T10:20:33.905Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\7-_api_debug_state.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/runtime/manifest",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/runtime/manifest",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T10:20:33.913Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\8-_api_runtime_manifest.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/debug/effective-config",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/debug/effective-config",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-01T10:20:33.922Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\9-_api_debug_effective-config.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "capability-ready-start-scripted-agent",
+      "executable": "python",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\capability-ready.py",
+        "--base-url",
+        "http://127.0.0.1:33221",
+        "--timeout",
+        "300",
+        "--output",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\start-scripted-agent-capability-ready.json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T10:20:33.931Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\10-capability-ready-start-scripted-agent.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\10-capability-ready-start-scripted-agent.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:20:43.401Z"
+    },
+    {
+      "label": "rss-scripted-agent",
+      "executable": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\head-rss-sampler.ps1",
+        "-Out",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\head-rss.csv",
+        "-Stop",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\rss.stop",
+        "-IncludeSplitWorker"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 2700,
+      "mode": "background",
+      "startedAt": "2026-10-01T10:20:43.409Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\11-rss-scripted-agent.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\11-rss-scripted-agent.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:40:54.764Z"
+    },
+    {
+      "label": "bulk-scripted-agent",
+      "executable": "python",
+      "args": [
+        "-m",
+        "jseval.bulk_load",
+        "--base-url",
+        "http://127.0.0.1:33221",
+        "--corpus-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\corpus\\scifact",
+        "--output-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent",
+        "--workload",
+        "scripted-agent",
+        "--admission-script",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\admission-loop.mjs",
+        "--block-seconds",
+        "600"
+      ],
+      "cwd": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 1500,
+      "window": {
+        "modes": [
+          "hybrid",
+          "lexical"
+        ],
+        "blockSeconds": 600,
+        "concurrency": 1,
+        "statusIntervalSeconds": 5,
+        "enrichmentWait": false
+      },
+      "startedAt": "2026-10-01T10:20:43.417Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\12-bulk-scripted-agent.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\12-bulk-scripted-agent.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:40:54.304Z"
+    },
+    {
+      "label": "encoder-scripted-agent",
+      "executable": "bash",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\encoder-latency-probe.sh",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\encoder",
+        "3",
+        "33221"
+      ],
+      "cwd": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 120,
+      "startedAt": "2026-10-01T10:40:54.769Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\13-encoder-scripted-agent.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\13-encoder-scripted-agent.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:41:06.013Z"
+    },
+    {
+      "label": "analyze-scripted-agent",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\analyze-head-run.cjs",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent",
+        "--paired-split"
+      ],
+      "cwd": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 30,
+      "identityRole": "scoring",
+      "startedAt": "2026-10-01T10:41:06.020Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\14-analyze-scripted-agent.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\14-analyze-scripted-agent.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:41:06.114Z"
+    },
+    {
+      "label": "stop-scripted-agent",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "stop",
+        "--json",
+        "--run",
+        "9985b192-16de-4cd4-867d-b2070220e2ea",
+        "--session-id",
+        "lane-f-e-2026-10-01T10-20-26-376Z-b04b8c16"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "mode": "stop",
+      "startedAt": "2026-10-01T10:41:06.122Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\15-stop-scripted-agent.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\15-stop-scripted-agent.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T10:41:17.212Z"
+    }
+  ],
+  "metrics": {
+    "searchP95": {
+      "hybrid": 427.3948000045493,
+      "lexical": 32.13189999223687
+    },
+    "agentP95": 311.40299999999115,
+    "chunksByWorkload": {
+      "scripted-agent": 0
+    },
+    "loadWindow": {
+      "startedAtMs": 1790850054088.5144,
+      "endedAtMs": 1790851254097.9192,
+      "durationSeconds": 1200,
+      "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+    },
+    "stageRates": {
+      "primary": {
+        "completedSources": [
+          "raw.worker.core.indexedDocuments"
+        ],
+        "expectedDocuments": 5184,
+        "expectedSource": "load.expectedDocuments",
+        "counterRegressions": [],
+        "activeSeconds": 327.07613232421875,
+        "completedDelta": 4656,
+        "startObservedAtMs": 1790850054088.498,
+        "endObservedAtMs": 1790850381164.6304,
+        "drainedInWindow": true,
+        "rate": 14.235217858650339
+      },
+      "embed": {
+        "completedSources": [
+          "raw.worker.enrichment.embeddingCompletedCount"
+        ],
+        "expectedDocuments": 5184,
+        "expectedSource": "load.expectedDocuments",
+        "counterRegressions": [],
+        "activeSeconds": 1200.0119978027344,
+        "completedDelta": 591,
+        "startObservedAtMs": 1790850054088.498,
+        "endObservedAtMs": 1790851254100.4958,
+        "drainedInWindow": false,
+        "rate": 0.4924950759510259
+      },
+      "splade": {
+        "completedSources": [
+          "raw.worker.enrichment.spladeCompletedCount"
+        ],
+        "expectedDocuments": 5184,
+        "expectedSource": "load.expectedDocuments",
+        "counterRegressions": [
+          {
+            "observedAtMs": 1790850882738.062,
+            "from": 1938,
+            "to": 1932
+          },
+          {
+            "observedAtMs": 1790851163970.0725,
+            "from": 2709,
+            "to": 2708
+          },
+          {
+            "observedAtMs": 1790851174771.2454,
+            "from": 2708,
+            "to": 2693
+          },
+          {
+            "observedAtMs": 1790851185543.326,
+            "from": 2693,
+            "to": 2678
+          },
+          {
+            "observedAtMs": 1790851196327.1138,
+            "from": 2678,
+            "to": 2665
+          },
+          {
+            "observedAtMs": 1790851207089.331,
+            "from": 2665,
+            "to": 2639
+          },
+          {
+            "observedAtMs": 1790851212476.2375,
+            "from": 2639,
+            "to": 2613
+          },
+          {
+            "observedAtMs": 1790851223240.3113,
+            "from": 2613,
+            "to": 2607
+          }
+        ],
+        "activeSeconds": 1200.0119978027344,
+        "completedDelta": 2633,
+        "startObservedAtMs": 1790850054088.498,
+        "endObservedAtMs": 1790851254100.4958,
+        "drainedInWindow": false,
+        "rate": 2.194144729236973
+      },
+      "chunk_embed": {
+        "completedSources": [
+          "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+        ],
+        "expectedDocuments": 5184,
+        "expectedSource": "load.expectedDocuments",
+        "counterRegressions": [],
+        "activeSeconds": 1200.0119978027344,
+        "completedDelta": 0,
+        "startObservedAtMs": 1790850054088.498,
+        "endObservedAtMs": 1790851254100.4958,
+        "drainedInWindow": false,
+        "rate": 0,
+        "reason": "no-completions-in-window"
+      },
+      "ner": {
+        "completedSources": [
+          "raw.worker.enrichment.completedNerCount"
+        ],
+        "expectedDocuments": 5184,
+        "expectedSource": "load.expectedDocuments",
+        "counterRegressions": [],
+        "activeSeconds": 1200.0119978027344,
+        "completedDelta": 49,
+        "startObservedAtMs": 1790850054088.498,
+        "endObservedAtMs": 1790851254100.4958,
+        "drainedInWindow": false,
+        "rate": 0.04083292507884986
+      }
+    },
+    "chunkActiveSeconds": 1200.0119978027344,
+    "chunkWorkDrainedInWindow": false,
+    "chunksPerSec": 0,
+    "docsPerSec": 3.88,
+    "windowBoundaryRequests": 3,
+    "wireRejections": 0,
+    "wireOffered": 39270,
+    "stageComparisons": {
+      "primary": {
+        "status": "pass",
+        "splitRate": 14.235217858650339,
+        "branchRate": 14.235217858650339,
+        "minimum": 12.811696072785304
+      },
+      "embed": {
+        "status": "pass",
+        "splitRate": 0.4924950759510259,
+        "branchRate": 0.4924950759510259,
+        "minimum": 0.44324556835592327
+      },
+      "splade": {
+        "status": "pass",
+        "splitRate": 2.194144729236973,
+        "branchRate": 2.194144729236973,
+        "minimum": 1.9747302563132758
+      },
+      "chunk_embed": {
+        "status": "not-compared",
+        "reason": "split-did-not-progress"
+      },
+      "ner": {
+        "status": "pass",
+        "splitRate": 0.04083292507884986,
+        "branchRate": 0.04083292507884986,
+        "minimum": 0.03674963257096488
+      }
+    }
+  },
+  "clauses": {
+    "indexing-window-valid": true,
+    "no-timeout-or-5xx": false,
+    "foreground-p95": true,
+    "agent-api-p95": true,
+    "scripted-rejections": true,
+    "stage-completion-rates-under-foreground-load": true
+  },
+  "gaps": {
+    "idle-rejections": "Named instrument did not produce a validated measurement for this clause"
+  },
+  "additionalArtifacts": [],
+  "revision": "ac1c93bf32c2bba3e4a22462295acbc618f850bc",
+  "tokenEnforced": false,
+  "sharedModels": "F:\\justsearch-public\\models",
+  "endedAt": "2026-10-01T10:41:17.268Z",
+  "rawFiles": [
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\0-revision.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\0-revision.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\1-dirty.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\1-dirty.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\10-capability-ready-start-scripted-agent.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\10-capability-ready-start-scripted-agent.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\11-rss-scripted-agent.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\11-rss-scripted-agent.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\12-bulk-scripted-agent.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\12-bulk-scripted-agent.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\13-encoder-scripted-agent.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\13-encoder-scripted-agent.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\14-analyze-scripted-agent.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\14-analyze-scripted-agent.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\15-stop-scripted-agent.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\15-stop-scripted-agent.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\2-runner-status.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\2-runner-status.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\3-machine.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\3-machine.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\4-gpu.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\4-gpu.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\5-start-scripted-agent.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\5-start-scripted-agent.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\6-_api_health.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\7-_api_debug_state.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\8-_api_runtime_manifest.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\9-_api_debug_effective-config.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\admission.stop",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\bulk-load.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\encoder\\encoder-stage-ms.csv",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\encoder\\encoder-stage-summary.md",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\head-rss.csv",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\phases.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\rss.stop",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\status.stop",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\scripted-agent\\workload.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\start-scripted-agent-capability-ready.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T10-20-26-376Z-b04b8c16\\start-scripted-agent-receipt.json"
+  ]
+}
