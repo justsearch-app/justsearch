@@ -73,6 +73,7 @@ export function instrumentFiles(plan, sourceRoot = SOURCE, executionRoot = sourc
   };
   for (const c of plan) {
     if (c.mode === 'start') { add(root('scripts/jseval/lane-f/e-start-ready.mjs')); add(root('scripts/jseval/lane-f/capability-ready.py'), pythonRoot(c, true)); }
+    if (c.mode === 'ai-activate') add(root('scripts/jseval/lane-f/e-start-ready.mjs'));
     if (['instruments-start', 'crash-experiment', 'hang-experiment', 'child-path'].includes(c.mode)) add(root('scripts/jseval/lane-f/e456-live.mjs'));
     if (c.identityRole === 'scoring') continue;
     for (const arg of c.args ?? []) {

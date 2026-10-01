@@ -5,9 +5,106 @@ import path from 'node:path';
 import { ARMS, ROOT, MAIN_REVISION, checkFixturePins, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, windowValidity, projectLoad, mergeLoadRecords, latestRecords, stageCompletionRates, compareStageRates, reprojectRecord, main } from './e-run.mjs';
 import { ingestAccepted } from './fixture-ingest.mjs';
 import { captureWorkload } from './admission-loop.mjs';
+import { activateChat, chatReady } from './e-start-ready.mjs';
+import { collect } from './e-run.mjs';
 
 const document = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'), 'utf8'));
 const values = document.values;
+
+for (const arm of ['main', 'branch']) for (const group of ['e2-e3-load', 'e4-memory-soak', 'e5-crash', 'e6-hang']) {
+  test(`chat activation follows every capable start: ${group}/${arm}`, () => {
+    const options = parseArgs([group, '--arm', arm,
+      ...(group === 'e2-e3-load' ? ['--workload', 'scripted-agent'] : []),
+      ...(group === 'e4-memory-soak' ? ['--window', '1'] : [])]);
+    const plan = buildPlan(options, values);
+    for (const [i, c] of plan.entries()) if (c.mode === 'start') {
+      const activation = plan[i + 1];
+      assert.equal(activation.mode, 'ai-activate');
+      assert.equal(activation.endpoint, '/api/ai/runtime/activate');
+      assert.deepEqual(activation.body, { variantId: 'cuda12', chatProfile: 'standard' });
+      assert.equal(activation.timeoutSeconds, 300);
+      assert.equal(activation.readyEndpoint, '/api/ai/runtime/status');
+    }
+    assert.equal(plan.filter(c => c.mode === 'ai-activate').length, plan.filter(c => c.mode === 'start').length);
+  });
+}
+test('E1 retains its fixture-owned chat activation', () => {
+  for (const arm of ['main', 'branch']) assert.ok(!buildPlan(parseArgs(['e1-quality', '--arm', arm]), values, ROOT,
+    { decision: 'recapture' }).some(c => c.mode === 'ai-activate'));
+});
+
+const activationCommand = () => buildPlan(parseArgs(['e2-e3-load', '--arm', 'main', '--workload', 'scripted-agent']), values)
+  .find(c => c.mode === 'ai-activate');
+test('activation records the standard request/response and waits for realized readiness without retaining a token', async t => {
+  const raw = fs.mkdtempSync(path.join(ROOT, 'tmp/e-activate-'));
+  t.after(() => fs.rmSync(raw, { recursive: true, force: true }));
+  const context = { raw, record: { commands: [] }, sequence: 0, token: 'private-boot-token' };
+  const calls = []; let clock = 0;
+  await activateChat(activationCommand(), context, { now: () => clock, sleep: async ms => { clock += ms; },
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      if (options.method === 'POST') return Response.json({ activation: { state: 'activating' } }, { status: 202 });
+      return Response.json(clock ? { active: { modelPath: 'model.gguf', chatProfile: 'standard' } }
+        : { active: { modelPath: 'old-model.gguf', chatProfile: 'compact' }, activation: { state: 'completed' } });
+    } });
+  assert.equal(clock, 2000);
+  assert.deepEqual(JSON.parse(calls[0].options.body), { variantId: 'cuda12', chatProfile: 'standard' });
+  assert.equal(calls[0].options.headers['X-JustSearch-Session'], context.token);
+  assert.equal(calls.length, 3);
+  for (const c of context.record.commands) {
+    assert.ok(fs.existsSync(c.requestFile) && fs.existsSync(c.rawFile));
+    assert.ok(!fs.readFileSync(c.requestFile, 'utf8').includes(context.token));
+    assert.ok(!JSON.stringify(c).includes(context.token));
+  }
+  assert.equal(chatReady({ activation: { state: 'completed' } }, 'standard'), false);
+  assert.equal(chatReady({ active: { activeVariantId: 'cuda12' }, activation: { state: 'completed' }, chatProfile: 'standard' }, 'standard'), true);
+});
+test('activation timeout fails the invocation prerequisite within 300 seconds', async t => {
+  const raw = fs.mkdtempSync(path.join(ROOT, 'tmp/e-activate-timeout-'));
+  t.after(() => fs.rmSync(raw, { recursive: true, force: true }));
+  const context = { raw, record: { commands: [] }, sequence: 0 }; let clock = 0;
+  await assert.rejects(activateChat(activationCommand(), context, { now: () => clock,
+    sleep: async ms => { clock += ms; }, fetch: async () => Response.json({ activation: { state: 'activating' } }) }),
+  /AI activation timed out: standard profile did not become ready within 300 s/);
+  assert.equal(clock, 300000);
+});
+
+test('AI_OFFLINE and every invalid streamed terminal are excluded from admitted p95 and fail the wire clause', () => {
+  const bad = { status: 200, durationMs: 8, streamed: true, terminal: { doneCount: 0, errorCount: 1, eof: true, errorCode: 'AI_OFFLINE' } };
+  const r = { ...record('main'), workload: 'scripted-agent', gaps: {} };
+  projectLoad(r, windowLoad(), [bad, { status: 200, durationMs: 300 }], values);
+  assert.equal(r.metrics.agentP95, 300);
+  assert.equal(r.metrics.agentAdmitted, 1);
+  assert.deepEqual(r.metrics.agentTerminalErrors, { AI_OFFLINE: 1 });
+  assert.match(r.gaps.agentTerminalErrors, /AI_OFFLINE/);
+  assert.equal(r.clauses['no-timeout-or-5xx'], false);
+  for (const terminal of [{ doneCount: 0, errorCount: 0, eof: true }, { doneCount: 2, errorCount: 0, eof: true },
+    { doneCount: 1, errorCount: 0, eof: false }, { doneCount: 1, errorCount: 0, eof: 'true' }, undefined]) {
+    projectLoad(r, windowLoad(), [{ ...bad, terminal }], values);
+    assert.equal(r.metrics.agentP95, undefined);
+    assert.equal(r.metrics.agentAdmitted, 0);
+    assert.equal(r.clauses['no-timeout-or-5xx'], false);
+  }
+  projectLoad(r, windowLoad(), [{ ...bad, terminal: { doneCount: 1, errorCount: 0, eof: true } }], values);
+  assert.equal(r.metrics.agentAdmitted, 1);
+  assert.equal(r.clauses['no-timeout-or-5xx'], true);
+  assert.deepEqual(r.metrics.agentTerminalErrors, {});
+});
+test('E4 collector excludes offline streams and fails the foreground workload', t => {
+  const raw = fs.mkdtempSync(path.join(ROOT, 'tmp/e-offline-soak-'));
+  t.after(() => fs.rmSync(raw, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(raw, 'summary.json'), JSON.stringify({ search_load: { errors: 0 } }));
+  fs.writeFileSync(path.join(raw, 'workload.json'), JSON.stringify({ requests: [{ status: 200, durationMs: 8,
+    streamed: true, terminal: { doneCount: 0, errorCount: 1, eof: true, errorCode: 'AI_OFFLINE' } }] }));
+  const r = { ...record('main', ['E4']), gaps: {}, commands: [{ label: 'soak-cycle-1', code: 0 }] };
+  r.clauses['index-agent-reconfigure-workload'] = true;
+  collect({ record: r, raw, values });
+  assert.equal(r.metrics.agentP95, undefined);
+  assert.equal(r.metrics.agentAdmitted, 0);
+  assert.deepEqual(r.metrics.agentTerminalErrors, { AI_OFFLINE: 1 });
+  assert.equal(r.clauses['no-timeout-or-5xx'], false);
+  assert.equal(r.clauses['index-agent-reconfigure-workload'], false);
+});
 test('shared model gate rejects missing and arm-local model directories', () => {
   const config = value => ({ keys: [{ key: 'justsearch.models.dir', value }] });
   const shared = path.resolve(ARMS.main, '../../../models');
@@ -358,7 +455,7 @@ test('dry run prints plans only, including paired fixture comparison', async () 
   } finally { console.log = prior; }
   assert.equal(output.length, 7);
   for (const plan of output.slice(3).map(JSON.parse)) {
-    assert.equal(plan.loadBudgetSeconds, 2700);
+    assert.equal(plan.loadBudgetSeconds, 3000);
     assert.equal(plan.commands.filter(c => c.mode === 'start').length, 1);
   }
   assert.ok(JSON.parse(output[2]).commands.some(c => c.label === 'fixture-gate'));

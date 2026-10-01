@@ -13,7 +13,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { gcLogOption, hangPolicy, splitGap } from './e456-instruments.mjs';
-import { startOwned, verifySharedModels as checkSharedModels } from './e-start-ready.mjs';
+import { startOwned, activateChat, verifySharedModels as checkSharedModels } from './e-start-ready.mjs';
+import { terminalComplete, isAdmitted, agentMetrics } from './e-agent-metrics.cjs';
 import { measurementIdentity } from './e-pair-identity.mjs';
 import { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies } from './e456-live.mjs';
 
@@ -216,7 +217,7 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
     }
   } else if (group === 'e2-e3-load') {
     const label = options.workload;
-    commands = [start(label), ...samplers(label).filter(c => c.label.startsWith('rss-')).map(c => ({ ...c, budgetSeconds: 2700 })),
+    commands = [start(label), ...samplers(label).filter(c => c.label.startsWith('rss-')).map(c => ({ ...c, budgetSeconds: 3000 })),
       cmd(`bulk-${label}`, 'python', ['-m', 'jseval.bulk_load',
         '--base-url', 'http://127.0.0.1:33221',
         '--corpus-dir', path.join(root, 'tmp/lane-f-e/corpus/scifact'),
@@ -251,7 +252,10 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
         splitDisposition: arm === 'main' ? splitGap('MAIN Worker gRPC supervision exists; MAIN Head HTTP hangs have no autonomous dev-arm recovery') : undefined },
       endInstruments(`hang-${kind}`), stop(`hang-${kind}`));
   }
-  return [...preamble, ...commands];
+  return [...preamble, ...commands].flatMap(c => c.mode === 'start' && group !== 'e1-quality' ? [c,
+    { label: `activate-${c.label}`, mode: 'ai-activate', args: [], baseUrl: 'http://127.0.0.1:33221',
+      method: 'POST', endpoint: '/api/ai/runtime/activate', body: { variantId: 'cuda12', chatProfile: 'standard' },
+      profile: 'standard', readyEndpoint: '/api/ai/runtime/status', timeoutSeconds: 300, pollIntervalMs: 2000 }] : [c]);
 }
 
 const CLAUSES = {
@@ -399,15 +403,16 @@ export function projectLoad(record, load, calls, values) {
   const legalRejection = c => rejectionCodes.has(c.code) && c.retrySafe === true && /^[1-9]\d*$/.test(c.retryAfter);
   record.metrics.wireRejections = wire.filter(c => c.status === 429).length;
   record.metrics.wireOffered = wire.length;
-  record.clauses['no-timeout-or-5xx'] = wire.length ? wire.every(c => c.windowBoundary && ['TRANSPORT_FAILURE', 'WINDOW_BOUNDARY_CANCELLED'].includes(c.error) && !(c.status >= 500) || !c.error
-    && ((c.status >= 200 && c.status < 300) || c.status === 429 && legalRejection(c))
-    && (!c.streamed || c.terminal?.doneCount === 1 && c.terminal?.errorCount === 0 && c.terminal?.eof))
+  record.clauses['no-timeout-or-5xx'] = wire.length ? wire.every(c => terminalComplete(c)
+    && (c.windowBoundary && ['TRANSPORT_FAILURE', 'WINDOW_BOUNDARY_CANCELLED'].includes(c.error) && !(c.status >= 500)
+      || !c.error && ((c.status >= 200 && c.status < 300) || c.status === 429 && legalRejection(c))))
     && !(load.samples ?? []).some(s => s.error)
     && (record.workload !== 'scripted-agent' || load.admissionExitCode === 0 && calls.length > 0) : undefined;
   record.clauses['foreground-p95'] = ['hybrid', 'lexical'].every(m => finite(load.searchP95?.[m])) ? true : undefined;
-  const admitted = calls.filter(c => !c.windowBoundary && !c.error && c.status >= 200 && c.status < 300 && finite(c.durationMs));
-  record.metrics.agentP95 = admitted.length
-    ? admitted.map(c => c.durationMs).sort((a, b) => a - b)[Math.ceil(admitted.length * .95) - 1] : undefined;
+  const admitted = calls.filter(isAdmitted);
+  Object.assign(record.metrics, agentMetrics(calls));
+  delete record.gaps.agentTerminalErrors;
+  if (Object.keys(record.metrics.agentTerminalErrors).length) record.gaps.agentTerminalErrors = JSON.stringify(record.metrics.agentTerminalErrors);
   if (record.workload === 'agent-idle') record.clauses['idle-rejections'] = wire.length
     ? record.metrics.wireRejections <= values.admissionRejectionCeiling.agentIdle : undefined;
   else {
@@ -440,10 +445,14 @@ export function mergeLoadRecords(workloads) {
       merged.metrics.searchP95[mode] = Math.max(merged.metrics.searchP95[mode] ?? 0, r.metrics.searchP95[mode]);
   }
   merged.metrics.agentP95 = workloads['scripted-agent']?.metrics.agentP95;
+  merged.metrics.agentTerminalErrors = workloads['scripted-agent']?.metrics.agentTerminalErrors;
+  merged.metrics.agentAdmitted = workloads['scripted-agent']?.metrics.agentAdmitted;
+  merged.metrics.agentOffered = workloads['scripted-agent']?.metrics.agentOffered;
   merged.metrics.chunksPerSec = list.every(r => finite(r?.metrics.chunksPerSec))
     ? Math.min(...list.map(r => r.metrics.chunksPerSec)) : undefined;
   merged.clauses = {};
   merged.gaps = {};
+  merged.gaps.agentTerminalErrors = workloads['scripted-agent']?.gaps?.agentTerminalErrors;
   for (const clause of new Set([...CLAUSES.E2, ...CLAUSES.E3])) {
     const applicable = clause === 'idle-rejections' ? [list[0]]
       : ['scripted-rejections', 'agent-api-p95'].includes(clause) ? [list[1]] : list;
@@ -649,7 +658,7 @@ function execute(command, context) {
   return { child, complete, stdout: () => stdout, expired: () => expired };
 }
 
-function collect(context) {
+export function collect(context) {
   const r = context.record;
   for (const command of r.commands) {
     if (!command.stdoutFile || !fs.existsSync(command.stdoutFile)) continue;
@@ -667,8 +676,11 @@ function collect(context) {
   }
   const captures = filesUnder(context.raw).filter(f => path.basename(f) === 'workload.json').map(read);
   const calls = captures.flatMap(c => c.requests ?? []);
-  const admitted = calls.filter(c => c.status >= 200 && c.status < 300 && finite(c.durationMs));
-  if (admitted.length) r.metrics.agentP95 = admitted.map(c => c.durationMs).sort((a, b) => a - b)[Math.ceil(admitted.length * .95) - 1];
+  const admitted = calls.filter(isAdmitted);
+  Object.assign(r.metrics, agentMetrics(calls));
+  if (Object.keys(r.metrics.agentTerminalErrors).length) r.gaps.agentTerminalErrors = JSON.stringify(r.metrics.agentTerminalErrors);
+  if (calls.length) r.clauses['no-timeout-or-5xx'] = calls.every(c => !c.error && terminalComplete(c)
+    && (c.status >= 200 && c.status < 300 || c.status === 429));
   r.metrics.chunksByWorkload = {};
   for (const file of filesUnder(context.raw).filter(f => path.basename(f) === 'status-series.csv')) {
     const [header, ...lines] = fs.readFileSync(file, 'utf8').trim().split(/\r?\n/);
@@ -699,7 +711,7 @@ function collect(context) {
   } else if (r.groups.includes('E2')) {
     r.clauses['no-timeout-or-5xx'] = calls.length && loads.length
       ? calls.every(c => !c.error && ((c.status >= 200 && c.status < 300) || c.status === 429)
-        && (!c.streamed || (c.terminal?.doneCount === 1 && c.terminal?.errorCount === 0 && c.terminal?.eof)))
+        && terminalComplete(c))
         && loads.every(s => s.search_load.errors === 0) : undefined;
     r.clauses['foreground-p95'] = Object.keys(r.metrics.searchP95).length === 2 ? true : undefined;
     r.clauses['agent-api-p95'] = admitted.length ? true : undefined;
@@ -713,7 +725,7 @@ function collect(context) {
   if (r.groups.includes('E4')) {
     const completedCycles = r.commands.filter(c => /^soak-cycle-/.test(c.label) && c.code === 0);
     const workload = completedCycles.length && loads.length && calls.length
-      ? loads.every(s => s.search_load.errors === 0) && calls.every(c => !c.error
+      ? loads.every(s => s.search_load.errors === 0) && calls.every(c => !c.error && terminalComplete(c)
         && (c.status >= 200 && c.status < 300 || c.status === 429)) : undefined;
     r.metrics.completedSoakCycles = completedCycles.length;
     r.clauses['index-agent-reconfigure-workload'] = verdict([
@@ -764,7 +776,7 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   const fixtureDecision = options.command === 'e1-quality' ? checkFixturePins(root) : undefined;
   const plan = buildPlan(options, values, root, fixtureDecision);
   if (options.dryRun) {
-    console.log(JSON.stringify({ options, fixtureDecision, limitSeconds: 3540, loadBudgetSeconds: options.command === 'e2-e3-load' ? 2700 : undefined, leaseDurationSec: 3600, commands: plan }, null, 2));
+    console.log(JSON.stringify({ options, fixtureDecision, limitSeconds: 3540, loadBudgetSeconds: options.command === 'e2-e3-load' ? 3000 : undefined, leaseDurationSec: 3600, commands: plan }, null, 2));
     return;
   }
   const records = latestRecords(root);
@@ -842,7 +854,7 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     recordFile, raw, runIds: [], commands: [], metrics: {}, clauses: {}, gaps: {},
     fixtureDecision,
     additionalArtifacts: [] };
-  const context = { raw, record, values, deadline: Date.now() + (options.command === 'e2-e3-load' ? 2700000 : 3540000), sequence: 0, background: [], root };
+  const context = { raw, record, values, deadline: Date.now() + (options.command === 'e2-e3-load' ? 3000000 : 3540000), sequence: 0, background: [], root };
   const bindings = { invocation: id, session: `lane-f-e-${id}` };
   const index = path.join(destination, 'index.json');
   write(recordFile, record); // Even failed/aborted branch starts prevent a later E0 refit.
@@ -852,6 +864,7 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     for (const template of plan) {
       if (Date.now() >= context.deadline) throw new Error('Invocation deadline');
       const command = resolveCommand(template, bindings);
+      if (command.mode === 'ai-activate') { await activateChat(command, context); continue; }
       if (command.mode === 'fixture-reuse') {
         for (const capture of command.captures) {
           if (hash(fs.readFileSync(capture.file)) !== capture.sha256) throw new Error('PR 0b capture changed after pin check');
@@ -938,6 +951,10 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
       context.deadline = Math.min(context.deadline + 30000, Date.parse(record.startedAt) + 3590000);
       const stopped = await execute(command, context).complete;
       if (stopped.code !== 0) record.failure = `${record.failure ?? ''}; owned stop failed`;
+    }
+    // Retain diagnostics even when an analyzer/start/load step failed before normal projection.
+    if (record.failure) {
+      try { collect(context); } catch (error) { record.failure += `; evidence projection: ${error.message}`; }
     }
     record.endedAt = new Date().toISOString();
     record.rawFiles = [raw, ...record.additionalArtifacts].flatMap(filesUnder);
