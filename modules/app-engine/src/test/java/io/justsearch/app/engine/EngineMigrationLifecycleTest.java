@@ -109,7 +109,7 @@ final class EngineMigrationLifecycleTest {
     Path bluePath = engine.indexBase().resolve("indices").resolve(activeBefore);
     Path greenPath = engine.indexBase().resolve("indices")
         .resolve(started.buildingGenerationId());
-    long openDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
+    long openDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
     boolean liveGreen = false;
     while (System.nanoTime() < openDeadline) {
       try (var view = engine.captureServingView()) {

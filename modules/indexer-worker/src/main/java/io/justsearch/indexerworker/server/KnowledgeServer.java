@@ -226,6 +226,7 @@ public final class KnowledgeServer implements Closeable {
     private boolean cleanupRunning;
     private boolean abortRetirement;
     private Runnable retireCleanup;
+    private LuceneRuntime runtimeRetirementDependency;
 
     private ServingView(WorkerAppServices services, LuceneRuntime searchRuntime,
         LuceneRuntime ingestRuntime, Path activeGenerationPath) {
@@ -305,9 +306,7 @@ public final class KnowledgeServer implements Closeable {
         servingViewMonitor.notifyAll();
       }
       cleanRetiredServingView(captured);
-      // An earlier view can be the last owner of a runtime also referenced by a later retired
-      // view. Its release must retry that later view's existing cleanup, not just its own.
-      retryRetiredServingViews();
+      retryRuntimeRetirementAfterRelease(captured);
     }
   }
   private volatile boolean closeStarted;
@@ -5992,8 +5991,15 @@ public final class KnowledgeServer implements Closeable {
 
   /** Cleanup starts only after A's actual issued work exits, outside owner/publication monitors. */
   private void cleanRetiredServingView(ServingView retired) {
+    cleanRetiredServingView(retired, null);
+  }
+
+  private void cleanRetiredServingView(ServingView retired, ServingView releasedView) {
     Runnable cleanup;
     synchronized (servingViewMonitor) {
+      if (releasedView != null && (retired == releasedView
+          || retired.runtimeRetirementDependency == null
+          || !referencesRuntime(releasedView, retired.runtimeRetirementDependency))) return;
       if (retired.holders != 0 || retired.retireCleanup == null || retired.cleanupRunning
           || retired.abortRetirement) return;
       retired.cleanupRunning = true;
@@ -6021,6 +6027,15 @@ public final class KnowledgeServer implements Closeable {
     List<ServingView> snapshot;
     synchronized (servingViewMonitor) { snapshot = List.copyOf(retiredServingViews); }
     for (ServingView retired : snapshot) cleanRetiredServingView(retired);
+  }
+
+  /** Wake only generation cleanup that was blocked by the released view's exact runtime. */
+  private void retryRuntimeRetirementAfterRelease(ServingView releasedView) {
+    List<ServingView> dependents;
+    synchronized (servingViewMonitor) {
+      dependents = List.copyOf(retiredServingViews);
+    }
+    for (ServingView dependent : dependents) cleanRetiredServingView(dependent, releasedView);
   }
 
   /** Notify outside publication/runtime locks: listeners may close their issued work and reconnect. */
@@ -8002,8 +8017,11 @@ public final class KnowledgeServer implements Closeable {
           && (referencesRuntime(servingView, retiringRuntime)
               || retiredServingViews.stream().anyMatch(view -> view != old
                   && referencesRuntime(view, retiringRuntime)))) {
+        old.runtimeRetirementDependency = retiringRuntime;
         throw new IllegalStateException("Retired generation still has another serving view");
       }
+      // Once physical ownership clears, a service close refusal belongs to the maintenance reaper.
+      old.runtimeRetirementDependency = null;
     }
     try {
       old.services.close();

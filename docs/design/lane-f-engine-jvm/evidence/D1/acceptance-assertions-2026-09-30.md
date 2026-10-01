@@ -10,6 +10,79 @@ authorized. Temporary production mutations must restore the original bytes.
 Governing inventory: [acceptance reconciliation](acceptance-reconciliation-2026-09-30.md).
 This receipt records additions and verification limits; it does not close D1.
 
+## Integrated follow-up on 5b4560d8c
+
+The owner's whole-suite run found that the first Blue fix (`f7b7ae6aa`) added
+an overbroad maintenance retry to every serving lease release. It ran unrelated
+application cleanup during query-only retirement and immediately retried the
+same deferred service close refusal. The unchanged assertions in
+`KnowledgeServerQuerySettingsOwnerTest.inPlaceIgnoresOlderServiceCleanupAfterItsQueryCallsDrain`
+and `KnowledgeServerDeferredRetirementTest.refusedRetiredViewCleanupRetainsOwnerForReaperRetry`
+are the regression witnesses. The provided red XML is copied into
+`tmp/d1-retirement-proof/integrated-red/`; the provided suite log is
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-batch3-full-suite.log`.
+The previous six-class pass below missed those interactions and did not prove
+the integrated module behaviour.
+
+The corrected release path wakes only another retired view whose exact runtime
+dependency was recorded by the generation close guard. Dependency eligibility
+is checked under `servingViewMonitor` at cleanup admission, preventing a stale
+snapshot from retrying a later service-close refusal. The dependency is cleared
+before service/model/runtime cleanup, so ordinary failures stay registered for
+the maintenance reaper. View counting, issued Blue usability, and immediate
+retirement after the earlier lease releases remain intact. The one dependency
+field projects the existing guard's refusal reason into its existing view;
+runtime identity alone cannot distinguish a view dependency from a service
+close failure. No new lease, counter, registry, or persistent mechanism was added.
+
+PMD's 13 redundant qualified `assertSame` calls now use their existing static
+import; the lifecycle test's qualified `TimeUnit` also uses its existing
+import. Neither of the two reported failing test classes or their assertions
+was edited.
+
+Verified on `5b4560d8c` plus this follow-up diff, Windows, with the existing
+worktree-local Gradle cache and temporary directory. Commands ran one at a time:
+
+```text
+./gradlew.bat :modules:indexer-worker:spotlessApply --offline --no-daemon
+./gradlew.bat :modules:app-engine:spotlessApply --offline --no-daemon
+./gradlew.bat :modules:indexer-worker:test :modules:app-engine:test :modules:indexer-worker:pmdTest :modules:app-engine:pmdTest :modules:indexer-worker:pmdMain -PskipWebBuild=true --continue --offline --no-daemon
+```
+
+Both formatting commands passed. The whole-module command compiled the affected
+sources and passed in 22m 27s. XML totals (tests / failures / errors / skips):
+
+| Module / class | Tests | Failures | Errors | Skips |
+|---|---:|---:|---:|---:|
+| indexer-worker, whole module | 1061 | 0 | 0 | 15 |
+| app-engine, whole module | 461 | 0 | 0 | 0 |
+| KnowledgeServerQuerySettingsOwnerTest | 13 | 0 | 0 | 0 |
+| KnowledgeServerDeferredRetirementTest | 5 | 0 | 0 | 0 |
+| KnowledgeServerCloseCompletionTest | 25 | 0 | 0 | 0 |
+| EngineMigrationLifecycleTest | 4 | 0 | 0 | 0 |
+| EngineNativePointerBootMutationTest | 2 | 0 | 0 | 0 |
+| RecordedBulkIngestionCoordinatorTest | 22 | 0 | 0 | 0 |
+
+Red/green: the owner's red query-settings XML is 13 / 1 / 0 / 0; its exact
+older-cleanup assertion now passes in 13 / 0 / 0 / 0. The owner's red deferred
+retirement XML is 5 / 1 / 0 / 0; its exact double-close assertion now passes in
+5 / 0 / 0 / 0. The earlier issued-Blue red proof below remains the lifetime
+regression witness; all 25 close-completion tests pass with the narrowed retry.
+The 15 existing skips comprise 12 ONNX model-discovery cases and three filesystem
+capability cases; no acceptance or cleanup regression skipped.
+
+PMD indexer-worker main/test and app-engine test each report zero violations and
+zero errors. `git diff --check` passes; all four changed files decode as UTF-8
+without BOM. `LC_ALL=C.UTF-8 git diff | grep -P '^\+.*[^\x00-\x7F]'` prints
+nothing (exit 1, no matches).
+
+Evidence is retained in `tmp/d1-retirement-proof/`: `indexer-format.log`,
+`app-format.log`, `full-modules.log`, `counts.json`, per-class
+`full-module-xml/<module>/TEST-*.xml`, red XML in `integrated-red/`, and the three
+PMD XML reports in `pmd/`. Retain through D1 review or at least 14 days. No commit,
+push, dev stack, or installed Engine run; the installed proof and D1-8f hook
+limits recorded below remain unchanged.
+
 ## Added regressions
 
 | Clause | Test / proof owner | Witness |
