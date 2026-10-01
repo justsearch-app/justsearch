@@ -1,0 +1,849 @@
+{
+  "kind": "lane-f-e-run.v1",
+  "id": "2026-10-01T18-54-42-700Z-c7edbf65",
+  "groups": [
+    "E5"
+  ],
+  "arm": "branch",
+  "startedAt": "2026-10-01T18:54:42.780Z",
+  "machine": {
+    "hostname": "DESKTOP-FA00PO7",
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "cpu": [
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K"
+    ],
+    "ramBytes": 34028519424,
+    "node": "v24.12.0"
+  },
+  "pairIdentity": null,
+  "pairIdentityInputs": {
+    "collector": {
+      "choice": "G1",
+      "compareOnlyIf": "E2 response-time group fails",
+      "pinnedAt": "bb399e495 (both spawn sites, explicit -XX:+UseG1GC)"
+    },
+    "corpus": [],
+    "heap": {
+      "confirmIn": "E4",
+      "packaged": "-Xmx2g"
+    },
+    "instruments": {
+      "modules/ui-web/src/api/operationKey.ts": [
+        "e453cb210803d4915b1cb51268b47cdf5f29db0225000aae2870a914b8ff1bbb"
+      ],
+      "scripts/dev/lib/process-identity.cjs": [
+        "87a370bc9b7a146b04f31394c945a46a89f7ae0dd07d3bc2a6b155b57474967c"
+      ],
+      "scripts/dev/lib/stop-exit-census.cjs": [
+        "81bf4d7a152e900e69a35c4711484c60fd9828c76133a6d450cd0255c58ed0f9"
+      ],
+      "scripts/dev/lib/stop-exit-census.ps1": [
+        "25ac2c9721bb651d95c328dca4e67d17b0f4653e30d9f74779f442ba642fe4d4"
+      ],
+      "scripts/jseval/jseval/__init__.py": [
+        "33fed79bd903510926568f1cbfac6785576b9602f60ef671561245e6ce6270dd"
+      ],
+      "scripts/jseval/jseval/preflight.py": [
+        "31f1cd7102861fe6d33cbcd036eda4e4177efc9a828d01b6d60385f7368edbe3"
+      ],
+      "scripts/jseval/jseval/readiness.py": [
+        "3b6246dff713a7dfc6d020865783e65954c33fa266fe70030d40f7a4e2e5bcaa"
+      ],
+      "scripts/jseval/jseval/types.py": [
+        "155f6f973aeda0a28a3857724e4228a7c1ffc8f295d337b52018c36710f94cd2"
+      ],
+      "scripts/jseval/lane-f/capability-ready.py": [
+        "88e330e7e27e40d81ea38009726c7340cb0dddecd264cbc6bc0c935f09d9beef"
+      ],
+      "scripts/jseval/lane-f/e-acquire.mjs": [
+        "414d22fa19d801854b5734b78d3ca31b99bc00bb8e565ca15efa95cbbb40a873"
+      ],
+      "scripts/jseval/lane-f/e-acquisition-eligibility.mjs": [
+        "0f03c72e35bc02efeb116070ac4b4e06a95f6c6b6ba82e34a4759f02b8c1e4df"
+      ],
+      "scripts/jseval/lane-f/e-crash-evidence.mjs": [
+        "64375e6c19067dc6e30f06b9d1164fc77dc88356e98f8906ea9130939bdb75ec"
+      ],
+      "scripts/jseval/lane-f/e-measured-inputs.mjs": [
+        "b9960f80efb166671a8294c0cf7aa5ea2a081cbcc5c95abdd22b30cfc2074388"
+      ],
+      "scripts/jseval/lane-f/e-memory-budget.mjs": [
+        "6ea7428b266f6373f445ddeec033455bd09450114c2a7e7d57b28d9c0ef67b8c"
+      ],
+      "scripts/jseval/lane-f/e-start-ready.mjs": [
+        "a747cf5366188d1ba290efdcc1ab818603b8a65e6e2247db7c8e79b33fa2ec35"
+      ],
+      "scripts/jseval/lane-f/e456-instruments.mjs": [
+        "a2bc4ec3de9309c9c2d787fe6c2e986f7b75c6a9f510396e0fde31c24af85fab"
+      ],
+      "scripts/jseval/lane-f/e456-live.mjs": [
+        "62389a83169f46c4b5a9fefdc776719df9cfe673b751d0f773faf5d496be9d6c"
+      ],
+      "scripts/supervisor-conformance/jdwp-fault.mjs": [
+        "90934f1a2c622856ea29b73e88c41973261ababa538ef51530c0cecc15b0413e"
+      ],
+      "scripts/supervisor-conformance/verified-crash.mjs": [
+        "b54228c9c1a552dac935e5f2a646e28ccc7faabfa1519a13c540893be6f4f531"
+      ]
+    },
+    "kind": "lane-f-measurement-identity.v3",
+    "machine": {
+      "arch": "x64",
+      "cpu": [
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K"
+      ],
+      "hostname": "DESKTOP-FA00PO7",
+      "node": "v24.12.0",
+      "platform": "win32",
+      "ramBytes": 34028519424,
+      "release": "10.0.26200"
+    },
+    "plan": [
+      {
+        "args": [
+          "rev-parse",
+          "HEAD"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "git",
+        "label": "revision",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "status",
+          "--porcelain"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "git",
+        "label": "dirty",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "status",
+          "--active",
+          "--json"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "runner-status",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "-e",
+          "const os=require(\"node:os\");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "machine",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "--query-gpu=name,uuid,memory.total,driver_version",
+          "--format=csv"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "nvidia-smi",
+        "label": "gpu",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "start",
+          "--json",
+          "--skip-build",
+          "--clean",
+          "none",
+          "--data-dir",
+          "<TREE>/tmp/lane-f-e/<INVOCATION>/crash",
+          "--api-port",
+          "33221",
+          "--session-id",
+          "<SESSION>",
+          "--lease-duration-sec",
+          "3600",
+          "--chat-profile",
+          "standard"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "start-crash",
+        "mode": "start"
+      },
+      {
+        "args": [],
+        "baseUrl": "http://127.0.0.1:33221",
+        "body": {
+          "chatProfile": "standard",
+          "variantId": "cuda12"
+        },
+        "endpoint": "/api/ai/runtime/activate",
+        "env": {},
+        "executable": null,
+        "label": "activate-start-crash",
+        "method": "POST",
+        "mode": "ai-activate",
+        "pollIntervalMs": 2000,
+        "profile": "standard",
+        "readyEndpoint": "/api/ai/runtime/status",
+        "timeoutSeconds": 300
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "encoder-sessions-activate-start-crash-start",
+        "mode": "encoder-sessions"
+      },
+      {
+        "args": [],
+        "consumer": "/api/indexing/excludes/apply?dryRun=true",
+        "directory": "<RAW>/crash",
+        "env": {},
+        "executable": null,
+        "gcEveryMinutes": 5,
+        "label": "instruments-crash",
+        "liveSetting": "ui.excludePatterns",
+        "mode": "instruments-start",
+        "reconfigureEveryMinutes": 15,
+        "settingsRoute": "/api/settings/v2",
+        "warmupMinutes": 5
+      },
+      {
+        "args": [],
+        "corpusDocuments": 100,
+        "env": {},
+        "executable": null,
+        "label": "durable-crash",
+        "mechanics": "scripts/supervisor-conformance/verified-crash.mjs (shared with real-writer recovery)",
+        "mode": "crash-experiment",
+        "requireProcessing": true
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "end-instruments-crash",
+        "mode": "instruments-stop"
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "encoder-sessions-stop-crash-end",
+        "mode": "encoder-sessions"
+      },
+      {
+        "acquisitionDependencies": [
+          "<TREE>/scripts/dev/lib/stop-exit-census.cjs",
+          "<TREE>/scripts/dev/lib/stop-exit-census.ps1"
+        ],
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "stop",
+          "--json",
+          "--run",
+          "<RUN>",
+          "--session-id",
+          "<SESSION>"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "stop-crash",
+        "mode": "stop"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "start",
+          "--json",
+          "--skip-build",
+          "--clean",
+          "none",
+          "--data-dir",
+          "<TREE>/tmp/lane-f-e/<INVOCATION>/children-restart",
+          "--api-port",
+          "33221",
+          "--session-id",
+          "<SESSION>",
+          "--lease-duration-sec",
+          "3600",
+          "--chat-profile",
+          "standard"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "start-children-restart",
+        "mode": "start"
+      },
+      {
+        "args": [],
+        "baseUrl": "http://127.0.0.1:33221",
+        "body": {
+          "chatProfile": "standard",
+          "variantId": "cuda12"
+        },
+        "endpoint": "/api/ai/runtime/activate",
+        "env": {},
+        "executable": null,
+        "label": "activate-start-children-restart",
+        "method": "POST",
+        "mode": "ai-activate",
+        "pollIntervalMs": 2000,
+        "profile": "standard",
+        "readyEndpoint": "/api/ai/runtime/status",
+        "timeoutSeconds": 300
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "encoder-sessions-activate-start-children-restart-start",
+        "mode": "encoder-sessions"
+      },
+      {
+        "args": [],
+        "consumer": "/api/indexing/excludes/apply?dryRun=true",
+        "directory": "<RAW>/children-restart",
+        "env": {},
+        "executable": null,
+        "gcEveryMinutes": 5,
+        "label": "instruments-children-restart",
+        "liveSetting": "ui.excludePatterns",
+        "mode": "instruments-start",
+        "reconfigureEveryMinutes": 15,
+        "settingsRoute": "/api/settings/v2",
+        "warmupMinutes": 5
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "children-restart",
+        "mechanism": "<RESTART_SUBJECT>",
+        "mode": "child-path",
+        "reason": "restart"
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "end-instruments-children-restart",
+        "mode": "instruments-stop"
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "encoder-sessions-stop-children-restart-end",
+        "mode": "encoder-sessions"
+      },
+      {
+        "acquisitionDependencies": [
+          "<TREE>/scripts/dev/lib/stop-exit-census.cjs",
+          "<TREE>/scripts/dev/lib/stop-exit-census.ps1"
+        ],
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "stop",
+          "--json",
+          "--run",
+          "<RUN>",
+          "--session-id",
+          "<SESSION>"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "stop-children-restart",
+        "mode": "stop"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "start",
+          "--json",
+          "--skip-build",
+          "--clean",
+          "none",
+          "--data-dir",
+          "<TREE>/tmp/lane-f-e/<INVOCATION>/children-quit",
+          "--api-port",
+          "33221",
+          "--session-id",
+          "<SESSION>",
+          "--lease-duration-sec",
+          "3600",
+          "--chat-profile",
+          "standard"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "start-children-quit",
+        "mode": "start"
+      },
+      {
+        "args": [],
+        "baseUrl": "http://127.0.0.1:33221",
+        "body": {
+          "chatProfile": "standard",
+          "variantId": "cuda12"
+        },
+        "endpoint": "/api/ai/runtime/activate",
+        "env": {},
+        "executable": null,
+        "label": "activate-start-children-quit",
+        "method": "POST",
+        "mode": "ai-activate",
+        "pollIntervalMs": 2000,
+        "profile": "standard",
+        "readyEndpoint": "/api/ai/runtime/status",
+        "timeoutSeconds": 300
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "encoder-sessions-activate-start-children-quit-start",
+        "mode": "encoder-sessions"
+      },
+      {
+        "args": [],
+        "consumer": "/api/indexing/excludes/apply?dryRun=true",
+        "directory": "<RAW>/children-quit",
+        "env": {},
+        "executable": null,
+        "gcEveryMinutes": 5,
+        "label": "instruments-children-quit",
+        "liveSetting": "ui.excludePatterns",
+        "mode": "instruments-start",
+        "reconfigureEveryMinutes": 15,
+        "settingsRoute": "/api/settings/v2",
+        "warmupMinutes": 5
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "children-quit",
+        "mechanism": "/api/lifecycle/shutdown",
+        "mode": "child-path",
+        "reason": "quit"
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "end-instruments-children-quit",
+        "mode": "instruments-stop"
+      },
+      {
+        "acquisitionDependencies": [
+          "<TREE>/scripts/dev/lib/stop-exit-census.cjs",
+          "<TREE>/scripts/dev/lib/stop-exit-census.ps1"
+        ],
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "stop",
+          "--json",
+          "--run",
+          "<RUN>",
+          "--session-id",
+          "<SESSION>"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "stop-children-quit",
+        "mode": "stop"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "start",
+          "--json",
+          "--skip-build",
+          "--clean",
+          "none",
+          "--data-dir",
+          "<TREE>/tmp/lane-f-e/<INVOCATION>/children-upgrade",
+          "--api-port",
+          "33221",
+          "--session-id",
+          "<SESSION>",
+          "--lease-duration-sec",
+          "3600",
+          "--chat-profile",
+          "standard"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "start-children-upgrade",
+        "mode": "start"
+      },
+      {
+        "args": [],
+        "baseUrl": "http://127.0.0.1:33221",
+        "body": {
+          "chatProfile": "standard",
+          "variantId": "cuda12"
+        },
+        "endpoint": "/api/ai/runtime/activate",
+        "env": {},
+        "executable": null,
+        "label": "activate-start-children-upgrade",
+        "method": "POST",
+        "mode": "ai-activate",
+        "pollIntervalMs": 2000,
+        "profile": "standard",
+        "readyEndpoint": "/api/ai/runtime/status",
+        "timeoutSeconds": 300
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "encoder-sessions-activate-start-children-upgrade-start",
+        "mode": "encoder-sessions"
+      },
+      {
+        "args": [],
+        "consumer": "/api/indexing/excludes/apply?dryRun=true",
+        "directory": "<RAW>/children-upgrade",
+        "env": {},
+        "executable": null,
+        "gcEveryMinutes": 5,
+        "label": "instruments-children-upgrade",
+        "liveSetting": "ui.excludePatterns",
+        "mode": "instruments-start",
+        "reconfigureEveryMinutes": 15,
+        "settingsRoute": "/api/settings/v2",
+        "warmupMinutes": 5
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "children-upgrade",
+        "mechanism": "/api/upgrade/prepare + /api/upgrade/commit-shutdown",
+        "mode": "child-path",
+        "reason": "upgrade"
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "end-instruments-children-upgrade",
+        "mode": "instruments-stop"
+      },
+      {
+        "acquisitionDependencies": [
+          "<TREE>/scripts/dev/lib/stop-exit-census.cjs",
+          "<TREE>/scripts/dev/lib/stop-exit-census.ps1"
+        ],
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "stop",
+          "--json",
+          "--run",
+          "<RUN>",
+          "--session-id",
+          "<SESSION>"
+        ],
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"<RAW>/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "stop-children-upgrade",
+        "mode": "stop"
+      }
+    ],
+    "workload": "e5-crash"
+  },
+  "projectionIdentity": "5844c1df728e487aa4a6f10618d463c2c2c01c33a2efced98ca85c6ceaf54b0c",
+  "valuesHash": "e69797158924b94fb7bd5df418a4a84d0f8ba6914bf7ffb463fb962cc773189f",
+  "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65.json",
+  "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65",
+  "runIds": [],
+  "commands": [
+    {
+      "label": "revision",
+      "executable": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e5-crash/branch/2026-10-01T18-54-42-700Z-c7edbf65/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m"
+      },
+      "startedAt": "2026-10-01T18:54:42.786Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65\\0-revision.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65\\0-revision.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T18:54:42.803Z"
+    },
+    {
+      "label": "dirty",
+      "executable": "git",
+      "args": [
+        "status",
+        "--porcelain"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e5-crash/branch/2026-10-01T18-54-42-700Z-c7edbf65/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m"
+      },
+      "startedAt": "2026-10-01T18:54:42.807Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65\\1-dirty.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65\\1-dirty.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T18:54:42.857Z"
+    }
+  ],
+  "metrics": {
+    "searchP95": {},
+    "agentOffered": 0,
+    "agentAdmitted": 0,
+    "agentTerminalErrors": {},
+    "wireOutcomes": {},
+    "chunksByWorkload": {}
+  },
+  "clauses": {},
+  "gaps": {
+    "actual-death-durable-operation": "Named instrument did not produce a validated measurement for this clause",
+    "crash-to-api": "Named instrument did not produce a validated measurement for this clause",
+    "crash-to-index": "Named instrument did not produce a validated measurement for this clause",
+    "checkpoint-resume": "Named instrument did not produce a validated measurement for this clause",
+    "visible-restarting": "Named instrument did not produce a validated measurement for this clause",
+    "no-orphaned-child": "Named instrument did not produce a validated measurement for this clause",
+    "restart-quit-upgrade-child-policy": "Named instrument did not produce a validated measurement for this clause"
+  },
+  "additionalArtifacts": [],
+  "revision": "88cc0fdc113db06560d5328571e78c7623c7c867",
+  "failure": "Arm source tree is dirty; built revision is ambiguous; acquisition input identity: Measured model identity unavailable: effective-config capture missing",
+  "endedAt": "2026-10-01T18:54:42.858Z",
+  "rawFiles": [
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65\\0-revision.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65\\0-revision.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65\\1-dirty.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65\\1-dirty.stdout"
+  ]
+}
