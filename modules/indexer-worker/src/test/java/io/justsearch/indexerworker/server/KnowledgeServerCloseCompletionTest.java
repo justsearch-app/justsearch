@@ -285,7 +285,7 @@ final class KnowledgeServerCloseCompletionTest {
       boolean refused = false;
       while (!refused && System.nanoTime() < deadline) {
         try (var probe = server.captureServingView()) {
-          org.junit.jupiter.api.Assertions.assertSame(services, probe.services());
+          assertSame(services, probe.services());
           Thread.onSpinWait();
         } catch (IllegalStateException expected) {
           refused = true;
@@ -359,7 +359,7 @@ final class KnowledgeServerCloseCompletionTest {
         }
       }
       assertTrue(lexicalPublished, "new lexical calls must enter while old native work is held");
-      org.junit.jupiter.api.Assertions.assertSame(services, held.services(),
+      assertSame(services, held.services(),
           "issued A keeps its original service bindings");
       assertFalse(owner.isClosed(), "the issued native A view retains its exact owner");
       assertFalse(build.isDone(), "B cannot compose until the old native view exits");
@@ -534,8 +534,8 @@ final class KnowledgeServerCloseCompletionTest {
         lexicalHeld.close();
       }
       try (var resumed = server.captureServingView()) {
-        org.junit.jupiter.api.Assertions.assertSame(services, resumed.services());
-        org.junit.jupiter.api.Assertions.assertSame(owner, resumed.encoderSet());
+        assertSame(services, resumed.services());
+        assertSame(owner, resumed.encoderSet());
       }
       assertFalse(owner.isClosed());
     } finally {
@@ -572,7 +572,7 @@ final class KnowledgeServerCloseCompletionTest {
       assertTrue(failure.get() instanceof java.io.IOException,
           "interrupted holder drain must refuse before destroying A");
       try (var restored = server.captureServingView()) {
-        org.junit.jupiter.api.Assertions.assertSame(services, restored.services());
+        assertSame(services, restored.services());
       }
     } finally {
       waiter.interrupt();
@@ -617,11 +617,11 @@ final class KnowledgeServerCloseCompletionTest {
     var failure = new java.io.IOException("queue connection still live");
     org.mockito.Mockito.doThrow(failure).doNothing().when(queue).close();
     try {
-      org.junit.jupiter.api.Assertions.assertSame(failure,
+      assertSame(failure,
           assertThrows(java.io.IOException.class, server::close));
       assertFalse(server.awaitClosed(0));
-      org.junit.jupiter.api.Assertions.assertSame(queue, queueField.get(server));
-      org.junit.jupiter.api.Assertions.assertSame(rootLock, lockField.get(server));
+      assertSame(queue, queueField.get(server));
+      assertSame(rootLock, lockField.get(server));
       org.mockito.Mockito.verify(rootLock, org.mockito.Mockito.never()).close();
     } finally {
       server.close();
@@ -643,10 +643,10 @@ final class KnowledgeServerCloseCompletionTest {
     var failure = new java.io.UncheckedIOException(new java.io.IOException("native close uncertain"));
     org.mockito.Mockito.doThrow(failure).doNothing().when(rootLock).close();
     try {
-      org.junit.jupiter.api.Assertions.assertSame(failure,
+      assertSame(failure,
           assertThrows(java.io.UncheckedIOException.class, server::close));
       assertFalse(server.awaitClosed(0));
-      org.junit.jupiter.api.Assertions.assertSame(rootLock, field.get(server));
+      assertSame(rootLock, field.get(server));
     } finally {
       server.close();
     }
@@ -715,10 +715,10 @@ final class KnowledgeServerCloseCompletionTest {
       var failed = assertThrows(java.lang.reflect.InvocationTargetException.class,
           () -> reconstruct.invoke(server));
       assertTrue(failed.getCause() instanceof IllegalStateException);
-      org.junit.jupiter.api.Assertions.assertSame(old, server.appServices());
+      assertSame(old, server.appServices());
       org.mockito.Mockito.verify(discarded, org.mockito.Mockito.never()).startIndexingLoop();
       reconstruct.invoke(server);
-      org.junit.jupiter.api.Assertions.assertSame(replacement, server.appServices());
+      assertSame(replacement, server.appServices());
       var order = org.mockito.Mockito.inOrder(discarded, old, replacement);
       order.verify(old).close();
       order.verify(discarded, org.mockito.Mockito.times(2)).close(); // Rollback, then retained retry.
@@ -739,7 +739,7 @@ final class KnowledgeServerCloseCompletionTest {
         .doNothing().when(services).close();
     assertThrows(java.io.IOException.class, server::close);
     assertFalse(server.awaitClosed(0));
-    org.junit.jupiter.api.Assertions.assertSame(services, server.appServices());
+    assertSame(services, server.appServices());
     server.close();
     assertTrue(server.awaitClosed(0));
     org.mockito.Mockito.verify(services, org.mockito.Mockito.times(2)).close();
