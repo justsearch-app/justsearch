@@ -81,6 +81,15 @@ const ACCEPT_GAPS_ROUTE = '/api/indexing/migration/accept-gaps';
 const CANCEL_REINDEX_ROUTE = '/api/operations/core.cancel-reindex/invoke';
 const ACTIVATION_ROUTE = '/api/operations/core.activate-installed-models/invoke';
 
+/** IDLE publication precedes retirement's final state write; retain the full settled snapshot. */
+export function settledPromotedSnapshot(observed, targetGeneration) {
+  const state = observed?.state;
+  return state?.active_generation === targetGeneration
+    && state.migration_state === 'IDLE'
+    && state.building_generation == null
+    && state.previous_generation == null ? observed : null;
+}
+
 /** Installed standard-model proof that an unsuperseded gap waits on A for a distinct user decision. */
 export async function exerciseBulkGapApproval(c) {
   const { work, data, indexBase, first, manifest, apiPort, readJson, waitFor, request,
@@ -198,8 +207,7 @@ export async function exerciseBulkGapApproval(c) {
     const row = operationRows(operationPath, operationKey)[0];
     const state = readJson(path.join(indexBase, 'state.json'));
     return row?.state === 'FAILED' && row.failure_reason === 'PROMOTED_WITH_GAPS'
-      && state?.active_generation === `g-${operationKey}`
-      && state?.migration_state === 'IDLE' ? { row, state } : null;
+      ? settledPromotedSnapshot({ row, state }, `g-${operationKey}`) : null;
   });
   const duplicate = await request(apiPort, ACCEPT_GAPS_ROUTE, {
     method: 'POST', headers: sessionHeaders(manifest), body: JSON.stringify(acceptanceInput),
@@ -387,14 +395,14 @@ export async function exerciseBulkFault(c) {
       'Flow A promotion unexpectedly requested a process restart');
   }
 
-  const final = await waitFor('bulk terminal success and exact queue acknowledgement', 90000, () => {
+  const final = await waitFor('bulk terminal success, queue acknowledgement and predecessor retirement', 180000, () => {
     const observed = snapshot({ operationPath, jobsPath, indexBase, operationKey });
     return observed.operations.length === 1
       && observed.operation?.state === 'COMPLETE'
       && observed.operation.phase === 'settled'
       && observed.walk?.sealed_at != null
       && observed.walk.acknowledged_revision === observed.walk.revision
-      ? observed : null;
+      ? settledPromotedSnapshot(observed, `g-${operationKey}`) : null;
   });
   fs.writeFileSync(path.join(work, 'bulk-final.json'), JSON.stringify(final, null, 2));
   assertFinal({ final, cut, prepared, files, hashes, capturedReplay, operationKey, selected,
@@ -446,16 +454,16 @@ export async function exerciseBulkFault(c) {
     before: { operation: stableOperation, queue: stableQueue },
     after: { operation: afterRetry.operation, queue: queueProjection(afterRetry) },
   })}`);
+  requireThat(sameJson(afterRetry.state, final.state)
+    && sameJson(afterRetry.generationManifest, final.generationManifest)
+    && sameJson(afterRetry.recordedGenerations, final.recordedGenerations),
+  `same-key replay changed the promoted generation: ${JSON.stringify({
+    before: { state: final.state, manifest: final.generationManifest,
+      generations: final.recordedGenerations },
+    after: { state: afterRetry.state, manifest: afterRetry.generationManifest,
+      generations: afterRetry.recordedGenerations },
+  })}`);
   if (selected.capturedEdit) {
-    requireThat(sameJson(afterRetry.state, final.state)
-        && sameJson(afterRetry.generationManifest, final.generationManifest)
-        && sameJson(afterRetry.recordedGenerations, final.recordedGenerations),
-      `same-key replay changed the promoted generation: ${JSON.stringify({
-        before: { state: final.state, manifest: final.generationManifest,
-          generations: final.recordedGenerations },
-        after: { state: afterRetry.state, manifest: afterRetry.generationManifest,
-          generations: afterRetry.recordedGenerations },
-      })}`);
     const afterRetryLatest = await post(recovered.manifest.head.apiPort,
       '/api/knowledge/search', { query: capturedReplay.h2.marker, limit: 10, mode: 'text' });
     const afterRetryStale = await post(recovered.manifest.head.apiPort,
@@ -638,7 +646,7 @@ export async function exerciseInstallerActivationFault(c) {
       `incarnation ${incarnation} did not record its own requested restart`);
   }
 
-  const final = await waitFor('installer activation terminal success and exact settings witness', 90000, () => {
+  const final = await waitFor('installer activation terminal success, settings witness and predecessor retirement', 180000, () => {
     const observed = snapshot({ operationPath, jobsPath, indexBase, operationKey });
     observed.settings = settingsWitnessOnDisk(data);
     return observed.operations.length === 1
@@ -646,7 +654,7 @@ export async function exerciseInstallerActivationFault(c) {
       && observed.operation.phase === 'settled'
       && observed.walk?.sealed_at != null
       && observed.walk.acknowledged_revision === observed.walk.revision
-      ? observed : null;
+      ? settledPromotedSnapshot(observed, `g-${operationKey}`) : null;
   });
   fs.writeFileSync(path.join(work, 'installer-final.json'), JSON.stringify(final, null, 2));
   assertInstallerFinal({ final, cut, prepared, files, hashes, operationKey, selected,
@@ -680,8 +688,12 @@ export async function exerciseInstallerActivationFault(c) {
   const afterRetry = snapshot({ operationPath, jobsPath, indexBase, operationKey });
   afterRetry.settings = settingsWitnessOnDisk(data);
   requireThat(sameJson(afterRetry.operation, stableOperation)
-    && sameJson(afterRetry.settings, final.settings),
-  'same-key replay changed the activation row or settings witness');
+    && sameJson(afterRetry.settings, final.settings)
+    && sameJson(queueProjection(afterRetry), queueProjection(final))
+    && sameJson(afterRetry.state, final.state)
+    && sameJson(afterRetry.generationManifest, final.generationManifest)
+    && sameJson(afterRetry.recordedGenerations, final.recordedGenerations),
+  'same-key replay changed the activation row, settings witness, queue or promoted generation');
 
   console.log('INSTALLER_ACTIVATION_FAULT_PASS', JSON.stringify({
     scenario, operationKey, phase: selected.phase,
@@ -1657,8 +1669,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     }
     const active = readJson(path.join(indexBase, 'state.json'));
     const settings = settingsWitnessOnDisk(data);
-    return row?.state === 'COMPLETE' && active?.active_generation === `g-${operationKey}`
+    return row?.state === 'COMPLETE'
       && settings.witness.lastCommittedOperationKey === operationKey
+      && settledPromotedSnapshot({ state: active }, `g-${operationKey}`)
       ? { row, active, settings } : null;
   });
   const bFingerprint = readJson(path.join(indexBase, 'indices', `g-${operationKey}`,
@@ -1841,6 +1854,9 @@ async function exerciseLowMemoryCrashRecovery({ crashBoundary, reached, combined
       && observed.settings.witness.acceptedRevision
         === beforeSettings.witness.acceptedRevision + 1
       && observed.settings.witness.lastCommittedOperationKey === operationKey
+      // Root-mutation proof checks first-publication content before its existing
+      // explicit predecessor-retirement wait; ordinary final evidence must settle now.
+      && (bootRootMutation || settledPromotedSnapshot(observed, targetGeneration))
       ? observed : null;
   });
   const capturedTerminalEvidence = bootRootMutation
@@ -2735,8 +2751,7 @@ async function exerciseLiveModelGapDecision(c) {
     const row = operationRows(operationPath, operationKey)[0];
     const state = readJson(path.join(indexBase, 'state.json'));
     return row?.state === 'FAILED' && row.failure_reason === 'PROMOTED_WITH_GAPS'
-      && state?.active_generation === `g-${operationKey}`
-      && state?.migration_state === 'IDLE' ? { row, state } : null;
+      ? settledPromotedSnapshot({ row, state }, `g-${operationKey}`) : null;
   });
   const approval = await waitFor('exact prepared gap decision is durably complete', 30000, () => {
     const row = operationRows(operationPath, acceptanceKey)[0];
