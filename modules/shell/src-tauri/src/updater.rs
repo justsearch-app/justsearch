@@ -2455,7 +2455,13 @@ mod tests {
     #[test]
     fn strategy_aware_compatibility_rejects_role_change() {
         let mut descriptor = test_descriptor(current_store_compatibility());
-        descriptor.compatibility[0].role = "DERIVED".into();
+        let settings = descriptor
+            .compatibility
+            .iter_mut()
+            .find(|store| store.owner_id == "ui-settings")
+            .unwrap();
+        assert_eq!(settings.role, "AUTHORED");
+        settings.role = "DERIVED".into();
         assert!(validate_store_compatibility(&descriptor)
             .unwrap_err()
             .contains("ownership or recovery strategy"));
