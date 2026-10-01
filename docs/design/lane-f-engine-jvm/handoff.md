@@ -165,6 +165,17 @@ branch E1, E2 x2, E4 x3, e4-hang-values, E5 and E6 on both arms, table) runs ser
 `tmp/lane-f-e-queue-q-full.stop` (it exits between items). **Never kill the runner**: its e-run child dies with
 the pipe and leaves an owned stack (stop such a stack with `dev-runner.cjs stop --run <id> --session-id
 lane-f-e-<invocation>` from the arm's tree).
+**Afternoon 2026-10-01 (lane head `0e47164c0`).** Owner paused E for an overnight run. A refute-first review
+of the driver ([both reviews](evidence/E/driver-reviews-2026-10-01.md)) found seven ways missing or failed
+evidence could pass; all fixed, then a confirmation review cleared seven and found three gaps (E4 search
+outcomes lost at the window boundary, model identity not fail-closed, no exit-census producer), in progress.
+Root decisions (E.md dated lines): timeouts/5xx and crashes are acceptance properties of the **branch**; main's
+are recorded baseline facts (main: 33 search 504s, chat stream timeouts, a native ORT crash in
+`OrtSession.closeSession` at teardown) and do not block E0. E4 `component-commit-budget` stays unmeasurable until
+an ORT consumer-accounting producer exists. Local suite green at `7c709a1af` (2 workers); hosted CI 36868218422
+14/14 green at `af4320d0e`. Overnight queue: `tmp/q-night.txt` with `tmp/lane-f-e-queue.mjs <file> --continue`
+(logs a failure and goes on); restart `tmp/gpu-mem-sampler.ps1` first (supplementary VRAM evidence).
+
 **Run discipline (from 12:53 local, queue `tmp/q-full2.txt`).** Tooling is frozen while the queue runs: any
 edit to an instrument the plan executes (including `scripts/jseval/jseval/*` modules it imports) changes pair
 identity and invalidates already-captured main records. E2-E6 activate the standard chat model on both arms
