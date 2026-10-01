@@ -149,6 +149,46 @@ node scripts/jseval/lane-f/e-run.mjs e6-hang --arm main
 node scripts/jseval/lane-f/e-run.mjs table
 ```
 
+Every subcommand accepts `--repo-root <path>` to resolve instruments, jseval,
+values, corpus cache and output evidence in that checkout while executing the
+driver and its `capability-ready.py` helper from their source worktree. This
+allows root to exercise unmerged driver changes without copying files. Both
+driver sources are included in the paired instrument identity.
+
+After each owned start, the driver waits up to five minutes for health and
+then up to five minutes for jseval's exact capability preflight:
+`derive_intended_engines('lexical,hybrid', cross_encoder=True)` and
+`assert_capabilities` from `jseval/preflight.py`. The latter reads and flattens
+`/api/status`, requiring `rerankerModelPath`; it deliberately does not require
+the lazy dense/SPLADE presence signals or CUDA initialization. Every attempt's
+verdict is retained in `<start-label>-capability-ready.json`. This gate runs
+before any measurement, including all fresh fixture starts, on either arm.
+The captured effective config must resolve `justsearch.models.dir` to the shared
+main checkout's `models` directory. The driver records the verified value.
+Git trust is limited to the assigned arm in child-process environment; machine
+facts use Node's OS API because Windows CIM is unavailable in the sandbox.
+
+**2026-10-01 supervised readiness-fix window:** two of three permitted real
+invocations were attempted, both before any measurement. Invocation
+`2026-10-01T06-21-13-044Z-82616ed8` failed because sandbox-account Git ownership
+rejection produced an empty revision, previously mislabeled as a pin mismatch.
+Process-scoped trust and immediate nonzero-command checking fix that diagnosis.
+Invocation `2026-10-01T06-22-16-797Z-ada7f994` reached startup but was denied
+write access to `F:/justsearch-public/tmp/dev-runner/active.lock.json` (EPERM).
+No stack was started; subsequent runner status reported `NO_ACTIVE_RUN`.
+No third invocation was spent repeating this filesystem restriction. Root must
+run with access to the existing shared runner state; redirecting that state
+would bypass shared-stack ownership. Raw outputs and per-clause missing-evidence
+records are in `lane-f-pr1-verify` under the paths described below. All four E1
+clauses remain unvalidated. The earlier main capture
+`2026-10-01T06-16-16-201Z-158dff46/9-_api_debug_effective-config.json` confirms
+`F:/justsearch-public/models`; live branch confirmation remains outstanding.
+Local regression evidence: `node --test scripts/jseval/lane-f/e-run.test.mjs`
+(19 cases) and, with `PYTHONPATH=scripts/jseval`,
+`python scripts/jseval/lane-f/capability-ready.test.py` (3 cases), retained in
+the driver tree at `tmp/lane-f-e-readiness-tests.txt` and
+`tmp/lane-f-e-capability-tests.txt`. No Gradle or commits were performed.
+
 Every subcommand accepts `--dry-run`, which prints the process plan without
 launching programs, contacting an API or writing evidence. E0 refuses to
 refit after any recorded branch invocation, including a failed launch.
