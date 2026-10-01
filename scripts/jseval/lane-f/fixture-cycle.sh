@@ -30,7 +30,8 @@ profile=${2:-standard}
 port=${3:-33221}
 base="http://127.0.0.1:$port"
 hdr=(-H "Host: 127.0.0.1:$port" -H "Content-Type: application/json")
-root=$(pwd)
+if [[ -n ${JUSTSEARCH_SESSION_TOKEN:-} ]]; then hdr+=(-H "X-JustSearch-Session: $JUSTSEARCH_SESSION_TOKEN"); fi
+root=${JUSTSEARCH_FIXTURE_CORPUS_ROOT:-$(pwd)}
 root_win=$(cygpath -w "$root" 2>/dev/null || echo "$root")
 out_abs=$(cygpath -w "$(cd "$(dirname "$out")" && pwd)/$(basename "$out")" 2>/dev/null || echo "$out")
 # POSIX-side directory for the diagnostics written beside the capture (the activate response and

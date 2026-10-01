@@ -20,6 +20,7 @@ started and no ``search_load`` block is written.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -27,7 +28,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from .retriever import DEFAULT_SEARCH_TIMEOUT_SEC
+from .retriever import DEFAULT_SEARCH_TIMEOUT_SEC, MODE_PIPELINES
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +48,9 @@ DEFAULT_SEARCH_MODE = "hybrid"
 
 def open_client(base_url: str) -> httpx.Client:
     """The HTTP client every foreground search in this harness is issued through."""
-    return httpx.Client(base_url=base_url, timeout=REQUEST_TIMEOUT_SEC)
+    token = os.environ.get("JUSTSEARCH_SESSION_TOKEN")
+    return httpx.Client(base_url=base_url, timeout=REQUEST_TIMEOUT_SEC,
+                        headers={"X-JustSearch-Session": token} if token else {})
 
 
 def search_body(
@@ -56,6 +59,8 @@ def search_body(
     search_mode: str = DEFAULT_SEARCH_MODE,
 ) -> dict:
     """Request body for ``POST /api/knowledge/search``."""
+    if search_mode in MODE_PIPELINES:
+        return {"query": query, "limit": top_k, "pipeline": dict(MODE_PIPELINES[search_mode])}
     return {"query": query, "limit": top_k, "mode": search_mode}
 
 

@@ -120,6 +120,78 @@ is a new run, not an amendment.
 
 ## 2. Instruments: what exists, what E adds
 
+### Root driver (2026-10-01)
+
+`scripts/jseval/lane-f/e-run.mjs` is the dependency-free Node driver. Run it
+from the driver worktree after root's `quick_health`/shared-lease preflight.
+It uses the already-built distributions in `lane-f-pr1-verify` (BRANCH) and
+`lane-f-e-main` (MAIN, pinned `ac1c93bf3`). It does not build or install.
+All jseval and lane-F instrument code comes from the driver tree; each arm's
+dev-runner owns its stack. Launches use G1, `-Xmx2g`, standard chat profile,
+fresh private data directories and `leaseDurationSec=3600`. The fixture uses
+MAIN's unchanged documentation corpus and the fixture-pair launch pins;
+three fresh fixture-cycle captures reproduce fixture-pair's capture sequence
+without its force-cleanup of an active stack. SciFact materialization is shared.
+
+```powershell
+node scripts/jseval/lane-f/e-run.mjs e1-quality --arm main --dry-run
+node scripts/jseval/lane-f/e-run.mjs e1-quality --arm main
+node scripts/jseval/lane-f/e-run.mjs e2-e3-load --arm main
+node scripts/jseval/lane-f/e-run.mjs e0-values --arm main
+node scripts/jseval/lane-f/e-run.mjs e1-quality --arm branch
+node scripts/jseval/lane-f/e-run.mjs e2-e3-load --arm branch
+# Run each following invocation separately for --arm main and --arm branch:
+node scripts/jseval/lane-f/e-run.mjs e4-memory-soak --arm main --window 1
+node scripts/jseval/lane-f/e-run.mjs e4-memory-soak --arm main --window 2
+node scripts/jseval/lane-f/e-run.mjs e4-memory-soak --arm main --window 3
+node scripts/jseval/lane-f/e-run.mjs e5-crash --arm main
+node scripts/jseval/lane-f/e-run.mjs e6-hang --arm main
+node scripts/jseval/lane-f/e-run.mjs table
+```
+
+Every subcommand accepts `--dry-run`, which prints the process plan without
+launching programs, contacting an API or writing evidence. E0 refuses to
+refit after any recorded branch invocation, including a failed launch.
+The load instrument runs fresh SciFact ingest under each combination of
+idle/scripted agent and lexical/hybrid foreground traffic. Agent traffic
+uses admission-loop's sequential workload mode rather than its saturation
+oracle. All mutating HTTP clients carry the current per-boot token.
+
+Invocation records and `index.json` live under
+`evidence/E/<subcommand>/<arm>/`; raw outputs live under
+`tmp/lane-f-e/<subcommand>/<arm>/<invocation>/`. Retain that tree through
+stage F review; the driver never prunes it. The invocation deadline is
+59 minutes, reserving the final minute for owned cleanup. The frozen
+values file currently specifies 55, 55 and 10 minute soak windows; the
+driver preserves all three boundaries and never calls them continuous.
+`table` runs the existing fixture gate when both captures are present,
+then reports every group and clause, including missing or failed evidence.
+
+**Instrument gaps remain explicit.** MAIN's pinned tree has neither the
+new Engine crash harness nor the conformance actuator. The available
+conformance cases drive a fake Engine with fixed 200 ms overrides, so
+the driver refuses to run them as E6's live-JVM/E4-derived proof and
+records E6 unmeasurable. E5's branch processing harness uses a single-file
+workload and a ten-second observation cooldown, so its successful replay
+does not prove the paired 100-document/deadline/child-policy clauses.
+E4 records memory windows but the existing instruments do not provide
+scheduled reconfigure, live-after-GC trend, a numeric component commit
+budget or continuous crash observations; those clauses stay unmeasurable.
+These are implementation gaps, not acceptance deferrals. E7 remains
+operator-driven and externally blocked on signing as specified in §7.
+
+Static verification: `node --check scripts/jseval/lane-f/e-run.mjs`,
+`node --test scripts/jseval/lane-f/e-run.test.mjs`, and
+`npm run lint:scripts`. Runtime proof belongs to root's lease; writing
+and testing the driver does not establish any E-group pass.
+
+Authoring verification (2026-10-01, no live stack): Node syntax checks and
+18 driver/wire-fixture tests passed; the admission oracle's 63 self-test
+cases and 26 Python search-load tests passed. `git diff --check` and the
+PowerShell comment gate passed. `npm ci --offline` failed with
+`ENOTCACHED` for `debug`; `npm run lint:scripts` consequently could not
+find ESLint. Lint remains unperformed until dependencies are available.
+
 Inventory at `be47faa40` (`scripts/jseval/lane-f/`, seven files; `scripts/supervisor-conformance/`;
 jseval; the dev MCP). Per row of 16, the instrument and its gap:
 

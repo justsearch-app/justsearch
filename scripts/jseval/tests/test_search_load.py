@@ -7,6 +7,21 @@ import pytest
 from jseval import search_load
 
 
+def test_lexical_foreground_uses_canonical_pipeline():
+    from jseval.retriever import LEXICAL_PIPELINE
+    body = search_load.search_body("paired foreground", search_mode="lexical")
+    assert body["pipeline"] == LEXICAL_PIPELINE
+    assert "mode" not in body
+    body["pipeline"]["denseEnabled"] = True
+    assert LEXICAL_PIPELINE["denseEnabled"] is False
+
+
+def test_load_client_forwards_per_boot_token(monkeypatch):
+    monkeypatch.setenv("JUSTSEARCH_SESSION_TOKEN", "fixture-token")
+    with search_load.open_client("http://127.0.0.1:33221") as client:
+        assert client.headers["X-JustSearch-Session"] == "fixture-token"
+
+
 # -- spec resolution ---------------------------------------------------------
 
 def test_resolve_spec_absent_is_none():
