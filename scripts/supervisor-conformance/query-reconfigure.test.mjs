@@ -35,8 +35,9 @@ function fixture(t, mode, options = {}) {
   const composition = { mode, reason: mode === 'BESIDE' ? 'candidate_fits_free_device_memory'
     : 'candidate_fits_after_source_release', freeBytes: mode === 'BESIDE' ? 4e9 : 1048576,
     footprintBytes: 1e9 };
-  let witness = { acceptedRevision: 0 };
+  let witness = { acceptedRevision: 0, lastCommittedOperationKey: null };
   let currentPath = a;
+  let versionOverride = null;
   let recoveryAttempts = 0;
   let state = 'READY';
   let stale = null;
@@ -53,8 +54,9 @@ function fixture(t, mode, options = {}) {
   const forcedKey = mode === 'IN_PLACE' ? createOperationKey() : null;
   const snapshot = () => ({ worker: { gpu: { rerankerModelPath: currentPath } },
     readiness: { engineComponents: { encoders: { ...composition, state, recoveryAttempts,
-      appliedVersion: currentPath === a ? 'A-version'
-        : currentPath.endsWith('-c') ? 'C-version' : 'B-version' } } } });
+      appliedVersion: versionOverride ?? (currentPath === a ? 'A-version'
+        : currentPath.endsWith('-c') ? (options.missingCVersion ? undefined : 'C-version')
+          : 'B-version') } } } });
   const persist = () => fs.writeFileSync(path.join(data, 'ui', 'settings.json'), JSON.stringify({
     witness, queryRoles: { reranker: { state: 'SELECTED', targetEp: 'CUDA',
       model: { path: path.join(currentPath, 'model_fp16.onnx'),
@@ -65,11 +67,13 @@ function fixture(t, mode, options = {}) {
     stale = snapshot();
     currentPath = body.rerankerModelPath;
     state = 'READY';
-    witness = { acceptedRevision: witness.acceptedRevision + 1 };
+    witness = { acceptedRevision: witness.acceptedRevision + 1, lastCommittedOperationKey: body.operationKey };
     persist();
-    const result = response(200, { state: 'COMPLETE', operationKey: body.operationKey, witness, composition });
-    outcomes.set(body.operationKey, result);
-    return result;
+    const outcome = { state: 'COMPLETE', operationKey: body.operationKey, witness, composition };
+    // Production reconstructs replay from bounded metadata, without re-projecting settings.
+    outcomes.set(body.operationKey, outcome);
+    return response(200, { ...outcome, ui: { mode: 'advanced' }, settingsMode: 'read_write',
+      rerankerModelPath: currentPath });
   };
   const finishApply = () => {
     const body = pendingApply;
@@ -127,11 +131,27 @@ function fixture(t, mode, options = {}) {
     const body = JSON.parse(opts.body);
     if (outcomes.has(body.operationKey)) {
       if (options.reapplyOldKey) return commit(body);
-      if (options.corruptReplay) return response(200, { ...JSON.parse(outcomes.get(body.operationKey).text), witness });
-      return outcomes.get(body.operationKey);
+      const outcome = structuredClone(outcomes.get(body.operationKey));
+      if (options.corruptReplay) outcome.witness = witness;
+      if (options.corruptReplayState) outcome.state = 'RUNNING';
+      if (options.corruptReplayKey) outcome.operationKey = createOperationKey();
+      if (options.corruptReplayComposition) outcome.composition.freeBytes++;
+      if (options.changeCVersionOnReplay) versionOverride = 'unexpected-version';
+      if (options.changeGenerationOnReplay) fs.writeFileSync(path.join(indexBase, 'state.json'),
+        JSON.stringify({ active_generation: 'g-unexpected' }));
+      // Different field order is immaterial to the JSON contract.
+      outcome.witness = { lastCommittedOperationKey: outcome.witness.lastCommittedOperationKey,
+        acceptedRevision: outcome.witness.acceptedRevision };
+      outcome.composition = { footprintBytes: outcome.composition.footprintBytes,
+        freeBytes: outcome.composition.freeBytes, reason: outcome.composition.reason,
+        mode: outcome.composition.mode };
+      return response(200, { ui: null, llm: null, indexPaths: null, settingsMode: null,
+        rerankerModelPath: null, citationScorerModelPath: null, ...outcome });
     }
     if (body.witness.acceptedRevision !== witness.acceptedRevision) {
       if (options.acceptStaleWitness) return commit(body);
+      if (options.changeCVersionOnConflict) versionOverride = 'unexpected-version';
+      if (options.wrongConflict) return response(409, { errorCode: 'HANDLER_FAILURE' });
       return response(409, { state: 'FAILED', errorCode: 'VERSION_CONFLICT' });
     }
     if (refusal?.key === body.operationKey) return refusal.response;
@@ -200,6 +220,14 @@ for (const mode of ['BESIDE', 'IN_PLACE']) {
     assert.equal(retry.appliedC, 'C-version');
     assert.equal(retry.generation, 'g-A');
     assert.equal(retry.stale.errorCode, 'VERSION_CONFLICT');
+    assert.deepEqual(retry.delayed.witness, proof.witnesses.toB.result.witness);
+    assert.equal(retry.delayed.state, proof.witnesses.toB.result.state);
+    assert.equal(retry.delayed.operationKey, proof.witnesses.toB.result.operationKey);
+    assert.deepEqual(retry.delayed.composition, proof.witnesses.toB.result.composition);
+    assert.equal(retry.delayed.ui, null);
+    assert.deepEqual(proof.witnesses.toB.result.ui, { mode: 'advanced' });
+    assert.equal(retry.delayed.rerankerModelPath, null);
+    assert.ok(proof.witnesses.toB.result.rerankerModelPath.endsWith('-b'));
     assert.ok(f.calls.indexOf('/api/knowledge/ingest') < f.calls.indexOf('/api/knowledge/search'));
     assert.equal(f.calls.filter(x => x === '/api/knowledge/ingest').length, 1);
     assert.ok(f.waits.find(x => x.label === 'all six query reconfigure corpus jobs committed DONE').attempts > 1);
@@ -215,7 +243,15 @@ for (const mode of ['BESIDE', 'IN_PLACE']) {
 for (const [option, reason] of [
   ['reapplyOldKey', /delayed k1 did not return its recorded outcome/],
   ['corruptReplay', /delayed k1 did not return its recorded outcome/],
+  ['corruptReplayState', /delayed k1 did not return its recorded outcome/],
+  ['corruptReplayKey', /delayed k1 did not return its recorded outcome/],
+  ['corruptReplayComposition', /delayed k1 did not return its recorded outcome/],
+  ['changeCVersionOnReplay', /delayed k1 replay changed C\/settings\/applied version\/generation/],
+  ['changeGenerationOnReplay', /delayed k1 replay changed C\/settings\/applied version\/generation/],
   ['acceptStaleWitness', /stale B witness was not refused/],
+  ['wrongConflict', /stale B witness was not refused/],
+  ['changeCVersionOnConflict', /stale new key changed C\/settings\/applied version\/generation/],
+  ['missingCVersion', /timeout waiting for IN_PLACE C publication/],
 ]) {
   test(`delayed retry rejects ${option}`, async t => {
     const f = fixture(t, 'IN_PLACE', { [option]: true });
