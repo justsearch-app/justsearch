@@ -351,7 +351,14 @@ async function startOwned(command, context, bindings) {
   // proceed without it there. Any mutation the server does guard still fails loudly on the wire.
   context.token = (await api(context, '/api/mcp/token')).token ?? null;
   context.record.tokenEnforced = Boolean(context.token);
-  await api(context, '/api/health');
+  // /api/health answers 503 until the index is ready; wait for readiness, bounded.
+  const readyBy = Date.now() + 300000;
+  for (;;) {
+    try { await api(context, '/api/health'); break; } catch (error) {
+      if (!/HTTP 503/.test(String(error.message)) || Date.now() > readyBy) throw error;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
   await api(context, '/api/debug/state');
   await api(context, '/api/runtime/manifest');
   await api(context, '/api/debug/effective-config');
