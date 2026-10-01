@@ -4447,6 +4447,26 @@
       ]
     },
     {
+      "path": "scripts/jseval/lane-f/e-pair-identity.mjs",
+      "term": "WORKER_",
+      "category": "d",
+      "reason": "Stage E comparison tooling: names the split MAIN arm's Worker-only launch settings so pair identity can normalize them away; the subject is the frozen pre-migration comparison arm.",
+      "occurrenceCount": 1,
+      "anchors": [
+        "delete env.JUSTSEARCH_WORKER_HEAP; delete env.JUSTSEARCH_JVM_OPTS;"
+      ]
+    },
+    {
+      "path": "scripts/jseval/lane-f/e-pair-identity.test.mjs",
+      "term": "WORKER_",
+      "category": "d",
+      "reason": "Stage E comparison tooling: names the split MAIN arm's Worker-only launch settings so pair identity can normalize them away; the subject is the frozen pre-migration comparison arm.",
+      "occurrenceCount": 1,
+      "anchors": [
+        "c.env.JUSTSEARCH_WORKER_HEAP = 'arm-worker-setting'; c.env.JUSTSEARCH_JVM_OPTS = 'arm-worker-options';"
+      ]
+    },
+    {
       "path": "scripts/jseval/lane-f/e-run.mjs",
       "term": "gRPC",
       "category": "d",
