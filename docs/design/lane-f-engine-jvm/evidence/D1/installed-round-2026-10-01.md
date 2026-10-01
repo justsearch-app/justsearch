@@ -31,3 +31,9 @@ All installed lifecycle and supervised recovery scenarios pass on the current re
 D1-11 UI check at `a38dc2883`: `jseval ui-shot library-gap-decision --fixtures` renders the gap list
 (two named units with reasons), "Accept gaps and activate" and "Cancel rebuild"; axe 0 violations,
 console 0 errors, overflow none (`tmp/lane-f-ui-gap-decision/library-gap-decision.{png,measure.json}`).
+
+Default (untagged) lifecycle task at `a545034d6`: 7/7 passed, including
+`pendingFeatureScenariosAreNamedAndReported` with no pending rows (`tmp/lane-f-lifecycle-default.log`,
+`-xml/`). Hosted CI run 36811134446 on exact SHA `56df784ad`: every job succeeded. Full local suite at
+`a38dc2883`: 1,879 suites, 12,488 tests, 0 failures, 0 errors, 33 existing skips
+(`tmp/lane-f-batch5-full-suite-counts.json`).
