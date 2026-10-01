@@ -164,6 +164,8 @@ is a new run, not an amendment.
 
 ### Root driver (2026-10-01)
 
+2026-10-01 chat readiness correction: every non-E1 start now activates cuda12/standard after capability readiness and waits at most 300 s for the fixture's AI-ready predicate, retaining request/response files; admitted counts/p95 require one streamed done, zero errors and EOF, with failed terminals reported by error code in `agentTerminalErrors` and failing the wire/workload clause.
+
 2026-10-01 identity correction: `pairIdentity` now hashes the normalized acquisition
 plan, the executed/imported measurement-instrument bytes, corpus, machine,
 workload, heap and collector; scoring-only `e-run.mjs` edits, tests and unrelated
@@ -272,9 +274,9 @@ or from an explicit `--repo-root`. The table compares immutable acquisition pair
 identities across MAIN and BRANCH; reprojection never changes that identity or
 its explanatory inputs.
 
-Budget: 2,700 seconds per invocation (45 minutes), below the 3,540-second outer
+Budget: 3,000 seconds per invocation (50 minutes), below the 3,540-second outer
 limit; reserve 60 seconds preamble, 780 startup/readiness, 1,500 corpus submission
-and load, 120 probe, 30 analysis, 60 stop and 150 slack. Cleanup has up to 30
+and load, 300 chat activation/readiness, 120 probe, 30 analysis, 60 stop and 150 slack. Cleanup has up to 30
 additional seconds after a deadline. No enrichment-completion wait occurs.
 
 E0 requires both valid MAIN workload records. It freezes per-workload/per-mode

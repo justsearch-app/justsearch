@@ -14,6 +14,55 @@ export function verifySharedModels(config, sharedModels) {
   }
   return models;
 }
+// Same realized-identity predicate used by fixture-cycle.sh (not merely a past activation result).
+export function chatReady(status, profile) {
+  const active = status?.active ?? {};
+  const online = active.modelPath != null || status?.activation?.state === 'completed' && active.activeVariantId;
+  return Boolean(online && (active.chatProfile ?? status?.chatProfile) === profile);
+}
+export async function activateChat(command, context, runtime = {}) {
+  const now = runtime.now ?? Date.now;
+  const request = runtime.fetch ?? fetch;
+  const sleep = runtime.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
+  if (!(command.timeoutSeconds > 0 && command.timeoutSeconds <= 300)) throw new Error('AI activation timeout must be <= 300 s');
+  const deadline = Math.min(context.deadline ?? Infinity, now() + command.timeoutSeconds * 1000);
+  const timeout = () => new Error(`AI activation timed out: ${command.profile} profile did not become ready within ${command.timeoutSeconds} s; see ${context.raw}`);
+  const call = async (endpoint, body) => {
+    if (now() >= deadline) throw timeout();
+    const url = `${command.baseUrl}${endpoint}`;
+    const headers = { Host: new URL(command.baseUrl).host, ...(body ? { 'Content-Type': 'application/json' } : {}) };
+    const prefix = path.join(context.raw, `${context.sequence++}-${command.label}`);
+    const requestFile = `${prefix}-request.json`, responseFile = `${prefix}-response.json`;
+    const receipt = { label: command.label, method: body ? 'POST' : 'GET', url, headers: { ...headers },
+      requestFile, rawFile: responseFile, observedAt: new Date(now()).toISOString(), tokenPresent: Boolean(context.token) };
+    write(requestFile, { method: receipt.method, url, headers: receipt.headers, body });
+    context.record.commands.push(receipt);
+    if (context.token) headers['X-JustSearch-Session'] = context.token;
+    try {
+      const response = await request(url, { method: receipt.method, headers,
+        ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(Math.min(body ? 30000 : 10000, deadline - now())) });
+      receipt.status = response.status;
+      const raw = await response.text();
+      let value; try { value = JSON.parse(raw); } catch { value = raw; }
+      write(responseFile, { status: response.status, body: value });
+      if (!response.ok) throw new Error(`AI activation ${endpoint}: HTTP ${response.status}; see ${responseFile}`);
+      if (now() >= deadline) throw timeout();
+      return value;
+    } catch (error) {
+      receipt.error = String(error.message);
+      if (now() >= deadline) throw timeout();
+      throw new Error(`AI activation request failed: ${endpoint}: ${error.message}; see ${prefix}`, { cause: error });
+    }
+  };
+  await call(command.endpoint, command.body);
+  while (now() < deadline) {
+    const status = await call(command.readyEndpoint);
+    if (chatReady(status, command.profile)) return;
+    if (status?.activation?.state === 'failed') throw new Error(`AI activation failed for ${command.profile}; see ${context.raw}`);
+    await sleep(Math.min(command.pollIntervalMs, deadline - now()));
+  }
+  throw timeout();
+}
 async function api(context, endpoint) {
   const url = `http://127.0.0.1:33221${endpoint}`;
   const response = await fetch(url, { headers: { Host: '127.0.0.1:33221' }, signal: AbortSignal.timeout(10000) });

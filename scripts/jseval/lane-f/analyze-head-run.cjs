@@ -3,6 +3,7 @@
 // Usage: node scripts/jseval/lane-f/analyze-head-run.cjs <outdir>
 const fs = require('fs');
 const path = require('path');
+const { isAdmitted, agentMetrics } = require('./e-agent-metrics.cjs');
 const dir = process.argv[2] || 'tmp';
 const phasesPath = path.join(dir, 'phases.json');
 const phases = fs.existsSync(phasesPath) ? JSON.parse(fs.readFileSync(phasesPath, 'utf8')) : {};
@@ -112,7 +113,8 @@ for (const file of ['context-many.json', 'context-one.json', 'fairness.json', 'w
   if (capture.requests.some((r) => !Number.isFinite(r.durationMs) || r.durationMs < 0 || r.error || r.status >= 500)) {
     throw new Error(`Invalid admission call records: ${file}`);
   }
-  for (const [label, calls] of [['all', capture.requests], ['admitted', capture.requests.filter((r) => r.status >= 200 && r.status < 300)]]) {
+  console.log(`- admission ${file} terminal errors: ${JSON.stringify(agentMetrics(capture.requests).agentTerminalErrors)}`);
+  for (const [label, calls] of [['all', capture.requests], ['admitted', capture.requests.filter(isAdmitted)]]) {
     if (!calls.length) throw new Error(`Empty admission ${label} phase: ${file}`);
     console.log(`- admission ${file} ${label}: n=${calls.length} p95 ${fmt(pct(calls.map((r) => r.durationMs), 0.95))} ms`);
   }

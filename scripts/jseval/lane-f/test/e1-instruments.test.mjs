@@ -87,3 +87,16 @@ test('e: admission call p95 and chunks/s use known caller records and time delta
   assert.match(r.stdout, /00:00:05Z: chunks\/s 10.000/);
   assert.match(r.stdout, /00:00:15Z: chunks\/s 2.000/);
 });
+
+test('e: streamed terminal errors never enter the analyzer admitted count', t => {
+  const dir = temporary(t);
+  fs.copyFileSync(path.join(fixtures, 'engine.csv'), path.join(dir, 'head-rss.csv'));
+  fs.writeFileSync(path.join(dir, 'workload.json'), JSON.stringify({ requests: [
+    { status: 200, durationMs: 200 },
+    { status: 200, durationMs: 8, streamed: true, terminal: { doneCount: 0, errorCount: 1, eof: true, errorCode: 'AI_OFFLINE' } },
+  ] }));
+  const result = spawnSync(process.execPath, [path.join(lane, 'analyze-head-run.cjs'), dir], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /terminal errors: {"AI_OFFLINE":1}/);
+  assert.match(result.stdout, /admission workload.json admitted: n=1 p95 200.0 ms/);
+});
