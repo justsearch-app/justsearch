@@ -20,10 +20,10 @@
     "admissionRejectionCeiling": {
       "agentIdle": 0,
       "scriptedAgentFraction": 0.01,
-      "countedBy": "harness oracle on the wire; timeout or 5xx is failure"
+      "countedBy": "harness oracle on the wire; candidate branch non-boundary timeout, 5xx or invalid streamed terminal is failure; MAIN outcomes are baseline facts and do not block E0 admitted finite-p95 ceilings (owner amendment 2026-10-01)"
     },
     "indexingProgressFraction": {
-      "rule": "per workload, compare primary, embed, splade, chunk_embed and ner completed/s over each stage active interval within the foreground window (at least 60 s); branch >= 0.90 x split for each stage with positive split rate; zero/missing split rates are not compared; no comparable stage is unmeasurable",
+      "rule": "per workload, compare primary, embed, splade, chunk_embed and ner completed/s over each stage active interval within the foreground window (at least 60 s); branch >= 0.90 x split for each positive split stage rate; extra branch stages are gains, never the only basis of a relative pass; zero/missing split rates are not compared and no comparable stage is unmeasurable; separately require positive branch chunk progress whenever chunks were pending, and >= 0.90 x split chunk rate when positive; split zero chunks is recorded as main starved chunks (baseline)",
       "measuredAtE0": true,
       "baselineSanity": {
         "primaryDocsPerSec": 127.4,

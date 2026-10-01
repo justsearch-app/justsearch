@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ARMS, ROOT, MAIN_REVISION, checkFixturePins, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, windowValidity, projectLoad, mergeLoadRecords, latestRecords, stageCompletionRates, compareStageRates, reprojectRecord, main } from './e-run.mjs';
+import { ARMS, ROOT, MAIN_REVISION, checkFixturePins, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, windowValidity, projectLoad, mergeLoadRecords, latestRecords, stageCompletionRates, compareStageRates, reprojectRecord, projectionIdentity, main } from './e-run.mjs';
 import { ingestAccepted } from './fixture-ingest.mjs';
 import { captureWorkload } from './admission-loop.mjs';
 import { activateChat, chatReady } from './e-start-ready.mjs';
@@ -90,7 +90,7 @@ test('AI_OFFLINE and every invalid streamed terminal are excluded from admitted 
   assert.equal(r.clauses['no-timeout-or-5xx'], true);
   assert.deepEqual(r.metrics.agentTerminalErrors, {});
   // A stream the fixed window cut is a boundary artifact: not a terminal error, not a wire failure.
-  const cut = { status: 200, durationMs: 9000, streamed: true, error: 'TRANSPORT_FAILURE', windowBoundary: true,
+  const cut = { status: 200, durationMs: 9000, streamed: true, error: 'TRANSPORT_FAILURE', windowBoundary: true, cancellationCause: 'fixed-window-end',
     terminal: { doneCount: 0, errorCount: 0, eventCount: 9, eof: false } };
   projectLoad(r, windowLoad(), [cut, { status: 200, durationMs: 300 }], values);
   assert.deepEqual(r.metrics.agentTerminalErrors, {});
@@ -102,7 +102,7 @@ test('AI_OFFLINE and every invalid streamed terminal are excluded from admitted 
   assert.deepEqual(r.metrics.agentTerminalErrors, { INVALID_TERMINAL: 1 });
   assert.equal(r.clauses['no-timeout-or-5xx'], false);
 });
-test('E4 collector excludes offline streams and fails the foreground workload', t => {
+test('E4 collector excludes offline streams; wire failures stay separate from workload coverage (owner amendment)', t => {
   const raw = fs.mkdtempSync(path.join(ROOT, 'tmp/e-offline-soak-'));
   t.after(() => fs.rmSync(raw, { recursive: true, force: true }));
   fs.writeFileSync(path.join(raw, 'summary.json'), JSON.stringify({ search_load: { errors: 0 } }));
@@ -115,7 +115,7 @@ test('E4 collector excludes offline streams and fails the foreground workload', 
   assert.equal(r.metrics.agentAdmitted, 0);
   assert.deepEqual(r.metrics.agentTerminalErrors, { AI_OFFLINE: 1 });
   assert.equal(r.clauses['no-timeout-or-5xx'], false);
-  assert.equal(r.clauses['index-agent-reconfigure-workload'], false);
+  assert.equal(r.clauses['index-agent-reconfigure-workload'], true);
 });
 test('shared model gate rejects missing and arm-local model directories', () => {
   const config = value => ({ keys: [{ key: 'justsearch.models.dir', value }] });
@@ -285,7 +285,7 @@ test('wire failures, actual idle refusals, and reason-coded scripted ceilings ar
   r.workload = 'scripted-agent';
   projectLoad(r, windowLoad(), [{ status: 200, durationMs: 20 }], values);
   assert.equal(r.clauses['agent-api-p95'], true);
-  const boundary = windowLoad(); boundary.requests.push({ windowBoundary: true, error: 'WINDOW_BOUNDARY_CANCELLED' });
+  const boundary = windowLoad(); boundary.requests.push({ windowBoundary: true, cancellationCause: 'fixed-window-end', error: 'WINDOW_BOUNDARY_CANCELLED' });
   projectLoad(r, boundary, [{ status: 200, durationMs: 20 }], values);
   assert.equal(r.clauses['no-timeout-or-5xx'], true);
   boundary.requests.at(-1).error = 'TIMED_OUT';
@@ -309,6 +309,7 @@ test('both workload records are required; E0 freezes workload-specific ceilings 
   assert.equal(filled.values.indexingProgressFraction.stagesByWorkload['agent-idle'].chunk_embed.minimumRate, 18);
   assert.equal(filled.values.foregroundSearchP95Ceiling.ceilingByWorkload['agent-idle'].hybrid, 100 * 1.1);
   const branch = structuredClone(merged); branch.arm = 'branch';
+  merged.projectionIdentity = branch.projectionIdentity = projectionIdentity(filled.values);
   const pairs = { 'E2/main': merged, 'E3/main': merged, 'E2/branch': branch, 'E3/branch': branch };
   assert.equal(tableVerdicts(pairs, filled.values).find(r => r.clause === 'foreground-p95').verdict, 'pass');
   branch.metrics.searchP95ByWorkload['scripted-agent'].lexical = 56;
@@ -486,7 +487,7 @@ test('an unpinned quality gate exit zero is not a baseline pass', () => {
   assert.equal(qualityGateVerdict({ exit_code: 0, current: .6, baseline: .61, floor: .59,
     checks: [{ name: 'ndcg10-no-regression', status: 'ok' }] }), true);
 });
-const record = (arm, groups = ['E2', 'E3']) => ({ arm, groups, id: `fixture-${arm}`, pairIdentity: 'same', valuesHash: 'fixed',
+const record = (arm, groups = ['E2', 'E3']) => ({ arm, groups, id: `fixture-${arm}`, pairIdentity: 'same', valuesHash: 'fixed', projectionIdentity: projectionIdentity(bounds),
 
   clauses: { 'indexing-window-valid': true, 'foreground-p95': true, 'agent-api-p95': true, 'stage-completion-rates-under-foreground-load': true,
     'idle-rejections': true, 'scripted-rejections': true, 'no-timeout-or-5xx': true },
@@ -516,7 +517,7 @@ test('timeout/5xx judges the branch; the split arm\'s own failures are reported 
   records['E2/branch'].clauses['no-timeout-or-5xx'] = true;
   const row = tableVerdicts(records, bounds).find(r => r.clause === 'no-timeout-or-5xx');
   assert.equal(row.verdict, 'pass');
-  assert.match(row.reason, /main baseline false/);
+  assert.match(row.reason, /main baseline outcomes/);
   records['E2/branch'].clauses['no-timeout-or-5xx'] = false;
   assert.equal(clause(records, 'no-timeout-or-5xx'), 'fail');
   records['E2/branch'].clauses['no-timeout-or-5xx'] = undefined;
@@ -544,10 +545,12 @@ test('E0 fixes bounds from MAIN and rejects a refit after branch observations', 
   records['E1/branch'] = { ...record('branch'), failure: 'failed launch' };
   assert.throws(() => fillValues(document, records), /after any branch/);
 });
-test('E0 does not substitute baseline sanity or zero throughput for measured load', () => {
+test('E0 uses admitted latency even with zero baseline throughput (2026-10-01 owner amendment)', () => {
   assert.throws(() => fillValues(document, {}), /MAIN/);
   const records = { 'E1/main': record('main'), 'E2/main': { ...record('main'), workloadRecords: ['idle.json', 'scripted.json'] } };
   for (const stage of Object.values(records['E2/main'].metrics.stagesByWorkload['agent-idle'])) stage.rate = 0;
+  assert.equal(fillValues(document, records).values.indexingProgressFraction.stagesByWorkload['agent-idle'].chunk_embed.comparison, 'not-compared');
+  records['E2/main'].metrics.agentP95 = undefined;
   assert.throws(() => fillValues(document, records), /cannot invent/);
   assert.equal(document.values.foregroundSearchP95Ceiling.measuredAtE0, true);
 });

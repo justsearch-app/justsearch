@@ -109,6 +109,7 @@ export async function startOwned(command, context, bindings, execute, sharedMode
   await api(context, '/api/debug/state');
   context.manifest = await api(context, '/api/runtime/manifest');
   const config = await api(context, '/api/debug/effective-config');
+  context.effectiveConfig = config;
   context.record.sharedModels = verifySharedModels(config, sharedModels);
   const ready = await execute({ label: `capability-ready-${command.label}`, executable: 'python',
     args: [path.join(ROOT, 'scripts/jseval/lane-f/capability-ready.py'),

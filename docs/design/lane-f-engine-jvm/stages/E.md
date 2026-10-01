@@ -164,14 +164,14 @@ is a new run, not an amendment.
 
 ### Root driver (2026-10-01)
 
-2026-10-01 chat readiness correction: every non-E1 start now activates cuda12/standard after capability readiness and waits at most 300 s for the fixture's AI-ready predicate, retaining request/response files; admitted counts/p95 require one streamed done, zero errors and EOF, with failed terminals reported by error code in `agentTerminalErrors` and failing the wire/workload clause.
+2026-10-01 chat readiness correction: every non-E1 start now activates cuda12/standard after capability readiness and waits at most 300 s for the fixture's AI-ready predicate, retaining request/response files; admitted counts/p95 require one streamed done, zero errors and EOF, with failed terminals reported by error code in `agentTerminalErrors` and failing the wire clause (the candidate-only policy below supersedes folding wire failures into workload coverage).
 
 2026-10-01 identity correction: `pairIdentity` now hashes the normalized acquisition
 plan, the executed/imported measurement-instrument bytes, corpus, machine,
 workload, heap and collector; scoring-only `e-run.mjs` edits, tests and unrelated
 instruments no longer invalidate a capture. `pairIdentityInputs` records the
-normalized plan and named file hashes. Startup/readiness acquisition lives in
-`e-start-ready.mjs`; in-process memory/fault acquisition stays in `e456-live.mjs`.
+normalized plan and named file hashes. Subprocess deadlines, soak iteration, background lifetimes and cleanup live in
+`e-acquire.mjs`; startup/readiness acquisition lives in `e-start-ready.mjs`; in-process memory/fault acquisition stays in `e456-live.mjs`.
 Dependency inventory follows local JS/TS imports and Python imports (including
 function-local imports conservatively), with CLI registration derived from its
 own catalog. Scoring-only analysis commands retain their plan entries but their
@@ -180,11 +180,61 @@ and scoring dispositions normalize away; common launch settings and workload
 parameters remain pinned. The arm's dev-runner is the subject launcher, analogous
 to its built application; its implementation may differ by arm, while its command
 and launch parameters remain in the normalized plan. Historical identities are
-retained unchanged by reprojection; this v2 identity applies to new acquisitions.
+retained unchanged by reprojection; the v3 identity below applies to new acquisitions.
 E4 aggregates the identities of corresponding window slots across arms, preserving
 the distinct 55/55/10-minute acquisition plans.
 Local proof: the pair-identity Node tests compare all five groups on both arms,
 refute scoring/test/unrelated-file invalidation and detect instrument/argument changes.
+
+**2026-10-01 review amendments (owner decisions):**
+
+- E3 retains stage-rate comparisons and adds absolute chunk anti-starvation,
+  reconciling design ?16 and ?4 with MAIN's document-first stage order. Matching
+  another stage cannot excuse starved chunks; branch-only gains cannot establish
+  the relative pass.
+- Acquisition v3 binds the materialized SciFact manifest (relative filenames and
+  SHA-256 bytes) and model selections from effective config and runtime status,
+  with paths, model IDs and file size/mtime. The shared model-store inventory is a
+  conservative superset, including lazy models; this avoids reading multi-GB
+  weights every invocation while detecting file metadata/selection changes.
+  Realized encoder sessions/providers are retained at window start/end on both
+  arms without a GPU co-residence gate. All checkout paths still use `<TREE>`;
+  acquisition behavior lives in hashed modules, outside scoring-only driver code.
+- Wire validity is acceptance of the candidate arm. BRANCH must have zero
+  non-boundary timeouts, 5xx or invalid streamed terminals. MAIN's failures are
+  baseline outcome counts in the table reason and E0, rather than a requirement
+  that MAIN already meet the candidate acceptance property. E0 requires both
+  valid MAIN windows and finite admitted per-mode/API p95s; MAIN's wire clause
+  does not block freezing those ceilings. E4 coverage and its wire clause are
+  separate, so baseline failures do not silently prevent a comparison.
+- E5 projects and tables both crash-to-API and crash-to-index against the same
+  13,600 ms budget in ?1; finite but slower index restoration fails.
+- E4's component budget uses per-process consumer private bytes/budgets for heap,
+  metaspace, direct memory, host ORT and other native allocations, with separate
+  Lucene mmap accounting. It requires every arm component and complete private
+  attribution. Missing consumer accounting (including currently unbounded host
+  ORT allocation in design ?8) is unmeasurable. Launch-flag compliance and the
+  machine-wide comparison are separate clauses, never substitutes.
+- The scoped RSS sampler waits at most 30 s for the collector's atomic scope
+  receipt before starting; missing scope fails the invocation explicitly.
+- Zero crashes is candidate acceptance, including teardown and every owned JVM
+  and native child. Scoped crash reports/hs_err files are scanned **after owned
+  stop**, with source paths and timing (`inside-window`, `teardown`, or unknown)
+  retained on both arms. MAIN crashes are baseline facts in table reasons, not
+  failed comparisons. Known live crashes remain failures even without an exit
+  receipt. A stopped port cannot prove clean native-child exits: absent complete
+  child-exit accounting through teardown, BRANCH zero-crashes is unmeasurable.
+  The current stop producer lacks that accounting, which remains a named live
+  evidence gap; no crash-free E4 pass is inferred from an empty crash directory.
+
+Check the common acquisition protocols without starting anything:
+
+```powershell
+node scripts/jseval/lane-f/e-run.mjs identity-check --dry-run
+```
+
+The check covers both E2 workloads and all three E4 window slots as well as
+E1/E5/E6. Live corpus/model receipts bind the final identities after acquisition.
 
 `scripts/jseval/lane-f/e-run.mjs` is the dependency-free Node driver. Run it
 from the driver worktree after root's `quick_health`/shared-lease preflight.
@@ -226,7 +276,7 @@ to 60 seconds, then runs hybrid for 600 seconds followed by lexical for 600 seco
 Both arms use the same query pool/order, restarting at query zero per mode, with
 one search request in flight. The scripted workload runs admission-loop throughout
 that same window. An explicit block/end-of-window cancellation is recorded as censored;
-it contributes no admitted latency. Request timeouts and 5xx remain failures.
+it contributes no admitted latency. Censoring requires no observed terminal error, at most one done and no observed HTTP failure; violations before cancellation remain failures. Receipts record `cancellationCause` (`mode-block-end` or `fixed-window-end`). Candidate request timeouts, 5xx and terminal failures fail the wire clause; MAIN outcomes are baseline facts as amended below.
 
 The `/api/status` sampler records raw snapshots every five seconds plus both
 window boundaries, including documents and `chunkEmbeddingCompletedCount`. Boundary snapshots retain
@@ -248,8 +298,8 @@ Intermediate counter dips are retained; a negative endpoint delta cannot be rate
 E0 stores each workload's split stage rates and 0.90 minimums for positive rates.
 BRANCH must meet every positive split stage rate; a zero branch rate fails that
 comparison and a missing branch rate is unmeasurable. Zero/missing split stage
-rates are explicitly not compared. No comparable stage is unmeasurable, never a
-pass. Docs/s and chunks/s remain descriptive metrics. Every sample must show
+rates are explicitly not compared. A positive branch stage absent from MAIN progress is a branch gain; it neither fails nor establishes a relative pass. No comparable stage is unmeasurable, never a
+pass. Separately, `chunk-progress-under-foreground-load` requires positive branch chunk completion and a positive measurable chunk rate whenever chunk work was pending. If MAIN has a positive chunk rate, the branch must also meet its 0.90 minimum. A zero MAIN chunk rate is reported as "main starved chunks (baseline)", not as proof of acceptable progress. Missing counters or an active interval below 60 s is unmeasurable. Docs/s and chunks/s remain descriptive metrics. Every sample must show
 bulk indexing/enrichment still active; early completion on either arm invalidates
 the window. Missing/stale/gapped counters cannot pass. RSS covers the foreground
 phase; the retained encoder probe follows the window and is supplemental, not part
@@ -272,7 +322,7 @@ not refit E0 or amend values.json; run `e0-values` explicitly after both MAIN
 records are re-scored. It reads values.json beside the record's owning group,
 or from an explicit `--repo-root`. The table compares immutable acquisition pair
 identities across MAIN and BRANCH; reprojection never changes that identity or
-its explanatory inputs.
+its explanatory inputs. Every record has a separate `projectionIdentity` covering `e-run.mjs`, the agent/analyzer and other scoring modules, and current values. `table` first reprojects all paired workload/window records with the current scorer, checking all retained files before writing any projections. It refuses missing evidence or mismatched/stale projection identities and directs reprojection of both arms. Historical acquisition and measured projection provenance remain intact.
 
 Budget: 3,000 seconds per invocation (50 minutes), below the 3,540-second outer
 limit; reserve 60 seconds preamble, 780 startup/readiness, 1,500 corpus submission
@@ -295,8 +345,7 @@ returning; that unbounded completion dependency is superseded here.
 Every subcommand accepts `--repo-root <path>` to resolve instruments, jseval,
 values, corpus cache and output evidence in that checkout while executing the
 driver and its `capability-ready.py` helper from their source worktree. This
-allows root to exercise unmerged driver changes without copying files. Both
-driver sources are included in the paired instrument identity.
+allows root to exercise unmerged driver changes without copying files. The executed helper/import closure is included in the paired instrument identity; scoring-only driver bytes are excluded.
 
 After each owned start, the driver waits up to five minutes for health and
 then up to five minutes for jseval's exact capability preflight:
@@ -364,11 +413,25 @@ MAIN has no Lane F operations/checkpoint ledger or recovering Head supervisor;
 the literal unsupported E5/E6 clauses remain `unmeasurable-on-split`, with
 native Worker results and the §16 disposition beside them. Missing GC,
 checkpoint, active child, or fault-confirmation evidence remains unmeasurable.
-The memory bound compares summed arm commit against split and checks each
-JVM's documented launch limits; it invents no absolute process ceiling.
+The memory rows separately compare summed arm commit against split, verify launch flags, and evaluate the component consumer budget from private-byte accounting. Flags and machine sums cannot prove the consumer budget.
 Run both E4 arms' three windows, then `e4-hang-values` before E6 to freeze
 the observed safepoint-derived interval and misses. E7 remains
 operator-driven and externally blocked on signing as specified in §7.
+
+Review-fix verification (2026-10-01, `af4320d0e` plus uncommitted driver edits):
+all 18 lane-F JavaScript syntax checks passed; all 112 lane-F Node tests passed,
+including `e-review.test.mjs` falsifying cases for all nine findings; all four
+`tests/test_bulk_load.py` cases passed. Retained authoring outputs in the driver
+worktree: `tmp/lane-f-e-review-syntax.txt`, `tmp/lane-f-e-review-node-tests.txt`,
+`tmp/lane-f-e-review-pytest.txt`, and `tmp/lane-f-e-review-identity.json` (eight
+MAIN/BRANCH acquisition protocol comparisons equal, including both workloads
+and three soak slots; E1 checks the fresh recapture protocol). The same check with
+`--repo-root lane-f-pr1-verify` also matched 8/8; its output is retained as
+`tmp/lane-f-e-review-root-identity.json`. Live model/corpus
+receipts complete the identity after measurement. No stack, Gradle, commit or
+push was performed. Root owns the fresh MAIN/BRANCH captures and E0 freeze;
+publication of these uncommitted edits is explicitly deferred to root. Consumer
+accounting and full native-child exit receipts remain named E4 evidence gaps.
 
 Static verification: `node --check scripts/jseval/lane-f/e-run.mjs`,
 `node --test scripts/jseval/lane-f/e-run.test.mjs`, and
@@ -430,8 +493,8 @@ pinned surfaces still match main.
 | run | paired section 16 group | procedure and required result |
 |---|---|---|
 | E1 | search quality and workflow fixture | Run jseval quality comparison and the pinned fixture on both arms. Require baseline gate and SearchTrace shape, deterministic evidence/citation/cancellation equality, and only the three predeclared difference classes. |
-| E2 | search and agent response times during bulk indexing | Run idle-agent and scripted-agent loads on both arms while bulk indexing. Compare admitted search/API p95; count reason-coded rejections under the owner ceiling, with timeout/5xx as failure. |
-| E3 | indexing speed | Measure per-stage completed/s over active intervals of at least 60 seconds under the same foreground loads; require 0.90 of each positive split stage rate while queries continue. Zero/missing split stages are not compared; no comparable stage is unmeasurable. Keep docs/s and chunks/s as metrics. |
+| E2 | search and agent response times during bulk indexing | Run idle-agent and scripted-agent loads on both arms while bulk indexing. Compare admitted search/API p95; count reason-coded rejections under the owner ceiling, with candidate timeout/5xx/terminal errors as failure and MAIN outcomes retained as baseline facts. |
+| E3 | indexing speed | Measure per-stage completed/s over active intervals of at least 60 seconds under the same foreground loads; require 0.90 of each positive split stage rate while queries continue. Zero/missing split stages are not compared; no comparable stage is unmeasurable. Require positive measurable branch chunk progress when chunk work was pending, plus 0.90 of any positive split chunk rate; report zero MAIN chunk progress as baseline starvation. Extra branch stages are gains. Keep docs/s and chunks/s as metrics. |
 | E4 | memory budget and no-crash soak | Sum Engine, llama-server and children commit charge against section 8 and split, report working set, measure live-after-GC trend and zero crashes across the owner-duration indexing/agent/reconfigure soak. |
 | E5 | crash recovery and children | Force an actual Engine death with a durable operation in flight. Compare crash-to-API restoration and checkpoint resume; require visible restarting, no orphaned child, correct adopt/stop behavior for each restart/quit/upgrade path. |
 | E6 | hang detection, graceful and forced | Exercise runnable-watcher/API-pool wedge and whole-JVM wedge on both arms under fixed hang settings; require request-channel and forced-kill recovery within the respective deadline plus budget. |

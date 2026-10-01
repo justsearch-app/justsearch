@@ -9,14 +9,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { gcLogOption, hangPolicy, splitGap } from './e456-instruments.mjs';
-import { startOwned, activateChat, verifySharedModels as checkSharedModels } from './e-start-ready.mjs';
-import { terminalComplete, isAdmitted, agentMetrics } from './e-agent-metrics.cjs';
+import { gcLogOption, hangPolicy, hangVerdict, crashObservation, splitGap } from './e456-instruments.mjs';
+import { verifySharedModels as checkSharedModels } from './e-start-ready.mjs';
+import { terminalComplete, boundaryCensored, isAdmitted, agentMetrics, wireOutcomes } from './e-agent-metrics.cjs';
 import { measurementIdentity } from './e-pair-identity.mjs';
 import { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies } from './e456-live.mjs';
+import { componentBudget } from './e-memory-budget.mjs';
+import { execute, resolveCommand, runAcquisition, invocationDeadline } from './e-acquire.mjs';
+import { projectCrashes } from './e-crash-evidence.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 export const ARMS = Object.freeze({
@@ -32,6 +35,10 @@ const write = (file, value) => {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 };
 const finite = x => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+export function projectionIdentity(values) {
+  const modules = ['e-run.mjs', 'e-agent-metrics.cjs', 'analyze-head-run.cjs', 'e-memory-budget.mjs', 'e-crash-evidence.mjs', 'e456-live.mjs', 'e456-instruments.mjs'];
+  return hash(JSON.stringify({ modules: modules.map(f => [f, hash(fs.readFileSync(path.join(ROOT, 'scripts/jseval/lane-f', f)))]), values: hash(JSON.stringify(values)) }));
+}
 export const MAIN_REVISION = 'ac1c93bf32c2bba3e4a22462295acbc618f850bc';
 
 /** E0.2: compare content, never ancestry, and retain the exact pin-check evidence. */
@@ -72,7 +79,7 @@ export function checkFixturePins(root = ROOT, revision = MAIN_REVISION, git = ar
 export const verifySharedModels = config => checkSharedModels(config, path.resolve(ARMS.main, '../../../models'));
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
-  if (![...GROUPS, 'e0-values', 'e4-hang-values', 'table', 'reproject'].includes(command)) throw new Error('Unknown subcommand');
+  if (![...GROUPS, 'e0-values', 'e4-hang-values', 'table', 'reproject', 'identity-check'].includes(command)) throw new Error('Unknown subcommand');
   const result = { command, dryRun: false };
   for (let i = 0; i < rest.length; i++) {
     const flag = rest[i];
@@ -91,6 +98,7 @@ export function parseArgs(argv) {
   if (result.arm && !Object.hasOwn(ARMS, result.arm)) throw new Error('Invalid arm');
   if (command === 'e0-values' && result.arm && result.arm !== 'main') throw new Error('E0 uses MAIN only');
   if (command === 'table' && result.arm) throw new Error('table reads both arms; omit --arm');
+  if (command === 'identity-check' && (!result.dryRun || result.arm)) throw new Error('identity-check requires --dry-run and no --arm');
   if (command === 'e4-hang-values' && result.arm) throw new Error('Hang values use both arms; omit --arm');
   if (result.armTree && !GROUPS.includes(command)) throw new Error('--arm-tree requires a run group');
   if (result.fault && (command !== 'e6-hang' || !['soft', 'hard'].includes(result.fault))) throw new Error('--fault soft|hard is E6 only');
@@ -252,17 +260,19 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
         splitDisposition: arm === 'main' ? splitGap('MAIN Worker gRPC supervision exists; MAIN Head HTTP hangs have no autonomous dev-arm recovery') : undefined },
       endInstruments(`hang-${kind}`), stop(`hang-${kind}`));
   }
-  return [...preamble, ...commands].flatMap(c => c.mode === 'start' && group !== 'e1-quality' ? [c,
+  const plan = [...preamble, ...commands].flatMap(c => c.mode === 'start' && group !== 'e1-quality' ? [c,
     { label: `activate-${c.label}`, mode: 'ai-activate', args: [], baseUrl: 'http://127.0.0.1:33221',
       method: 'POST', endpoint: '/api/ai/runtime/activate', body: { variantId: 'cuda12', chatProfile: 'standard' },
       profile: 'standard', readyEndpoint: '/api/ai/runtime/status', timeoutSeconds: 300, pollIntervalMs: 2000 }] : [c]);
+  return plan.flatMap(c => [c, ...((c.mode === 'ai-activate' || c.mode === 'start' && group === 'e1-quality') ? [{ label: `encoder-sessions-${c.label}-start`, mode: 'encoder-sessions', args: [] }] : [])])
+    .flatMap(c => c.mode === 'stop' ? [{ label: `encoder-sessions-${c.label}-end`, mode: 'encoder-sessions', args: [] }, c] : [c]);
 }
 
 const CLAUSES = {
   E1: ['baseline-quality', 'SearchTrace-shape', 'workflow-evidence-citations-cancellation', 'allowed-differences'],
   E2: ['indexing-window-valid', 'foreground-p95', 'agent-api-p95', 'idle-rejections', 'scripted-rejections', 'no-timeout-or-5xx'],
-  E3: ['indexing-window-valid', 'stage-completion-rates-under-foreground-load'],
-  E4: ['component-commit-budget', 'machine-wide-commit-vs-main', 'working-set', 'live-after-GC-trend',
+  E3: ['indexing-window-valid', 'stage-completion-rates-under-foreground-load', 'chunk-progress-under-foreground-load'],
+  E4: ['no-timeout-or-5xx', 'component-commit-budget', 'launch-flag-compliance', 'machine-wide-commit-vs-main', 'working-set', 'live-after-GC-trend',
     'zero-crashes', 'owner-duration', 'index-agent-reconfigure-workload'],
   E5: ['actual-death-durable-operation', 'crash-to-api', 'crash-to-index', 'checkpoint-resume',
     'visible-restarting', 'no-orphaned-child', 'restart-quit-upgrade-child-policy'],
@@ -344,7 +354,7 @@ export function stageCompletionRates(load) {
         : finite(pending) ? pending > 0 : undefined;
       return { time: s.observedAtMs, completed, active };
     });
-    const result = { completedSources: [...sources], expectedDocuments, expectedSource };
+    const result = { completedSources: [...sources], expectedDocuments, expectedSource, pendingObserved: rows.some(r => r.active === true) };
     if (!rows.length || rows.some(r => !finite(r.time) || !finite(r.completed) || r.active === undefined))
       return [stage, { ...result, reason: 'missing-stage-counter-or-time' }];
     if (rows.some((r, i) => i && r.time <= rows[i - 1].time))
@@ -369,7 +379,8 @@ export function compareStageRates(stages, splitStages) {
   for (const stage of INDEX_STAGES) {
     const main = splitStages?.[stage]?.rate;
     if (!finite(main) || main <= 0) {
-      comparisons[stage] = { status: 'not-compared', reason: finite(main) ? 'split-did-not-progress' : 'split-rate-unmeasurable' };
+      comparisons[stage] = { status: stages?.[stage]?.rate > 0 ? 'branch-gain' : 'not-compared',
+        branchRate: stages?.[stage]?.rate, reason: finite(main) ? 'split-did-not-progress' : 'split-rate-unmeasurable' };
       continue;
     }
     const branch = stages?.[stage]?.rate, minimum = main * .9;
@@ -378,6 +389,15 @@ export function compareStageRates(stages, splitStages) {
     checks.push(check);
   }
   return { comparisons, check: checks.includes(false) ? false : checks.length && checks.every(c => c === true) ? true : undefined };
+}
+export function chunkProgress(stage, main) {
+  const baseline = main?.rate === 0 ? 'main starved chunks (baseline)' : 'main chunk rate absent or not positive';
+  if (stage?.pendingObserved !== true || !finite(stage?.completedDelta)) return { check: undefined, reason: `Chunk progress unmeasurable; ${baseline}` };
+  if (stage.completedDelta <= 0 || stage.rate === 0) return { check: false, reason: `Pending chunk work made no positive progress; ${baseline}` };
+  if (!finite(stage.rate)) return { check: undefined, reason: `Chunk active interval cannot be rated; ${baseline}` };
+  if (main?.rate > 0) return { check: finite(stage.rate) ? stage.rate >= .9 * main.rate && stage.rate > 0 : undefined,
+    reason: `Chunk delta ${stage.completedDelta}; branch rate ${stage.rate}, minimum ${.9 * main.rate}` };
+  return { check: true, reason: `Positive chunk delta ${stage.completedDelta}; ${baseline}` };
 }
 export function projectLoad(record, load, calls, values) {
   const valid = windowValidity(load);
@@ -403,16 +423,15 @@ export function projectLoad(record, load, calls, values) {
   const legalRejection = c => rejectionCodes.has(c.code) && c.retrySafe === true && /^[1-9]\d*$/.test(c.retryAfter);
   record.metrics.wireRejections = wire.filter(c => c.status === 429).length;
   record.metrics.wireOffered = wire.length;
-  record.clauses['no-timeout-or-5xx'] = wire.length ? wire.every(c => (c.windowBoundary || terminalComplete(c))
-    && (c.windowBoundary && ['TRANSPORT_FAILURE', 'WINDOW_BOUNDARY_CANCELLED'].includes(c.error) && !(c.status >= 500)
-      || !c.error && ((c.status >= 200 && c.status < 300) || c.status === 429 && legalRejection(c))))
+  record.metrics.wireOutcomes = wireOutcomes(wire);
+  record.clauses['no-timeout-or-5xx'] = wire.length ? wire.every(c => boundaryCensored(c)
+      || terminalComplete(c) && !c.error && ((c.status >= 200 && c.status < 300) || c.status === 429 && legalRejection(c)))
     && !(load.samples ?? []).some(s => s.error)
     && (record.workload !== 'scripted-agent' || load.admissionExitCode === 0 && calls.length > 0) : undefined;
   record.clauses['foreground-p95'] = ['hybrid', 'lexical'].every(m => finite(load.searchP95?.[m])) ? true : undefined;
   const admitted = calls.filter(isAdmitted);
   Object.assign(record.metrics, agentMetrics(calls));
   // A stream the fixed window cut is a boundary artifact, not a terminal error of the arm.
-  record.metrics.agentTerminalErrors = agentMetrics(calls.filter(c => !c.windowBoundary)).agentTerminalErrors;
   delete record.gaps.agentTerminalErrors;
   if (Object.keys(record.metrics.agentTerminalErrors).length) record.gaps.agentTerminalErrors = JSON.stringify(record.metrics.agentTerminalErrors);
   if (record.workload === 'agent-idle') record.clauses['idle-rejections'] = wire.length
@@ -429,6 +448,9 @@ export function projectLoad(record, load, calls, values) {
   record.metrics.stageComparisons = compared.comparisons;
   record.clauses[E3_RATE_CLAUSE] = valid === false ? false : valid === true ? compared.check : undefined;
   if (record.clauses[E3_RATE_CLAUSE] !== true) record.gaps[E3_RATE_CLAUSE] = JSON.stringify(compared.comparisons);
+  const chunks = chunkProgress(record.metrics.stageRates.chunk_embed, record.arm === 'main' ? record.metrics.stageRates.chunk_embed : split?.chunk_embed);
+  record.clauses['chunk-progress-under-foreground-load'] = valid === false ? false : valid === true ? chunks.check : undefined;
+  record.gaps['chunk-progress-under-foreground-load'] = chunks.reason;
 }
 export function mergeLoadRecords(workloads) {
   const list = ['agent-idle', 'scripted-agent'].map(w => workloads[w]);
@@ -437,6 +459,7 @@ export function mergeLoadRecords(workloads) {
   merged.id = present.map(r => r.id).join(', ');
   merged.workloadRecords = present.map(r => r.recordFile);
   merged.pairIdentity = hash(JSON.stringify(list.map(r => r?.pairIdentity)));
+  merged.projectionIdentity = list.every(r => r?.projectionIdentity === present[0].projectionIdentity) ? present[0].projectionIdentity : undefined;
   merged.metrics = { searchP95: {}, searchP95ByWorkload: {}, chunksByWorkload: {}, queryPoolByWorkload: {}, stagesByWorkload: {} };
   for (const r of present) {
     merged.metrics.stagesByWorkload[r.workload] = r.metrics.stageRates;
@@ -450,6 +473,7 @@ export function mergeLoadRecords(workloads) {
   merged.metrics.agentTerminalErrors = workloads['scripted-agent']?.metrics.agentTerminalErrors;
   merged.metrics.agentAdmitted = workloads['scripted-agent']?.metrics.agentAdmitted;
   merged.metrics.agentOffered = workloads['scripted-agent']?.metrics.agentOffered;
+  merged.metrics.wireOutcomesByWorkload = Object.fromEntries(present.map(r => [r.workload, r.metrics.wireOutcomes]));
   merged.metrics.chunksPerSec = list.every(r => finite(r?.metrics.chunksPerSec))
     ? Math.min(...list.map(r => r.metrics.chunksPerSec)) : undefined;
   merged.clauses = {};
@@ -466,7 +490,7 @@ export function mergeLoadRecords(workloads) {
   if (present.some(r => r.valuesHash !== merged.valuesHash || r.revision !== merged.revision)) merged.failure = 'Workload provenance mismatch';
   return merged;
 }
-const BRANCH_ONLY_CLAUSES = new Set(['no-timeout-or-5xx']);
+const BRANCH_ONLY_CLAUSES = new Set(['no-timeout-or-5xx', 'chunk-progress-under-foreground-load', 'zero-crashes']);
 export function tableVerdicts(records, values) {
   const output = [];
   const pair = (group, clause, evaluate) => {
@@ -478,7 +502,7 @@ export function tableVerdicts(records, values) {
     const checks = branchOnly ? [arms[1]?.clauses?.[clause], arms[0] ? true : undefined]
       : arms.map(r => r?.clauses?.[clause]);
     if (evaluate && arms.every(Boolean)) checks.push(evaluate(arms[1], arms[0]));
-    if (arms.some(r => r?.failure)) checks.push(false);
+    if (arms[1]?.failure || arms[0]?.failure && !branchOnly && !['E2', 'E3'].includes(group)) checks.push(false);
     if (arms.every(Boolean)) {
       if (group === 'E2' || group === 'E3') {
         for (const w of ['agent-idle', 'scripted-agent']) {
@@ -487,14 +511,19 @@ export function tableVerdicts(records, values) {
         }
       }
       checks.push(arms[0].pairIdentity === arms[1].pairIdentity, arms[0].valuesHash === arms[1].valuesHash);
+      checks.push(Boolean(arms[0].pairIdentity));
     }
     const disposition = arms[0]?.dispositions?.[clause];
-    const result = verdict(disposition?.status === 'unmeasurable-on-split' ? [...checks, undefined] : checks);
+    const projectionMismatch = arms.every(Boolean) && (arms[0].projectionIdentity !== arms[1].projectionIdentity
+      || arms[0].projectionIdentity !== projectionIdentity(values));
+    const result = projectionMismatch ? 'unmeasurable' : verdict(disposition?.status === 'unmeasurable-on-split' ? [...checks, undefined] : checks);
     output.push({ group, clause, verdict: result === 'unmeasurable' && disposition ? 'unmeasurable-on-split' : result,
       disposition,
       sources: arms.map(r => r?.id ?? 'missing').join(' / '),
       sourceRecords: arms.flatMap(r => r?.workloadRecords ?? [r?.recordFile]),
-      reason: [...(branchOnly && arms[0] ? [`main baseline ${arms[0].clauses?.[clause]}`] : []),
+      reason: [...(projectionMismatch ? ['Projection identity mismatch: reproject both arms with the current scorer before comparing'] : []),
+        ...(clause === 'no-timeout-or-5xx' && arms[0] ? [`main baseline outcomes ${JSON.stringify(arms[0].metrics?.wireOutcomesByWorkload ?? arms[0].metrics?.wireOutcomes)}`] : []),
+        ...(clause === 'zero-crashes' && arms[0] ? [`main baseline crashes ${JSON.stringify(arms[0].metrics?.crashesByWindow ?? arms[0].metrics?.crashEvidence?.events)}`] : []),
         ...arms.map(r => r?.gaps?.[clause]).filter(Boolean)].join('; ') || 'paired clause and frozen values' });
   };
   for (const [group, clauses] of Object.entries(CLAUSES)) for (const clause of clauses) {
@@ -523,9 +552,13 @@ export function tableVerdicts(records, values) {
     };
     if (group === 'E4' && clause === 'machine-wide-commit-vs-main') evaluate = (b, m) =>
       finite(b.metrics?.peakCommitMB) && finite(m.metrics?.peakCommitMB) ? b.metrics.peakCommitMB <= m.metrics.peakCommitMB : undefined;
-    if (group === 'E4' && clause === 'component-commit-budget') evaluate = (b, m) =>
-      finite(b.metrics?.peakCommitMB) && finite(m.metrics?.peakCommitMB) ? b.metrics.peakCommitMB <= m.metrics.peakCommitMB : undefined;
-    if (group === 'E5' && clause === 'crash-to-api') evaluate = b =>
+    if (group === 'E3' && clause === 'chunk-progress-under-foreground-load') evaluate = b => {
+      const checks = ['agent-idle', 'scripted-agent'].map(w => chunkProgress(b.metrics?.stagesByWorkload?.[w]?.chunk_embed,
+        values.indexingProgressFraction.stagesByWorkload?.[w]?.chunk_embed).check);
+      return checks.includes(false) ? false : checks.every(c => c === true) ? true : undefined;
+    };
+    if (group === 'E4' && clause === 'component-commit-budget') evaluate = b => componentBudget(b.metrics?.consumerAccounting, b.arm).check;
+    if (group === 'E5' && ['crash-to-api', 'crash-to-index'].includes(clause)) evaluate = b =>
       finite(b.metrics?.[clause]) ? b.metrics[clause] <= values.crashToApiRestoredMs : undefined;
     pair(group, clause, evaluate);
   }
@@ -534,6 +567,7 @@ export function tableVerdicts(records, values) {
 
 function filesUnder(dir) {
   if (!fs.existsSync(dir)) return [];
+  if (fs.statSync(dir).isFile()) return [dir];
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory()
     ? filesUnder(path.join(dir, e.name)) : [path.join(dir, e.name)]);
 }
@@ -568,6 +602,7 @@ export function latestRecords(root) {
     const merged = structuredClone(list.at(-1));
     merged.id = list.map(r => r.id).join(', ');
     merged.windowRecords = list.map(r => r.recordFile);
+    merged.projectionIdentity = list.every(r => r.projectionIdentity === list[0].projectionIdentity) ? list[0].projectionIdentity : undefined;
     // Each slot has its own acquisition plan (55/55/10 minutes). Compare the same
     // slots across arms, rather than requiring unlike durations to share an identity.
     merged.pairIdentityInputs = { kind: 'lane-f-e4-window-identities.v1', windows: Object.fromEntries(
@@ -581,6 +616,7 @@ export function latestRecords(root) {
         ? true : applicable.some(r => r.clauses[clause] === false) ? false : undefined;
     }
     merged.metrics.worstPauseMs = list.every(r => finite(r.metrics.worstPauseMs)) ? Math.max(...list.map(r => r.metrics.worstPauseMs)) : undefined;
+    merged.metrics.crashesByWindow = Object.fromEntries(list.map(r => [r.window, r.metrics.crashEvidence?.events]));
     const durationChecks = ['1', '2', '3'].map(w => windows[arm][w]?.clauses['window-duration']);
     durationChecks.push(list.every(r => r.valuesHash === merged.valuesHash
       && r.revision === merged.revision));
@@ -595,18 +631,17 @@ export function fillValues(document, records) {
   if (Object.values(records).some(r => r.arm === 'branch')) throw new Error('E0 is forbidden after any branch run');
   const quality = records['E1/main'];
   const load = records['E2/main'];
-  if (!quality || !load || quality.failure || load.failure) throw new Error('Successful MAIN E1-E3 records required');
-  if (load.clauses?.['indexing-window-valid'] !== true || load.workloadRecords?.length !== 2
-    || [...CLAUSES.E2, ...CLAUSES.E3].some(c => load.clauses[c] !== true)) throw new Error('Both valid MAIN workload windows required');
+  if (!quality || !load || quality.failure) throw new Error('Successful MAIN E1 and measured E2-E3 records required');
+  if (load.clauses?.['indexing-window-valid'] !== true || load.workloadRecords?.length !== 2) throw new Error('Both valid MAIN workload windows required');
   const metrics = load.metrics;
-  if (!['agent-idle', 'scripted-agent'].every(w => INDEX_STAGES.some(stage => finite(metrics.stagesByWorkload?.[w]?.[stage]?.rate) && metrics.stagesByWorkload[w][stage].rate > 0)
-    && ['hybrid', 'lexical'].every(m => finite(metrics.searchP95ByWorkload?.[w]?.[m]) && metrics.searchP95ByWorkload[w][m] > 0))
-    || !['hybrid', 'lexical'].every(mode => finite(metrics.searchP95?.[mode]) && metrics.searchP95[mode] > 0)
-    || !finite(metrics.agentP95) || metrics.agentP95 <= 0) {
-    throw new Error('MAIN lacks measured E0 search/API p95 or positive stage rates; cannot invent bounds');
+  if (!['agent-idle', 'scripted-agent'].every(w => ['hybrid', 'lexical'].every(m => finite(metrics.searchP95ByWorkload?.[w]?.[m])))
+    || !['hybrid', 'lexical'].every(mode => finite(metrics.searchP95?.[mode]) )
+    || !finite(metrics.agentP95) ) {
+    throw new Error('MAIN lacks finite admitted E0 search/API p95; cannot invent bounds');
   }
   const next = structuredClone(document);
   const v = next.values;
+  next.e0BaselineOutcomes = metrics.wireOutcomesByWorkload ?? metrics.wireOutcomes;
   for (const key of ['foregroundSearchP95Ceiling', 'agentLoopApiP95Ceiling', 'indexingProgressFraction']) {
     v[key].measuredAtE0 = false;
     v[key].sourceRun = load.id;
@@ -620,51 +655,13 @@ export function fillValues(document, records) {
   for (const obsolete of ['measuredChunksPerSec', 'minimumChunksPerSec', 'minimumByWorkload']) delete v.indexingProgressFraction[obsolete];
   v.indexingProgressFraction.stagesByWorkload = Object.fromEntries(['agent-idle', 'scripted-agent'].map(w =>
     [w, Object.fromEntries(INDEX_STAGES.map(stage => {
-      const measured = metrics.stagesByWorkload[w][stage];
+      const measured = metrics.stagesByWorkload?.[w]?.[stage];
       return [stage, { ...measured, minimumRate: finite(measured?.rate) && measured.rate > 0 ? measured.rate * .9 : undefined,
         comparison: finite(measured?.rate) && measured.rate > 0 ? 'compared' : 'not-compared' }];
     }))]));
   v.indexingProgressFraction.sourceRecords = load.workloadRecords;
   next.e0 = { qualityRun: quality.id, loadRun: load.id, fixedAt: new Date().toISOString() };
   return next;
-}
-
-function resolveCommand(command, bindings) {
-  const replace = s => s.replace(/\$\{(\w+)\}/g, (_, key) => {
-    if (bindings[key] === undefined) throw new Error(`Unresolved ${key}`);
-    return bindings[key];
-  });
-  return { ...command, args: command.args?.map(replace), directory: command.directory && replace(command.directory),
-    env: command.env && Object.fromEntries(Object.entries(command.env).map(([k, v]) => [k, replace(v)])) };
-}
-function execute(command, context) {
-  const log = path.join(context.raw, `${context.sequence++}-${command.label}`);
-  const out = fs.openSync(`${log}.stdout`, 'w');
-  const err = fs.openSync(`${log}.stderr`, 'w');
-  const child = spawn(command.executable, command.args, { cwd: command.cwd,
-    env: { ...process.env, ...command.env, JUSTSEARCH_SESSION_TOKEN: context.token ?? '' },
-    stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-  let stdout = '';
-  child.stdout.on('data', b => { fs.writeSync(out, b); stdout += b; });
-  child.stderr.on('data', b => fs.writeSync(err, b));
-  const receipt = { ...command, startedAt: new Date().toISOString(), stdoutFile: `${log}.stdout`, stderrFile: `${log}.stderr` };
-  context.record.commands.push(receipt);
-  const complete = new Promise(resolve => {
-    child.once('error', error => { receipt.error = error.message; });
-    child.once('close', (code, signal) => {
-      fs.closeSync(out); fs.closeSync(err);
-      Object.assign(receipt, { code, signal, endedAt: new Date().toISOString() });
-      resolve({ code, stdout, receipt });
-    });
-  });
-  let expired = false;
-  const timer = setTimeout(() => {
-    expired = true;
-    // The registered supervisor is stopped by its owned lifecycle, never by a PID kill.
-    if (command.mode !== 'start') child.kill();
-  }, Math.max(1, Math.min(context.deadline - Date.now(), (command.budgetSeconds ?? 3540) * 1000)));
-  complete.finally(() => clearTimeout(timer));
-  return { child, complete, stdout: () => stdout, expired: () => expired };
 }
 
 export function collect(context) {
@@ -687,9 +684,9 @@ export function collect(context) {
   const calls = captures.flatMap(c => c.requests ?? []);
   const admitted = calls.filter(isAdmitted);
   Object.assign(r.metrics, agentMetrics(calls));
-  r.metrics.agentTerminalErrors = agentMetrics(calls.filter(c => !c.windowBoundary)).agentTerminalErrors;
+  r.metrics.wireOutcomes = wireOutcomes(calls);
   if (Object.keys(r.metrics.agentTerminalErrors).length) r.gaps.agentTerminalErrors = JSON.stringify(r.metrics.agentTerminalErrors);
-  if (calls.length) r.clauses['no-timeout-or-5xx'] = calls.every(c => !c.error && terminalComplete(c)
+  if (calls.length) r.clauses['no-timeout-or-5xx'] = calls.every(c => boundaryCensored(c) || !c.error && terminalComplete(c)
     && (c.status >= 200 && c.status < 300 || c.status === 429));
   r.metrics.chunksByWorkload = {};
   for (const file of filesUnder(context.raw).filter(f => path.basename(f) === 'status-series.csv')) {
@@ -707,6 +704,7 @@ export function collect(context) {
     }
   }
   if (r.groups.includes('E1')) {
+    r.clauses['baseline-quality'] = undefined;
     const gate = path.join(context.raw, 'relevance-gate.json');
     if (fs.existsSync(gate)) r.clauses['baseline-quality'] = qualityGateVerdict(read(gate));
     const fixtures = filesUnder(path.join(context.raw, 'fixture')).filter(f => /^capture-\d+\.json$/.test(path.basename(f))).map(read);
@@ -731,12 +729,15 @@ export function collect(context) {
       && calls.filter(c => c.status === 429).length / calls.length <= context.values.admissionRejectionCeiling.scriptedAgentFraction : undefined;
     r.clauses['idle-rejections'] = loads.length ? loads.filter(s => s.search_load && !s.search_load.errors).length === loads.length : undefined;
   }
+  r.projectionIdentity = projectionIdentity(context.values);
   // Legacy unbounded load records have no validated per-stage population.
   if (r.groups.includes('E4')) {
     const completedCycles = r.commands.filter(c => /^soak-cycle-/.test(c.label) && c.code === 0);
     const workload = completedCycles.length && loads.length && calls.length
-      ? loads.every(s => s.search_load.errors === 0) && calls.every(c => !c.error && terminalComplete(c)
-        && (c.status >= 200 && c.status < 300 || c.status === 429)) : undefined;
+      ? true : undefined;
+    if (loads.some(s => s.search_load.errors > 0)) r.clauses['no-timeout-or-5xx'] = false;
+    r.metrics.searchWireFailures = loads.reduce((n, s) => n + (s.search_load.errors ?? 0), 0);
+    r.metrics.wireOutcomes['search-load-failure'] = r.metrics.searchWireFailures;
     r.metrics.completedSoakCycles = completedCycles.length;
     r.clauses['index-agent-reconfigure-workload'] = verdict([
       r.clauses['index-agent-reconfigure-workload'], workload]) === 'pass' ? true : workload === false ? false : undefined;
@@ -744,15 +745,93 @@ export function collect(context) {
 
 }
 
-/** Re-score only retained E2/E3 wire evidence. Never refit E0 or alter launch provenance. */
+/** Offline projection of the retained E456 instrument populations; never samples a process. */
+export function projectExperiments(record, values) {
+  if (record.groups.includes('E4')) {
+    for (const clause of [...CLAUSES.E4, 'window-duration']) record.clauses[clause] = undefined;
+    for (const metric of ['peakCommitMB', 'peakWorkingSetMB', 'worstPauseMs']) delete record.metrics[metric];
+    const file = path.join(record.raw, 'soak/instruments.json');
+    if (!fs.existsSync(file)) {
+      for (const clause of CLAUSES.E4) record.clauses[clause] = undefined;
+      record.gaps['component-commit-budget'] = 'Missing retained consumer/instrument population';
+    } else {
+      const data = read(file);
+      const collector = Object.create(LiveCollector.prototype);
+      Object.assign(collector, { context: { record, values, raw: record.raw }, directory: path.dirname(file), arm: record.arm,
+        startMs: data.startedAtMs, endMs: data.endedAtMs, snapshots: data.snapshots, errors: data.errors,
+        diagnostics: data.diagnostics, reconfigures: data.reconfigures, flags: new Map(data.flags),
+        processes: new Map(data.processes.map(p => [`${p.ProcessId}/${p.CreationFileTimeUtc}`, p])),
+        initialRoots: new Set(data.snapshots.map(s => s.processes?.find(p => p.role === (record.arm === 'main' ? 'head' : 'engine')))
+          .filter(Boolean).map(p => `${p.pid}/${p.creationFileTimeUtc}`)) });
+      collector.projectE4();
+    }
+    const crashFile = path.join(record.raw, 'crash-evidence.json');
+    record.metrics.crashEvidence = fs.existsSync(crashFile) ? read(crashFile) : record.metrics.crashEvidence;
+    projectCrashes(record);
+  }
+  if (record.groups.includes('E5')) {
+    const m = record.metrics;
+    const recoveryFile = path.join(record.raw, 'crash/recovery.json');
+    const deathFile = path.join(record.raw, 'crash/after-death.json');
+    const recovery = fs.existsSync(recoveryFile) ? read(recoveryFile) : undefined;
+    const death = fs.existsSync(deathFile) ? read(deathFile) : undefined;
+    if (recovery) Object.assign(m, { crashBefore: recovery.cut, crashAfter: recovery.after,
+      crashTimeline: recovery.timeline, childRecovery: recovery.childRecovery });
+    const observed = m.crashTimeline ? crashObservation(m.crashBefore, m.crashAfter, m.crashTimeline, record.arm) : {};
+    for (const [clause, measurement] of [['crash-to-api', m.crashTimeline ? observed.apiMs : m['crash-to-api']], ['crash-to-index', m.crashTimeline ? observed.indexMs : m['crash-to-index']]]) {
+      record.metrics[clause] = measurement;
+      record.clauses[clause] = finite(measurement) ? measurement <= values.crashToApiRestoredMs : undefined;
+    }
+    record.clauses['actual-death-durable-operation'] = death?.durableAtDeath === true
+      ? observed.identityChanged && m.crashAfter?.noDuplicateEffects === true : undefined;
+    record.clauses['checkpoint-resume'] = death?.durableAtDeath === true ? observed.checkpointResume : undefined;
+    const instrumentFile = path.join(record.raw, 'crash/instruments.json');
+    const instrument = fs.existsSync(instrumentFile) ? read(instrumentFile) : undefined;
+    record.clauses['visible-restarting'] = record.arm === 'branch' && instrument
+      ? instrument.snapshots.some(s => s.supervisor?.state === 'restarting' && s.atMs >= m.crashTimeline?.killMs) || undefined : undefined;
+    const children = m.childRecovery?.originalChildren?.filter(p => p.role !== 'llama-server');
+    record.clauses['no-orphaned-child'] = m.childRecovery?.orphaned?.length ? false : children?.length ? true : undefined;
+    projectChildPolicies(record);
+  }
+  if (record.groups.includes('E1')) for (const clause of ['workflow-evidence-citations-cancellation', 'allowed-differences']) {
+    record.clauses[clause] = undefined; record.gaps[clause] = 'Paired fixture gate must be recomputed by table with both retained populations';
+  }
+  if (record.groups.includes('E6')) for (const kind of ['soft', 'hard']) {
+    const file = path.join(record.raw, `hang-${kind}/result.json`);
+    const facts = fs.existsSync(file) ? read(file) : undefined;
+    const deadline = kind === 'soft' ? 'graceful-deadline' : 'forced-deadline';
+    record.clauses[deadline] = facts ? hangVerdict(facts.evidence, kind, facts.native, values.warmStartBudgetMs) : undefined;
+    record.clauses[kind === 'soft' ? 'runnable-watcher-api-pool-wedge' : 'whole-JVM-wedge'] = facts?.evidence?.postUnresponsive;
+  }
+  if (record.groups.includes('E6')) {
+    let policy;
+    try { policy = hangPolicy(values, values.hangParameters?.worstPauseMs); } catch { /* absent frozen policy */ }
+    const checks = ['soft', 'hard'].map(kind => {
+      const file = path.join(record.raw, `hang-${kind}/instruments.json`);
+      if (!policy || !fs.existsSync(file)) return undefined;
+      const snapshots = read(file).snapshots ?? [];
+      const resultFile = path.join(record.raw, `hang-${kind}/result.json`);
+      const native = fs.existsSync(resultFile) ? read(resultFile).native : undefined;
+      if (!native) return undefined;
+      if (native.intervalMs !== policy.intervalMs || native.missCount !== policy.missCount) return false;
+      return record.arm === 'main' ? policy.splitCompatible ? true : undefined
+        : snapshots.some(s => s.supervisor?.policyProfile === 'harness'
+          && ['hangPollIntervalMs', 'hangUnhealthyThreshold'].every(k => s.supervisor.policyOverrides?.includes(k))) || undefined;
+    });
+    record.clauses['E4-derived-hang-settings'] = checks.includes(false) ? false : checks.every(c => c === true) ? true : undefined;
+  }
+  record.projectionIdentity = projectionIdentity(values);
+}
+
+/** Re-score retained Stage E populations. Never refit E0 or alter measured provenance. */
 export function reprojectRecord(file, values, dryRun = false) {
   const original = read(file);
-  if (!original.endedAt || !original.groups?.includes('E2') || !original.groups?.includes('E3')
-    || !['agent-idle', 'scripted-agent'].includes(original.workload)) throw new Error('Complete E2/E3 workload record required');
-  const directory = path.join(original.raw, original.workload);
+  if (!original.endedAt || !original.groups?.some(g => ['E1', 'E2', 'E4', 'E5', 'E6'].includes(g))) throw new Error('Complete Stage E record required');
+  const isLoad = original.groups.includes('E2') && ['agent-idle', 'scripted-agent'].includes(original.workload);
+  const directory = path.join(original.raw, original.workload ?? '');
   const bulk = path.join(directory, 'bulk-load.json');
   const workload = path.join(directory, 'workload.json');
-  const required = [...(original.rawFiles ?? []), bulk, ...(original.workload === 'scripted-agent' ? [workload] : [])];
+  const required = [...(original.rawFiles ?? []), ...(isLoad ? [bulk, ...(original.workload === 'scripted-agent' ? [workload] : [])] : [])];
   const missing = required.filter(f => !fs.existsSync(f) || !fs.statSync(f).isFile());
   if (!required.length || missing.length) throw new Error(`Missing retained raw files: ${missing.join(', ')}`);
   const projected = structuredClone(original);
@@ -760,13 +839,19 @@ export function reprojectRecord(file, values, dryRun = false) {
   projected.projectionHistory = [...(original.projectionHistory ?? []),
     { at: original.reprojectedAt ?? original.endedAt, driverHash: original.reprojectionDriverHash,
       metrics: original.metrics, clauses: original.clauses, gaps: original.gaps }];
-  projected.metrics = {}; projected.clauses = {}; projected.gaps = {};
-  const calls = original.workload === 'scripted-agent' ? read(workload).requests ?? [] : [];
-  projectLoad(projected, read(bulk), calls, values);
+  if (isLoad) {
+    projected.metrics = {}; projected.clauses = {}; projected.gaps = {};
+    const calls = original.workload === 'scripted-agent' ? read(workload).requests ?? [] : [];
+    projectLoad(projected, read(bulk), calls, values);
+  } else {
+    projectExperiments(projected, values);
+    collect({ record: projected, values, raw: projected.raw });
+  }
+  projected.projectionIdentity = projectionIdentity(values);
   projected.reprojectedAt = new Date().toISOString();
   projected.reprojectionDriverHash = hash(fs.readFileSync(fileURLToPath(import.meta.url)));
   projected.reprojectionValuesHash = hash(JSON.stringify(values));
-  projected.reprojectionRawHashes = Object.fromEntries([bulk, ...(original.workload === 'scripted-agent' ? [workload] : [])]
+  projected.reprojectionRawHashes = Object.fromEntries(required
     .map(f => [f, hash(fs.readFileSync(f))]));
   if (!dryRun) write(file, projected);
   return projected;
@@ -778,6 +863,21 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   const valuesFile = options.command === 'reproject' && !options.repoRoot
     ? path.resolve(path.dirname(options.record), '../../values.json') : path.join(root, EVIDENCE, 'values.json');
   const document = read(valuesFile), values = document.values;
+  if (options.command === 'identity-check') {
+    const comparisons = [];
+    for (const group of GROUPS) for (const variant of group === 'e2-e3-load' ? ['agent-idle', 'scripted-agent'] : group === 'e4-memory-soak' ? ['1', '2', '3'] : ['both']) {
+      const ids = ['main', 'branch'].map(arm => {
+        const args = [group, '--arm', arm, ...(group === 'e2-e3-load' ? ['--workload', variant] : group === 'e4-memory-soak' ? ['--window', variant] : [])];
+        return measurementIdentity(buildPlan(parseArgs(args), values, root, { decision: 'recapture' }), {
+          sourceRoot: ROOT, outputRoot: root, armTree: ARMS[arm], arm, group, heap: values.heap, collector: values.collector, workload: variant,
+        }).pairIdentity;
+      });
+      comparisons.push({ group, variant, main: ids[0], branch: ids[1], equal: ids[0] === ids[1] });
+    }
+    console.log(JSON.stringify({ kind: 'acquisition-protocol-dry-run', note: 'Live corpus/model receipts bind the final identities after measurement', comparisons }, null, 2));
+    if (comparisons.some(c => !c.equal)) throw new Error('Acquisition protocols differ between arms');
+    return;
+  }
   if (options.command === 'reproject') {
     const result = reprojectRecord(path.resolve(options.record), values, options.dryRun);
     console.log(JSON.stringify({ recordFile: result.recordFile, reprojectedAt: result.reprojectedAt, metrics: result.metrics, clauses: result.clauses }, null, 2));
@@ -789,7 +889,22 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     console.log(JSON.stringify({ options, fixtureDecision, limitSeconds: 3540, loadBudgetSeconds: options.command === 'e2-e3-load' ? 3000 : undefined, leaseDurationSec: 3600, commands: plan }, null, 2));
     return;
   }
-  const records = latestRecords(root);
+  let records = latestRecords(root);
+  if (options.command === 'table') {
+    const pairedFiles = new Set();
+    for (const group of ['E1', 'E2', 'E3', 'E4', 'E5', 'E6']) if (records[`${group}/main`] && records[`${group}/branch`]) {
+      for (const arm of ['main', 'branch']) {
+        const r = records[`${group}/${arm}`];
+        for (const file of r.workloadRecords ?? r.windowRecords ?? [r.recordFile]) pairedFiles.add(file);
+      }
+    }
+    const projected = [];
+    for (const file of pairedFiles) {
+      try { projected.push([file, reprojectRecord(file, values, true)]); } catch (e) { throw new Error(`Table refused stale projection; reproject both arms: ${file}: ${e.message}`); }
+    }
+    for (const [file, record] of projected) write(file, record);
+    records = latestRecords(root);
+  }
   if (options.command === 'e4-hang-values') {
     const arms = ['main', 'branch'].map(arm => records[`E4/${arm}`]);
     if (arms.some(r => !r || r.failure || r.clauses['owner-duration'] !== true || !finite(r.metrics.worstPauseMs))) {
@@ -850,7 +965,8 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   const groups = { 'e1-quality': ['E1'], 'e2-e3-load': ['E2', 'E3'], 'e4-memory-soak': ['E4'], 'e5-crash': ['E5'], 'e6-hang': ['E6'] }[options.command];
   const machine = { hostname: os.hostname(), platform: os.platform(), release: os.release(), arch: os.arch(),
     cpu: os.cpus().map(c => c.model), ramBytes: os.totalmem(), node: process.version };
-  const corpusFiles = ['docs/explanation', 'docs/reference'].flatMap(dir => filesUnder(path.join(ARMS.main, dir))).sort();
+  const corpusFiles = options.command === 'e1-quality'
+    ? ['docs/explanation', 'docs/reference'].flatMap(dir => filesUnder(path.join(ARMS.main, dir))).sort() : [];
   const { pairIdentity, pairIdentityInputs } = measurementIdentity(plan, {
     sourceRoot: ROOT, outputRoot: root, armTree: options.armTree ? path.resolve(options.armTree) : ARMS[options.arm],
     arm: options.arm, group: options.command, raw, invocation: id, session: `lane-f-e-${id}`,
@@ -860,127 +976,17 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   const destination = path.join(root, EVIDENCE, options.command, options.arm);
   const recordFile = path.join(destination, `${id}.json`);
   const record = { kind: 'lane-f-e-run.v1', id, groups, arm: options.arm, window: options.window, workload: options.workload,
-    startedAt: new Date().toISOString(), machine, pairIdentity, pairIdentityInputs, valuesHash: hash(fs.readFileSync(valuesFile)),
+    startedAt: new Date().toISOString(), machine, pairIdentity, pairIdentityInputs, projectionIdentity: projectionIdentity(values), valuesHash: hash(fs.readFileSync(valuesFile)),
     recordFile, raw, runIds: [], commands: [], metrics: {}, clauses: {}, gaps: {},
     fixtureDecision,
     additionalArtifacts: [] };
-  const context = { raw, record, values, deadline: Date.now() + (options.command === 'e2-e3-load' ? 3000000 : 3540000), sequence: 0, background: [], root };
+  const context = { raw, record, values, deadline: invocationDeadline(options.command), options, sequence: 0, background: [], root };
   const bindings = { invocation: id, session: `lane-f-e-${id}` };
   const index = path.join(destination, 'index.json');
   write(recordFile, record); // Even failed/aborted branch starts prevent a later E0 refit.
   write(index, { runs: [...(fs.existsSync(index) ? read(index).runs : []), { id, record: recordFile, raw }] });
-  try {
-    fs.mkdirSync(path.join(raw, 'gc'), { recursive: true });
-    for (const template of plan) {
-      if (Date.now() >= context.deadline) throw new Error('Invocation deadline');
-      const command = resolveCommand(template, bindings);
-      if (command.mode === 'ai-activate') { await activateChat(command, context); continue; }
-      if (command.mode === 'fixture-reuse') {
-        for (const capture of command.captures) {
-          if (hash(fs.readFileSync(capture.file)) !== capture.sha256) throw new Error('PR 0b capture changed after pin check');
-          const target = path.join(raw, 'fixture', path.basename(capture.file));
-          fs.mkdirSync(path.dirname(target), { recursive: true });
-          fs.copyFileSync(capture.file, target);
-        }
-        record.commands.push({ ...command, copiedAt: new Date().toISOString() });
-        continue;
-      }
-      if (command.mode === 'instruments-start') {
-        context.collector = await new LiveCollector(context, command).start(); continue;
-      }
-      if (command.mode === 'instruments-stop') {
-        await context.collector.stop();
-        if (groups.includes('E4')) { context.collector.projectE4(); context.instrumentedE4 = true; }
-        context.collector = null; continue;
-      }
-      if (command.mode === 'crash-experiment') { await crashExperiment(context); continue; }
-      if (command.mode === 'hang-experiment') { await hangExperiment(context, command); continue; }
-      if (command.mode === 'child-path') { await childPathExperiment(context, command.reason); continue; }
-      if (command.mode === 'end-samples') {
-        fs.writeFileSync(path.join(command.directory, 'rss.stop'), 'stop');
-        fs.writeFileSync(path.join(command.directory, 'status.stop'), 'stop');
-        fs.writeFileSync(path.join(command.directory, 'admission.stop'), 'stop');
-        for (const proc of context.background.splice(0)) {
-          const result = await proc.complete;
-          if (result.code !== 0) throw new Error(`Instrument failed: ${result.receipt.label}`);
-        }
-        continue;
-      }
-      for (const arg of command.args.filter(a => /\.(csv|tsv|json)$/.test(a) && a.startsWith(raw))) fs.mkdirSync(path.dirname(arg), { recursive: true });
-      if (command.mode === 'start') {
-        await startOwned(command, context, bindings, execute, path.resolve(ARMS.main, '../../../models'));
-        continue;
-      }
-      if (command.mode === 'background') {
-        context.background.push(execute(command, context)); continue;
-      }
-      if (command.mode === 'soak') {
-        const end = Date.now() + command.minutes * 60000;
-        if (end + 60000 > context.deadline) throw new Error('Insufficient one-hour budget for complete soak window');
-        let cycle = 0;
-        while (Date.now() < end) {
-          const iteration = { ...command, label: `soak-cycle-${++cycle}`, args: [...command.args, '--reset'] };
-          const cycleContext = { ...context, deadline: Math.min(context.deadline, end) };
-          const execution = execute(iteration, cycleContext);
-          context.sequence = cycleContext.sequence;
-          const result = await execution.complete;
-          if (execution.expired() && Date.now() >= end) break;
-          if (result.code !== 0) throw new Error(`Soak cycle exited ${result.code}`);
-        }
-        record.metrics.measuredMinutes = command.minutes;
-        continue;
-      }
-      const result = await execute(command, context).complete;
-      if (result.code !== 0 && command.label.startsWith('encoder-')) {
-        // The request-time encoder probe is informational (no verdict clause). Its failure is recorded
-        // evidence about the arm (main's searches timed out after the scripted window, 2026-10-01).
-        record.gaps['encoder-probe'] = `${command.label} exited ${result.code}; see ${result.receipt.stderrFile}`;
-        continue;
-      }
-      if (result.code !== 0) throw new Error(`${command.label} exited ${result.code}; see ${result.receipt.stderrFile}`);
-      if (command.label === 'runner-status') {
-        const status = JSON.parse(result.stdout);
-        if (status.runId) throw new Error(`Shared stack occupied by ${status.runId}; no takeover`);
-      } else if (command.label === 'dirty') {
-        if (sourceDirt(result.stdout).length) throw new Error('Arm source tree is dirty; built revision is ambiguous');
-      } else if (command.label === 'revision') {
-        record.revision = result.stdout.trim();
-        if (options.arm === 'main' && !record.revision.startsWith('ac1c93bf3')) throw new Error('MAIN revision differs from owner pin');
-      }
-      if (command.mode === 'stop') { context.owned = null; delete bindings.runId; context.token = null; }
-    }
-    collect(context);
-    if (groups.includes('E5')) projectChildPolicies(record);
-  } catch (error) {
-    record.failure = error.message;
-    process.exitCode = 1;
-  } finally {
-    if (context.collector) {
-      try {
-        await context.collector.stop();
-        if (groups.includes('E4')) { context.collector.projectE4(); context.instrumentedE4 = true; }
-      } catch (error) { record.failure = `${record.failure ?? ''}; collector cleanup: ${error.message}`; }
-    }
-    for (const proc of context.background) proc.child.kill();
-    if (context.owned) {
-      const command = resolveCommand(plan.find(c => c.mode === 'stop'), bindings);
-      context.deadline = Math.min(context.deadline + 30000, Date.parse(record.startedAt) + 3590000);
-      const stopped = await execute(command, context).complete;
-      if (stopped.code !== 0) record.failure = `${record.failure ?? ''}; owned stop failed`;
-    }
-    // Retain diagnostics even when an analyzer/start/load step failed before normal projection.
-    if (record.failure) {
-      try { collect(context); } catch (error) { record.failure += `; evidence projection: ${error.message}`; }
-    }
-    record.endedAt = new Date().toISOString();
-    record.rawFiles = [raw, ...record.additionalArtifacts].flatMap(filesUnder);
-    for (const group of groups) for (const clause of CLAUSES[group]) {
-      if (record.clauses[clause] === undefined && !record.gaps[clause]) record.gaps[clause] =
-        'Named instrument did not produce a validated measurement for this clause';
-    }
-    write(recordFile, record);
-    console.log(JSON.stringify({ id, recordFile, failure: record.failure, gaps: record.gaps }, null, 2));
-  }
+  await runAcquisition(plan, context, bindings, { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies, collect, sourceDirt, CLAUSES,
+    sharedModels: path.resolve(ARMS.main, '../../../models'), finalize: context => { context.record.projectionIdentity = projectionIdentity(context.values); } });
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { await main(); } catch (error) { console.error(error.message); process.exitCode = 1; }

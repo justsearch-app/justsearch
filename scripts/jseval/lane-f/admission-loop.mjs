@@ -1103,14 +1103,14 @@ export async function captureWorkload(directory, baseUrl, stopFile, endAtMs) {
       const contextId = 'lane-f-e-workload';
       const search = newRow(`search-${sequence}`, contextId, 'search', start);
       await runSearch(connection.baseUrl, connection.token, search, controller.signal, start, timeoutState);
-      if (endAtMs !== undefined && Date.now() >= deadline && !timeoutState.timedOut && controller.signal.aborted && search.error === 'TRANSPORT_FAILURE') search.windowBoundary = true;
+      markBoundaryCancellation(search, endAtMs !== undefined && Date.now() >= deadline && !timeoutState.timedOut && controller.signal.aborted);
       capture.requests.push(search);
       if (!fs.existsSync(stopFile) && Date.now() < deadline) {
         const chat = newRow(`chat-${sequence}`, contextId, 'chat', start);
         const started = await startChat(connection.baseUrl, connection.token, chat,
           `lane-f-e-${randomUUID()}`, controller.signal, start, timeoutState);
         await started.completion;
-        if (endAtMs !== undefined && Date.now() >= deadline && !timeoutState.timedOut && controller.signal.aborted && chat.error === 'TRANSPORT_FAILURE') chat.windowBoundary = true;
+        markBoundaryCancellation(chat, endAtMs !== undefined && Date.now() >= deadline && !timeoutState.timedOut && controller.signal.aborted);
         capture.requests.push(chat);
       }
     } finally {
@@ -1122,6 +1122,13 @@ export async function captureWorkload(directory, baseUrl, stopFile, endAtMs) {
   capture.offered = capture.requests.length;
   capture.durationMs = elapsedMs(start);
   writeCapture(directory, capture);
+}
+
+export function markBoundaryCancellation(row, boundary) {
+  if (!boundary || row.error !== 'TRANSPORT_FAILURE') return;
+  row.cancellationCause = 'fixed-window-end';
+  row.windowBoundary = (row.status == null || row.status >= 200 && row.status < 300)
+    && (!row.streamed || row.terminal?.errorCount === 0 && row.terminal?.doneCount <= 1 && row.terminal?.eof === false);
 }
 
 function captureOptions(argv, commandFlag) {

@@ -38,6 +38,23 @@ def snapshot(client, expected):
             **{k: s[k] for k in keys}, 'raw': raw}
 
 
+def corpus_manifest(corpus):
+    return [[str(p.relative_to(corpus)).replace('\\', '/'), hashlib.sha256(p.read_bytes()).hexdigest()]
+            for p in sorted(corpus.rglob('*')) if p.is_file()]
+
+
+def encoder_sessions(client):
+    result = {}
+    for name, endpoint in [('ai', '/api/ai/runtime/status'), ('manifest', '/api/runtime/manifest')]:
+        try:
+            response = client.get(endpoint, timeout=5)
+            response.raise_for_status()
+            result[name] = response.json()
+        except Exception as error:
+            result[name + 'Error'] = str(error)
+    return result
+
+
 def run(args):
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -45,6 +62,7 @@ def run(args):
     count = _ensure_materialized('scifact', corpus, None)
     queries = _foreground_queries('scifact', 'bulk-load')
     result = {'kind': 'lane-f-bulk-load.v1', 'workload': args.workload, 'expectedDocuments': count,
+              'corpusManifest': corpus_manifest(corpus),
               'blockSeconds': args.block_seconds, 'modes': ['hybrid', 'lexical'],
               'concurrency': 1, 'queryPoolHash': hashlib.sha256(
                   json.dumps(queries, ensure_ascii=False).encode()).hexdigest(),
@@ -72,6 +90,7 @@ def run(args):
         result['durationSeconds'] = 2 * args.block_seconds
         first['offsetSeconds'] = 0
         result['samples'].append(first)
+        result['encoderSessions'] = {'start': encoder_sessions(client)}
 
         def sample():
             with open_client(args.base_url) as status_client:
@@ -118,7 +137,8 @@ def run(args):
                             except asyncio.TimeoutError:
                                 # Explicit block-boundary cancellation; httpx's
                                 # independent 30-second request timeout still fails.
-                                row.update(error='WINDOW_BOUNDARY_CANCELLED', windowBoundary=True)
+                                row.update(error='WINDOW_BOUNDARY_CANCELLED', windowBoundary=True,
+                                           cancellationCause='mode-block-end' if index == 0 else 'fixed-window-end')
                             except Exception as error:
                                 row['error'] = str(error)
                             row['durationMs'] = (time.monotonic() - began) * 1000
@@ -132,6 +152,7 @@ def run(args):
             final = snapshot(client, count)
             final['offsetSeconds'] = result['durationSeconds']
             result['samples'].append(final)
+            result['encoderSessions']['end'] = encoder_sessions(client)
             (out / 'phases.json').write_text(json.dumps({'foreground-load': [
                 time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(result['startedAtMs'] / 1000)),
                 time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(result.get('endedAtMs', time.time() * 1000) / 1000))]}))
