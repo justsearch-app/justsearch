@@ -411,6 +411,71 @@ final class KnowledgeServerQuerySettingsOwnerTest {
   }
 
   @Test
+  void besideCleanupErrorReleasesCapturedAAndOrderedShutdownRetriesCandidate(@TempDir Path dir)
+      throws Exception {
+    assertBesideCleanupErrorShutdown(dir, false);
+  }
+
+  @Test
+  void besideCleanupErrorPreservesEarlierServiceFailureAndCandidate(@TempDir Path dir)
+      throws Exception {
+    assertBesideCleanupErrorShutdown(dir, true);
+  }
+
+  private void assertBesideCleanupErrorShutdown(Path dir, boolean serviceFailure) throws Exception {
+    try (var f = new QueryFixture(dir, 2048L); var composition = f.composition()) {
+      var candidateSurface = f.freshSurface(false);
+      var sessions = candidateSurface.reranker().orElseThrow().sessions();
+      var nativeFailure = new LinkageError("one-shot B native close failed");
+      doThrow(nativeFailure).doNothing().when(sessions).close();
+      composition.when(() -> InferenceCompositionRoot.composeQueryRoles(any(), any(), any(),
+          any(), any())).thenReturn(candidateSurface);
+      when(f.producer.prepareQueryServingSuccessor(any(), any(), any())).thenReturn(f.candidate);
+      var prepared = f.prepare();
+      assertEquals(io.justsearch.core.component.ComposeEvidence.Mode.BESIDE,
+          prepared.composition().mode());
+      var source = (KnowledgeServer.ServingLease) get(prepared, "source");
+      var capturedA = get(source, "captured");
+      var candidateOwner = (QueryRoleSet) get(prepared, "query");
+      assertEquals(1, get(capturedA, "holders"));
+      var serviceCloseFailure = new java.io.IOException("one-shot B service close failed");
+      if (serviceFailure) doThrow(serviceCloseFailure).doNothing().when(f.candidate).close();
+      var refusal = new IllegalStateException("later owner rejected B");
+      try {
+        assertDoesNotThrow(() -> prepared.abort(refusal));
+        assertFalse(candidateOwner.isClosed());
+        assertSame(candidateOwner, get(prepared, "query"));
+        var retained = get(f.server, "encoderRecoveryReservation");
+        assertNotNull(retained);
+        assertSame(prepared, get(retained, "querySettings"));
+        assertEquals(1, refusal.getSuppressed().length);
+        var cleanup = refusal.getSuppressed()[0];
+        if (serviceFailure) {
+          assertSame(serviceCloseFailure, cleanup.getCause());
+          assertArrayEquals(new Throwable[] {nativeFailure}, cleanup.getSuppressed());
+        } else {
+          assertSame(nativeFailure, cleanup);
+        }
+        f.assertA();
+        verify(f.producer, never()).prepareProducerTransferTo(any());
+        // assertAll also attempts real ordered close on the red revision. Release only in the
+        // test's finally so a failed drain can be retried by fixture cleanup without leaking A.
+        assertAll(
+            () -> assertEquals(0, get(capturedA, "holders"), "preparation released its A capture"),
+            () -> assertDoesNotThrow(f.server::close),
+            () -> assertTrue(f.server.awaitClosed(0), "ordered shutdown completed"),
+            () -> assertTrue(candidateOwner.isClosed(), "retained B cleanup was retried"));
+        verify(sessions, atLeast(2)).close();
+        verify(f.candidate, times(2)).close();
+        verify(f.producer).close();
+        assertTrue(f.queryA.isClosed());
+      } finally {
+        source.close();
+      }
+    }
+  }
+
+  @Test
   void unknownMemoryAndInsufficientReleaseRefuseBeforeRetirement(@TempDir Path dir)
       throws Exception {
     for (Long free : java.util.Arrays.asList(null, 1L)) {
@@ -617,6 +682,12 @@ final class KnowledgeServerQuerySettingsOwnerTest {
     var method = view.getClass().getDeclaredMethod("releaseModelSets");
     method.setAccessible(true);
     method.invoke(view);
+  }
+
+  private static Object get(Object owner, String name) throws Exception {
+    Field field = owner.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(owner);
   }
 
   private static void set(Object owner, String name, Object value) throws Exception {
