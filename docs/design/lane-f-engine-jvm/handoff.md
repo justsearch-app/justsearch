@@ -165,13 +165,20 @@ branch E1, E2 x2, E4 x3, e4-hang-values, E5 and E6 on both arms, table) runs ser
 `tmp/lane-f-e-queue-q-full.stop` (it exits between items). **Never kill the runner**: its e-run child dies with
 the pipe and leaves an owned stack (stop such a stack with `dev-runner.cjs stop --run <id> --session-id
 lane-f-e-<invocation>` from the arm's tree).
+**Run discipline (from 12:53 local, queue `tmp/q-full2.txt`).** Tooling is frozen while the queue runs: any
+edit to an instrument the plan executes (including `scripts/jseval/jseval/*` modules it imports) changes pair
+identity and invalidates already-captured main records. E2-E6 activate the standard chat model on both arms
+(the first E2 main scripted run answered AI_OFFLINE for every chat call). Neither arm uses a dev AOT cache:
+`modules/ui/build/aot-dev` is deleted in the lane worktree for parity with main; do not regenerate it before E ends.
+The AOT training flag fix (`59927a956`) is for the packaged and dev caches, outside E.
+
 **F.** F-1 exits 0 at `a604f70af`: 1,373 hits dispositioned (rewrites, renames, and a reviewed allowlist
 `governance/lane-f-residue-allowlist.v1.json` whose entries are exact paths with per-occurrence line anchors),
 [dispositions](evidence/F/residue-dispositions-2026-10-01.md), [review fixes](evidence/F/residue-refutation-2026-10-01.md).
 F-5 lease holder `WORKER` -> `INDEXING` on `/api/status`. Residue branch verified: build and tests green, ui-web
 6,637 unit tests and 27/27 gates, wire gate, docs-validate, lint. Remaining F: F-6, F-7 (needs E's table), F-8;
-pruning the 36 stale `io.grpc` rows of `gradle/verification-metadata.xml` (no dependency remains; needs Gradle);
-AOT cache training flags lack G1 and compact headers.
+the 36 stale `io.grpc` verification rows are pruned (`6ddc14994`);
+AOT cache training now passes G1 and compact headers (`59927a956`; the old cache was refused at startup).
 
 ## Re-plan (owner-authorized 2026-09-30)
 
