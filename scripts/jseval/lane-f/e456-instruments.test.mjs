@@ -71,7 +71,8 @@ test('GC parser distinguishes used-after-young from full-GC retained heap and ha
     + '[2026-10-01T00:06:00.000+0000][safepoint] Safepoint "G1CollectForAllocation", Total: 10000000 ns\nmalformed');
   assert.equal(result.points.length, 2); assert.equal(result.points[0].bytes, 10 * 1024 ** 2);
   assert.deepEqual(result.points.map(p => p.full), [true, false]); assert.deepEqual(result.pausesMs, [100, 10, 10]);
-  assert.ok(gcLogOption('F:/my logs').includes('F\\:/my logs'));
+  assert.ok(gcLogOption('F:\\my logs').includes('file="F:/my logs/jvm-%p-%t.log"'));
+  assert.ok(!gcLogOption('F:/my logs').includes('\\:'), 'JDK 25 rejects an escaped drive colon');
 });
 test('heap slopes reject growth, sparse/wrong-kind coverage and preserve rotated-point identities', () => {
   const start = Date.parse('2026-10-01T00:00:00Z'), end = start + 55 * 60000;

@@ -6,8 +6,9 @@ export const verdict = checks => checks.includes(false) ? 'fail'
   : checks.length && checks.every(c => c === true) ? 'pass' : 'unmeasurable';
 
 export function gcLogOption(directory) {
-  // Unified logging uses ':' as a delimiter, including on Windows drive paths.
-  const destination = directory.replaceAll('\\', '/').replace(/^([A-Za-z]):/, '$1\\:');
+  // Unified logging uses ':' as a delimiter; the quoted file name carries a Windows drive colon.
+  // A backslash escape (F\:) makes JDK 25 refuse to start ("Invalid argument"; checked 2026-10-01).
+  const destination = directory.replaceAll('\\', '/');
   return `-Xlog:gc*,safepoint:file="${destination}/jvm-%p-%t.log":time,uptime,pid,level,tags:filecount=20,filesize=32m`;
 }
 const bytes = (value, unit) => Number(value) * ({ B: 1, K: 1024, M: 1024 ** 2, G: 1024 ** 3 }[unit] ?? NaN);
