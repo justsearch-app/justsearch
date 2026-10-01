@@ -6970,15 +6970,8 @@ public final class KnowledgeServer implements Closeable {
                         migrationCutoverMaxFailedJobs,
                         () -> ingestLifecycle,
                         this::finalizeEmbeddingRebuildBeforeCutover,
-                        this::verifyGreenCommitMetadataBestEffort,
                         this::drainSwitchBufferBestEffort,
-                        this::flushTelemetryBestEffort,
-                        () -> migrationRestartAction.run(),
-                        dataDir,
                         log,
-                         () -> {
-                           throw new IOException("Live cutover requires its prepared serving successor");
-                         },
                          this::enterSwitchingWithMutationAdmission,
                          new KnowledgeServerMigrationOps.CheckedLiveCutover() {
                            @Override public boolean recorded() {
@@ -8036,16 +8029,6 @@ public final class KnowledgeServer implements Closeable {
 
   private static boolean referencesRuntime(ServingView view, LuceneRuntime runtime) {
     return view != null && (view.searchRuntime == runtime || view.ingestRuntime == runtime);
-  }
-
-  /**
-   * Writes the pending worker metrics snapshot now rather than at the next 60s tick. Called before
-   * the cutover restart, which otherwise discards the counters the cutover itself produced.
-   */
-  private void flushTelemetryBestEffort() {
-    if (telemetry instanceof LocalTelemetry lt) {
-      lt.flush();
-    }
   }
 
   /**

@@ -37,7 +37,6 @@ final class MigrationOps {
         return startMigration(
                     MigrationStartRequest.newBuilder()
                             .setReason(reason == null ? "" : reason)
-                            .setRestartWorker(false)
                             .addAllProjectionSourceIds(projectionSourceIds)
                             .setProjectionSourceIdsPresent(true)
                             .build(), engineContext);
@@ -59,7 +58,6 @@ final class MigrationOps {
         }
         var request = MigrationStartRequest.newBuilder()
                 .setReason(reason == null ? "" : reason)
-                .setRestartWorker(false)
                 .setRecordedOperationKey(operationKey)
                 .setTargetIndexFingerprint(targetIndexFingerprint)
                 .setExpectedSourceGeneration(expectedSourceGeneration);
@@ -128,7 +126,7 @@ final class MigrationOps {
     MigrationOutcome rollbackMigration(EngineContext engineContext) {
         try {
             MigrationRollbackRequest req =
-                    MigrationRollbackRequest.newBuilder().setRestartWorker(true).build();
+                    MigrationRollbackRequest.getDefaultInstance();
             var resp =
                     rpc.execute(
                             "rollbackMigration",

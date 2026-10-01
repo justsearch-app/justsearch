@@ -90,14 +90,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private final OnlineAiService onlineAi;
   private final UiSettingsStore settingsStore;
   private final io.justsearch.app.api.SettingsService settingsService;
-  // Tempdoc 374 alpha.17 R3: late-bound. LocalApiServer constructs this service
-  // before the worker bootstrap completes (HeadlessApp passes null at api-builder
-  // time and late-binds via apiServer.lateBindKnowledgeServer). Pre-alpha.17
-  // this field was final-null forever — tryRestartWorkerBestEffort silently
-  // early-returned, the post-Install-AI worker restart never fired, and the
-  // boot-1 worker JVM kept its empty ORT native_path until the user manually
-  // relaunched. Volatile to make the late-bind visible to any subsequent
-  // Install AI invocation.
+  // Late-bound after the index half starts; volatile publishes it to later install invocations.
   private volatile KnowledgeServerBootstrap knowledgeServer;
   private final EnterprisePolicyService policyService;
   // Tempdoc 737 fix pack (fix 3): the single-writer runtime authority. When present, the post-
@@ -337,13 +330,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     this(onlineAi, settingsStore, knowledgeServer, policyService, resolveHomeDir(), reconciler, settingsService);
   }
 
-  /**
-   * Tempdoc 374 alpha.17 R3: late-bind the worker reference. Called from
-   * {@code LocalApiServer.lateBindKnowledgeServer} once the Worker bootstrap
-   * finishes. Without this, {@link #tryRestartWorkerBestEffort} silently
-   * no-ops at end of Install AI and the worker never picks up the new ORT
-   * native_path until the user manually relaunches.
-   */
+  /** Publishes the index bootstrap after LocalApiServer late binding. */
   public void setKnowledgeServer(KnowledgeServerBootstrap knowledgeServer) {
     this.knowledgeServer = knowledgeServer;
   }
@@ -1497,7 +1484,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
                             // activation owns their settings projection after this acquisition.
                             () -> false,
                             ortNativePathOnce,
-                            StagedAcquisition.restartGate(acquired, this::tryRestartWorkerBestEffort),
+                            StagedAcquisition.restartGate(acquired, this::reportEngineRestartRequired),
                             cancelFlag::get,
                             (phase, message) -> updateState("running", phase, message))
                         .apply(),
@@ -1512,7 +1499,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
                             // activation owns their settings projection after this acquisition.
                             () -> false,
                             ortNativePathOnce,
-                            this::tryRestartWorkerBestEffort,
+                            this::reportEngineRestartRequired,
                             cancelFlag::get,
                             (phase, message) -> updateState("running", phase, message))
                         .apply(),
@@ -2481,20 +2468,15 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   // ---------------------------------------------------------------------------
-  // Worker restart and smoke test
+  // Engine restart guidance and smoke test
   // ---------------------------------------------------------------------------
 
   /**
-   * @return always false since lane F stage A item A11: there is no worker process to restart.
-   *
-   * <p>This used to replace the Worker child process so a freshly installed model was picked up
-   * without the user doing anything. The index half runs in this process now, so the equivalent is
-   * an Engine restart — the user's action, not the installer's. The method is kept (rather than
-   * having its two call sites drop the step silently) so the FALSE it returns keeps flowing into
-   * the install status the surface already renders: the caller reports "a restart is required"
-   * instead of claiming the model is live. Stage A §10, "restart-as-reload".
+   * Reports that installed inputs need an ordered Engine restart. This callback does not request
+   * a restart; false keeps the acquisition gate from claiming that the new model is already live.
+   * Restart-required settings are requested by the settings coordinator through the supervisor.
    */
-  private boolean tryRestartWorkerBestEffort() {
+  private boolean reportEngineRestartRequired() {
     if (knowledgeServer == null || !knowledgeServer.hasClient()) {
       return false;
     }

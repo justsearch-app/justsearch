@@ -17,9 +17,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Migration start opens Green live; rollback and cutover retain their own response contracts. */
+/** Live migration responses, including compatibility with the retained obsolete restart flag. */
 @DisplayName("migration responses — live start")
-final class MigrationRestartRequiredTest {
+final class MigrationLifecycleResponseTest {
   private static final String OPERATION_KEY = "01994180-0000-7000-8000-000000000121";
   private static final String TARGET_FINGERPRINT = "a".repeat(64);
 
@@ -67,7 +67,7 @@ final class MigrationRestartRequiredTest {
   }
 
   @Test
-  @DisplayName("a caller that did not ask for a restart is not told one is required")
+  @DisplayName("migration start without the obsolete flag opens Green live")
   void startWithoutRestartRequestReportsFalse(@TempDir Path tempDir) throws Exception {
     Path indexBase = tempDir.resolve("index");
     IndexGenerationManager seed = new IndexGenerationManager(indexBase);
@@ -78,7 +78,7 @@ final class MigrationRestartRequiredTest {
             .startMigration(
                 MigrationStartRequest.newBuilder()
                     .setReason("checkpoint_test")
-                    .setRestartWorker(false)
+
                     .build());
 
     assertTrue(response.getAccepted(), "precondition: the migration must be accepted");
@@ -121,7 +121,7 @@ final class MigrationRestartRequiredTest {
     assertTrue(idle.getAccepted());
     assertFalse(idle.getRestartRequired(), "an idle no-op has no promotion to reopen");
     assertTrue(ops.startMigration(MigrationStartRequest.newBuilder()
-        .setReason("checkpoint_test").setRestartWorker(false).build()).getAccepted());
+        .setReason("checkpoint_test").build()).getAccepted());
     var cutover = ops.requestCutover(MigrationCutoverRequest.newBuilder()
         .setForceSwitching(true).build());
     assertTrue(cutover.getAccepted());
@@ -137,17 +137,23 @@ final class MigrationRestartRequiredTest {
     seed.initializeOrLoad();
     MigrationControlOps ops = opsOver(indexBase);
     ops.startMigration(
-        MigrationStartRequest.newBuilder().setReason("checkpoint_test").setRestartWorker(false).build());
+        MigrationStartRequest.newBuilder().setReason("checkpoint_test").build());
 
     seed.promoteBuildingGenerationToActive();
+    String published = seed.readStateBestEffort().active_generation();
 
     MigrationRollbackResponse response =
         ops.rollbackMigration(MigrationRollbackRequest.newBuilder().setRestartWorker(true).build());
 
     assertFalse(response.getAccepted(), "a live serving view cannot be reverted by pointer only");
     assertFalse(response.getRestartRequired());
-    assertEquals(seed.readStateBestEffort().active_generation(),
-        new IndexGenerationManager(indexBase).readStateBestEffort().active_generation());
+    assertTrue(response.getError().contains("new recorded rebuild"));
+    assertEquals(published, new IndexGenerationManager(indexBase).readStateBestEffort().active_generation());
+    var withoutFlag = ops.rollbackMigration(MigrationRollbackRequest.getDefaultInstance());
+    assertFalse(withoutFlag.getAccepted());
+    assertFalse(withoutFlag.getRestartRequired());
+    assertEquals(response.getError(), withoutFlag.getError());
+    assertEquals(published, new IndexGenerationManager(indexBase).readStateBestEffort().active_generation());
   }
 
   @Test
@@ -159,7 +165,6 @@ final class MigrationRestartRequiredTest {
     var initial = seed.initializeOrLoad().state();
     MigrationStartRequest request = MigrationStartRequest.newBuilder()
         .setReason("bulk_reindex")
-        .setRestartWorker(true)
         .setRecordedOperationKey(OPERATION_KEY)
         .setTargetIndexFingerprint(TARGET_FINGERPRINT)
         .setExpectedSourceGeneration(initial.active_generation())
@@ -205,13 +210,13 @@ final class MigrationRestartRequiredTest {
     MigrationControlOps ops = opsOver(indexBase);
 
     MigrationStartResponse keyOnly = ops.startMigration(MigrationStartRequest.newBuilder()
-        .setReason("bulk_reindex").setRestartWorker(true)
+        .setReason("bulk_reindex")
         .setRecordedOperationKey(OPERATION_KEY).build());
     MigrationStartResponse fingerprintOnly = ops.startMigration(MigrationStartRequest.newBuilder()
-        .setReason("bulk_reindex").setRestartWorker(true)
+        .setReason("bulk_reindex")
         .setTargetIndexFingerprint(TARGET_FINGERPRINT).build());
     MigrationStartResponse missingSource = ops.startMigration(MigrationStartRequest.newBuilder()
-        .setReason("bulk_reindex").setRestartWorker(true)
+        .setReason("bulk_reindex")
         .setRecordedOperationKey(OPERATION_KEY)
         .setTargetIndexFingerprint(TARGET_FINGERPRINT).build());
 

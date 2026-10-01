@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import io.justsearch.app.api.IndexingService.MigrationOutcome;
 import io.justsearch.ipc.MigrationCutoverResponse;
 import io.justsearch.ipc.MigrationRollbackResponse;
+import io.justsearch.ipc.MigrationRollbackRequest;
 import io.justsearch.ipc.MigrationStartRequest;
 import io.justsearch.ipc.MigrationStartResponse;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,21 @@ final class MigrationOutcomeProjectionTest {
       assertEquals(expected, client.startMigration("manual", io.justsearch.app.services.TestEngineContexts.durableInternal()));
       assertEquals(expected, client.requestCutover(true, io.justsearch.app.services.TestEngineContexts.durableInternal()));
       assertEquals(expected, client.rollbackMigration(io.justsearch.app.services.TestEngineContexts.durableInternal()));
+    }
+  }
+
+  @Test
+  void rollbackDoesNotRequestTheRetiredProcessRestart() {
+    IngestServiceCalls calls = mock(IngestServiceCalls.class);
+    when(calls.rollbackMigration(any())).thenReturn(MigrationRollbackResponse.newBuilder()
+        .setAccepted(false).setError("Generation rollback requires a new recorded rebuild").build());
+    try (var client = new TestKnowledgeClient(
+        new io.justsearch.core.execution.TestEngineExecutors(), null, calls, null)) {
+      assertEquals(new MigrationOutcome(false, false), client.rollbackMigration(
+          io.justsearch.app.services.TestEngineContexts.durableInternal()));
+      var request = ArgumentCaptor.forClass(MigrationRollbackRequest.class);
+      verify(calls).rollbackMigration(request.capture());
+      assertFalse(request.getValue().getRestartWorker());
     }
   }
 
