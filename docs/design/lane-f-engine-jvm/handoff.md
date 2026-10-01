@@ -190,6 +190,8 @@ Branch E4/E6 fail fast on the same check until fixed. Overnight: `tmp/q-night2.t
 `tmp/q-night3.txt` (main E4 w3, main E5, table) via `tmp/lane-f-e-chain.mjs`. After both fixes: rebuild the
 branch and rerun every branch group (E1, E2 x2, E4 x3, E5, E6), then `e4-hang-values`, E6 and `table`.
 
+**Owner decision 2026-10-01 ~22:30: GPU policy = budget-aware co-residence.** A new ADR supersedes ADR-0004 single tenancy: encoders stay on CUDA beside the chat model when the device budget fits, yield on small devices or under pressure. Diagnosis: main never applied ADR-0004 (its Head GPU listener was never registered: HeadlessApp null bootstrap -> InferenceWiring returns early), the branch does, so whenever chat is loaded the branch ran encoders on CPU. A refute-first review ([gpu review](evidence/E/gpu-yield-diagnosis-2026-10-01.md) + C:/Users/Elias/AppData/Local/Temp/cx/gpurev-findings.md) rejected the first quick fix (subprocess GPU probes per acquisition, 512 MiB reserve below embedding working memory, no SPLADE/NER reclamation, no hysteresis, stale docs/ADR). Design + implementation in progress, worktree `lane-f-gpu-yield`, Sol session `01a0f924-c5d0-76c3-8a40-c329e3e317ee` (output gpuyield2.out). Then: build, unit + lifecycle tests, live proof, independent review, rerun every branch E group.
+
 **Run discipline (from 12:53 local, queue `tmp/q-full2.txt`).** Tooling is frozen while the queue runs: any
 edit to an instrument the plan executes (including `scripts/jseval/jseval/*` modules it imports) changes pair
 identity and invalidates already-captured main records. E2-E6 activate the standard chat model on both arms
