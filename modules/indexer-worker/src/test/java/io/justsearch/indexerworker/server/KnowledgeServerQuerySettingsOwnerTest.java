@@ -77,8 +77,11 @@ final class KnowledgeServerQuerySettingsOwnerTest {
       server.appServices = producer;
       try (var issuedA = server.captureServingView()) {
         assertSame(producer, issuedA.services());
+        assertEquals(1, server.retainedEncoderCount());
         var aborted = server.prepareQueryRoleSettings(new UiSettings(), desired, Set.of(), prior);
+        assertEquals(2, server.retainedEncoderCount(), "BESIDE holds both exact query owners");
         aborted.abort();
+        assertEquals(1, server.retainedEncoderCount());
         verify(successor).close();
         try (var stillA = server.captureServingView()) {
           assertSame(producer, stillA.services());
@@ -99,7 +102,9 @@ final class KnowledgeServerQuerySettingsOwnerTest {
         }
         verify(producer, never()).close();
         assertFalse(queryA.isClosed());
+        assertEquals(2, server.retainedEncoderCount(), "Issued A retains its native query owner");
       }
+      assertEquals(1, server.retainedEncoderCount(), "Final A lease drain releases the second set");
       verify(producer).close();
       assertTrue(queryA.isClosed());
       assertFalse(index.isClosed());
@@ -120,10 +125,19 @@ final class KnowledgeServerQuerySettingsOwnerTest {
             assertFalse(f.queryA.isClosed());
             return f.surface;
           });
+      assertEquals(1, f.server.retainedEncoderCount());
       var prepared = f.prepare();
       assertEquals(io.justsearch.core.component.ComposeEvidence.Mode.BESIDE,
           prepared.composition().mode());
+      assertEquals(2, f.server.retainedEncoderCount());
+      var refused = assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class,
+          f::prepare);
+      assertTrue(refused.getCause().getMessage().contains("Retained-state co-resident-encoders cap=2"));
+      composition.verify(() -> InferenceCompositionRoot.composeQueryRoles(any(), any(), any(), any(),
+          any()), times(1));
+      assertEquals(2, f.server.retainedEncoderCount(), "A refusal cannot close the first candidate");
       prepared.abort();
+      assertEquals(1, f.server.retainedEncoderCount());
       f.assertA();
     }
   }
@@ -444,6 +458,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
       try {
         assertDoesNotThrow(() -> prepared.abort(refusal));
         assertFalse(candidateOwner.isClosed());
+        assertEquals(2, f.server.retainedEncoderCount(), "Refused native retirement still occupies capacity");
         assertSame(candidateOwner, get(prepared, "query"));
         var retained = get(f.server, "encoderRecoveryReservation");
         assertNotNull(retained);

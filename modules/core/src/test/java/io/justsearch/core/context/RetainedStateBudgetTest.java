@@ -10,6 +10,31 @@ import org.junit.jupiter.api.Test;
 
 final class RetainedStateBudgetTest {
   @Test
+  void projectedOwnerUsesRealCountsWithoutInventingPermits() {
+    var budget = new RetainedStateBudget();
+    budget.declare("fixture-resource", 2, "owner");
+    var count = new java.util.concurrent.atomic.AtomicReference<Integer>();
+    budget.connect("fixture-resource", () -> {
+      org.junit.jupiter.api.Assertions.assertFalse(Thread.holdsLock(budget),
+          "Owner projection must run outside the budget monitor");
+      return count.get();
+    });
+    assertNull(budget.snapshot().getFirst().count());
+    assertNull(budget.snapshot().getFirst().awaitingProducer(), "Connected but unobserved is not unimplemented");
+    count.set(2);
+    assertEquals(2, budget.snapshot().getFirst().count());
+    assertNull(budget.snapshot().getFirst().awaitingProducer());
+    count.set(1);
+    assertEquals(1, budget.snapshot().getFirst().count());
+    count.set(3);
+    assertEquals(3, budget.snapshot().getFirst().count(), "A breached bound must remain visible");
+    assertEquals(2, budget.cap("fixture-resource"));
+    assertThrows(IllegalStateException.class, () -> budget.tryAcquire("fixture-resource"));
+    assertThrows(IllegalStateException.class, () -> budget.activate("fixture-resource"));
+    assertThrows(IllegalStateException.class, () -> budget.connect("fixture-resource", count::get));
+  }
+
+  @Test
   void concurrentOwnersCannotExceedTheCap() throws Exception {
     var budget = new RetainedStateBudget();
     budget.declare("fixture-resource", 3, "test");

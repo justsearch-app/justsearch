@@ -31,14 +31,14 @@
     {
       "kind": "representation-generations",
       "cap": 2,
-      "awaitingProducer": "D1",
-      "note": "Target active plus candidate. Current IndexGenerationManager can protect active, building and previous: three distinct generations. D1 must reconcile rollback retention with this target before claiming enforcement."
+      "producer": "IndexGenerationManager.retainedGenerationCount",
+      "note": "Active plus candidate or committed predecessor. Physical directories, including abandoned candidates and locked retirement payloads, occupy capacity until deletion; a third is refused by IndexGenerationManager.requireBuildCapacity. Diagnostic corruption backups are excluded by that same admission filter."
     },
     {
       "kind": "co-resident-encoders",
       "cap": 2,
-      "awaitingProducer": "D1",
-      "note": "Count ceiling only. D1 additionally checks each generation's declared footprint against free device memory; this count does not prove device-memory fit."
+      "producer": "KnowledgeServer.retainedEncoderCount",
+      "note": "The live maximum of distinct unclosed index-role and query-role sets, including unpublished candidates and retired sets awaiting lease/native drain. KnowledgeServer refuses a third set before composition with Retained-state co-resident-encoders cap=2 and the live domain counts. Count ceiling only. D1 additionally checks each generation's declared footprint against free device memory; this count does not prove device-memory fit."
     },
     {
       "kind": "attempted-configurations",

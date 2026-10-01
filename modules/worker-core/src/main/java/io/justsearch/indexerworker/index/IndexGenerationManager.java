@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
  */
 // PERMANENT COMPAT - DO NOT REMOVE (generation layout is an on-disk contract)
 public final class IndexGenerationManager {
+  public static final int RETAINED_GENERATION_CAP = 2;
   private static final Logger log = LoggerFactory.getLogger(IndexGenerationManager.class);
   // Several manager instances share one Engine's generation pointers. Serialize control and
   // fallback repair without a persistent lock or an alias-sensitive/unbounded path registry.
@@ -1847,6 +1848,36 @@ public final class IndexGenerationManager {
   }
 
   /** Count physical representations, including an abandoned but not yet deleted candidate. */
+  public int retainedGenerationCount() {
+    try (var ignored = stateControl()) {
+      java.nio.file.attribute.BasicFileAttributes directory;
+      try {
+        directory = Files.readAttributes(indicesDir, java.nio.file.attribute.BasicFileAttributes.class,
+            java.nio.file.LinkOption.NOFOLLOW_LINKS);
+      } catch (java.nio.file.NoSuchFileException absent) {
+        return 0;
+      }
+      if (!directory.isDirectory()) throw new IOException("Generation root is not a directory: " + indicesDir);
+      try (var entries = Files.list(indicesDir)) {
+        int count = 0;
+        var paths = entries.iterator();
+        while (paths.hasNext()) {
+          if (isRetainedRepresentation(paths.next())) count = Math.incrementExact(count);
+        }
+        return count;
+      }
+    } catch (IOException failure) {
+      throw new java.io.UncheckedIOException("Cannot measure retained index generations", failure);
+    }
+  }
+
+  private static boolean isRetainedRepresentation(Path entry) throws IOException {
+    // Diagnostic corruption backups are not open/serving/building representations.
+    return Files.readAttributes(entry, java.nio.file.attribute.BasicFileAttributes.class,
+            java.nio.file.LinkOption.NOFOLLOW_LINKS).isDirectory()
+        && !entry.getFileName().toString().matches("g-.+\\.bak-[0-9]{8}-[0-9]{6}");
+  }
+
   private void requireBuildCapacity(State state, String acceptedTarget, boolean allowActivePrevious)
       throws IOException {
     String active =
@@ -1860,15 +1891,12 @@ public final class IndexGenerationManager {
     }
     try (var entries = Files.list(indicesDir)) {
       for (Path entry : entries.toList()) {
-        if (!Files.isDirectory(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        if (!isRetainedRepresentation(entry)) {
           continue;
         }
         String name = entry.getFileName().toString();
         // Backup-first corruption recovery retains the damaged index as a diagnostic backup.
         // It is not a serving/building generation and must not block rebuilding its replacement.
-        if (name.matches("g-.+\\.bak-[0-9]{8}-[0-9]{6}")) {
-          continue;
-        }
         if (!name.equals(active) && !name.equals(acceptedTarget)) {
           throw new IOException(
               "A retained generation representation still occupies build capacity");

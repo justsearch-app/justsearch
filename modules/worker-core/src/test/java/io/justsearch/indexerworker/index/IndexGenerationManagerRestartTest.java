@@ -25,6 +25,54 @@ import org.junit.jupiter.api.Test;
 class IndexGenerationManagerRestartTest {
 
   @Test
+  void physicalRetainedCountFollowsMigrationAndRetirement(@org.junit.jupiter.api.io.TempDir Path base)
+      throws Exception {
+    var manager = new IndexGenerationManager(base);
+    assertEquals(0, manager.retainedGenerationCount());
+    manager.initializeOrLoad();
+    assertEquals(1, manager.retainedGenerationCount());
+    manager.startFreshMigration("retained-count");
+    assertEquals(2, manager.retainedGenerationCount());
+    var refusal = assertThrows(java.io.IOException.class,
+        () -> manager.startFreshMigration("third-generation"));
+    assertTrue(refusal.getMessage().contains("active or retained"));
+    assertEquals(2, manager.retainedGenerationCount());
+    var promoted = manager.promoteBuildingGenerationToActive();
+    assertEquals(2, manager.retainedGenerationCount(), "Pointer publication does not retire disk payload");
+    var retained = assertThrows(java.io.IOException.class,
+        () -> manager.startFreshMigration("third-before-retirement"));
+    assertTrue(retained.getMessage().contains("Previous generation still occupies build capacity"));
+    manager.retirePreviousGeneration(promoted.active_generation(), promoted.previous_generation());
+    assertEquals(1, manager.retainedGenerationCount());
+    new IndexGenerationManager(base).startFreshMigration("after-retirement");
+    assertEquals(2, manager.retainedGenerationCount(), "Projection reads disk, not one manager's allocations");
+  }
+
+  @Test
+  void diskProjectionDoesNotHideAbandonedOrLockedRetirementRepresentations(
+      @org.junit.jupiter.api.io.TempDir Path base) throws Exception {
+    var manager = new IndexGenerationManager(base);
+    manager.initializeOrLoad();
+    Files.createDirectory(base.resolve("indices/g-damaged.bak-20261001-120000"));
+    assertEquals(1, manager.retainedGenerationCount(), "Admission excludes diagnostic backups");
+    Files.createDirectory(base.resolve("indices/g-abandoned.del-20261001-120000"));
+    assertEquals(2, manager.retainedGenerationCount());
+    var refused = assertThrows(java.io.IOException.class,
+        () -> manager.startFreshMigration("locked-predecessor"));
+    assertTrue(refused.getMessage().contains("retained generation representation"));
+    Files.createDirectory(base.resolve("indices/g-unexpected-third"));
+    assertEquals(3, manager.retainedGenerationCount(), "A physical breach is visible, never clamped");
+  }
+
+  @Test
+  void unreadableGenerationLayoutCannotReportMeasuredZero(
+      @org.junit.jupiter.api.io.TempDir Path base) throws Exception {
+    var manager = new IndexGenerationManager(base);
+    Files.createFile(base.resolve("indices"));
+    assertThrows(java.io.UncheckedIOException.class, manager::retainedGenerationCount);
+  }
+
+  @Test
   void openedPathIdentityRejectsAnotherGenerationsManifest() throws Exception {
     Path base = Files.createTempDirectory("genmgr-opened-identity");
     IndexGenerationManager manager = new IndexGenerationManager(base);
