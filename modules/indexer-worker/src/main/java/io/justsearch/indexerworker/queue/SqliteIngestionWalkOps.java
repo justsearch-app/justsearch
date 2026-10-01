@@ -105,6 +105,24 @@ final class SqliteIngestionWalkOps {
     var existing = find(connection, key);
     if (existing.isEmpty()) {
       if (!createIfMissing) throw new IllegalStateException("Recorded walk state is unavailable");
+      // Acceptance without a checkpoint can legitimately precede the first walk. It cannot
+      // justify recreating a projection whose units or receipts survived its disappearance.
+      // The queue's transaction owns both this check and the following insert.
+      try (var evidence = connection.prepareStatement("""
+          SELECT 1 FROM jobs WHERE scan_id = ? AND walk_seen_epoch IS NOT NULL
+          UNION ALL SELECT 1 FROM ingestion_ledger WHERE operation_key = ?
+          UNION ALL SELECT 1 FROM ingestion_walk_sealed_units WHERE operation_key = ?
+          LIMIT 1
+          """)) {
+        evidence.setString(1, key);
+        evidence.setString(2, key);
+        evidence.setString(3, key);
+        try (var retained = evidence.executeQuery()) {
+          if (retained.next()) {
+            throw new JobQueue.RecordedWalkGapException("Recorded walk evidence survived missing progress");
+          }
+        }
+      }
       try (var insert = connection.prepareStatement("INSERT INTO ingestion_walk_progress "
           + "(operation_key, plan_hash, enumeration_epoch, captured_plan) VALUES (?, ?, 1, ?)")) {
         insert.setString(1, key); insert.setString(2, planHash); insert.setBoolean(3, capturedPlan);

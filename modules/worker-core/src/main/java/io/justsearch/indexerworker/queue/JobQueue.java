@@ -93,7 +93,9 @@ public interface JobQueue extends Closeable {
 
   /**
    * Enter a finite walk only after outer operation acceptance. Missing progress may be created
-   * only for a fresh attempt, never to infer successful recovery from a rebuilt jobs database.
+   * only when the outer owner proves acceptance without any checkpoint or confirmed progress,
+   * including a recovered child that never reached its first walk. Retained units or receipts
+   * forbid creation; a rebuilt jobs database cannot justify discarding a confirmed checkpoint.
    * An interrupted enumeration gets a new epoch; a closed enumeration is never silently reopened.
    */
   default WalkProgress beginRecordedWalk(String operationKey, String planHash, boolean createIfMissing) {
