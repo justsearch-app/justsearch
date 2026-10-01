@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import identity from '../dev/lib/process-identity.cjs';
+import { killOwned } from './verified-crash.mjs';
 
 function recordedPair(data, parentKey) {
   const database = new DatabaseSync(path.join(data, 'operations.db'), { readOnly: true });
@@ -62,7 +63,7 @@ export async function exerciseProcessingReplay(c) {
   requireThat(identity.isVerifiedMatch(verified), `refusing unverified test crash: ${verified.reason}`);
   // This is the regression's deliberate crash of its own Engine, not helper cleanup. The runner
   // remains alive and performs production recovery; final cleanup still uses its owned stop path.
-  process.kill(first.pid, 'SIGKILL');
+  killOwned(record, data);
   await waitFor('Engine is dead and host has entered counted restart cooldown', 10000, () => {
     let alive = true;
     try { process.kill(first.pid, 0); } catch (error) {

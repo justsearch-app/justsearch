@@ -227,17 +227,24 @@ driver preserves all three boundaries and never calls them continuous.
 `table` runs the existing fixture gate when both captures are present,
 then reports every group and clause, including missing or failed evidence.
 
-**Instrument gaps remain explicit.** MAIN's pinned tree has neither the
-new Engine crash harness nor the conformance actuator. The available
-conformance cases drive a fake Engine with fixed 200 ms overrides, so
-the driver refuses to run them as E6's live-JVM/E4-derived proof and
-records E6 unmeasurable. E5's branch processing harness uses a single-file
-workload and a ten-second observation cooldown, so its successful replay
-does not prove the paired 100-document/deadline/child-policy clauses.
-E4 records memory windows but the existing instruments do not provide
-scheduled reconfigure, live-after-GC trend, a numeric component commit
-budget or continuous crash observations; those clauses stay unmeasurable.
-These are implementation gaps, not acceptance deferrals. E7 remains
+**Instrument gaps remain explicit.** The paired extensions are specified in
+[the accepted E4–E6 instrument design](../evidence/E/e456-instruments-design.md).
+`e456-live.mjs` collects scoped process/private-byte samples, every JVM's
+GC logs and launch flags, scheduled real settings changes, and continuous
+supervisor/Head log evidence. E5 kills the actual owned Engine or Worker
+with accepted jobs in flight, sharing verified crash mechanics with the
+real-writer fixture while retaining production cooldown. E6 attaches JDWP
+only to an owned loopback debug port and suspends request threads or the
+application VM; it uses no fake Engine or production code changes.
+These implementations require root's live run before any acceptance claim.
+MAIN has no Lane F operations/checkpoint ledger or recovering Head supervisor;
+the literal unsupported E5/E6 clauses remain `unmeasurable-on-split`, with
+native Worker results and the §16 disposition beside them. Missing GC,
+checkpoint, active child, or fault-confirmation evidence remains unmeasurable.
+The memory bound compares summed arm commit against split and checks each
+JVM's documented launch limits; it invents no absolute process ceiling.
+Run both E4 arms' three windows, then `e4-hang-values` before E6 to freeze
+the observed safepoint-derived interval and misses. E7 remains
 operator-driven and externally blocked on signing as specified in §7.
 
 Static verification: `node --check scripts/jseval/lane-f/e-run.mjs`,
