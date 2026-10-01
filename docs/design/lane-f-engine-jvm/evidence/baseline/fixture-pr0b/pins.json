@@ -1,0 +1,22 @@
+{
+  "directory": "docs/design/lane-f-engine-jvm/evidence/baseline/fixture-pr0b/side-a",
+  "recordedRevision": "f938c4eb2e9b487bd0965859108d239c30e8601f",
+  "revisionSource": "PR 0b publication (#717), which records these captures and their unchanged pinned implementation",
+  "pinnedSurfaces": [
+    "modules",
+    ":(exclude)modules/ui-web",
+    ":(exclude)modules/shell",
+    "contracts",
+    "SSOT",
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    "gradle",
+    "build-logic",
+    "scripts/jseval/lane-f-workflow-fixture.v1.json",
+    "scripts/jseval/jseval/workflow_fixture.py",
+    "scripts/jseval/lane-f/fixture-pair.sh",
+    "scripts/jseval/lane-f/fixture-cycle.sh",
+    "docs/explanation",
+    "docs/reference"
+  ]
+}
