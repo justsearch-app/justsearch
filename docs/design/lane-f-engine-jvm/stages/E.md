@@ -237,13 +237,34 @@ model set, and the stop producer supplied no exit census. The corrections are:
   within its timeout, without observed violations, can be boundary-censored;
   the cancellation cause is retained. Collector calls, including settings
   restoration, append their own HTTP journal and enter the same wire verdict.
-- Effective config plus runtime AI receipts must establish the executed models
-  before loading. Configured external model files enter the size/mtime inventory
-  directly, even without runtime references. Missing/unknown runtime identity
-  fails the invocation and finalization. E1 may start with explicitly dormant
-  sessions; finalization still requires executed identity. E5 quit/upgrade do not
+- Effective config/manifest receipts plus model discovery under the verified
+  shared model root establish configured identities before loading. Configured
+  external model files enter the size/mtime inventory directly. Missing configured
+  files fail the invocation and finalization; reported runtime paths must match
+  the configured directory or its declared CPU/GPU weight variant. E5 quit/upgrade do not
   request a runtime receipt after deliberately terminating the API; their
   mandatory startup receipts identify the models used by those experiments.
+
+  **2026-10-01 lazy-session correction (owner decision):** MAIN's embed/SPLADE
+  worker-policy snapshot claims CPU activity with null model paths before first
+  inference. Requiring realized paths blocked E1 before measurement at 259e022da.
+  Acquisition identity now binds configured paths for embed, SPLADE, NER,
+  reranker, citation scorer and chat, resolving relative paths against the shared
+  models directory using the module discoverers' standard/dev layouts. Additional
+  configured choices (including projector and chunk reranker) are also bound.
+  Runtime observations never enter pair identity: lazy/missing identities and
+  unavailable observations are retained as evidence, while any reported model
+  path that differs from configuration invalidates the invocation. Start/end
+  receipts retain model-active claims, identity availability, execution provider,
+  GPU fallback and its reason so CPU fallback on either arm remains visible.
+  Offline replay of the failed MAIN startup receipt resolves all six required
+  identities and accepts its lazy sessions; no live stack was used for that proof.
+  Local verification: all 126 lane-F Node tests and 32 bulk/search-load Python
+  tests pass, with 22 JavaScript syntax checks and 8/8 dry-run protocol identities
+  equal. Output is retained in `tmp/e-configured-model-node.log` and
+  `tmp/e-configured-model-identities.json`. The new metadata-bearing pair test
+  uses the same group/workload context as acquisition; CPU/CUDA realization is
+  excluded, and switching a configured chunk-reranker choice changes identity.
 - BRANCH stop opens read-only process handles before teardown and records actual
   exit code/time for the spawn-bound Engine and B11's registered children. The
   handles retain OS birth identity; exact owned CIM births bind sampled identities
