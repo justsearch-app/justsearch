@@ -24,7 +24,7 @@ public final class BootstrapDocumentService {
 
   private BootstrapDocumentService() {}
 
-  /** Construct a supplier-aware DocumentService backed by the gRPC Worker client. */
+  /** Construct a supplier-aware DocumentService backed by the in-process port Worker client. */
   public static DocumentService create(
       Executor foregroundExecutor,
       Executor backgroundExecutor,
@@ -41,7 +41,7 @@ public final class BootstrapDocumentService {
       Telemetry telemetry,
       RemoteDocumentService.ClientCaptureSupplier captureSupplier) {
     log.info(
-        "Using RemoteDocumentService (gRPC, supplier-aware) for document fetching - avoids index"
+        "Using RemoteDocumentService (in-process port, supplier-aware) for document fetching - avoids index"
             + " locking");
     RagMetricCatalog ragCatalog =
         telemetry instanceof LocalTelemetry lt

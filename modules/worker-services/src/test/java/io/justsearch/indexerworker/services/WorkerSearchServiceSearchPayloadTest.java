@@ -25,7 +25,7 @@ class WorkerSearchServiceSearchPayloadTest extends io.justsearch.adapters.lucene
     // UI search readiness regression:
     // - The index stores large extracted `content`.
     // - ui-web does not use `fields.content` in search results and loads text via /api/preview instead.
-    // This test ensures gRPC SearchService.Search drops `content` from hit fields.
+    // This test ensures in-process port SearchService.Search drops `content` from hit fields.
     String prev = System.getProperty("justsearch.config");
     try {
       Path base = Files.createTempDirectory("justsearch-grpc-search-test-");

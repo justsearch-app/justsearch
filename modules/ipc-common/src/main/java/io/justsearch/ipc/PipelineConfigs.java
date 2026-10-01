@@ -5,7 +5,7 @@ package io.justsearch.ipc;
  * Standard pipeline presets as proto {@link PipelineConfig} instances.
  *
  * <p>These mirror the app-api {@code io.justsearch.app.api.knowledge.PipelineConfig} presets but
- * use the proto builder type for direct use in gRPC request construction. Both layers (app-api and
+ * use the proto builder type for direct use in in-process port request construction. Both layers (app-api and
  * ipc-common) are authoritative for their own type.
  */
 public final class PipelineConfigs {

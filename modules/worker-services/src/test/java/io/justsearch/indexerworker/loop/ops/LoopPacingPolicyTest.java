@@ -85,7 +85,7 @@ final class LoopPacingPolicyTest {
   @DisplayName("flipping the in-process gauge changes shouldRunBackfill (lane F item A5)")
   void gaugeDrivesTheBackfillGate() {
     // The gate's two inputs are exactly the gauge's two signals. This is the A5 acceptance:
-    // whatever writes main_gpu_active / energy_reduced — the MMF byte today, the gauge in the
+    // whatever writes the shared scheduling gauge — the current in-process input to the
     // merged Engine — the pacing decision must follow it with no change in meaning.
     GpuSchedulingGauge gauge = new GpuSchedulingGauge();
 

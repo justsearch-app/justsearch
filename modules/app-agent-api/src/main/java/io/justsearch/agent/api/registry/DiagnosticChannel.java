@@ -26,7 +26,7 @@ import java.util.Set;
  *       receive the union. Wire shape is {@code Set} not single-valued because the
  *       empirical scan demonstrated lines belong to multiple classes simultaneously.
  *   <li>{@link #producer}: declares whether emissions originate in-process, from a
- *       cross-process gRPC producer, or from an external observer. Forward-compat slots
+ *       Logback appender or an external observer. Forward-compat slots
  *       documented on {@link ProducerKind}.
  *   <li>{@link #deliveryMode}: V1 ships {@link DeliveryMode#SSE_STREAM} only. Reserved
  *       for substrate amendment.

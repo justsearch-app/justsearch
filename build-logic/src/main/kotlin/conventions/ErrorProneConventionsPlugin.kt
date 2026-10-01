@@ -70,7 +70,7 @@ class ErrorProneConventionsPlugin : Plugin<Project> {
             isEnabled.set(false)
           }
           disableWarningsInGeneratedCode.set(true)
-          // Protobuf and gRPC generated sources often miss @Generated annotations.
+          // Protobuf generated sources often miss @Generated annotations.
           // Exclude build/generated trees to keep warning output focused on handwritten code.
           excludedPaths.set(".*[\\\\/]build[\\\\/]generated[\\\\/].*")
           // Promote specific javadoc-quality checks from warning to error so stale method refs

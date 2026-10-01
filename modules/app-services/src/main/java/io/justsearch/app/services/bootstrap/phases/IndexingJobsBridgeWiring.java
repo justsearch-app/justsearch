@@ -19,7 +19,7 @@ import java.util.function.Supplier;
  * from {@code HeadAssembly}'s main constructor body. The bridge is constructed eagerly
  * with a deferred-stub supplier so the catalog + change registry + controller wire-up happens
  * at bootstrap time, before {@code prepareKnowledgeServerBinding()} runs (LocalApiServer is built
- * before the gRPC channel comes up). The bridge resolves the stub at {@code start()} time;
+ * before the index component is ready). The bridge resolves the client at {@code start()} time;
  * {@code activateKnowledgeServerBinding} triggers the start after publication.
  *
  * <p>Subscription bridges the worker's typed Delta events into the

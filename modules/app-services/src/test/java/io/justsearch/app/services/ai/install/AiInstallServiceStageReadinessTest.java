@@ -124,7 +124,7 @@ final class AiInstallServiceStageReadinessTest {
 
   /**
    * The second fact readiness rests on is unchanged: a stage that ended in a state whose
-   * configuration pass never ran has the bytes on disk but no Worker restarted onto them.
+   * configuration pass never ran has the bytes on disk but no configuration applied for them.
    */
   @Test
   @DisplayName("a cancelled stage announces nothing even though its packages installed")

@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
  * 730 looked for the same symptom with WORKER-LEVEL tests — index documents from inside the worker,
  * close, reopen — and concluded "no code-level defect reproduced". The trigger is not worker-level:
  * {@code KnowledgeServerBootstrap.tryIngestHelpFiles} lives in {@code app-services} and reaches the
- * Worker over gRPC FROM THE HEAD, in the window before {@code initDeferredModels} had constructed
+ * Worker through ports FROM THE HEAD, in the window before {@code initDeferredModels} had constructed
  * the controller. Isolate the worker and the index under test is genuinely empty when
  * {@code refresh()} runs, the fast path fires correctly, and the defect vanishes. (Eval mode skips
  * help ingest precisely "so a fresh index truly starts empty" —
@@ -114,7 +114,7 @@ class EmbeddingCompatibilityBootOrderingTest extends io.justsearch.adapters.luce
           "a genuinely empty index must take the fast path");
       assertEquals("NEW_INDEX_NO_FINGERPRINT", ecc.reasonCode());
 
-      // ...and ONLY NOW does the Head's help batch arrive over gRPC and get committed by the
+      // ...and ONLY NOW does the Head's help batch arrive through the index port and get committed by the
       // indexing loop. This is the commit that used to precede the controller entirely.
       indexHelpBatch(runtime);
       runtime.commitOps().commitAndTrack();

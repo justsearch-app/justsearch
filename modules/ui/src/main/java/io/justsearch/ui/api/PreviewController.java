@@ -27,7 +27,7 @@ import tools.jackson.databind.ObjectMapper;
  * Preview endpoint for inspecting extracted/indexed text content.
  *
  * <p>IMPORTANT: This controller must never open Lucene files directly. It only uses {@link DocumentService},
- * which is backed by the Worker process in production.
+ * which is backed by the index component in production.
  *
  * <p>GET /api/preview?docId=...&offsetChars=...&maxChars=...
  *

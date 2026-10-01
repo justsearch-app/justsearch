@@ -167,7 +167,7 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
   /**
    * Creates a new coordinator.
    *
-   * @param knowledgeClient gRPC client for corpus iteration, document fetch, and remote reranking
+   * @param knowledgeClient in-process port client for corpus iteration, document fetch, and remote reranking
    * @param onlineAiService LLM service for synthetic query generation
    * @param rerankerAvailable whether the cross-encoder is available in the Worker (360)
    * @param tripleStore persistent NDJSON store for training triples
@@ -190,7 +190,7 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
   /**
    * Creates a new coordinator with a post-completion callback.
    *
-   * @param knowledgeClient gRPC client for corpus iteration, document fetch, and remote reranking
+   * @param knowledgeClient in-process port client for corpus iteration, document fetch, and remote reranking
    * @param onlineAiService LLM service for synthetic query generation
    * @param rerankerAvailable whether the cross-encoder is available in the Worker (360)
    * @param tripleStore persistent NDJSON store for training triples
@@ -367,7 +367,7 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
       markFailed(new CancellationException("GPL job cancelled before execution"));
       return;
     }
-    // 360: reranker now runs in the Worker via gRPC
+    // 360: reranker now runs in the Worker via an in-process port
     if (!rerankerAvailable) {
       log.warn(
           "GPL job: cross-encoder reranker unavailable — all scores will default to 1.0"

@@ -27,7 +27,7 @@ export async function addRoot(
   signal?: AbortSignal
 ): Promise<void> {
   // Watched roots (persistent indexing).
-  // This is the canonical Library flow: Head stores the watched root and the Worker indexes via gRPC.
+  // This is the canonical Library flow: Head stores the watched root and the Worker indexes via an in-process port.
   await request(baseUrl, '/api/indexing/roots', {
     method: 'POST',
     body: { path, collection },

@@ -375,11 +375,11 @@ final class LifecycleSnapshotTapTest {
   // ============================================================
 
   @Test
-  @DisplayName("WORKER_CONTROL_PLANE NOT_READY/component.start_deadline → index.start-error")
+  @DisplayName("INDEX_CONTROL_PLANE NOT_READY/component.start_deadline → index.start-error")
   void indexStartDeadlineEmitsStartError() {
     tap.accept(
         singleDim(
-            ReadinessDimension.WORKER_CONTROL_PLANE,
+            ReadinessDimension.INDEX_CONTROL_PLANE,
             component("NOT_READY", "component.start_deadline")));
 
     assertEquals(1, listener.size());
@@ -392,10 +392,10 @@ final class LifecycleSnapshotTapTest {
   }
 
   @Test
-  @DisplayName("tempdoc 837: WORKER_CONTROL_PLANE NOT_READY/index.failed → index.start-error")
+  @DisplayName("tempdoc 837: INDEX_CONTROL_PLANE NOT_READY/index.failed → index.start-error")
   void workerLostEmitsStartError() {
     tap.accept(
-        singleDim(ReadinessDimension.WORKER_CONTROL_PLANE, component("NOT_READY", "index.failed")));
+        singleDim(ReadinessDimension.INDEX_CONTROL_PLANE, component("NOT_READY", "index.failed")));
 
     assertEquals(1, listener.size(), "a new code without a tap row emits NOTHING but a WARN");
     HealthEvent event = listener.events.get(0).event();
@@ -406,11 +406,11 @@ final class LifecycleSnapshotTapTest {
   }
 
   @Test
-  @DisplayName("tempdoc 837: WORKER_CONTROL_PLANE NOT_READY/index.corrupt → index.start-error")
+  @DisplayName("tempdoc 837: INDEX_CONTROL_PLANE NOT_READY/index.corrupt → index.start-error")
   void workerIndexCorruptEmitsStartError() {
     tap.accept(
         singleDim(
-            ReadinessDimension.WORKER_CONTROL_PLANE, component("NOT_READY", "index.corrupt")));
+            ReadinessDimension.INDEX_CONTROL_PLANE, component("NOT_READY", "index.corrupt")));
 
     assertEquals(1, listener.size());
     HealthEvent event = listener.events.get(0).event();
@@ -420,11 +420,11 @@ final class LifecycleSnapshotTapTest {
   }
 
   @Test
-  @DisplayName("tempdoc 825: WORKER_CONTROL_PLANE NOT_READY/component.recovery_exhausted → start-error")
+  @DisplayName("tempdoc 825: INDEX_CONTROL_PLANE NOT_READY/component.recovery_exhausted → start-error")
   void bootRecoveryExhaustedEmitsStartError() {
     tap.accept(
         singleDim(
-            ReadinessDimension.WORKER_CONTROL_PLANE,
+            ReadinessDimension.INDEX_CONTROL_PLANE,
             component("NOT_READY", "component.recovery_exhausted")));
 
     // Without the mapping row the lookup misses and the Condition disappears at the exact moment the
@@ -444,13 +444,13 @@ final class LifecycleSnapshotTapTest {
         "component.start_deadline", "component.recovery_exhausted",
         "index.failed", "index.corrupt", "index.schema_open_refused")) {
       tap.accept(envelope(Map.of(
-          ReadinessDimension.WORKER_CONTROL_PLANE, component("NOT_READY", code),
+          ReadinessDimension.INDEX_CONTROL_PLANE, component("NOT_READY", code),
           ReadinessDimension.INDEX_SERVING, component("NOT_READY", code))));
       assertTrue(conditions.find("index.start-error", "worker").isPresent(), code);
       assertTrue(conditions.find("index.unavailable", "worker").isPresent(), code);
 
       tap.accept(envelope(Map.of(
-          ReadinessDimension.WORKER_CONTROL_PLANE, ready(),
+          ReadinessDimension.INDEX_CONTROL_PLANE, ready(),
           ReadinessDimension.INDEX_SERVING, ready())));
       assertTrue(conditions.find("index.start-error", "worker").isEmpty(), code);
       assertTrue(conditions.find("index.unavailable", "worker").isEmpty(), code);

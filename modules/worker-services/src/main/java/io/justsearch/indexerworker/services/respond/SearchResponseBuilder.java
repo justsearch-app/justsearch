@@ -41,7 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Builds the gRPC {@link SearchResponse} from {@link SearchOutcome} + {@link SearchDecision}
+ * Builds the in-process port {@link SearchResponse} from {@link SearchOutcome} + {@link SearchDecision}
  * (tempdoc 517).
  *
  * <p>Reads runtime-derived state from the outcome (hits, timings, fusion data) and

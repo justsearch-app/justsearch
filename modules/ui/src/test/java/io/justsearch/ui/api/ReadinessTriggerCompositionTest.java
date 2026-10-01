@@ -60,7 +60,7 @@ import org.junit.jupiter.api.io.TempDir;
  * the handler's only caller is the trigger's daemon thread, so a condition observed to change here
  * changed because a capability transitioned.
  *
- * <p>The Worker gRPC call {@code buildStatusMap} performs is kept offline the way {@code
+ * <p>The Worker in-process port call {@code buildStatusMap} performs is kept offline the way {@code
  * StatusReadinessStalenessTest} keeps it offline — a mocked {@link KnowledgeServerBootstrap} whose
  * client returns a canned {@link WorkerOperationalView}.
  */

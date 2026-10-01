@@ -382,7 +382,7 @@ final class RootLifecycleOps {
             log.debug("Worker unwatch failed for {}: {}", normalized, e.getMessage());
         }
 
-        // 2. Call gRPC to delete from worker
+        // 2. Call the index port to delete indexed data
         int deletedJobs = 0;
         try {
             DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
@@ -415,7 +415,7 @@ final class RootLifecycleOps {
 
     /**
      * Clears all watched roots — stops watchers, clears state, persists empty. Used by profiling
-     * reset. Does NOT issue per-root gRPC deletion (the Worker deleteAll handles that).
+     * reset. Does NOT issue per-root in-process port deletion (the Worker deleteAll handles that).
      */
     void clearAllRoots(EngineContext engineContext) {
         log.info("clearAllRoots: clearing root state");
@@ -484,7 +484,7 @@ final class RootLifecycleOps {
     }
 
     /**
-     * Re-indexes all persisted roots and starts file watchers. Call AFTER gRPC connection is
+     * Re-indexes all persisted roots and starts file watchers. Call AFTER in-process port connection is
      * established AND watcher bootstrap is set.
      *
      * <p>Starts file watchers immediately for each root, then queues background walks on {@code

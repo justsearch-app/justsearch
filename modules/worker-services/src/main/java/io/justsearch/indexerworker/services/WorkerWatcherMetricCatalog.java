@@ -14,7 +14,7 @@ import java.util.Objects;
  * Catalog for {@code index.watcher.*} metrics emitted by the Worker-side
  * {@link WorkerMethvinWatcher}. Tempdoc 418 Phase B3 introduced this watcher as a replacement
  * for the Head-side {@code MethvinWatcherStrategy}; this catalog is the typed entry point for
- * the metric on the Worker process.
+ * the metric on the index component.
  *
  * <p>The Head-side {@code WatcherMetricCatalog} (in {@code app-indexing}) emits the same metric
  * name. The two catalogs differ in tag schema: Head emits only {@code kind}; Worker emits

@@ -410,12 +410,12 @@ public final class ApiErrorHandler {
         return sanitized;
     }
 
-    // ── gRPC → HTTP status mapping ─────────────────────────────────────────
+    // ── in-process port → HTTP status mapping ─────────────────────────────────────────
 
     /**
-     * Maps a gRPC status code to the most appropriate HTTP status code.
+     * Maps an in-process port status code to the most appropriate HTTP status code.
      *
-     * @param code the gRPC status code (nullable — returns 500 if null)
+     * @param code the in-process port status code (nullable — returns 500 if null)
      * @return the corresponding HTTP status code
      */
     /**

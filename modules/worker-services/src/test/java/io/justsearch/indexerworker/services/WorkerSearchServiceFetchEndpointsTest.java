@@ -189,7 +189,7 @@ class WorkerSearchServiceFetchEndpointsTest extends io.justsearch.adapters.lucen
     }
 
     @Test
-    @DisplayName("trims content to gRPC max payload cap")
+    @DisplayName("trims content to in-process port max payload cap")
     void trimsLargeContent() throws Exception {
       String docId = "doc-large";
       String largeContent = "a".repeat(210_000);

@@ -5,7 +5,7 @@
 //
 // Tempdoc 402 P2: added SLF4J main-source dep for BootContractRunner.
 // Tempdoc 402 P5: added OpenTelemetry API for ContractEmitter span events.
-// No gRPC. No protobuf. No framework. Pure JDK + SLF4J + OTel API.
+// No network transport. No protobuf. No framework. Pure JDK + SLF4J + OTel API.
 
 plugins {
   `java-library`

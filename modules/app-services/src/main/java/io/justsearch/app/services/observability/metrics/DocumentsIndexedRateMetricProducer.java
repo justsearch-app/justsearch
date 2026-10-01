@@ -103,7 +103,7 @@ public final class DocumentsIndexedRateMetricProducer {
    * {@code JobQueueDepthMetricProducer.publishFromValues} — closes the same
    * worker→head metric replication gap (observations.md inbox item #1,
    * 2026-05-08) by reading the worker-shipped {@code recent_docs_per_sec}
-   * array out of the {@code CoreStatus} gRPC view instead of polling the
+   * array out of the {@code CoreStatus} in-process port view instead of polling the
    * (empty) head-side RRD.
    */
   public void publishFromValues(double[] values) {

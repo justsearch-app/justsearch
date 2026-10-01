@@ -54,7 +54,7 @@ final class StatusReadinessStalenessTest {
    * handler's private switch: a new {@link ReadinessDimension} constant makes the size assertion
    * below fail, which is the point — the new dimension has to be classified deliberately.
    */
-  private static final Map<String, Boolean> WORKER_OBSERVED = workerObservedByKey();
+  private static final Map<String, Boolean> INDEX_OBSERVED = workerObservedByKey();
 
   private static Map<String, Boolean> workerObservedByKey() {
     Map<String, Boolean> m = new LinkedHashMap<>();
@@ -78,11 +78,11 @@ final class StatusReadinessStalenessTest {
   void everyDimensionIsClassified() {
     assertEquals(
         ReadinessDimension.values().length,
-        WORKER_OBSERVED.size(),
+        INDEX_OBSERVED.size(),
         "a new ReadinessDimension must be classified worker-observed or head-local here"
             + " (and in StatusLifecycleHandler.workerObserved)");
     for (ReadinessDimension dim : ReadinessDimension.values()) {
-      assertNotNull(WORKER_OBSERVED.get(dim.key()), "unclassified dimension: " + dim.key());
+      assertNotNull(INDEX_OBSERVED.get(dim.key()), "unclassified dimension: " + dim.key());
     }
 
     // The classification is observable: under a lost contact, exactly the worker-observed
@@ -97,7 +97,7 @@ final class StatusReadinessStalenessTest {
 
     for (ReadinessDimension dim : ReadinessDimension.values()) {
       assertEquals(
-          WORKER_OBSERVED.get(dim.key()),
+          INDEX_OBSERVED.get(dim.key()),
           env.components().get(dim.key()).stale(),
           "stale flag for " + dim.key());
     }
@@ -121,7 +121,7 @@ final class StatusReadinessStalenessTest {
 
     for (ReadinessDimension dim : ReadinessDimension.values()) {
       ReadinessComponentView comp = components.get(dim.key());
-      if (Boolean.TRUE.equals(WORKER_OBSERVED.get(dim.key()))) {
+      if (Boolean.TRUE.equals(INDEX_OBSERVED.get(dim.key()))) {
         assertTrue(comp.stale(), dim.key() + " should be stale when the Worker was not observed");
         // Never observed in this process: staleness measures from Head start (a lower bound),
         // and observedAt is omitted rather than fabricated.

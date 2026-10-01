@@ -74,7 +74,7 @@ gRPC stub below were all deleted at items A9/A10; today `KnowledgeSearchControll
 [DefaultIndexingService] indexPath()
       |
       v
-[gRPC → IndexerWorker / IndexingLoop]
+[in-process port → IndexerWorker / IndexingLoop]
       |
       +-> Extract Text (Tika)
       +-> Analyze (Lucene Analyzers)

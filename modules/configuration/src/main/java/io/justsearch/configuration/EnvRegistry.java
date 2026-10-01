@@ -498,7 +498,7 @@ public enum EnvRegistry {
     /**
      * Worker extraction sandbox mode. Values: {@code auto} (default — per-family routing:
      * PDF/Office/archives/images out of process, text/markdown/code/CSV/JSON in process),
-     * {@code in_process} (everything in the Worker JVM) or {@code process} (everything in the
+     * {@code in_process} (everything in the Engine JVM) or {@code process} (everything in the
      * child pool). See tempdoc 410 for the failure-domain design and tempdoc 885 item 14 for the
      * persistent pool that made it shippable.
      */
@@ -1557,7 +1557,7 @@ public enum EnvRegistry {
     }
 
     /**
-     * Config keys checked for Head→Worker divergence after gRPC handshake (tempdoc 329).
+     * Config keys checked for Head→Worker divergence after in-process port handshake (tempdoc 329).
      *
      * <p>If the Head's {@link #get()} value for any of these keys differs from the Worker's value,
      * a WARN is logged. This turns silent misconfiguration (tempdoc 312 item 20) into a visible

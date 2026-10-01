@@ -147,7 +147,7 @@ public record Resource(
     // tempdoc 575 §4.2: origin is the operator-trace producer mechanism of this Resource's data — a
     // GUARDRAIL facet. It defaults to empty because an ordinary Resource is product truth (no producer
     // mechanism). It is declarable so the Channel-vs-Resource boundary is REPRESENTABLE: a Resource that
-    // reaches for an operator-trace origin (it is logback / worker-gRPC / external-observer trace data) is
+    // reaches for an operator-trace origin (it is logback / index-port / external-observer trace data) is
     // modelling something that belongs on a DiagnosticChannel, which the observed-happening gate's
     // operator-trace-must-be-channel rule forecloses (ADR-0036: operator traces are not Resource truth).
     origin = origin == null ? Optional.empty() : origin;
@@ -221,7 +221,7 @@ public record Resource(
   /**
    * Returns a copy of this Resource with the operator-trace {@link ProducerKind} origin set (tempdoc
    * 575 §4.2). Declaring an origin asserts this Resource's data is operator-trace data (logback /
-   * worker-gRPC / external-observer) — which the {@code observed-happening} gate's
+   * index-port / external-observer) — which the {@code observed-happening} gate's
    * {@code operator-trace-must-be-channel} rule forecloses, because such data belongs on a
    * {@link DiagnosticChannel}, not a Resource (ADR-0036). The facet exists so that boundary is
    * representable-and-rejected rather than a silent mis-model. Mirrors {@link #withRole} so a catalog

@@ -13,16 +13,15 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Where {@link AcquisitionScheduler} owns the set of FILES, this owns the sequence of STAGES: per
  * stage it takes an op-lease, acquires that stage's slice, applies the configuration its artifacts
- * enable, and moves on — so a user has working search after the first ~1.3 GB instead of after all
- * ~7 GB. The stage boundary is also the Worker restart point, because there is no encoder
- * hot-reload: an encoder's model path is resolved once when the worker config is built, so a
- * newly-downloaded model only becomes live across a full Worker process restart.
+ * enable, and moves on. The first ~1.3 GB supplies the core search models before all ~7 GB
+ * have arrived. Encoder paths are resolved when Engine configuration is built; applying a
+ * stage reports that JustSearch must be restarted to use the newly downloaded models.
  *
  * <p><b>It performs no IO and knows no wire type</b>, for the same reason the scheduler does not:
  * acquisition goes through {@link Acquirer}, configuration through {@link Configurer}, leases
  * through {@link LeaseRegistrar}, and everything a surface would want to know is reported to {@link
  * Listener}. The three properties that were previously only reachable by downloading ~7 GB onto
- * Windows — the ordering, that a stage which delivered nothing does not restart the Worker, and that
+ * Windows — the ordering, that a stage which delivered nothing skips the final apply step, and that
  * a cancellation mid-stage leaves the earlier stages' results standing — are unit-testable here.
  */
 final class StagedAcquisition {
@@ -105,7 +104,7 @@ final class StagedAcquisition {
    * <p>Every stage being empty is a supported outcome, not a degenerate one: it is what a
    * pre-staged {@code JUSTSEARCH_MODELS_DIR} produces, and what a repair on an already-complete
    * machine produces. Before this seam existed such a run applied nothing at all — no ONNX model
-   * paths written, no system properties latched, no ConfigStore rebuild, no Worker restart — while
+   * paths written, no system properties latched, no ConfigStore rebuild, no configuration application — while
    * reporting itself completed, because every configuration call site hung off a stage that had
    * files to fetch.
    *
@@ -223,11 +222,10 @@ final class StagedAcquisition {
   }
 
   /**
-   * The Worker restart, gated on the stage having actually placed something.
+   * The final configuration-application notification, gated on acquiring new artifacts.
    *
-   * <p>A restart is user-visible — search blips while the Worker comes back — so the run may only
-   * pay for one at a boundary that delivered a model for the restarted Worker to load. This is the
-   * ONE configuration step that is stage-gated at all; every other step guards on its own inputs
+   * <p>The notification requests an application restart; it does not restart a component here.
+   * This is the ONE configuration step that is stage-gated; every other step guards on its own inputs
    * being on disk, which is a better selector than any stage mapping because it is disk truth.
    *
    * <p>Short-circuit order is load-bearing: {@code restart} must not be invoked at all when nothing
@@ -255,8 +253,7 @@ final class StagedAcquisition {
       carried = null;
 
       if (slice.isEmpty()) {
-        // No lease, no configuration pass, and above all no Worker restart: there is nothing new for
-        // a restarted Worker to load, and the blip would buy the user nothing.
+        // No lease or configuration pass: this stage acquired no new artifacts.
         listener.onStageEnded(slice.stage(), StageState.SKIPPED);
         if (lease != null) {
           lease.release(true);
@@ -324,7 +321,7 @@ final class StagedAcquisition {
     if (!anyStageConfigured) {
       // No stage had anything to fetch, so no stage configured anything — yet the run must still
       // leave the process pointed at what is on disk. See TerminalConfigurer for why this one also
-      // restarts the Worker where a stage's restart is gated on having placed something.
+      // reports the application restart requirement even when every stage was already on disk.
       log.info(
           "No stage acquired anything; applying the run's configuration once, terminally"
               + " (pre-staged models or a repair with nothing missing)");

@@ -185,8 +185,8 @@ public final class AiInstallStatus {
 
   /**
    * Capability-tier ids ({@code retrieval-core}, {@code runtime}, {@code retrieval-enrichment},
-   * {@code llm}) that are already usable — the tiers of every stage that completed, acquired its
-   * files and had the Worker restarted onto them.
+   * {@code llm}) whose acquisition and configuration stages completed. Encoder activation may
+   * require the application restart reported by the configuration stage.
    *
    * <p>Fail-closed: a stage that ended with a failed package contributes nothing, because a
    * capability whose model did not land is not usable no matter how far the run got. Empty until the

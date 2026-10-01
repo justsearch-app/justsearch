@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
  * (T6 + T4); this unit test pins the token's own contract.
  *
  * <p>Lane F stage A item A10 re-homed {@code CancelToken} off {@code io.grpc.Context}, so the two
- * cases that pinned delegation to the gRPC context are re-expressed against the property that
+ * cases that pinned delegation to the in-process port context are re-expressed against the property that
  * delegation existed to deliver: a cancel issued from anywhere is observable by the producer, both
  * as a flag and as a one-shot notification. Nothing was dropped — {@code onCancel} is now what the
  * in-process producer wires to its own cancel signal, so it carries the assertion the context

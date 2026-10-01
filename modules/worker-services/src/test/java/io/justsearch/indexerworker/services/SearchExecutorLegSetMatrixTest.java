@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Tempdoc 517 verification — §A.12 E2 query matrix executed against the
- * in-process gRPC + real Lucene surface (Tier-3a).
+ * in-process services + real Lucene surface (Tier-3a).
  *
  * <p>The 7 {@code LegSet} variants + {@code EmptyQueryDecision} +
  * {@code BlockedDecision} are the decision tree's possible outcomes. This test

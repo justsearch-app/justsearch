@@ -204,7 +204,7 @@ public final class WorkerSearchService {
   /**
    * Deferred injection of the embedding provider for query-time embedding.
    *
-   * <p>The embedding model is loaded asynchronously after the gRPC service is created, so the
+   * <p>The embedding model is loaded asynchronously after the index service is created, so the
    * constructor receives null. This setter distributes the provider to all sub-components that need
    * it for query-time vector generation.
    */
@@ -219,7 +219,7 @@ public final class WorkerSearchService {
    * Sets the embedding compatibility controller.
    *
    * <p>This is called after construction to inject the controller, which is created
-   * after the gRPC service due to circular dependencies.
+   * after the index service due to circular dependencies.
    *
    * @param controller the embedding compatibility controller
    */
@@ -426,7 +426,7 @@ public final class WorkerSearchService {
    * search-reranker warm-up), so the first real user query doesn't pay the Lucene/ICU
    * analyzer + query-builder + {@code IndexSearcher} JIT/class-load cold-start cost. Does
    * NOT go through the {@link #search} RPC method (no {@code awaitModelsReady} gate needed —
-   * this runs before the model-ready latch is released — and no gRPC framing). Delegates to
+   * this runs before the model-ready latch is released — and no transport framing). Delegates to
    * {@link SearchOrchestrator#warmUp()}; see its Javadoc for exactly what is (and is
    * deliberately not) exercised.
    *

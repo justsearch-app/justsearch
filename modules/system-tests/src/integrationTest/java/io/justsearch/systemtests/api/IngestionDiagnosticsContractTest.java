@@ -135,7 +135,7 @@ class IngestionDiagnosticsContractTest {
     ingestSync(corpus.toAbsolutePath().toString());
     awaitLedgerHasOutcomeForSize(Files.size(docPath), SEARCHABLE_TIMEOUT);
     // First search after backend boot loads the embedding ONNX model on the worker.
-    // Loading exceeds the 5s gRPC search deadline, which trips the circuit breaker;
+    // Loading exceeds the 5s in-process port search deadline, which trips the circuit breaker;
     // retry until the model is warm and search returns results.
     awaitSearchHit(marker, SEARCHABLE_TIMEOUT);
 
@@ -320,7 +320,7 @@ class IngestionDiagnosticsContractTest {
         }
       } catch (java.io.IOException ioe) {
         // First search after backend boot races with the embedding ONNX session load:
-        // the worker exceeds its 5s gRPC deadline, HttpTimeoutException (extends
+        // the worker exceeds its 5s in-process port deadline, HttpTimeoutException (extends
         // IOException) bubbles up, and the next-3-failures circuit breaker opens. Both
         // resolve once the model warms; keep polling.
         lastError = ioe;

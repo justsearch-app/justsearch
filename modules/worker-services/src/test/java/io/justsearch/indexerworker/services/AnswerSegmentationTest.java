@@ -92,27 +92,27 @@ class AnswerSegmentationTest {
               """
               Key properties of the index:
 
-              - The index is written only by the Worker process [1].
-              - The Head delegates all index IO over gRPC [2].
+              - The index is written only by the index component [1].
+              - The API gateway delegates all index IO through ports [2].
               - Search analysis is locale invariant by construction [3].
               """,
               List.of(
                   "Key properties of the index:",
-                  "The index is written only by the Worker process [1].",
-                  "The Head delegates all index IO over gRPC [2].",
+                  "The index is written only by the index component [1].",
+                  "The API gateway delegates all index IO through ports [2].",
                   "Search analysis is locale invariant by construction [3].")),
           new Shape(
               "F-bullet-star-bold",
               """
               Key properties:
 
-              * **Ownership**: the index is written only by the Worker process [1].
-              * **Transport**: the Head delegates all index IO over gRPC [2].
+              * **Ownership**: the index is written only by the index component [1].
+              * **Transport**: the Head delegates all index IO through ports [2].
               """,
               List.of(
                   "Key properties:",
-                  "Ownership: the index is written only by the Worker process [1].",
-                  "Transport: the Head delegates all index IO over gRPC [2].")),
+                  "Ownership: the index is written only by the index component [1].",
+                  "Transport: the Head delegates all index IO through ports [2].")),
           new Shape(
               "G-nested-list",
               """
@@ -206,7 +206,7 @@ class AnswerSegmentationTest {
               { "citations": { "enabled": true } }
               ```
 
-              2. Restart the Worker process so the change is applied [2].
+              2. Restart JustSearch so the change is applied [2].
               """,
               // The fence keeps its own key (it is a block a reader sees), but the ```json info
               // string is structure and no longer heads the key — the leading foreign token that
@@ -215,7 +215,7 @@ class AnswerSegmentationTest {
                   "To enable the flag:",
                   "Set the flag in the configuration file [1].",
                   "{ \"citations\": { \"enabled\": true } }",
-                  "Restart the Worker process so the change is applied [2].")),
+                  "Restart JustSearch so the change is applied [2].")),
           new Shape(
               "M-cjk-numbered",
               """
@@ -237,10 +237,10 @@ class AnswerSegmentationTest {
               """
               索引的关键属性：
 
-              - 索引只由工作进程写入 [1]。
-              - 主进程通过 gRPC 委托所有索引读写 [2]。
+              - 索引只由索引组件写入 [1]。
+              - API 网关通过进程内端口委托所有索引读写 [2]。
               """,
-              List.of("索引的关键属性：", "索引只由工作进程写入 [1]。", "主进程通过 gRPC 委托所有索引读写 [2]。")),
+              List.of("索引的关键属性：", "索引只由索引组件写入 [1]。", "API 网关通过进程内端口委托所有索引读写 [2]。")),
           new Shape(
               "O-japanese-numbered",
               """
@@ -296,25 +296,25 @@ class AnswerSegmentationTest {
               Two rules apply:
 
               - See [the architecture overview](docs/explanation/01-system-overview.md) for details [1].
-              - The Head delegates all index IO over gRPC [2].
+              - The API gateway delegates all index IO through ports [2].
               """,
               // The link contributes its label, never its URL — the same collapsing the renderer
               // applies to the key before anchoring.
               List.of(
                   "Two rules apply:",
                   "See the architecture overview for details [1].",
-                  "The Head delegates all index IO over gRPC [2].")),
+                  "The API gateway delegates all index IO through ports [2].")),
           new Shape(
               "S-hardwrapped-prose",
               // Soft line breaks INSIDE one sentence: a block is not a line, so this stays one key.
               """
-              The Worker owns the Lucene index and the Head delegates every index read
-              and write to it over gRPC, so no index handle ever exists in the Head
+              The index component owns Lucene and the API gateway delegates every index read
+              and write to it through ports, so no index handle ever exists in the API
               process [1]. That boundary is enforced by an ArchUnit rule [2].
               """,
               List.of(
-                  "The Worker owns the Lucene index and the Head delegates every index read and"
-                      + " write to it over gRPC, so no index handle ever exists in the Head process"
+                  "The index component owns Lucene and the API gateway delegates every index read and"
+                      + " write to it through ports, so no index handle ever exists in the API layer"
                       + " [1].",
                   "That boundary is enforced by an ArchUnit rule [2].")),
           new Shape(
@@ -337,15 +337,15 @@ class AnswerSegmentationTest {
               """
               Checklist:
 
-              - [x] The index is written only by the Worker process [1].
-              - [ ] The Head delegates all index IO over gRPC [2].
+              - [x] The index is written only by the index component [1].
+              - [ ] The API gateway delegates all index IO through ports [2].
               """,
               // The task marker is structure: `marked` renders a checkbox element, so a key that
               // began with a literal "[x]" would open with a token no DOM run can match.
               List.of(
                   "Checklist:",
-                  "The index is written only by the Worker process [1].",
-                  "The Head delegates all index IO over gRPC [2].")),
+                  "The index is written only by the index component [1].",
+                  "The API gateway delegates all index IO through ports [2].")),
           new Shape(
               "V-raw-html-block",
               // DOMPurify keeps the container and the renderer walks its text nodes, so the prose

@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 public sealed interface RequiredCapability
     permits RequiredCapability.WorkerOnline, RequiredCapability.InferenceOnline {
 
-  /** Operation requires the Worker (Body) process to be reachable via gRPC. */
+  /** Operation requires the Engine index component to be available through its port. */
   record WorkerOnline() implements RequiredCapability {
     public static final WorkerOnline INSTANCE = new WorkerOnline();
   }

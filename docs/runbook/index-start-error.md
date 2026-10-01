@@ -7,13 +7,13 @@ description: "Operator response when the Engine index component fails to start."
 
 # Runbook: `index.start-error`
 
-The indexer failed to start. The Engine was unable to bring the index half (the Knowledge Server) to a ready state at all - this is structurally distinct from `index.unavailable`, which is reported once the index half is up but the index is not serving. Since lane F stage A this is an in-process composition failure inside the Engine JVM (`KnowledgeServerBootstrap`), not a child-process spawn failure. The lane F retained `WORKER_CONTROL_PLANE` dimension now reports the index failure with reason `index.failed`.
+The indexer failed to start. The Engine was unable to bring the index half (the Knowledge Server) to a ready state at all - this is structurally distinct from `index.unavailable`, which is reported once the index half is up but the index is not serving. Since lane F stage A this is an in-process composition failure inside the Engine JVM (`KnowledgeServerBootstrap`), not a child-process spawn failure. The lane F retained `INDEX_CONTROL_PLANE` dimension now reports the index failure with reason `index.failed`.
 
 ## Symptoms
 
 - Health view shows the **Indexer failed to start** banner.
 - `/api/health/events/stream` emits an `AssertedCondition` with `id="index.start-error"` and `status=TRUE`.
-- `/api/status` reports the lane F retained `WORKER_CONTROL_PLANE` dimension in `NOT_READY` with reason `index.failed`.
+- `/api/status` reports the lane F retained `INDEX_CONTROL_PLANE` dimension in `NOT_READY` with reason `index.failed`.
 
 ## Likely causes
 

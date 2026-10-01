@@ -651,7 +651,7 @@ def _status_body(variant: str) -> str:
     `tasks-occlusion` step. Every knob is load-bearing for `selectIndexingProgress`
     (indexingProgress.ts):
       - `core.indexState` -> "INDEXING": the projection ignores any state the WORKER does not
-        report (WORKER_REPORTED_INDEX_STATES = IDLE/INDEXING/ERROR/FAILED). The captured live fixture
+        report (INDEX_REPORTED_STATES = IDLE/INDEXING/ERROR/FAILED). The captured live fixture
         says "SERVING", a `WorkerOperationalView.fallback` state, so the projection is on its
         `unknown` arm by default and the panel correctly renders nothing.
       - `core.pendingJobs` > 0: the ONLY input that selects the `indexing` phase (and the panel's

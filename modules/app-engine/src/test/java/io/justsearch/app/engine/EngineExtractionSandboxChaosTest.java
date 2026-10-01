@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * contained; the next file indexes and the Worker never restarts").
  *
  * <p><b>The property is containment of a hostile extraction child, and it never involved the
- * Head/Worker process split.</b> The parent under test is the production
+ * former process split.</b> The parent under test is the production
  * {@code PersistentExtractionSandbox}; only the child's <b>parser</b> is substituted, through the
  * production {@code JUSTSEARCH_EXTRACTION_SANDBOX_COMMAND} operator override pointing at
  * {@link ChaosExtractionSandboxChild}. That substitution is necessary, not convenient: no real

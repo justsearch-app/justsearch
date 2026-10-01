@@ -112,7 +112,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   /**
    * Tempdoc 333 §4 (deferred there, filled by 821 §3-C1): epoch-ms of the newest SUCCESSFUL Worker
-   * gRPC observation in this Head process, or {@code 0} when the Worker has never been reached.
+   * in-process port observation in this Head process, or {@code 0} when the Worker has never been reached.
    *
    * <p>Stamped from the timestamp taken immediately BEFORE the call, not after it — a conservative
    * choice, so the age reported to consumers is never younger than the observation actually is.
@@ -389,7 +389,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * observations.md inbox item #1 (2026-05-08): bypasses the broken
    * worker→head RRD replication by feeding the worker-shipped recent-arrays
    * (`recent_job_queue_depth` / `recent_docs_per_sec`, present on every
-   * {@code CoreStatus} gRPC response) directly into the {@code TimeseriesSnapshotHolder}s
+   * {@code CoreStatus} in-process port response) directly into the {@code TimeseriesSnapshotHolder}s
    * that back the `/api/metrics/worker.*` endpoints. The RRD-based ticks
    * stay scheduled (harmless no-ops because the head's RRD never receives
    * worker.* samples) — this callback is the live data source.
@@ -1481,7 +1481,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       LifecycleSnapshotV2 lifecycleSnapshot,
       String observedAt) {
     return switch (dim) {
-      case WORKER_CONTROL_PLANE ->
+      case INDEX_CONTROL_PLANE ->
           readinessComponent(
               mapComponentToReadiness(lifecycleSnapshot.components().index().state()),
               lifecycleSnapshot.components().index().reason_code(),
@@ -1768,7 +1768,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * The Head's contact state with the Worker for a single {@code /api/status} response — the fact
    * {@link StatusMeta} already reports process-wide, projected onto individual dimensions.
    *
-   * @param stale {@code true} when this response's Worker gRPC observation did not happen (the call
+   * @param stale {@code true} when this response's Worker in-process port observation did not happen (the call
    *     threw, or the worker capability was unavailable so no call was attempted)
    * @param lastObservationAtMs epoch-ms of the newest successful Worker observation in this Head
    *     process, or {@code 0} when the Worker has never been reached
@@ -1792,7 +1792,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   /**
-   * Whether a dimension's verdict is read from the Worker's gRPC {@link WorkerOperationalView}.
+   * Whether a dimension's verdict is read from the Worker's in-process port {@link WorkerOperationalView}.
    *
    * <p>This is the classification {@code ReadinessComponentView.stale} depends on, and it is an
    * exhaustive switch on purpose: a new {@link ReadinessDimension} constant fails to compile until
@@ -1825,7 +1825,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
               // what-it-reads standard as VDU above.
               GPU ->
           true;
-      case WORKER_CONTROL_PLANE, // source: lifecycle_snapshot — head-side workerCapability.health()
+      case INDEX_CONTROL_PLANE, // source: lifecycle_snapshot — head-side workerCapability.health()
               AI, // source: lifecycle_inference — head-side inferenceCapability.health()
               LAMBDAMART_MODEL, // source: head_gpl_status
               TELEMETRY -> // source: telemetry_health

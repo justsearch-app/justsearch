@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
  * capabilities have been driven.
  *
  * <p>Execution discipline: the thunk runs on a single daemon thread, never on the transition
- * thread (it performs a Worker gRPC call, and a health reconciliation must never be able to stall
+ * thread (it performs a Worker in-process port call, and a health reconciliation must never be able to stall
  * or kill a capability transition). Requests coalesce — a burst of transitions produces one
  * reconcile, not N — and every failure is swallowed, so a throwing thunk can neither propagate into
  * a capability listener nor wedge the trigger.

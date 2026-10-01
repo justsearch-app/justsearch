@@ -13,7 +13,7 @@
 //   - reaction-outcome         (xDS-narrow; one-way observability emit
 //                               from consumers reporting reaction status)
 //
-// `contract-version-changed` is intentionally absent. gRPC / protovalidate
+// `contract-version-changed` is intentionally absent. Protobuf / protovalidate
 // additive-by-construction makes patch + minor wire bumps non-breaking
 // structurally; major bumps prohibited mid-session by slice 3a-1-8 Phase 6
 // rule. No consumer reaction is needed to a wire-version bump beyond "the

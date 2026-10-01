@@ -2093,7 +2093,7 @@ public final class HeadAssembly implements AutoCloseable {
     return substrateOut.metricsOut();
   }
 
-  /** Head-side bridge owning SubscribeIndexingJobs gRPC stream. Null until connect. */
+  /** Head-side bridge owning SubscribeIndexingJobs in-process subscription. Null until connect. */
   public io.justsearch.app.services.worker.RemoteIndexingJobsBridge indexingJobsBridge() {
     return substrateOut.indexingJobsBridge();
   }

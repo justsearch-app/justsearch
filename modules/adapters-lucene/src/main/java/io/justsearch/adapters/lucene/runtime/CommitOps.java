@@ -363,9 +363,9 @@ public final class CommitOps {
    * The timer period from {@code index.commit.timer_interval_ms} (tempdoc 885's tracked commit-
    * cadence item), falling back to {@link #DEFAULT_COMMIT_TIMER_INTERVAL_MS}.
    *
-   * <p>Read from the resolved config rather than a raw sysprop: this class runs in the WORKER, so a
-   * sysprop read here would only ever see the Worker JVM's own launch arguments — the [R1] defect
-   * shape. Non-positive values fall back rather than throw: a zero-period fixed-rate schedule would
+   * <p>Read from the resolved Engine configuration rather than re-reading a raw sysprop.
+   * The configuration projection owns precedence and validation for this boot generation.
+   * Non-positive values fall back rather than throw: a zero-period fixed-rate schedule would
    * spin the commit thread, and a boot-time knob must not be able to do that.
    */
   private long commitTimerIntervalMs() {

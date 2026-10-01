@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Tempdoc 931 §E item 10 — {@code SettleIndex} at the gRPC boundary.
+ * Tempdoc 931 §E item 10 — {@code SettleIndex} at the in-process port boundary.
  *
  * <p>Pins the two halves that matter to a paired evaluation: the happy path reports the before /
  * after document counts (that report IS the evidence both arms queried equal merge state), and the

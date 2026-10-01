@@ -38,7 +38,7 @@ public final class DebugRoutes {
     app.get("/api/debug/session-policies", sessionPoliciesController::handle);
     app.post("/api/debug/reset-index", resetIndexHandler);
     // Tempdoc 406 — admin-triggered runtime swap. Triggers a holder swap on the
-    // ingest runtime via gRPC ReloadRuntime; returns swap duration in ms.
+    // ingest runtime via an in-process port ReloadRuntime; returns swap duration in ms.
     app.post("/api/admin/runtime/reload", adminRuntimeReloadHandler);
   }
 }

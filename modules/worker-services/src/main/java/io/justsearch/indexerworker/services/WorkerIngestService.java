@@ -651,7 +651,7 @@ public final class WorkerIngestService {
    * Sets the {@link io.justsearch.ort.PolicySnapshot} supplier for the
    * {@code GetSessionPolicies} rpc (tempdoc 397 §14.28 U4). Returns Worker's authoritative
    * snapshot; Head's re-resolve path in {@code SessionPoliciesController} is deleted in favour
-   * of reading this via gRPC.
+   * of reading this through the index port.
    */
   public void setPolicySnapshotSupplier(Supplier<io.justsearch.ort.PolicySnapshot> supplier) {
     this.policySnapshotSupplier = supplier;

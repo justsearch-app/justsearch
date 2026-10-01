@@ -312,7 +312,7 @@ final class CoreApiAssembly {
                             == io.justsearch.app.services.atrest.AtRestProtection.State.NOT_ENCRYPTED));
       }
       // observations.md inbox item #1 (2026-05-08): publish recent worker
-      // metric arrays from the gRPC view into the TIMESERIES metric holders.
+      // metric arrays from the in-process port view into the TIMESERIES metric holders.
       // Bypasses the broken worker→head RRD replication so /api/metrics/worker.*
       // returns non-empty values arrays after ingest.
       var jqProducer = b.HeadAssembly.metricsOut().jobQueueDepthMetricProducer();

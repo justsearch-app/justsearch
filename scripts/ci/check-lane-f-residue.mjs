@@ -43,14 +43,44 @@ function retiredRanges(text) {
   return ranges;
 }
 
-export function findResidue(file, text) {
+const allowlistPath = 'governance/lane-f-residue-allowlist.v1.json';
+
+// Deliberately small path-glob grammar: *, ** and ?. No repository-wide wildcard.
+function matchesPath(glob, file) {
+  const parts = glob.split(/(\*\*\/|\*\*|\*|\?)/);
+  const pattern = parts.map(part => part === '**/' ? '(?:.*/)?'
+    : part === '**' ? '.*' : part === '*' ? '[^/]*' : part === '?' ? '[^/]'
+      : part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('');
+  return new RegExp(`^${pattern}$`).test(file);
+}
+
+export function validateAllowlist(data) {
+  if (data.version !== 1 || !Array.isArray(data.entries)) throw new Error('Invalid residue allowlist version/entries');
+  const keys = new Set();
+  for (const entry of data.entries) {
+    if (typeof entry.path !== 'string' || !entry.path || entry.path === '**'
+        || entry.path.startsWith('**/') || entry.path.startsWith('/') || entry.path.includes('..')
+        || entry.path.includes('\\') || !terms.concat('gRPC', 'SupervisionPolicy').includes(entry.term) // lane F vocabulary
+        || !['b', 'c', 'd'].includes(entry.category) || typeof entry.reason !== 'string'
+        || !entry.reason.trim() || (entry.category === 'b' && !entry.reason.includes('C2-1'))) {
+      throw new Error(`Invalid residue allowlist entry: ${JSON.stringify(entry)}`);
+    }
+    const key = `${entry.path}\0${entry.term}`;
+    if (keys.has(key)) throw new Error(`Duplicate residue allowlist entry: ${entry.path} / ${entry.term}`);
+    keys.add(key);
+  }
+  return data.entries;
+}
+
+export function findResidue(file, text, allowlist = [], matched = new Set()) {
   file = file.replaceAll('\\', '/');
+  const fileAllowlist = allowlist.filter(entry => matchesPath(entry.path, file));
   const basename = path.posix.basename(file);
   const legacyFixture = /legacy/i.test(basename)
     && (/(?:^|\/)(?:test|tests|fixtures?)(?:\/|$)/i.test(file)
       || /(?:^|[-_.])(?:tests?|fixtures?)(?:[-_.]|$)/i.test(basename)
       || /(?:Test|Fixture)s?(?:[A-Z._-]|$)/.test(basename));
-  if (/^docs\/(?:tempdocs\/|design\/lane-f-engine-jvm\/)/.test(file) || legacyFixture) return [];
+  if (file === allowlistPath || /^docs\/(?:tempdocs\/|design\/lane-f-engine-jvm\/)/.test(file) || legacyFixture) return [];
   const historicalDecision = /^docs\/decisions\/00(?:01|02)[^/]*\.md$/.test(file);
   const frontmatter = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text);
   const decisionBodyStart = frontmatter?.[0].length ?? 0;
@@ -77,13 +107,18 @@ export function findResidue(file, text) {
     const positions = candidates.flatMap(term => {
       const positionsForTerm = [];
       for (let from = 0, index; (index = currentLine.indexOf(term, from)) !== -1; from = index + term.length) positionsForTerm.push(offset + index);
-      return positionsForTerm;
+      return positionsForTerm.map(position => ({ term, position }));
     });
     if (positions.length && !label.test(line) && !gitHistory.test(line)
         && !headings.some(h => h.labelled)
-        && !(historicalDecision && offset >= decisionBodyStart)
-        && positions.some(position => !ranges.some(([start, end]) => position >= start && position <= end))) {
-      hits.push(`${file}:${index + 1}: ${line.trimEnd()}`);
+        && !(historicalDecision && offset >= decisionBodyStart)) {
+      const unlabelled = positions.filter(({ position }) => !ranges.some(([start, end]) => position >= start && position <= end));
+      const unresolved = unlabelled.filter(({ term }) => {
+        const entries = fileAllowlist.filter(entry => entry.term === term);
+        for (const entry of entries) matched.add(entry);
+        return !entries.length;
+      });
+      if (unresolved.length) hits.push(`${file}:${index + 1}: ${line.trimEnd()}`);
     }
     offset += line.length + 1;
   }
@@ -114,13 +149,23 @@ function main(args) {
   } catch {
     files = walk(root);
   }
-  const hits = [...new Set(files)].sort().filter(file => !paths.length || paths.some(p => file === p || file.startsWith(p.replace(/\/$/, '') + '/'))).flatMap(file => {
+  const absoluteAllowlist = path.join(root, allowlistPath);
+  const allowlist = fs.existsSync(absoluteAllowlist)
+    ? validateAllowlist(JSON.parse(fs.readFileSync(absoluteAllowlist, 'utf8'))) : [];
+  const matched = new Set();
+  const hits = [];
+  // Scan every file even for --paths, so stale entries cannot hide behind a scoped run.
+  for (const file of [...new Set(files)].sort()) {
     const absolute = path.join(root, file);
-    if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) return [];
+    if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) continue;
     const bytes = fs.readFileSync(absolute);
-    if (bytes.includes(0)) return [];
-    return findResidue(file, bytes.toString('utf8'));
-  });
+    if (bytes.includes(0)) continue;
+    const found = findResidue(file, bytes.toString('utf8'), allowlist, matched);
+    if (!paths.length || paths.some(p => file === p || file.startsWith(p.replace(/\/$/, '') + '/'))) hits.push(...found);
+  }
+  for (const entry of allowlist) {
+    if (!matched.has(entry)) hits.push(`STALE allowlist: ${entry.path} / ${entry.term}: ${entry.reason}`);
+  }
   for (const hit of hits) console.log(hit);
   process.exitCode = hits.length ? 1 : 0;
 }

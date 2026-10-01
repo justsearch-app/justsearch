@@ -60,7 +60,7 @@ public final class EmbeddingFingerprint {
   /**
    * Forces recomputation of the fingerprint on next access.
    *
-   * <p>Intended for use after embedding model path changes (e.g., via Worker restart).
+   * <p>Intended for use after embedding model path changes (e.g., via an index component recovery).
    */
   public static void invalidate() {
     cachedResult.set(null);

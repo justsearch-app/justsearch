@@ -163,7 +163,7 @@ final class McpAnswerLegibilityTest {
   }
 
   /**
-   * Mirrors the REAL shape {@code RemoteDocumentService.retrieveContextFallback} (gRPC-failure
+   * Mirrors the REAL shape {@code RemoteDocumentService.retrieveContextFallback} (in-process port-failure
    * catch, FULLTEXT_FALLBACK path) actually returns: empty citations (a chunk-RAG-only concept
    * the full-document fallback never populates), a non-blank budgeter-built context with two
    * {@code [From: ...]} sections, populated {@code sections()}/{@code docsUsed()}, and

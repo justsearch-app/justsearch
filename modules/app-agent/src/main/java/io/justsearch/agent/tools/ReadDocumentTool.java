@@ -32,7 +32,7 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>Readable universe: whatever the Worker will serve, i.e. INDEXED documents only. The Head never
  * touches document bytes (Hard Invariant #1) — this rides {@code DocumentService.fetchSlice}, which
- * is the {@code FetchDocumentSlice} gRPC. That is a stronger boundary than a path allowlist and
+ * is the {@code FetchDocumentSlice} in-process port. That is a stronger boundary than a path allowlist and
  * needs no new consent posture; un-indexed content stays behind the MEDIUM {@code core_ingest_files}
  * confirm.
  */

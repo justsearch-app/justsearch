@@ -15,7 +15,7 @@ This module is the **shared home for Protobuf contracts** that define process bo
 
 - **Protos**: `src/main/proto/io/justsearch/ipc/v1/*.proto`
 - **Package**: `io.justsearch.ipc.v1`
-- **What it is**: Message types used by pipeline tooling / infra integrations. Not the Knowledge Server gRPC surface.
+- **What it is**: Message types used by pipeline tooling / infra integrations. Not the Knowledge Server in-process port surface.
 
 ## Why this README exists
 

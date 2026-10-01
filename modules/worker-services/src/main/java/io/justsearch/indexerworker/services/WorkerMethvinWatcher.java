@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Replaces the Head-side {@code MethvinWatcherStrategy} (modules/app-indexing) with a watcher
  * that lives in the same process as {@link JobQueue} — events feed straight into the queue with
- * no IPC hop and no per-event gRPC submitBatch. The watcher is registered per root via an immutable
+ * no IPC hop and no per-event in-process port submitBatch. The watcher is registered per root via an immutable
  * {@link RootWatcherRegistry.Subscription}; deregistration via {@link #unregisterRoot(Path)} closes
  * the underlying Methvin {@code DirectoryWatcher} for that root.
  *

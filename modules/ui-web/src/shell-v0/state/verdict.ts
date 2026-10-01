@@ -191,7 +191,7 @@ export function computeStability(i: StabilityInput): Stability {
   ) {
     return { kind: 'provisional', cause: 'index-recovery' };
   }
-  // Worker process down/restarting: a SUCCESSFUL poll returned the fallback view
+  // index component down/restarting: a SUCCESSFUL poll returned the fallback view
   // (ConnectionPhase stays `connected`, so this is NOT caught by phase — 595 §9.1).
   if ((i.indexState ?? '').toUpperCase() === 'UNAVAILABLE') {
     return { kind: 'provisional', cause: 'worker-restart' };

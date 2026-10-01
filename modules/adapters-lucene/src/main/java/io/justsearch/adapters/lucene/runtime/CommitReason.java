@@ -7,7 +7,7 @@ import java.util.Objects;
 /**
  * Bounded set of attribution values for {@code CommitOps.commitAndTrack(reason)} and the
  * {@code index.runtime.commit_ms} histogram. Tempdoc 417 Phase 1: replaces ~19 free-form strings
- * scattered across {@link CommitOps}, {@link RunningRuntime}, indexing loop ops, and gRPC
+ * scattered across {@link CommitOps}, {@link RunningRuntime}, indexing loop ops, and in-process port
  * service handlers with a compile-time-bounded enum.
  *
  * <p>Each value's {@link #wireValue()} returns the existing NDJSON tag value verbatim, so the
@@ -68,7 +68,7 @@ public enum CommitReason {
 
   /**
    * Parses a wire-format string back to a typed reason. Unknown values map to
-   * {@link #UNKNOWN} — a typed sentinel distinct from a typo'd metric series, so REST/gRPC
+   * {@link #UNKNOWN} — a typed sentinel distinct from a typo'd metric series, so port/HTTP
    * boundaries can accept legacy values defensively without crashing.
    */
   public static CommitReason fromWire(String wire) {

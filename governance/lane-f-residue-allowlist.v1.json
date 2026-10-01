@@ -1,0 +1,2351 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": ".agents/skills/dev-stack/SKILL.md",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "contracts/wire/stream.proto",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "gates/config-surface/.changesets/885-commit-timer-interval-key.md",
+      "term": "Worker JVM",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "gates/config-surface/.changesets/885-indexing-foreground-pacing-keys.md",
+      "term": "breath",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "gates/config-surface/.changesets/885-indexing-foreground-pacing-keys.md",
+      "term": "Worker JVM",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "gates/config-surface/.changesets/885-nrt-cadence-keys.md",
+      "term": "Worker JVM",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "gates/config-surface/.changesets/931-identity-deletion-grace-key.md",
+      "term": "Worker JVM",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "gates/config-surface/.changesets/936-vector-exhaustive-search-key.md",
+      "term": "Worker JVM",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "gates/config-surface/.changesets/936-worker-health-service-rename.md",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "gates/config-surface/.changesets/936-worker-health-service-rename.md",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "gates/config-surface/sysaccess-allowlist.txt",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "gates/test-efficacy/.changesets/936-retired-worker-process-seams.md",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "gates/test-efficacy/.changesets/936-retired-worker-process-seams.md",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "gates/test-efficacy/.changesets/936-retired-worker-process-seams.md",
+      "term": "Worker restart",
+      "category": "c",
+      "reason": "Dated governance changeset records the configuration or test seam that existed at that revision; explicitly label as historical, do not change that decision."
+    },
+    {
+      "path": "governance/adr-probes.v1.json",
+      "term": "breath",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "governance/adr-probes.v1.json",
+      "term": "gRPC",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "governance/adr-probes.v1.json",
+      "term": "io.grpc",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "governance/consult-register.v1.json",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "governance/engine-ports.v1.json",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "governance/inflight-liveness-projections.v1.json",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "governance/observed-happening.v1.json",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "governance/store-corruption-policies.v1.json",
+      "term": "worker-config-snapshot",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "governance/store-recoverability.v1.json",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "governance/store-recoverability.v1.json",
+      "term": "worker-config-snapshot",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "governance/worktree-lifecycle.v1.json",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "gradle/verification-metadata.xml",
+      "term": "io.grpc",
+      "category": "c",
+      "reason": "Dependency verification history only: no io.grpc imports or declared grpc dependency remain. Root owns dependency/verification-metadata pruning; do not assert a current classpath consumer."
+    },
+    {
+      "path": "models/onnx/citation-scorer/tokenizer.json",
+      "term": "breath",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/onnx/citation-scorer/tokenizer.json",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/onnx/citation-scorer/tokenizer.json",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/onnx/gte-multilingual-base/tokenizer.json",
+      "term": "breath",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/onnx/gte-multilingual-base/tokenizer.json",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/onnx/ner/tokenizer.json",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/onnx/reranker/tokenizer.json",
+      "term": "breath",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/onnx/reranker/tokenizer.json",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/splade/naver-splade-v3/tokenizer.json",
+      "term": "breath",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/splade/naver-splade-v3/tokenizer.json",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/splade/naver-splade-v3/vocab.txt",
+      "term": "breath",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "models/splade/naver-splade-v3/vocab.txt",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/analyzers/SsotAnalyzerRegistry.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/DataClass.java",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/LoggerNamespaceSelector.java",
+      "term": "io.grpc",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/ProducerKind.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/SubCategory.java",
+      "term": "io.grpc",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/RunObservation.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/tools/AgentToolErrors.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-agent/src/test/java/io/justsearch/agent/tools/AgentToolErrorsTest.java",
+      "term": "RemoteKnowledgeClient",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/ApiErrorCode.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/OfflineProcessingOutcome.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/OperationLease.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/OperationLeaseHandle.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/run/LiveRunSummary.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/stream/SseEnvelope.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/stream/SseFrameKind.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-api/src/main/resources/messages/errors.en.properties",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/CrossEncoderSkipReasonTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-engine/src/main/java/io/justsearch/app/engine/BoundedHandoff.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical comparison with the removed process/transport; the enclosing explanation names the current Engine owner."
+    },
+    {
+      "path": "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineKnowledgeClient.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical comparison with the removed process/transport; the enclosing explanation names the current Engine owner."
+    },
+    {
+      "path": "modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineDocumentFetchAndContextTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineDocumentFetchAndContextTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExtractionSandboxChaosTest.java",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForegroundPacingTest.java",
+      "term": "breath",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForegroundPacingTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForegroundPacingTest.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineFormatCapabilityMatrixTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineFormatCapabilityMatrixTest.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIndexingWorkflowTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIndexingWorkflowTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIndexingWorkflowTest.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineReadWhileWriteTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineReadWhileWriteTest.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSoakTest.java",
+      "term": "Worker restart",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSwitchingFenceBufferingTest.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSyncDirectoryTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineTestHarness.java",
+      "term": "WorkerProcessManager",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineVduRecoveryTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/KnowledgeClientExceptionStatusParityTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/RichDocumentInProcessTest.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-inference/src/main/java/io/justsearch/app/inference/LlamaServerOps.java",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/UnreferencedCodeTest.java",
+      "term": "gRPC",
+      "category": "d",
+      "reason": "Generated-service reflection guard; retained spelling detects framework callbacks, not a live index process."
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/CapabilitiesChangeRegistry.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/CapabilitiesService.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionEvent.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerProjection.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/stream/run/AbstractRunChannel.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/stream/run/RunChannel.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ActionEventJournalTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ActionEventStoreTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistryTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/run/RunChannelRegistryTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseEnvelopeContractTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/stream/SseStreamChannelAtomicSubscribeTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-services/README.md",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/README.md",
+      "term": "MMF",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/README.md",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/ai/PolledStateLiveness.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/InfraPhase.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/gpl/GplJobCoordinator.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/gpl/GplJobCoordinator.java",
+      "term": "io.grpc",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/lease/OperationLeaseServiceImpl.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/power/EnergyStatePoller.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/power/EnergyStatePoller.java",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/RecoverComponentHandler.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/VduBatchProcessor.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/BoundedDocumentFetch.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical comparison with the removed process/transport; the enclosing explanation names the current Engine owner."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/CancelToken.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/HealthServiceCalls.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/IngestServiceCalls.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/IpcMetricCatalog.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical comparison with the removed process/transport; the enclosing explanation names the current Engine owner."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerBootstrap.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerBootstrap.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerBootstrap.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerBootstrap.java",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerConfig.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerConfig.java",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeServerHealthMonitor.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchServiceCalls.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/ShutdownOutcome.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/SyncOps.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/WorkerHost.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/worker/WorkerHost.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/IndexingJobsBridgeWiringTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/lease/OperationLeaseServiceImplTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java",
+      "term": "MMF",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java",
+      "term": "MmfWorkerSignalLayoutV1",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/RecoverComponentHandlerTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/supervision/SupervisionContractTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/supervision/SupervisionContractTest.java",
+      "term": "MmfWorkerSignalBus",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/supervision/SupervisionContractTest.java",
+      "term": "SupervisionPolicy",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/supervision/SupervisionContractTest.java",
+      "term": "WorkerLivenessDecision",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/supervision/SupervisionContractTest.java",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/worker/IpcMetricCatalogSmokeTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/worker/IpcTelemetryTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeServerWorkerDownCodeTest.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteIndexingJobsBridgeTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/worker/TestKnowledgeClient.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/worker/TestKnowledgeClient.java",
+      "term": "MainSignalBus",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/worker/WatchedRootsStateTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java",
+      "term": "breath",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/configuration/src/test/java/io/justsearch/configuration/EnvRegistryTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/configuration/src/test/java/io/justsearch/configuration/EnvRegistryTest.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/configuration/src/test/java/io/justsearch/configuration/EnvRegistryTest.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ResolvedConfigBuilderTest.java",
+      "term": "worker-config-snapshot",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java",
+      "term": "MMF",
+      "category": "c",
+      "reason": "Historical comparison of the scheduling gauge with removed signal bytes; the current holder is explicitly in process."
+    },
+    {
+      "path": "modules/core/src/test/java/io/justsearch/core/scheduling/GpuSchedulingGaugeTest.java",
+      "term": "MMF",
+      "category": "c",
+      "reason": "Regression explanation compares the shared holder with the old signal bytes; the test uses the in-process gauge."
+    },
+    {
+      "path": "modules/indexer-worker/README.md",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/indexer-worker/README.md",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/indexer-worker/README.md",
+      "term": "MMF",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/indexer-worker/README.md",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/DevReloadManager.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/IndexConfigurationProjection.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+      "term": "breath",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+      "term": "ForegroundLoadInterceptor",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Historical comparison with the removed process/transport; the enclosing explanation names the current Engine owner."
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RecordedWalkAuthorityTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/DevReloadManagerTriggerTest.java",
+      "term": "OFFSET_",
+      "category": "c",
+      "reason": "DateTimeFormatter ISO_OFFSET_DATE_TIME or evidence-offset schema; not a signal-bus layout."
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PreOpenSchemaMismatchBootTest.java",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceTest.java",
+      "term": "breath",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ipc-common/src/main/java/io/justsearch/ipc/grpc/GrpcMessageLimits.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration transport comparison in the enclosing explanation; no channel/stub exists on the current path."
+    },
+    {
+      "path": "modules/ipc-common/src/main/proto/indexing.proto",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/ipc-common/src/main/proto/indexing.proto",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ipc-common/src/test/java/io/justsearch/ipc/IndexingProtoDeprecationsTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/ipc-common/src/test/java/io/justsearch/ipc/IndexingProtoDeprecationsTest.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/shell/src-tauri/src/lib.rs",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/shell/src-tauri/src/updater.rs",
+      "term": "WORKER_",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "modules/shell/src-tauri/src/updater.rs",
+      "term": "worker-config-snapshot",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "modules/system-tests/build.gradle.kts",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/chaos/ExtractionSandboxOrphanE2ETest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/chaos/ExtractionSandboxOrphanE2ETest.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ai/SummarizationPipelineE2ETest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ai/SummarizationPipelineE2ETest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ai/SummarizationPipelineE2ETest.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ai/SummarizationPipelineE2ETest.java",
+      "term": "Worker JVM",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ai/SummarizationPipelineE2ETest.java",
+      "term": "WorkerProcessManager",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java",
+      "term": "Worker JVM",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java",
+      "term": "WorkerProcessManager",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/system-tests/src/test/resources/corpus/passage-retrieval/long-container-orchestration.txt",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "modules/system-tests/src/test/resources/corpus/passage-retrieval/long-http-protocols.txt",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "modules/telemetry/src/main/java/io/justsearch/telemetry/LocalTelemetry.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/telemetry/src/main/java/io/justsearch/telemetry/LocalTelemetry.java",
+      "term": "OFFSET_",
+      "category": "c",
+      "reason": "DateTimeFormatter ISO_OFFSET_DATE_TIME or evidence-offset schema; not a signal-bus layout."
+    },
+    {
+      "path": "modules/telemetry/src/main/java/io/justsearch/telemetry/NdjsonMetricExporter.java",
+      "term": "OFFSET_",
+      "category": "c",
+      "reason": "DateTimeFormatter ISO_OFFSET_DATE_TIME or evidence-offset schema; not a signal-bus layout."
+    },
+    {
+      "path": "modules/telemetry/src/main/java/io/justsearch/telemetry/NdjsonSpanExporter.java",
+      "term": "OFFSET_",
+      "category": "c",
+      "reason": "DateTimeFormatter ISO_OFFSET_DATE_TIME or evidence-offset schema; not a signal-bus layout."
+    },
+    {
+      "path": "modules/telemetry/src/test/java/io/justsearch/telemetry/LocalTelemetryExecutorWiringTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/telemetry/src/test/java/io/justsearch/telemetry/TracingBootstrapGlobalRegistrationFailureTest.java",
+      "term": "WORKER_",
+      "category": "c",
+      "reason": "OpenTelemetry BatchSpanProcessor thread-name fixture: worker is an exporter thread, not the index process."
+    },
+    {
+      "path": "modules/ui-web/scripts/dev-all.cjs",
+      "term": "RemoteKnowledgeClient",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui-web/src/api/contract/contractEvents.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/api/contract/contractEventsBridge.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/api/contract/contractEventsBridge.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/api/domains/health.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/api/generated/stream-liveness-constants.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/api/intent/bootIntentStreamBridge.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/handshake/CapabilitiesHandshake.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/operations/ActionLedgerClient.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/aiStateStore.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/folderStatus.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/folderStatus.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/originContact.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/snapshotLiveness.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/state/verdict.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/strategies/diagnosticChannelStrategy.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/strategies/diagnosticChannelStrategy.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/strategies/subscriptionStrategy.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/streaming/envelope-types.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/streaming/EnvelopeStream.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/streaming/EnvelopeStream.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/streaming/EnvelopeStreamPool.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/streaming/LivenessWatchdog.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/streaming/MultiplexedStream.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/streaming/MultiplexedStream.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/ai/aiInstallBridge.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/ai/aiInstallBridge.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/tasks/aiInstallTasksBridge.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsBridge.feedstall.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsBridge.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsBridge.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/tasks/inFlightLiveness.test.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/tasks/inFlightLiveness.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/HealthLitView.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/LibrarySurface.ts",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Main.ts",
+      "term": "breath",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui/src/integrationTest/java/io/justsearch/ui/api/SchemaMismatchStatusContractTest.java",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/AotTraining.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/AotTraining.java",
+      "term": "io.grpc",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ActionLedgerController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/AdvisoryStreamController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/AgentController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ApiErrorHandler.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration transport comparison in the enclosing explanation; no channel/stub exists on the current path."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ApiModule.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/CapabilitiesStreamController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ChatController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ConditionRecoveryIndexController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/DebugStateController.java",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/DiagnosticChannelStreamController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/DocumentsIndexedRateMetricController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/GpuMemoryUtilizationMetricController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/GpuUtilizationMetricController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/HealthEventStreamController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/IndexingJobsStreamController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/InferenceHandlers.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/IntentStreamController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/JobQueueDepthMetricController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/LocalApiServer.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/MultiplexedSseWriter.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperationHistoryController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ResourceApiModule.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/RunStreamController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/RunStreamWriter.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/runtime/RuntimeManifestStreamController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/RuntimeContextController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ShellEventsStreamController.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SseConnection.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SseEnvelopeWriter.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SseHeartbeat.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SseWriter.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/StreamLivenessWindows.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Historical comparison with the removed process/transport; the enclosing explanation names the current Engine owner."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui/src/main/resources/logback.xml",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/ActionLedgerControllerTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/AgentControllerShutdownTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerHeartbeatTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/EngineDurableSseWorkTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingJobsSubstrateIntegrationTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/LiveRunsEnumerationTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/MultiplexedSseWriterTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/RunStreamWriterTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SessionPoliciesControllerTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration transport comparison in the enclosing explanation; no channel/stub exists on the current path."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SseConnectionTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SseEnvelopeWriterAtomicResumeTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SseEnvelopeWriterTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SseSnapshotBoundaryTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppOrtNativePackTest.java",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppStartErrorTest.java",
+      "term": "Worker process",
+      "category": "c",
+      "reason": "Historical comparison with the removed process/transport; the enclosing explanation names the current Engine owner."
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/InProcessWorkerSignalBus.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/InProcessWorkerSignalBus.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/WorkerSignalBus.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/WorkerSignalBus.java",
+      "term": "MainSignalBus",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/WorkerSignalBus.java",
+      "term": "MmfWorkerSignalBus",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/WorkerSignalBus.java",
+      "term": "suicide",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/liveness/LivenessWindows.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/worker-core/src/test/java/io/justsearch/indexerworker/coordination/InProcessWorkerSignalBusReloadTest.java",
+      "term": "MmfWorkerSignalLayoutV1",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-core/src/test/java/io/justsearch/indexerworker/coordination/InProcessWorkerSignalBusReloadTest.java",
+      "term": "OFFSET_",
+      "category": "c",
+      "reason": "DateTimeFormatter ISO_OFFSET_DATE_TIME or evidence-offset schema; not a signal-bus layout."
+    },
+    {
+      "path": "modules/worker-core/src/test/java/io/justsearch/indexerworker/WorkerConfigLoadTest.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/ExtractionSandboxCommand.java",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java",
+      "term": "breath",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/pacing/ForegroundLoad.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/pacing/ForegroundLoad.java",
+      "term": "MMF",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/pacing/ForegroundLoad.java",
+      "term": "MmfWorkerSignalBus",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/pacing/IndexingPacing.java",
+      "term": "breath",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/server/DefaultWorkerAppServices.java",
+      "term": "ForegroundLoadInterceptor",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/server/DefaultWorkerAppServices.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/server/WorkerAppServices.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical comparison with the removed process/transport; the enclosing explanation names the current Engine owner."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/CallContext.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/execute/SearchExecutor.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerHealthService.java",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java",
+      "term": "breath",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerOpsMetricCatalog.java",
+      "term": "breath",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerServiceException.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TimeboxedContentExtractorTest.java",
+      "term": "Worker restart",
+      "category": "c",
+      "reason": "Historical comparison with the removed process/transport; the enclosing explanation names the current Engine owner."
+    },
+    {
+      "path": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/MidMigrationCompatSurfaceTest.java",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankTest.java",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/agent-analytics/hooks/dispatch.mjs",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/ci/check-readiness-reason-codes.mjs",
+      "term": "WORKER_",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/ci/check-readiness-reason-codes.test.mjs",
+      "term": "WORKER_",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/ci/check-runtime-manifest-closure.mjs",
+      "term": "worker-config-snapshot",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/ci/check-store-recoverability.test.mjs",
+      "term": "WORKER_",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/ci/check-store-recoverability.test.mjs",
+      "term": "worker-config-snapshot",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/ci/derive-release-sequence.test.mjs",
+      "term": "WORKER_",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/ci/derive-release-sequence.test.mjs",
+      "term": "worker-config-snapshot",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/ci/test-check-lane-f-residue.mjs",
+      "term": "heartbeat",
+      "category": "d",
+      "reason": "Checker fixtures must exercise a legitimate liveness term and verify stale-entry rejection."
+    },
+    {
+      "path": "scripts/codegen/gen-liveness-constants.mjs",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/codegen/gen-liveness-constants.test.mjs",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/codegen/gen-stream-liveness-constants.mjs",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/dev/dev-runner.cjs",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/dev/dev-runner.cjs",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/dev/HotSwapPush.java",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/dev/justsearch-dev-mcp/schemas.mjs",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/dev/justsearch-dev-mcp/server.mjs",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/dev/run-watcher.mjs",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/dev/run-watcher.test.mjs",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/dev/test-dev-runner-admission.mjs",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/dev/test-dev-runner-death-observability.mjs",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/dev/test-dev-runner-death-observability.mjs",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/dev/test-dev-runner-head-java-opts.mjs",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/governance/_fixtures/observed-happening/negative/governance/observed-happening.v1.json",
+      "term": "heartbeat",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/governance/_fixtures/observed-happening/positive/catalog/FixtureDiagnosticChannelCatalog.java",
+      "term": "core.head-log",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/governance/_fixtures/observed-happening/positive/governance/observed-happening.v1.json",
+      "term": "core.head-log",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/governance/_fixtures/surface-altitude/positive/catalog/CoreSurfaceCatalog.java",
+      "term": "core.head-log",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/governance/gates/config-surface/enforcer.mjs",
+      "term": "WorkerSpawner",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/governance/gates/engine-port/rule-descriptions.mjs",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "scripts/governance/gates/engine-port/truth-table.mjs",
+      "term": "gRPC",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "scripts/jseval/624-run-2026-07-18-confirmatory/chain-confirm.bat.txt",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/jseval/707-corpora/en-email-enron-raw/entity-bank/entity-bank.v2.json",
+      "term": "MMF",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "scripts/jseval/707-corpora/en-legal-clerc/entity-bank/entity-bank.v2.json",
+      "term": "MMF",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "scripts/jseval/748-corpora/de-miracl/entity-bank/entity-bank.v2.json",
+      "term": "MMF",
+      "category": "c",
+      "reason": "Opaque model vocabulary or retrieval corpus content, unrelated to the application process model; preserve fixture bytes."
+    },
+    {
+      "path": "scripts/jseval/916_launch_phase.ps1",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/jseval/916-corpora/rag-qa-v1/generate.py",
+      "term": "OFFSET_",
+      "category": "c",
+      "reason": "DateTimeFormatter ISO_OFFSET_DATE_TIME or evidence-offset schema; not a signal-bus layout."
+    },
+    {
+      "path": "scripts/jseval/chain-confirm-v5.bat",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/jseval/chain-confirm.bat",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/jseval/chain-phase2.bat",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/jseval/jseval/workflow_fixture.py",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/jseval/lane-f-workflow-fixture.v1.json",
+      "term": "heartbeat",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f-workflow-fixture.v1.json",
+      "term": "suicide",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f/e-run.mjs",
+      "term": "gRPC",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f/e-run.mjs",
+      "term": "restart-worker",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f/e-run.mjs",
+      "term": "Worker JVM",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f/e-run.mjs",
+      "term": "WORKER_",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f/e-run.mjs",
+      "term": "WorkerSpawner",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f/e456-live.mjs",
+      "term": "gRPC",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f/e456-live.mjs",
+      "term": "restart-worker",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f/e456-live.mjs",
+      "term": "Worker restart",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/lane-f/head-flag-run.sh",
+      "term": "suicide",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/tests/fixtures/recorded/justsearch_search_structured.json",
+      "term": "gRPC",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/tests/fixtures/recorded/justsearch_search_structured.json",
+      "term": "heartbeat",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/tests/fixtures/recorded/justsearch_search_structured.json",
+      "term": "WorkerSpawner",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/jseval/tests/test_index_cache.py",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/jseval/tests/test_workflow_fixture.py",
+      "term": "heartbeat",
+      "category": "c",
+      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact."
+    },
+    {
+      "path": "scripts/release/app-release-assets.test.mjs",
+      "term": "WORKER_",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/release/app-release-assets.test.mjs",
+      "term": "worker-config-snapshot",
+      "category": "d",
+      "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared."
+    },
+    {
+      "path": "scripts/sandbox/sandbox-environment.md",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/sandbox/sandbox-start-SKILL.md",
+      "term": "Head/Worker",
+      "category": "c",
+      "reason": "Historical pre-migration comparison in the enclosing paragraph; the current Engine owner/port is described separately. Preserve the actual removed transport in the rationale."
+    },
+    {
+      "path": "scripts/sandbox/sandbox-start-SKILL.md",
+      "term": "worker.log",
+      "category": "c",
+      "reason": "Pre-migration rationale/comparison or absence assertion: retain the spelling with an explicit historical label, never present it as a live transport."
+    },
+    {
+      "path": "scripts/supervisor-conformance/component-recovery-scenario.mjs",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "scripts/supervisor-conformance/real-writer-recovery.mjs",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    },
+    {
+      "path": "SSOT/messages/errors.en.json",
+      "term": "WORKER_",
+      "category": "b",
+      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values."
+    }
+  ]
+}

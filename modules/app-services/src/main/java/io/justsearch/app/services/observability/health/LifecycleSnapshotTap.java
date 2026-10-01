@@ -114,22 +114,22 @@ public final class LifecycleSnapshotTap {
   // "NOT_CONFIGURED", "UNKNOWN"); reasonCode values come from LifecycleReasonCode enum codes
   // and a few inline string literals (index.starting, index.unavailable, etc.).
   static {
-    // ----- WORKER_CONTROL_PLANE: the index component's fatal facts. -----
+    // ----- INDEX_CONTROL_PLANE: the index component's fatal facts. -----
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.WORKER_CONTROL_PLANE, "NOT_READY", "index.failed"),
+        new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "index.failed"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.WORKER_CONTROL_PLANE, "NOT_READY", "component.start_deadline"),
+        new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "component.start_deadline"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.WORKER_CONTROL_PLANE, "NOT_READY", "index.corrupt"),
+        new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "index.corrupt"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.WORKER_CONTROL_PLANE, "NOT_READY", "index.schema_open_refused"),
+        new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "index.schema_open_refused"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
     MAPPING_TABLE.put(
         new MappingKey(
-            ReadinessDimension.WORKER_CONTROL_PLANE, "NOT_READY", "component.recovery_exhausted"),
+            ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "component.recovery_exhausted"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
 
     // ----- INDEX_SERVING: worker availability + throughput. -----

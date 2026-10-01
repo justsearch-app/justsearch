@@ -31,7 +31,7 @@ import io.justsearch.ipc.StatusResponse;
 import java.util.List;
 
 /**
- * Builds UI-facing and debug status maps from gRPC proto responses.
+ * Builds UI-facing and debug status maps from proto responses.
  *
  * <p>Pure static functions: no mutable state, no RPC calls. Extracted from {@link
  * KnowledgeClient} to reduce file size.

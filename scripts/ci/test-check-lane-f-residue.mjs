@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { findResidue } from './check-lane-f-residue.mjs';
+import { findResidue, validateAllowlist } from './check-lane-f-residue.mjs';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lane-f-residue-'));
 const checker = fileURLToPath(new URL('./check-lane-f-residue.mjs', import.meta.url));
@@ -45,6 +45,35 @@ try {
   const clean = spawnSync(process.execPath, [checker, '--root', root, '--paths', 'docs'], { encoding: 'utf8' });
   assert.equal(clean.status, 0);
   assert.equal(clean.stdout, '');
+  fs.mkdirSync(path.join(root, 'governance'));
+  const allowlist = path.join(root, 'governance', 'lane-f-residue-allowlist.v1.json');
+  const writeAllowlist = entries => fs.writeFileSync(allowlist, JSON.stringify({ version: 1, entries }));
+  const entry = { path: 'docs/*.md', term: 'heartbeat', category: 'c', reason: 'SSE stream liveness.' };
+  const runChecker = () => spawnSync(process.execPath, [checker, '--root', root], { encoding: 'utf8' });
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\n');
+  writeAllowlist([entry]);
+  assert.equal(runChecker().status, 0, 'an allowlisted hit passes');
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\nWorker process\n'); // lane F fixture
+  const otherTerm = runChecker();
+  assert.equal(otherTerm.status, 1, 'a different term on the same path still fails');
+  assert.match(otherTerm.stdout, /current.md:2:/);
+  assert.equal(findResidue('docs/current.md', 'heartbeat Worker process', [entry]).length, 1); // lane F fixture
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'current stream\n');
+  assert.match(runChecker().stdout, /STALE allowlist:/, 'an entry cannot justify itself by its own JSON');
+  assert.equal(runChecker().status, 1, 'a stale entry fails');
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'Historical heartbeat\n');
+  assert.equal(runChecker().status, 1, 'already-labelled history cannot keep an entry alive');
+  fs.writeFileSync(path.join(root, 'docs', 'current.md'), 'heartbeat\n');
+  writeAllowlist([{ ...entry, path: 'other/*.md' }]);
+  assert.equal(runChecker().status, 1, 'a nonmatching path fails');
+  const scoped = spawnSync(process.execPath, [checker, '--root', root, '--paths', 'docs'], { encoding: 'utf8' });
+  assert.equal(scoped.status, 1, 'a scoped scan still validates all allowlist entries');
+  assert.match(scoped.stdout, /STALE allowlist:/);
+  for (const invalid of [ { ...entry, path: '**' }, { ...entry, path: '**/*.md' },
+    { ...entry, reason: '' }, { ...entry, category: 'b' }, { ...entry, term: 'unregistered-term' } ]) {
+    assert.throws(() => validateAllowlist({ version: 1, entries: [invalid] }));
+  }
+  assert.throws(() => validateAllowlist({ version: 1, entries: [entry, entry] }));
   console.log('test-check-lane-f-residue: PASS (unlabelled fixture exits 1; labelled fixtures exit 0)');
 } finally {
   fs.rmSync(root, { recursive: true, force: true });

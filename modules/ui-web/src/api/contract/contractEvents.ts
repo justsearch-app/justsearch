@@ -22,7 +22,7 @@
  *  - `catalog-membership-changed` is a delta shape (Envoy delta xDS
  *    pattern) for first-party catalog mutations.
  *  - Wire-version evolution (`contract-version-changed`) is intentionally
- *    absent — gRPC additive-by-construction makes it structurally
+ *    absent — additive Protobuf contract evolution makes it structurally
  *    non-breaking mid-session.
  *  - Static + dynamic registration non-collision: V1 default is last-
  *    write-wins reconciliation with WARN log on duplicate `id`; LSP-

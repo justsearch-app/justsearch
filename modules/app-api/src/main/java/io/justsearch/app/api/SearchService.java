@@ -11,7 +11,7 @@ package io.justsearch.app.api;
  * three typed service records ({@code CoreServices}, {@code WorkerServices},
  * {@code InferenceServices}) replace the locator entirely. {@code SearchService} lives in
  * {@code WorkerServices} because it requires a reachable Worker (the implementation wraps a
- * core {@code SearchPort} which gRPC-dials the Worker).
+ * core {@code SearchPort} which calls the index half through a port).
  *
  * <p>Production implementation: {@code io.justsearch.app.services.search.SearchServiceImpl}.
  *

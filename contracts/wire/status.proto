@@ -400,6 +400,7 @@ message InferenceRuntimeView {
   string engine_state = 7 [json_name = "engineState"];
   string engine_reason = 8 [json_name = "engineReason"];
   string procedure = 9;
+  // GPU lease holder: CHAT | INDEXING | NONE; empty until observed.
   string lease_holder = 10 [json_name = "leaseHolder"];
 }
 

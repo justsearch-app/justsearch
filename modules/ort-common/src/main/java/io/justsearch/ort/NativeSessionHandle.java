@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
 // @BuildContract annotation), so we document the invariant here in a
 // comment rather than as an annotation. Moving the annotation classes to a
 // truly foundational module (or adding ipc-common to ort-common — rejected
-// because ipc-common pulls gRPC) is deferred.
+// because of its protocol DTO dependency) is deferred.
 public final class NativeSessionHandle implements SessionHandle {
 
   private static final Logger log = LoggerFactory.getLogger(NativeSessionHandle.class);

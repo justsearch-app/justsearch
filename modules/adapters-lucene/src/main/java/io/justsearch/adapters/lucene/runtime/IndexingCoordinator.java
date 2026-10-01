@@ -506,7 +506,7 @@ public final class IndexingCoordinator {
 
   private void guardBackpressure(int delta) {
     // Tempdoc 406 Gap G: reject writes during drain. Caller should retry on the upgraded
-    // holder reference (UNAVAILABLE on the gRPC layer); see RunningRuntime.drainAndClose.
+    // holder reference (UNAVAILABLE on the in-process port layer); see RunningRuntime.drainAndClose.
     if (session.draining) {
       throw new IndexRuntimeIOException(
           IndexRuntimeIOException.Reason.DRAINING,

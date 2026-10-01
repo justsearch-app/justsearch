@@ -372,7 +372,7 @@ final class RAGContextTest {
   }
 
   @Test
-  @DisplayName("806: a gRPC DEADLINE_EXCEEDED underneath is recognised as a timeout, not a plain failure")
+  @DisplayName("806: an in-process port DEADLINE_EXCEEDED underneath is recognised as a timeout, not a plain failure")
   void grpcDeadlineIsRecognisedAsTimeout() {
     var docs =
         new FailingRetrieveDocs(

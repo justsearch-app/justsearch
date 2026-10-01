@@ -72,7 +72,7 @@ public class VduBatchProcessor {
      *
      * @param vduProcessor processor for individual VDU files
      * @param gpuCapabilitiesService NVML-first capability snapshot service
-     * @param knowledgeClientSupplier live supplier of the gRPC client for Worker communication
+     * @param knowledgeClientSupplier live supplier of the in-process port client for Worker communication
      * @param catalog VDU metric catalog
      */
     public VduBatchProcessor(VduProcessor vduProcessor,

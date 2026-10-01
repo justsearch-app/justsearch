@@ -45,9 +45,22 @@ final class RuntimeStatusTest {
   @Test
   void leaseAxisDerivation() {
     assertEquals("CHAT", RuntimeStatus.deriveLease(RuntimeGpuLease.Holder.CHAT, 0L, NOW).status());
-    assertEquals("WORKER", RuntimeStatus.deriveLease(RuntimeGpuLease.Holder.WORKER, 0L, NOW).status());
+    assertEquals("INDEXING", RuntimeStatus.deriveLease(RuntimeGpuLease.Holder.INDEXING, 0L, NOW).status());
     assertEquals("NONE", RuntimeStatus.deriveLease(RuntimeGpuLease.Holder.NONE, 0L, NOW).status());
     assertEquals("NONE", RuntimeStatus.deriveLease(null, 0L, NOW).status());
+  }
+
+  @Test
+  void indexingLeaseSurvivesTransitionUntilModeCommits() {
+    RuntimeGpuLease lease = new RuntimeGpuLease();
+    lease.mirrorFromMode(Mode.INDEXING);
+    assertEquals(RuntimeGpuLease.Holder.INDEXING, lease.holder());
+    lease.mirrorFromMode(Mode.TRANSITIONING);
+    assertEquals("INDEXING", RuntimeStatus.deriveLease(lease.holder(), 0L, NOW).status());
+    lease.mirrorFromMode(Mode.ONLINE);
+    assertEquals(RuntimeGpuLease.Holder.CHAT, lease.holder());
+    lease.mirrorFromMode(Mode.OFFLINE);
+    assertEquals(RuntimeGpuLease.Holder.NONE, lease.holder());
   }
 
   @Test

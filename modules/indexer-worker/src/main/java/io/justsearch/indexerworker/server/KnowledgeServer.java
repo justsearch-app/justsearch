@@ -4450,7 +4450,7 @@ public final class KnowledgeServer implements Closeable {
         log.debug("Failed to initialize disambiguation service (stack trace)", e);
       }
 
-      // 360: Search reranker (GPU-capable, in Worker process).
+      // 360: Search reranker (GPU-capable, in index component).
       var searchRerankConfig = encoderConfiguration.reranker();
       if (surface.reranker().isPresent()) {
         var rerankAssembly = surface.reranker().get();

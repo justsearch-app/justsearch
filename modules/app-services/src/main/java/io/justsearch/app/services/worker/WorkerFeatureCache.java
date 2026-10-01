@@ -4,7 +4,7 @@ package io.justsearch.app.services.worker;
 import java.util.List;
 
 /**
- * Provides cached ONNX model discovery status from the Worker process.
+ * Provides cached ONNX model discovery status from the index component.
  *
  * <p>Implementations return the last-known-good state: if the Worker is unreachable, the most
  * recent successful response is returned. If no successful response has been received, returns an

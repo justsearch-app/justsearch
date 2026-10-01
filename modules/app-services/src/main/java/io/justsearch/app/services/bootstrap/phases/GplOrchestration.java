@@ -115,7 +115,7 @@ public final class GplOrchestration {
         long uptimeMs = status.getCore().getUptimeMs();
         if (uptimeMs < prevUptimeMs) {
           log.info(
-              "GPL auto-trigger: Worker restart detected (uptime {}ms < {}ms); resetting stabilization counter",
+              "GPL auto-trigger: index component recovery detected (uptime {}ms < {}ms); resetting stabilization counter",
               uptimeMs, prevUptimeMs);
           prevDocCount = -1L;
         }

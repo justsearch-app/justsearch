@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * the previous one (no-op suppress to avoid wasted SSE traffic).
  *
  * <p>Cross-process design (per slice 3a.1.4 §B.10): the head's RRD store already
- * accumulates {@code worker.job_queue.depth} samples (worker pushes telemetry via gRPC;
+ * accumulates {@code worker.job_queue.depth} samples (worker pushes telemetry via an in-process port;
  * head's OTel adapter records into RRD). No new worker→head streaming RPC is introduced;
  * the producer reuses the existing pipeline.
  *
@@ -132,8 +132,8 @@ public final class JobQueueDepthMetricProducer {
    * head's RRD). Used by the head-side worker-view tap to bypass the broken worker→head
    * RRD replication pipeline (observations.md inbox item #1, 2026-05-08): the worker
    * already ships its 30-min job-queue-depth window inline as part of every
-   * {@code CoreStatus} gRPC response (`recent_job_queue_depth`), so the head can publish
-   * the metric snapshot directly from the gRPC-projected view without needing OTel
+   * {@code CoreStatus} in-process port response (`recent_job_queue_depth`), so the head can publish
+   * the metric snapshot directly from the port-projected view without needing OTel
    * worker→head metric replication.
    *
    * <p>No-op when {@code values} is null. Otherwise builds a snapshot using the same

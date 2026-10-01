@@ -191,7 +191,7 @@ final class IndexingJobsSubstrateIntegrationTest {
         sent.stream().anyMatch(s -> s.contains("\"pathHash\":\"hash-a\"")),
         "snapshot extras include items from the bridge cache: " + sent);
 
-    // Drive a delta on the gRPC side; expect an UPDATE frame at the SSE level.
+    // Drive a delta on the in-process port side; expect an UPDATE frame at the SSE level.
     int beforeDelta = sent.size();
     stubService.queueDelta(
         8L,

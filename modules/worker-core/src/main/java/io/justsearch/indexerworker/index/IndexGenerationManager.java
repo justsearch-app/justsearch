@@ -244,7 +244,7 @@ public final class IndexGenerationManager {
 
   // Read-cache for readStateBestEffort(): avoids re-parsing state.json on every RPC when nothing has
   // changed. The cached State is published atomically through ONE volatile reference, so a reader on
-  // a gRPC handler thread can never observe a torn version/state pair while a migration thread writes;
+  // an service handler thread can never observe a torn version/state pair while a migration thread writes;
   // writeState() invalidates by nulling it. (tempdoc 589 — replaces a non-volatile lastReadVersion +
   // a non-atomic stateVersion++ counter, which together formed a data race.)
   //

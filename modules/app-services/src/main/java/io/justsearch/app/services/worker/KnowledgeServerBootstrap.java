@@ -974,7 +974,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             return ShutdownOutcome.FAILED;
         }
 
-        // Stop the energy poll before the signal bus goes: its transitional MMF write would
+        // Stop the energy poll before closing its shared scheduling-gauge target; a late update would
         // otherwise race the unmap. The poller is restartable, and the last polled state survives,
         // so a physical replacement resumes without an UNKNOWN window.
         try {

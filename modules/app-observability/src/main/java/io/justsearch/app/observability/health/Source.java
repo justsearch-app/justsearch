@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * Provenance fields attached to every {@link HealthEvent}.
  *
- * <p>Per tempdoc 430 §B.I: with three processes (Head/Worker/Brain) emitting into one
+ * <p>Per tempdoc 430 §B.I: with several logical Engine services emitting into one
  * stream, the FE cannot distinguish "Worker says embedding is blocked" from "Inference
  * says embedding is blocked" without a structured source. Adopts OpenTelemetry Resource
  * semconv (Stable group) verbatim:

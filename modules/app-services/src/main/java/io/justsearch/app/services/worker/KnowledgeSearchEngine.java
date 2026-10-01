@@ -67,7 +67,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Adapter that maps the Knowledge HTTP API contract (app-api DTOs) to/from gRPC proto DTOs.
+ * Adapter that maps the Knowledge HTTP API contract (app-api DTOs) to/from proto DTOs.
  *
  * <p>UI controllers should not import proto DTOs directly; this class is the intended boundary.
  */
@@ -729,7 +729,7 @@ final class KnowledgeSearchEngine {
 
     // 256-I2: LLM query expansion gated by PipelineConfig.expansionEnabled().
     // 256-I4: structured skip reason tracking for pipeline execution report.
-    // Fires before base search so LLM latency overlaps with gRPC round-trip.
+    // Fires before base search so LLM latency overlaps with index operation.
     CompletableFuture<String> expansionFuture = null;
     boolean expansionApplied = false;
     String expansionSkipReason = null;

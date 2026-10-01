@@ -68,7 +68,7 @@ public final class AgentToolErrors {
     // bus" — an internal invariant it cannot act on, and which does not say the one thing that
     // matters: waiting fixes this (877 open items).
     String modelFacing =
-        code == ApiErrorCode.SERVICE_UNAVAILABLE ? WORKER_UNAVAILABLE_GUIDANCE : detail;
+        code == ApiErrorCode.SERVICE_UNAVAILABLE ? INDEX_UNAVAILABLE_GUIDANCE : detail;
 
     return OperationResult.failure(
         userMessagePrefix + ": " + modelFacing,
@@ -83,7 +83,7 @@ public final class AgentToolErrors {
    * the condition, say it self-heals, name the retry. One wording for one condition, whether the
    * dispatcher refused the call up front or the tool got as far as the transport.
    */
-  static final String WORKER_UNAVAILABLE_GUIDANCE =
+  static final String INDEX_UNAVAILABLE_GUIDANCE =
       "the knowledge worker is not reachable; the index is restarting — retry shortly";
 
   /**

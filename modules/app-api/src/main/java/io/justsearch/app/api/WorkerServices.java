@@ -2,8 +2,8 @@
 package io.justsearch.app.api;
 
 /**
- * Worker-process-dependent services: indexing, document fetch, exclude-pattern enforcement,
- * and search (which gRPC-dials the Worker via {@code SearchPort}).
+ * Index-component-dependent services: indexing, document fetch, exclude-pattern enforcement,
+ * and search (which calls the index half through a port via {@code SearchPort}).
  * All four require a reachable Worker to function — they may be unavailable (or have
  * supplier-backed indirection) until {@code ConnectPhase} resolves the live Worker reference.
  *

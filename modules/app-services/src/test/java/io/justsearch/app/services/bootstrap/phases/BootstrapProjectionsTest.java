@@ -126,6 +126,22 @@ final class BootstrapProjectionsTest {
     reconciler.close();
   }
 
+  @Test
+  void indexingLease_projectsIndexingHolderToStatus() {
+    InferenceLifecycleManager manager = mock(InferenceLifecycleManager.class);
+    when(manager.getCurrentMode()).thenReturn(Mode.INDEXING);
+    when(manager.identity()).thenReturn(Optional.empty());
+    when(manager.lastFailure()).thenReturn(Optional.empty());
+    RuntimeReconciler reconciler = mock(RuntimeReconciler.class);
+    when(reconciler.current()).thenReturn(
+        RuntimeStatus.derive(Mode.INDEXING, false, RuntimeGpuLease.Holder.INDEXING,
+            0L, java.time.Instant.parse("2026-10-01T00:00:00Z")));
+
+    InferenceRuntimeView view = BootstrapProjections.projectInferenceSnapshot(manager, reconciler);
+
+    assertEquals("INDEXING", view.leaseHolder());
+  }
+
   /** Minimal {@link OnlineAiLifecycleControl} double, mirroring InferenceCapabilityWiringTest's. */
   private static final class FakeControl implements OnlineAiLifecycleControl {
     private volatile Mode currentMode;

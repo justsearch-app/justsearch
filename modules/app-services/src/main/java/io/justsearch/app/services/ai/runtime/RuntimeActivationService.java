@@ -634,7 +634,7 @@ public final class RuntimeActivationService
    * <p>These two fell back to CPU in round 11 exactly like the reranker did, but they could not be
    * reported: {@link #resolveOneOnnxFeature} derives its INTENT axis from two sources neither of
    * them has. There is no Head-side enabled/path env pair for them (the SPLADE levers in {@code
-   * EnvRegistry} are resolved in the Worker process, not here), and {@code
+   * EnvRegistry} are resolved in the index component, not here), and {@code
    * WorkerModelDiscovery.discoverAll()} enumerates only {@code reranker} and {@code
    * citation-scorer}, so {@code workerFeatureCache} is structurally blind to them — a
    * discovery-derived row would report a permanent {@code not_found}.

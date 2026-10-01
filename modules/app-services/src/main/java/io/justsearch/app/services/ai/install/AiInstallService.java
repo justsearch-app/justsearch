@@ -1332,7 +1332,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
     // ONE reconciler procedure for the whole install window (tempdoc 840 Phase 3). Staged
     // acquisition churns the runtime several times where a monolithic run churned it once — a
-    // Worker restart per stage, plus the engine's runtime overrides when the chat model lands — and
+    // configuration application per stage, plus the engine's runtime overrides when the chat model lands — and
     // drift convergence must stay suppressed across all of it, not per burst. The engine returns to
     // spec exactly once, at the end. INSTALL_SMOKE_TEST nests inside this; overlapping kinds are
     // supported and only the LAST end re-arms convergence.
@@ -1428,9 +1428,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * {@code setSysPropIfBlank} is first-writer-wins, and the settings writes are the same absolute
    * paths.
    *
-   * <p>Only the Worker restart is stage-gated, because it is the one step whose input is not a file
-   * but the RUN: a restart is a user-visible search blip, so a stage that placed nothing must not
-   * pay for one.
+   * <p>Only the configuration application is stage-gated, because it is the one step whose input is not a file
+   * but the RUN: only a stage that acquired new artifacts requests a restart to use them.
    *
    * @return true to carry on with the rest of the run; false when a stage already put the run into a
    *     terminal state
@@ -1489,7 +1488,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
                             (phase, message) -> updateState("running", phase, message))
                         .apply(),
                 // The pass a run owes when no stage acquired anything (tempdoc 840 R1): same steps,
-                // same order, same once-per-run latches — and the Worker restart UNGATED, because a
+                // same order, same once-per-run latches — and the configuration application UNGATED, because a
                 // pre-staged models dir is new to the Worker even though this run fetched none of it.
                 () ->
                     ConfigurationStage.forInstall(

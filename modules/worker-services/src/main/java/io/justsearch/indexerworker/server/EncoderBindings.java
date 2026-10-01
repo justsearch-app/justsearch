@@ -19,7 +19,7 @@ import java.util.Objects;
  * {@code bindings.bindX(...)} calls instead of fanning out across peer setters.
  *
  * <p>The complete encoder set is held in one volatile immutable snapshot. The async-load thread
- * that publishes (typically the gRPC incoming-RPC thread or the deferred-init worker thread) can
+ * that publishes (typically the port-call thread or the deferred-init worker thread) can
  * therefore hand off a coherent set to the indexing-loop thread and any search-handling threads
  * without external synchronization.
  *

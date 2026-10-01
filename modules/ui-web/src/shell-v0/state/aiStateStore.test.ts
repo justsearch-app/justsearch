@@ -544,7 +544,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
   it('E2: a settled poll stamps lastSettledIndex; a provisional poll keeps it', () => {
     feed(statusWith('READY', [], { docs: 1234, sizeBytes: 4096 }));
     expect(getAiState().lastSettledIndex).toEqual({ documentCount: 1234, searchableDocumentCount: null, indexSizeBytes: 4096 });
-    // Worker restarts: a *successful* poll returns the fallback (0 docs / UNAVAILABLE). The
+    // index component recoveries: a *successful* poll returns the fallback (0 docs / UNAVAILABLE). The
     // retained settled value must NOT be overwritten by that transient zero.
     feed(statusWith('UNKNOWN', [], { indexState: 'UNAVAILABLE', docs: 0, sizeBytes: 0 }));
     const s = getAiState();
@@ -646,7 +646,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
 
   it('W2: a hard-zeroed fallback snapshot is absence, not a drain — the mark survives it', () => {
     feed(withPendingJobs(1600));
-    // Worker restart: a *successful* poll returns the fallback block (UNAVAILABLE + zeroed counts).
+    // index component recovery: a *successful* poll returns the fallback block (UNAVAILABLE + zeroed counts).
     // Reading its `pendingJobs: 0` as a drain would reset the denominator mid-episode.
     feed(withPendingJobs(0, 'UNAVAILABLE'));
     expect(getAiState().episodeMaxPendingJobs).toBe(1600);

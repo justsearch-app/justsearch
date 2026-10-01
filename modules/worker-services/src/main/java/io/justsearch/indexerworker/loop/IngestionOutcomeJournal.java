@@ -169,7 +169,7 @@ public final class IngestionOutcomeJournal {
    * {@link OutcomeWriteException} fall back to per-transition writes so a single bad row doesn't
    * block the rest. Transitions that fail individually stay in {@code pendingMarkDone} (via the caller's
    * identity removal of the surviving in-list) so the next drain or
-   * {@code recoverStuckJobs} on Worker restart can retry.
+   * {@code recoverStuckJobs} on index component recovery can retry.
    */
   private void drainGroup(
       List<JobQueue.IngestionLedgerTransition> group, IngestionOutcome outcome) {
