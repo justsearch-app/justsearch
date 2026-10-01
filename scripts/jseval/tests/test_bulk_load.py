@@ -74,6 +74,7 @@ class BulkLoadTest(unittest.TestCase):
     def test_submits_without_wait_then_equal_blocks_and_boundary_samples(self):
         client = Client()
         with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / 'document.txt').write_text('corpus bytes', encoding='utf-8')
             args = SimpleNamespace(output_dir=directory, corpus_dir=directory,
                 base_url='http://127.0.0.1:33221', workload='agent-idle',
                 block_seconds=.02, admission_script='unused')
@@ -88,6 +89,12 @@ class BulkLoadTest(unittest.TestCase):
             result = json.loads((Path(directory) / 'bulk-load.json').read_text())
             self.assertEqual(ingest.call_count, 1)
             self.assertEqual(result['modes'], ['hybrid', 'lexical'])
+            self.assertEqual(result['corpusManifest'][0][0], 'document.txt')
+            self.assertEqual(len(result['corpusManifest'][0][1]), 64)
+            self.assertEqual(set(result['encoderSessions']), {'start', 'end'})
+            for row in result['requests']:
+                if row.get('windowBoundary'):
+                    self.assertEqual(row['cancellationCause'], 'mode-block-end' if row['mode'] == 'hybrid' else 'fixed-window-end')
             self.assertEqual(result['durationSeconds'], .04)
             self.assertEqual(result['samples'][0]['offsetSeconds'], 0)
             self.assertEqual(result['samples'][-1]['offsetSeconds'], .04)
@@ -98,6 +105,29 @@ class BulkLoadTest(unittest.TestCase):
                 self.assertTrue(rows)
                 self.assertEqual(rows[0]['queryIndex'], 0)
             self.assertTrue((Path(directory) / 'phases.json').exists())
+
+    def test_corpus_manifest_binds_bytes_and_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            corpus = Path(directory)
+            first = corpus / 'first.txt'
+            first.write_text('first', encoding='utf-8')
+            original = bulk_load.corpus_manifest(corpus)
+            first.write_text('second', encoding='utf-8')
+            self.assertNotEqual(original, bulk_load.corpus_manifest(corpus))
+            first.write_text('first', encoding='utf-8')
+            first.rename(corpus / 'renamed.txt')
+            self.assertNotEqual(original, bulk_load.corpus_manifest(corpus))
+
+    def test_encoder_session_observations_preserve_lazy_state_and_errors_without_gating(self):
+        client = Client()
+        client.get = lambda endpoint, **kwargs: Response({'onnxFeatures': [
+            {'id': 'embed', 'modelPath': None, 'fallbackReason': 'lazy'}]})
+        observed = bulk_load.encoder_sessions(client)
+        self.assertIsNone(observed['ai']['onnxFeatures'][0]['modelPath'])
+        def unavailable(*args, **kwargs):
+            raise ValueError('session endpoint unavailable')
+        client.get = unavailable
+        self.assertIn('unavailable', bulk_load.encoder_sessions(client)['aiError'])
 
     def test_stale_or_missing_counts_fail_instead_of_zero_progress(self):
         client = Client()

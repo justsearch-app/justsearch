@@ -72,6 +72,7 @@ export function instrumentFiles(plan, sourceRoot = SOURCE, executionRoot = sourc
     add(file, pyRoot);
   };
   for (const c of plan) {
+    if (c.mode === 'start') add(root('scripts/jseval/lane-f/e-acquire.mjs'));
     if (c.mode === 'start') { add(root('scripts/jseval/lane-f/e-start-ready.mjs')); add(root('scripts/jseval/lane-f/capability-ready.py'), pythonRoot(c, true)); }
     if (c.mode === 'ai-activate') add(root('scripts/jseval/lane-f/e-start-ready.mjs'));
     if (['instruments-start', 'crash-experiment', 'hang-experiment', 'child-path'].includes(c.mode)) add(root('scripts/jseval/lane-f/e456-live.mjs'));
@@ -127,9 +128,9 @@ export function measurementIdentity(plan, options, readBytes = fs.readFileSync) 
     const hashes = instruments[name] ?? new Set(); hashes.add(digest(readBytes(file))); instruments[name] = hashes;
   }
   const inputs = {
-    kind: 'lane-f-measurement-identity.v2', plan: normalizePlan(plan, options),
+    kind: 'lane-f-measurement-identity.v3', plan: normalizePlan(plan, options),
     instruments: Object.fromEntries(Object.entries(instruments).map(([name, hashes]) => [name, [...hashes].sort()])),
-    corpus: options.corpus, machine: options.machine, workload: options.workload,
+    corpus: options.corpus, scifact: options.scifact, models: options.models, machine: options.machine, workload: options.workload,
     heap: options.heap, collector: options.collector,
   };
   return { pairIdentity: digest(JSON.stringify(stable(inputs))), pairIdentityInputs: stable(inputs) };

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
-import { ROOT, parseArgs, buildPlan, main, tableVerdicts, latestRecords, sourceDirt } from './e-run.mjs';
+import { ROOT, parseArgs, buildPlan, main, tableVerdicts, latestRecords, sourceDirt, projectionIdentity } from './e-run.mjs';
 import { gcLogOption, parseGc, heapTrend, summedHeapTrend, ownedProcesses, memorySeries, launchBudget,
   crashObservation, hangVerdict, hangPolicy, splitGap } from './e456-instruments.mjs';
 import { settingsPatch, requestLive, executableFrom, projectChildPolicies, LiveCollector, jobRows, logEventTime } from './e456-live.mjs';
@@ -165,7 +165,7 @@ test('hang verdict requires the real fault/channel and rejects the wrong actuato
   assert.throws(() => hangPolicy({ hangParameters: { intervalMs: 10000, missCount: 3 } }, 11000), /Freeze/);
 });
 test('unmeasurable-on-split dispositions remain gaps while known failure still dominates', () => {
-  const make = arm => ({ arm, id: arm, pairIdentity: 'same', valuesHash: 'same', clauses: { 'checkpoint-resume': true }, metrics: {} });
+  const make = arm => ({ arm, id: arm, pairIdentity: 'same', valuesHash: 'same', projectionIdentity: projectionIdentity(values), clauses: { 'checkpoint-resume': true }, metrics: {} });
   const m = make('main'), b = make('branch'); m.dispositions = { 'checkpoint-resume': splitGap('no operations.db') };
   const records = { 'E5/main': m, 'E5/branch': b };
   assert.equal(tableVerdicts(records, values).find(r => r.clause === 'checkpoint-resume').verdict, 'unmeasurable-on-split');
@@ -280,15 +280,13 @@ test('E4 aggregation keeps failed long-window slopes and does not replace them w
   assert.equal(record.clauses['live-after-GC-trend'], false); assert.equal(record.clauses['owner-duration'], true);
 });
 
-test('component memory verdict compares the split arm sum and launch bounds, with no synthetic total', () => {
-  const make = (arm, peak) => ({ id: arm, arm, valuesHash: 'same', pairIdentity: 'same',
-    metrics: { peakCommitMB: peak }, clauses: { 'component-commit-budget': true } });
-  const main = make('main', 5000), branch = make('branch', 4999);
-  const result = () => tableVerdicts({ 'E4/main': main, 'E4/branch': branch }, values).find(r => r.clause === 'component-commit-budget').verdict;
-  assert.equal(result(), 'pass'); branch.metrics.peakCommitMB = 5001; assert.equal(result(), 'fail');
-  delete branch.metrics.peakCommitMB; assert.equal(result(), 'unmeasurable');
-  branch.metrics.peakCommitMB = 1000; branch.clauses['component-commit-budget'] = false; assert.equal(result(), 'fail');
+test('component budget cannot use flags or machine sums as consumer accounting (2026-10-01 owner amendment)', () => {
+  const make = arm => ({ id: arm, arm, valuesHash: 'same', pairIdentity: 'same', projectionIdentity: projectionIdentity(values),
+    metrics: { peakCommitMB: 1000 }, clauses: { 'component-commit-budget': true } });
+  const records = { 'E4/main': make('main'), 'E4/branch': make('branch') };
+  assert.equal(tableVerdicts(records, values).find(r => r.clause === 'component-commit-budget').verdict, 'unmeasurable');
 });
+
 test('live settings collector verifies the real consumer and restores the original patterns', async t => {
   const directory = fs.mkdtempSync(path.join(ROOT, 'tmp/e-settings-'));
   t.after(() => fs.rmSync(directory, { recursive: true }));

@@ -11,6 +11,7 @@ import { killOwned, verifyOwned } from '../../supervisor-conformance/verified-cr
 import { attachFault } from '../../supervisor-conformance/jdwp-fault.mjs';
 import { ownedProcesses, parseGc, heapTrend, summedHeapTrend, memorySeries, launchBudget,
   splitGap, verdict, hangPolicy, hangVerdict, crashObservation } from './e456-instruments.mjs';
+import { componentBudget } from './e-memory-budget.mjs';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const json = file => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
@@ -214,8 +215,11 @@ export class LiveCollector {
       r.clauses['window-duration'] = memory.sampledMs >= values.soak.windows[Number(r.window) - 1].minutes * 60000 - 5000;
     }
     const flagChecks = [...this.flags.values()].map(f => f.code === 0 ? launchBudget(f.stdout, f.role) : undefined);
-    r.clauses['component-commit-budget'] = verdict(flagChecks) === 'pass' && memory?.complete ? true
+    r.clauses['launch-flag-compliance'] = verdict(flagChecks) === 'pass' && memory?.complete ? true
       : flagChecks.includes(false) ? false : undefined;
+    r.metrics.consumerAccounting = this.consumerAccounting ?? json(path.join(this.directory, 'consumer-accounting.json'));
+    const budget = componentBudget(r.metrics.consumerAccounting, this.arm);
+    r.clauses['component-commit-budget'] = budget.check;
     const longLived = [...this.processes.values()].filter(p => ['head', 'worker', 'engine'].includes(p.role));
     const coverage = this.snapshots.length > 1 && this.errors.length === 0 && this.snapshots.every(s =>
       (this.arm === 'main' ? ['head', 'worker'] : ['engine']).every(role => s.processes.some(p => p.role === role)))
@@ -254,7 +258,7 @@ export class LiveCollector {
     const configured = this.reconfigures.filter(r => !r.restore);
     r.clauses['index-agent-reconfigure-workload'] = coverage && configured.length === due
       && configured.every((change, i) => Math.abs(change.atMs - (this.startMs + (i + 1) * 900000)) < 30000) ? true : undefined;
-    r.gaps['component-commit-budget'] = 'Observed JVM heap/direct/metaspace launch limits; the total private-bytes envelope is the paired split sum, not a synthetic total ceiling.';
+    r.gaps['component-commit-budget'] = budget.reason;
     if (Number(r.window) === 3) r.gaps['live-after-GC-trend'] = 'Ten-minute tail contributes memory/duration/crashes; slopes are required in windows 1 and 2.';
   }
 }
@@ -409,7 +413,7 @@ export async function crashExperiment(context) {
   r.clauses['actual-death-durable-operation'] = durableAtDeath ? observed.identityChanged && noDuplicateEffects : undefined;
   if (!durableAtDeath) r.gaps['actual-death-durable-operation'] = 'PROCESSING/RUNNING cut was not observed after verified death; not substituted by a pre-kill snapshot';
   r.clauses['crash-to-api'] = observed.apiMs <= context.values.crashToApiRestoredMs;
-  r.clauses['crash-to-index'] = Number.isFinite(observed.indexMs) ? true : undefined;
+  r.clauses['crash-to-index'] = Number.isFinite(observed.indexMs) ? observed.indexMs <= context.values.crashToApiRestoredMs : undefined;
   r.clauses['checkpoint-resume'] = durableAtDeath ? observed.checkpointResume : undefined;
   const supervisor = collector.snapshots.filter(s => s.supervisor?.state === 'restarting' && s.atMs >= timeline.killMs);
   r.clauses['visible-restarting'] = r.arm === 'branch' ? supervisor.length > 0 ? true : undefined : undefined;
