@@ -72,6 +72,8 @@ export function instrumentFiles(plan, sourceRoot = SOURCE, executionRoot = sourc
     add(file, pyRoot);
   };
   for (const c of plan) {
+    // Common stop-observation policy: candidate uses handle receipts, frozen MAIN uses reports.
+    for (const file of c.acquisitionDependencies ?? []) add(file);
     if (c.mode === 'start') add(root('scripts/jseval/lane-f/e-acquire.mjs'));
     if (c.mode === 'start') { add(root('scripts/jseval/lane-f/e-start-ready.mjs')); add(root('scripts/jseval/lane-f/capability-ready.py'), pythonRoot(c, true)); }
     if (c.mode === 'ai-activate') add(root('scripts/jseval/lane-f/e-start-ready.mjs'));

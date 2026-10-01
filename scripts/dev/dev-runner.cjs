@@ -21,6 +21,7 @@ const { spawn, spawnSync, execFile } = require('child_process');
 // can't break the build/Engine JVMs. Injected into every JVM spawn's env below.
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
+const { engineIdentity, startStopExitCensus } = require('./lib/stop-exit-census.cjs');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const uiWebDir = path.resolve(repoRoot, 'modules', 'ui-web');
@@ -668,9 +669,15 @@ function buildStopReport({
   interruptibleWithLossInterrupted = null,
   gracefulBackendShutdown = null,
   incarnation = null,
+  processExits = null,
+  exitAccountingComplete = null,
+  exitAccountingGaps = null,
+  exitCensusFile = null,
+  exitAccountingScope = null,
 }) {
   return {
     schemaVersion: 2,
+    ...(processExits ? { processExits, exitAccountingComplete, exitAccountingGaps, exitCensusFile, exitAccountingScope } : {}),
     runId,
     stoppedAt,
     disposition,
@@ -2300,6 +2307,7 @@ async function cmdStart(opts) {
   );
 
   const runJson = {
+    exitCensusEngine: engineIdentity(backend.pid, dataDir),
     schemaVersion: 1,
     runId,
     startedAt,
@@ -2847,6 +2855,7 @@ async function cmdStart(opts) {
     runJson.apiPortActual = apiPortActual;
     runJson.apiBaseUrl = `http://127.0.0.1:${apiPortActual}`;
     runJson.pids.backendRootPid = backend.pid;
+    runJson.exitCensusEngine = engineIdentity(backend.pid, dataDir);
     runJson.incarnation = incarnation;
     runJson.resourceClaims.apiPort = apiPortActual;
     runJson.resourceClaims.runtimeManifestInstanceId = manifestInstanceId;
@@ -3110,6 +3119,7 @@ async function stopRun(opts) {
   // flag can't reach the supervisor's `backend.on('exit')` handler. The marker file is how it
   // learns "this exit was requested by an external stop" and skips writing its own racing
   // `writeSelfExitStopReport` (see the handler in cmdStart).
+  const exitCensus = await startStopExitCensus(run, dataDirAbs, path.dirname(runPath), process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE);
   const backendRootPid = Number(run?.pids?.backendRootPid);
   const gracefulShutdownMarkerPath = path.join(path.dirname(runPath), 'graceful-shutdown.json');
   const gracefulBackendShutdown =
@@ -3188,8 +3198,10 @@ async function stopRun(opts) {
   // death run's evidence survives alongside its stop-report instead of only in the shared,
   // cross-run <dataDir>/logs/engine.log.
   const engineLog = await preserveEngineLog(run, runPath);
+  const exitAccounting = await exitCensus.finish(killedPids);
 
   const stopReport = buildStopReport({
+    ...exitAccounting,
     runId,
     stoppedAt: nowIso(),
     disposition,
@@ -3248,6 +3260,7 @@ async function stopRun(opts) {
     killedPids,
     portsClosed: stopReport.portsClosed,
     stopReportPath: toPosix(path.relative(repoRoot, stopReportPath)),
+    ...exitAccounting,
   };
 }
 

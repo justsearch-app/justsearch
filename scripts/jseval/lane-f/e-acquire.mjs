@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { sourceDirt, sharedModelStore } from './e-acquisition-eligibility.mjs';
 import { startOwned, activateChat } from './e-start-ready.mjs';
 import { finalizeInputs, captureEncoderSessions } from './e-measured-inputs.mjs';
 import { crashEvidence, projectCrashes } from './e-crash-evidence.mjs';
@@ -67,7 +68,7 @@ export function execute(command, context) {
 }
 
 export async function runAcquisition(plan, context, bindings, services) {
-  const { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies, collect, sourceDirt, sharedModels, CLAUSES, finalize } = services;
+  const { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies, collect, CLAUSES, finalize } = services;
   const { record, raw, options } = context, groups = record.groups;
   try {
     fs.mkdirSync(path.join(raw, 'gc'), { recursive: true });
@@ -109,7 +110,7 @@ export async function runAcquisition(plan, context, bindings, services) {
       }
       for (const arg of command.args.filter(a => /\.(csv|tsv|json)$/.test(a) && a.startsWith(raw))) fs.mkdirSync(path.dirname(arg), { recursive: true });
       if (command.mode === 'start') {
-        await startOwned(command, context, bindings, execute, sharedModels);
+        await startOwned(command, context, bindings, execute, sharedModelStore());
         record.dataDirs ??= []; record.dataDirs.push(context.dataDir);
         continue;
       }
@@ -125,12 +126,15 @@ export async function runAcquisition(plan, context, bindings, services) {
         if (end + 60000 > context.deadline) throw new Error('Insufficient one-hour budget for complete soak window');
         let cycle = 0;
         while (Date.now() < end) {
-          const iteration = { ...command, label: `soak-cycle-${++cycle}`, args: [...command.args, '--reset'] };
+          const iteration = { ...command, label: `soak-cycle-${++cycle}`, outcomesFile: path.join(raw, 'soak', `search-cycle-${cycle}.jsonl`),
+            args: [...command.args, '--reset', '--search-load-outcomes', path.join(raw, 'soak', `search-cycle-${cycle}.jsonl`)] };
           const cycleContext = { ...context, deadline: Math.min(context.deadline, end) };
           const execution = execute(iteration, cycleContext);
           context.sequence = cycleContext.sequence;
           const result = await execution.complete;
-          if (execution.expired() && Date.now() >= end) break;
+          if (execution.expired() && Date.now() >= end) {
+            result.receipt.cancellationCause = 'fixed-window-end'; break;
+          }
           if (result.code !== 0) throw new Error(`Soak cycle exited ${result.code}`);
         }
         record.metrics.measuredMinutes = command.minutes;
@@ -190,6 +194,8 @@ export async function runAcquisition(plan, context, bindings, services) {
       record.metrics.crashEvidence = crashEvidence([...new Set([...(record.dataDirs ?? []), context.dataDir].filter(Boolean))], record.metrics.soakWindow, stop, stop.processExits ?? [], census);
       projectCrashes(record);
       record.additionalArtifacts.push(...record.metrics.crashEvidence.sources);
+      record.additionalArtifacts.push(...(stop.processExits ?? []).map(e => e.source).filter(f => f && fs.existsSync(f)));
+      if (stop.exitCensusFile && fs.existsSync(stop.exitCensusFile)) record.additionalArtifacts.push(stop.exitCensusFile);
       write(path.join(raw, 'crash-evidence.json'), record.metrics.crashEvidence);
     }
     record.rawFiles = [raw, ...record.additionalArtifacts].flatMap(filesUnder);

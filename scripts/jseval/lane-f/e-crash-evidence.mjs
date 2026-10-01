@@ -45,7 +45,7 @@ export function crashEvidence(dataDirs, window, stop = {}, exits = [], census) {
     .map(p => [`${p.pid}/${p.creationFileTimeUtc}`, p]));
   const exitCoverage = identities.size > 0 && [...identities.values()].every(p => exits.some(e =>
     e.pid === p.pid && e.creationFileTimeUtc === p.creationFileTimeUtc && Number.isInteger(e.exitCode) && e.source));
-  return { events, sources, window, exitCoverage, throughTeardown: stop.portsClosed === true,
+  return { events, sources, window, exitCoverage, exitAccountingGaps: stop.exitAccountingGaps ?? [], throughTeardown: stop.portsClosed === true,
     // Exit receipts cover native children too; a stopped port alone says nothing about their exit outcome.
     complete: stop.portsClosed === true && stop.exitAccountingComplete === true && exitCoverage };
 }
@@ -54,5 +54,5 @@ export function projectCrashes(record) {
   record.clauses['zero-crashes'] = evidence?.events?.length || record.clauses['zero-crashes'] === false ? false
     : evidence?.complete === true && record.clauses['zero-crashes'] === true ? true : undefined;
   record.gaps['zero-crashes'] = evidence?.events?.length
-    ? JSON.stringify(evidence.events) : record.clauses['zero-crashes'] === false ? 'Crash observed in retained live census; exact exit/timing receipt unavailable' : 'No crash observed; complete exit accounting through teardown for every JVM/native child is required';
+    ? JSON.stringify(evidence.events) : record.clauses['zero-crashes'] === false ? 'Crash observed in retained live census; exact exit/timing receipt unavailable' : `No crash observed; complete exit accounting through teardown for every JVM/native child is required; ${JSON.stringify(evidence?.exitAccountingGaps ?? [])}`;
 }

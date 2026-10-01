@@ -38,6 +38,8 @@ test('scorer, test, and unrelated instrument bytes do not enter measurement iden
   assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/jseval/bulk_load.py']);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/jseval/readiness.py']);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/jseval/search_load.py']);
+  assert.ok(normal.pairIdentityInputs.instruments['scripts/dev/lib/stop-exit-census.cjs']);
+  assert.ok(normal.pairIdentityInputs.instruments['scripts/dev/lib/stop-exit-census.ps1']);
   assert.ok(!normal.pairIdentityInputs.instruments['scripts/jseval/lane-f/analyze-head-run.cjs']);
 });
 test('instrument bytes, imported dependencies, plan arguments and shared launch settings change identity', () => {

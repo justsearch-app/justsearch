@@ -15,7 +15,9 @@ export function corpusManifest(dir) {
 export function modelIdentity(config, statuses = []) {
   const root = config?.keys?.find(k => k.key === 'justsearch.models.dir')?.value;
   if (!root || !fs.existsSync(root)) throw new Error('Captured effective config lacks an accessible model store');
-  const refs = statuses.flatMap(s => [s.active?.modelPath, ...(s.onnxFeatures ?? []).map(f => f.modelPath)].filter(Boolean));
+  const configured = config.keys.filter(k => typeof k.value === 'string' && k.value.trim()
+    && (/\.model_path$/.test(k.key) || /\.model$/.test(k.key) && path.isAbsolute(k.value))).map(k => k.value);
+  const refs = [...configured, ...statuses.flatMap(s => [s.active?.modelPath, ...(s.onnxFeatures ?? []).map(f => f.modelPath)].filter(Boolean))];
   const inventory = [...new Set([...files(root), ...refs.flatMap(p => fs.existsSync(p) && fs.statSync(p).isDirectory() ? files(p) : [p])].map(p => path.resolve(p)))].sort();
   const models = inventory.map(file => {
     const stat = fs.statSync(file);
@@ -31,6 +33,24 @@ export function modelIdentity(config, statuses = []) {
   ]).map(v => JSON.stringify(v)))].sort().map(v => JSON.parse(v));
   return { configuredSelections, executedSelections, method: 'configured-store-superset-size-mtime', root: root.replaceAll('\\', '/'), chatModels, models };
 }
+export function establishExecutedModels(config, statuses, requireChat, allowDormant = false) {
+  if (!statuses.length || statuses.some(s => !s || !Array.isArray(s.onnxFeatures)))
+    throw new Error('Executed model identity unavailable: required runtime AI status receipt missing or malformed');
+  if (requireChat && !statuses.some(s => typeof s.active?.modelPath === 'string' && s.active.modelPath))
+    throw new Error('Executed chat model identity unavailable: runtime model path missing');
+  const identity = modelIdentity(config, statuses);
+  if (!identity.executedSelections.length && !(allowDormant && !requireChat && statuses.every(s =>
+    s.active?.modelPath == null && s.onnxFeatures.every(f => f.id && f.modelActive === false && f.status !== 'unknown'))))
+    throw new Error('Executed model identity unavailable: no runtime model IDs/paths');
+  for (const s of statuses) for (const feature of s.onnxFeatures) {
+    if (!feature.id || feature.modelActive === true && !feature.modelPath || feature.status === 'unknown')
+      throw new Error(`Executed encoder identity unavailable: ${feature.id ?? 'missing ID'} has unknown model identity`);
+    if (feature.modelPath && (!feature.id || !identity.models.some(m => m.path === path.resolve(feature.modelPath).replaceAll('\\', '/')
+      || m.path.startsWith(path.resolve(feature.modelPath).replaceAll('\\', '/') + '/'))))
+      throw new Error(`Executed encoder identity unavailable: ${feature.id ?? 'missing ID'}`);
+  }
+  return identity;
+}
 export function finalizeInputs(context) {
   const { record: r, root } = context;
   const captures = files(context.raw).filter(f => /effective-config\.json$/.test(f)).map(f => JSON.parse(fs.readFileSync(f)));
@@ -38,8 +58,11 @@ export function finalizeInputs(context) {
   const loads = files(context.raw).filter(f => /bulk-load.json$/.test(f)).map(f => JSON.parse(fs.readFileSync(f)));
   const statuses = [...files(context.raw).filter(f => /encoder-sessions.*\.json$/.test(f)).map(f => JSON.parse(fs.readFileSync(f)).ai),
     ...loads.flatMap(l => Object.values(l.encoderSessions ?? {}).map(s => s.ai))].filter(Boolean);
+  const sessionReceipts = [...files(context.raw).filter(f => /encoder-sessions.*\.json$/.test(f)).map(f => JSON.parse(fs.readFileSync(f))),
+    ...loads.flatMap(l => Object.values(l.encoderSessions ?? {}))];
+  if (sessionReceipts.some(s => !s.ai || s.modelIdentityError)) throw new Error('Required runtime model identity capture failed');
   r.executedModels = statuses.flatMap(s => [{ id: 'chat', modelPath: s?.active?.modelPath }, ...(s?.onnxFeatures ?? []).map(f => ({ id: f.id, modelPath: f.modelPath }))]);
-  r.pairIdentityInputs.models = modelIdentity(captures[0], statuses.filter(Boolean));
+  r.pairIdentityInputs.models = establishExecutedModels(captures[0], statuses, !r.groups.includes('E1'));
   const capturedModels = files(context.raw).filter(f => /encoder-sessions.*\.json$/.test(f)).map(f => JSON.parse(fs.readFileSync(f)).models).filter(Boolean);
   if (capturedModels.some(m => JSON.stringify(m.models) !== JSON.stringify(r.pairIdentityInputs.models.models)))
     throw new Error('Model file size/mtime changed during acquisition');
@@ -62,10 +85,11 @@ export async function captureEncoderSessions(context, label, request = fetch) {
   }
   const file = path.join(context.raw, `encoder-sessions-${label}.json`);
   if (context.effectiveConfig) {
-    try { result.models = modelIdentity(context.effectiveConfig, result.ai ? [result.ai] : []); }
+    try { result.models = establishExecutedModels(context.effectiveConfig, result.ai ? [result.ai] : [], !context.record.groups.includes('E1'), true); }
     catch (e) { result.modelIdentityError = e.message; }
   }
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
   context.record.encoderSessions ??= {};
   context.record.encoderSessions[label] = result;
+  if (!result.ai || result.modelIdentityError || !result.models) throw new Error(`Required model identity unavailable before measurement: ${result.aiError ?? result.modelIdentityError ?? 'effective config missing'}; see ${file}`);
 }

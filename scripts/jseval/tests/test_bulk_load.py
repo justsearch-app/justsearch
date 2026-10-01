@@ -9,6 +9,8 @@ import unittest
 from unittest.mock import patch
 
 from jseval import bulk_load
+from jseval.search_load import SearchLoadRunner, SearchLoadSpec, search_body
+import httpx
 
 
 class Response:
@@ -71,6 +73,42 @@ class AsyncClient:
 
 
 class BulkLoadTest(unittest.TestCase):
+    def test_search_journal_retains_504_before_cycle_summary_or_stop(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / 'search-cycle.jsonl'
+            runner = SearchLoadRunner('http://127.0.0.1:33221', ['query'],
+                SearchLoadSpec(mode='continuous', outcomes_file=str(file)))
+            client = httpx.Client(transport=httpx.MockTransport(
+                lambda request: httpx.Response(504, request=request)), base_url='http://127.0.0.1:33221')
+            with client:
+                runner._issue(client, search_body('query'))
+            events = [json.loads(line) for line in file.read_text().splitlines()]
+            self.assertEqual([e['event'] for e in events], ['request-start', 'http-response', 'request-outcome'])
+            self.assertEqual(events[1]['status'], 504)
+            self.assertEqual(events[-1]['status'], 504)
+            self.assertEqual(events[-1]['error'], 'REQUEST_FAILURE')
+            self.assertEqual(runner._errors, 1)
+            self.assertFalse(runner._latencies_ms)
+
+    def test_search_journal_persists_timeout_and_success_separately(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = Path(directory) / 'search-cycle.jsonl'
+            runner = SearchLoadRunner('http://127.0.0.1:33221', ['query'],
+                SearchLoadSpec(mode='continuous', outcomes_file=str(file)))
+            def reply(request):
+                if request.read().find(b'timeout') >= 0:
+                    raise httpx.ReadTimeout('request expired')
+                return httpx.Response(200, request=request)
+            with httpx.Client(transport=httpx.MockTransport(reply), base_url='http://127.0.0.1:33221') as client:
+                runner._issue(client, search_body('timeout'))
+                runner._issue(client, search_body('success'))
+            outcomes = [json.loads(line) for line in file.read_text().splitlines()
+                if json.loads(line)['event'] == 'request-outcome']
+            self.assertEqual(outcomes[0]['error'], 'TIMEOUT')
+            self.assertEqual(outcomes[1]['status'], 200)
+            self.assertNotIn('error', outcomes[1])
+            self.assertEqual([e['requestId'] for e in outcomes], [0, 1])
+
     def test_submits_without_wait_then_equal_blocks_and_boundary_samples(self):
         client = Client()
         with tempfile.TemporaryDirectory() as directory:
