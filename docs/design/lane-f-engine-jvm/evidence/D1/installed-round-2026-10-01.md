@@ -43,3 +43,6 @@ Closure-review proofs at `51fff0a62` (retained-state producers merged):
 - `nativeCompleteSource...` and `refusedInPlaceGapRestoresAThenApprovesAndPromotesB` with the new restoration-time-versus-budget assertion (D1-9): PASSED (`tmp/lane-f-proofs-p3.log`).
 - Supervised recovery set with the per-component readiness clock and TEXT/semantic queries (D1-2): PASSED (`tmp/lane-f-proofs-p4.log`).
 - `ordinaryQueryReconfigure...` with the A->B->C delayed-retry extension: FAILED on the delayed k1 replay comparison (`tmp/lane-f-proofs-p1.log`; fixture `tmp/lane-f-takeover/query-reconfigure-31fca5bf-*`); under investigation. Its XML was overwritten by a later group (results directory shared); the log and fixture are retained.
+- `ordinaryQueryReconfigure...` with the delayed-retry extension, rerun at `7ab2aedf5` after the comparison was corrected to the C2 recorded-outcome contract: PASSED. BESIDE 514 samples, IN_PLACE 665 samples, 0 API outages, restartCount 0; delayed k1 replay returns k1's recorded outcome, a stale new key with B's witness is refused, C and its applied version stay unchanged (`tmp/lane-f-proofs-p1-r2.log`, `-xml/`).
+
+Full suite at `51fff0a62`: 1,879 suites, 12,493 tests, 0 failures, 0 errors, 33 existing skips (`tmp/lane-f-batch6-full-suite-counts.json`).
