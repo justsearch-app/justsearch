@@ -149,7 +149,7 @@ final class ConfigurationStageTest {
         phases,
         "the FE keys off phase — these two strings are the contract. The second message changed"
             + " at lane F stage A: nothing restarts a worker any more, so it states the outcome"
-            + " and the user action (restart_required) instead of narrating a restart. Pinned"
+            + " and the user action instead of narrating a restart. Pinned"
             + " exactly, so a re-introduction of the old over-claim fails here.");
   }
 }

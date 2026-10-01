@@ -7,11 +7,9 @@ import io.justsearch.configuration.persistence.WatchedRootsFormat;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
-import io.justsearch.adapters.lucene.runtime.CleanShutdownMarker;
 import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntime;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
-import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.SystemAccess;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
@@ -96,65 +94,12 @@ public final class KnowledgeServerMigrationOps {
       // COMPATIBLE iff the green is fully embedded) BEFORE the COMPLETE commit, so that commit stamps
       // the embedding fingerprint deterministically rather than racing the indexing-loop thread.
       BooleanSupplier finalizeEmbeddingRebuildAction,
-      BooleanSupplier verifyGreenCommitMetadataSupplier,
       Runnable drainSwitchBufferAction,
-      // Tempdoc 915 (live validation D4): flush the worker metrics snapshot before the cutover
-      // restart. The snapshot cadence is 60s and the cutover restarts the worker roughly 20s after
-      // the migration starts, so the session that performed the cutover was discarded before any
-      // snapshot was written - and commit_by_reason therefore never carried migration/cutover in a
-      // live run, though both emit sites are production code.
-      Runnable flushTelemetryAction,
-      Runnable requestedRestartAction,
-      Path dataDir,
       Logger log,
-      RecordedIngestionLifecycle.CheckedPromotion promotion,
       CheckedSwitchingTransition switchingTransition,
       CheckedLiveCutover liveCutover) {
-    public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
-        BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
-        Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
-        long migrationSwitchingMaxDurationMs, int migrationCutoverMaxFailedJobs,
-        Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
-        BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
-        Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log,
-        RecordedIngestionLifecycle.CheckedPromotion promotion,
-        CheckedSwitchingTransition switchingTransition) {
-      this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
-          migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
-          migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
-          finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
-          flushTelemetryAction, requestedRestartAction, dataDir, log, promotion,
-          switchingTransition, null);
-    }
-    public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
-        BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
-        Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
-        long migrationSwitchingMaxDurationMs, int migrationCutoverMaxFailedJobs,
-        Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
-        BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
-        Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log,
-        RecordedIngestionLifecycle.CheckedPromotion promotion) {
-      this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
-          migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
-          migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
-          finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
-          flushTelemetryAction, requestedRestartAction, dataDir, log, promotion,
-          observed -> indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING), null);
-    }
-
-    public CutoverContext(IndexGenerationManager indexGenerationManager, JobQueue jobQueue,
-        BooleanSupplier runningSupplier, BooleanSupplier migrationEnumeratorDoneSupplier,
-        Supplier<Throwable> migrationEnumeratorFailureSupplier, long migrationSwitchingQueueDepthThreshold,
-        long migrationSwitchingMaxDurationMs, int migrationCutoverMaxFailedJobs,
-        Supplier<LuceneRuntime> ingestLifecycleSupplier, BooleanSupplier finalizeEmbeddingRebuildAction,
-        BooleanSupplier verifyGreenCommitMetadataSupplier, Runnable drainSwitchBufferAction,
-        Runnable flushTelemetryAction, Runnable requestedRestartAction, Path dataDir, Logger log) {
-      this(indexGenerationManager, jobQueue, runningSupplier, migrationEnumeratorDoneSupplier,
-          migrationEnumeratorFailureSupplier, migrationSwitchingQueueDepthThreshold,
-          migrationSwitchingMaxDurationMs, migrationCutoverMaxFailedJobs, ingestLifecycleSupplier,
-          finalizeEmbeddingRebuildAction, verifyGreenCommitMetadataSupplier, drainSwitchBufferAction,
-          flushTelemetryAction, requestedRestartAction, dataDir, log,
-          indexGenerationManager::promoteBuildingGenerationToActive);
+    public CutoverContext {
+      Objects.requireNonNull(liveCutover, "liveCutover");
     }
   }
 
@@ -269,12 +214,11 @@ public final class KnowledgeServerMigrationOps {
         }
 
         if (ms == IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE) {
-          if (context.liveCutover() != null && !context.liveCutover().enterGapWait()) {
+          if (!context.liveCutover().enterGapWait()) {
             Thread.sleep(1_000);
             continue;
           }
-          if (context.liveCutover() != null
-              && context.liveCutover().gapDecision()
+          if (context.liveCutover().gapDecision()
                   == RecordedIngestionLifecycle.GapDecision.ACCEPTED) {
             context.liveCutover().resumeAcceptedGapBuild();
           } else {
@@ -297,9 +241,7 @@ public final class KnowledgeServerMigrationOps {
           context.log().info(
               "Migration nearing completion (queueDepth={}). Entering SWITCHING cutover fence...",
               depth);
-          if (context.liveCutover() != null) {
-            context.liveCutover().transition("migration-before-switching");
-          }
+          context.liveCutover().transition("migration-before-switching");
           context.switchingTransition().run(state);
           Thread.sleep(250);
           continue;
@@ -342,7 +284,7 @@ public final class KnowledgeServerMigrationOps {
             "Migration drain criteria met in SWITCHING (queueDepth={}). Finalizing cutover...",
             depth);
 
-        if (context.liveCutover() == null || !context.liveCutover().recorded()) {
+        if (!context.liveCutover().recorded()) {
           long failedJobs;
           try {
             failedJobs = context.jobQueue().failureSummary().failedCount();
@@ -388,67 +330,17 @@ public final class KnowledgeServerMigrationOps {
           continue;
         }
 
-        if (context.liveCutover() != null) {
-          IndexGenerationManager.State promoted = context.liveCutover().promote();
-          if (promoted == null) {
-            if (context.liveCutover().gapDecision()
-                == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) {
-              context.liveCutover().enterGapWait();
-            }
-            Thread.sleep(250);
-            continue;
-          }
-          context.log().info("Migration promoted generation {} without restarting the Engine",
-              promoted.active_generation());
-          return;
-        }
-
-        try {
-          // Tempdoc 598 review Fix E: finalize the embedding rebuild on this (drained) green BEFORE
-          // the COMPLETE commit. This deterministically flips the ECC to COMPATIBLE iff the green is
-          // fully embedded, so the COMPLETE commit's overlay stamps embedding_model_sha256 — rather
-          // than racing the indexing-loop thread that would otherwise flip rebuildCompleted. A green
-          // that is genuinely not fully embedded is NOT flipped, so its commit lacks the fingerprint
-          // and the verification below correctly blocks promotion (no false promote-into-BLOCKED).
-          // Phase 5 (folded into Phase 2-3 Step C): commitWithBuildState replaces the
-          // setBuildState + commit two-step. Updates ctx.buildState then commits, so
-          // the final commit (and any subsequent timer commit) stamps build_state=COMPLETE.
-          ingestLifecycle
-              .commitOps()
-              .commitWithBuildState(
-                  LuceneRuntimeTypes.BuildState.COMPLETE, CommitReason.MIGRATION_CUTOVER);
-        } catch (Exception e) {
-          context.log().warn(
-              "Migration cutover failed: final commit failed (keeping Blue): {}", e.getMessage());
-          context
-              .indexGenerationManager()
-              .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
-          context.drainSwitchBufferAction().run();
-          return;
-        }
-
-        if (!context.verifyGreenCommitMetadataSupplier().getAsBoolean()) {
-          context.log().warn("Migration cutover failed: Green verification failed; keeping Blue active");
-          context
-              .indexGenerationManager()
-              .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
-          context.drainSwitchBufferAction().run();
-          return;
-        }
-
-        IndexGenerationManager.State promoted = context.promotion().promote();
+        IndexGenerationManager.State promoted = context.liveCutover().promote();
         if (promoted == null) {
+          if (context.liveCutover().gapDecision()
+              == RecordedIngestionLifecycle.GapDecision.AWAITING_ACCEPTANCE) {
+            context.liveCutover().enterGapWait();
+          }
           Thread.sleep(250);
           continue;
         }
-        try { Files.deleteIfExists(context.dataDir().resolve(".help-ingested-version")); }
-        catch (IOException ignored) {
-          // Best-effort cleanup of stale marker; failure is non-fatal to cutover.
-        }
-        preserveEvidenceBeforeRestart(context, promoted);
-        context.log().info("Migration promoted generation {}; requesting Engine restart",
-            promoted == null ? "(unknown)" : promoted.active_generation());
-        context.requestedRestartAction().run();
+        context.log().info("Migration promoted generation {} without restarting the Engine",
+            promoted.active_generation());
         return;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -565,46 +457,6 @@ public final class KnowledgeServerMigrationOps {
       }
     }
     return true;
-  }
-
-  /**
-   * Records what the restarting process would otherwise take with it. The cutover restart is the one
-   * shutdown the worker performs on its own, and neither of these facts survived it (tempdoc 915,
-   * live validation).
-   *
-   * <p><b>Clean-shutdown marker.</b> The promoted generation has just taken its {@code COMPLETE}
-   * commit and been verified, so it is clean by construction at this instant. Leaving the marker to
-   * {@code RuntimeSession.close()} made that contingent on the whole shutdown sequence completing
-   * before the process goes away, and live runs showed the next boot logging {@code Unclean previous
-   * shutdown detected} for the freshly promoted generation and paying a FULL integrity verification
-   * for it. Writing it here states a fact that is true now rather than hoping a later step runs.
-   *
-   * <p><b>Telemetry flush.</b> Same shape: the cutover commit is counted in-process and the periodic
-   * snapshot is minutes away.
-   *
-   * <p>Both are best-effort. A failure costs an integrity scan or a lost counter, never correctness,
-   * and must not abort a cutover that has already completed.
-   */
-  // Package-private: the cutover loop that calls it needs a live migration to reach, and the two
-  // facts it records are observable directly (a marker file, a Runnable that ran).
-  static void preserveEvidenceBeforeRestart(
-      CutoverContext context, IndexGenerationManager.State promoted) {
-    try {
-      String activeGen = promoted == null ? null : promoted.active_generation();
-      if (activeGen != null && !activeGen.isBlank()) {
-        CleanShutdownMarker.write(
-            context.indexGenerationManager().resolveGenerationPathStrict(activeGen));
-      }
-    } catch (Exception e) {
-      context.log().debug("Clean-shutdown marker not written before cutover restart: {}", e.getMessage());
-    }
-    try {
-      if (context.flushTelemetryAction() != null) {
-        context.flushTelemetryAction().run();
-      }
-    } catch (Exception e) {
-      context.log().debug("Telemetry flush before cutover restart failed: {}", e.getMessage());
-    }
   }
 
   public static void drainSwitchBufferBestEffort(DrainSwitchBufferContext context) {
