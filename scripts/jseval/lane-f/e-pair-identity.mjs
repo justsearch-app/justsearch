@@ -15,7 +15,9 @@ export function normalizePlan(plan, options) {
   const { sourceRoot = SOURCE, outputRoot = sourceRoot, armTree, arm, invocation, session, runId } = options;
   const replacements = [
     [options.raw, '<RAW>'], [path.join(outputRoot, 'tmp/lane-f-e', options.group ?? '', arm ?? '', '${invocation}'), '<RAW>'],
-    [armTree, '<ARM_TREE>'], [sourceRoot, '<REPO>'], [outputRoot, '<REPO>'],
+    // One placeholder for every checkout: in real runs the branch arm IS the tooling root, so a
+    // path cannot say which role it plays, and the bytes it names are hashed separately anyway.
+    [armTree, '<TREE>'], [sourceRoot, '<TREE>'], [outputRoot, '<TREE>'],
     [invocation, '<INVOCATION>'], [session, '<SESSION>'], [runId, '<RUN>'], [options.revision, '<ARM_REVISION>'],
   ].filter(([v]) => v).sort((a, b) => String(b[0]).length - String(a[0]).length);
   const text = value => {
@@ -31,7 +33,7 @@ export function normalizePlan(plan, options) {
     delete env.JUSTSEARCH_WORKER_HEAP; delete env.JUSTSEARCH_JVM_OPTS;
     if (env.JUSTSEARCH_FIXTURE_CORPUS_ROOT) env.JUSTSEARCH_FIXTURE_CORPUS_ROOT = '<CORPUS_TREE>';
     for (const key of Object.keys(env)) if (/^GIT_CONFIG_VALUE_\d+$/.test(key)
-      && env[key.replace('VALUE', 'KEY')] === 'safe.directory') env[key] = '<ARM_TREE>';
+      && env[key.replace('VALUE', 'KEY')] === 'safe.directory') env[key] = '<TREE>';
     // The debugger attaches to the subject JVM on either arm, in different launch slots.
     if (options.group === 'e6-hang' && env.JAVA_OPTS) env.JAVA_OPTS = env.JAVA_OPTS.replace(/\s+-agentlib:jdwp=[^\s]+/, '');
     const result = normalize({ ...command, env });
