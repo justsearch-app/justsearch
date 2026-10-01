@@ -8,7 +8,7 @@ import { barrierFiles } from './barrier-files.mjs';
 export async function exerciseQueryReconfigure(c) {
   const { mode, work, data, indexBase, modelsRoot, apiPort, manifest, first,
     readJson, waitFor, request, post, requireThat, createOperationKey,
-    operationKey: forcedOperationKey } = c;
+    operationKey: forcedOperationKey, requireOperationSuccess, jobStateFor } = c;
   const source = path.join(modelsRoot, 'onnx', 'reranker');
   const stage = (name) => {
     const destination = path.join(work, name);
@@ -27,8 +27,7 @@ export async function exerciseQueryReconfigure(c) {
     return destination;
   };
   const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-  // A is the retained source reranker the Engine boots with. The launcher sets
-  // JUSTSEARCH_QUERY_RECONFIGURE_A on the Engine's environment, not on this process.
+  // The launcher selects this retained models root for A; no child-only env value is read here.
   const a = path.resolve(source);
   const b = stage(`query-reranker-${mode.toLowerCase()}-b`);
   const sourceFp16 = path.join(source, 'model_fp16.onnx');
@@ -91,15 +90,22 @@ export async function exerciseQueryReconfigure(c) {
     return reranker;
   };
   const query = async (label) => {
-    return waitFor(label, 90000, async () => {
-      const response = await post(apiPort, '/api/knowledge/search',
-        { query: 'query reconfigure availability', limit: 10, mode: 'text' }, 60000);
-      const value = read(response, label);
-      const crossEncoder = value.searchTrace?.stages?.find(stage => stage.id === 'cross-encoder');
-      return response.status === 200 && value.results?.length >= 3
-        && crossEncoder?.status === 'executed'
-        ? { status: response.status, results: value.results.length, crossEncoder } : null;
-    });
+    let last = null;
+    try {
+      return await waitFor(label, 90000, async () => {
+        const response = await post(apiPort, '/api/knowledge/search',
+          { query: 'query reconfigure availability', limit: 10, mode: 'text' }, 60000);
+        const value = read(response, label);
+        const crossEncoder = value.searchTrace?.stages?.find(stage => stage.id === 'cross-encoder');
+        last = { status: response.status, results: value.results?.length ?? null,
+          crossEncoder: crossEncoder ?? null, degradation: value.searchTrace?.degradation ?? null };
+        return response.status === 200 && value.results?.length >= 6
+          && crossEncoder?.status === 'executed'
+          ? { status: response.status, results: value.results.length, crossEncoder } : null;
+      });
+    } catch (failure) {
+      throw new Error(`${failure.message}; last model query=${JSON.stringify(last)}`, { cause: failure });
+    }
   };
   const headers = { 'content-type': 'application/json' };
   if (typeof manifest.head?.sessionToken === 'string' && manifest.head.sessionToken.length > 0) {
@@ -234,6 +240,24 @@ export async function exerciseQueryReconfigure(c) {
       composition, degradation };
   };
 
+  // Files written before boot do not become jobs merely by recording a watched root.
+  // Admit the fixture through the same operation API used by the installed writer scenarios.
+  const corpus = path.join(work, 'query-reconfigure-corpus');
+  const corpusPaths = Array.from({ length: 6 }, (_, i) => path.join(corpus, `rerank-${i}.txt`));
+  requireThat(corpusPaths.every(file => fs.existsSync(file)), 'query reconfigure corpus is incomplete');
+  const ingestKey = createOperationKey();
+  const ingestResponse = await request(apiPort, '/api/knowledge/ingest', {
+    method: 'POST', headers,
+    body: JSON.stringify({ paths: corpusPaths, idempotencyKey: ingestKey }),
+  }, 60000);
+  const ingest = requireOperationSuccess(ingestResponse, 'query reconfigure corpus ingest');
+  requireThat(ingest.operationKey === ingestKey, 'corpus ingest changed its supplied operation key');
+  const committedCorpus = await waitFor('all six query reconfigure corpus jobs committed DONE',
+    120000, () => {
+      const rows = corpusPaths.map(file => jobStateFor(path.basename(file)));
+      return rows.every(row => row?.state === 'DONE') ? rows : null;
+    });
+
   const generation = readJson(path.join(indexBase, 'state.json'))?.active_generation;
   requireThat(typeof generation === 'string' && generation.length > 0,
     'query reconfigure lacks an active index generation');
@@ -272,9 +296,13 @@ export async function exerciseQueryReconfigure(c) {
         mode: encoders.mode, reason: encoders.reason,
         freeBytes: encoders.freeBytes, footprintBytes: encoders.footprintBytes,
       };
-      return compose?.mode === mode ? { value, compose } : null;
+      return compose?.mode === mode && encoders.state === 'READY'
+          && encoders.appliedVersion !== appliedA
+          && path.resolve(value.worker?.gpu?.rerankerModelPath ?? '').toLowerCase() === b.toLowerCase()
+        ? { value, compose } : null;
     } catch { return null; }
   });
+  assertComposition(statusB.compose, `${mode} B status`);
   const selectedB = selectedRole(b, `${mode} B`);
   const appliedB = statusB.value.readiness.engineComponents.encoders.appliedVersion;
   requireThat(typeof appliedB === 'string' && appliedB !== appliedA
@@ -287,7 +315,11 @@ export async function exerciseQueryReconfigure(c) {
   const statusA = await waitFor(`${mode} restored A publication`, 90000, async () => {
     try {
       const value = await status();
-      return value.readiness?.engineComponents?.encoders?.mode === mode ? value : null;
+      const encoders = value.readiness?.engineComponents?.encoders;
+      return encoders?.mode === mode && encoders.state === 'READY'
+          && encoders.appliedVersion === appliedA
+          && path.resolve(value.worker?.gpu?.rerankerModelPath ?? '').toLowerCase() === a.toLowerCase()
+        ? value : null;
     } catch { return null; }
   });
   const selectedA = selectedRole(a, `${mode} restored A`);
@@ -343,14 +375,22 @@ export async function exerciseQueryReconfigure(c) {
   const replayBody = read(replay, `${mode} refusal replay`);
   assertComposition(replayBody.composition, `${mode} refusal replay`);
   const afterReplay = await settings();
-  requireThat(replayBody.state === refusedBody.state && replayBody.operationKey === refusalKey
+  requireThat(replay.status === refused.status && replayBody.state === refusedBody.state
+      && replayBody.operationKey === refusalKey
       && JSON.stringify(replayBody.composition) === JSON.stringify(refusedBody.composition)
       && JSON.stringify(afterReplay.witness) === JSON.stringify(beforeRefusal.witness)
       && fs.readFileSync(path.join(data, 'ui', 'settings.json'), 'utf8') === witnessBytes,
   `${mode} same-key refusal replay changed evidence or durable settings: ${replay.text}`);
-  const afterRefusalStatus = await status();
-  const afterRefusalEncoders = afterRefusalStatus.readiness?.engineComponents?.encoders;
   const expectedRecoveryAttempts = recoveryAttemptsBefore + (mode === 'IN_PLACE' ? 1 : 0);
+  const afterRefusalStatus = await waitFor(`${mode} A restoration after refusal`, 90000, async () => {
+    const value = await status();
+    const encoders = value.readiness?.engineComponents?.encoders;
+    return encoders?.state === 'READY' && encoders.mode === mode
+        && encoders.appliedVersion === appliedA && encoders.recoveryAttempts === expectedRecoveryAttempts
+        && path.resolve(value.worker?.gpu?.rerankerModelPath ?? '').toLowerCase() === a.toLowerCase()
+      ? value : null;
+  });
+  const afterRefusalEncoders = afterRefusalStatus.readiness.engineComponents.encoders;
   requireThat(path.resolve(afterRefusalStatus.worker?.gpu?.rerankerModelPath ?? '').toLowerCase()
       === a.toLowerCase()
       && afterRefusalEncoders?.mode === mode
@@ -367,7 +407,9 @@ export async function exerciseQueryReconfigure(c) {
       && availabilityRounds.every(round => round.samples > 0 && round.outages === 0
         && round.samplingStartedAt <= round.postIssuedAt
         && round.postIssuedAt <= round.settledAt)
-      && finalSupervisor?.pid === first.pid && finalSupervisor?.restartCount === first.restartCount
+      && first.restartCount === 0 && finalSupervisor?.restartCount === 0
+      && finalSupervisor?.pid === first.pid && finalSupervisor?.incarnation === first.incarnation
+      && finalSupervisor?.instanceId === first.instanceId
       && readJson(path.join(indexBase, 'state.json'))?.active_generation === generation,
   `${mode} changed API/process/generation continuity: ${JSON.stringify({
     apiOutages, samples, first, finalSupervisor, generation })}`);
@@ -379,6 +421,7 @@ export async function exerciseQueryReconfigure(c) {
   `${mode} omitted bounded compose evidence: ${JSON.stringify(evidence)}`);
   console.log('QUERY_RECONFIGURE_ROUND_PASS', JSON.stringify({ mode, generation,
     pid: first.pid, restartCount: finalSupervisor.restartCount, apiOutages, samples,
+    corpus: { operationKey: ingestKey, committedJobs: committedCorpus.length },
     paths: { a, b }, evidence, versions: { appliedA, appliedB, appliedRestoredA },
     selections: { initialA: initialIdentity, b: selectedB, restoredA: selectedA },
     recoveryAttempts: { beforeRefusal: recoveryAttemptsBefore,

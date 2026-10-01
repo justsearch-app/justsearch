@@ -204,3 +204,77 @@ Final checks: `git diff --check` passes; the requested
 `LC_ALL=C.UTF-8 git diff | grep -P '^\+.*[^\x00-\x7F]'` prints nothing.
 Production/test files are unchanged from tested HEAD `fcb99659fa9f7b98c5754597aec01d908ab92409`;
 only this evidence report remains modified. No design deviation was needed.
+
+
+### 2026-10-01: installed run 2 model-query timeout (harness correction)
+
+Investigated lane head `eee08b92ed517a6d1cd1bf694b0cbeb34c6266fe` and the root-preserved
+run-2 Gradle log/XML plus fixture
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-takeover/query-reconfigure-abc39326-1f47-4488-bc01-db6b148c1944/`.
+The installed XML records 1 failure at "timeout waiting for model query A". No installed
+scenario, Gradle command, dev stack, Engine or sub-agent was run for this investigation.
+
+The original `query()` waits up to 90 seconds for POST `/api/knowledge/search` with
+`{query:"query reconfigure availability",limit:10,mode:"text"}` to return HTTP 200,
+`results.length >= 3`, and `searchTrace.stages.find(s => s.id === "cross-encoder").status`
+equal to the lowercase wire value `"executed"`. The id/status expectation is correct:
+`SearchTrace.StageStatus.wireValue()` lowercases statuses, and `SearchTraceMapper` projects
+crossEncoderApplied as executed/skipped. TEXT presets enable CE when RerankerConfig enables it.
+
+Observed evidence, rather than an inference from the timeout alone:
+
+- `data/jobs.db`, opened read-only/immutable, has **zero jobs**.
+- All **772** records in `data/feedback/feature-snapshots.ndjson` have empty hits for the fixture query.
+- `data/logs/engine.log:1462` reports zero serving parent documents during identity import.
+- Engine log lines 1598-1602 show the CUDA model loading, GPU session initialization,
+  one-document warm-up, and "Search reranker ready (gpu=true, warm-up=3019ms)".
+- The fixture's backend stdout identifies API port 62685; stderr contains ORT's normal
+  warning about some graph nodes assigned to CPU, not a CUDA allocation failure.
+- `real-writer-recovery.mjs` already deletes AI_OFFLINE for this scenario. Its eval-mode
+  JVM flag suppresses help-file auto-ingest (`KnowledgeServerBootstrap`), so it cannot supply
+  accidental candidates. Generative OFFLINE/retrieval-only observations do not disable the
+  independent reranker, as the CUDA warm-up proves.
+
+Cause: the harness creates six files before boot and writes watched_roots.json, then enters
+the query-reconfigure branch without admitting any files. The generic writer branch's later
+`/api/knowledge/ingest` call never executes for this scenario. The harness waits on an empty
+index. The product's `KnowledgeSearchEngine.isRerankerEligible` requires at least the configured
+five candidates, so empty searches cannot apply CE; its skip reason is BELOW_MIN_THRESHOLD.
+No trace-field rename, offline switch, GPU failure or product modification is needed for this
+observed failure. The correction uses the existing ingest-operation and jobStateFor helpers.
+
+Changes:
+
+- Admit all six fixture files through `/api/knowledge/ingest`, validate the canonical operation
+  receipt/key, and wait for all six jobs to be DONE before any model query. Require six search
+  hits and keep the executed CE assertion. Model-query failures now retain the last HTTP status,
+  result count, CE stage/reason and degradation in the error.
+- Keep A on the explicit retained models root's normal discovery; remove the unused child-only
+  JUSTSEARCH_QUERY_RECONFIGURE_A variable and ambient reranker model-path override. An operator
+  path override would mask settings changes (SettingsCommitCoordinator's QUERY_ROLE_PATH_OVERRIDDEN).
+- Explicitly enable GPU, pin the existing five-hit threshold, and use the existing issued-request
+  scenario's 180-second Worker deadline. Clear an ambient device-memory ceiling for BESIDE;
+  force the existing one-MB ceiling only for IN_PLACE. Keep eval mode and the existing AI_OFFLINE
+  deletion. Corpus text now matches the held-query terms too.
+- Wait for READY plus target path/version for B and restored A; wait for restored A's READY,
+  applied version and recovery-attempt count after refusal. Mode alone cannot identify a new
+  publication because a cached source snapshot can carry the same mode. Check status compose
+  evidence and refusal replay HTTP status, and require zero restarts plus stable incarnation/
+  instanceId as well as PID/generation.
+
+Local proof: `node --check` passes for both changed harness scripts; `node --test
+scripts/supervisor-conformance/query-reconfigure.test.mjs` passes **3 tests**, zero failures/skips.
+The two mode regressions execute the full fake-API harness, including held-request and IN_PLACE
+composition barriers, four sampled mutation rounds, stale same-mode publication and refusal replay.
+The third verifies missing-trace timeout diagnostics. Restoring only query-reconfigure.mjs from
+HEAD makes both positive regressions red at "model queries must follow corpus admission and
+committed DONE jobs"; restoring the fix makes all three green. Logs are preserved under the
+ignored worktree path `tmp/query-reconfigure-r2-proof/{red,green}.log`.
+This proves harness control flow; real CUDA, actual ingestion and installed continuity remain
+unverified until the orchestrator executes the following focused installed scenario.
+
+```text
+./gradlew.bat :modules:system-tests:lifecycleIntegrationTest --tests io.justsearch.systemtests.supervision.EngineLifecycleE2ETest.ordinaryQueryReconfigureProvesBesideAndForcedInPlaceWithoutRestart -PincludeAiTests=true -PskipWebBuild=true
+```
+
+Java is unchanged, so no new Java formatting/compile command is requested. No commit or push.
