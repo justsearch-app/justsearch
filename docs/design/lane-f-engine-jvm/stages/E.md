@@ -224,8 +224,54 @@ refute scoring/test/unrelated-file invalidation and detect instrument/argument c
   failed comparisons. Known live crashes remain failures even without an exit
   receipt. A stopped port cannot prove clean native-child exits: absent complete
   child-exit accounting through teardown, BRANCH zero-crashes is unmeasurable.
-  The current stop producer lacks that accounting, which remains a named live
-  evidence gap; no crash-free E4 pass is inferred from an empty crash directory.
+  No crash-free E4 pass is inferred from an empty crash directory.
+
+**2026-10-01 confirmation-review amendment:** interrupted E4 cycles previously
+lost search counters, unavailable runtime receipts could hash an empty executed
+model set, and the stop producer supplied no exit census. The corrections are:
+
+- Every soak cycle appends `search-cycle-N.jsonl` as requests occur, using
+  jseval's `--search-load-outcomes` option. A cycle with no completed outcomes,
+  or missing/corrupt evidence, makes wire validity unmeasurable. An earlier 504
+  still fails even when the last cycle is interrupted. Only an unfinished request
+  within its timeout, without observed violations, can be boundary-censored;
+  the cancellation cause is retained. Collector calls, including settings
+  restoration, append their own HTTP journal and enter the same wire verdict.
+- Effective config plus runtime AI receipts must establish the executed models
+  before loading. Configured external model files enter the size/mtime inventory
+  directly, even without runtime references. Missing/unknown runtime identity
+  fails the invocation and finalization. E1 may start with explicitly dormant
+  sessions; finalization still requires executed identity. E5 quit/upgrade do not
+  request a runtime receipt after deliberately terminating the API; their
+  mandatory startup receipts identify the models used by those experiments.
+- BRANCH stop opens read-only process handles before teardown and records actual
+  exit code/time for the spawn-bound Engine and B11's registered children. The
+  handles retain OS birth identity; exact owned CIM births bind sampled identities
+  through teardown. Java's millisecond start receipts are matched to the same
+  represented millisecond, with ambiguous births refused, never a tolerance
+  window. The census and its gaps are retained for offline reprojection. MAIN's
+  launcher stays frozen: crash reports/hs_err remain baseline evidence.
+  B11 is a **current** child registry: it removes completed children and has no
+  historical child-exit codes. Children removed before stop, descendants absent
+  from B11, unavailable handles and unresolvable birth identities are explicit
+  accounting gaps. They prevent BRANCH zero-crashes from passing. Complete
+  historical native-child coverage still needs lifecycle exit receipts at spawn
+  and exit; this stop census cannot manufacture them.
+- Fixture/dirty-source eligibility, run prerequisites, machine/corpus receipts
+  and shared-model location now belong to hashed acquisition modules. The common
+  stop-observer policy is hashed alongside them. Resolved plan outputs retain
+  `<TREE>` normalization; projection-only changes remain outside pair identity.
+
+Local verification for this amendment (edit-only driver tree, 2026-10-01):
+122 lane-F Node tests and six stop-census tests passed; six bulk-load and 26
+search-load Python tests passed. All 24 JavaScript syntax checks and the
+PowerShell parser passed. `identity-check --dry-run` matched all eight protocols.
+The falsifying cases include an interrupted earlier 504, missing cycle journals,
+collector restoration failures, missing model status, external weight changes,
+PID reuse and native exception exits. Node output and the identity check are
+retained in `tmp/e-confirmation-node.log` and
+`tmp/e-confirmation-identities.log`. This is local regression proof; live model,
+stack and teardown verification belongs to root's acquisition runs.
 
 Check the common acquisition protocols without starting anything:
 

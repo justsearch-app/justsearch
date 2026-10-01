@@ -274,7 +274,7 @@ test('realized encoder sessions retain lazy and active window boundaries without
   const context = { raw: dir, root: dir, effectiveConfig: config, record: { ...record('main', ['E5']), pairIdentityInputs: {} } };
   let realized = false;
   const request = async url => ({ ok: true, json: async () => url.endsWith('/status')
-    ? { onnxFeatures: [{ id: 'embed', modelPath: realized ? model : null }] } : { encoders: realized } });
+    ? { active: { modelPath: model }, onnxFeatures: [{ id: 'embed', modelPath: realized ? model : null }] } : { encoders: realized } });
   await captureEncoderSessions(context, 'window-start', request); realized = true;
   await captureEncoderSessions(context, 'window-end', request); finalizeInputs(context);
   assert.equal(context.record.encoderSessions['window-start'].ai.onnxFeatures[0].modelPath, null);

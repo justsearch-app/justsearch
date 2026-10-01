@@ -19,6 +19,8 @@ started and no ``search_load`` block is written.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 import logging
 import os
 import threading
@@ -84,6 +86,7 @@ class SearchLoadSpec:
     qpm: int | None = None
     top_k: int = DEFAULT_TOP_K
     search_mode: str = DEFAULT_SEARCH_MODE
+    outcomes_file: str | None = None
 
 
 def resolve_spec(qpm: int | None, continuous: bool) -> SearchLoadSpec | None:
@@ -162,6 +165,8 @@ def summarize(
             "p95": round(percentile(ordered, 95), 3),
             "max": round(ordered[-1], 3),
         }
+    if spec.outcomes_file:
+        block["outcomes_file"] = spec.outcomes_file
     return block
 
 
@@ -182,10 +187,12 @@ class SearchLoadRunner:
         self._ended_at = ""
         self._wall_start = 0.0
         self._wall_end = 0.0
+        self._request_sequence = 0
 
     def start(self) -> None:
         self._started_at = datetime.now(timezone.utc).isoformat()
         self._wall_start = time.monotonic()
+        self._append({'event': 'load-start', 'atMs': time.time() * 1000})
         self._thread = threading.Thread(
             target=self._run, name="jseval-search-load", daemon=True,
         )
@@ -233,6 +240,9 @@ class SearchLoadRunner:
                     index += 1
         except Exception:  # pragma: no cover - the loop must never kill the run
             log.exception("Search load thread aborted")
+            self._append({'event': 'load-error', 'error': 'LOAD_THREAD_ABORTED', 'atMs': time.time() * 1000})
+        finally:
+            self._append({'event': 'load-end', 'atMs': time.time() * 1000})
 
     def _wait_for_slot(self, index: int) -> bool:
         """Sleep until query ``index`` is due. Returns False if stopped while waiting."""
@@ -244,8 +254,38 @@ class SearchLoadRunner:
             self._stop.wait(min(remaining, _STOP_POLL_SEC))
         return False
 
+    def _append(self, row: dict) -> None:
+        if not self._spec.outcomes_file:
+            return
+        file = Path(self._spec.outcomes_file)
+        file.parent.mkdir(parents=True, exist_ok=True)
+        # Each append closes/flushed the file; a later killed cycle cannot erase prior responses.
+        with file.open('a', encoding='utf-8') as journal:
+            journal.write(json.dumps(row) + '\n')
+            journal.flush()
+
     def _issue(self, client: httpx.Client, body: dict) -> None:
-        latency_ms = issue_search(client, body)
+        if not self._spec.outcomes_file:
+            latency_ms = issue_search(client, body)
+        else:
+            request_id = self._request_sequence
+            self._request_sequence += 1
+            started = time.monotonic()
+            row = {'requestId': request_id, 'atMs': time.time() * 1000,
+                   'mode': self._spec.search_mode, 'requestTimeoutMs': REQUEST_TIMEOUT_SEC * 1000}
+            self._append({**row, 'event': 'request-start'})
+            try:
+                response = client.post(SEARCH_PATH, json=body)
+                row['status'] = response.status_code
+                # Record the observed HTTP failure before anything else can abort the cycle.
+                self._append({**row, 'event': 'http-response'})
+                response.raise_for_status()
+            except Exception as error:
+                row['error'] = 'TIMEOUT' if isinstance(error, httpx.TimeoutException) else 'REQUEST_FAILURE'
+                row['errorDetail'] = str(error)
+            row['durationMs'] = (time.monotonic() - started) * 1000
+            self._append({**row, 'event': 'request-outcome', 'endedAtMs': time.time() * 1000})
+            latency_ms = None if row.get('error') else row['durationMs']
         if latency_ms is None:
             self._errors += 1
         else:

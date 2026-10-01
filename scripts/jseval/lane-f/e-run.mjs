@@ -8,24 +8,19 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
-import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { gcLogOption, hangPolicy, hangVerdict, crashObservation, splitGap } from './e456-instruments.mjs';
-import { verifySharedModels as checkSharedModels } from './e-start-ready.mjs';
 import { terminalComplete, boundaryCensored, isAdmitted, agentMetrics, wireOutcomes } from './e-agent-metrics.cjs';
 import { measurementIdentity } from './e-pair-identity.mjs';
 import { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies } from './e456-live.mjs';
 import { componentBudget } from './e-memory-budget.mjs';
 import { execute, resolveCommand, runAcquisition, invocationDeadline } from './e-acquire.mjs';
+import { soakWire } from './e-soak-wire.mjs';
 import { projectCrashes } from './e-crash-evidence.mjs';
 
-export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-export const ARMS = Object.freeze({
-  branch: 'F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify',
-  main: 'F:/justsearch-public/.claude/worktrees/lane-f-e-main',
-});
+export { ROOT, ARMS, MAIN_REVISION, checkFixturePins, verifySharedModels, sourceDirt } from './e-acquisition-eligibility.mjs';
+import { ROOT, ARMS, checkFixturePins, runPrerequisites, acquisitionReceipts } from './e-acquisition-eligibility.mjs';
 const GROUPS = ['e1-quality', 'e2-e3-load', 'e4-memory-soak', 'e5-crash', 'e6-hang'];
 const EVIDENCE = 'docs/design/lane-f-engine-jvm/evidence/E';
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -36,47 +31,9 @@ const write = (file, value) => {
 };
 const finite = x => typeof x === 'number' && Number.isFinite(x) && x >= 0;
 export function projectionIdentity(values) {
-  const modules = ['e-run.mjs', 'e-agent-metrics.cjs', 'analyze-head-run.cjs', 'e-memory-budget.mjs', 'e-crash-evidence.mjs', 'e456-live.mjs', 'e456-instruments.mjs'];
+  const modules = ['e-run.mjs', 'e-agent-metrics.cjs', 'analyze-head-run.cjs', 'e-memory-budget.mjs', 'e-crash-evidence.mjs', 'e456-live.mjs', 'e456-instruments.mjs', 'e-soak-wire.mjs'];
   return hash(JSON.stringify({ modules: modules.map(f => [f, hash(fs.readFileSync(path.join(ROOT, 'scripts/jseval/lane-f', f)))]), values: hash(JSON.stringify(values)) }));
 }
-export const MAIN_REVISION = 'ac1c93bf32c2bba3e4a22462295acbc618f850bc';
-
-/** E0.2: compare content, never ancestry, and retain the exact pin-check evidence. */
-export function checkFixturePins(root = ROOT, revision = MAIN_REVISION, git = args => {
-  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true });
-  if (result.status !== 0) throw new Error(`Fixture pin check failed: ${result.stderr || result.error}`);
-  return result.stdout.trim();
-}, stampFile = path.join(ARMS.main, 'modules/indexer-worker/build/install/indexer-worker/build-stamp.txt')) {
-  const spec = read(path.join(root, 'scripts/jseval/lane-f-workflow-fixture.v1.json'));
-  const baseline = read(path.join(root, 'docs/design/lane-f-engine-jvm/evidence/baseline/fixture-pr0b/pins.json'));
-  if (!baseline?.recordedRevision || !baseline.pinnedSurfaces?.length) throw new Error('Missing PR 0b pinned surfaces');
-  const directory = path.join(root, baseline.directory);
-  const captures = [1, 2, 3].map(n => {
-    const file = path.join(directory, `capture-${n}.json`);
-    return { file, sha256: hash(fs.readFileSync(file)), provenance: read(file).provenance };
-  });
-  const first = captures[0].provenance;
-  const stamp = first?.['worker.buildStamp'];
-  const pins = first?.pins;
-  if (!stamp || !pins || !Object.keys(pins).length) throw new Error('PR 0b lacks recorded build or pins');
-  const sameBuildAndPins = captures.every(c => c.provenance?.['worker.buildStamp'] === stamp
-    && JSON.stringify(c.provenance?.pins) === JSON.stringify(pins)
-    && c.provenance?.chatProfile === first.chatProfile
-    && Object.keys(c.provenance?.sampling ?? {}).length === Object.keys(spec.sampling).length
-    && Object.entries(spec.sampling).every(([key, value]) => c.provenance?.sampling?.[key] === value));
-  const args = ['diff', '--name-only', baseline.recordedRevision, revision, '--', ...baseline.pinnedSurfaces];
-  const changedFiles = git(args).split(/\r?\n/).filter(Boolean);
-  const currentBuildStamp = fs.existsSync(stampFile) ? fs.readFileSync(stampFile, 'utf8').trim() : null;
-  const decision = sameBuildAndPins && changedFiles.length === 0 && currentBuildStamp === stamp ? 'reuse' : 'recapture';
-  return { rule: 'E0.2', decision, directory, recordedRevision: baseline.recordedRevision,
-    mainRevision: revision, revisionSource: baseline.revisionSource, gitDiffArgs: args, changedFiles,
-    reasons: [...(!sameBuildAndPins ? ['capture-build-or-pins-mismatch'] : []),
-      ...(changedFiles.length ? ['pinned-surfaces-changed'] : []),
-      ...(currentBuildStamp !== stamp ? ['installed-build-mismatch-or-missing'] : [])],
-    recordedBuildStamp: stamp, currentBuildStamp, stampFile, sameBuildAndPins, pins,
-    recordedChatProfile: first.chatProfile, captures: captures.map(({ file, sha256 }) => ({ file, sha256 })) };
-}
-export const verifySharedModels = config => checkSharedModels(config, path.resolve(ARMS.main, '../../../models'));
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (![...GROUPS, 'e0-values', 'e4-hang-values', 'table', 'reproject', 'identity-check'].includes(command)) throw new Error('Unknown subcommand');
@@ -125,6 +82,7 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
   const pythonCwd = path.join(root, 'scripts/jseval');
   const env = {
     PYTHONPATH: pythonCwd, PYTHONUTF8: '1',
+    ...(group === 'e4-memory-soak' ? { JUSTSEARCH_EXIT_CENSUS_SCOPE: path.join(raw, 'soak/instruments.json') } : {}),
     // Trust only the selected owner-assigned arm in child processes; no global Git config edits.
     GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'safe.directory', GIT_CONFIG_VALUE_0: tree,
     JUSTSEARCH_HEAD_HEAP: values.heap.packaged.replace('-Xmx', ''),
@@ -158,7 +116,8 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
     '--chat-profile', 'standard'], tree, { mode: 'start',
       requestsAfterReceipt: ['/api/mcp/token', '/api/health', '/api/status', '/api/debug/state', '/api/runtime/manifest', '/api/debug/effective-config'] });
   const stop = label => cmd(`stop-${label}`, 'node', [runner, 'stop', '--json', '--run', '${runId}',
-    '--session-id', '${session}'], tree, { mode: 'stop' });
+    '--session-id', '${session}'], tree, { mode: 'stop', acquisitionDependencies: [
+      path.join(ROOT, 'scripts/dev/lib/stop-exit-census.cjs'), path.join(ROOT, 'scripts/dev/lib/stop-exit-census.ps1')] });
   const evalRun = (label, load = false, mode = 'hybrid') => cmd(label, 'python', ['-m', 'jseval', 'run',
     '--dataset', 'scifact', '--modes', 'lexical,hybrid', '--embedding', '--splade', '--ce',
     '--pipeline', '--base-url', 'http://127.0.0.1:33221',
@@ -237,7 +196,7 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
       endSamples(label), { ...probe(label), budgetSeconds: 120 }, { ...analyze(label), budgetSeconds: 30 }, stop(label)];
   } else if (group === 'e4-memory-soak') {
     commands = [start('soak'), instruments('soak'), ...samplers('soak'), admission('soak'),
-      { ...evalRun('soak', true), mode: 'soak', minutes: values.soak.windows[Number(options.window) - 1].minutes },
+      { ...evalRun('soak', true), mode: 'soak', searchOutcomePattern: path.join(raw, 'soak/search-cycle-{cycle}.jsonl'), minutes: values.soak.windows[Number(options.window) - 1].minutes },
       endSamples('soak'), endInstruments('soak'), analyze('soak'), stop('soak')];
   } else if (group === 'e5-crash') {
     commands = [start('crash'), instruments('crash'), { label: 'durable-crash', mode: 'crash-experiment',
@@ -265,7 +224,14 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
       method: 'POST', endpoint: '/api/ai/runtime/activate', body: { variantId: 'cuda12', chatProfile: 'standard' },
       profile: 'standard', readyEndpoint: '/api/ai/runtime/status', timeoutSeconds: 300, pollIntervalMs: 2000 }] : [c]);
   return plan.flatMap(c => [c, ...((c.mode === 'ai-activate' || c.mode === 'start' && group === 'e1-quality') ? [{ label: `encoder-sessions-${c.label}-start`, mode: 'encoder-sessions', args: [] }] : [])])
-    .flatMap(c => c.mode === 'stop' ? [{ label: `encoder-sessions-${c.label}-end`, mode: 'encoder-sessions', args: [] }, c] : [c]);
+    .flatMap((c, i, all) => {
+      // Quit/upgrade already terminated the API by design; their start receipt identifies models.
+      const childPath = all.slice(0, i).findLast(c => c.mode === 'child-path' || c.mode === 'start');
+      const terminated = group === 'e5-crash' && childPath?.mode === 'child-path'
+        && ['quit', 'upgrade'].includes(childPath.reason);
+      return c.mode === 'stop' && !terminated
+        ? [{ label: `encoder-sessions-${c.label}-end`, mode: 'encoder-sessions', args: [] }, c] : [c];
+    });
 }
 
 const CLAUSES = {
@@ -571,12 +537,6 @@ function filesUnder(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory()
     ? filesUnder(path.join(dir, e.name)) : [path.join(dir, e.name)]);
 }
-export function sourceDirt(porcelain) {
-  return porcelain.split(/\r?\n/).filter(Boolean).filter(line => {
-    const name = line.slice(3).replaceAll('\\', '/');
-    return !name.startsWith(`${EVIDENCE}/`);
-  });
-}
 export function latestRecords(root) {
   const records = {};
   const windows = { main: {}, branch: {} };
@@ -735,8 +695,15 @@ export function collect(context) {
     const completedCycles = r.commands.filter(c => /^soak-cycle-/.test(c.label) && c.code === 0);
     const workload = completedCycles.length && loads.length && calls.length
       ? true : undefined;
-    if (loads.some(s => s.search_load.errors > 0)) r.clauses['no-timeout-or-5xx'] = false;
-    r.metrics.searchWireFailures = loads.reduce((n, s) => n + (s.search_load.errors ?? 0), 0);
+    const wire = soakWire({ ...r, raw: context.raw }, calls, loads);
+    r.clauses['no-timeout-or-5xx'] = wire.check;
+    r.gaps['no-timeout-or-5xx'] = [...wire.gaps, ...(wire.check === false
+      ? [`Wire outcomes: ${JSON.stringify(wire.outcomes)}; summary errors (overlapping journals): ${wire.summaryErrors}`] : [])].join('; ');
+    r.metrics.searchWireFailures = wire.search.filter(c => c.error && !boundaryCensored(c) || c.status >= 300).length + wire.legacyErrors;
+    r.metrics.collectorWire = wire.collector;
+    r.metrics.searchSummaryErrors = wire.summaryErrors;
+    r.metrics.searchWireCoverage = { cycles: wire.cycles, gaps: wire.gaps };
+    r.metrics.wireOutcomes = wire.outcomes;
     r.metrics.wireOutcomes['search-load-failure'] = r.metrics.searchWireFailures;
     r.metrics.completedSoakCycles = completedCycles.length;
     r.clauses['index-agent-reconfigure-workload'] = verdict([
@@ -957,20 +924,16 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     fs.writeFileSync(path.join(root, EVIDENCE, 'table.md'), text);
     return;
   }
-  if (options.arm === 'branch' && Object.values(values).some(v => v?.measuredAtE0 === true)) throw new Error('Run MAIN E1-E3 and e0-values before any branch run');
-  if (options.command === 'e6-hang') hangPolicy(values, values.hangParameters?.worstPauseMs);
+  runPrerequisites(options, values);
   const id = `${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
   const raw = path.join(root, 'tmp/lane-f-e', options.command, options.arm, id);
   fs.mkdirSync(raw, { recursive: true });
   const groups = { 'e1-quality': ['E1'], 'e2-e3-load': ['E2', 'E3'], 'e4-memory-soak': ['E4'], 'e5-crash': ['E5'], 'e6-hang': ['E6'] }[options.command];
-  const machine = { hostname: os.hostname(), platform: os.platform(), release: os.release(), arch: os.arch(),
-    cpu: os.cpus().map(c => c.model), ramBytes: os.totalmem(), node: process.version };
-  const corpusFiles = options.command === 'e1-quality'
-    ? ['docs/explanation', 'docs/reference'].flatMap(dir => filesUnder(path.join(ARMS.main, dir))).sort() : [];
+  const { machine, corpus } = acquisitionReceipts(options);
   const { pairIdentity, pairIdentityInputs } = measurementIdentity(plan, {
     sourceRoot: ROOT, outputRoot: root, armTree: options.armTree ? path.resolve(options.armTree) : ARMS[options.arm],
     arm: options.arm, group: options.command, raw, invocation: id, session: `lane-f-e-${id}`,
-    machine, corpus: corpusFiles.map(f => [path.relative(ARMS.main, f), hash(fs.readFileSync(f))]),
+    machine, corpus,
     workload: options.workload ?? options.command, heap: values.heap, collector: values.collector,
   });
   const destination = path.join(root, EVIDENCE, options.command, options.arm);
@@ -985,8 +948,8 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
   const index = path.join(destination, 'index.json');
   write(recordFile, record); // Even failed/aborted branch starts prevent a later E0 refit.
   write(index, { runs: [...(fs.existsSync(index) ? read(index).runs : []), { id, record: recordFile, raw }] });
-  await runAcquisition(plan, context, bindings, { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies, collect, sourceDirt, CLAUSES,
-    sharedModels: path.resolve(ARMS.main, '../../../models'), finalize: context => { context.record.projectionIdentity = projectionIdentity(context.values); } });
+  await runAcquisition(plan, context, bindings, { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies, collect, CLAUSES,
+    finalize: context => { context.record.projectionIdentity = projectionIdentity(context.values); } });
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { await main(); } catch (error) { console.error(error.message); process.exitCode = 1; }

@@ -40,12 +40,26 @@ export async function requestLive(context, endpoint, body, timeoutMs = 3000) {
     headers['Content-Type'] = 'application/json';
     if (context.token) headers['X-JustSearch-Session'] = context.token;
   }
-  const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers,
-    body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
-  const text = await response.text();
-  let value; try { value = JSON.parse(text); } catch { value = { text }; }
-  if (!response.ok) throw new Error(`${endpoint}: HTTP ${response.status}: ${text.slice(0, 300)}`);
-  return value;
+  const row = { requestId: context.collectorRequestSequence = (context.collectorRequestSequence ?? 0) + 1,
+    endpoint, atMs: Date.now(), requestTimeoutMs: timeoutMs };
+  const append = event => {
+    if (context.raw && context.record?.groups?.includes('E4')) {
+      fs.appendFileSync(path.join(context.raw, 'collector-wire.jsonl'), JSON.stringify({ ...row, event }) + '\n');
+    }
+  };
+  append('request-start');
+  try {
+    const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers,
+      body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
+    row.status = response.status; append('http-response');
+    const text = await response.text();
+    let value; try { value = JSON.parse(text); } catch { value = { text }; }
+    if (!response.ok) throw new Error(`${endpoint}: HTTP ${response.status}: ${text.slice(0, 300)}`);
+    return value;
+  } catch (error) {
+    row.error = ['TimeoutError', 'AbortError'].includes(error.name) ? 'TIMEOUT' : 'REQUEST_FAILURE';
+    row.errorDetail = error.message; throw error;
+  } finally { row.durationMs = Date.now() - row.atMs; append('request-outcome'); }
 }
 export function settingsPatch(snapshot, patterns, arm, operationKey = createOperationKey()) {
   if (arm === 'branch' && !snapshot?.witness) throw new Error('Fresh branch settings witness required');
