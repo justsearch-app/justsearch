@@ -27,7 +27,9 @@ export async function exerciseQueryReconfigure(c) {
     return destination;
   };
   const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-  const a = path.resolve(process.env.JUSTSEARCH_QUERY_RECONFIGURE_A);
+  // A is the retained source reranker the Engine boots with. The launcher sets
+  // JUSTSEARCH_QUERY_RECONFIGURE_A on the Engine's environment, not on this process.
+  const a = path.resolve(source);
   const b = stage(`query-reranker-${mode.toLowerCase()}-b`);
   const sourceFp16 = path.join(source, 'model_fp16.onnx');
   const sourceFp16Hash = hash(sourceFp16);
