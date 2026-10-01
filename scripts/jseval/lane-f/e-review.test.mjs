@@ -7,7 +7,8 @@ import { ROOT, ARMS, parseArgs, buildPlan, compareStageRates, chunkProgress, pro
 import { markBoundaryCancellation } from './admission-loop.mjs';
 import { boundaryCensored, agentMetrics } from './e-agent-metrics.cjs';
 import { measurementIdentity } from './e-pair-identity.mjs';
-import { corpusManifest, modelIdentity, captureEncoderSessions, finalizeInputs } from './e-measured-inputs.mjs';
+import { corpusManifest, modelIdentity, validateRuntimeIdentity, captureEncoderSessions, finalizeInputs } from './e-measured-inputs.mjs';
+import { configuredFixture } from './e-model-fixture.test-support.mjs';
 import { componentBudget } from './e-memory-budget.mjs';
 import { waitForScope, markTeardown } from './e-acquire.mjs';
 import { crashEvidence, crashTiming, projectCrashes } from './e-crash-evidence.mjs';
@@ -86,7 +87,7 @@ test('acquisition identity binds corpus names/bytes, model file metadata and dea
   const dir = scratch(t), corpus = path.join(dir, 'corpus'), models = path.join(dir, 'models');
   fs.mkdirSync(corpus); fs.mkdirSync(models);
   fs.writeFileSync(path.join(corpus, 'one.txt'), 'one'); fs.writeFileSync(path.join(models, 'encoder.onnx'), 'model');
-  const config = { keys: [{ key: 'justsearch.models.dir', value: models }] };
+  const config = configuredFixture(models);
   const plan = buildPlan(parseArgs(['e2-e3-load', '--arm', 'main', '--workload', 'agent-idle']), values);
   const opts = () => ({ sourceRoot: ROOT, outputRoot: ROOT, armTree: ARMS.main, arm: 'main', group: 'e2-e3-load',
     scifact: corpusManifest(corpus), models: modelIdentity(config) });
@@ -100,10 +101,9 @@ test('acquisition identity binds corpus names/bytes, model file metadata and dea
   fs.writeFileSync(path.join(models, 'encoder.onnx'), 'different-model');
   assert.notEqual(measurementIdentity(plan, opts()).pairIdentity, original.pairIdentity);
   const current = measurementIdentity(plan, opts());
-  const selected = modelIdentity(config, [{ onnxFeatures: [{ id: 'embed', modelPath: path.join(models, 'encoder.onnx') }] }]);
-  const differentSelection = modelIdentity(config, [{ onnxFeatures: [{ id: 'splade', modelPath: path.join(models, 'encoder.onnx') }] }]);
-  assert.notDeepEqual(selected.executedSelections, differentSelection.executedSelections);
-  assert.notEqual(measurementIdentity(plan, { ...opts(), models: selected }).pairIdentity, measurementIdentity(plan, { ...opts(), models: differentSelection }).pairIdentity);
+  const selected = modelIdentity(config);
+  validateRuntimeIdentity(selected, [{ onnxFeatures: [{ id: 'embed', modelPath: path.join(models, 'onnx/gte-multilingual-base') }] }]);
+  assert.throws(() => validateRuntimeIdentity(selected, [{ onnxFeatures: [{ id: 'splade', modelPath: path.join(models, 'onnx/gte-multilingual-base') }] }]), /mismatch/);
   const changed = measurementIdentity(plan, opts(), file => file.endsWith('e-acquire.mjs')
     ? Buffer.concat([fs.readFileSync(file), Buffer.from('\n// deadline change')]) : fs.readFileSync(file));
   assert.notEqual(changed.pairIdentity, current.pairIdentity);
@@ -268,13 +268,14 @@ test('crash receipts include Worker teardown, hs_err sources and abnormal native
 
 test('realized encoder sessions retain lazy and active window boundaries without adding an acceptance gate', async t => {
   const dir = scratch(t), models = path.join(dir, 'models'); fs.mkdirSync(models);
-  const model = path.join(models, 'embed.onnx'); fs.writeFileSync(model, 'model');
-  const config = { keys: [{ key: 'justsearch.models.dir', value: models }] };
+  const config = configuredFixture(models);
+  const model = path.join(models, 'onnx/gte-multilingual-base/model.onnx');
+  const chat = path.join(models, 'chat.gguf');
   write(path.join(dir, 'effective-config.json'), config);
   const context = { raw: dir, root: dir, effectiveConfig: config, record: { ...record('main', ['E5']), pairIdentityInputs: {} } };
   let realized = false;
   const request = async url => ({ ok: true, json: async () => url.endsWith('/status')
-    ? { active: { modelPath: model }, onnxFeatures: [{ id: 'embed', modelPath: realized ? model : null }] } : { encoders: realized } });
+    ? { active: { modelPath: chat }, onnxFeatures: [{ id: 'embed', modelPath: realized ? model : null }] } : { encoders: realized } });
   await captureEncoderSessions(context, 'window-start', request); realized = true;
   await captureEncoderSessions(context, 'window-end', request); finalizeInputs(context);
   assert.equal(context.record.encoderSessions['window-start'].ai.onnxFeatures[0].modelPath, null);

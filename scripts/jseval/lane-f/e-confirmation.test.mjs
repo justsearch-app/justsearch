@@ -5,7 +5,8 @@ import path from 'node:path';
 import { ROOT, ARMS, buildPlan, parseArgs, collect, tableVerdicts } from './e-run.mjs';
 import { soakWire } from './e-soak-wire.mjs';
 import { requestLive } from './e456-live.mjs';
-import { establishExecutedModels, captureEncoderSessions, finalizeInputs, digest } from './e-measured-inputs.mjs';
+import { modelIdentity, validateRuntimeIdentity, captureEncoderSessions, finalizeInputs, digest } from './e-measured-inputs.mjs';
+import { configuredFixture } from './e-model-fixture.test-support.mjs';
 import { measurementIdentity } from './e-pair-identity.mjs';
 
 const scratch = t => {
@@ -74,41 +75,44 @@ test('collector settings restoration HTTP failures enter E4 wire evidence even i
 });
 function models(t) {
   const raw = scratch(t), store = path.join(raw, 'models'); fs.mkdirSync(store);
+  const config = configuredFixture(store);
   const chat = path.join(store, 'chat.gguf'), external = path.join(raw, 'external.onnx');
   fs.writeFileSync(chat, 'chat'); fs.writeFileSync(external, 'external');
-  return { raw, external, config: { keys: [{ key: 'justsearch.models.dir', value: store },
-    { key: 'justsearch.reranker.model_path', value: external }] },
+  config.keys.push({ key: 'justsearch.rerank.model_path', value: external });
+  return { raw, external, config,
   status: { active: { modelPath: chat }, onnxFeatures: [] } };
 }
-test('missing runtime status fails before measurement and identity finalization rather than hashing an empty set', async t => {
+test('missing runtime observations remain visible while configured identity is mandatory (2026-10-01 owner correction)', async t => {
   const m = models(t), context = { raw: m.raw, effectiveConfig: m.config,
     record: { groups: ['E5'], pairIdentityInputs: {} } };
-  assert.throws(() => establishExecutedModels(m.config, [], true), /runtime AI status/);
   const request = async url => ({ ok: !url.endsWith('/status'), status: 503, json: async () => ({}) });
-  await assert.rejects(captureEncoderSessions(context, 'pre-load', request), /before measurement.*HTTP 503/);
+  await captureEncoderSessions(context, 'pre-load', request);
   const receipt = JSON.parse(fs.readFileSync(path.join(m.raw, 'encoder-sessions-pre-load.json')));
   assert.equal(receipt.aiError, 'HTTP 503');
   write(path.join(m.raw, 'effective-config.json'), m.config);
-  assert.throws(() => finalizeInputs(context), /runtime model identity capture failed/);
+  finalizeInputs(context);
+  assert.ok(context.record.pairIdentityInputs.models.configuredSelections.length >= 6);
   fs.rmSync(path.join(m.raw, 'encoder-sessions-pre-load.json'));
-  assert.throws(() => finalizeInputs(context), /runtime AI status/);
+  finalizeInputs(context);
+  fs.rmSync(path.join(m.raw, 'effective-config.json'));
+  assert.throws(() => finalizeInputs(context), /effective-config capture missing/);
 });
 test('configured external weights bind metadata without any runtime reference to that file', t => {
-  const m = models(t), before = establishExecutedModels(m.config, [m.status], true);
+  const m = models(t), before = modelIdentity(m.config);
   assert.ok(before.models.some(f => f.path === m.external.replaceAll('\\', '/')));
   fs.writeFileSync(m.external, 'changed external weights');
-  assert.notEqual(digest(JSON.stringify(before)), digest(JSON.stringify(establishExecutedModels(m.config, [m.status], true))));
-  fs.rmSync(m.external); assert.throws(() => establishExecutedModels(m.config, [m.status], true), /ENOENT/);
+  assert.notEqual(digest(JSON.stringify(before)), digest(JSON.stringify(modelIdentity(m.config))));
+  fs.rmSync(m.external); assert.throws(() => modelIdentity(m.config), /Configured model missing/);
 });
-test('E1 may start with explicitly dormant encoders; unknown or active unidentifiable encoders fail', async t => {
+test('MAIN lazy worker-policy sessions at start are valid on every arm and group', async t => {
   const m = models(t), dormant = { active: { modelPath: null },
-    onnxFeatures: [{ id: 'embed', modelPath: null, modelActive: false, status: 'inactive' }] };
-  const context = { raw: m.raw, effectiveConfig: m.config, record: { groups: ['E1'], pairIdentityInputs: {} } };
-  await captureEncoderSessions(context, 'e1-pre-load', async () => ({ ok: true, json: async () => dormant }));
-  assert.deepEqual(context.record.encoderSessions['e1-pre-load'].models.executedSelections, []);
-  assert.throws(() => establishExecutedModels(m.config, [dormant], false), /no runtime model IDs/);
-  for (const feature of [{ id: 'embed', status: 'unknown' }, { id: 'embed', modelActive: true, modelPath: null }]) {
-    assert.throws(() => establishExecutedModels(m.config, [{ ...m.status, onnxFeatures: [feature] }], true), /unknown model identity/);
+    onnxFeatures: [{ id: 'embed', modelPath: null, modelActive: true, status: 'active',
+      reason: 'worker_policy_snapshot', executionProvider: 'cpu', gpuFallback: true }] };
+  for (const arm of ['main', 'branch']) for (const group of ['E1', 'E2', 'E4', 'E5', 'E6']) {
+    const context = { raw: m.raw, effectiveConfig: m.config, record: { arm, groups: [group], pairIdentityInputs: {} } };
+    await captureEncoderSessions(context, 'pre-load', async () => ({ ok: true, json: async () => dormant }));
+    assert.deepEqual(context.record.encoderSessions['pre-load'].models, modelIdentity(m.config));
+    assert.equal(context.record.encoderSessions['pre-load'].sessions[1].runtimeIdentityAvailable, false);
   }
 });
 test('E5 does not require a post-quit runtime API; every experiment still requires pre-load model proof', () => {
@@ -121,12 +125,63 @@ test('E5 does not require a post-quit runtime API; every experiment still requir
       assert.notEqual(plan[plan.findIndex(c => c.label === label) - 1].mode, 'encoder-sessions');
   }
 });
-test('failed end-of-window model receipt cannot be replaced by a valid startup status', t => {
+test('missing end observation is recorded; runtime/config mismatch at end invalidates acquisition', t => {
   const m = models(t), context = { raw: m.raw, record: { groups: ['E5'], pairIdentityInputs: {} } };
   write(path.join(m.raw, 'effective-config.json'), m.config);
   write(path.join(m.raw, 'encoder-sessions-start.json'), { ai: m.status });
   write(path.join(m.raw, 'bulk-load.json'), { encoderSessions: { end: { aiError: 'status unavailable' } } });
-  assert.throws(() => finalizeInputs(context), /runtime model identity capture failed/);
+  finalizeInputs(context);
+  assert.ok(context.record.runtimeModelObservations.some(r => r.aiError === 'status unavailable'));
+  write(path.join(m.raw, 'bulk-load.json'), { encoderSessions: { end: { ai: {
+    onnxFeatures: [{ id: 'embed', modelPath: m.external }] } } } });
+  assert.throws(() => finalizeInputs(context), /Runtime model identity mismatch: embed/);
+});
+test('runtime mismatch fails immediately even if that file is in the bound shared store', async t => {
+  const m = models(t), wrong = path.join(m.raw, 'models/onnx/ner');
+  const context = { raw: m.raw, effectiveConfig: m.config, record: { groups: ['E1'], pairIdentityInputs: {} } };
+  await assert.rejects(captureEncoderSessions(context, 'start', async () => ({ ok: true,
+    json: async () => ({ onnxFeatures: [{ id: 'embed', modelPath: wrong }] }) })), /Runtime model identity mismatch: embed/);
+  assert.match(JSON.parse(fs.readFileSync(path.join(m.raw, 'encoder-sessions-start.json'))).modelIdentityError, /mismatch/);
+});
+test('missing configured encoder fails before measurement, regardless of lazy runtime state', async t => {
+  const m = models(t); fs.rmSync(path.join(m.raw, 'models/onnx/gte-multilingual-base/model.onnx'));
+  const context = { raw: m.raw, effectiveConfig: m.config, record: { groups: ['E1'], pairIdentityInputs: {} } };
+  await assert.rejects(captureEncoderSessions(context, 'start', async () => ({ ok: true,
+    json: async () => ({ onnxFeatures: [{ id: 'embed', modelPath: null }] }) })), /Configured model missing: embed/);
+});
+test('CPU fallback at window end is recorded and never changes pair identity', async t => {
+  const m = models(t), embed = path.join(m.raw, 'models/onnx/gte-multilingual-base');
+  write(path.join(m.raw, 'effective-config.json'), m.config);
+  const context = { raw: m.raw, effectiveConfig: m.config, record: { groups: ['E5'], pairIdentityInputs: {} } };
+  let ended = false;
+  const request = async url => ({ ok: true, json: async () => url.endsWith('/status') ? { ...m.status,
+    onnxFeatures: [{ id: 'embed', modelPath: ended ? embed : null, modelActive: ended,
+      executionProvider: ended ? 'cpu' : 'unknown', gpuFallback: ended, fallbackReason: ended ? 'CPU fallback' : null }] } : {} });
+  await captureEncoderSessions(context, 'window-start', request);
+  const before = context.record.encoderSessions['window-start'].models;
+  ended = true; await captureEncoderSessions(context, 'window-end', request); finalizeInputs(context);
+  assert.deepEqual(context.record.pairIdentityInputs.models, before);
+  const observation = context.record.runtimeModelObservations.find(r => r.label === 'window-end').sessions[1];
+  assert.equal(observation.executionProvider, 'cpu'); assert.equal(observation.modelActive, true);
+  assert.equal(observation.gpuFallback, true); assert.equal(observation.fallbackReason, 'CPU fallback');
+  validateRuntimeIdentity(before, [{ onnxFeatures: [{ id: 'embed', modelPath: path.join(embed, 'model.onnx') }] }]);
+});
+test('CPU and CUDA realizations bind the same configured identity; all declared model choices enter it', t => {
+  const m = models(t), store = path.join(m.raw, 'models'), dir = path.join(store, 'onnx/gte-multilingual-base');
+  fs.writeFileSync(path.join(dir, 'model_fp16.onnx'), 'GPU weights');
+  write(path.join(dir, 'model_manifest.json'), { cpu: 'model.onnx', gpu: 'model_fp16.onnx' });
+  const identity = modelIdentity(m.config);
+  const main = { onnxFeatures: [{ id: 'embed', modelPath: path.join(dir, 'model.onnx'), executionProvider: 'cpu' }] };
+  const branch = { onnxFeatures: [{ id: 'embed', modelPath: path.join(dir, 'model_fp16.onnx'), executionProvider: 'cuda' }] };
+  validateRuntimeIdentity(identity, [main]); validateRuntimeIdentity(identity, [branch]);
+  const values = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'))).values;
+  const paired = arm => measurementIdentity(buildPlan(parseArgs(['e2-e3-load', '--arm', arm, '--workload', 'agent-idle']), values, ROOT),
+    { sourceRoot: ROOT, outputRoot: ROOT, armTree: ARMS[arm], arm, group: 'e2-e3-load', workload: 'agent-idle', models: identity });
+  assert.equal(paired('main').pairIdentity, paired('branch').pairIdentity);
+  m.config.keys.push({ key: 'justsearch.rerank.chunks.model_path', value: 'onnx/reranker' });
+  const first = modelIdentity(m.config);
+  m.config.keys.at(-1).value = 'onnx/ner';
+  assert.notDeepEqual(first.configuredSelections, modelIdentity(m.config).configuredSelections);
 });
 test('eligibility predicates and machine/corpus receipts are hashed acquisition behavior', () => {
   const values = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'))).values;
