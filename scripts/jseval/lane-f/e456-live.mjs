@@ -12,6 +12,7 @@ import { attachFault } from '../../supervisor-conformance/jdwp-fault.mjs';
 import { ownedProcesses, parseGc, heapTrend, summedHeapTrend, memorySeries, launchBudget,
   splitGap, verdict, hangPolicy, hangVerdict, crashObservation } from './e456-instruments.mjs';
 import { componentBudget } from './e-memory-budget.mjs';
+import { identifyArmRoot, requireCollectorSample } from './e456-root.mjs';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const json = file => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
@@ -75,6 +76,7 @@ export class LiveCollector {
     this.context = context; this.arm = context.record.arm; this.directory = command.directory;
     this.data = context.dataDir; this.startMs = Date.now(); this.stopped = false;
     this.snapshots = []; this.errors = []; this.processes = new Map(); this.flags = new Map();
+    this.current = []; this.root = null; this.manifest = null;
     this.diagnostics = []; this.reconfigures = []; this.nextGcMs = this.startMs + 300000;
     this.nextSettingsMs = this.startMs + 900000; this.initialRoots = new Set(); this.logOffsets = new Map();
     this.scopeFile = path.join(this.directory, 'process-scope.json');
@@ -99,17 +101,31 @@ export class LiveCollector {
     return next;
   }
   async sampleOnce() {
+    this.current = []; this.root = null; this.manifest = null;
     this.tailLogs();
     const supervisor = json(path.join(this.data, 'runtime/supervisor.v1.json'));
-    const table = this.table(), candidates = table.table.filter(row => /HeadlessApp/.test(row.CommandLine ?? '')
-      && (row.CommandLine ?? '').includes(this.data));
-    if (!candidates.length) {
-      this.snapshots.push({ atMs: Date.now(), processes: [], supervisor }); this.persist(); return;
-    }
-    if (candidates.length !== 1) throw new Error(`Expected one owned Head/Engine, found ${candidates.length}`);
-    const root = recordOf(candidates[0]);
+    const table = this.table();
     const manifest = json(path.join(this.data, 'runtime/manifest.json'));
-    if (this.arm === 'branch' && (manifest?.pid !== root.pid || !manifest?.instanceId)) throw new Error('Root manifest identity mismatch');
+    let rootRow, rootSource;
+    try {
+      const start = (this.context.record.commands ?? []).findLast(c => c.mode === 'start'
+        && (!this.context.owned || c.label === this.context.owned.command?.label));
+      if (!start || !this.context.raw) throw new Error('Arm root identity unavailable: owned start command/raw directory missing');
+      const receiptFile = path.join(this.context.raw, `${start.label}-receipt.json`);
+      const receipt = json(receiptFile);
+      if (!receipt?.runId || receipt.ok === false || this.context.owned && receipt.runId !== this.context.owned.runId)
+        throw new Error('Arm root identity unavailable: owned start receipt/run ID missing or mismatched');
+      rootRow = identifyArmRoot({ arm: this.arm, dataDir: this.data, receipt, issuedAt: start?.startedAt }, table.table, manifest);
+      if (this.arm === 'main' && (fileTimeMs(rootRow.CreationFileTimeUtc) > fs.statSync(receiptFile).mtimeMs
+        || this.receiptRoot && (keyOf(this.receiptRoot) !== keyOf(rootRow) || this.receiptRoot.CommandLine !== rootRow.CommandLine)))
+        throw new Error('Arm root identity unavailable: MAIN receipt JVM identity changed/reused after startup');
+      if (this.arm === 'main') this.receiptRoot ??= rootRow;
+      rootSource = { receiptFile, startCommandIssuedAt: start.startedAt, backendRootPid: receipt.pids.backendRootPid,
+        manifestPid: manifest?.pid, rootPid: rootRow.ProcessId, creationFileTimeUtc: rootRow.CreationFileTimeUtc };
+    } catch (error) {
+      this.snapshots.push({ atMs: Date.now(), processes: [], supervisor, identityError: error.message }); this.persist(); throw error;
+    }
+    const root = recordOf(rootRow);
     const retained = [];
     for (const child of manifest?.children ?? []) {
       const row = table.table.find(p => Number(p.ProcessId) === child.pid);
@@ -135,8 +151,8 @@ export class LiveCollector {
         save(path.join(this.directory, `flags-${row.ProcessId}-${row.CreationFileTimeUtc}.json`), diagnostic);
       }
     }
-    this.initialRoots.add(keyOf(candidates[0]));
-    const snapshot = { atMs: now, processes: records, supervisor, instanceId: manifest?.instanceId };
+    this.initialRoots.add(keyOf(rootRow));
+    const snapshot = { atMs: now, processes: records, supervisor, instanceId: manifest?.instanceId, rootSource };
     this.snapshots.push(snapshot);
     // Atomic scope projection consumed by the existing PowerShell memory sampler.
     const temporary = `${this.scopeFile}.pending`;
@@ -159,6 +175,7 @@ export class LiveCollector {
     }
   }
   async collectGc() {
+    requireCollectorSample(this, 'E4 GC');
     for (const row of this.current.filter(p => p.isJvm)) {
       const record = recordOf(row), check = identity.verifyProcessIdentity({ record, table: this.table() });
       if (!identity.isVerifiedMatch(check)) throw new Error(`GC target identity changed: ${check.reason}`);
@@ -309,10 +326,12 @@ export function logEventTime(log, pattern, afterMs) {
   }).at(-1);
 }
 async function healthyLlama(collector, children) {
+  requireCollectorSample(collector, 'healthy llama');
   for (const child of children) {
     const current = collector.current.find(p => keyOf(p) === keyOf(child));
     if (!current) return false;
-    verifyOwned(recordOf(collector.root), collector.data);
+    const rootCheck = identity.verifyProcessIdentity({ record: collector.root, table: collector.table() });
+    if (!identity.isVerifiedMatch(rootCheck)) throw new Error(`Collector root identity changed: ${rootCheck.reason}`);
     const check = identity.verifyProcessIdentity({ record: recordOf(child), table: collector.table() });
     if (!identity.isVerifiedMatch(check)) return undefined;
     const command = child.CommandLine ?? '';
@@ -330,6 +349,7 @@ async function healthyLlama(collector, children) {
 }
 export async function crashExperiment(context) {
   const collector = context.collector, r = context.record;
+  requireCollectorSample(collector, 'E5 crash');
   if (r.arm === 'main') {
     r.dispositions ??= {};
     for (const clause of ['actual-death-durable-operation', 'checkpoint-resume', 'visible-restarting']) {
@@ -359,7 +379,7 @@ export async function crashExperiment(context) {
       if (!searchHit(await requestLive(context, '/api/knowledge/search', { query: marker, limit: 5, mode: 'text' }), marker)) return null;
       await collector.sample();
       if (!jobRows(collector.data, corpus).some(j => j.path === processing.path && j.state === 'PROCESSING')) return null;
-      const target = collector.current.find(p => p.role === (r.arm === 'branch' ? 'engine' : 'worker'));
+      const target = requireCollectorSample(collector, 'E5 durable cut', r.arm === 'branch' ? 'engine' : 'worker');
       return { ...recordOf(target), instanceId: collector.manifest?.instanceId, operation, processing, completed, jobs, marker, accepted,
         children: collector.current.filter(p => ['llama-server', 'extraction-child'].includes(p.role)),
         registeredChildren: collector.manifest?.children ?? [] };
@@ -384,6 +404,7 @@ export async function crashExperiment(context) {
   const deadline = Math.min(context.deadline, timeline.killMs + 180000);
   const restored = await until(deadline, 'API restoration', async () => {
     const manifest = await requestLive(context, '/api/runtime/manifest');
+    if (!manifest?.instanceId) throw new Error('Runtime manifest unavailable (E5 successor API): instance required');
     if (r.arm === 'branch' && manifest.instanceId === cut.instanceId) return null;
     context.token = (await requestLive(context, '/api/mcp/token')).token ?? null;
     return manifest;
@@ -397,7 +418,7 @@ export async function crashExperiment(context) {
     return collector.current.some(p => p.role === (r.arm === 'branch' ? 'engine' : 'worker')
       && keyOf(p) !== `${cut.pid}/${cut.creationFileTimeUtc}`);
   });
-  const target = collector.current.find(p => p.role === (r.arm === 'branch' ? 'engine' : 'worker'));
+  const target = requireCollectorSample(collector, 'E5 successor', r.arm === 'branch' ? 'engine' : 'worker');
   let repeatedCompleted = false, regressedCheckpoint = false;
   const checkpointSamples = [];
   const completion = await until(deadline, 'Original accepted jobs finish without resubmission', () => {
@@ -443,7 +464,7 @@ export async function crashExperiment(context) {
   let adopted = llamaBefore.length ? llamaBefore.every(before => collector.current.some(after => after.role === 'llama-server'
     && keyOf(before) === keyOf(after))) : undefined;
   if (adopted && r.arm === 'branch') adopted = cut.registeredChildren.filter(c => c.kind === 'LLAMA_SERVER')
-    .every(old => collector.manifest.children.some(c => c.pid === old.pid && c.startedAt === old.startedAt
+    .every(old => (collector.manifest.children ?? []).some(c => c.pid === old.pid && c.startedAt === old.startedAt
       && c.declaredConfigHash === old.declaredConfigHash && c.realizedArgvHash === old.realizedArgvHash));
   if (adopted) adopted = await healthyLlama(collector, llamaBefore);
   r.metrics.childPaths ??= {};
@@ -465,6 +486,7 @@ export async function crashExperiment(context) {
 
 export async function childPathExperiment(context, reason) {
   const collector = context.collector, r = context.record;
+  requireCollectorSample(collector, `E5 child ${reason}`);
   // Make real extraction children exist before evaluating their cleanup policy.
   const corpus = path.join(collector.directory, 'child-policy-corpus'); fs.mkdirSync(corpus);
   // A complete RTF document with a font table and paragraph marks: the bare one-group form
@@ -482,9 +504,10 @@ export async function childPathExperiment(context, reason) {
   await until(deadline, 'Child-policy corpus ready', async () => searchHit(await requestLive(context,
     '/api/knowledge/search', { query: 'childpolicycapybara', limit: 5, mode: 'text' }), 'childpolicycapybara'));
   await collector.sample();
+  requireCollectorSample(collector, `E5 child ${reason} before`);
   const before = collector.current.filter(p => ['llama-server', 'extraction-child'].includes(p.role));
   const initialRoot = collector.root, initialInstance = collector.manifest?.instanceId;
-  const initialWorker = collector.current.find(p => p.role === 'worker');
+  const initialWorker = r.arm === 'main' ? requireCollectorSample(collector, 'E5 child MAIN worker', 'worker') : undefined;
   const registered = collector.manifest?.children ?? [];
   const result = { reason, before, registered, issuedAtMs: Date.now() };
   if (reason === 'restart') {
@@ -497,18 +520,21 @@ export async function childPathExperiment(context, reason) {
     }
     await until(deadline, 'Requested restart readiness', async () => {
       const manifest = await requestLive(context, '/api/runtime/manifest');
+      if (!manifest?.instanceId) throw new Error('Runtime manifest unavailable (E5 child restart): instance required');
       if (r.arm === 'branch' && manifest.instanceId === initialInstance) return null;
       await collector.sample();
+      requireCollectorSample(collector, 'E5 child restart');
       if (r.arm === 'main' && !collector.current.some(p => p.role === 'worker' && keyOf(p) !== keyOf(initialWorker))) return null;
       context.token = (await requestLive(context, '/api/mcp/token')).token ?? null;
       await requestLive(context, '/api/health'); return true;
     });
     await collector.sample();
+    requireCollectorSample(collector, 'E5 child restart successor');
     result.after = collector.current;
     result.healthyLlamaAdopted = before.some(p => p.role === 'llama-server') ? before.filter(p => p.role === 'llama-server')
       .every(old => collector.current.some(p => p.role === 'llama-server' && keyOf(p) === keyOf(old))) : undefined;
     if (r.arm === 'branch' && result.healthyLlamaAdopted) result.healthyLlamaAdopted = registered.filter(c => c.kind === 'LLAMA_SERVER')
-      .every(old => collector.manifest.children.some(c => c.pid === old.pid && c.startedAt === old.startedAt
+      .every(old => (collector.manifest.children ?? []).some(c => c.pid === old.pid && c.startedAt === old.startedAt
         && c.declaredConfigHash === old.declaredConfigHash && c.realizedArgvHash === old.realizedArgvHash));
     if (result.healthyLlamaAdopted) result.healthyLlamaAdopted = await healthyLlama(collector, before.filter(p => p.role === 'llama-server'));
   } else if (reason === 'quit') {
@@ -546,6 +572,7 @@ export function projectChildPolicies(record) {
 
 export async function hangExperiment(context, command) {
   const collector = context.collector, r = context.record, kind = command.kind;
+  requireCollectorSample(collector, `E6 ${kind}`);
   const directory = path.join(context.raw, `hang-${kind}`); fs.mkdirSync(directory, { recursive: true });
   const policy = hangPolicy(context.values, command.worstPauseMs);
   if (r.arm === 'main') {
@@ -556,10 +583,10 @@ export async function hangExperiment(context, command) {
       r.gaps[clause] = r.dispositions[clause].reason;
     }
   }
-  const declaredPolicy = json(path.join(context.tree, 'governance/supervision-contract.v1.json'))?.processes.find(p => p.id === 'engine')?.policy;
+  const declaredPolicy = json(path.join(context.tree, 'governance/supervision-contract.v1.json'))?.processes?.find(p => p.id === 'engine')?.policy;
   if (r.arm === 'branch' && !declaredPolicy) throw new Error('Owned arm supervision contract missing');
   await collector.sample();
-  const target = collector.current.find(p => p.role === (r.arm === 'main' ? 'worker' : 'engine'));
+  const target = requireCollectorSample(collector, `E6 ${kind} target`, r.arm === 'main' ? 'worker' : 'engine');
   const record = recordOf(target), port = Number(command.port), initialInstance = collector.manifest?.instanceId,
     evidence = { kind, injected: false, preHealthy: false };
   const verify = async () => {
@@ -634,6 +661,7 @@ export async function hangExperiment(context, command) {
       : supervisor?.lastExit?.code === 5 || supervisor?.lastExit?.exitCode === 5;
     await until(deadline, 'Recovered health and text query', async () => {
       const manifest = await requestLive(context, '/api/runtime/manifest');
+      if (!manifest?.instanceId) throw new Error('Runtime manifest unavailable (E6 successor API): instance required');
       if (r.arm === 'branch' && manifest.instanceId === initialInstance) return null;
       context.token = (await requestLive(context, '/api/mcp/token')).token ?? null;
       await requestLive(context, '/api/health');

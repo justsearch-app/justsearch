@@ -296,6 +296,26 @@ stack and teardown verification belongs to root's acquisition runs.
 
 Check the common acquisition protocols without starting anything:
 
+**2026-10-01 receipt-root correction:** MAIN's Head omits the data directory from
+its command line, so the prior E4-E6 root filter never sampled its processes.
+Collectors now use their own start receipt's `backendRootPid`, following launcher
+descendants to exactly one Java `HeadlessApp`. The root must exist and have a
+creation time after the start command; an explicitly supplied JVM data directory
+must agree with the receipt. MAIN's initial verified birth/command identity is
+pinned against PID reuse. BRANCH retains its owned manifest PID/instance check,
+including supervised replacements. Failed samples clear the current process set,
+retain the root error, and fail with a named diagnostic. E5/E6 require verified
+samples/targets and valid manifest evidence before using them. Root provenance
+is retained in each successful snapshot. The change lives solely in the E4-E6
+instrument closure: all six E1/E2 arm/workload pair identities and exact
+instrument hashes remain unchanged; E0 values are untouched.
+
+Local proof: fake-table tests exercise MAIN receipt -> launcher -> Head -> Worker,
+BRANCH manifest selection, missing/ambiguous/old/reused PIDs, wrong directories,
+scope-file production, and guarded E5/E6 entry points. Outputs are retained in
+`tmp/e-root-node.log`, `tmp/e-root-identity-before.json`, and
+`tmp/e-root-pairs.json`. Live acquisition remains root's verification step.
+
 ```powershell
 node scripts/jseval/lane-f/e-run.mjs identity-check --dry-run
 ```
