@@ -20,13 +20,29 @@ final class EngineLifecycleE2ETest {
 
   @Tag("ai")
   @Test
-  @Timeout(20 * 60)
+  @Timeout(26 * 60)
   void ordinaryQueryReconfigureProvesBesideAndForcedInPlaceWithoutRestart() throws Exception {
     String beside = EngineSupervisedRecoveryE2ETest.runQueryReconfigureRound(false);
     String inPlace = EngineSupervisedRecoveryE2ETest.runQueryReconfigureRound(true);
     assertTrue(beside.contains("\"mode\":\"BESIDE\""), beside);
     assertTrue(inPlace.contains("\"mode\":\"IN_PLACE\""), inPlace);
+    assertTrue(beside.contains("QUERY_RECONFIGURE_DELAYED_RETRY_PASS"), beside);
+    assertTrue(inPlace.contains("QUERY_RECONFIGURE_DELAYED_RETRY_PASS"), inPlace);
     System.out.println("LIFECYCLE_QUERY_RECONFIGURE_PASS D1-4/D1-12/D1-14");
+  }
+
+  @Tag("ai")
+  @Test
+  @Timeout(14 * 60)
+  void preparedInPlaceQueryCrashBootsAAndFailsTheOperation() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runQueryReconfigureCrash(false);
+  }
+
+  @Tag("ai")
+  @Test
+  @Timeout(14 * 60)
+  void committedInPlaceQueryCrashBootsBAndCompletesTheOperation() throws Exception {
+    EngineSupervisedRecoveryE2ETest.runQueryReconfigureCrash(true);
   }
 
   @Test

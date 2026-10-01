@@ -358,6 +358,24 @@ export async function exerciseNativeMixedAfterPointer({ work, data, indexBase, j
   assertSearchHit(parseBody(initialRetained), fixture.files.retained, 'native-retained-file', 'A text');
   const initialStatus = await request(initialApi, '/api/status', {}, 30000);
   check(initialStatus.status === 200, 'A model status query failed');
+  const componentNames = ['api', 'index', 'encoders', 'generative'];
+  const recoveryTrace = [];
+  const recordReadiness = (phase, value) => {
+    const components = value.readiness?.engineComponents;
+    check(value.readiness?.schemaVersion === 2, `${phase} omitted schema-2 readiness`);
+    for (const name of componentNames) {
+      const row = components?.[name];
+      check(row && Number.isFinite(Date.parse(row.stateSince))
+        && ['ABSENT', 'STARTING', 'READY', 'RELOADING', 'UNAVAILABLE', 'FAILED'].includes(row.state)
+        && row.state === value.components?.[name]?.state
+        && row.stateSince === value.components?.[name]?.state_since,
+      `${phase} lost ${name} state/epoch projection: ${JSON.stringify(row)}`);
+    }
+    const observation = { phase, observedAtMs: Date.now(), components };
+    recoveryTrace.push(observation);
+    return observation;
+  };
+  recordReadiness('before-death', parseBody(initialStatus));
   const sourceEmbedding = parseBody(initialStatus).worker?.compatibility?.embeddingFingerprintCurrent;
   check(typeof sourceEmbedding === 'string' && /^[a-f0-9]{64}$/.test(sourceEmbedding),
     `A did not publish a real embedding identity: ${sourceEmbedding}`);
@@ -391,9 +409,24 @@ export async function exerciseNativeMixedAfterPointer({ work, data, indexBase, j
         && supervisor.lastExit?.requestedReason == null
       ? supervisor : null;
   });
-  const successor = await waitFor('one supervised successor incarnation', 180000, () => {
+  const deathObservedAtMs = Date.now();
+  let deathRequest;
+  try { deathRequest = await request(initialApi, '/api/status', {}, 1000); }
+  catch (failure) { deathRequest = { transportError: failure.message }; }
+  check(deathRequest.status !== 200, 'dead Engine still served a readiness envelope');
+  recoveryTrace.push({ phase: 'dead', observedAtMs: deathObservedAtMs,
+    components: null, lastReachable: recoveryTrace[0], deathRequest, supervisor: firstExit });
+  // The first reachable successor samples may precede model readiness; retain every envelope.
+  const successor = await waitFor('one supervised successor incarnation', 180000, async () => {
     const supervisor = read(path.join(runtime, 'supervisor.v1.json'));
     const live = read(path.join(runtime, 'manifest.json'));
+    if (live?.pid === supervisor?.pid && live?.instanceId === supervisor?.instanceId
+      && supervisor?.incarnation === first.incarnation + 1) {
+      let reply;
+      try { reply = await request(live.head.apiPort, '/api/status', {}, 5000); }
+      catch { reply = null; }
+      if (reply?.status === 200) recordReadiness('successor-starting', parseBody(reply));
+    }
     return supervisor?.runId === first.runId
         && supervisor.incarnation === first.incarnation + 1
         && supervisor.restartCount === 1
@@ -416,10 +449,27 @@ export async function exerciseNativeMixedAfterPointer({ work, data, indexBase, j
     const response = await request(bPort, '/api/status', {}, 30000);
     if (response.status !== 200) return null;
     const value = parseBody(response);
+    recordReadiness('successor-recovering', value);
     return value.components?.index?.state === 'READY'
         && value.components?.encoders?.state === 'READY'
-        && value.worker?.migration?.activeGenerationId === buildingGeneration ? value : null;
+      && value.worker?.migration?.activeGenerationId === buildingGeneration ? value : null;
   });
+  const recovered = recordReadiness('recovered', status);
+  const beforeDeath = recoveryTrace[0];
+  const timeToReadyMs = {};
+  for (const name of componentNames) {
+    const row = recovered.components[name];
+    const epoch = Date.parse(row.stateSince);
+    check(epoch >= deathObservedAtMs && epoch <= recovered.observedAtMs
+      && row.stateSince !== beforeDeath.components[name].stateSince,
+    `successor reused ${name} stateSince from dead Engine`);
+    // ABSENT is an intentional optional state, not a fabricated time-to-READY.
+    timeToReadyMs[name] = { state: row.state, stateSince: row.stateSince,
+      readyMs: row.state === 'READY' ? epoch - deathObservedAtMs : null,
+      observedReadyMs: row.state === 'READY' ? recovered.observedAtMs - deathObservedAtMs : null };
+  }
+  check(['api', 'index', 'encoders'].every(name => timeToReadyMs[name].state === 'READY'),
+    'recovery did not restore all required components');
   const retainedText = await post(bPort, '/api/knowledge/search', {
     query: retainedProjectionMarker, limit: 10, mode: 'text',
   }, 30000);
@@ -445,6 +495,13 @@ export async function exerciseNativeMixedAfterPointer({ work, data, indexBase, j
       && vectorTrace.degradation?.vectorBlocked !== true
       && vectorTrace.stages?.some(stage => stage.id === 'dense-retrieval' && stage.status === 'executed'),
     `B query did not execute real vector retrieval: ${JSON.stringify(vectorTrace)}`);
+  const recoveryProof = { deathObservedAtMs, recoveryTrace, timeToReadyMs,
+    text: { status: retainedText.status, results: parseBody(retainedText).results.length },
+    semantic: { status: retainedVector.status, results: parseBody(retainedVector).results.length,
+      vectorTrace } };
+  fs.writeFileSync(path.join(work, 'component-recovery-proof.json'),
+    JSON.stringify(recoveryProof, null, 2));
+  console.log('COMPONENT_DEATH_RECOVERY_PASS', JSON.stringify(recoveryProof));
   const generationManifest = read(path.join(indexBase, 'indices', buildingGeneration,
     '.justsearch-index-generation.json'));
   const embedding = status.worker?.compatibility;

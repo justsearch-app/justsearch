@@ -47,12 +47,14 @@ function fixture(t, mode, options = {}) {
   let jobReads = 0;
   let committed = false;
   let refusal = null;
+  const outcomes = new Map();
   let sequence = 0;
   const createOperationKey = () => `01996c43-8300-7000-8000-${String(++sequence).padStart(12, '0')}`;
   const forcedKey = mode === 'IN_PLACE' ? createOperationKey() : null;
   const snapshot = () => ({ worker: { gpu: { rerankerModelPath: currentPath } },
     readiness: { engineComponents: { encoders: { ...composition, state, recoveryAttempts,
-      appliedVersion: currentPath === a ? 'A-version' : 'B-version' } } } });
+      appliedVersion: currentPath === a ? 'A-version'
+        : currentPath.endsWith('-c') ? 'C-version' : 'B-version' } } } });
   const persist = () => fs.writeFileSync(path.join(data, 'ui', 'settings.json'), JSON.stringify({
     witness, queryRoles: { reranker: { state: 'SELECTED', targetEp: 'CUDA',
       model: { path: path.join(currentPath, 'model_fp16.onnx'),
@@ -65,7 +67,9 @@ function fixture(t, mode, options = {}) {
     state = 'READY';
     witness = { acceptedRevision: witness.acceptedRevision + 1 };
     persist();
-    return response(200, { state: 'COMPLETE', operationKey: body.operationKey, witness, composition });
+    const result = response(200, { state: 'COMPLETE', operationKey: body.operationKey, witness, composition });
+    outcomes.set(body.operationKey, result);
+    return result;
   };
   const finishApply = () => {
     const body = pendingApply;
@@ -121,6 +125,15 @@ function fixture(t, mode, options = {}) {
     assert.equal(endpoint, '/api/settings/v2');
     if (opts.method !== 'POST') return response(200, { witness });
     const body = JSON.parse(opts.body);
+    if (outcomes.has(body.operationKey)) {
+      if (options.reapplyOldKey) return commit(body);
+      if (options.corruptReplay) return response(200, { ...JSON.parse(outcomes.get(body.operationKey).text), witness });
+      return outcomes.get(body.operationKey);
+    }
+    if (body.witness.acceptedRevision !== witness.acceptedRevision) {
+      if (options.acceptStaleWitness) return commit(body);
+      return response(409, { state: 'FAILED', errorCode: 'VERSION_CONFLICT' });
+    }
     if (refusal?.key === body.operationKey) return refusal.response;
     if (body.rerankerModelPath.endsWith('-invalid')) {
       stale = snapshot();
@@ -182,7 +195,11 @@ for (const mode of ['BESIDE', 'IN_PLACE']) {
     assert.equal(proof.corpus.committedJobs, 6);
     assert.equal(proof.apiOutages, 0);
     assert.equal(proof.restartCount, 0);
-    assert.equal(proof.availabilityRounds.length, 4);
+    assert.equal(proof.availabilityRounds.length, 7);
+    const retry = JSON.parse(output.find(args => args[0] === 'QUERY_RECONFIGURE_DELAYED_RETRY_PASS')[1]);
+    assert.equal(retry.appliedC, 'C-version');
+    assert.equal(retry.generation, 'g-A');
+    assert.equal(retry.stale.errorCode, 'VERSION_CONFLICT');
     assert.ok(f.calls.indexOf('/api/knowledge/ingest') < f.calls.indexOf('/api/knowledge/search'));
     assert.equal(f.calls.filter(x => x === '/api/knowledge/ingest').length, 1);
     assert.ok(f.waits.find(x => x.label === 'all six query reconfigure corpus jobs committed DONE').attempts > 1);
@@ -192,6 +209,17 @@ for (const mode of ['BESIDE', 'IN_PLACE']) {
       assert.equal(proof.witnesses.toB.degradation.compositionBarrier.encoders.state, 'RELOADING');
       assert.equal(proof.recoveryAttempts.afterRefusal, 1);
     }
+  });
+}
+
+for (const [option, reason] of [
+  ['reapplyOldKey', /delayed k1 did not return its recorded outcome/],
+  ['corruptReplay', /delayed k1 did not return its recorded outcome/],
+  ['acceptStaleWitness', /stale B witness was not refused/],
+]) {
+  test(`delayed retry rejects ${option}`, async t => {
+    const f = fixture(t, 'IN_PLACE', { [option]: true });
+    await assert.rejects(exerciseQueryReconfigure(f.context), reason);
   });
 }
 

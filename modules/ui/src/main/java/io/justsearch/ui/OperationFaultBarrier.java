@@ -50,6 +50,7 @@ final class OperationFaultBarrier {
             "installer-before-receipt")
         : "reconfigure".equals(kind)
             ? Set.of("before-accept", "after-accept", "after-effect", "settings-mid-compose",
+                "settings-after-prepare-before-file-replace",
                 "settings-after-file-replace-before-publication")
             : Set.of("before-accept", "after-accept", "after-effect");
     if (phase == null || !phases.contains(phase)
