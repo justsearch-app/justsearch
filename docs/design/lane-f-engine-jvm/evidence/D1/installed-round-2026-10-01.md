@@ -37,3 +37,9 @@ Default (untagged) lifecycle task at `a545034d6`: 7/7 passed, including
 `-xml/`). Hosted CI run 36811134446 on exact SHA `56df784ad`: every job succeeded. Full local suite at
 `a38dc2883`: 1,879 suites, 12,488 tests, 0 failures, 0 errors, 33 existing skips
 (`tmp/lane-f-batch5-full-suite-counts.json`).
+
+Closure-review proofs at `51fff0a62` (retained-state producers merged):
+- `preparedInPlaceQueryCrashBootsAAndFailsTheOperation`, `committedInPlaceQueryCrashBootsBAndCompletesTheOperation` (D1-4): PASSED (`tmp/lane-f-proofs-p2.log`).
+- `nativeCompleteSource...` and `refusedInPlaceGapRestoresAThenApprovesAndPromotesB` with the new restoration-time-versus-budget assertion (D1-9): PASSED (`tmp/lane-f-proofs-p3.log`).
+- Supervised recovery set with the per-component readiness clock and TEXT/semantic queries (D1-2): PASSED (`tmp/lane-f-proofs-p4.log`).
+- `ordinaryQueryReconfigure...` with the A->B->C delayed-retry extension: FAILED on the delayed k1 replay comparison (`tmp/lane-f-proofs-p1.log`; fixture `tmp/lane-f-takeover/query-reconfigure-31fca5bf-*`); under investigation. Its XML was overwritten by a later group (results directory shared); the log and fixture are retained.
