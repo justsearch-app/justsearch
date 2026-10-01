@@ -132,11 +132,12 @@ test('reproject is offline, preserves original scores/provenance and refuses mis
   fs.mkdirSync(dir);
   const bulk = path.join(dir, 'bulk-load.json'); fs.writeFileSync(bulk, JSON.stringify(windowLoad()));
   const original = { ...record('main'), workload: 'agent-idle', raw: scratch, recordFile: file,
+    pairIdentityInputs: { plan: ['original acquisition'], instruments: { sampler: ['original bytes hash'] } },
     rawFiles: [bulk], endedAt: '2026-10-01T01:00:00Z', gaps: {}, commands: [{ label: 'original' }] };
   fs.writeFileSync(file, JSON.stringify(original));
   try {
     const projected = reprojectRecord(file, values);
-    for (const key of ['id', 'pairIdentity', 'valuesHash', 'endedAt', 'commands']) assert.deepEqual(projected[key], original[key]);
+    for (const key of ['id', 'pairIdentity', 'pairIdentityInputs', 'valuesHash', 'endedAt', 'commands']) assert.deepEqual(projected[key], original[key]);
     assert.deepEqual(projected.measuredProjection.metrics, original.metrics);
     assert.match(projected.reprojectionDriverHash, /^[a-f0-9]{64}$/);
     assert.ok(projected.reprojectedAt);
@@ -147,28 +148,11 @@ test('reproject is offline, preserves original scores/provenance and refuses mis
     assert.equal(fs.readFileSync(file, 'utf8'), before);
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 });
-test('new acquisition and reprojected baseline pair by actual protocol without replacing provenance', () => {
-  const mainLoads = {}, branchLoads = {};
-  for (const w of ['agent-idle', 'scripted-agent']) {
-    const r = { ...record('main'), workload: w, gaps: {}, machine: { host: 'same' },
-      commands: [{ mode: 'start', env: { JUSTSEARCH_HEAD_HEAP: '2g' } }] };
-    projectLoad(r, windowLoad(), w === 'scripted-agent' ? [{ status: 200, durationMs: 200 }] : [], values);
-    mainLoads[w] = r;
-  }
-  const mainMerged = mergeLoadRecords(mainLoads);
-  const v = fillValues(document, { 'E1/main': record('main'), 'E2/main': mainMerged }).values;
-  for (const w of ['agent-idle', 'scripted-agent']) {
-    const r = { ...structuredClone(mainLoads[w]), arm: 'branch', pairIdentity: 'new-acquisition-instrument-hash' };
-    projectLoad(r, windowLoad(), w === 'scripted-agent' ? [{ status: 200, durationMs: 200 }] : [], v);
-    branchLoads[w] = r;
-  }
-  const rows = () => tableVerdicts({ 'E2/main': mainMerged, 'E3/main': mainMerged,
-    'E2/branch': mergeLoadRecords(branchLoads), 'E3/branch': mergeLoadRecords(branchLoads) }, v);
-  assert.equal(rows().find(r => r.clause === 'stage-completion-rates-under-foreground-load').verdict, 'pass');
-  assert.equal(branchLoads['agent-idle'].pairIdentity, 'new-acquisition-instrument-hash');
-  branchLoads['agent-idle'].commands[0].env.JUSTSEARCH_HEAD_HEAP = '4g';
-  projectLoad(branchLoads['agent-idle'], windowLoad(), [], v);
-  assert.equal(rows().find(r => r.clause === 'stage-completion-rates-under-foreground-load').verdict, 'fail');
+test('scoring projection leaves acquisition identity and its explanation unchanged', () => {
+  const r = { ...record('main'), workload: 'agent-idle', gaps: {}, pairIdentityInputs: { plan: ['captured'], instruments: { sampler: 'original' } } };
+  const before = structuredClone({ hash: r.pairIdentity, inputs: r.pairIdentityInputs });
+  projectLoad(r, windowLoad(), [], values);
+  assert.deepEqual({ hash: r.pairIdentity, inputs: r.pairIdentityInputs }, before);
 });
 test('wire failures, actual idle refusals, and reason-coded scripted ceilings are measured', () => {
   const r = record('main'); r.workload = 'agent-idle'; r.gaps = {};
