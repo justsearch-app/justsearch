@@ -40,8 +40,8 @@ Default (untagged) lifecycle task at `a545034d6`: 7/7 passed, including
 
 Closure-review proofs at `51fff0a62` (retained-state producers merged):
 - `preparedInPlaceQueryCrashBootsAAndFailsTheOperation`, `committedInPlaceQueryCrashBootsBAndCompletesTheOperation` (D1-4): PASSED (`tmp/lane-f-proofs-p2.log`).
-- `nativeCompleteSource...` and `refusedInPlaceGapRestoresAThenApprovesAndPromotesB` with the new restoration-time-versus-budget assertion (D1-9): PASSED (`tmp/lane-f-proofs-p3.log`).
-- Supervised recovery set with the per-component readiness clock and TEXT/semantic queries (D1-2): PASSED (`tmp/lane-f-proofs-p4.log`).
+- `nativeCompleteSource...` with the per-component readiness clock and TEXT/dense-vector queries across a real death (D1-2; fixture `tmp/lane-f-takeover/writer-junit-b39c2d7d-*`), and `refusedInPlaceGapRestoresAThenApprovesAndPromotesB` with the restoration time measured at 23,178 ms against the 120,000 ms encoder deadline (D1-9): PASSED (`tmp/lane-f-proofs-p3.log`).
+- Supervised recovery set (writer, migration, lock-ingest, processing): PASSED (`tmp/lane-f-proofs-p4.log`).
 - `ordinaryQueryReconfigure...` with the A->B->C delayed-retry extension: FAILED on the delayed k1 replay comparison (`tmp/lane-f-proofs-p1.log`; fixture `tmp/lane-f-takeover/query-reconfigure-31fca5bf-*`); under investigation. Its XML was overwritten by a later group (results directory shared); the log and fixture are retained.
 - `ordinaryQueryReconfigure...` with the delayed-retry extension, rerun at `7ab2aedf5` after the comparison was corrected to the C2 recorded-outcome contract: PASSED. BESIDE 514 samples, IN_PLACE 665 samples, 0 API outages, restartCount 0; delayed k1 replay returns k1's recorded outcome, a stale new key with B's witness is refused, C and its applied version stay unchanged (`tmp/lane-f-proofs-p1-r2.log`, `-xml/`).
 
