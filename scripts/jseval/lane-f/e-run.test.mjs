@@ -89,6 +89,18 @@ test('AI_OFFLINE and every invalid streamed terminal are excluded from admitted 
   assert.equal(r.metrics.agentAdmitted, 1);
   assert.equal(r.clauses['no-timeout-or-5xx'], true);
   assert.deepEqual(r.metrics.agentTerminalErrors, {});
+  // A stream the fixed window cut is a boundary artifact: not a terminal error, not a wire failure.
+  const cut = { status: 200, durationMs: 9000, streamed: true, error: 'TRANSPORT_FAILURE', windowBoundary: true,
+    terminal: { doneCount: 0, errorCount: 0, eventCount: 9, eof: false } };
+  projectLoad(r, windowLoad(), [cut, { status: 200, durationMs: 300 }], values);
+  assert.deepEqual(r.metrics.agentTerminalErrors, {});
+  assert.equal(r.gaps.agentTerminalErrors, undefined);
+  assert.equal(r.clauses['no-timeout-or-5xx'], true);
+  // A stream that stalls inside the window is still a terminal error and fails the wire clause.
+  const stalled = { ...cut, error: 'TIMED_OUT', windowBoundary: undefined };
+  projectLoad(r, windowLoad(), [stalled, { status: 200, durationMs: 300 }], values);
+  assert.deepEqual(r.metrics.agentTerminalErrors, { INVALID_TERMINAL: 1 });
+  assert.equal(r.clauses['no-timeout-or-5xx'], false);
 });
 test('E4 collector excludes offline streams and fails the foreground workload', t => {
   const raw = fs.mkdtempSync(path.join(ROOT, 'tmp/e-offline-soak-'));
@@ -497,6 +509,21 @@ test('table numeric bounds include exact limits and reject regression', () => {
   assert.equal(clause(records, 'foreground-p95'), 'fail');
   records['E3/branch'].metrics.stagesByWorkload['agent-idle'].chunk_embed.rate = 17.99;
   assert.equal(clause(records, 'stage-completion-rates-under-foreground-load'), 'fail');
+});
+test('timeout/5xx judges the branch; the split arm\'s own failures are reported as its baseline', () => {
+  const records = pairRecords();
+  records['E2/main'].clauses['no-timeout-or-5xx'] = false;
+  records['E2/branch'].clauses['no-timeout-or-5xx'] = true;
+  const row = tableVerdicts(records, bounds).find(r => r.clause === 'no-timeout-or-5xx');
+  assert.equal(row.verdict, 'pass');
+  assert.match(row.reason, /main baseline false/);
+  records['E2/branch'].clauses['no-timeout-or-5xx'] = false;
+  assert.equal(clause(records, 'no-timeout-or-5xx'), 'fail');
+  records['E2/branch'].clauses['no-timeout-or-5xx'] = undefined;
+  assert.equal(clause(records, 'no-timeout-or-5xx'), 'unmeasurable');
+  delete records['E2/main'];
+  records['E2/branch'].clauses['no-timeout-or-5xx'] = true;
+  assert.notEqual(clause(records, 'no-timeout-or-5xx'), 'pass', 'a missing main record still cannot pass');
 });
 test('table missing measurements, nonfinite numbers, and mismatched provenance cannot pass', () => {
   const records = pairRecords();

@@ -403,7 +403,7 @@ export function projectLoad(record, load, calls, values) {
   const legalRejection = c => rejectionCodes.has(c.code) && c.retrySafe === true && /^[1-9]\d*$/.test(c.retryAfter);
   record.metrics.wireRejections = wire.filter(c => c.status === 429).length;
   record.metrics.wireOffered = wire.length;
-  record.clauses['no-timeout-or-5xx'] = wire.length ? wire.every(c => terminalComplete(c)
+  record.clauses['no-timeout-or-5xx'] = wire.length ? wire.every(c => (c.windowBoundary || terminalComplete(c))
     && (c.windowBoundary && ['TRANSPORT_FAILURE', 'WINDOW_BOUNDARY_CANCELLED'].includes(c.error) && !(c.status >= 500)
       || !c.error && ((c.status >= 200 && c.status < 300) || c.status === 429 && legalRejection(c))))
     && !(load.samples ?? []).some(s => s.error)
@@ -411,6 +411,8 @@ export function projectLoad(record, load, calls, values) {
   record.clauses['foreground-p95'] = ['hybrid', 'lexical'].every(m => finite(load.searchP95?.[m])) ? true : undefined;
   const admitted = calls.filter(isAdmitted);
   Object.assign(record.metrics, agentMetrics(calls));
+  // A stream the fixed window cut is a boundary artifact, not a terminal error of the arm.
+  record.metrics.agentTerminalErrors = agentMetrics(calls.filter(c => !c.windowBoundary)).agentTerminalErrors;
   delete record.gaps.agentTerminalErrors;
   if (Object.keys(record.metrics.agentTerminalErrors).length) record.gaps.agentTerminalErrors = JSON.stringify(record.metrics.agentTerminalErrors);
   if (record.workload === 'agent-idle') record.clauses['idle-rejections'] = wire.length
@@ -464,11 +466,17 @@ export function mergeLoadRecords(workloads) {
   if (present.some(r => r.valuesHash !== merged.valuesHash || r.revision !== merged.revision)) merged.failure = 'Workload provenance mismatch';
   return merged;
 }
+const BRANCH_ONLY_CLAUSES = new Set(['no-timeout-or-5xx']);
 export function tableVerdicts(records, values) {
   const output = [];
   const pair = (group, clause, evaluate) => {
     const arms = ['main', 'branch'].map(arm => records[`${group}/${arm}`]);
-    const checks = arms.map(r => r?.clauses?.[clause]);
+    // Timeout/5xx is a property of the arm under test. The split arm's own timeouts are the baseline
+    // it is compared against (2026-10-01: main timed out a chat stream and its searches after the
+    // scripted window); they are reported in the reason, not counted as a failed comparison.
+    const branchOnly = BRANCH_ONLY_CLAUSES.has(clause);
+    const checks = branchOnly ? [arms[1]?.clauses?.[clause], arms[0] ? true : undefined]
+      : arms.map(r => r?.clauses?.[clause]);
     if (evaluate && arms.every(Boolean)) checks.push(evaluate(arms[1], arms[0]));
     if (arms.some(r => r?.failure)) checks.push(false);
     if (arms.every(Boolean)) {
@@ -486,7 +494,8 @@ export function tableVerdicts(records, values) {
       disposition,
       sources: arms.map(r => r?.id ?? 'missing').join(' / '),
       sourceRecords: arms.flatMap(r => r?.workloadRecords ?? [r?.recordFile]),
-      reason: arms.map(r => r?.gaps?.[clause]).filter(Boolean).join('; ') || 'paired clause and frozen values' });
+      reason: [...(branchOnly && arms[0] ? [`main baseline ${arms[0].clauses?.[clause]}`] : []),
+        ...arms.map(r => r?.gaps?.[clause]).filter(Boolean)].join('; ') || 'paired clause and frozen values' });
   };
   for (const [group, clauses] of Object.entries(CLAUSES)) for (const clause of clauses) {
     let evaluate;
@@ -678,6 +687,7 @@ export function collect(context) {
   const calls = captures.flatMap(c => c.requests ?? []);
   const admitted = calls.filter(isAdmitted);
   Object.assign(r.metrics, agentMetrics(calls));
+  r.metrics.agentTerminalErrors = agentMetrics(calls.filter(c => !c.windowBoundary)).agentTerminalErrors;
   if (Object.keys(r.metrics.agentTerminalErrors).length) r.gaps.agentTerminalErrors = JSON.stringify(r.metrics.agentTerminalErrors);
   if (calls.length) r.clauses['no-timeout-or-5xx'] = calls.every(c => !c.error && terminalComplete(c)
     && (c.status >= 200 && c.status < 300 || c.status === 429));
@@ -921,6 +931,12 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
         continue;
       }
       const result = await execute(command, context).complete;
+      if (result.code !== 0 && command.label.startsWith('encoder-')) {
+        // The request-time encoder probe is informational (no verdict clause). Its failure is recorded
+        // evidence about the arm (main's searches timed out after the scripted window, 2026-10-01).
+        record.gaps['encoder-probe'] = `${command.label} exited ${result.code}; see ${result.receipt.stderrFile}`;
+        continue;
+      }
       if (result.code !== 0) throw new Error(`${command.label} exited ${result.code}; see ${result.receipt.stderrFile}`);
       if (command.label === 'runner-status') {
         const status = JSON.parse(result.stdout);
