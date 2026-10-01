@@ -12,6 +12,8 @@ import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { gcLogOption, hangPolicy, splitGap } from './e456-instruments.mjs';
+import { LiveCollector, crashExperiment, hangExperiment, childPathExperiment, projectChildPolicies } from './e456-live.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 export const ARMS = Object.freeze({
@@ -27,9 +29,17 @@ const write = (file, value) => {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 };
 const finite = x => typeof x === 'number' && Number.isFinite(x) && x >= 0;
+export function verifySharedModels(config) {
+  const models = config.keys?.find(entry => entry.key === 'justsearch.models.dir')?.value;
+  const sharedModels = path.resolve(ARMS.main, '../../../models');
+  if (typeof models !== 'string' || path.resolve(models).toLowerCase() !== sharedModels.toLowerCase()) {
+    throw new Error(`Shared models required: effective justsearch.models.dir=${models}, expected ${sharedModels}`);
+  }
+  return models;
+}
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
-  if (![...GROUPS, 'e0-values', 'table'].includes(command)) throw new Error('Unknown subcommand');
+  if (![...GROUPS, 'e0-values', 'e4-hang-values', 'table'].includes(command)) throw new Error('Unknown subcommand');
   const result = { command, dryRun: false };
   for (let i = 0; i < rest.length; i++) {
     const flag = rest[i];
@@ -37,7 +47,8 @@ export function parseArgs(argv) {
       if (result.dryRun) throw new Error('Duplicate --dry-run');
       result.dryRun = true;
     } else {
-      const key = { '--arm': 'arm', '--window': 'window' }[flag];
+      const key = { '--arm': 'arm', '--window': 'window', '--repo-root': 'repoRoot', '--arm-tree': 'armTree',
+        '--fault': 'fault', '--debug-port': 'debugPort' }[flag];
       const value = rest[++i];
       if (!key || !value || value.startsWith('--') || result[key]) throw new Error(`Invalid option ${flag}`);
       result[key] = value;
@@ -47,6 +58,11 @@ export function parseArgs(argv) {
   if (result.arm && !Object.hasOwn(ARMS, result.arm)) throw new Error('Invalid arm');
   if (command === 'e0-values' && result.arm && result.arm !== 'main') throw new Error('E0 uses MAIN only');
   if (command === 'table' && result.arm) throw new Error('table reads both arms; omit --arm');
+  if (command === 'e4-hang-values' && result.arm) throw new Error('Hang values use both arms; omit --arm');
+  if (result.armTree && !GROUPS.includes(command)) throw new Error('--arm-tree requires a run group');
+  if (result.fault && (command !== 'e6-hang' || !['soft', 'hard'].includes(result.fault))) throw new Error('--fault soft|hard is E6 only');
+  if (result.debugPort && (command !== 'e6-hang' || !/^\d+$/.test(result.debugPort)
+    || Number(result.debugPort) < 1024 || Number(result.debugPort) > 65535)) throw new Error('--debug-port 1024..65535 is E6 only');
   if (command === 'e4-memory-soak' ? !['1', '2', '3'].includes(result.window) : result.window !== undefined) {
     throw new Error('--window 1|2|3 required only for E4');
   }
@@ -56,25 +72,45 @@ export function parseArgs(argv) {
 /** A reviewable process plan; placeholders are resolved only after the owned start receipt. */
 export function buildPlan(options, values, root = ROOT) {
   const arm = options.arm ?? 'main';
-  const tree = ARMS[arm];
+  const tree = options.armTree ? path.resolve(options.armTree) : ARMS[arm];
   const group = options.command;
   const raw = path.join(root, 'tmp/lane-f-e', group, arm, '${invocation}');
-  const tools = path.join(root, 'scripts/jseval/lane-f');
+  const tools = path.join(ROOT, 'scripts/jseval/lane-f');
   const runner = path.join(tree, 'scripts/dev/dev-runner.cjs');
   const pythonCwd = path.join(root, 'scripts/jseval');
   const env = {
     PYTHONPATH: pythonCwd, PYTHONUTF8: '1',
+    // Trust only the selected owner-assigned arm in child processes; no global Git config edits.
+    GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'safe.directory', GIT_CONFIG_VALUE_0: tree,
     JUSTSEARCH_HEAD_HEAP: values.heap.packaged.replace('-Xmx', ''),
     UI_OPTS: '-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC',
     JAVA_OPTS: '-Djustsearch.eval.mode=true',
     JUSTSEARCH_CHAT_PROFILE: 'standard',
   };
+  if (['e4-memory-soak', 'e5-crash', 'e6-hang'].includes(group)) {
+    env.JAVA_TOOL_OPTIONS = gcLogOption(path.join(raw, 'gc')) + ' -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m';
+    if (arm === 'main') {
+      env.JUSTSEARCH_WORKER_HEAP = values.heap.packaged.replace('-Xmx', '');
+      env.JUSTSEARCH_JVM_OPTS = '-XX:+UseG1GC';
+    }
+  }
+  const worstPauseMs = values.hangParameters?.worstPauseMs;
+  const debugPort = options.debugPort ?? '33225';
+  if (group === 'e6-hang') {
+    // Dry runs remain reviewable before E4 freezes the values; execution validates them first.
+    env.JUSTSEARCH_SUPERVISOR_HARNESS = '1';
+    env.JUSTSEARCH_SUPERVISOR_HANG_POLL_INTERVAL_MS = String(values.hangParameters?.intervalMs ?? '${hangIntervalMs}');
+    env.JUSTSEARCH_SUPERVISOR_HANG_THRESHOLD = String(values.hangParameters?.missCount ?? '${hangMissCount}');
+    const debug = `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=127.0.0.1:${debugPort}`;
+    if (arm === 'main') env.JUSTSEARCH_JVM_OPTS += ` ${debug}`;
+    else env.JAVA_OPTS += ` ${debug}`;
+  }
   const cmd = (label, executable, args, cwd = tree, extra = {}) => ({ label, executable, args, cwd, env, ...extra });
   const start = label => cmd(`start-${label}`, 'node', [runner, 'start', '--json', '--skip-build',
     '--clean', 'none', '--data-dir', path.join(tree, 'tmp/lane-f-e', '${invocation}', label),
     '--api-port', '33221', '--session-id', '${session}', '--lease-duration-sec', '3600',
     '--chat-profile', 'standard'], tree, { mode: 'start',
-      requestsAfterReceipt: ['/api/mcp/token', '/api/health', '/api/debug/state', '/api/runtime/manifest', '/api/debug/effective-config'] });
+      requestsAfterReceipt: ['/api/mcp/token', '/api/health', '/api/status', '/api/debug/state', '/api/runtime/manifest', '/api/debug/effective-config'] });
   const stop = label => cmd(`stop-${label}`, 'node', [runner, 'stop', '--json', '--run', '${runId}',
     '--session-id', '${session}'], tree, { mode: 'stop' });
   const evalRun = (label, load = false, mode = 'hybrid') => cmd(label, 'python', ['-m', 'jseval', 'run',
@@ -87,7 +123,8 @@ export function buildPlan(options, values, root = ROOT) {
   const samplers = label => [
     cmd(`rss-${label}`, 'powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
       path.join(tools, 'head-rss-sampler.ps1'), '-Out', path.join(raw, label, 'head-rss.csv'),
-      '-Stop', path.join(raw, label, 'rss.stop'), '-IncludeSplitWorker'], tree, { mode: 'background' }),
+      '-Stop', path.join(raw, label, 'rss.stop'), '-IncludeSplitWorker',
+      ...(group === 'e4-memory-soak' ? ['-Scope', path.join(raw, label, 'process-scope.json'), '-Arm', arm] : [])], tree, { mode: 'background' }),
     cmd(`status-${label}`, 'bash', [path.join(tools, 'status-sampler.sh'), path.join(raw, label),
       '33221', path.join(raw, label, 'status.stop')], tree, { mode: 'background' }),
   ];
@@ -98,13 +135,20 @@ export function buildPlan(options, values, root = ROOT) {
     path.join(raw, label, 'encoder'), '3', '33221'], root);
   const analyze = label => cmd(`analyze-${label}`, 'node', [path.join(tools, 'analyze-head-run.cjs'), path.join(raw, label), '--paired-split'], root);
   const endSamples = label => ({ label: `end-samples-${label}`, mode: 'end-samples', directory: path.join(raw, label) });
+  const instruments = label => ({ label: `instruments-${label}`, mode: 'instruments-start', directory: path.join(raw, label),
+    arm, target: arm === 'main' ? 'Head + Worker under Head WorkerSpawner' : 'Engine under dev-runner supervisor',
+    gcEveryMinutes: 5, warmupMinutes: 5, reconfigureEveryMinutes: 15,
+    settingsRoute: '/api/settings/v2', liveSetting: 'ui.excludePatterns', consumer: '/api/indexing/excludes/apply?dryRun=true' });
+  const endInstruments = label => ({ label: `end-instruments-${label}`, mode: 'instruments-stop' });
   const preamble = [cmd('revision', 'git', ['rev-parse', 'HEAD']),
     cmd('dirty', 'git', ['status', '--porcelain']),
     cmd('runner-status', 'node', [runner, 'status', '--active', '--json']),
-    cmd('machine', 'powershell', ['-NoProfile', '-Command',
-      'Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,TotalVisibleMemorySize,TotalVirtualMemorySize | ConvertTo-Json']),
+    cmd('machine', 'node', ['-e',
+      'const os=require("node:os");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))']),
     cmd('gpu', 'nvidia-smi', ['--query-gpu=name,uuid,memory.total,driver_version', '--format=csv'])];
   if (group === 'e0-values') return [{ mode: group, label: group }];
+  if (group === 'e4-hang-values') return [{ mode: group, label: group,
+    rule: 'Freeze interval >= 10 seconds, interval * misses >= 3 * worst observed E4 safepoint pause across both arms' }];
   if (group === 'table') return [cmd('fixture-gate', 'bash', [path.join(tools, 'fixture-gate.sh'),
     '${mainFixture}', '${branchFixture}', '${fixtureReport}'], root), { mode: group, label: group }];
   let commands;
@@ -136,17 +180,29 @@ export function buildPlan(options, values, root = ROOT) {
       endSamples(label), probe(label), analyze(label), stop(label));
     }
   } else if (group === 'e4-memory-soak') {
-    commands = [start('soak'), ...samplers('soak'), admission('soak'),
+    commands = [start('soak'), instruments('soak'), ...samplers('soak'), admission('soak'),
       { ...evalRun('soak', true), mode: 'soak', minutes: values.soak.windows[Number(options.window) - 1].minutes },
-      endSamples('soak'), analyze('soak'), stop('soak')];
+      endSamples('soak'), endInstruments('soak'), analyze('soak'), stop('soak')];
   } else if (group === 'e5-crash') {
-    commands = [cmd('durable-crash', 'node', [path.join(tree, 'scripts/supervisor-conformance/real-writer-recovery.mjs')], tree,
-      { env: { ...env, JUSTSEARCH_REAL_RECOVERY_SCENARIO: 'processing',
-        JUSTSEARCH_WRITER_RECOVERY_WORK: path.join(tree, 'tmp/lane-f-e', '${invocation}', 'recovery') } })];
+    commands = [start('crash'), instruments('crash'), { label: 'durable-crash', mode: 'crash-experiment',
+      killTarget: arm === 'branch' ? 'owned Engine JVM' : 'owned Worker JVM (Head survives)',
+      mechanics: 'scripts/supervisor-conformance/verified-crash.mjs (shared with real-writer recovery)',
+      corpusDocuments: 100, requireProcessing: true, requireNonzeroCheckpoint: arm === 'branch',
+      splitDisposition: arm === 'main' ? splitGap('MAIN exposes durable jobs, no Lane F operations checkpoint') : undefined },
+    endInstruments('crash'), stop('crash')];
+    for (const reason of ['restart', 'quit', 'upgrade']) commands.push(start(`children-${reason}`),
+      instruments(`children-${reason}`), { label: `children-${reason}`, mode: 'child-path', reason,
+        mechanism: reason === 'restart' ? arm === 'branch' ? 'existing shutdown request channel' : 'core.restart-worker'
+          : reason === 'quit' ? '/api/lifecycle/shutdown' : '/api/upgrade/prepare + /api/upgrade/commit-shutdown' },
+      endInstruments(`children-${reason}`), stop(`children-${reason}`));
   } else {
-    commands = ['hang-soft-recovered-through-the-request-file', 'hang-hard-recovered-by-forced-kill'].map(id =>
-      cmd(id, 'node', [path.join(tree, 'scripts/supervisor-conformance/run.mjs'), '--adapter', 'dev-runner', '--case', id], tree,
-        { env: { ...env, SUPERVISOR_CONFORMANCE_KEEP: '1', SUPERVISOR_CONFORMANCE_VERBOSE: '1' } }));
+    commands = [];
+    for (const kind of options.fault ? [options.fault] : ['soft', 'hard']) commands.push(start(`hang-${kind}`),
+      instruments(`hang-${kind}`), { label: `hang-${kind}`, mode: 'hang-experiment', kind, port: debugPort, worstPauseMs,
+        loopback: '127.0.0.1', target: arm === 'branch' ? 'Engine' : 'Worker',
+        policy: values.hangParameters,
+        splitDisposition: arm === 'main' ? splitGap('MAIN Worker gRPC supervision exists; MAIN Head HTTP hangs have no autonomous dev-arm recovery') : undefined },
+      endInstruments(`hang-${kind}`), stop(`hang-${kind}`));
   }
   return [...preamble, ...commands];
 }
@@ -182,7 +238,10 @@ export function tableVerdicts(records, values) {
       checks.push(arms[0].pairIdentity === arms[1].pairIdentity,
         arms[0].valuesHash === arms[1].valuesHash);
     }
-    output.push({ group, clause, verdict: verdict(checks),
+    const disposition = arms[0]?.dispositions?.[clause];
+    const result = verdict(disposition?.status === 'unmeasurable-on-split' ? [...checks, undefined] : checks);
+    output.push({ group, clause, verdict: result === 'unmeasurable' && disposition ? 'unmeasurable-on-split' : result,
+      disposition,
       sources: arms.map(r => r?.id ?? 'missing').join(' / '),
       sourceRecords: arms.map(r => r?.recordFile),
       reason: arms.map(r => r?.gaps?.[clause]).filter(Boolean).join('; ') || 'paired clause and frozen values' });
@@ -210,7 +269,9 @@ export function tableVerdicts(records, values) {
     };
     if (group === 'E4' && clause === 'machine-wide-commit-vs-main') evaluate = (b, m) =>
       finite(b.metrics?.peakCommitMB) && finite(m.metrics?.peakCommitMB) ? b.metrics.peakCommitMB <= m.metrics.peakCommitMB : undefined;
-    if (group === 'E5' && ['crash-to-api', 'crash-to-index'].includes(clause)) evaluate = b =>
+    if (group === 'E4' && clause === 'component-commit-budget') evaluate = (b, m) =>
+      finite(b.metrics?.peakCommitMB) && finite(m.metrics?.peakCommitMB) ? b.metrics.peakCommitMB <= m.metrics.peakCommitMB : undefined;
+    if (group === 'E5' && clause === 'crash-to-api') evaluate = b =>
       finite(b.metrics?.[clause]) ? b.metrics[clause] <= values.crashToApiRestoredMs : undefined;
     pair(group, clause, evaluate);
   }
@@ -222,7 +283,13 @@ function filesUnder(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory()
     ? filesUnder(path.join(dir, e.name)) : [path.join(dir, e.name)]);
 }
-function latestRecords(root) {
+export function sourceDirt(porcelain) {
+  return porcelain.split(/\r?\n/).filter(Boolean).filter(line => {
+    const name = line.slice(3).replaceAll('\\', '/');
+    return !name.startsWith(`${EVIDENCE}/`);
+  });
+}
+export function latestRecords(root) {
   const records = {};
   const windows = { main: {}, branch: {} };
   for (const file of filesUnder(path.join(root, EVIDENCE)).filter(f => path.basename(f) === 'index.json')) {
@@ -242,11 +309,17 @@ function latestRecords(root) {
     merged.windowRecords = list.map(r => r.recordFile);
     merged.metrics.peakCommitMB = list.every(r => finite(r.metrics.peakCommitMB))
       ? Math.max(...list.map(r => r.metrics.peakCommitMB)) : undefined;
-    for (const clause of CLAUSES.E4) merged.clauses[clause] = verdict(list.map(r => r.clauses[clause])) === 'pass'
-      ? true : list.some(r => r.clauses[clause] === false) ? false : undefined;
-    merged.clauses['owner-duration'] = ['1', '2', '3'].every(w => windows[arm][w]?.clauses['window-duration'] === true)
-      && list.every(r => r.valuesHash === merged.valuesHash && r.pairIdentity === merged.pairIdentity && r.revision === merged.revision)
-      ? true : undefined;
+    for (const clause of CLAUSES.E4) {
+      const applicable = clause === 'live-after-GC-trend' ? list.filter(r => r.window !== '3') : list;
+      merged.clauses[clause] = applicable.length && verdict(applicable.map(r => r.clauses[clause])) === 'pass'
+        ? true : applicable.some(r => r.clauses[clause] === false) ? false : undefined;
+    }
+    merged.metrics.worstPauseMs = list.every(r => finite(r.metrics.worstPauseMs)) ? Math.max(...list.map(r => r.metrics.worstPauseMs)) : undefined;
+    const durationChecks = ['1', '2', '3'].map(w => windows[arm][w]?.clauses['window-duration']);
+    durationChecks.push(list.every(r => r.valuesHash === merged.valuesHash
+      && r.pairIdentity === merged.pairIdentity && r.revision === merged.revision));
+    merged.clauses['owner-duration'] = durationChecks.includes(false) ? false
+      : durationChecks.every(c => c === true) ? true : undefined;
     if (list.some(r => r.failure)) merged.failure = list.filter(r => r.failure).map(r => r.failure).join('; ');
     records[`E4/${arm}`] = merged;
   }
@@ -345,14 +418,32 @@ async function startOwned(command, context, bindings) {
   });
   bindings.runId = receipt.runId;
   context.owned = { command, proc, runId: receipt.runId };
+  context.dataDir = command.args[command.args.indexOf('--data-dir') + 1];
+  context.tree = command.cwd;
   context.record.runIds.push(receipt.runId);
   write(path.join(context.raw, `${command.label}-receipt.json`), receipt);
-  context.token = (await api(context, '/api/mcp/token')).token;
-  if (!context.token) throw new Error('No mutation token');
-  await api(context, '/api/health');
+  // A dev-mode stack (main's split arm) does not enforce the per-boot token and hands out none;
+  // proceed without it there. Any mutation the server does guard still fails loudly on the wire.
+  context.token = (await api(context, '/api/mcp/token')).token ?? null;
+  context.record.tokenEnforced = Boolean(context.token);
+  // /api/health answers 503 until the index is ready; wait for readiness, bounded.
+  const readyBy = Date.now() + 300000;
+  for (;;) {
+    try { await api(context, '/api/health'); break; } catch (error) {
+      if (!/HTTP 503/.test(String(error.message)) || Date.now() > readyBy) throw error;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
   await api(context, '/api/debug/state');
-  await api(context, '/api/runtime/manifest');
-  await api(context, '/api/debug/effective-config');
+  context.manifest = await api(context, '/api/runtime/manifest');
+  const config = await api(context, '/api/debug/effective-config');
+  context.record.sharedModels = verifySharedModels(config);
+  const ready = await execute({ label: `capability-ready-${command.label}`, executable: 'python',
+    args: [path.join(ROOT, 'scripts/jseval/lane-f/capability-ready.py'),
+      '--base-url', 'http://127.0.0.1:33221', '--timeout', '300',
+      '--output', path.join(context.raw, `${command.label}-capability-ready.json`)],
+    cwd: command.cwd, env: command.env }, context).complete;
+  if (ready.code !== 0) throw new Error(`Capability readiness failed for ${command.label}; see ${ready.receipt.stderrFile}`);
 }
 
 function collect(context) {
@@ -414,34 +505,20 @@ function collect(context) {
   }
   if (r.groups.includes('E3')) r.clauses['chunks-per-second-under-foreground-load'] = finite(r.metrics.chunksPerSec) ? true : undefined;
   if (r.groups.includes('E4')) {
-    const file = path.join(context.raw, 'soak/head-rss.csv');
-    if (fs.existsSync(file)) {
-      const rows = fs.readFileSync(file, 'utf8').trim().split(/\r?\n/).slice(1).map(line => line.split(','));
-      const sums = new Map();
-      for (const [ts, role, pid, working, commit] of rows) {
-        if (!finite(Number(working)) || !finite(Number(commit)) || !Number.isFinite(Date.parse(ts))) throw new Error('Invalid memory sample');
-        const sum = sums.get(ts) ?? { working: 0, commit: 0 };
-        sum.working += Number(working); sum.commit += Number(commit); sums.set(ts, sum);
-      }
-      if (sums.size > 1 && rows.some(row => row[1] === 'engine')
-        && (r.arm !== 'main' || rows.some(row => row[1] === 'worker'))) {
-        r.metrics.peakCommitMB = Math.max(...[...sums.values()].map(s => s.commit));
-        r.metrics.peakWorkingSetMB = Math.max(...[...sums.values()].map(s => s.working));
-        r.metrics.sampledSeconds = (Date.parse(rows.at(-1)[0]) - Date.parse(rows[0][0])) / 1000;
-        r.clauses['window-duration'] = r.metrics.sampledSeconds >= context.values.soak.windows[Number(r.window) - 1].minutes * 60 - 5;
-        r.clauses['working-set'] = true;
-        r.clauses['machine-wide-commit-vs-main'] = true;
-        // More than one incarnation falsifies no-crash; sparse process samples cannot prove zero deaths.
-        if (['engine', 'worker'].some(role => new Set(rows.filter(row => row[1] === role).map(row => row[2])).size > 1)) {
-          r.clauses['zero-crashes'] = false;
-        }
-      }
-    }
+    const completedCycles = r.commands.filter(c => /^soak-cycle-/.test(c.label) && c.code === 0);
+    const workload = completedCycles.length && loads.length && calls.length
+      ? loads.every(s => s.search_load.errors === 0) && calls.every(c => !c.error
+        && (c.status >= 200 && c.status < 300 || c.status === 429)) : undefined;
+    r.metrics.completedSoakCycles = completedCycles.length;
+    r.clauses['index-agent-reconfigure-workload'] = verdict([
+      r.clauses['index-agent-reconfigure-workload'], workload]) === 'pass' ? true : workload === false ? false : undefined;
   }
+
 }
 
 export async function main(argv = process.argv.slice(2), root = ROOT) {
   const options = parseArgs(argv);
+  root = path.resolve(options.repoRoot ?? root);
   const valuesFile = path.join(root, EVIDENCE, 'values.json');
   const document = read(valuesFile), values = document.values;
   const plan = buildPlan(options, values, root);
@@ -450,6 +527,17 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     return;
   }
   const records = latestRecords(root);
+  if (options.command === 'e4-hang-values') {
+    const arms = ['main', 'branch'].map(arm => records[`E4/${arm}`]);
+    if (arms.some(r => !r || r.failure || r.clauses['owner-duration'] !== true || !finite(r.metrics.worstPauseMs))) {
+      throw new Error('Both complete E4 arm records with observed safepoint pauses required');
+    }
+    const worstPauseMs = Math.max(...arms.map(r => r.metrics.worstPauseMs));
+    values.hangParameters = { ...values.hangParameters, intervalMs: 10000,
+      missCount: Math.max(3, Math.ceil(3 * worstPauseMs / 10000)), worstPauseMs,
+      measuredAtE4: false, sourceRuns: arms.map(r => r.id), frozenAt: new Date().toISOString() };
+    hangPolicy(values, worstPauseMs); write(valuesFile, document); return;
+  }
   if (options.command === 'e0-values') {
     write(valuesFile, fillValues(document, records));
     // MAIN established these bounds: bind its existing reference records to the frozen file.
@@ -487,40 +575,49 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
     return;
   }
   if (options.arm === 'branch' && Object.values(values).some(v => v?.measuredAtE0 === true)) throw new Error('Run MAIN E1-E3 and e0-values before any branch run');
+  if (options.command === 'e6-hang') hangPolicy(values, values.hangParameters?.worstPauseMs);
   const id = `${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
   const raw = path.join(root, 'tmp/lane-f-e', options.command, options.arm, id);
   fs.mkdirSync(raw, { recursive: true });
   const groups = { 'e1-quality': ['E1'], 'e2-e3-load': ['E2', 'E3'], 'e4-memory-soak': ['E4'], 'e5-crash': ['E5'], 'e6-hang': ['E6'] }[options.command];
   const machine = { hostname: os.hostname(), platform: os.platform(), release: os.release(), arch: os.arch(),
     cpu: os.cpus().map(c => c.model), ramBytes: os.totalmem(), node: process.version };
-  const instrumentFiles = filesUnder(path.join(root, 'scripts/jseval/lane-f'));
+  const instrumentFiles = filesUnder(path.join(ROOT, 'scripts/jseval/lane-f')).filter(f => !/\.(pyc|log)$/.test(f));
+  const driverFiles = ['scripts/jseval/lane-f/e-run.mjs', 'scripts/jseval/lane-f/capability-ready.py',
+    'scripts/supervisor-conformance/jdwp-fault.mjs', 'scripts/supervisor-conformance/verified-crash.mjs']
+    .map(file => path.join(ROOT, file));
   const corpusFiles = ['docs/explanation', 'docs/reference'].flatMap(dir => filesUnder(path.join(ARMS.main, dir)));
-  const pairIdentity = hash(JSON.stringify({ machine, instruments: instrumentFiles.map(f => [path.relative(root, f), hash(fs.readFileSync(f))]),
-    corpus: corpusFiles.map(f => [path.relative(ARMS.main, f), hash(fs.readFileSync(f))]), env: plan.find(c => c.env)?.env }));
+  const pairIdentity = hash(JSON.stringify({ machine, instruments: instrumentFiles.map(f => [path.relative(ROOT, f), hash(fs.readFileSync(f))]),
+    driver: driverFiles.map(f => [path.basename(f), hash(fs.readFileSync(f))]),
+    corpus: corpusFiles.map(f => [path.relative(ARMS.main, f), hash(fs.readFileSync(f))]),
+    workload: options.command, heap: values.heap, collector: values.collector }));
   const destination = path.join(root, EVIDENCE, options.command, options.arm);
   const recordFile = path.join(destination, `${id}.json`);
   const record = { kind: 'lane-f-e-run.v1', id, groups, arm: options.arm, window: options.window,
     startedAt: new Date().toISOString(), machine, pairIdentity, valuesHash: hash(fs.readFileSync(valuesFile)),
     recordFile, raw, runIds: [], commands: [], metrics: {}, clauses: {}, gaps: {},
-    additionalArtifacts: options.command === 'e5-crash' ? [path.join(ARMS[options.arm], 'tmp/lane-f-e', id, 'recovery')] : [] };
-  const context = { raw, record, values, deadline: Date.now() + 3540000, sequence: 0, background: [] };
+    additionalArtifacts: [] };
+  const context = { raw, record, values, deadline: Date.now() + 3540000, sequence: 0, background: [], root };
   const bindings = { invocation: id, session: `lane-f-e-${id}` };
   const index = path.join(destination, 'index.json');
   write(recordFile, record); // Even failed/aborted branch starts prevent a later E0 refit.
   write(index, { runs: [...(fs.existsSync(index) ? read(index).runs : []), { id, record: recordFile, raw }] });
   try {
+    fs.mkdirSync(path.join(raw, 'gc'), { recursive: true });
     for (const template of plan) {
       if (Date.now() >= context.deadline) throw new Error('Invocation deadline');
       const command = resolveCommand(template, bindings);
-      if (command.label === 'durable-crash' || command.label.startsWith('hang-soft-')) {
-        const missingInstrument = !fs.existsSync(command.args[0]);
-        if (missingInstrument || options.command === 'e6-hang') {
-          for (const group of groups) for (const clause of CLAUSES[group]) record.gaps[clause] = missingInstrument
-            ? `Pinned ${options.arm} tree has no ${command.args[0]}; live paired proof unavailable`
-            : 'Conformance fake-engine cases hardcode 200ms/3-miss overrides; cannot exercise E4-derived settings or live JVM wedges';
-          break;
-        }
+      if (command.mode === 'instruments-start') {
+        context.collector = await new LiveCollector(context, command).start(); continue;
       }
+      if (command.mode === 'instruments-stop') {
+        await context.collector.stop();
+        if (groups.includes('E4')) { context.collector.projectE4(); context.instrumentedE4 = true; }
+        context.collector = null; continue;
+      }
+      if (command.mode === 'crash-experiment') { await crashExperiment(context); continue; }
+      if (command.mode === 'hang-experiment') { await hangExperiment(context, command); continue; }
+      if (command.mode === 'child-path') { await childPathExperiment(context, command.reason); continue; }
       if (command.mode === 'end-samples') {
         fs.writeFileSync(path.join(command.directory, 'rss.stop'), 'stop');
         fs.writeFileSync(path.join(command.directory, 'status.stop'), 'stop');
@@ -545,54 +642,47 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
         let cycle = 0;
         while (Date.now() < end) {
           const iteration = { ...command, label: `soak-cycle-${++cycle}`, args: [...command.args, '--reset'] };
-          const result = await execute(iteration, context).complete;
+          const cycleContext = { ...context, deadline: Math.min(context.deadline, end) };
+          const execution = execute(iteration, cycleContext);
+          context.sequence = cycleContext.sequence;
+          const result = await execution.complete;
+          if (execution.expired() && Date.now() >= end) break;
           if (result.code !== 0) throw new Error(`Soak cycle exited ${result.code}`);
         }
         record.metrics.measuredMinutes = command.minutes;
-        record.gaps['index-agent-reconfigure-workload'] = 'Existing instruments have no scheduled fifteen-minute reconfigure soak';
         continue;
       }
       const result = await execute(command, context).complete;
+      if (result.code !== 0) throw new Error(`${command.label} exited ${result.code}; see ${result.receipt.stderrFile}`);
       if (command.label === 'runner-status') {
         const status = JSON.parse(result.stdout);
         if (status.runId) throw new Error(`Shared stack occupied by ${status.runId}; no takeover`);
       } else if (command.label === 'dirty') {
-        if (result.stdout.trim()) throw new Error('Arm source tree is dirty; built revision is ambiguous');
+        if (sourceDirt(result.stdout).length) throw new Error('Arm source tree is dirty; built revision is ambiguous');
       } else if (command.label === 'revision') {
         record.revision = result.stdout.trim();
         if (options.arm === 'main' && !record.revision.startsWith('ac1c93bf3')) throw new Error('MAIN revision differs from owner pin');
-      } else if (result.code !== 0) throw new Error(`${command.label} exited ${result.code}`);
+      }
       if (command.mode === 'stop') { context.owned = null; delete bindings.runId; context.token = null; }
     }
     collect(context);
-    if (groups.includes('E5')) record.gaps['crash-to-api'] = 'Processing harness uses 10s cooldown; lacks paired 100-document crash/readiness timing';
-    if (groups.includes('E6')) record.gaps['E4-derived-hang-settings'] = 'Existing conformance uses fake Engine and 200ms harness overrides; not E4-set live JVM hang proof';
+    if (groups.includes('E5')) projectChildPolicies(record);
   } catch (error) {
     record.failure = error.message;
     process.exitCode = 1;
   } finally {
+    if (context.collector) {
+      try {
+        await context.collector.stop();
+        if (groups.includes('E4')) { context.collector.projectE4(); context.instrumentedE4 = true; }
+      } catch (error) { record.failure = `${record.failure ?? ''}; collector cleanup: ${error.message}`; }
+    }
     for (const proc of context.background) proc.child.kill();
     if (context.owned) {
       const command = resolveCommand(plan.find(c => c.mode === 'stop'), bindings);
       context.deadline = Math.min(context.deadline + 30000, Date.parse(record.startedAt) + 3590000);
       const stopped = await execute(command, context).complete;
       if (stopped.code !== 0) record.failure = `${record.failure ?? ''}; owned stop failed`;
-    }
-    if (options.command === 'e5-crash') {
-      const stateRoot = path.join(record.additionalArtifacts[0], 'state');
-      const activeFile = path.join(stateRoot, 'active.json');
-      if (fs.existsSync(activeFile)) {
-        const active = read(activeFile);
-        if (active.runId) {
-          if (!record.runIds.includes(active.runId)) record.runIds.push(active.runId);
-          context.deadline = Date.parse(record.startedAt) + 3590000;
-          const stopped = await execute({ label: 'stop-crash-fixture', executable: 'node',
-            args: [path.join(ARMS[options.arm], 'scripts/dev/dev-runner.cjs'), 'stop', '--json',
-              '--run', active.runId, '--session-id', 'writer-recovery-live'], cwd: ARMS[options.arm],
-            env: { JUSTSEARCH_DEV_RUNNER_STATE_ROOT: stateRoot, JUSTSEARCH_SUPERVISOR_HARNESS: '1' } }, context).complete;
-          if (stopped.code !== 0) record.failure = `${record.failure ?? ''}; crash-fixture owned stop failed`;
-        }
-      }
     }
     record.endedAt = new Date().toISOString();
     record.rawFiles = [raw, ...record.additionalArtifacts].flatMap(filesUnder);

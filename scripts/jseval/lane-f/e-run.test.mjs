@@ -2,16 +2,24 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ARMS, ROOT, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, main } from './e-run.mjs';
+import { ARMS, ROOT, parseArgs, buildPlan, verdict, tableVerdicts, fillValues, qualityGateVerdict, verifySharedModels, main } from './e-run.mjs';
 import { captureWorkload } from './admission-loop.mjs';
 
 const document = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'), 'utf8'));
 const values = document.values;
+test('shared model gate rejects missing and arm-local model directories', () => {
+  const config = value => ({ keys: [{ key: 'justsearch.models.dir', value }] });
+  const shared = path.resolve(ARMS.main, '../../../models');
+  assert.equal(verifySharedModels(config(shared)), shared);
+  assert.throws(() => verifySharedModels({}), /Shared models required/);
+  for (const tree of Object.values(ARMS)) assert.throws(() => verifySharedModels(config(path.join(tree, 'models'))), /Shared models required/);
+});
 for (const command of ['e1-quality', 'e2-e3-load', 'e5-crash', 'e6-hang']) {
   test(`parse ${command}`, () => assert.deepEqual(parseArgs([command, '--arm', 'main', '--dry-run']),
     { command, arm: 'main', dryRun: true }));
 }
 test('strict options and required window', () => {
+  assert.equal(parseArgs(['e1-quality', '--arm', 'main', '--repo-root', ARMS.branch]).repoRoot, ARMS.branch);
   for (const argv of [[], ['bad'], ['e1-quality'], ['e1-quality', '--arm', 'other'],
     ['e1-quality', '--arm', 'main', '--arm', 'main'], ['table', '--arm', 'main'],
     ['e0-values', '--arm', 'branch'], ['e4-memory-soak', '--arm', 'main'],

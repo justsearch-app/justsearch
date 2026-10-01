@@ -66,8 +66,10 @@ const names = Object.keys(phases);
 // The current sampler already calls the merged HeadlessApp JVM 'engine'. Old split
 // 'head'/'worker' CSVs are incompatible; accepting them would hide missing Engine data.
 const roles = [...new Set(rows.map((row) => row.role))];
-const allowedRoles = ['engine', 'llama-server', 'extraction-child', ...(process.argv.includes('--paired-split') ? ['worker'] : [])];
-if (!roles.includes('engine') || roles.some((role) => !allowedRoles.includes(role))) {
+const pairedSplit = process.argv.includes('--paired-split');
+const rootRole = roles.includes('head') && pairedSplit ? 'head' : 'engine';
+const allowedRoles = ['engine', 'llama-server', 'extraction-child', ...(pairedSplit ? ['head', 'worker'] : [])];
+if (!roles.includes(rootRole) || roles.some((role) => !allowedRoles.includes(role))) {
   throw new Error(`Invalid RSS role set: ${roles.join(',')}; expected engine with optional llama-server/extraction-child`);
 }
 if (!names.length) {
@@ -78,7 +80,7 @@ if (!names.length) {
     if (!Number.isFinite(a) || !Number.isFinite(b) || a > b) throw new Error(`Invalid RSS phase: ${n}`);
     if (!rows.some((row) => row.t >= a && row.t <= b)) throw new Error(`Empty RSS phase: ${n}`);
     // Children need not exist in every phase; an Engine sample is mandatory.
-    console.log(`- ${n}: ${roles.filter((role) => role === 'engine' || rows.some((row) => row.role === role && row.t >= a && row.t <= b)).map((role) => `${role} ${summar(role, a, b)}`).join(' | ')}`);
+    console.log(`- ${n}: ${roles.filter((role) => role === rootRole || rows.some((row) => row.role === role && row.t >= a && row.t <= b)).map((role) => `${role} ${summar(role, a, b)}`).join(' | ')}`);
   }
 }
 const first = rows.find((x) => x.role === 'engine'), last = [...rows].reverse().find((x) => x.role === 'engine');
