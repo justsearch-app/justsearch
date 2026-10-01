@@ -2395,6 +2395,8 @@ async function exerciseLiveModelGapDecision(c) {
   let waiting;
   let settledBCitation;
   let failedRecompose;
+  let refusalDecisionReleasedAt;
+  let reconfigureBudgetMs;
   try {
     try {
       const reached = await waitFor('installer Green drained before gap decision', 180000,
@@ -2421,6 +2423,11 @@ async function exerciseLiveModelGapDecision(c) {
         `in-place A lost lexical service during B composition: ${text.text}`);
       floorEvidence = { mode: encoder.mode, freeBytes: encoder.freeBytes,
         footprintBytes: encoder.footprintBytes };
+      // EngineRoot's encoder ComponentSpec declares the two-minute lifecycle deadline.
+      // Use its live projection for this restoration acceptance bound, not a fixture timeout.
+      reconfigureBudgetMs = encoder.deadlineMs;
+      requireThat(Number.isSafeInteger(reconfigureBudgetMs) && reconfigureBudgetMs > 0,
+        'gap restoration omitted its governing encoder reconfigure deadline');
       if (sourceModel) {
         requireThat(sourceModel.startsWith(path.resolve(work, 'installer-models') + path.sep)
           && fs.existsSync(sourceModel) && !fs.existsSync(hiddenSourceModel),
@@ -2428,6 +2435,10 @@ async function exerciseLiveModelGapDecision(c) {
         fs.renameSync(sourceModel, hiddenSourceModel);
       }
     } finally {
+      // This cut precedes the refusal and mandatory A recompose. Starting here gives a
+      // conservative upper bound, including the final refusal fence, rather than starting
+      // at AWAITING_ACCEPTANCE (which is only published AFTER A has been restored).
+      refusalDecisionReleasedAt = performance.now();
       fs.writeFileSync(migrationBarrier.releaseFile, 'release');
     }
     waiting = await waitFor('installer gap keeps A active and B bound', 180000,
@@ -2541,6 +2552,30 @@ async function exerciseLiveModelGapDecision(c) {
           ? reply : null;
       } catch { return null; }
     });
+  if (!gapCancellation && !gapRecomposeFailure) {
+    const refusalToReadyUpperBoundMs = Math.ceil(performance.now() - refusalDecisionReleasedAt);
+    const vectorTrace = parseJson(aVector, 'restored A semantic budget query').searchTrace;
+    requireThat(vectorTrace?.effectiveMode === 'VECTOR'
+      && vectorTrace.degradation?.vectorBlocked !== true
+      && vectorTrace.stages?.some(stage => stage.id === 'dense-retrieval' && stage.status === 'executed'),
+    'restoration budget query did not execute real vector retrieval');
+    const reply = await request(apiPort, '/api/status', {}, 15000);
+    const restored = parseJson(reply, 'restored A budget witness');
+    const state = readJson(path.join(indexBase, 'state.json'));
+    requireThat(reply.status === 200 && restored.readiness?.engineComponents?.encoders?.state === 'READY'
+      && state?.active_generation === sourceGeneration
+      && state?.building_generation === `g-${operationKey}`
+      && state?.migration_state === 'AWAITING_ACCEPTANCE'
+      && refusalToReadyUpperBoundMs <= reconfigureBudgetMs,
+    `A semantic restoration exceeded reconfigure budget: ${refusalToReadyUpperBoundMs}ms > ${reconfigureBudgetMs}ms`);
+    const restoration = { refusalToReadyUpperBoundMs, reconfigureBudgetMs,
+      startBoundary: 'migration-green-drained release before refusal',
+      sourceGeneration, buildingGeneration: state.building_generation,
+      encoders: restored.readiness.engineComponents.encoders, vectorTrace };
+    fs.writeFileSync(path.join(work, 'gap-restoration-budget-proof.json'),
+      JSON.stringify(restoration, null, 2));
+    console.log('MODEL_LIVE_AB_GAP_RESTORATION_BUDGET_PASS', JSON.stringify(restoration));
+  }
   await waitFor('restored A has an active CPU citation scorer', 30000,
     () => readActiveCitation(apiPort, request));
   const restoredAManifest = readJson(path.join(indexBase, 'indices', sourceGeneration,

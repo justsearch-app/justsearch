@@ -491,6 +491,11 @@ final class EngineSupervisedRecoveryE2ETest {
       var citationIdentity = markerPayload(output, "MODEL_LIVE_AB_CITATION_IDENTITY");
       var cudaA = markerPayload(output, "MODEL_LIVE_AB_CUDA_A");
       var nativeLease = markerPayload(output, "MODEL_LIVE_AB_RESTORED_NATIVE_LEASE");
+      var restoration = markerPayload(output, "MODEL_LIVE_AB_GAP_RESTORATION_BUDGET_PASS");
+      assertTrue(restoration.path("reconfigureBudgetMs").asLong() > 0, output);
+      assertTrue(restoration.path("refusalToReadyUpperBoundMs").asLong() > 0
+          && restoration.path("refusalToReadyUpperBoundMs").asLong()
+              <= restoration.path("reconfigureBudgetMs").asLong(), output);
       assertEquals("floor simulated by device-memory cap", result.path("floor").asText(), line);
       assertEquals("PROMOTED_WITH_GAPS", result.path("terminalReason").asText(), line);
       String gapListHash = result.path("gapListHash").asText();
@@ -849,6 +854,28 @@ final class EngineSupervisedRecoveryE2ETest {
     withModelCacheCleanup(repo, work, () -> output[0] = runInstalledModelScenario(
         repo, work, scenario, Map.of(), "QUERY_RECONFIGURE_ROUND_PASS"));
     return output[0];
+  }
+
+  static void runQueryReconfigureCrash(boolean committed) throws Exception {
+    Path repo = repositoryRoot();
+    assumeTrue(hasRetainedCudaReranker(repo),
+        "IN_PLACE query crash requires retained CUDA reranker model bytes");
+    Path work = repo.resolve("tmp/lane-f-takeover/query-crash-" + UUID.randomUUID());
+    String scenario = committed ? "query-reconfigure-in-place-postcommit-crash"
+        : "query-reconfigure-in-place-precommit-crash";
+    withModelCacheCleanup(repo, work, () -> {
+      String output = runInstalledModelScenario(repo, work, scenario, Map.of(),
+          "QUERY_RECONFIGURE_CRASH_PASS");
+      var proof = markerPayload(output, "QUERY_RECONFIGURE_CRASH_PASS");
+      assertEquals("IN_PLACE", proof.path("mode").asText(), output);
+      assertEquals(committed ? "COMPLETE" : "FAILED",
+          proof.path("operation").path("state").asText(), output);
+      if (!committed) {
+        assertEquals("ENGINE_RESTARTED_DURING_APPLY",
+            proof.path("operation").path("failure_reason").asText(), output);
+      }
+      assertEquals(1, proof.path("successor").path("restartCount").asInt(), output);
+    });
   }
 
   @FunctionalInterface
@@ -1291,6 +1318,17 @@ final class EngineSupervisedRecoveryE2ETest {
           "migration settlement and refused rollback must preserve the Engine incarnation");
     } else if (nativeProjectionScenario) {
       assertTrue(output.contains("PASS native-mixed-after-pointer"), output);
+      var recovery = markerPayload(output, "COMPONENT_DEATH_RECOVERY_PASS");
+      assertTrue(recovery.path("recoveryTrace").size() >= 3, output);
+      for (String component : List.of("api", "index", "encoders")) {
+        var timing = recovery.path("timeToReadyMs").path(component);
+        assertEquals("READY", timing.path("state").asText(), output);
+        assertTrue(timing.path("readyMs").isNumber(), output);
+        assertTrue(timing.path("observedReadyMs").asLong() >= timing.path("readyMs").asLong(), output);
+      }
+      assertEquals(200, recovery.path("text").path("status").asInt(), output);
+      assertEquals(200, recovery.path("semantic").path("status").asInt(), output);
+      assertTrue(Files.isRegularFile(work.resolve("component-recovery-proof.json")), output);
       assertTrue(output.contains("STOP"), output);
     } else if (scenario.startsWith("bulk-")) {
       assertTrue(output.contains("\"scenario\":\"" + scenario + "\""), output);

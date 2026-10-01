@@ -765,6 +765,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (restartRequired) preparedResponse = withRestartScheduled(preparedResponse);
       var receipt = new Receipt(active.key, next.acceptedRevision(), preparedResponse);
       ConfigStore.PreparedSwap preparedConfig = config.prepareSwap(servingResolved);
+      faultHook.accept(new OperationAttemptRunnerImpl.FaultBoundary(
+          "settings-after-prepare-before-file-replace", OperationKind.RECONFIGURE,
+          active.key, active.key, active.id, "encoders", 0, 0));
       var publication = config.publicationLock();
       SettingsComponentComposer.Prepared preparedForPublish = preparedComponents;
       Runnable publish = () -> {

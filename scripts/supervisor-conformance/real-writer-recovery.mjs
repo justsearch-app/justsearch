@@ -36,8 +36,12 @@ import {
 
 const repo = process.cwd();
 const scenario = process.env.JUSTSEARCH_REAL_RECOVERY_SCENARIO;
+const queryCrashPoint = scenario === 'query-reconfigure-in-place-precommit-crash'
+  ? 'settings-after-prepare-before-file-replace'
+  : scenario === 'query-reconfigure-in-place-postcommit-crash'
+    ? 'settings-after-file-replace-before-publication' : null;
 const queryReconfigureMode = scenario === 'query-reconfigure-beside' ? 'BESIDE'
-  : scenario === 'query-reconfigure-in-place' ? 'IN_PLACE' : null;
+  : scenario === 'query-reconfigure-in-place' || queryCrashPoint ? 'IN_PLACE' : null;
 const nativeMixedAfterPointer = scenario === NATIVE_MIXED_AFTER_POINTER;
 const operationFault = new Set(['ingest-before-accept', 'settings-before-accept',
   'ingest-after-accept-before-effect', 'settings-after-accept-before-effect',
@@ -105,7 +109,7 @@ function findRetainedModelsRoot() {
   }
 }
 const operationKey = operationFault || bulkFault || bulkGapApproval || installerFault || modelLiveAB
-  || scenario === 'query-reconfigure-in-place'
+  || queryReconfigureMode === 'IN_PLACE'
   || scenario === 'query-role-after-file-crash' || scenario === 'query-role-two-owner-rollback'
   ? createOperationKey() : null;
 const work = process.env.JUSTSEARCH_WRITER_RECOVERY_WORK
@@ -242,13 +246,17 @@ delete env.JUSTSEARCH_ISSUED_CITATION_BARRIER_ANSWER;
 delete env.JUSTSEARCH_QUERY_PUBLICATION_BARRIER;
 delete env.JUSTSEARCH_INDEX_START_BARRIERS;
 delete env.JUSTSEARCH_GENERATIVE_RECOVERY_BARRIER;
-if (queryReconfigureMode) {
+if (queryReconfigureMode && !queryCrashPoint) {
   env.JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY = 'query reconfigure held lease';
 }
 if (queryReconfigureMode === 'IN_PLACE') {
   env.JUSTSEARCH_OPERATION_FAULT_KEY = operationKey;
   env.JUSTSEARCH_OPERATION_FAULT_KIND = 'reconfigure';
-  env.JUSTSEARCH_OPERATION_FAULT_POINT = 'settings-mid-compose';
+  env.JUSTSEARCH_OPERATION_FAULT_POINT = queryCrashPoint ?? 'settings-mid-compose';
+  if (queryCrashPoint) {
+    env.JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS = '10000';
+    env.JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS = '10000';
+  }
 }
 if (indexLockScenario) {
   env.JUSTSEARCH_INDEX_START_BARRIERS = 'index-start-initial,index-start-recovery-1';
@@ -583,7 +591,7 @@ const engineLogWindow = modelLiveAB ? (() => {
 const child = spawn(process.execPath, [
   runner, 'start', '--json', '--skip-build', '--clean', 'none', '--api-port', '0',
   '--ui-port', String(port), '--data-dir', data, '--session-id', 'writer-recovery-live',
-  '--lease-duration-sec', nativeMixedAfterPointer ? '900' : '600',
+  '--lease-duration-sec', nativeMixedAfterPointer || queryReconfigureMode ? '900' : '600',
 ], { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let output = '';
 let ownedRunId = null;
@@ -730,7 +738,7 @@ try {
     await exerciseQueryReconfigure({ mode: queryReconfigureMode, work, data, indexBase,
       modelsRoot: findRetainedModelsRoot(), apiPort, manifest, first, readJson, waitFor,
       request, post, requireThat, requireOperationSuccess, jobStateFor,
-      createOperationKey, operationKey });
+      createOperationKey, operationKey, crashPoint: queryCrashPoint });
   } else if (queryRoleScenario) {
     await exerciseQueryRoleScenario({ scenario, work, data,
       modelsRoot: findRetainedModelsRoot(), apiPort, manifest, first, readJson,

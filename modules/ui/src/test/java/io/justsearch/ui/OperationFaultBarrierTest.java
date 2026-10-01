@@ -164,6 +164,35 @@ final class OperationFaultBarrierTest {
   }
 
   @Test
+  void preparedQueryBoundaryIsHarnessOnlyAndReconfigureOnly() throws Exception {
+    String phase = "settings-after-prepare-before-file-replace";
+    var selected = new HashMap<>(selection(phase, "reconfigure"));
+    assertNotSame(OperationAttemptRunnerImpl.NO_FAULT_HOOK,
+        OperationFaultBarrier.fromEnvironment(data, selected::get));
+    selected.remove("JUSTSEARCH_SUPERVISOR_HARNESS");
+    assertThrows(IllegalArgumentException.class,
+        () -> OperationFaultBarrier.fromEnvironment(data, selected::get));
+    for (String kind : java.util.List.of("ingest", "settings-apply", "reindex")) {
+      assertThrows(IllegalArgumentException.class,
+          () -> OperationFaultBarrier.fromEnvironment(data, selection(phase, kind)::get));
+    }
+    Path runtime = data.resolve("runtime");
+    Files.createDirectories(runtime);
+    Files.writeString(runtime.resolve("operation-fault-release"), "release");
+    var hook = OperationFaultBarrier.fromEnvironment(data, selection(phase, "reconfigure")::get);
+    var boundary = new OperationAttemptRunnerImpl.FaultBoundary(
+        phase, OperationKind.RECONFIGURE, KEY, KEY, 17, "encoders", 0, 0);
+    hook.accept(boundary);
+    var marker = JsonMapper.builder().build().readTree(
+        Files.readString(runtime.resolve("operation-fault-reached.json")));
+    assertEquals(phase, marker.path("phase").asText());
+    assertEquals(KEY, marker.path("parentKey").asText());
+    Files.delete(runtime.resolve("operation-fault-release"));
+    var successor = OperationFaultBarrier.fromEnvironment(data, selection(phase, "reconfigure")::get);
+    assertTimeoutPreemptively(Duration.ofSeconds(1), () -> successor.accept(boundary));
+  }
+
+  @Test
   void eachBulkBoundaryPublishesExactEvidenceOnceAcrossSuccessorHook() throws Exception {
     for (String phase : java.util.List.of(
         "bulk-partial-capture", "bulk-before-building-checkpoint", "bulk-after-promotion",

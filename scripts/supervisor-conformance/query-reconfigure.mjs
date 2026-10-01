@@ -3,12 +3,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { barrierFiles } from './barrier-files.mjs';
+import { DatabaseSync } from 'node:sqlite';
+import identity from '../dev/lib/process-identity.cjs';
 
 /** Installed ordinary-settings proof for the query-only composition owner. */
 export async function exerciseQueryReconfigure(c) {
   const { mode, work, data, indexBase, modelsRoot, apiPort, manifest, first,
     readJson, waitFor, request, post, requireThat, createOperationKey,
-    operationKey: forcedOperationKey, requireOperationSuccess, jobStateFor } = c;
+    operationKey: forcedOperationKey, requireOperationSuccess, jobStateFor, crashPoint } = c;
   const source = path.join(modelsRoot, 'onnx', 'reranker');
   const stage = (name) => {
     const destination = path.join(work, name);
@@ -89,11 +91,11 @@ export async function exerciseQueryReconfigure(c) {
     `${label} was not a realized CUDA reranker: ${response.text}`);
     return reranker;
   };
-  const query = async (label) => {
+  const query = async (label, port = apiPort) => {
     let last = null;
     try {
       return await waitFor(label, 90000, async () => {
-        const response = await post(apiPort, '/api/knowledge/search',
+        const response = await post(port, '/api/knowledge/search',
           { query: 'query reconfigure availability', limit: 10, mode: 'text' }, 60000);
         const value = read(response, label);
         const crossEncoder = value.searchTrace?.stages?.find(stage => stage.id === 'cross-encoder');
@@ -237,7 +239,7 @@ export async function exerciseQueryReconfigure(c) {
     const composition = result.composition;
     assertComposition(composition, label);
     return { operationKey, before: before.witness, after: result.witness,
-      composition, degradation };
+      composition, degradation, result };
   };
 
   // Files written before boot do not become jobs merely by recording a watched root.
@@ -275,6 +277,88 @@ export async function exerciseQueryReconfigure(c) {
   const initial = await waitFor('realized CUDA reranker A', 90000, async () => {
     try { return await runtime('runtime A'); } catch { return null; }
   });
+  if (crashPoint) {
+    requireThat(mode === 'IN_PLACE' && forcedOperationKey, 'crash cut requires IN_PLACE/key');
+    const settingsFile = path.join(data, 'ui', 'settings.json');
+    const before = await settings();
+    const settingsBytes = () => fs.existsSync(settingsFile) ? fs.readFileSync(settingsFile, 'utf8') : null;
+    const originalBytes = settingsBytes();
+    const table = identity.readProcessTable();
+    requireThat(table.ok, 'query crash process identity is unavailable');
+    const original = table.table.find(row => Number(row.ProcessId) === first.pid);
+    requireThat(original?.CommandLine?.includes(data) && manifest.pid === first.pid
+      && manifest.instanceId === first.instanceId, 'query crash must target its admitted Engine');
+    const record = { pid: first.pid, creationFileTimeUtc: original.CreationFileTimeUtc,
+      cmdlineFingerprint: original.CommandLine };
+    const held = request(apiPort, '/api/settings/v2', { method: 'POST', headers,
+      body: JSON.stringify({ rerankerModelPath: b, witness: before.witness,
+        operationKey: forcedOperationKey }) }, 240000).then(value => ({ value }), error => ({ error }));
+    const reached = await waitFor('prepared IN_PLACE query crash cut', 120000,
+      () => readJson(barrierFiles(data).reachedFile));
+    requireThat(reached?.phase === crashPoint && reached.parentKey === forcedOperationKey
+      && reached.operationKey === forcedOperationKey && reached.cursor === 'encoders'
+      && reached.pid === first.pid, `wrong query crash marker: ${JSON.stringify(reached)}`);
+    const committed = crashPoint === 'settings-after-file-replace-before-publication';
+    const cutBytes = settingsBytes();
+    if (committed) {
+      selectedRole(b, 'committed B crash cut');
+      const persisted = JSON.parse(cutBytes);
+      requireThat(persisted.acceptedRevision === before.witness.acceptedRevision + 1
+        && persisted.lastCommittedOperationKey === forcedOperationKey,
+      'postcommit barrier did not persist B and its operation witness');
+    } else {
+      requireThat(cutBytes === originalBytes, 'prepared B changed settings before commit');
+      const during = await status();
+      requireThat(during.readiness.engineComponents.encoders.state === 'RELOADING',
+        'prepared IN_PLACE B must remain unpublished');
+    }
+    const current = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
+    requireThat(current?.pid === first.pid && current.instanceId === first.instanceId,
+      'crash marker no longer belongs to original Engine');
+    const verified = identity.verifyProcessIdentity({ record, table: identity.readProcessTable() });
+    requireThat(identity.isVerifiedMatch(verified), `refusing query crash: ${verified.reason}`);
+    process.kill(first.pid, 'SIGKILL');
+    const successor = await waitFor('query crash same-run successor', 180000, async () => {
+      const s = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
+      const m = readJson(path.join(data, 'runtime', 'manifest.json'));
+      if (s?.state !== 'running' || s.runId !== first.runId || s.restartCount !== 1
+        || s.incarnation !== first.incarnation + 1 || s.instanceId === first.instanceId
+        || s.pid === first.pid || m?.pid !== s.pid || m.instanceId !== s.instanceId) return null;
+      try {
+        const r = await request(m.head.apiPort, '/api/status', {}, 15000);
+        const value = read(r, 'successor query status');
+        const encoders = value.readiness?.engineComponents?.encoders;
+        return r.status === 200 && encoders?.state === 'READY'
+          && path.resolve(value.worker?.gpu?.rerankerModelPath ?? '').toLowerCase()
+            === (committed ? b : a).toLowerCase()
+          && (committed ? encoders.appliedVersion !== appliedA : encoders.appliedVersion === appliedA)
+          ? { supervisor: s, manifest: m, encoders } : null;
+      } catch { return null; }
+    });
+    const operation = await waitFor('query crash durable reconciliation', 30000, () => {
+      const db = new DatabaseSync(path.join(data, 'operations.db'), { readOnly: true });
+      try {
+        const row = db.prepare('SELECT state, failure_reason FROM operations WHERE operation_key = ?')
+          .get(forcedOperationKey);
+        return row?.state === (committed ? 'COMPLETE' : 'FAILED') ? row : null;
+      } finally { db.close(); }
+    });
+    requireThat(committed || operation.failure_reason === 'ENGINE_RESTARTED_DURING_APPLY',
+      `wrong precommit reconciliation reason: ${JSON.stringify(operation)}`);
+    const recovered = await request(successor.manifest.head.apiPort, '/api/settings/v2');
+    const recoveredSettings = read(recovered, 'query crash recovered settings');
+    requireThat(recovered.status === 200 && settingsBytes() === cutBytes
+      && (committed ? recoveredSettings.witness.acceptedRevision === before.witness.acceptedRevision + 1
+        : JSON.stringify(recoveredSettings.witness) === JSON.stringify(before.witness))
+      && readJson(path.join(indexBase, 'state.json'))?.active_generation === generation,
+    'query crash recovery changed committed settings/witness/generation');
+    const scored = await query(`successor serves ${committed ? 'B' : 'A'}`, successor.manifest.head.apiPort);
+    await held;
+    console.log('QUERY_RECONFIGURE_CRASH_PASS', JSON.stringify({ mode, crashPoint, reached,
+      operation, successor: successor.supervisor, encoders: successor.encoders,
+      witness: recoveredSettings.witness, generation, query: scored }));
+    return;
+  }
   const issuedBarrier = barrierFiles(data, 'issued-a-search');
   heldA = { settled: false, reached: null, releaseFile: issuedBarrier.releaseFile };
   heldA.outcome = post(apiPort, '/api/knowledge/search',
@@ -311,7 +395,61 @@ export async function exerciseQueryReconfigure(c) {
     `${mode} B did not publish its distinct encoder path/version`);
   const queryB = await query('model query B');
   const realizedB = await runtime('runtime B');
-  const toA = await apply(a, `${mode} B to restored A`);
+  const modelC = stage(`query-reranker-${mode.toLowerCase()}-c`);
+  const cFp16 = path.join(modelC, 'model_fp16.onnx');
+  fs.unlinkSync(cFp16);
+  const cMetadata = Buffer.from(metadataEntry);
+  cMetadata[cMetadata.length - 1] = 'C'.charCodeAt(0);
+  fs.writeFileSync(cFp16, Buffer.concat([fs.readFileSync(sourceFp16),
+    Buffer.from([0x72, cMetadata.length]), cMetadata]));
+  const toC = await apply(modelC, `${mode} B to C`);
+  const statusC = await waitFor(`${mode} C publication`, 90000, async () => {
+    const value = await status();
+    const encoders = value.readiness?.engineComponents?.encoders;
+    return encoders?.state === 'READY' && encoders.appliedVersion !== appliedA
+      && encoders.appliedVersion !== appliedB
+      && path.resolve(value.worker?.gpu?.rerankerModelPath ?? '').toLowerCase() === modelC.toLowerCase()
+      ? value : null;
+  });
+  const appliedC = statusC.readiness.engineComponents.encoders.appliedVersion;
+  const selectedC = selectedRole(modelC, `${mode} C`);
+  requireThat(selectedC.sha256 !== selectedB.sha256 && selectedC.sha256 !== sourceFp16Hash,
+    'C did not select its distinct model bytes');
+  await query('model query C');
+  const beforeDelayed = await settings();
+  const cBytes = fs.readFileSync(path.join(data, 'ui', 'settings.json'), 'utf8');
+  const assertCUnchanged = async label => {
+    const value = await status();
+    const currentSettings = await settings();
+    requireThat(value.readiness?.engineComponents?.encoders?.state === 'READY'
+      && value.readiness.engineComponents.encoders.appliedVersion === appliedC
+      && path.resolve(value.worker?.gpu?.rerankerModelPath ?? '').toLowerCase() === modelC.toLowerCase()
+      && JSON.stringify(currentSettings.witness) === JSON.stringify(beforeDelayed.witness)
+      && fs.readFileSync(path.join(data, 'ui', 'settings.json'), 'utf8') === cBytes
+      && readJson(path.join(indexBase, 'state.json'))?.active_generation === generation,
+    `${label} changed C/settings/applied version/generation`);
+  };
+  const delayedObserved = observe(`${mode} delayed k1 replay`, () => request(apiPort,
+    '/api/settings/v2', { method: 'POST', headers, body: JSON.stringify({
+      rerankerModelPath: b, witness: toB.before, operationKey: toB.operationKey }) }, 120000));
+  const delayed = await delayedObserved.complete();
+  const delayedBody = read(delayed, 'delayed k1 replay');
+  requireThat(delayed.status === 200 && JSON.stringify(delayedBody) === JSON.stringify(toB.result),
+    `delayed k1 did not return its recorded outcome: ${delayed.text}`);
+  await assertCUnchanged('delayed k1 replay');
+  const staleKey = createOperationKey();
+  const staleObserved = observe(`${mode} stale new key`, () => request(apiPort,
+    '/api/settings/v2', { method: 'POST', headers, body: JSON.stringify({
+      rerankerModelPath: b, witness: toB.after, operationKey: staleKey }) }, 120000));
+  const stale = await staleObserved.complete();
+  const staleBody = read(stale, 'stale new key');
+  requireThat(stale.status === 409 && staleBody.errorCode === 'VERSION_CONFLICT',
+    `stale B witness was not refused: ${stale.text}`);
+  await assertCUnchanged('stale new key');
+  console.log('QUERY_RECONFIGURE_DELAYED_RETRY_PASS', JSON.stringify({ mode,
+    k1: toB.operationKey, k2: toC.operationKey, staleKey, delayed: delayedBody,
+    stale: staleBody, selectedC, appliedC, generation, witness: beforeDelayed.witness }));
+  const toA = await apply(a, `${mode} C to restored A`);
   const statusA = await waitFor(`${mode} restored A publication`, 90000, async () => {
     try {
       const value = await status();
@@ -403,7 +541,7 @@ export async function exerciseQueryReconfigure(c) {
   const afterRefusalRuntime = await runtime('runtime A after refusal');
   const finalSupervisor = readJson(path.join(data, 'runtime', 'supervisor.v1.json'));
   requireThat(apiOutages === 0 && samples > 0
-      && availabilityRounds.length === 4
+      && availabilityRounds.length === 7
       && availabilityRounds.every(round => round.samples > 0 && round.outages === 0
         && round.samplingStartedAt <= round.postIssuedAt
         && round.postIssuedAt <= round.settledAt)
@@ -422,7 +560,7 @@ export async function exerciseQueryReconfigure(c) {
   console.log('QUERY_RECONFIGURE_ROUND_PASS', JSON.stringify({ mode, generation,
     pid: first.pid, restartCount: finalSupervisor.restartCount, apiOutages, samples,
     corpus: { operationKey: ingestKey, committedJobs: committedCorpus.length },
-    paths: { a, b }, evidence, versions: { appliedA, appliedB, appliedRestoredA },
+    paths: { a, b, c: modelC }, evidence, versions: { appliedA, appliedB, appliedC, appliedRestoredA },
     selections: { initialA: initialIdentity, b: selectedB, restoredA: selectedA },
     recoveryAttempts: { beforeRefusal: recoveryAttemptsBefore,
       afterRefusal: afterRefusalEncoders.recoveryAttempts },
