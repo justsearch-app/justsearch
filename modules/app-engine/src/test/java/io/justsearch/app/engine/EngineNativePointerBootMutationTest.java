@@ -62,6 +62,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -123,10 +124,23 @@ final class EngineNativePointerBootMutationTest {
         "deleted-files");
     MemoryProjectionSource source = new MemoryProjectionSource(List.of(retained));
     CountDownLatch restartRequested = new CountDownLatch(1);
-    TwoPhaseBarrier barrier = new TwoPhaseBarrier();
+    List<Path> deletedFiles = List.of(prefixVictimPath, collectionVictimPath, dualVictimPath);
+    AtomicReference<Epoch> liveOwner = new AtomicReference<>();
+    AtomicReference<RunningRuntime> greenRuntime = new AtomicReference<>();
+    AtomicReference<NativePostPointerWitness> postPointerWitness = new AtomicReference<>();
+    TwoPhaseBarrier barrier = new TwoPhaseBarrier(transition -> {
+      RunningRuntime green = greenRuntime.get();
+      postPointerWitness.set(new NativePostPointerWitness(
+          new IndexGenerationManager(data.resolve("index")).readStateBestEffort(),
+          List.copyOf(journal(liveOwner.get().server()).listSwitchBufferOpsStrictForGeneration(
+              green.openedIndexPath().getFileName().toString())),
+          projectionWitness(green, retained), projectionWitness(green, late),
+          deletedFileCounts(green, deletedFiles)));
+    });
     Epoch first = null;
     try {
       first = open(data, models, source, barrier, restartRequested);
+      liveOwner.set(first);
       KnowledgeClient client = first.client();
       assertTrue(client.watchRoot(prefix.toString(), "keep-collection",
           TestEngineContexts.BACKGROUND).getWatching());
@@ -232,22 +246,27 @@ final class EngineNativePointerBootMutationTest {
       assertTrue(suffix.stream().allMatch(EngineNativePointerBootMutationTest::hasDurableRevision));
 
       source.replace(List.of(retained, late));
+      greenRuntime.set(greenBeforeDeletes);
       barrier.releaseBeforeSwitching();
       assertTrue(barrier.awaitAfterPointerCommit(WAIT_MS),
           "native cutover did not reach its post-pointer publication barrier");
-      IndexGenerationManager.State committed = new IndexGenerationManager(data.resolve("index"))
-          .readStateBestEffort();
+      if (barrier.afterPointerObservationFailure() != null) {
+        throw new AssertionError("post-pointer same-thread witness failed",
+            barrier.afterPointerObservationFailure());
+      }
+      NativePostPointerWitness witness = postPointerWitness.get();
+      assertNotNull(witness);
+      IndexGenerationManager.State committed = witness.state();
       assertEquals(buildingB, committed.active_generation());
       assertEquals(activeA, committed.previous_generation());
       assertNull(committed.building_generation());
       assertEquals("IDLE", committed.migration_state());
-      assertEquals(beforeRelease, journal(first.server())
-          .listSwitchBufferOpsStrictForGeneration(buildingB),
+      assertEquals(beforeRelease, witness.journal(),
           "post-pointer cancellation must retain the exact B journal snapshot");
-      assertProjection(greenBeforeDeletes, retained);
-      assertProjection(greenBeforeDeletes, late);
-      assertDeletedFiles(greenBeforeDeletes,
-          List.of(prefixVictimPath, collectionVictimPath, dualVictimPath));
+      assertProjection(witness.retained(), retained);
+      assertProjection(witness.late(), late);
+      for (int count : witness.deletedFileCounts()) assertEquals(0, count);
+      assertNull(barrier.barrierTimeout(), "cutover must not escape through a barrier timeout");
 
       // The hook fails after the pointer write. This forces the existing ordered recovery callback;
       // it is a latch-only test owner, so no automatic restart races the explicit close below.
@@ -255,6 +274,7 @@ final class EngineNativePointerBootMutationTest {
       assertTrue(restartRequested.await(30, TimeUnit.SECONDS),
           "post-pointer ambiguity must notify the Engine owner exactly once");
       assertTrue(awaitCutoverExit(first.server(), 30, TimeUnit.SECONDS));
+      assertNull(barrier.barrierTimeout(), "cutover must not escape through a barrier timeout");
       Path aPath = data.resolve("index").resolve("indices").resolve(activeA);
       first.close();
       first = null;
@@ -383,6 +403,7 @@ final class EngineNativePointerBootMutationTest {
           "post-pointer ambiguity did not request recovery");
       assertTrue(awaitCutoverExit(live.server(), 30, TimeUnit.SECONDS),
           "the interrupted cutover owner did not exit before reopen");
+      assertNull(barrier.barrierTimeout(), "cutover must not escape through a barrier timeout");
       assertEquals(OperationState.RUNNING,
           live.operations().find(operationKey).orElseThrow().state(),
           "the stopped post-pointer owner must leave terminal settlement to recovery");
@@ -595,30 +616,48 @@ final class EngineNativePointerBootMutationTest {
   }
 
   private static void assertDeletedFiles(RunningRuntime runtime, List<Path> files) throws IOException {
+    for (int count : deletedFileCounts(runtime, files)) assertEquals(0, count);
+  }
+
+  private static List<Integer> deletedFileCounts(RunningRuntime runtime, List<Path> files)
+      throws IOException {
     runtime.commitOps().maybeRefreshBlocking();
+    List<Integer> counts = new ArrayList<>();
     for (Path path : files) {
-      assertEquals(0, runtime.indexCountOps().countByIdAndChunksStrict(PathNormalizer.normalizeKey(path)));
+      counts.add(runtime.indexCountOps()
+          .countByIdAndChunksStrict(PathNormalizer.normalizeKey(path)));
     }
+    return List.copyOf(counts);
   }
 
   private static void assertProjection(RunningRuntime runtime, AcceptedProjection projection)
       throws IOException {
+    assertProjection(projectionWitness(runtime, projection), projection);
+  }
+
+  private static ProjectionWitness projectionWitness(RunningRuntime runtime,
+      AcceptedProjection projection) throws IOException {
     var fields = runtime.documentFieldOps();
-    assertEquals(projection.indexId(), fields.getDocumentFieldOrThrow(
-        projection.indexId(), SchemaFields.DOC_ID));
-    assertEquals(SOURCE, fields.getDocumentFieldOrThrow(
-        projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID));
-    assertEquals(Long.toString(projection.sourceRevision()), fields.getDocumentFieldOrThrow(
-        projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION));
-    assertEquals(projection.fieldsDigest(), fields.getDocumentFieldOrThrow(
-        projection.indexId(), SchemaFields.PROJECTION_DIGEST));
+    return new ProjectionWitness(
+        fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.DOC_ID),
+        fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PROJECTION_SOURCE_ID),
+        fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PROJECTION_SOURCE_REVISION),
+        fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PROJECTION_DIGEST),
+        fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.PATH),
+        fields.getDocumentFieldOrThrow(projection.indexId(), SchemaFields.COLLECTION),
+        fields.queryDocIdsByFieldOrThrow(SchemaFields.DOC_ID, projection.indexId(), 10).size());
+  }
+
+  private static void assertProjection(ProjectionWitness witness, AcceptedProjection projection)
+      throws IOException {
+    assertEquals(projection.indexId(), witness.id());
+    assertEquals(SOURCE, witness.source());
+    assertEquals(Long.toString(projection.sourceRevision()), witness.revision());
+    assertEquals(projection.fieldsDigest(), witness.digest());
     var json = JsonMapper.builder().build().readTree(projection.fieldsJson());
-    assertEquals(json.path("path").stringValue(), fields.getDocumentFieldOrThrow(
-        projection.indexId(), SchemaFields.PATH));
-    assertEquals(json.path("collection").stringValue(), fields.getDocumentFieldOrThrow(
-        projection.indexId(), SchemaFields.COLLECTION));
-    assertEquals(1, fields.queryDocIdsByFieldOrThrow(
-        SchemaFields.DOC_ID, projection.indexId(), 10).size());
+    assertEquals(json.path("path").stringValue(), witness.path());
+    assertEquals(json.path("collection").stringValue(), witness.collection());
+    assertEquals(1, witness.matchingDocuments());
   }
 
   private static boolean hasDurableRevision(SwitchBufferCapableQueue.SwitchBufferOp row) {
@@ -827,6 +866,13 @@ final class EngineNativePointerBootMutationTest {
       OperationState operationState, boolean queueSealed, long queueRevision,
       BulkReindexProgress.Phase progressPhase, long settlementRevision) {}
 
+  private record NativePostPointerWitness(IndexGenerationManager.State state,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> journal, ProjectionWitness retained,
+      ProjectionWitness late, List<Integer> deletedFileCounts) {}
+
+  private record ProjectionWitness(String id, String source, String revision, String digest,
+      String path, String collection, int matchingDocuments) {}
+
   private record CompletionSnapshot(String operationState, String progressPhase,
       long settlementRevision, boolean queueSealed, long queueRevision, long replayRows) {}
 
@@ -856,9 +902,8 @@ final class EngineNativePointerBootMutationTest {
     private final CountDownLatch afterPointerRelease = new CountDownLatch(1);
     private final CheckedTransitionObserver afterPointerObserver;
     private final AtomicReference<Throwable> afterPointerObservationFailure = new AtomicReference<>();
+    private final AtomicReference<String> barrierTimeout = new AtomicReference<>();
     private volatile boolean cancelAfterPointer;
-
-    TwoPhaseBarrier() { this(ignored -> {}); }
 
     TwoPhaseBarrier(CheckedTransitionObserver afterPointerObserver) {
       this.afterPointerObserver = afterPointerObserver;
@@ -869,6 +914,7 @@ final class EngineNativePointerBootMutationTest {
       if ("migration-before-switching".equals(transition.point())) {
         beforeSwitchingReached.countDown();
         if (!beforeSwitchingRelease.await(WAIT_MS, TimeUnit.MILLISECONDS)) {
+          barrierTimeout.compareAndSet(null, "before-switching");
           throw new IOException("before-switching barrier timed out");
         }
         return;
@@ -878,6 +924,7 @@ final class EngineNativePointerBootMutationTest {
         catch (Throwable failure) { afterPointerObservationFailure.compareAndSet(null, failure); }
         afterPointerReached.countDown();
         if (!afterPointerRelease.await(WAIT_MS, TimeUnit.MILLISECONDS)) {
+          barrierTimeout.compareAndSet(null, "after-pointer");
           throw new IOException("after-pointer barrier timed out");
         }
         if (cancelAfterPointer) throw new InterruptedException("cancelled post-pointer cut");
@@ -895,6 +942,8 @@ final class EngineNativePointerBootMutationTest {
     }
 
     Throwable afterPointerObservationFailure() { return afterPointerObservationFailure.get(); }
+
+    String barrierTimeout() { return barrierTimeout.get(); }
 
     void cancelAfterPointerCommit() {
       cancelAfterPointer = true;

@@ -203,14 +203,3 @@ testing {
 }
 
 tasks.named("check") { dependsOn(tasks.named("integrationTest")) }
-
-// `pmdIntegrationTest` fails to serialize its `Pmd.classpath` (UnionFileCollection) into
-// Gradle's configuration cache at v9.1.0, blocking `./gradlew build -x test` from worktrees
-// with a fresh cache. The task never executes (`pmd.includeTests` gates it off in
-// JvmBaseConventionsPlugin) and no workflow names it, so this marker exists purely to keep
-// local CC-enabled builds functional. Same precedent as the AOT-training tasks in
-// `modules/ui/build.gradle.kts`.
-tasks.matching { it.name == "pmdIntegrationTest" }.configureEach {
-  notCompatibleWithConfigurationCache(
-      "Pmd.classpath UnionFileCollection serialization fails at Gradle 9.1.0")
-}
