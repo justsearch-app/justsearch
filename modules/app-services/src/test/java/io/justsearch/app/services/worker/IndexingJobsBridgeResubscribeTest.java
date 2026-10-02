@@ -46,17 +46,7 @@ import org.junit.jupiter.api.Timeout;
 final class IndexingJobsBridgeResubscribeTest {
   @Test
   void replacementSnapshotsResetFailureCapAndKeepAutomaticRecoveryAlive() {
-    var registry = org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
-    var registration = org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.Registration.class);
-    var scheduler = org.mockito.Mockito.mock(java.util.concurrent.ScheduledExecutorService.class);
-    org.mockito.Mockito.when(registry.limits(org.mockito.ArgumentMatchers.any()))
-        .thenReturn(new io.justsearch.core.execution.EngineExecutorRegistry.Limits(1, 32));
-    org.mockito.Mockito.when(registry.register(org.mockito.ArgumentMatchers.any())).thenReturn(registration);
-    org.mockito.Mockito.when(registration.openScheduled(org.mockito.ArgumentMatchers.any())).thenReturn(scheduler);
-    var pending = new java.util.ArrayDeque<Runnable>();
-    org.mockito.Mockito.when(scheduler.schedule(org.mockito.ArgumentMatchers.any(Runnable.class),
-        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.eq(TimeUnit.MILLISECONDS)))
-        .thenAnswer(invocation -> { pending.addLast(invocation.getArgument(0)); return null; });
+    var reconnects = new ControlledReconnects();
     AtomicInteger attempts = new AtomicInteger();
     AtomicInteger closed = new AtomicInteger();
     AtomicReference<Consumer<Throwable>> error = new AtomicReference<>();
@@ -66,13 +56,13 @@ final class IndexingJobsBridgeResubscribeTest {
       onFrame.accept(snapshotFrame(attempt, "snapshot-" + attempt));
       return () -> closed.incrementAndGet();
     };
-    var bridge = new RemoteIndexingJobsBridge(registry, () -> source);
+    var bridge = new RemoteIndexingJobsBridge(reconnects.registry, () -> source);
     try {
       bridge.start().join();
       for (int burst = 0; burst < 10; burst++) {
         error.get().accept(new IllegalStateException("separate overload burst " + burst));
-        assertEquals(1, pending.size(), "a successful replacement snapshot resets the retry cap");
-        pending.removeFirst().run();
+        assertEquals(1, reconnects.pending.size(), "a successful replacement snapshot resets the retry cap");
+        reconnects.pending.removeFirst().run();
       }
       assertEquals(11, attempts.get());
       assertEquals(10, closed.get(), "each failed subscription is closed before replacement");
@@ -189,34 +179,55 @@ final class IndexingJobsBridgeResubscribeTest {
 
   @Test
   @DisplayName("a permanently failing flow stops retrying instead of spinning")
-  void permanentFailureIsCapped() throws Exception {
-    // The failure FAIL_FAST recovers from can be permanent: a consumer that never drains fails the
-    // replacement flow the instant it is created. Unbounded retry against that is a busy loop that
-    // also re-issues a full snapshot every time, so the cap is part of the fix, not a nicety.
+  void permanentFailureIsCapped() {
+    var reconnects = new ControlledReconnects();
     AtomicInteger subscribes = new AtomicInteger();
     IndexingJobsSource alwaysFails =
         (onFrame, onError, onCompleted) -> {
           subscribes.incrementAndGet();
-          onFrame.accept(snapshotFrame(subscribes.get(), "doomed"));
+          // No successful snapshot: snapshots intentionally clear the rolling failure history.
           onError.accept(new IllegalStateException("still wedged"));
           return () -> {};
         };
 
-    RemoteIndexingJobsBridge bridge = new RemoteIndexingJobsBridge(executors(), () -> alwaysFails);
-    bridge.start().exceptionally(t -> null).join();
+    var bridge = new RemoteIndexingJobsBridge(reconnects.registry, () -> alwaysFails);
+    try {
+      assertThrows(CompletionException.class, () -> bridge.start().join());
+      // Drive callbacks immediately; backoff cannot limit this test's attempts. All failures are
+      // in the same rolling minute, without depending on scheduler timing or sleeping.
+      for (int retry = 0; retry < RemoteIndexingJobsBridge.RECONNECT_MAX_PER_MINUTE; retry++) {
+        assertEquals(1, reconnects.pending.size(), "retry " + retry + " must be scheduled");
+        reconnects.pending.removeFirst().run();
+      }
+      assertEquals(RemoteIndexingJobsBridge.RECONNECT_MAX_PER_MINUTE + 1, subscribes.get());
+      assertEquals(0, reconnects.pending.size(), "the exhausted cap must schedule no further retry");
+      assertEquals(List.of(250L, 500L, 1_000L, 2_000L, 4_000L, 8_000L), reconnects.delays);
+    } finally {
+      bridge.stop();
+    }
+  }
 
-    // Give the backoff room to exhaust its per-minute budget.
-    Thread.sleep(3_000);
-    int attempts = subscribes.get();
-    assertTrue(
-        attempts <= RemoteIndexingJobsBridge.RECONNECT_MAX_PER_MINUTE + 2,
-        "retries must be capped per minute (cap "
-            + RemoteIndexingJobsBridge.RECONNECT_MAX_PER_MINUTE
-            + "); saw "
-            + attempts
-            + " subscribes, which is a busy loop against a producer that cannot succeed");
+  private static final class ControlledReconnects {
+    final io.justsearch.core.execution.EngineExecutorRegistry registry =
+        org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
+    final java.util.ArrayDeque<Runnable> pending = new java.util.ArrayDeque<>();
+    final List<Long> delays = new java.util.ArrayList<>();
 
-    bridge.stop();
+    ControlledReconnects() {
+      var registration = org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.Registration.class);
+      var scheduler = org.mockito.Mockito.mock(java.util.concurrent.ScheduledExecutorService.class);
+      org.mockito.Mockito.when(registry.limits(org.mockito.ArgumentMatchers.any()))
+          .thenReturn(new io.justsearch.core.execution.EngineExecutorRegistry.Limits(1, 32));
+      org.mockito.Mockito.when(registry.register(org.mockito.ArgumentMatchers.any())).thenReturn(registration);
+      org.mockito.Mockito.when(registration.openScheduled(org.mockito.ArgumentMatchers.any())).thenReturn(scheduler);
+      org.mockito.Mockito.when(scheduler.schedule(org.mockito.ArgumentMatchers.any(Runnable.class),
+          org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.eq(TimeUnit.MILLISECONDS)))
+          .thenAnswer(invocation -> {
+            pending.addLast(invocation.getArgument(0));
+            delays.add(invocation.getArgument(1));
+            return null;
+          });
+    }
   }
 
   @Test

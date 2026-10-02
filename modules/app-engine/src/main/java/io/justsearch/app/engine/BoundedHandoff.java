@@ -3,6 +3,8 @@ package io.justsearch.app.engine;
 
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,6 +39,10 @@ import org.slf4j.LoggerFactory;
  * permanently wrong and cannot detect that it is: a dropped Delete leaves a phantom row on the
  * Library surface until the next restart, silently. Failing the flow is bounded and visible, and
  * the consumer recovers by re-subscribing, which re-issues a snapshot.
+ *
+ * <p>Subscriptions use finite delivery drains: an idle feed occupies no executor thread, and a
+ * busy feed yields after a bounded batch so startup tasks on the same pool can run. Scans retain
+ * their polling delivery loop and its actual-exit completion contract.
  *
  * <p><b>Close stops production, within one poll.</b> The delivery loop polls with a
  * {@value #POLL_TICK_MS} ms tick, so {@link #close()} both stops delivery and makes
@@ -112,6 +118,10 @@ final class BoundedHandoff<T> implements AutoCloseable {
   private final Backpressure backpressure;
   private final java.util.function.Function<T, String> coalescingKey;
   private final java.util.function.BinaryOperator<T> coalesce;
+  private final Executor deliveryThread;
+  private final boolean deliveryOnDemand;
+  private final int deliveryBatchSize;
+  private final AtomicBoolean deliveryScheduled = new AtomicBoolean();
   private final AtomicBoolean closed = new AtomicBoolean(false);
   private final AtomicBoolean failed = new AtomicBoolean(false);
   private final AtomicReference<Runnable> onClose = new AtomicReference<>();
@@ -152,31 +162,34 @@ final class BoundedHandoff<T> implements AutoCloseable {
       Backpressure backpressure,
       int capacity,
       long offerTimeoutMs) {
-    this(name, sink, onError, deliveryThread, backpressure, capacity, offerTimeoutMs, null, null);
+    this(name, sink, onError, deliveryThread, backpressure, capacity, offerTimeoutMs, null, null, false);
   }
 
   BoundedHandoff(
       String name, Consumer<T> sink, Consumer<Throwable> onError, Executor deliveryThread,
       Backpressure backpressure, java.util.function.Function<T, String> coalescingKey,
-      java.util.function.BinaryOperator<T> coalesce) {
+      java.util.function.BinaryOperator<T> coalesce, boolean deliveryOnDemand) {
     this(name, sink, onError, deliveryThread, backpressure, DEFAULT_CAPACITY,
-        DEFAULT_OFFER_TIMEOUT_MS, coalescingKey, coalesce);
+        DEFAULT_OFFER_TIMEOUT_MS, coalescingKey, coalesce, deliveryOnDemand);
   }
 
   private BoundedHandoff(
       String name, Consumer<T> sink, Consumer<Throwable> onError, Executor deliveryThread,
       Backpressure backpressure, int capacity, long offerTimeoutMs,
       java.util.function.Function<T, String> coalescingKey,
-      java.util.function.BinaryOperator<T> coalesce) {
+      java.util.function.BinaryOperator<T> coalesce, boolean deliveryOnDemand) {
     this.name = name;
     this.sink = sink;
     this.onError = onError;
     this.backpressure = backpressure;
     this.coalescingKey = coalescingKey;
     this.coalesce = coalesce;
+    this.deliveryThread = deliveryThread;
+    this.deliveryOnDemand = deliveryOnDemand;
+    this.deliveryBatchSize = capacity;
     this.queue = new ArrayBlockingQueue<>(capacity);
     this.offerTimeoutMs = offerTimeoutMs;
-    deliveryThread.execute(this::deliver);
+    if (!deliveryOnDemand) deliveryThread.execute(this::deliver);
   }
 
   /**
@@ -195,7 +208,8 @@ final class BoundedHandoff<T> implements AutoCloseable {
     accepted.incrementAndGet();
     try {
       if (offerUnderPolicy(frame)) {
-        return true;
+        if (deliveryOnDemand) scheduleDelivery();
+        return !deliveryOnDemand || !closed.get();
       }
     } catch (InterruptedException e) {
       // The producer's thread was interrupted while waiting for room. Restore the flag and stop
@@ -360,6 +374,20 @@ final class BoundedHandoff<T> implements AutoCloseable {
   }
 
   /**
+   * A task cancelled before entry cannot report failure from its body. Its exceptional exit must
+   * close this flow too. Normal task return is not completion of a live change-feed subscription.
+   */
+  void observeTaskExit(CompletionStage<?> exit) {
+    exit.whenComplete((ignored, failure) -> {
+      if (failure != null && !closed.get()) {
+        Throwable cause = failure instanceof CompletionException && failure.getCause() != null
+            ? failure.getCause() : failure;
+        fail(cause);
+      }
+    });
+  }
+
+  /**
    * Registers the one handler to run when the flow closes — the producer-side unsubscribe. Runs
    * immediately if the flow is already closed, so a late registration cannot leak a subscription.
    */
@@ -389,6 +417,49 @@ final class BoundedHandoff<T> implements AutoCloseable {
     }
   }
 
+  /**
+   * Idle subscriptions hold no executor thread. One bounded drain at a time preserves ordering;
+   * yielding after a queue's capacity lets queued subscription startups run even under a hot feed.
+   */
+  private void scheduleDelivery() {
+    if (closed.get() || !deliveryScheduled.compareAndSet(false, true)) return;
+    try {
+      deliveryThread.execute(this::deliverAvailable);
+    } catch (RuntimeException | Error failure) {
+      deliveryScheduled.set(false);
+      if (!closed.get()) fail(failure);
+      if (failure instanceof Error error) throw error;
+    }
+  }
+
+  private void deliverAvailable() {
+    try {
+      int remaining = deliveryBatchSize;
+      while (!closed.get() && remaining-- > 0) {
+        T frame = queue.poll();
+        if (frame == null || !deliverFrame(frame)) return;
+      }
+    } finally {
+      deliveryScheduled.set(false);
+      // A publish racing the empty poll either saw the old task or schedules the next one itself.
+      if (!queue.isEmpty()) scheduleDelivery();
+    }
+  }
+
+  private boolean deliverFrame(T frame) {
+    try {
+      sink.accept(frame);
+      delivered.incrementAndGet();
+      return true;
+    } catch (Throwable t) {
+      // Report fatal sink failures as well: otherwise the producer only sees a later queue overflow.
+      log.warn("{}: consumer threw on delivery; closing the flow", name, t);
+      fail(t);
+      if (t instanceof Error error) throw error;
+      return false;
+    }
+  }
+
   private void deliver() {
     while (!closed.get()) {
       T frame;
@@ -402,22 +473,7 @@ final class BoundedHandoff<T> implements AutoCloseable {
       if (frame == null) {
         continue;
       }
-      try {
-        sink.accept(frame);
-        delivered.incrementAndGet();
-      } catch (Throwable t) {
-        // Throwable, not RuntimeException: this is the flow's only thread, and an Error escaping
-        // here (a StackOverflowError in an SSE serializer, an OOM under load) would kill it
-        // silently. The producer would then fill the queue, hit the bound and fail the flow with a
-        // "consumer stopped draining" message naming nothing — the real cause lost. Rethrowing an
-        // Error after reporting keeps the JVM's own handling of it.
-        log.warn("{}: consumer threw on delivery; closing the flow", name, t);
-        fail(t);
-        if (t instanceof Error err) {
-          throw err;
-        }
-        return;
-      }
+      if (!deliverFrame(frame)) return;
     }
   }
 }

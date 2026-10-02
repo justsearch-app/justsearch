@@ -308,10 +308,10 @@ final class EngineRecordedProducerExitTest {
   }
 
   @Test
-  void subscriptionOuterCleanupClosesDeliveryWhenProducerRejectionHasACleanupFailure() throws Exception {
+  void subscriptionOuterCleanupClosesFlowWhenProducerRejectionHasACleanupFailure() throws Exception {
     var admission = spy(new EngineAdmissionController(8, 8, 1));
     var retains = new AtomicInteger();
-    var deliveryExited = new CountDownLatch(1);
+    var subscriptionClosed = new CountDownLatch(1);
     var pool = new AtomicReference<ExecutorService>();
     var cleanupFailure = new IllegalStateException("producer release reported failure");
     doAnswer(call -> {
@@ -320,12 +320,11 @@ final class EngineRecordedProducerExitTest {
       doAnswer(retain -> {
         EngineWorkHandle retained = (EngineWorkHandle) retain.callRealMethod();
         int ordinal = retains.incrementAndGet();
-        if (ordinal == 2) return retained;
         var observed = spy(retained);
         if (ordinal == 1) {
-          doAnswer(close -> { close.callRealMethod(); deliveryExited.countDown(); return null; }).when(observed).close();
+          doAnswer(close -> { close.callRealMethod(); subscriptionClosed.countDown(); return null; }).when(observed).close();
         } else {
-          assertEquals(3, ordinal, "delivery, subscription then producer own the only retained references");
+          assertEquals(2, ordinal, "idle subscription and producer own the only retained references");
           pool.get().shutdown();
           doAnswer(close -> { close.callRealMethod(); throw cleanupFailure; }).when(observed).close();
         }
@@ -344,7 +343,9 @@ final class EngineRecordedProducerExitTest {
       assertSame(cleanupFailure, assertThrows(IllegalStateException.class,
           () -> client.subscribeIndexingJobs(frame -> fail("unexpected frame"),
               failure -> {}, () -> {}, TestEngineContexts.BACKGROUND)));
-      assertTrue(deliveryExited.await(3, TimeUnit.SECONDS), "outer subscription catch must close the accepted flow");
+      assertTrue(subscriptionClosed.await(3, TimeUnit.SECONDS), "outer subscription catch must close the accepted flow");
+      assertEquals(1, cleanupFailure.getSuppressed().length);
+      assertInstanceOf(java.util.concurrent.RejectedExecutionException.class, cleanupFailure.getSuppressed()[0]);
       assertEquals(0, admission.activeWorkCount());
       verifyNoInteractions(services);
     }

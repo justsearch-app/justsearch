@@ -33,6 +33,55 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(10)
 final class EngineKnowledgeClientExecutorTest {
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(ints = {1, 4})
+  void concurrentSubscriptionsDeliverSnapshotsAndLaterDeltasBeyondTheThreadCount(int threads)
+      throws Exception {
+    var ingest = mock(io.justsearch.indexerworker.services.WorkerIngestService.class);
+    var publishers = new java.util.concurrent.CopyOnWriteArrayList<
+        java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>();
+    org.mockito.Mockito.doAnswer(invocation -> {
+      var publish = invocation.<java.util.function.Consumer<io.justsearch.ipc.IndexingJobsFrame>>getArgument(1);
+      publishers.add(publish);
+      publish.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder()
+          .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+      return null;
+    }).when(ingest).subscribeIndexingJobs(any(), any(), any());
+    var services = mock(WorkerAppServices.class);
+    when(services.ingestService()).thenReturn(ingest);
+    var admission = new EngineAdmissionController(8, 8, 1);
+    var failure = new AtomicReference<Throwable>();
+    var streams = new java.util.ArrayList<io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream>();
+    var deltas = new CountDownLatch(threads + 2);
+    try (var registry = registry(1, 16, threads, 16);
+        var client = newClient(registry, services, admission)) {
+      try {
+        for (int i = 0; i < threads + 2; i++) {
+          var snapshot = new CountDownLatch(1);
+          streams.add(client.subscribeIndexingJobs(frame -> {
+            if (frame.hasSnapshot()) snapshot.countDown();
+            if (frame.hasDelta()) deltas.countDown();
+          }, failure::set, () -> {}, TestEngineContexts.BACKGROUND));
+          assertTrue(snapshot.await(1, TimeUnit.SECONDS),
+              "subscription " + i + " must start while every earlier subscription stays open");
+        }
+        for (var publish : publishers) {
+          publish.accept(io.justsearch.ipc.IndexingJobsFrame.newBuilder()
+              .setDelta(io.justsearch.ipc.IndexingJobsDelta.newBuilder().setDeletePathHash("later"))
+              .build());
+        }
+        assertTrue(deltas.await(2, TimeUnit.SECONDS),
+            "idle subscriptions must reschedule delivery using their retained work owner");
+        org.junit.jupiter.api.Assertions.assertNull(failure.get());
+      } finally {
+        streams.forEach(io.justsearch.app.services.worker.KnowledgeClient.IndexingJobsStream::close);
+      }
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+      while (admission.activeWorkCount() != 0 && System.nanoTime() < deadline) Thread.onSpinWait();
+      assertEquals(0, admission.activeWorkCount(), "closing every stream releases every retained owner");
+    }
+  }
+
   @Test
   void deadlineRetainsExactServingViewUntilWorkerActuallyExits() throws Exception {
     var entered = new CountDownLatch(1);
