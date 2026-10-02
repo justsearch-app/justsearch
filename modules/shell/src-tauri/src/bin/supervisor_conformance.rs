@@ -41,15 +41,11 @@ mod engine_host;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use supervisor::{
     load_policy, run_supervision, Actuator, Outcome, Ready, StateRecord, Supervisor,
 };
-
-fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
-}
 
 struct EngineHostActuator {
     node: PathBuf,
@@ -125,6 +121,9 @@ impl Actuator for EngineHostActuator {
 
     fn await_ready(&mut self, deadline_ms: u64) -> Result<Ready, String> {
         loop {
+            if !self.should_continue() {
+                return Err("supervision cancelled while awaiting startup".into());
+            }
             if let Some(manifest) = binding::read_manifest_if_present(&self.manifest_path()) {
                 self.host.observe_manifest(&manifest);
             }
@@ -137,7 +136,7 @@ impl Actuator for EngineHostActuator {
                     instance_id: binding.instance_id,
                 });
             }
-            if now_ms() >= deadline_ms {
+            if self.monotonic_ms() >= deadline_ms {
                 return Err("the incarnation did not publish a port and answer in time".into());
             }
             std::thread::sleep(Duration::from_millis(50));
@@ -208,8 +207,8 @@ impl Actuator for EngineHostActuator {
         }
     }
 
-    fn now_ms(&mut self) -> u64 {
-        now_ms()
+    fn monotonic_ms(&mut self) -> u64 {
+        self.started.elapsed().as_millis() as u64
     }
 
     fn publish_state(&mut self, record: &StateRecord) {
