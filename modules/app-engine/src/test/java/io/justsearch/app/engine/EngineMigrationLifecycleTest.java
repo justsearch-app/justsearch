@@ -4,6 +4,7 @@ package io.justsearch.app.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -93,6 +94,7 @@ final class EngineMigrationLifecycleTest {
     writeWatchedRoots(dataDir, docsDir);
 
     engine = EngineTestHarness.start(dataDir);
+    KnowledgeServer liveServer = engineServer();
 
     assertTrue(
         engine.client().submitBatch(List.of(file), TestEngineContexts.FOREGROUND).getAcceptedCount() > 0,
@@ -174,6 +176,31 @@ final class EngineMigrationLifecycleTest {
     assertTrue(awaitPreviousRetired(engine.indexBase(), activeBefore, 60_000),
         "Blue must retire only after its last serving view exits");
 
+    String firstSuccessor = engine.status().getMigration().getActiveGenerationId();
+    var second = engine.client().startMigration("system_test", TestEngineContexts.FOREGROUND);
+    assertTrue(second.accepted(), "a second rebuild must be admitted after predecessor retirement");
+    assertFalse(second.restartRequired());
+    Path secondGreen = engine.indexBase().resolve("indices").resolve(second.buildingGenerationId());
+    long secondOpenDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+    boolean secondOpened = false;
+    while (System.nanoTime() < secondOpenDeadline) {
+      try (var view = engine.captureServingView()) {
+        secondOpened = secondGreen.equals(view.ingestRuntime().openedIndexPath());
+      }
+      if (secondOpened) break;
+      Thread.sleep(50);
+    }
+    assertTrue(secondOpened, "the second live start must open a distinct Green writer");
+    assertSame(liveServer, engineServer(), "successive starts must retain the same Engine server");
+    assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted());
+    assertTrue(awaitActiveGenerationChanged(engine.indexBase(), firstSuccessor, 180_000));
+    assertEquals(second.buildingGenerationId(),
+        awaitMigrationState("IDLE", 60_000).getMigration().getActiveGenerationId());
+    assertTrue(engine.awaitSearchable(marker, 60_000),
+        "the second enumeration and promotion must preserve the source document");
+    assertTrue(awaitPreviousRetired(engine.indexBase(), firstSuccessor, 60_000));
+    assertSame(liveServer, engineServer(), "both promotions must complete without an Engine restart");
+
     engine.restart();
 
     StatusResponse after = awaitMigrationState("IDLE", 60_000);
@@ -191,6 +218,36 @@ final class EngineMigrationLifecycleTest {
     assertTrue(
         engine.awaitSearchable(marker, 120_000),
         "the marker must still be findable on the new active generation");
+  }
+
+  @Test
+  void publicProjectionPortReportsTheAdmittedServingMode(@TempDir Path tempDir) throws Exception {
+    engine = EngineTestHarness.start(tempDir.resolve("data"));
+    KnowledgeServer server = engineServer();
+    Field mode = KnowledgeServer.class.getDeclaredField("recordedCandidateInPlace");
+    mode.setAccessible(true);
+    // Isolate the public receipt contract from native encoder allocation while retaining
+    // the real composition wiring, serving writer and KnowledgeClient forwarding path.
+    try {
+      for (int revision = 1; revision <= 3; revision++) {
+        boolean deferred = revision == 2;
+        mode.setBoolean(server, deferred);
+        var projection = new io.justsearch.app.api.indexing.AcceptedProjection(
+            "memory", "receipt-note", revision,
+            io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT,
+            "{\"content\":\"receipt marker\"}");
+        var receipt = engine.client().indexAndReturn(projection,
+            io.justsearch.app.api.indexing.ProjectionDurability.NRT, TestEngineContexts.FOREGROUND);
+        assertEquals(deferred
+                ? io.justsearch.app.api.indexing.ProjectionReceipt.Visibility.TEXT_ONLY_SEMANTIC_AT_ACTIVATION
+                : io.justsearch.app.api.indexing.ProjectionReceipt.Visibility.NRT,
+            receipt.visibility());
+        assertEquals(engine.status().getMigration().getActiveGenerationId(), receipt.generationId());
+        assertTrue(engine.awaitSearchable("receipt marker", 30_000));
+      }
+    } finally {
+      mode.setBoolean(server, false);
+    }
   }
 
   /** Blue gains C through its active lexical projection; Green owns only C after publication. */

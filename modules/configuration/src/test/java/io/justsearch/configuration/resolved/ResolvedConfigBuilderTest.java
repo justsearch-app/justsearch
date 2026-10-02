@@ -1396,6 +1396,12 @@ final class ResolvedConfigBuilderTest {
     }
 
     @Test
+    @DisplayName("Index migration refuses failed jobs by default")
+    void indexMigrationCutoverDefaultsToZeroFailedJobs() {
+      assertEquals(0, new ResolvedConfigBuilder().build().index().migrationCutoverMaxFailedJobs());
+    }
+
+    @Test
     @DisplayName("Index migration cutover max_failed_jobs is clamped to >= -1")
     void indexMigrationCutoverClamped() {
       ResolvedConfigBuilder builder = new ResolvedConfigBuilder();

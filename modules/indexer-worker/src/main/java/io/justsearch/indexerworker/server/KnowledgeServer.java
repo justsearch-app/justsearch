@@ -138,7 +138,7 @@ public final class KnowledgeServer implements Closeable {
   private Path buildingIndexPath;
   private volatile IndexGenerationManager indexGenerationManager;
   private IndexGenerationManager.BootOwnership generationBootOwnership;
-  private IndexGenerationManager.BootDisposition generationBootDisposition;
+  private volatile IndexGenerationManager.BootDisposition generationBootDisposition;
   /** Replay settlement is valid only for this exact active generation. */
   private volatile String replaySettledGeneration;
   private List<RootBinding> bootRootBindings = List.of();
@@ -377,15 +377,15 @@ public final class KnowledgeServer implements Closeable {
   private DevReloadManager devReloadManager;
   private io.justsearch.telemetry.TracingBootstrap tracingBootstrap;
   private Thread sentinelThread;
-  private Thread migrationEnumeratorThread;
-  private Thread migrationCutoverThread;
+  private volatile Thread migrationEnumeratorThread;
+  private volatile Thread migrationCutoverThread;
   private MigrationTransitionBarrier.Hook migrationTransitionHook;
   private volatile boolean running;
   private volatile Consumer<Throwable> terminalWriterFaultHandler =
       failure -> log.error("Terminal writer failure has no Engine fault handler", failure);
   private volatile Runnable migrationRestartAction =
       () -> log.warn("Promoted generation requires an Engine restart; no process owner is installed");
-  private int migrationCutoverMaxFailedJobs = -1;
+  private int migrationCutoverMaxFailedJobs = 0;
   /**
    * Tempdoc 819: set when this boot started a corruption-recovery rebuild (the active generation
    * was recovered to EMPTY and a green is being rebuilt from source). Read once, when the embedding
@@ -762,7 +762,8 @@ public final class KnowledgeServer implements Closeable {
   private record CandidateModels(
       EncoderSet owner,
       QueryRoleSet queryOwner,
-      GpuDiagnosticSuppliers diagnostics) {
+      GpuDiagnosticSuppliers diagnostics,
+      IndexCompositionPlan indexPlan) {
     EmbeddingService embedding() { return owner.embedding(); }
     EncoderBindings.Snapshot bindings() {
       return new EncoderBindings.Snapshot(owner.splade(), owner.bgeM3(), owner.ner(), null);
@@ -3231,6 +3232,7 @@ public final class KnowledgeServer implements Closeable {
    * {@link DefaultWorkerAppServices} with non-null indexingLoop / ingestService).
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
+    svc.ingestService().setProjectionSemanticDeferralSupplier(() -> recordedCandidateInPlace);
     // 343: Wire resolved config supplier for search config status reporting.
     svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());
@@ -3337,6 +3339,7 @@ public final class KnowledgeServer implements Closeable {
     // The callback can drive an operation that re-enters Worker control. It runs outside the
     // physical runtime lock and rechecks its own attachment identity before doing any work.
     if (attachment != null) attachment.servicesPublished();
+    retryCommittedGenerationRetirement();
   }
 
   private void closePendingAppServices() {
@@ -4045,14 +4048,16 @@ public final class KnowledgeServer implements Closeable {
     QueryRoleSelection exactQuery = exactQueryObservation == null ? null
         : exactQueryObservation.querySelection().orElseThrow(
             () -> new IOException("Active A query selection is unknown"));
+    AtomicReference<IndexCompositionPlan> capturedPlan = new AtomicReference<>();
     InferenceSurface surface = InferenceCompositionRoot.compose(encoderConfiguration, hardware,
         contract, modelsDir, () -> !signalBus.isMainGpuActive(), ortSessionEvents, selection,
-        exactQuery);
+        exactQuery, ignored -> {}, captured -> capturedPlan.set(captured.indexPlan()));
     if (exactQueryObservation != null) {
       surface = surface.withUnavailableQueryRoles(
           unresolvedQueryRoles(exactQueryObservation, exactQuery));
     }
-    return buildCandidateModels(surface, identity, encoderConfiguration, null);
+    return buildCandidateModels(surface, identity, encoderConfiguration,
+        Objects.requireNonNull(capturedPlan.get(), "Selected encoder composition plan"));
   }
 
   /** Replays the boot-captured index plan without consulting install or discovery state. */
@@ -4084,7 +4089,7 @@ public final class KnowledgeServer implements Closeable {
     var partition = surface.partitionQueryRoles(encoderConfiguration);
     var owner = new EncoderSet(partition.index(), identity);
     var queryOwner = new QueryRoleSet(partition.query());
-    unpublishedModels = new CandidateModels(owner, queryOwner, null);
+    unpublishedModels = new CandidateModels(owner, queryOwner, null, exactPlan);
     EmbeddingService embedding = null;
     io.justsearch.indexerworker.ner.NerService ner;
     io.justsearch.indexerworker.bgem3.BgeM3Encoder bge = null;
@@ -4170,9 +4175,9 @@ public final class KnowledgeServer implements Closeable {
           citation == null ? null : citation::getOrtCudaStatus,
           bge == null ? null : bge::getOrtCudaStatus);
       owner.releaseModelReady();
-      return new CandidateModels(owner, queryOwner, diagnostics);
+      return new CandidateModels(owner, queryOwner, diagnostics, exactPlan);
     } catch (IOException | RuntimeException | Error failure) {
-      try { new CandidateModels(owner, queryOwner, null).close(); }
+      try { new CandidateModels(owner, queryOwner, null, exactPlan).close(); }
       catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
       throw failure;
     }
@@ -6328,8 +6333,12 @@ public final class KnowledgeServer implements Closeable {
       log.warn("Committed generation retirement awaits readable state", unavailable);
       return;
     }
-    if (state == null || state.previous_generation() == null || state.previous_generation().isBlank()
-        || state.active_generation() == null || !state.active_generation().startsWith("g-")) return;
+    if (state == null || state.active_generation() == null
+        || !state.active_generation().startsWith("g-")) return;
+    if (state.previous_generation() == null || state.previous_generation().isBlank()) {
+      settlePromotedServingGeneration(state, null);
+      return;
+    }
     String active = state.active_generation();
     String previous = state.previous_generation();
     // A failed precommit can retain the original pointer in both fields. There is no
@@ -6361,11 +6370,44 @@ public final class KnowledgeServer implements Closeable {
         return;
       }
       indexGenerationManager.retirePreviousGeneration(active, previous);
+      settlePromotedServingGeneration(indexGenerationManager.readStateBestEffort(), null);
     } catch (IOException | RuntimeException unavailable) {
       log.warn("Committed generation predecessor {} still owns capacity", previous, unavailable);
     }
     } finally {
       runtimeSwapLock.unlock();
+    }
+  }
+
+  /** Replay, operation settlement and physical retirement turn a promoted owner into native serving. */
+  private void settlePromotedServingGeneration(
+      IndexGenerationManager.State state, String nextBuildingGeneration) {
+    if (state == null || generationBootDisposition != IndexGenerationManager.BootDisposition.PROMOTED
+        || activeIndexPath == null || buildingIndexPath != null
+        || ingestLifecycle != searchLifecycle || !(ingestLifecycle instanceof RunningRuntime active)
+        || !active.isAcceptingWrites()) return;
+    String generation = activeIndexPath.getFileName().toString();
+    if (!generation.equals(state.active_generation())
+        || !generation.equals(replaySettledGeneration)
+        || !generation.equals(rootReconciliationSettledGeneration)
+        || state.previous_generation() != null && !generation.equals(state.previous_generation())
+        || !Objects.equals(nextBuildingGeneration, state.building_generation())) return;
+    if (generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
+        && !recordedIngestionLifecycle.committedBulkTerminal(recorded.operationKey())) return;
+    publicationLock.writeLock().lock();
+    try {
+      synchronized (servingViewMonitor) {
+        if (servingView == null || servingView.retiring || !retiredServingViews.isEmpty()
+            || servingView.services != appServices || servingView.searchRuntime != active
+            || servingView.ingestRuntime != active) return;
+        generationBootDisposition = IndexGenerationManager.BootDisposition.NATIVE;
+        generationBootOwnership = new IndexGenerationManager.BootOwnership.Native();
+        recordedCandidate = null;
+        recordedCandidateFingerprint = null;
+        candidateServiceConfiguration = null;
+      }
+    } finally {
+      publicationLock.writeLock().unlock();
     }
   }
 
@@ -7109,10 +7151,12 @@ public final class KnowledgeServer implements Closeable {
     return KnowledgeServerMigrationOps.parseMigrationState(raw);
   }
 
-  private void startMigrationCutoverMonitorBestEffort() {
-    if (migrationCutoverThread != null) {
+  private synchronized void startMigrationCutoverMonitorBestEffort() {
+    if (migrationCutoverThread != null && migrationCutoverThread.isAlive()) {
       return;
     }
+    final int cutoverMaxFailedJobs = recordedCandidate == null ? migrationCutoverMaxFailedJobs
+        : recordedCandidate.configuration().index().migrationCutoverMaxFailedJobs();
     migrationCutoverThread =
         new Thread(
             () -> {
@@ -7128,7 +7172,7 @@ public final class KnowledgeServer implements Closeable {
                         () -> migrationEnumeratorFailure,
                         MIGRATION_SWITCHING_QUEUE_DEPTH_THRESHOLD,
                         MIGRATION_SWITCHING_MAX_DURATION_MS,
-                        migrationCutoverMaxFailedJobs,
+                        cutoverMaxFailedJobs,
                         () -> ingestLifecycle,
                         this::finalizeEmbeddingRebuildBeforeCutover,
                         this::drainSwitchBufferBestEffort,
@@ -7143,7 +7187,7 @@ public final class KnowledgeServer implements Closeable {
                                throws IOException, InterruptedException {
                              return promoteServingSuccessor(
                                  generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Recorded recorded
-                                     ? recorded : null);
+                                     ? recorded : null, cutoverMaxFailedJobs);
                            }
 
                            @Override public RecordedIngestionLifecycle.GapDecision gapDecision() {
@@ -7494,6 +7538,21 @@ public final class KnowledgeServer implements Closeable {
 
   private boolean beginBuildingLive(String buildingGeneration, String operationKey)
       throws IOException {
+    // A committed monitor can still be notifying the recorded owner after pointer publication.
+    // Let it finish outside the runtime lock before reusing either migration thread slot.
+    if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED
+        || generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
+      try {
+        for (Thread previous : new Thread[] {migrationEnumeratorThread, migrationCutoverThread}) {
+          if (previous == null) continue;
+          previous.join(10_000);
+          if (previous.isAlive()) return false;
+        }
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        return false;
+      }
+    }
     ServingView retired;
     DefaultWorkerAppServices prepared = null;
     RunningRuntime green = null;
@@ -7505,6 +7564,9 @@ public final class KnowledgeServer implements Closeable {
     boolean enumerateSources;
     runtimeSwapLock.lock();
     try {
+      if (indexGenerationManager != null) {
+        settlePromotedServingGeneration(indexGenerationManager.readStateBestEffort(), buildingGeneration);
+      }
       if (closeStarted || encoderRecoveryReservation != null
           || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()
           || !running || rebuildBrakeExhausted || indexGenerationManager == null
@@ -7816,7 +7878,8 @@ public final class KnowledgeServer implements Closeable {
 
   /** Final Flow A fence: replay, certify Green, commit the pointer and install its view. */
   private IndexGenerationManager.State promoteServingSuccessor(
-      IndexGenerationManager.BootOwnership.Recorded recorded) throws IOException, InterruptedException {
+      IndexGenerationManager.BootOwnership.Recorded recorded, int cutoverMaxFailedJobs)
+      throws IOException, InterruptedException {
     runtimeSwapLock.lockInterruptibly();
     DefaultWorkerAppServices successor = null;
     DefaultWorkerAppServices incumbent = null;
@@ -7906,8 +7969,8 @@ public final class KnowledgeServer implements Closeable {
         var settled = jobQueue.jobStateCountsStrict();
         if (settled.processingCount() != 0 || settled.pendingReadyCount() != 0
             || settled.pendingBackoffCount() != 0 || !current.mutationAdmission().replayCertain()
-            || (recorded == null && migrationCutoverMaxFailedJobs >= 0
-                && settled.failedCount() > migrationCutoverMaxFailedJobs)
+            || (recorded == null && cutoverMaxFailedJobs >= 0
+                && settled.failedCount() > cutoverMaxFailedJobs)
             || !finalizeEmbeddingRebuildBeforeCutover()) return null;
         migrationTransition("migration-green-drained");
         current.commitActiveLexicalProjectionForCutover();
@@ -7960,8 +8023,8 @@ public final class KnowledgeServer implements Closeable {
               var counts = jobQueue.jobStateCountsStrict();
               if (counts.processingCount() != 0 || counts.pendingReadyCount() != 0
                   || counts.pendingBackoffCount() != 0
-                  || (recorded == null && migrationCutoverMaxFailedJobs >= 0
-                      && counts.failedCount() > migrationCutoverMaxFailedJobs)) {
+                  || (recorded == null && cutoverMaxFailedJobs >= 0
+                      && counts.failedCount() > cutoverMaxFailedJobs)) {
                 throw new IOException("Green changed during cutover preparation");
               }
               try (var transfer = current.prepareProducerTransferTo(nextServices)) {
@@ -8054,9 +8117,14 @@ public final class KnowledgeServer implements Closeable {
                             "Promoted candidate model bundle");
                         initialEncoderSet = promotedModels.owner();
                         initialQueryRoleSet = promotedModels.queryOwner();
+                        initialIndexCompositionPlan = promotedModels.indexPlan();
+                        initialModelIdentity = promotedModels.owner().modelIdentity();
                         embeddingCompatController = candidateEmbeddingCompatController;
                         candidateEmbeddingCompatController = null;
                         startupConfiguration = recordedCandidate.configuration();
+                        serviceConfiguration = candidateServiceConfiguration;
+                        migrationCutoverMaxFailedJobs =
+                            startupConfiguration.index().migrationCutoverMaxFailedJobs();
                         initialModelSelection = promotedSelection;
                         candidateModels = null;
                         recordedCandidateInPlace = false;
@@ -8306,8 +8374,9 @@ public final class KnowledgeServer implements Closeable {
     startMigrationEnumeratorBestEffort(rc, true);
   }
 
-  private void startMigrationEnumeratorBestEffort(ResolvedConfig rc, boolean enumerateFiles) {
-    if (migrationEnumeratorThread != null) {
+  private synchronized void startMigrationEnumeratorBestEffort(
+      ResolvedConfig rc, boolean enumerateFiles) {
+    if (migrationEnumeratorThread != null && migrationEnumeratorThread.isAlive()) {
       return;
     }
     migrationEnumeratorRunning.set(true);
