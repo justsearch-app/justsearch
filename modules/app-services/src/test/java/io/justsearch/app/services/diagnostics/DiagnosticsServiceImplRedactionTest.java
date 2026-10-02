@@ -12,6 +12,8 @@ import io.justsearch.contract.wire.LifecycleState;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.junit.jupiter.api.AfterEach;
@@ -70,6 +72,65 @@ final class DiagnosticsServiceImplRedactionTest {
     assertFalse(redacted.contains("Alice Smith"));
     assertFalse(redacted.contains("Private, Folder"));
     assertFalse(redacted.contains("secret.txt"));
+  }
+
+  @Test
+  void zipRedactsActiveAndCompressedEngineLogs() throws Exception {
+    Path logs = Files.createDirectories(tempHome.resolve("logs"));
+    String input =
+        "Windows: C:\\Users\\Alice Smith\\Private, Folder\\secret.txt\n"
+            + "Unix: /home/Alice Smith/Private, Folder/secret.txt\n"
+            + "safe event\n";
+    Files.writeString(logs.resolve("engine.log"), input);
+    try (var gzip =
+        new GZIPOutputStream(Files.newOutputStream(logs.resolve("engine.2026-10-02.0.log.gz")))) {
+      gzip.write(input.getBytes(StandardCharsets.UTF_8));
+    }
+
+    Path zip = new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+        .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+      ZipEntry active = zipFile.getEntry("logs/engine.log");
+      ZipEntry rotation = zipFile.getEntry("logs/engine.2026-10-02.0.log.gz");
+      assertNotNull(active);
+      assertNotNull(rotation);
+      String expected = "Windows: [path]\nUnix: [path]\nsafe event\n";
+      try (var in = zipFile.getInputStream(active)) {
+        assertEquals(expected, new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      }
+      try (var in = new GZIPInputStream(zipFile.getInputStream(rotation))) {
+        String redacted = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(expected, redacted);
+        assertFalse(redacted.contains("Alice Smith"));
+        assertFalse(redacted.contains("secret.txt"));
+      }
+    }
+  }
+
+  @Test
+  void zipIncludesDataDirectoryAndDistinctAiHomeLogs() throws Exception {
+    Path dataDir = Files.createDirectories(tempHome.resolve("search-data"));
+    System.setProperty("justsearch.data.dir", dataDir.toString());
+    Files.createDirectories(dataDir.resolve("logs"));
+    Files.createDirectories(tempHome.resolve("logs"));
+    Files.writeString(dataDir.resolve("logs/engine.log"), "engine event\n");
+    // Deliberately collide on the filename to prove both sources survive unambiguously.
+    Files.writeString(tempHome.resolve("logs/engine.log"), "AI home event\n");
+
+    Path zip = new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+        .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+      ZipEntry engine = zipFile.getEntry("logs/engine.log");
+      ZipEntry ai = zipFile.getEntry("ai/logs/engine.log");
+      assertNotNull(engine);
+      assertNotNull(ai);
+      try (var in = zipFile.getInputStream(engine)) {
+        assertEquals("engine event\n", new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      }
+      try (var in = zipFile.getInputStream(ai)) {
+        assertEquals("AI home event\n", new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      }
+    }
   }
 
   @Test

@@ -1089,7 +1089,7 @@ public final class KnowledgeServer implements Closeable {
         try {
           tracingBootstrap = io.justsearch.telemetry.TracingBootstrap.forIndexing(
               dataDir, ((LocalTelemetry) telemetry).getHealthState(), tracingLevel);
-          log.info("Worker tracing initialized: level={}", tracingLevel);
+          log.info("Engine index tracing active: sampler={}", tracingBootstrap.samplerDescription());
         } catch (IllegalStateException e) {
           log.info(
               "Index tracing level '{}' is not in effect: OpenTelemetry is already registered in"
@@ -6747,7 +6747,8 @@ public final class KnowledgeServer implements Closeable {
           // (each catalog gauge/observable-counter goes through registry.buildGauge/buildObservableCounter
           // which adds the handle there). LocalTelemetry.close() drains them on shutdown.
 
-          // Close tracing (flush spans) before telemetry shuts down.
+          // Flush spans before index telemetry shuts down; the global tracing owner survives
+          // physical index replacement and closes only when the Engine process exits.
           if (tracingBootstrap != null) {
             try {
               tracingBootstrap.close();

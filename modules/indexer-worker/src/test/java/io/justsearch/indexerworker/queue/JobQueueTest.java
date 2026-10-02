@@ -13,6 +13,8 @@ import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.indexerworker.util.PathNormalizer;
+import io.justsearch.indexerworker.services.WorkerHealthService;
+import io.justsearch.ipc.HealthCheckRequest;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,6 +48,24 @@ final class JobQueueTest {
     if (jobQueue != null) {
       jobQueue.close();
     }
+  }
+
+  @Test
+  void healthRejectsFailedSqliteReadThatBestEffortDepthReportsAsZero() throws Exception {
+    var health = new WorkerHealthService("test", jobQueue, null, null);
+    assertTrue(health.check(HealthCheckRequest.getDefaultInstance()).getServing());
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+        Statement stmt = conn.createStatement()) {
+      stmt.execute("DROP TABLE jobs");
+    }
+
+    assertEquals(0, jobQueue.queueDepth(), "best-effort callers retain their zero fallback");
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, jobQueue::jobStateCountsStrict);
+    assertTrue(failure.getCause() instanceof SQLException);
+    var response = health.check(HealthCheckRequest.getDefaultInstance());
+    assertFalse(response.getServing(), "a failed store read must not certify serving health");
+    assertTrue(response.getVersion().contains("JobQueue:"));
   }
 
   @Test
