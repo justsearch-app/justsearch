@@ -70,6 +70,7 @@ final class WorkerRecordedScanAdmissionTest extends LuceneExecutorTestBase {
       assertEquals(1, claims.size());
       var claim = claims.getFirst();
       assertEquals(file, claim.path());
+      assertEquals(singleFile ? file : directory, claim.ingestionRoot());
       assertEquals(KEY, claim.scanId());
       assertEquals(epoch, claim.walkEpoch());
       assertEquals("notes", claim.collection());

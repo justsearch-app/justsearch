@@ -451,7 +451,7 @@ final class AdversarialCorpusIngestionTest {
     Method extractJob =
         extractor.getClass().getDeclaredMethod("extractJob", JobQueue.IndexJob.class);
     extractJob.setAccessible(true);
-    return extractJob.invoke(extractor, new JobQueue.IndexJob(file, null));
+    return extractJob.invoke(extractor, rootedJob(file, null));
   }
 
   private void invokeExtractAndDrain(Path file) throws Exception {
@@ -586,5 +586,9 @@ final class AdversarialCorpusIngestionTest {
 
     @Override
     public void close() {}
+  }
+
+  private static JobQueue.IndexJob rootedJob(Path file, String collection) {
+    return new JobQueue.IndexJob(file, collection, null, null, null, null, false, null, file);
   }
 }

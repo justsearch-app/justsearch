@@ -363,26 +363,24 @@ public final class WorkerIngestService {
     }
   }
 
-  /** Watcher events share RPC mutation admission and the existing durable switch buffer. */
-  public void acceptWatcherUpsert(String collection, Path path) {
-    try (var ignoredMutation = mutationLease()) {
-      acceptWatcherUpsertUnderLease(collection, path);
-    }
-  }
-
   /** Live UPSERT retains its registration identity through concrete queue admission. */
   public void acceptWatcherUpsert(
       RootWatcherRegistry.Subscription witness, String collection, Path path) {
     java.util.Objects.requireNonNull(witness, "witness");
     try (var ignoredMutation = mutationLease()) {
       requireWatcherRootCurrent(witness);
-      acceptWatcherUpsertUnderLease(collection, path);
+      if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
+          path, witness.root())) return;
+      acceptWatcherUpsertUnderLease(collection, path, witness.root());
       requireWatcherRootCurrent(witness);
     }
   }
 
-  private void acceptWatcherUpsertUnderLease(String collection, Path path) {
-    var entry = WorkerMethvinWatcher.entryForLiveEvent(path);
+  private boolean acceptWatcherUpsertUnderLease(String collection, Path path, Path root) {
+    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)) {
+      return false;
+    }
+    var entry = WorkerMethvinWatcher.entryForLiveEvent(path).withinRoot(root);
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration != null) {
       if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
@@ -393,6 +391,7 @@ public final class WorkerIngestService {
     } else if (jobQueue.enqueueEntries(List.of(entry), collection) != 1) {
       throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
     }
+    return true;
   }
 
   /** The watcher owns its deletion marker; this method owns its routing and effect fence. */
@@ -832,7 +831,7 @@ public final class WorkerIngestService {
         // 813 Slice B: stat each admitted path for its byte size. A stat failure degrades that
         // entry to unknown size (NULL) — it never rejects the enqueue.
         var entries = validPaths.stream()
-            .map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance())).toList();
+            .map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance()).withinRoot(path)).toList();
         String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
         int accepted = candidateGeneration == null
             ? jobQueue.enqueueEntries(entries, collection)
@@ -1502,8 +1501,7 @@ public final class WorkerIngestService {
           SyncDirectoryOps.checkCancelled(cancelled);
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
-          acceptWatcherUpsertUnderLease(collection, path);
-          added++;
+          if (acceptWatcherUpsertUnderLease(collection, path, root)) added++;
         }
         for (String path : difference.deletions()) {
           SyncDirectoryOps.checkCancelled(cancelled);
@@ -1574,7 +1572,7 @@ public final class WorkerIngestService {
             // Reuse the queue's captured source witness so extraction cannot skip this claim.
             var capturedEntry = new JobQueue.EnqueueEntry(
                 liveEntry.path(), liveEntry.sizeBytes(), liveEntry.provenance(),
-                io.justsearch.indexerworker.loop.SourceContentHash.sha256(path));
+                io.justsearch.indexerworker.loop.SourceContentHash.sha256(path)).withinRoot(root);
             SyncDirectoryOps.checkCancelled(cancelled);
             if (switchBufferOps.buildingGenerationForFileAdmission() != null
                 || jobQueue.enqueueEntriesWithExactCollection(

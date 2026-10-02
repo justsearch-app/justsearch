@@ -248,7 +248,7 @@ final class WorkerScanOps {
             }
             if (excludedByOwnership(request, dir)) return FileVisitResult.SKIP_SUBTREE;
             String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
-            if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
+            if (!dir.equals(root) && IngestionSkipPolicy.isSkippedDirectoryName(name)) {
               return FileVisitResult.SKIP_SUBTREE;
             }
             currentDir[0] = displayDirectory(dir, root);
@@ -301,7 +301,8 @@ final class WorkerScanOps {
             // 813 Slice B: the walk already holds the size — no extra stat.
             String sourceHash = request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED
                 ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(file) : null;
-            batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance(), sourceHash));
+            batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance(), sourceHash)
+                .withinRoot(root));
             if (batch.size() >= ENQUEUE_BATCH_SIZE) {
               if (!awaitAdmissionCapacity(request) || isCancelled.getAsBoolean()) {
                 cancelled[0] = true;

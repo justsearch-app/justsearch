@@ -29,6 +29,21 @@ final class IngestionSkipPolicyTest {
   }
 
   @Test
+  void directoryExclusionsAreRootRelativeAndOverrideExemptFileNames() {
+    IngestionSkipPolicy.installResolved(new IngestionSkipPolicy(null, null, Set.of("private")));
+    Path root = Path.of("private", "watched").toAbsolutePath();
+    assertTrue(IngestionSkipPolicy.shouldSkipWithinRoot(root.resolve("private/notes.txt"), root));
+    assertTrue(IngestionSkipPolicy.shouldSkipWithinRoot(root.resolve("private/.env"), root));
+    assertFalse(IngestionSkipPolicy.shouldSkipWithinRoot(root.resolve("public/notes.txt"), root));
+    Path excludedNameRoot = root.resolve("private");
+    assertFalse(IngestionSkipPolicy.shouldSkipWithinRoot(
+        excludedNameRoot.resolve("notes.txt"), excludedNameRoot));
+    assertFalse(IngestionSkipPolicy.shouldSkipWithinRoot(
+        root.resolve("private/notes.txt"), root.resolve("private/notes.txt")));
+    assertTrue(IngestionSkipPolicy.shouldSkipWithinRoot(root.resolveSibling("outside.txt"), root));
+  }
+
+  @Test
   void allowsDotEnv() {
     assertFalse(IngestionSkipPolicy.shouldSkip(Paths.get(".env")));
   }

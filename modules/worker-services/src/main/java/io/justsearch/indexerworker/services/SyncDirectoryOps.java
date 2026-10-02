@@ -617,7 +617,9 @@ final class SyncDirectoryOps {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
               if (!Files.isReadable(file)) return FileVisitResult.CONTINUE;
-              if (IngestionSkipPolicy.shouldSkip(file)) return FileVisitResult.CONTINUE;
+              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
+                return FileVisitResult.CONTINUE;
+              }
               if (isCloudPlaceholder(file)) {
                 recordCloudPlaceholderObservation(file, provenance);
                 return FileVisitResult.CONTINUE;
@@ -675,7 +677,14 @@ final class SyncDirectoryOps {
 
       int filesAdded = spool.drain(SYNC_ENQUEUE_BATCH_SIZE, provenance,
           () -> cancelled.getAsBoolean() || walkInterrupted[0]
-              || Thread.currentThread().isInterrupted(), jobQueue::enqueueEntries);
+              || Thread.currentThread().isInterrupted(), entries -> {
+            // Recheck scoped policy at admission while retaining the spool's bounded batches.
+            var admitted = entries.stream()
+                .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
+                .map(entry -> entry.withinRoot(root))
+                .toList();
+            return admitted.isEmpty() ? 0 : jobQueue.enqueueEntries(admitted);
+          });
       walkInterrupted[0] |= Thread.currentThread().isInterrupted();
       if (!walkInterrupted[0] && !cancelled.getAsBoolean() && filesAdded > 0) {
         log.info("syncDirectory: enqueued {} missing files for indexing", filesAdded);

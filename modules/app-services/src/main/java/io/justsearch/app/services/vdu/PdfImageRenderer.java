@@ -5,7 +5,6 @@ import io.justsearch.app.util.TempFileManager;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +32,7 @@ public class PdfImageRenderer implements AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(PdfImageRenderer.class);
 
     /** DPI for rendering. 100 DPI is sufficient for VLM OCR (~50% faster than 150 DPI). */
-    private static final int DEFAULT_DPI = 100;
+    static final int DEFAULT_DPI = 100;
 
     /** Maximum pages to process per PDF (prevent runaway processing). */
     private static final int MAX_PAGES = 50;
@@ -61,9 +60,29 @@ public class PdfImageRenderer implements AutoCloseable {
         renderedImages.clear();
 
         try (PDDocument document = Loader.loadPDF(pdfPath.toFile())) {
-            PDFRenderer renderer = new PDFRenderer(document);
+            BoundedPdfRenderer renderer = new BoundedPdfRenderer(document);
             int totalPages = document.getNumberOfPages();
             int pageCount = Math.min(totalPages, MAX_PAGES);
+
+            // Validate every selected page before the first raster allocation. PDFRenderer uses
+            // the crop box and DPI scale; round upward to cover its integer raster dimensions.
+            long documentPixels = 0;
+            for (int page = 0; page < pageCount; page++) {
+                var box = document.getPage(page).getCropBox();
+                float scale = DEFAULT_DPI / 72f;
+                documentPixels += VduImageLimits.checkDimensions(
+                    box.getWidth() * scale, box.getHeight() * scale);
+                if (documentPixels > VduImageLimits.MAX_DOCUMENT_PIXELS) {
+                    throw new IOException("VDU document pixels exceed allocation limit");
+                }
+            }
+
+            // Reserve both page rasters for every selected page before allocating the first.
+            for (int page = 0; page < pageCount; page++) {
+                var box = document.getPage(page).getCropBox();
+                renderer.chargeRaster(box.getWidth() * (DEFAULT_DPI / 72f),
+                    box.getHeight() * (DEFAULT_DPI / 72f), 2);
+            }
 
             if (pageCount < totalPages) {
                 LOG.warn("PDF has {} pages, processing only first {} (limit)",
@@ -74,6 +93,9 @@ public class PdfImageRenderer implements AutoCloseable {
 
             for (int page = 0; page < pageCount; page++) {
                 BufferedImage image = renderer.renderImageWithDPI(page, DEFAULT_DPI, ImageType.RGB);
+                // PDFBox may catch an operator's IOException. A refused image must reject the
+                // document even if the renderer returned a page with that image omitted.
+                renderer.requireWithinLimits();
                 Path tempPath = tempFileManager.createTempFile("vdu_page_" + page + "_", ".png");
                 ImageIO.write(image, "PNG", tempPath.toFile());
                 renderedImages.add(tempPath);

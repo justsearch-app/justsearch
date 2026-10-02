@@ -360,6 +360,10 @@ final class SqliteQueueMigrationOps {
         }
         log.info("V20 to V21: Scoped switch-buffer rows to candidate generations");
       }
+      case 22 -> {
+        addColumnIfMissing(conn, "ingestion_root", SqliteSchema.MIGRATE_V21_TO_V22_INGESTION_ROOT);
+        log.info("V21 to V22: Persisted root-relative ingestion policy boundaries");
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }

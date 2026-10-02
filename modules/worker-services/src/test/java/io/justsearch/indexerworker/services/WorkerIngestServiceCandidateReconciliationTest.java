@@ -25,6 +25,7 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.indexerworker.ingest.IngestionSkipPolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
@@ -41,13 +42,20 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
 final class WorkerIngestServiceCandidateReconciliationTest {
   @TempDir Path tempDir;
+
+  @AfterEach
+  void resetPolicy() {
+    IngestionSkipPolicy.resetToDefaults();
+  }
 
   @Test
   void migrationRefusesLongPathSnapshotsBeforeAnyAdmissionAndKeepsCutoverFenced()
@@ -190,8 +198,11 @@ final class WorkerIngestServiceCandidateReconciliationTest {
 
     assertEquals(1, response.getFilesAdded());
     assertEquals(1, response.getFilesDeleted());
+    var entry = ArgumentCaptor.forClass(JobQueue.EnqueueEntry.class);
     verify(fixture.queue).enqueueAndBufferFileForGeneration(
-        eq(fixture.buildingGeneration), any(JobQueue.EnqueueEntry.class), eq("research"));
+        eq(fixture.buildingGeneration), entry.capture(), eq("research"));
+    assertEquals(added, entry.getValue().path());
+    assertEquals(root, entry.getValue().ingestionRoot());
     verify(fixture.queue).putSwitchBufferForGeneration(
         fixture.buildingGeneration, IngestResponses.switchBufferPathKey(deleted), "DELETE", deleted);
     verify(fixture.servingWriter).deleteByIdAndChunks(deleted);
@@ -201,6 +212,54 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     assertTrue(fixture.admission.replayCertain());
     assertTrue(Files.exists(added));
     assertFalse(Files.exists(Path.of(deleted)));
+  }
+
+  @Test
+  void candidateReconciliationUsesRootRelativeExclusionsForOrdinaryAndForcedScans() throws Exception {
+    IngestionSkipPolicy.installResolved(
+        new IngestionSkipPolicy(null, null, java.util.Set.of("private")));
+    Path root = Files.createDirectories(tempDir.resolve("private").resolve("watched"));
+    Path admitted = Files.writeString(root.resolve("public.txt"), "public content");
+    Files.writeString(Files.createDirectory(root.resolve("private")).resolve("notes.txt"),
+        "excluded content");
+    for (boolean force : new boolean[] {false, true}) {
+      Fixture fixture = fixture();
+      watch(fixture, root);
+
+      var response = fixture.service.syncDirectory(request(root, force), CallContext.none());
+
+      assertEquals(1, response.getFilesAdded());
+      var entry = ArgumentCaptor.forClass(JobQueue.EnqueueEntry.class);
+      verify(fixture.queue, times(1)).enqueueAndBufferFileForGeneration(
+          eq(fixture.buildingGeneration), entry.capture(), eq("research"));
+      assertEquals(admitted, entry.getValue().path());
+      assertEquals(root, entry.getValue().ingestionRoot());
+      assertTrue(fixture.admission.replayCertain());
+    }
+  }
+
+  @Test
+  void candidateAdmissionRechecksExclusionsAfterDiscovery() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("policy-change-root"));
+    Path admitted = Files.writeString(root.resolve("a.txt"), "public content");
+    Files.writeString(Files.createDirectory(root.resolve("private")).resolve("notes.txt"),
+        "private content");
+    Fixture fixture = fixture();
+    watch(fixture, root);
+    when(fixture.queue.enqueueAndBufferFileForGeneration(
+        eq(fixture.buildingGeneration), any(), eq("research"))).thenAnswer(call -> {
+          assertEquals(admitted, ((JobQueue.EnqueueEntry) call.getArgument(1)).path());
+          IngestionSkipPolicy.installResolved(
+              new IngestionSkipPolicy(null, null, java.util.Set.of("private")));
+          return true;
+        });
+
+    var response = fixture.service.syncDirectory(request(root), CallContext.none());
+
+    assertEquals(1, response.getFilesAdded(), "Only successful admissions count as added");
+    verify(fixture.queue, times(1)).enqueueAndBufferFileForGeneration(
+        eq(fixture.buildingGeneration), any(), eq("research"));
+    assertTrue(fixture.admission.replayCertain());
   }
 
   @Test

@@ -991,7 +991,7 @@ final class JobQueueMigrationTest {
         assertTrue(rs.next());
         assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
-      assertEquals(21, SqliteSchema.TARGET_VERSION);
+      assertEquals(22, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
@@ -1013,9 +1013,10 @@ final class JobQueueMigrationTest {
             "a migrated V11 database has no evidence of WHICH generation it imported");
       }
       try (ResultSet rs =
-          stmt.executeQuery("SELECT state FROM jobs WHERE path='/v11/preserved.txt'")) {
+          stmt.executeQuery("SELECT state, ingestion_root FROM jobs WHERE path='/v11/preserved.txt'")) {
         assertTrue(rs.next());
         assertEquals("PENDING", rs.getString(1));
+        assertNull(rs.getString(2), "A legacy admission must not acquire an inferred volume boundary");
       }
     } finally {
       queue.close();

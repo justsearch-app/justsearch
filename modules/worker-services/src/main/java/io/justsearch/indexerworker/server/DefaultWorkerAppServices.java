@@ -273,14 +273,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       }
     }
 
-    private void upsert(String collection, Path path) {
-      try (RoutedTarget routed = acquireTarget()) {
-        Target selected = routed.target();
-        if (selected.runtime() == null) return;
-        selected.ingest().acceptWatcherUpsert(collection, path);
-      }
-    }
-
     private void upsert(
         io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription witness,
         String collection,
@@ -694,7 +686,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
           executors.watcherReconcile(), ctx.jobQueue(), workerWatcherCatalog,
           watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
           ignored -> mutationAdmission.markReplayUncertain(), watcherCallbacks::route,
-          watcherCallbacks::delete, watcherCallbacks::upsert);
+          watcherCallbacks::delete);
       this.rootWatcherRegistry =
           new io.justsearch.indexerworker.services.RootWatcherRegistry(workerWatcher);
     } else {

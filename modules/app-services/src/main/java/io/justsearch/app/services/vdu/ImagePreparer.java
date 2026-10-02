@@ -31,7 +31,7 @@ public class ImagePreparer {
      * @throws IOException if image cannot be read or processed
      */
     public byte[] prepare(Path imagePath) throws IOException {
-        BufferedImage original = ImageIO.read(imagePath.toFile());
+        BufferedImage original = VduImageLimits.read(imagePath);
         if (original == null) {
             throw new IOException("Failed to read image (unsupported format?): " + imagePath);
         }
