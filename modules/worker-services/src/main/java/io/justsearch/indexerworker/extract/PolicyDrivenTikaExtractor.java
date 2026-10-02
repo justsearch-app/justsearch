@@ -79,7 +79,8 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     // the structured extractor parses under (tempdoc 803).
     this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
     this.tika.setMaxStringLength(this.policy.maxExtractedChars());
-    this.structuredExtractor = new StructuredContentExtractor(this.policy.maxExtractedChars());
+    this.structuredExtractor =
+        new StructuredContentExtractor(this.policy.maxExtractedChars(), this.policy);
     this.ocrEngine = PdfOcrEngine.create(poolFactory, this.ocrConfig, log);
   }
 
@@ -151,7 +152,8 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
               ? trySelectivePdfOcr(file, result, summary, ocrEvidence)
               : tryOcr(file, result, summary, ocrEvidence);
       if (ocrArtifact != null) {
-        return ocrArtifact;
+        return ocrArtifact.withEmbeddedCounts(
+            structured.embeddedResourceCount(), structured.maxEmbeddedDepth());
       }
       } catch (java.util.concurrent.RejectedExecutionException refusal) {
         // OCR is an enhancement of an already extracted document. Keep that baseline while
@@ -167,7 +169,8 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       }
     }
     return withVisualEvidence(
-        ExtractionArtifact.full(result, policy, "tika-policy-structured", truncated),
+        ExtractionArtifact.full(result, policy, "tika-policy-structured", truncated)
+            .withEmbeddedCounts(structured.embeddedResourceCount(), structured.maxEmbeddedDepth()),
         summary,
         "structured",
         false,

@@ -48,18 +48,24 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   private final AutoDetectParser parser;
   private final Tika tika; // for detectMimeType only
   private final int maxContentLength;
+  private final TikaExtractionPolicy policy;
 
   public StructuredContentExtractor() {
     this(DEFAULT_MAX_CONTENT_LENGTH);
   }
 
   public StructuredContentExtractor(int maxContentLength) {
+    this(maxContentLength, TikaExtractionPolicy.defaults());
+  }
+
+  StructuredContentExtractor(int maxContentLength, TikaExtractionPolicy policy) {
     // Text-named, text-byte files must not be routed to a binary parser by a magic-number
     // collision — see TextNameMagicConflictDetector (tempdoc 803).
     org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
     this.parser = new AutoDetectParser(detector);
     this.tika = new Tika(detector);
     this.maxContentLength = maxContentLength;
+    this.policy = policy;
   }
 
   @Override
@@ -87,19 +93,24 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           StructuredDocumentSummary.empty());
     }
 
+    ParseContext context = parseContextWithMarkedPdfContent();
+    EmbeddedResourceBudget budget = new EmbeddedResourceBudget(policy, Files.size(file), context);
+    context.set(org.apache.tika.parser.Parser.class, parser);
     try {
-      return extractStructured(file, parseContextWithMarkedPdfContent());
+      StructuredExtractionResult result = extractStructured(file, context);
+      budget.check();
+      return new StructuredExtractionResult(result.result(), result.truncated(), result.summary(),
+          budget.resources(), budget.maxDepth());
     } catch (Exception e) {
+      budget.check();
       log.warn(
           "Structured extraction failed for {}, falling back to flat extraction",
           file.getFileName(),
           e);
-      // Flat fallback can't observe SAX-level truncation; report not-truncated. This path is rare
-      // (only fires when structured parsing throws) and the flat extractor enforces its own cap.
       return new StructuredExtractionResult(
-          new ContentExtractor(maxContentLength).extract(file),
+          new ContentExtractor(maxContentLength).extract(file, context, budget),
           false,
-          StructuredDocumentSummary.empty());
+          StructuredDocumentSummary.empty(), budget.resources(), budget.maxDepth());
     }
   }
 
@@ -130,7 +141,13 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   public record StructuredExtractionResult(
       ContentExtractor.ExtractionResult result,
       boolean truncated,
-      StructuredDocumentSummary summary) {
+      StructuredDocumentSummary summary,
+      int embeddedResourceCount,
+      int maxEmbeddedDepth) {
+    public StructuredExtractionResult(ContentExtractor.ExtractionResult result,
+        boolean truncated, StructuredDocumentSummary summary) {
+      this(result, truncated, summary, 0, 0);
+    }
     public int pageCount() {
       return summary == null ? 0 : summary.pageCount();
     }

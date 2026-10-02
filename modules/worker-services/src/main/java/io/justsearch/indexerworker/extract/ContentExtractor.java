@@ -76,6 +76,14 @@ public final class ContentExtractor implements ContentExtractorProvider {
    */
   @Override
   public ExtractionResult extract(Path file) throws IOException, ExtractionException {
+    org.apache.tika.parser.ParseContext context = new org.apache.tika.parser.ParseContext();
+    EmbeddedResourceBudget budget = new EmbeddedResourceBudget(
+        TikaExtractionPolicy.defaults(), Files.size(file), context);
+    return extract(file, context, budget);
+  }
+
+  ExtractionResult extract(Path file, org.apache.tika.parser.ParseContext context,
+      EmbeddedResourceBudget budget) throws IOException, ExtractionException {
     Objects.requireNonNull(file, "file");
 
     if (!Files.exists(file)) {
@@ -117,7 +125,18 @@ public final class ContentExtractor implements ContentExtractorProvider {
     metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.getFileName().toString());
 
     try (InputStream is = Files.newInputStream(file)) {
-      String content = tika.parseToString(is, metadata, maxContentLength);
+      org.apache.tika.sax.BodyContentHandler handler =
+          new org.apache.tika.sax.BodyContentHandler(maxContentLength);
+      context.set(org.apache.tika.parser.Parser.class, tika.getParser());
+      try {
+        tika.getParser().parse(is, handler, metadata, context);
+      } catch (org.xml.sax.SAXException e) {
+        if (!org.apache.tika.exception.WriteLimitReachedException.isWriteLimitReached(e)) {
+          throw new TikaException("Flat extraction failed", e);
+        }
+      }
+      budget.check();
+      String content = handler.toString();
       String mimeType = metadata.get(Metadata.CONTENT_TYPE);
       String title = metadata.get(TikaCoreProperties.TITLE);
       // Fallback: extract title from YAML frontmatter (Tika doesn't parse markdown frontmatter)
@@ -138,8 +157,12 @@ public final class ContentExtractor implements ContentExtractorProvider {
       return new ExtractionResult(content, title, mimeType, author, frontmatterMeta);
 
     } catch (TikaException e) {
+      budget.check();
       log.warn("Tika extraction failed for {}", file.getFileName(), e);
       throw new ExtractionException("Failed to extract content: " + e.getMessage(), e);
+    } catch (RuntimeException | IOException e) {
+      budget.check();
+      throw e;
     }
   }
 

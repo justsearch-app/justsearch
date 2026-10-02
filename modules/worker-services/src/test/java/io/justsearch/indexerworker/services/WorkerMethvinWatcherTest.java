@@ -58,6 +58,31 @@ final class WorkerMethvinWatcherTest {
 
   @TempDir Path tempDir;
 
+  @Test
+  void createAndModifyEventsDoNotQueueExcludedDirectoryContents() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("watched"));
+    Path privateFile = Files.writeString(
+        Files.createDirectory(root.resolve("private")).resolve("notes.txt"), "private content");
+    Path publicFile = Files.writeString(root.resolve("public.txt"), "public content");
+    var queue = new RecordingQueue();
+    io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(
+        new io.justsearch.indexerworker.ingest.IngestionSkipPolicy(null, null,
+            java.util.Set.of("private")));
+    try (var watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+        queue, null, ignored -> {}, (ignored, force) -> {})) {
+      var registration = subscription(root, "docs", new Object());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.CREATE, privateFile);
+      Files.writeString(privateFile, "updated private content");
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.MODIFY, privateFile);
+      assertTrue(queue.enqueuedPaths.isEmpty());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.CREATE, publicFile);
+      assertEquals(List.of(publicFile), new ArrayList<>(queue.enqueuedPaths));
+    } finally {
+      io.justsearch.indexerworker.ingest.IngestionSkipPolicy.resetToDefaults();
+    }
+  }
+
   private static RootWatcherRegistry.Subscription registerAndActivate(
       WorkerMethvinWatcher watcher, Path root, String collection, Object watcherEpoch)
       throws IOException {

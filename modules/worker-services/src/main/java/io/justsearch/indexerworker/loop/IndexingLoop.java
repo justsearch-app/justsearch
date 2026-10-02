@@ -86,6 +86,10 @@ import org.slf4j.LoggerFactory;
  * </ol>
  */
 public class IndexingLoop implements Closeable {
+  /** The current watched-root boundary is used only for directory skip policy, not authority. */
+  public void setIngestionPolicyRootResolver(java.util.function.Function<Path, Path> resolver) {
+    ingestionAuthority.setRootResolver(resolver);
+  }
   private static final Logger log = LoggerFactory.getLogger(IndexingLoop.class);
 
   private static final long ERROR_BACKOFF_MS = 1000; // back-off after a recovered error (tempdoc 588)

@@ -185,6 +185,12 @@ public final class WorkerIngestService {
       long migrationSwitchingMaxDurationMs) {
     this.jobQueue = jobQueue;
     this.indexingLoop = indexingLoop;
+    if (indexingLoop != null) {
+      indexingLoop.setIngestionPolicyRootResolver(path -> rootWatcherRegistry.watchedRoots().stream()
+          .filter(path::startsWith)
+          .max(java.util.Comparator.comparingInt(Path::getNameCount))
+          .orElse(path.getRoot()));
+    }
     this.indexingPacing =
         java.util.Objects.requireNonNull(indexingPacing, "indexingPacing");
     this.ingestLifecycle = ingestLifecycle;
@@ -366,6 +372,8 @@ public final class WorkerIngestService {
     java.util.Objects.requireNonNull(witness, "witness");
     try (var ignoredMutation = mutationLease()) {
       requireWatcherRootCurrent(witness);
+      if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
+          path, witness.root())) return;
       acceptWatcherUpsertUnderLease(collection, path);
       requireWatcherRootCurrent(witness);
     }

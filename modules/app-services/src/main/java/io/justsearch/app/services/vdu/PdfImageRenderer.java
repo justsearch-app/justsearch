@@ -65,6 +65,19 @@ public class PdfImageRenderer implements AutoCloseable {
             int totalPages = document.getNumberOfPages();
             int pageCount = Math.min(totalPages, MAX_PAGES);
 
+            // Validate every selected page before the first raster allocation. PDFRenderer uses
+            // the crop box and DPI scale; round upward to cover its integer raster dimensions.
+            long documentPixels = 0;
+            for (int page = 0; page < pageCount; page++) {
+                var box = document.getPage(page).getCropBox();
+                float scale = DEFAULT_DPI / 72f;
+                documentPixels += VduImageLimits.checkDimensions(
+                    box.getWidth() * scale, box.getHeight() * scale);
+                if (documentPixels > VduImageLimits.MAX_DOCUMENT_PIXELS) {
+                    throw new IOException("VDU document pixels exceed allocation limit");
+                }
+            }
+
             if (pageCount < totalPages) {
                 LOG.warn("PDF has {} pages, processing only first {} (limit)",
                     totalPages, MAX_PAGES);

@@ -109,6 +109,11 @@ public record ExtractionArtifact(
     return withVisualExtractionEvidenceJson(evidence == null ? null : evidence.toJson());
   }
 
+  public ExtractionArtifact withEmbeddedCounts(int resources, int depth) {
+    return new ExtractionArtifact(status, result, policyId, parserId, truncated, warnings,
+        resources, depth, visualExtractionEvidenceJson);
+  }
+
   public ExtractionArtifact withVisualExtractionEvidenceJson(String evidenceJson) {
     return new ExtractionArtifact(
         status,

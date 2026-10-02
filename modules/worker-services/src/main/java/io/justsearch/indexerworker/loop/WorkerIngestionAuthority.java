@@ -13,9 +13,19 @@ import java.nio.file.Path;
 
 /** Single Worker-side authority for source admission and freshness classification. */
 final class WorkerIngestionAuthority {
+  private volatile java.util.function.Function<Path, Path> rootResolver = path -> path.getRoot();
+
+  void setRootResolver(java.util.function.Function<Path, Path> resolver) {
+    rootResolver = java.util.Objects.requireNonNull(resolver);
+  }
 
   SourceAdmission admit(Path filePath) throws IOException {
-    if (IngestionSkipPolicy.shouldSkip(filePath)) {
+    Path absolute = filePath.toAbsolutePath().normalize();
+    return admit(filePath, rootResolver.apply(absolute));
+  }
+
+  SourceAdmission admit(Path filePath, Path root) throws IOException {
+    if (IngestionSkipPolicy.shouldSkipWithinRoot(filePath, root)) {
       return SourceAdmission.terminal(
           SourceAdmissionAction.SKIP_DONE,
           outcome(

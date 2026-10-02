@@ -459,6 +459,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   }
 
   private void handleUpsert(RootWatcherRegistry.Subscription witness, Path path) {
+    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
+        path, witness.root())) return;
     try {
       witnessedUpsertPathSink.accept(witness, witness.collection(), path);
     } catch (RuntimeException failure) {

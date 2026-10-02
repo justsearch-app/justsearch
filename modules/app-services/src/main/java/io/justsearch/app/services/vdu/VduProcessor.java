@@ -11,7 +11,6 @@ import io.justsearch.core.execution.EngineFutures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -214,7 +213,7 @@ public class VduProcessor {
 
             // Tempdoc 677 Stage 0: measure input legibility on every page BEFORE any model call
             // (ImagePreparer.prepare() also reads the file, but re-reads it via a fresh
-            // ImageIO.read() here so this measurement runs on the raw page image, independent of
+            // bounded decoding here so this measurement runs on the raw page image, independent of
             // ImagePreparer's own resize path — ImagePreparer is intentionally not touched by
             // this slice). Below-floor pages are skipped from the model call entirely; if EVERY
             // page is below floor, abstain without calling the model at all (Stage 0 CAUTION,
@@ -222,7 +221,7 @@ public class VduProcessor {
             List<LegibilityMeasures> pageMeasures = new ArrayList<>(pageImages.size());
             List<Integer> legiblePageIndices = new ArrayList<>();
             for (Path pageImage : pageImages) {
-                BufferedImage rawImage = ImageIO.read(pageImage.toFile());
+                BufferedImage rawImage = VduImageLimits.read(pageImage);
                 if (rawImage == null) {
                     throw new IOException("Failed to read image (unsupported format?): " + pageImage);
                 }
