@@ -69,23 +69,23 @@ Use the `tempdoc:` form — not `metric:` or `test:` — when the instrument doe
 named lane is scheduled to build it. Naming an unbuilt metric as if it were built is the failure
 this mechanism exists to end.
 
-## RISK-001: Single-tenant GPU policy limits concurrent AI operations
+## RISK-001: GPU co-residency leaves little VRAM headroom
 
 **Category:** performance | **Status:** Accepted
 
-**Trade-off:** Mutual exclusion between GPU workloads ensures VRAM safety on consumer 8GB GPUs. The Engine indexing loop yields bulk embedding backfill whenever the generative model has claimed the GPU, so the two workloads never contend for VRAM.
+**Risk:** Shipped builds allow ONNX encoders and `llama-server` to use the GPU at the same time. On the measured 12 GB card, `llama-server` used 7.5 GB and co-resident encoders used 3.3 GB p95 / 5.5 GB peak: 11.9 GB of 12.28 GB, leaving about 0.4 GB headroom. A larger context, workload peak, or model change can exhaust that margin and cause allocation failure or degraded inference.
 
-**Impact:** While Online Mode holds the GPU, GPU-side embedding backfill is paused, so enrichment progress stalls for the duration. With CPU-side embeddings the practical impact is minor (slight CPU contention).
+**Impact:** VRAM pressure can disrupt chat and GPU encoder work. Enforcing the previous exclusion policy avoided co-residency but ran every encoder on CPU; hybrid-search p95 measured 9.8 s versus 0.26 s with co-residency. A budget-aware policy is a follow-up lane, not current behavior.
 
-**Reassess when:** Target GPU VRAM exceeds 16GB, or CUDA adds reliable cross-process VRAM reservation.
+**Reassess when:** The packaged chat model, context budget, encoder set, or supported GPU memory changes, or a budget-aware co-residency policy is implemented.
 
-**Instrument:** `test:modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/LoopPacingPolicyTest.java#gpuYieldIsConflictOnly`
+**Instrument:** none - the product has no per-process co-residency or headroom monitor; the VRAM figures above are a one-off owner measurement. Host-level VRAM observations do not reserve memory or guarantee a safe budget.
 
-**Owner tempdoc:** none — no lane owns it; the mutual-exclusion mechanism is pinned by ADR-0004's premise probe `adr-0004-gpu-mutual-exclusion`.
+**Owner tempdoc:** none — budget-aware encoder yielding is a follow-up lane. The legacy `LoopPacingPolicyTest#gpuYieldIsConflictOnly` probe covers unit pacing behavior only; it does not prove Online GPU exclusion is wired in shipped builds.
 
-**Last reviewed:** 2026-09-02
+**Last reviewed:** 2026-10-02
 
-**Notes:** Reconciled 2026-09-07 (lane F stage A). [ADR-0004](../decisions/0004-single-tenant-gpu-policy.md) is now `status: superseded` — the GGUF/FFM embedding stack it framed the trade-off around was deleted in March 2026 — but the **mechanism** survives in a new form: lane F item A10 deleted the memory-mapped Head↔Worker signal bus (`MmfWorkerSignalLayoutV1` no longer exists) along with the Worker process itself (item A11), so `main_gpu_active` is no longer a cross-process byte. It is now the `mainGpuActive` field of the single in-process `GpuSchedulingGauge` (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`), written by the inference mode-change listener (`InferenceWiring.wireGpuStatusBroadcast`, `modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/InferenceWiring.java`) and read by `LoopPacingPolicy.shouldRunBackfill` (`modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/LoopPacingPolicy.java:53`) in the same JVM. The mutual-exclusion trade-off itself is unchanged — this is a mechanism update only, not a resolution.
+**Notes:** The prior 2026-09-07 note described an intended in-JVM gauge path as an active mechanism. Owner review on 2026-10-02 established that the shipped split Head never registered the GPU listener because `HeadlessApp` passed a null bootstrap and `InferenceWiring` returned early; the merged Engine does not apply the exclusion either. See [ADR-0004](../decisions/0004-single-tenant-gpu-policy.md) for the dated decision and measurements.
 
 ## RISK-002: SQLite job queue write contention under high-throughput ingestion
 

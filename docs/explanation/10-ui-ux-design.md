@@ -208,9 +208,9 @@ snapshot (`shell-v0/state/indexingProgress.ts`). Numbers may differ between surf
     *   *System:* Re-index File.
 
 ### AI Mode Switching
-The system operates in two mutually exclusive modes to manage GPU VRAM:
-*   **Online Mode:** LLM is loaded. Chat and Search QA are available. Embeddings are paused.
-*   **Indexing Mode:** Embedding model is loaded. New files are vectorized. LLM is unloaded.
+The system exposes Online and indexing activity as runtime modes; they do not imply exclusive GPU ownership:
+*   **Online Mode:** LLM is loaded. Chat and Search QA are available, and ONNX encoders may remain GPU-resident and continue indexing/search work.
+*   **Indexing Mode:** Background embedding and enrichment work runs; the LLM may also be loaded. Both workloads share available GPU memory.
 
 **Transition:**
 *   Users can manually toggle via the "Brain" view (Settings).

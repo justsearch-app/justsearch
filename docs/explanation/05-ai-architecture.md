@@ -14,13 +14,24 @@ Modern local AI requires two distinct types of models:
 1.  **Embedding Model:** ONNX Runtime encoder assets selected from the model manifest. High-throughput, used for vector search and chunk embeddings in the Engine's index half.
 2.  **Generative LLM:** (e.g., `Qwen_Qwen3.5-9B-Q4_K_M.gguf`, the current packaged default). Latency-sensitive, used for Chat, Q&A, Summarization, and VDU (served by `llama-server.exe`). Models that emit `reasoning_content` support chain-of-thought reasoning (see §Reasoning Pipeline below).
 
-On an 8GB GPU, loading both simultaneously (or leaving both GPU-enabled) can cause OOM (Out Of Memory) errors or fallback to ultra-slow system RAM.
+Co-residency can exhaust VRAM on small GPUs. On a measured 12 GB card, `llama-server` used 7.5 GB and co-resident ONNX encoders used 3.3 GB p95 / 5.5 GB peak, reaching 11.9 GB of 12.28 GB and leaving about 0.4 GB headroom. OOM risk therefore depends on device and workload.
 
-## The Solution: Mutual Exclusion
+## GPU co-residence and VRAM risk
 
-JustSearch enforces a strict **Single-tenant GPU Policy** between the two GPU-consuming halves of the single Engine JVM (lane F stage A — the Head and the index half are composed in-process, not separate processes):
-* Online inference (`llama-server.exe`) is driven via `modules/app-inference` and `InferenceLifecycleManager`.
-* Indexing + the index half's ONNX Runtime encoders cooperate via the in-process `mainGpuActive` field on `GpuSchedulingGauge` (`modules/core/src/main/java/io/justsearch/core/scheduling/GpuSchedulingGauge.java`), read through the existing `WorkerSignalBus.isMainGpuActive()` class.
+Shipped builds allow ONNX Runtime encoders to remain GPU-resident while
+`llama-server.exe` is Online. The proposed single-tenant exclusion was never
+active in shipped split builds: `HeadlessApp` supplied a null index bootstrap,
+so `InferenceWiring` returned without registering the Head's GPU-status
+listener. The merged Engine also does not apply the exclusion. The in-process
+`GpuSchedulingGauge` exists, but its presence is not proof that Online mode
+publishes a claim consumed by encoders.
+
+The measured co-residency leaves only about 0.4 GB headroom on the tested
+12 GB card. Enforcing exclusion sent every encoder to CPU and raised
+hybrid-search p95 from 0.26 s to 9.8 s. A budget-aware policy that keeps query
+encoders on CUDA while bulk work yields on small devices is a follow-up, not
+the merged Engine behavior. See [ADR-0004](../decisions/0004-single-tenant-gpu-policy.md)
+and [RISK-001](../reference/architectural-risks.md).
 
 ### The Runtime Authority (desired state, status, procedures)
 
@@ -51,29 +62,28 @@ directly:
 ### Modes (internal machinery)
 
 The `Mode` enum remains the internal FSM vocabulary of
-  `InferenceLifecycleManager` beneath the authority; externally the index half only
-ever sees the one-bit GPU lease state.
+`InferenceLifecycleManager` beneath the authority. Online mode does not grant
+the generative process exclusive GPU ownership from ONNX encoders.
 
 | Mode | Active Model | Purpose | Process |
 | :--- | :--- | :--- | :--- |
 | **Indexing Mode** | Embedding Model | Vectorizing documents in background | Engine index half |
-| **Online Mode** | Generative LLM | Interactive Chat, Q&A, Summarization, Vision | Main (llama-server) |
+| **Online Mode** | Generative LLM plus co-resident ONNX encoders | Interactive Chat, Q&A, Summarization, Vision and search | Engine + llama-server |
 | **Offline Mode** | none | No GPU work; background queues can accumulate | Engine + Brain |
 
 ### Transition Protocol
 
 When the user escalates to an Ask/agent turn in the unified "Search" window (tempdoc 687 — there is no separate Chat tab):
 1.  **Main:** Begins a mode transition via `ModeStateMachine` (validates not already transitioning, stores previous mode for rollback).
-2.  **Main:** Sets the in-process `GpuSchedulingGauge.mainGpuActive = true` (lane F stage A — an in-JVM field write, not a cross-process signal).
-3.  **Index half:** Unloads/suspends GPU-backed ORT encoder work as needed and skips embedding work while the flag is set.
+2.  **Main:** Does not claim the GPU from ONNX encoders as part of the Online transition.
+3.  **Index half:** ONNX encoders may remain GPU-resident and continue query and background work while Chat is Online; VRAM capacity is shared.
 4.  **Main:** Starts `llama-server.exe` (or **adopts** an already-running instance on the configured port).
 5.  **Main:** Polls `GET /health` until 200 OK (timeout configurable via `justsearch.inference.health_check_timeout_ms` system property, default 30000ms; progress logged every 10s during wait — tempdoc 369), then reads `GET /props` (best-effort) to learn the effective `n_ctx` and `model_alias`.
 6.  **Main:** Completes the transition to ONLINE via `ModeStateMachine`. On failure at any step, rolls back to the previous mode.
 
 When the user closes Chat or minimizes the app:
 1.  **Main:** Kills `llama-server.exe`.
-2.  **Main:** Sets `GpuSchedulingGauge.mainGpuActive = false`.
-3.  **Index half:** Reloads its ORT encoders as needed and resumes backfill.
+2.  **Index half:** Continues its ordinary encoder lifecycle; Chat closing does not trigger a GPU-yield/resume transition.
 
 ## Components
 
@@ -239,9 +249,9 @@ GPU is enabled by default (`JUSTSEARCH_RERANK_GPU_ENABLED=true`).
 
 GPU arbitration:
 - **Startup initialization**: GPU session is created in `initDeferredModels()` with a warm-up inference to compile the ORT execution plan.
-- **Signal bus arbitration**: `selectSession()` checks `!signalBus.isMainGpuActive()` - same as all other index-half ORT consumers.
-- **VRAM release**: `releaseGpuSession()` frees the GPU session when Main process claims GPU (e.g., `llama-server` going online).
-- **Fallback**: Reranking continues on CPU session while GPU is released or unavailable.
+- **Session selection**: `selectSession()` honors the scheduling gauge if active; the shipped Online path does not publish an exclusion claim, so this is not a co-residency arbiter for Chat.
+- **VRAM lifecycle**: The shipped Engine does not release this GPU session because Chat becomes Online; it can be co-resident with `llama-server`.
+- **Fallback**: Reranking continues on a CPU session when GPU inference is unavailable or its session falls back.
 - **Application-side invocation**: The application half calls the index half's `rerank` port call, sending pre-built document texts (title + snippet). The application half has no ORT sessions.
 
 Defaults: `gpu_mem_mb=2048`, `max_seq_len=512`. At seq=512, GPU inference
@@ -558,7 +568,7 @@ The cross-encoder runs on CPU, eliminating the GPU contention that blocked the o
 
 Fallback chain in `matchCitations()`:
 1. Cross-encoder (CPU, no GPU needed) → preferred
-2. Embedding cosine similarity (requires `EmbeddingService`) → blocked during Q&A on single-GPU
+2. Embedding cosine similarity (requires `EmbeddingService`) → available through the co-resident encoder path while Q&A is Online
 3. `EMBEDDING_UNAVAILABLE` → no post-hoc matching
 
 ### Frontend rendering

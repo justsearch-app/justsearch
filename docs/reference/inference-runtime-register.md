@@ -122,7 +122,8 @@ Settled empirical facts. Each was an open question that got answered.
 
 - **GPU:** ~2.2s for top-20 documents at seq=512, 2048MB arena, RTX 4070. Default: `gpu=true, mem=2048MB, seq=512`.
 - **CPU:** ~42s for top-20 documents at seq=2048 on RTX 4070 host CPU.
-- **VRAM budget (all ORT consumers):** embed ~2GB + SPLADE ~1GB + NER ~0.5GB + reranker ~2GB = ~5.5GB total (leaves ~6.5GB for LLM on 12GB GPU). *Updated by tempdoc 691:* NER's arena cap is now 2GB (see F-013) — caps are per-session budgets, not pre-allocations, and enrichment backfill yields the GPU when Main claims it, so LLM coexistence is unaffected; measured total VRAM peak during full-corpus enrichment (no LLM): 7.7GB of 12GB. *Further 691 Phase-N note (2026-07-11):* the default-on long-doc single-pass embed (batch-1, up to 8192 tokens) can BFC-OOM inside the 3072MB embed arena on near-8k docs (fragmentation from varying seq lengths; ~1.3-1.5GB BiasSoftmax requests) — it falls back to windowed cleanly, but `JUSTSEARCH_EMBED_GPU_MEM_MB=6144` removes the double-pay and recovers the last ~0.04 nDCG on legal-clerc (0.2967→0.3401). **6144 is the shipped default since 2026-07-11 (founder decision; history 2048→3072 (391)→6144 (691/F-031))** — worst-case cap sum across lanes now exceeds 12GB on paper, but caps are per-session budgets, not pre-allocations, and GPU mutual exclusion + shrinkage + the windowed fallback bound the realized peak (measured 7.7GB at the old caps; re-measure at next full-corpus enrichment profiling).
+- **VRAM budget and co-residency:** historical ORT per-session arena caps are not pre-allocations and do not establish a safe total budget. Owner measurement on a 12 GB card: `llama-server` 7.5 GB plus co-resident encoders 3.3 GB p95 / 5.5 GB peak, 11.9 GB of 12.28 GB total and about 0.4 GB headroom. With the exclusion policy applied, every encoder ran on CPU and hybrid-search p95 was 9.8 s versus 0.26 s with co-residency. Shipped builds allow this co-residency; OOM risk remains when workload or model memory exceeds the measured profile. Budget-aware yielding is a follow-up lane.
+- **Historical F-010 measurements:** full-corpus enrichment without an LLM peaked at 7.7 GB of 12 GB in tempdoc 691 (2026-07-11). Its former claim that Online yielding made LLM coexistence unaffected is superseded by the 2026-10-02 owner measurement above. The long-document single-pass path may BFC-OOM within the 3072 MB embed arena on near-8k docs; it falls back to windowed processing. `JUSTSEARCH_EMBED_GPU_MEM_MB=6144` is the shipped default since 2026-07-11 (founder decision; history 2048→3072→6144); arena caps are not pre-allocations.
 - **Evidence:** tempdoc 360 (Worker migration), tempdoc 361 I9; tempdoc 691 Phase C (NER cap update).
 
 ### F-011: JAR-bundled CUDA defeats native-path-based GPU-failure-reproduction
@@ -242,7 +243,7 @@ Settled empirical facts. Each was an open question that got answered.
   and post-acquire interruption with a mocked native session boundary. Real-model pacing and
   overall native close/quiescence remain separate proof obligations.
 
-### F-018: async index connection must seed the GPU scheduling signal
+### F-018: Online GPU status publication does not establish shipped encoder exclusion
 
 - **Finding (2026-09-09):** inference setup runs before the index bootstrap connects. Capturing
   that initial null bootstrap disabled GPU-status publication throughout a normal Engine boot,
@@ -250,10 +251,14 @@ Settled empirical facts. Each was an open question that got answered.
 - **Correction:** one mode listener resolves the existing live bootstrap supplier; connect and
   reconnect seed current manager mode. Publication reads current mode under the gauge lock, so
   delayed callbacks cannot replay stale mode values. Existing teardown removes the same listener.
-- **Operating shape:** GPU-configured bulk enrichment pauses while chat owns the GPU; primary
-  indexing continues and query encoding uses CPU. Throughput proof must distinguish these arms.
+- **Current disposition (2026-10-02):** the intended yield signal is not the shipped operating
+  shape. In shipped split builds, `HeadlessApp` passed a null bootstrap and the Head never
+  registered the listener. The merged Engine does not make Online chat claim the GPU from ONNX
+  encoders. Encoders and `llama-server` are co-resident; see F-010 and ADR-0004 for measured
+  memory use and the follow-up policy.
 - **Evidence:** lane-F C1 `gpu-scheduling-connect.md` records clean standard-run207, the disabled
-  broadcast log, unit215 and the connect-seed adverse mutation217. Restored live proof remains open.
+  broadcast log, unit215 and the connect-seed adverse mutation217. This evidence documents the
+  historical signal investigation; it does not establish shipped Online exclusion.
 
 ### F-019: refused generative configuration must preserve the incumbent; failed restoration must report OFFLINE
 
