@@ -383,6 +383,13 @@ async function healthyLlama(collector, children) {
   }
   return children.length ? true : undefined;
 }
+// A complete RTF document (font table, paragraph marks). The bare one-group form ("{\rtf1\ansi word}")
+// extracted as blank content on MAIN (SUCCESS_EMPTY), so a readiness search on its marker never matched
+// (child policy 2026-10-01, crash corpus 2026-10-02).
+export function rtfDocument(paragraphs) {
+  return ['{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Arial;}}\\f0\\fs24',
+    ...paragraphs.map(text => `${text}\\par`), '}'].join('\r\n');
+}
 export async function crashExperiment(context) {
   const collector = context.collector, r = context.record;
   requireCollectorSample(collector, 'E5 crash');
@@ -397,8 +404,9 @@ export async function crashExperiment(context) {
   }
   const directory = path.join(context.raw, 'crash'); fs.mkdirSync(directory, { recursive: true });
   const corpus = path.join(directory, 'corpus'); fs.mkdirSync(corpus);
-  for (let i = 0; i < 100; i++) fs.writeFileSync(path.join(corpus, `recovery-${i}.rtf`),
-    `{\\rtf1\\ansi lanefrecoverydoc${i} ${'durable checkpoint capybara '.repeat(2500)}}`);
+  for (let i = 0; i < 100; i++) fs.writeFileSync(path.join(corpus, `recovery-${i}.rtf`), rtfDocument([
+    `lanefrecoverydoc${i} is the marker term for recovery document ${i}.`,
+    ...Array.from({ length: 50 }, () => 'durable checkpoint capybara '.repeat(50))]));
   const key = createOperationKey(), accepted = await requestLive(context, '/api/knowledge/ingest', { paths: [corpus], idempotencyKey: key }, 30000);
   save(path.join(directory, 'accepted.json'), accepted);
   let cut;
@@ -525,16 +533,10 @@ export async function childPathExperiment(context, reason) {
   requireCollectorSample(collector, `E5 child ${reason}`);
   // Make real extraction children exist before evaluating their cleanup policy.
   const corpus = path.join(collector.directory, 'child-policy-corpus'); fs.mkdirSync(corpus);
-  // A complete RTF document with a font table and paragraph marks: the bare one-group form
-  // ("{\rtf1\ansi word}") extracted as blank content on MAIN (2026-10-01), so the readiness search
-  // could never find it.
-  fs.writeFileSync(path.join(corpus, 'children.rtf'), [
-    '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Arial;}}',
-    '\\f0\\fs24 childpolicycapybara is the marker term for the child policy check.\\par',
-    'This document exists so that real extraction children parse durable content during the crash round.\\par',
-    'The parser children must be cleaned up or restarted according to the policy under test.\\par',
-    '}',
-  ].join('\r\n'));
+  fs.writeFileSync(path.join(corpus, 'children.rtf'), rtfDocument([
+    'childpolicycapybara is the marker term for the child policy check.',
+    'This document exists so that real extraction children parse durable content during the crash round.',
+    'The parser children must be cleaned up or restarted according to the policy under test.']));
   await requestLive(context, '/api/knowledge/ingest', { paths: [corpus], idempotencyKey: createOperationKey() }, 30000);
   const deadline = Math.min(context.deadline, Date.now() + 180000);
   await until(deadline, 'Child-policy corpus ready', async () => searchHit(await requestLive(context,
