@@ -1121,20 +1121,17 @@ impl ShellActuator {
 }
 
 fn publish_terminal_spawn_failure(
-    app: &tauri::AppHandle,
-    state: &BackendState,
+    host: &EngineHost,
+    predecessor_instance_id: Option<String>,
     data_dir: Option<&std::path::Path>,
     error: &str,
+    event: impl FnOnce(&supervisor::StateRecord),
 ) {
+    if let Some(data_dir) = data_dir {
+        cleanup_registered_children_for_terminal(data_dir);
+    }
     let path = data_dir.map(|d| d.join("runtime").join("supervisor.v1.json"));
-    state.host.publish_initial_spawn_failure(
-        path.as_deref(),
-        state.binding_snapshot().instance_id,
-        error,
-        |record| {
-            let _ = app.emit(EVENT_SUPERVISOR_STATE, record);
-        },
-    );
+    host.publish_initial_spawn_failure(path.as_deref(), predecessor_instance_id, error, event);
 }
 
 impl supervisor::Actuator for ShellActuator {
@@ -1274,6 +1271,12 @@ impl supervisor::Actuator for ShellActuator {
     }
 }
 
+fn cleanup_after_supervision(outcome: &supervisor::Outcome, data_dir: &std::path::Path) {
+    if matches!(outcome, supervisor::Outcome::Exhausted { .. }) {
+        cleanup_registered_children_for_terminal(data_dir);
+    }
+}
+
 /// Start supervising the Engine on an OS thread.
 ///
 /// An OS thread, following the split this file already uses for the stdout drain and the manifest
@@ -1289,6 +1292,7 @@ pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>
         let policy = supervisor::load_policy();
         let mut sup = supervisor::Supervisor::new(policy);
         let outcome = supervisor::run_supervision(&mut sup, &mut actuator);
+        cleanup_after_supervision(&outcome, &actuator.data_dir);
         match outcome {
             supervisor::Outcome::Exhausted { reason, .. } => {
                 // The current host state already carries the terminal result. B13 uses owned
@@ -1703,10 +1707,13 @@ pub fn run() {
                 state.port_ready.notify_waiters();
                 state.session_token_ready.notify_waiters();
                 publish_terminal_spawn_failure(
-                    app.handle(),
-                    &state,
+                    &state.host,
+                    state.binding_snapshot().instance_id,
                     launch_data_dir.as_deref(),
                     &err,
+                    |record| {
+                        let _ = app.emit(EVENT_SUPERVISOR_STATE, record);
+                    },
                 );
                 eprintln!("Failed to spawn headless backend: {err}");
             } else {
@@ -1717,7 +1724,15 @@ pub fn run() {
                 // Only on a successful spawn: a spawn that failed has no child to supervise, and the
                 // failure is already reported through `spawn_error` to everything waiting on it.
                 if let Err(error) = start_supervision(app.handle(), state.clone()) {
-                    publish_terminal_spawn_failure(app.handle(), &state, launch_data_dir.as_deref(), &error);
+                    publish_terminal_spawn_failure(
+                        &state.host,
+                        state.binding_snapshot().instance_id,
+                        launch_data_dir.as_deref(),
+                        &error,
+                        |record| {
+                            let _ = app.emit(EVENT_SUPERVISOR_STATE, record);
+                        },
+                    );
                 }
             }
             let reconciliation_app = app.handle().clone();
@@ -1927,6 +1942,64 @@ mod tests {
             executable: identity["executable"].as_str().unwrap().to_string(),
         };
         (child, record)
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn exhaustion_cleans_registered_children() {
+        let dir = tempdir().unwrap();
+        fs::create_dir(dir.path().join("runtime")).unwrap();
+        let (mut child, record) = owned_sleep_child();
+        let manifest = serde_json::json!({ "schemaVersion": 2, "children": [{
+            "pid": record.pid, "startedAt": record.started_at, "executable": record.executable
+        }] });
+        fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
+        cleanup_after_supervision(&supervisor::Outcome::Cancelled, dir.path());
+        assert!(child.try_wait().unwrap().is_none());
+        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
+            reason: "restart budget exhausted".into(), exit_code: 1,
+        }, dir.path());
+        assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn initial_spawn_failure_cleans_predecessor_children_before_terminal_event() {
+        let dir = tempdir().unwrap();
+        fs::create_dir(dir.path().join("runtime")).unwrap();
+        let (mut matched, record) = owned_sleep_child();
+        let (mut unrelated, mut mismatch) = owned_sleep_child();
+        mismatch.executable.push_str(".unrelated");
+        let manifest = serde_json::json!({ "schemaVersion": 2, "children": [
+            { "pid": record.pid, "startedAt": record.started_at, "executable": record.executable },
+            { "pid": mismatch.pid, "startedAt": mismatch.started_at, "executable": mismatch.executable }
+        ] });
+        fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
+        let host = EngineHost::default();
+        let error = host
+            .admit(PreparedCommand {
+                command: Command::new("a-command-that-does-not-exist-justsearch"),
+            })
+            .unwrap_err();
+        publish_terminal_spawn_failure(
+            &host,
+            Some("predecessor".into()),
+            Some(dir.path()),
+            &error,
+            |record| {
+                assert_eq!(record.state, "exhausted");
+                assert_eq!(record.instance_id.as_deref(), Some("predecessor"));
+                assert!(matched.try_wait().unwrap().is_some());
+                assert!(unrelated.try_wait().unwrap().is_none());
+            },
+        );
+        let disk: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(dir.path().join("runtime/supervisor.v1.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(disk["state"], "exhausted");
+        unrelated.kill().unwrap();
+        let _ = unrelated.wait();
     }
 
     #[cfg(windows)]

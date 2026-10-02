@@ -53,6 +53,71 @@ test('native exception survives teardown; forced-stop success does not fabricate
   assert.deepEqual(report.processExits, result.processExits);
   assert.equal(report.exitAccountingComplete, true);
 });
+test('Engine-owned fallback accepts only code 1 with matching owner/child identity and prior intent', t => {
+  const dir = fs.mkdtempSync(path.join(root, 'tmp/engine-intent-test-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const startedAt = '2026-10-01T00:00:00.123Z';
+  const extraction = { ...manifest.children[1], id: 'extraction', startedAt };
+  const i = census.exitTargets(run, { ...manifest, children: [extraction] },
+    [{ pid: extraction.pid, executable: exe, creationFileTimeUtc: birth }]);
+  const at = Date.parse(startedAt) + 2000;
+  i.observedAfterMs = at - 100;
+  const intent = { enginePid: 10, engineStartedAt: startedAt, child: extraction,
+    requestedAtMs: at, reason: 'graceful-close-fallback' };
+  const exits = i.targets.map(t => ({ ...t, exitCode: t.kind === 'EXTRACTION' ? 1 : 0, atMs: at + 1 }));
+  const log = path.join(dir, 'backend.stderr.log');
+  fs.writeFileSync(log, census.TERMINATION_INTENT_PREFIX + JSON.stringify(intent) + '\n');
+  const receipts = [{ ...intent, source: log }];
+  const classify = intents => census.exitResult(i, { processExits: exits, engineTerminationIntents: intents }, 'os-exits');
+  assert.equal(classify(receipts).processExits[1].expectedTermination, true);
+  assert.equal(classify(receipts).processExits[1].terminationIntent.source, log);
+  assert.deepEqual(census.readEngineTerminationIntents(log), receipts);
+  assert.equal(classify([]).processExits[1].expectedTermination, false);
+  for (const bad of [
+    { ...intent, enginePid: 99 }, { ...intent, engineStartedAt: '2026-10-01T00:00:00.124Z' },
+    { ...intent, reason: 'crash' }, { ...intent, requestedAtMs: at + 2 }, { ...intent, requestedAtMs: at - 101 },
+    ...[{ pid: 99 }, { id: 'reused' }, { kind: 'LLAMA_SERVER' }, { executable: exe + '.other' },
+      { startedAt: '2026-10-01T00:00:00.1230001Z' }].map(change => ({ ...intent, child: { ...extraction, ...change } })),
+  ]) assert.equal(classify([bad]).processExits[1].expectedTermination, false, JSON.stringify(bad));
+  exits[1].exitCode = -1073741819;
+  assert.equal(classify(receipts).processExits[1].expectedTermination, false, 'native exception remains a crash');
+  assert.equal(census.exitResult(i, { engineTerminationIntents: receipts }, 'os-exits').exitAccountingComplete, false);
+  fs.writeFileSync(log, census.TERMINATION_INTENT_PREFIX + '{bad}\n' + census.TERMINATION_INTENT_PREFIX + JSON.stringify(intent));
+  assert.deepEqual(census.readEngineTerminationIntents(log), [], 'malformed/partial markers grant no exemption');
+});
+
+test('observer reads Engine fallback evidence from existing stderr after its pre-stop cursor', async t => {
+  const dir = fs.mkdtempSync(path.join(root, 'tmp/engine-intent-test-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(dir, 'runtime')); fs.mkdirSync(path.join(dir, 'logs'));
+  fs.writeFileSync(path.join(dir, 'runtime/manifest.json'), JSON.stringify(manifest));
+  const scope = path.join(dir, 'scope.json'); fs.writeFileSync(scope, JSON.stringify({ processes: input().targets }));
+  const log = path.join(dir, 'logs/backend.stderr.log');
+  const at = Date.parse(start) + 2000;
+  const intent = { enginePid: 10, engineStartedAt: start, child: manifest.children[1],
+    requestedAtMs: at, reason: 'graceful-close-fallback' };
+  fs.writeFileSync(log, census.TERMINATION_INTENT_PREFIX + JSON.stringify(intent) + '\n');
+  let clock = at - 100, args;
+  const proc = new EventEmitter(); proc.exitCode = null; proc.kill = () => {};
+  const flag = f => args[args.indexOf(f) + 1];
+  const observer = await census.startStopExitCensus(run, dir, dir, scope, {
+    launch: a => { args = a; fs.writeFileSync(flag('-ReadyFile'), '{}'); return proc; }, now: () => clock,
+    pause: async ms => {
+      clock += ms;
+      if (fs.existsSync(flag('-FinishFile'))) {
+        fs.appendFileSync(log, census.TERMINATION_INTENT_PREFIX + JSON.stringify(intent) + '\n');
+        fs.writeFileSync(flag('-OutputFile'), JSON.stringify({ processExits: input().targets.map(t => ({
+          ...t, exitCode: t.kind === 'EXTRACTION' ? 1 : 0, atMs: at + 1,
+        })), forcedPids: [] }));
+      }
+    },
+  });
+  const result = await observer.finish([]);
+  assert.equal(result.exitAccountingComplete, true);
+  assert.equal(result.processExits[2].expectedTermination, true);
+  assert.equal(result.processExits[2].terminationIntent.source, log);
+});
+
 test('observer becomes ready before shutdown and returns held-handle receipts after stop (including PS UTF8 BOM)', async t => {
   const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-test-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
