@@ -445,5 +445,5 @@ tasks.register<JavaExec>("generatePassageVectors") {
 tasks.register("fullTestSuite") {
   description = "Runs all test tiers: unit, integration, and system tests."
   group = "verification"
-  dependsOn(tasks.named("test"), integrationTest, systemTest)
+  dependsOn(tasks.named("test"), integrationTest, tasks.named("lifecycleIntegrationTest"), systemTest)
 }

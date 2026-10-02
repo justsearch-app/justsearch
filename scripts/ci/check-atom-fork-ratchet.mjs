@@ -119,7 +119,10 @@ export function detect({ srcRoot = SRC, baselinePath = BASELINE } = {}) {
 
 /** Rewrite the baseline to the current (shrunk) counts. Returns {files, total}. */
 export function rebalanceBaseline({ srcRoot = SRC, baselinePath = BASELINE } = {}) {
-  const current = scanFiles(srcRoot);
+  const { current, failures } = detect({ srcRoot, baselinePath });
+  if (failures.length > 0) {
+    throw new Error('Cannot rebalance atom-fork baseline upward: ' + failures.map((f) => f.message).join('\n'));
+  }
   const sorted = Object.fromEntries(Object.entries(current).sort(([a], [b]) => a.localeCompare(b)));
   writeFileSync(baselinePath, JSON.stringify(sorted, null, 2) + '\n');
   return { files: Object.keys(current).length, total: Object.values(current).reduce((t, n) => t + n, 0) };
