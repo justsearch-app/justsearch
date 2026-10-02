@@ -17,6 +17,7 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -217,8 +218,30 @@ final class LauncherEnvironmentCloseTest {
 
   @Test
   void failedOperationsInitializationCannotReleaseLauncherInstanceLock() throws Exception {
+    failedOperationsInitializationCannotReleaseLauncherInstanceLock("open");
+  }
+
+  @Test
+  void failedAssemblyInitializationCleanupRemainsReachableForReplacementLauncher() throws Exception {
+    failedOperationsInitializationCannotReleaseLauncherInstanceLock("assembly");
+  }
+
+  private void failedOperationsInitializationCannotReleaseLauncherInstanceLock(String failurePoint)
+      throws Exception {
     System.setProperty("justsearch.data.dir", tempDir.toString());
     var resources = Mockito.mock(io.justsearch.app.api.EngineProcessResources.class);
+    var store = Mockito.mock(io.justsearch.app.observability.operations.SqliteOperationStore.class);
+    var initializationFailure = new java.io.IOException("injected " + failurePoint + " failure");
+    var closeFailure = new java.io.IOException("native operations owner still open");
+    var failCleanup = new AtomicBoolean(true);
+    var replacementHead = Mockito.mock(io.justsearch.app.services.HeadAssembly.class);
+    if (failurePoint.equals("open")) Mockito.doThrow(initializationFailure).when(store).open();
+    Mockito.doAnswer(invocation -> {
+      assertTrue(io.justsearch.app.util.AppInstanceLock.isHeldByThisJvm(tempDir),
+          "store cleanup must precede releasing exclusion");
+      if (failCleanup.get()) throw closeFailure;
+      return null;
+    }).when(store).close();
     try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
       Mockito.when(resources.executors()).thenReturn(executors);
       LauncherEnvironment.installFactories(
@@ -226,26 +249,118 @@ final class LauncherEnvironmentCloseTest {
           () -> resources,
           (owner, dataDir, profile) -> new LocalTelemetry(owner, dataDir, 1_000, "launcher-test", profile,
               "metrics.ndjson", List.of(io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher"))),
-          (owner, telemetry, config, operations) -> { throw new AssertionError("assembly must not start"); });
-      var store = Mockito.mock(io.justsearch.app.observability.operations.SqliteOperationStore.class);
-      var initializationFailure = new java.io.IOException("injected operations initialization failure");
-      var closeFailure = new java.io.IOException("native operations owner still open");
-      Mockito.doThrow(initializationFailure).when(store).open();
-      Mockito.doThrow(closeFailure).when(store).close();
+          (owner, telemetry, config, operations) -> {
+            if (operations == store) throw initializationFailure;
+            return replacementHead;
+          });
+      var replacementStore = io.justsearch.app.observability.operations.SqliteOperationStore.unopened(
+          tempDir.resolve("operations.db"));
+      try (var stores = Mockito.mockStatic(io.justsearch.app.observability.operations.SqliteOperationStore.class,
+          Mockito.CALLS_REAL_METHODS)) {
+        stores.when(() -> io.justsearch.app.observability.operations.SqliteOperationStore.unopened(
+            tempDir.resolve("operations.db"))).thenReturn(store, replacementStore);
+        try {
+          assertSame(initializationFailure,
+              assertThrows(java.io.IOException.class, () -> LauncherEnvironment.create("smoke")));
+          assertEquals(1, initializationFailure.getSuppressed().length);
+          assertSame(closeFailure, initializationFailure.getSuppressed()[0]);
+          assertTrue(io.justsearch.app.util.AppInstanceLock.isHeldByThisJvm(tempDir));
+          Mockito.verifyNoInteractions(replacementHead);
+          var order = Mockito.inOrder(store);
+          order.verify(store).open();
+          order.verify(store).close();
+          try (var blocked = new io.justsearch.app.util.AppInstanceLock(tempDir)) {
+            assertThrows(io.justsearch.app.util.AppInstanceLock.AppInstanceLockException.class, blocked::acquire);
+          }
+
+          assertSame(closeFailure,
+              assertThrows(java.io.IOException.class, LauncherEnvironment::retryFailedStartupCleanup));
+          assertTrue(io.justsearch.app.util.AppInstanceLock.isHeldByThisJvm(tempDir));
+          var previousConfig = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+          assertSame(closeFailure,
+              assertThrows(java.io.IOException.class, () -> LauncherEnvironment.create("smoke")));
+          assertSame(previousConfig, io.justsearch.configuration.resolved.ConfigStore.globalOrNull());
+          stores.verify(() -> io.justsearch.app.observability.operations.SqliteOperationStore.unopened(
+              tempDir.resolve("operations.db")));
+
+          failCleanup.set(false);
+          LauncherEnvironment.retryFailedStartupCleanup();
+          assertFalse(io.justsearch.app.util.AppInstanceLock.isHeldByThisJvm(tempDir));
+          Mockito.verify(store, Mockito.times(4)).close();
+          LauncherEnvironment.retryFailedStartupCleanup();
+          Mockito.verify(store, Mockito.times(4)).close();
+
+          try (var replacement = LauncherEnvironment.create("smoke")) {
+            assertSame(replacementHead, replacement.HeadAssembly());
+            assertTrue(io.justsearch.app.util.AppInstanceLock.isHeldByThisJvm(tempDir),
+                "a replacement launcher must acquire ownership after production cleanup retry");
+            assertTrue(Files.isRegularFile(tempDir.resolve("operations.db")));
+          }
+          assertFalse(io.justsearch.app.util.AppInstanceLock.isHeldByThisJvm(tempDir));
+          stores.verify(() -> io.justsearch.app.observability.operations.SqliteOperationStore.unopened(
+              tempDir.resolve("operations.db")), Mockito.times(2));
+        } finally {
+          failCleanup.set(false);
+          LauncherEnvironment.retryFailedStartupCleanup();
+          replacementStore.close();
+        }
+      }
+    }
+  }
+
+  @Test
+  void failedStartupLockCleanupRetainsOwnerAndSkipsConfirmedStoreCloseOnRetry() throws Exception {
+    failedStartupLockCleanupRetainsOwnerAndSkipsConfirmedStoreCloseOnRetry("assembly");
+  }
+
+  @Test
+  void failedStartupAcquisitionCleanupRetainsReservationForRetry() throws Exception {
+    failedStartupLockCleanupRetainsOwnerAndSkipsConfirmedStoreCloseOnRetry("acquire");
+  }
+
+  private void failedStartupLockCleanupRetainsOwnerAndSkipsConfirmedStoreCloseOnRetry(String failurePoint)
+      throws Exception {
+    System.setProperty("justsearch.data.dir", tempDir.toString());
+    var resources = Mockito.mock(io.justsearch.app.api.EngineProcessResources.class);
+    var store = Mockito.mock(io.justsearch.app.observability.operations.SqliteOperationStore.class);
+    var initializationFailure = new java.io.IOException("injected " + failurePoint + " failure");
+    var closeFailure = new java.io.UncheckedIOException(new java.io.IOException("native lock owner still open"));
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      Mockito.when(resources.executors()).thenReturn(executors);
+      LauncherEnvironment.installFactories(
+          () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+          () -> resources,
+          (owner, dataDir, profile) -> new LocalTelemetry(owner, dataDir, 1_000, "launcher-test", profile,
+              "metrics.ndjson", List.of(io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher"))),
+          (owner, telemetry, config, operations) -> { throw initializationFailure; });
       try (var stores = Mockito.mockStatic(io.justsearch.app.observability.operations.SqliteOperationStore.class);
-          var locks = Mockito.mockConstruction(io.justsearch.app.util.AppInstanceLock.class)) {
+          var locks = Mockito.mockConstruction(io.justsearch.app.util.AppInstanceLock.class, (lock, context) -> {
+            if (failurePoint.equals("acquire")) Mockito.doThrow(initializationFailure).when(lock).acquire();
+            Mockito.doThrow(closeFailure).when(lock).close();
+          })) {
         stores.when(() -> io.justsearch.app.observability.operations.SqliteOperationStore.unopened(
             tempDir.resolve("operations.db"))).thenReturn(store);
-        assertSame(initializationFailure,
-            assertThrows(java.io.IOException.class, () -> LauncherEnvironment.create("smoke")));
-        assertEquals(1, initializationFailure.getSuppressed().length);
-        assertSame(closeFailure, initializationFailure.getSuppressed()[0]);
-        var lock = locks.constructed().getFirst();
-        Mockito.verify(lock).acquire();
-        Mockito.verify(lock, Mockito.never()).close();
-        var order = Mockito.inOrder(store);
-        order.verify(store).open();
-        order.verify(store).close();
+        try {
+          assertSame(initializationFailure,
+              assertThrows(java.io.IOException.class, () -> LauncherEnvironment.create("smoke")));
+          assertEquals(1, initializationFailure.getSuppressed().length);
+          assertSame(closeFailure, initializationFailure.getSuppressed()[0]);
+          int storeCloses = failurePoint.equals("assembly") ? 1 : 0;
+          Mockito.verify(store, Mockito.times(storeCloses)).close();
+          assertSame(closeFailure,
+              assertThrows(java.io.UncheckedIOException.class, LauncherEnvironment::retryFailedStartupCleanup));
+          Mockito.verify(store, Mockito.times(storeCloses)).close();
+          var lock = locks.constructed().getFirst();
+          Mockito.verify(lock, Mockito.times(2)).close();
+          Mockito.doNothing().when(lock).close();
+          LauncherEnvironment.retryFailedStartupCleanup();
+          LauncherEnvironment.retryFailedStartupCleanup();
+          Mockito.verify(lock, Mockito.times(3)).close();
+          Mockito.verify(store, Mockito.times(storeCloses)).close();
+        } finally {
+          for (var lock : locks.constructed()) Mockito.doNothing().when(lock).close();
+          LauncherEnvironment.retryFailedStartupCleanup();
+        }
       }
     }
   }

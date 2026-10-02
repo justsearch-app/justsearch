@@ -119,9 +119,67 @@ final class LauncherEnvironment implements AutoCloseable {
       DEFAULT_PROCESS_RESOURCES_FACTORY;
   private static volatile TelemetryFactory telemetryFactory = DEFAULT_TELEMETRY_FACTORY;
   private static volatile AppFacadeFactory appFacadeFactory = DEFAULT_APP_FACADE_FACTORY;
+  private static final java.util.List<FailedStartupCleanup> FAILED_STARTUP_CLEANUPS =
+      new java.util.ArrayList<>();
 
   static LauncherEnvironment create(String profile) throws Exception {
+    retryFailedStartupCleanup();
     return new LauncherEnvironment(profile);
+  }
+
+  /** Retry failed construction before another launcher changes process configuration. */
+  static void retryFailedStartupCleanup() throws IOException {
+    Throwable failure = null;
+    synchronized (FAILED_STARTUP_CLEANUPS) {
+      var owners = FAILED_STARTUP_CLEANUPS.iterator();
+      while (owners.hasNext()) {
+        try {
+          owners.next().close();
+          owners.remove();
+        } catch (IOException | RuntimeException | Error cleanupFailure) {
+          failure = appendCloseFailure(failure, cleanupFailure);
+        }
+      }
+    }
+    if (failure instanceof IOException io) throw io;
+    if (failure instanceof RuntimeException runtime) throw runtime;
+    if (failure instanceof Error error) throw error;
+  }
+
+  private static void closeFailedStartup(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.util.AppInstanceLock instanceLock) throws IOException {
+    if (operations == null && instanceLock == null) return;
+    var owner = new FailedStartupCleanup(operations, instanceLock);
+    synchronized (FAILED_STARTUP_CLEANUPS) {
+      // Construction cannot return this owner. Register before attempting native cleanup.
+      FAILED_STARTUP_CLEANUPS.add(owner);
+      owner.close();
+      FAILED_STARTUP_CLEANUPS.remove(owner);
+    }
+  }
+
+  private static final class FailedStartupCleanup {
+    private io.justsearch.app.api.operations.OperationStore operations;
+    private io.justsearch.app.util.AppInstanceLock instanceLock;
+
+    private FailedStartupCleanup(
+        io.justsearch.app.api.operations.OperationStore operations,
+        io.justsearch.app.util.AppInstanceLock instanceLock) {
+      this.operations = operations;
+      this.instanceLock = instanceLock;
+    }
+
+    private void close() throws IOException {
+      if (operations != null) {
+        operations.close();
+        operations = null;
+      }
+      if (instanceLock != null) {
+        instanceLock.close();
+        instanceLock = null;
+      }
+    }
   }
 
   static void installFactories(
@@ -199,14 +257,11 @@ final class LauncherEnvironment implements AutoCloseable {
       this.previousConfigStore = previousStore;
       this.installedConfigStore = installedStore;
     } catch (Exception | Error failure) {
-      boolean operationsClosed = createdOperations == null;
-      if (createdOperations != null) {
-        try { createdOperations.close(); operationsClosed = true; }
-        catch (IOException | RuntimeException | Error closeFailure) {
-          if (closeFailure != failure) failure.addSuppressed(closeFailure);
-        }
+      try {
+        closeFailedStartup(createdOperations, createdInstanceLock);
+      } catch (IOException | RuntimeException | Error closeFailure) {
+        if (closeFailure != failure) failure.addSuppressed(closeFailure);
       }
-      if (operationsClosed && createdInstanceLock != null) createdInstanceLock.close();
       if (createdTelemetry != null) {
         try { createdTelemetry.close(); } catch (RuntimeException closeFailure) {
           failure.addSuppressed(closeFailure);
