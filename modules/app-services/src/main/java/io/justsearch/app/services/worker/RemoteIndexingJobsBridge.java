@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +87,7 @@ public final class RemoteIndexingJobsBridge {
   }
 
   private final Supplier<IndexingJobsSource> sourceSupplier;
+  private final LongSupplier reconnectClock;
   private final EngineExecutorRegistry.Registration reconnectRegistration;
   private final java.util.concurrent.ScheduledExecutorService reconnects;
   private final EngineExecutorRegistry.Registration reconnectRetryRegistration;
@@ -120,6 +122,8 @@ public final class RemoteIndexingJobsBridge {
 
   static final int RECONNECT_MAX_PER_MINUTE = 6;
 
+  static final long RECONNECT_WINDOW_MS = 60_000L;
+
   private final java.util.concurrent.atomic.AtomicInteger consecutiveFailures =
       new java.util.concurrent.atomic.AtomicInteger();
 
@@ -141,7 +145,15 @@ public final class RemoteIndexingJobsBridge {
    */
   public RemoteIndexingJobsBridge(
       EngineExecutorRegistry processExecutors, Supplier<IndexingJobsSource> sourceSupplier) {
+    this(processExecutors, sourceSupplier,
+        () -> java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
+  }
+
+  RemoteIndexingJobsBridge(
+      EngineExecutorRegistry processExecutors, Supplier<IndexingJobsSource> sourceSupplier,
+      LongSupplier reconnectClock) {
     this.sourceSupplier = Objects.requireNonNull(sourceSupplier, "sourceSupplier");
+    this.reconnectClock = Objects.requireNonNull(reconnectClock, "reconnectClock");
     Objects.requireNonNull(processExecutors, "processExecutors");
     EngineExecutorRegistry.Limits background =
         processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
@@ -285,33 +297,41 @@ public final class RemoteIndexingJobsBridge {
    * wrong cache here, which is the property the flow's never-drop policy exists to protect.
    */
   private void scheduleResubscribe(Throwable cause) {
-    long now = System.currentTimeMillis();
+    long now = reconnectClock.getAsLong();
     recentAttempts.addLast(now);
-    while (!recentAttempts.isEmpty() && now - recentAttempts.peekFirst() > 60_000L) {
+    while (!recentAttempts.isEmpty() && now - recentAttempts.peekFirst() > RECONNECT_WINDOW_MS) {
       recentAttempts.pollFirst();
     }
     int attemptsThisMinute = recentAttempts.size();
     int failures = consecutiveFailures.incrementAndGet();
 
+    long delay = Math.min(RECONNECT_MAX_DELAY_MS, RECONNECT_BASE_DELAY_MS * (1L << Math.min(failures - 1, 16)));
     if (attemptsThisMinute > RECONNECT_MAX_PER_MINUTE) {
+      // Exhaustion throttles the one pending reconnect; it must not discard that obligation.
+      // Leave a slot for the next attempt, including the failures beyond the cap. A timestamp
+      // remains in the rolling window at its exact expiry, hence the +1.
+      int failuresToExpire = attemptsThisMinute - RECONNECT_MAX_PER_MINUTE + 1;
+      for (long attempt : recentAttempts) {
+        if (--failuresToExpire == 0) {
+          delay = Math.max(delay, RECONNECT_WINDOW_MS - (now - attempt) + 1);
+          break;
+        }
+      }
       log.warn(
           "RemoteIndexingJobsBridge: indexing-jobs flow failed {} times in the last minute"
-              + " (cap {}); giving up until something calls start() again. The Library surface will"
-              + " stop receiving job updates.",
+              + " (cap {}); retaining reconnect after {}ms cooldown.",
           attemptsThisMinute,
           RECONNECT_MAX_PER_MINUTE,
+          delay,
           cause);
-      started.set(false);
-      return;
+    } else {
+      log.warn(
+          "RemoteIndexingJobsBridge: indexing-jobs flow failed (attempt {} this minute); re-subscribing"
+              + " in {}ms. A fresh snapshot will replace the listeners' state.",
+          attemptsThisMinute,
+          delay,
+          cause);
     }
-
-    long delay = Math.min(RECONNECT_MAX_DELAY_MS, RECONNECT_BASE_DELAY_MS * (1L << Math.min(failures - 1, 16)));
-    log.warn(
-        "RemoteIndexingJobsBridge: indexing-jobs flow failed (attempt {} this minute); re-subscribing"
-            + " in {}ms. A fresh snapshot will replace the listeners' state.",
-        attemptsThisMinute,
-        delay,
-        cause);
 
     KnowledgeClient.IndexingJobsStream dead = stream;
     stream = null;
@@ -326,9 +346,10 @@ public final class RemoteIndexingJobsBridge {
     started.set(false);
 
     if (!stopped && reconnectPending.compareAndSet(false, true)) {
+      long reconnectDelay = delay;
       try {
         // This worker needs no timer credit. One retained obligation survives timer saturation.
-        reconnectRetries.execute(() -> retryReconnectSchedule(delay));
+        reconnectRetries.execute(() -> retryReconnectSchedule(reconnectDelay));
       } catch (java.util.concurrent.RejectedExecutionException closed) {
         reconnectPending.set(false);
         log.debug("RemoteIndexingJobsBridge: reconnect retry owner is closed", closed);
