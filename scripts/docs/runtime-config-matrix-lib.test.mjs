@@ -171,6 +171,29 @@ function readRepoFile(relativePath) {
   return readFileSync(new URL(`../../${relativePath}`, import.meta.url), "utf8");
 }
 
+test("overlapping ConfigKey declarations inherit the operator sources and precedence", () => {
+  withFixture(({ root, envRegistryPath, configKeyPath, builderPath, configApplyPath }) => {
+    writeFileSync(configKeyPath, `enum ConfigKey {
+      OVERLAPPING("justsearch.normal", LifecycleStage.EXPERIMENTAL),
+      YAML_ONLY("internal.normal", LifecycleStage.PERMANENT);
+    }`);
+    const model = buildMatrixModel({ repoRoot: root, envRegistryPath, configKeyPath,
+      builderPath, configApplyPath });
+    const rows = new Map(model.rows.map((row) => [row.declaration, row]));
+    const operator = rows.get("EnvRegistry.NORMAL");
+    const overlapping = rows.get("ConfigKey.OVERLAPPING");
+    for (const field of ["yamlKey", "envVar", "sysprop", "envRegistryConstant", "precedenceNotes"]) {
+      assert.equal(overlapping[field], operator[field], `shared resolved key must share ${field}`);
+    }
+    assert.equal(overlapping.lifecycleStage, "experimental");
+    const unmatched = rows.get("ConfigKey.YAML_ONLY");
+    assert.equal(unmatched.precedenceNotes, "YAML > default");
+    assert.equal(unmatched.envVar, "");
+    assert.equal(unmatched.sysprop, "");
+    assert.match(renderMatrixMarkdown(model), /ConfigKey entries without a matching EnvRegistry declaration/);
+  });
+});
+
 test("schema recovery guide uses emitted lifecycle reasons and preserves marker compatibility", () => {
   const guide = readRepoFile("docs/explanation/11-index-schema-migration.md");
   const section = guide.split("### A `FAIL_CLOSED` refusal")[1].split("\n### ")[0];
@@ -209,4 +232,38 @@ test("RAG streaming contract names registered routes and the producer's metadata
   assert.match(doc, /event: rag\.meta\ndata: /);
   assert.ok(doc.includes("finalResponse"));
   assert.ok(doc.includes("iterationsUsed"));
+});
+
+test("conversation failure contract distinguishes controller, engine and pre-stream refusals", () => {
+  const doc = readRepoFile("docs/reference/contracts/search-and-rag-reason-codes.md");
+  const controller = readRepoFile("modules/ui/src/main/java/io/justsearch/ui/api/ChatController.java");
+  const controllerError = controller.split("private static SseEvent errorEvent(")[1]
+    .split('return new SseEvent("error", err);')[0];
+  const controllerClaim = doc.split("Controller SSE errors")[1]?.split("\n\n")[0] ?? "";
+  for (const field of ["error", "errorCode", "errorClass", "retryable"]) {
+    assert.ok(controllerError.includes(`err.put("${field}"`));
+    assert.ok(controllerClaim.includes(`\`${field}\``), `controller claim must include ${field}`);
+  }
+  assert.doesNotMatch(controllerError, /i18nKey/);
+  assert.match(controllerClaim, /no `i18nKey`/);
+  const engine = readRepoFile(
+    "modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java");
+  const engineError = engine.split("private static void emitError(")[1]
+    .split('sink.accept(new SseEvent("error", payload));')[0];
+  const injector = readRepoFile(
+    "modules/app-services/src/main/java/io/justsearch/app/services/conversation/spi/RAGContext.java");
+  const injectorError = injector.split("private static Map<String, Object> errorPayload(")[1];
+  const engineClaim = doc.split("Engine/injector SSE errors")[1]?.split("\n\n")[0] ?? "";
+  for (const field of ["error", "errorCode", "i18nKey"]) {
+    assert.ok(engineError.includes(`payload.put("${field}"`));
+    assert.ok(injectorError.includes(`p.put("${field}"`));
+    assert.ok(engineClaim.includes(`\`${field}\``));
+  }
+  const locked = controller.split("if (engine.wouldDiscardWhileLocked(")[1]
+    .split("sseWriter.initSseHeaders")[0];
+  assert.match(controller, /LOCKED_STATUS = 423/);
+  assert.ok(locked.includes("ctx.status(LOCKED_STATUS).json(locked)"));
+  assert.match(doc, /HTTP 423 JSON before SSE headers/);
+  assert.match(doc, /admitted streaming response/);
+  assert.match(doc, /Malformed bodies.*controller SSE errors/);
 });

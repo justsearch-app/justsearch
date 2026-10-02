@@ -270,17 +270,19 @@ export function buildMatrixModel(opts = {}) {
     });
   }
 
-  // ConfigKey entries: YAML-only, no env var or sysprop
+  // ConfigKey entries share resolution with matching operator declarations.
+  const operatorRowsByKey = new Map(rows.map((row) => [row.sysprop, row]));
   for (const entry of configKeys.entries) {
+    const operatorRow = operatorRowsByKey.get(entry.configKey);
     rows.push({
       declaration: `ConfigKey.${entry.constant}`,
       lifecycleStage: entry.lifecycleStage,
       yamlKey: entry.configKey,
-      envVar: "",
-      sysprop: "",
-      envRegistryConstant: "",
+      envVar: operatorRow?.envVar ?? "",
+      sysprop: operatorRow?.sysprop ?? "",
+      envRegistryConstant: operatorRow?.envRegistryConstant ?? "",
       ownerModule: "modules/configuration (ResolvedConfigBuilder)",
-      precedenceNotes: "YAML > default",
+      precedenceNotes: operatorRow?.precedenceNotes ?? "YAML > default",
     });
   }
 
@@ -330,7 +332,7 @@ export function renderMatrixMarkdown(model) {
   lines.push("");
   lines.push("Precedence note:");
   lines.push("1. `sysprop > env > YAML > default` where a YAML key and env/sysprop override both exist.");
-  lines.push("2. `YAML > default` for YAML-only keys (ConfigKey entries, no env var override).");
+  lines.push("2. `YAML > default` for YAML-only keys (ConfigKey entries without a matching EnvRegistry declaration).");
   lines.push("3. `sysprop > env > default` for env/sysprop-only runtime knobs.");
   lines.push("4. Every declaration explicitly carries `permanent`, `experimental`, or `deprecated`; non-permanent rows require joined review metadata in `governance/config-lifecycle.v1.json`.");
   lines.push("");

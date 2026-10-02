@@ -128,10 +128,21 @@ The Head may fall back to a full-document fetch when the `retrieveContext` port 
 - `POST /api/chat/batch-summarize`: `BatchSummarizeShape`, with whole-document access through
   `BatchDocAccess`. This shape emits `progress` with `phase: "files"` rather than RAG retrieval metadata.
 
-The response is `text/event-stream`. Each frame carries an `event:` name and a JSON `data:`
-payload. `ConversationEngine` streams `chunk` events with `{"text":"..."}` and optional
+The admitted streaming response is `text/event-stream`. A locked conversation store refusal
+returns HTTP 423 JSON before SSE headers are set, with `locked: true`; clients must check the
+HTTP status and content type before parsing SSE. Malformed bodies produce controller SSE errors.
+
+Each SSE frame carries an `event:` name and a JSON `data:` payload.
+`ConversationEngine` streams `chunk` events with `{"text":"..."}` and optional
 `reasoning_chunk` events, then emits `done` with `finalResponse`, `iterationsUsed`, and
-shape-specific enrichment. Failures emit `error` with an `error` message, `errorCode`, and `i18nKey`.
+shape-specific enrichment.
+
+Controller SSE errors use the `error` event with an `error` message, `errorCode`, `errorClass`,
+and `retryable`, with no `i18nKey`. This envelope covers malformed bodies and mid-run controller
+failures.
+
+Engine/injector SSE errors use the `error` event with an `error` message, `errorCode`, and
+`i18nKey`. Clients must not assume `i18nKey` is present on every error event.
 
 On the ask route, `RAGContext` emits `rag.meta` when a retrieval result is available, before
 `rag.citations` and the first answer `chunk`. Mode and degradation reasons appear in this
