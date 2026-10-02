@@ -178,7 +178,7 @@ final class WorkerWatcherEventOwnershipTest {
       var event = executor.submit(() -> fixture.service.acceptWatcherEvent(witness, () -> {
         effectEntered.countDown();
         await(releaseNestedRead);
-        fixture.service.acceptWatcherUpsert("docs", child);
+        fixture.service.acceptWatcherUpsert(witness, "docs", child);
       }));
       assertTrue(effectEntered.await(5, TimeUnit.SECONDS));
       var writer = executor.submit(() -> {

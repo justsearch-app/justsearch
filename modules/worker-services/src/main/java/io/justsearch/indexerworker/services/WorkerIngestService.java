@@ -353,13 +353,6 @@ public final class WorkerIngestService {
     }
   }
 
-  /** Watcher events share RPC mutation admission and the existing durable switch buffer. */
-  public void acceptWatcherUpsert(String collection, Path path) {
-    try (var ignoredMutation = mutationLease()) {
-      acceptWatcherUpsertUnderLease(collection, path, null);
-    }
-  }
-
   /** Live UPSERT retains its registration identity through concrete queue admission. */
   public void acceptWatcherUpsert(
       RootWatcherRegistry.Subscription witness, String collection, Path path) {

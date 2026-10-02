@@ -112,7 +112,7 @@ final class WorkerMethvinWatcherTest {
         new RecordingQueue(), null,
         ignored -> { throw new IllegalStateException("delete route lost"); },
         (ignored, force) -> {},
-        (collection, path) -> { throw new IllegalStateException("upsert route lost"); },
+        (witness, collection, path) -> { throw new IllegalStateException("upsert route lost"); },
         ignored -> admission.markReplayUncertain())) {
       assertTrue(admission.replayCertain());
       RootWatcherRegistry.Subscription registration =
@@ -131,7 +131,7 @@ final class WorkerMethvinWatcherTest {
     try (var watcher = new WorkerMethvinWatcher(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
         new RecordingQueue(), null, ignored -> {}, (ignored, force) -> {},
-        (collection, path) -> {}, failures::add)) {
+        (witness, collection, path) -> {}, failures::add)) {
       Object oldEpoch = new Object();
       Object currentEpoch = new Object();
       registerAndActivate(watcher, root, "docs", oldEpoch);
@@ -162,7 +162,7 @@ final class WorkerMethvinWatcherTest {
         (observed, force) -> {
           if (root.equals(observed) && force) reconciled.countDown();
         },
-        (collection, path) -> {}, failures::add)) {
+        (witness, collection, path) -> {}, failures::add)) {
       Object epoch = new Object();
       var registration = new RootWatcherRegistry.Subscription(
           root, "docs", epoch, RootIdentity.capture(root));
@@ -195,7 +195,7 @@ final class WorkerMethvinWatcherTest {
     try (var watcher = new WorkerMethvinWatcher(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
         new RecordingQueue(), null, ignored -> {}, (ignored, force) -> {},
-        (collection, path) -> {}, failures::add)) {
+        (witness, collection, path) -> {}, failures::add)) {
       Object epoch = new Object();
       registerAndActivate(watcher, root, "docs", epoch);
       CompletableFuture<Void> future = watchFuture(watcher, root);
@@ -214,7 +214,7 @@ final class WorkerMethvinWatcherTest {
     try (var watcher = new WorkerMethvinWatcher(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
         new RecordingQueue(), null, ignored -> {}, (ignored, force) -> {},
-        (collection, path) -> {}, failures::add)) {
+        (witness, collection, path) -> {}, failures::add)) {
       Object first = new Object();
       Object second = new Object();
       registerAndActivate(watcher, root, "docs", first);

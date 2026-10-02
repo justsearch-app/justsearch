@@ -18,6 +18,8 @@ import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSDictionary;
 import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.cos.COSNull;
+import org.apache.pdfbox.cos.COSNumber;
 import org.apache.pdfbox.cos.COSStream;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.common.PDStream;
@@ -49,14 +51,23 @@ final class BoundedPdfRenderer extends PDFRenderer {
     requireWithinLimits();
     try {
       long pixels = VduImageLimits.checkDimensions(width, height);
-      decodedPixels += pixels * copies;
-      if (decodedPixels > VduImageLimits.MAX_DOCUMENT_PIXELS) {
-        throw new IOException("VDU decoded PDF image pixels exceed allocation limit");
-      }
+      chargePixels(Math.multiplyExact(pixels, copies));
     } catch (IOException failure) {
       rejected = failure;
       throw failure;
     }
+  }
+
+  private void chargePixels(long pixels) throws IOException {
+    if (pixels < 0 || pixels > VduImageLimits.MAX_DOCUMENT_PIXELS - decodedPixels) {
+      throw new IOException("VDU decoded PDF image pixels exceed allocation limit");
+    }
+    decodedPixels += pixels;
+  }
+
+  private void chargeBytes(long bytes) throws IOException {
+    // The shared raster budget uses four-byte pixels. Round each byte buffer upward.
+    chargePixels(Math.addExact(bytes, 3) / 4);
   }
 
   private void charge(COSDictionary image, Set<COSDictionary> visiting) throws IOException {
@@ -104,12 +115,106 @@ final class BoundedPdfRenderer extends PDFRenderer {
     return filter.equals(filters) || filters instanceof COSArray array && array.indexOfObject(filter) >= 0;
   }
 
-  private static void checkFilters(COSDictionary image) throws IOException {
-    // These codecs can derive allocation dimensions from their codestream rather than the PDF
-    // dictionary. Until rendering runs in a resource-limited child, reject them before decoding.
-    if (hasFilter(image, "JPXDecode") || hasFilter(image, "JBIG2Decode")) {
-      throw new IOException("VDU cannot safely bound this PDF image codec");
+  private void checkFilters(COSDictionary image) throws IOException {
+    // Filter.getDecodeParams prefers the inline aliases; other PDFBox readers prefer full names.
+    // Refuse conflicting representations rather than inspect different parameters than it uses.
+    COSBase filters = unambiguousEntry(image, COSName.FILTER, COSName.F);
+    COSBase parameters = unambiguousEntry(image, COSName.DECODE_PARMS, COSName.DP);
+    if (filters == null) {
+      if (parameters != null) throw invalidDecodeParameters();
+      return;
     }
+    int count = filters instanceof COSArray array ? array.size() : 1;
+    if (count < 1 || count > 32) throw invalidDecodeParameters();
+    if (parameters != null && !(parameters instanceof COSNull)) {
+      if (filters instanceof COSArray) {
+        if (!(parameters instanceof COSArray array) || array.size() != count) {
+          throw invalidDecodeParameters();
+        }
+      } else if (!(parameters instanceof COSDictionary)) {
+        throw invalidDecodeParameters();
+      }
+    }
+    for (int i = 0; i < count; i++) {
+      COSBase filter = filters instanceof COSArray array ? array.getObject(i) : filters;
+      COSBase entry = parameters instanceof COSArray array ? array.getObject(i) : parameters;
+      if (entry != null && !(entry instanceof COSNull) && !(entry instanceof COSDictionary)) {
+        throw invalidDecodeParameters();
+      }
+      COSDictionary params =
+          entry instanceof COSDictionary dictionary ? dictionary : new COSDictionary();
+      if (!(filter instanceof COSName name)) throw invalidDecodeParameters();
+      switch (name.getName()) {
+        case "FlateDecode", "Fl", "LZWDecode", "LZW" -> {
+          int predictor = decodeInt(params, COSName.PREDICTOR, 1);
+          if (predictor != 1 && predictor != 2 && (predictor < 10 || predictor > 15)) {
+            throw invalidDecodeParameters();
+          }
+          if (predictor > 1) {
+            int colors = decodeInt(params, COSName.COLORS, 1);
+            int bits = decodeInt(params, COSName.BITS_PER_COMPONENT, 8);
+            int columns = decodeInt(params, COSName.COLUMNS, 1);
+            if (colors < 1 || colors > 32 || columns < 1
+                || columns > VduImageLimits.MAX_DIMENSION
+                || (bits != 1 && bits != 2 && bits != 4 && bits != 8 && bits != 16)) {
+              throw invalidDecodeParameters();
+            }
+            // Predictor creates currentRow and lastRow immediately, independently of Width.
+            long rowBytes =
+                (Math.multiplyExact(Math.multiplyExact((long) colors, bits), columns) + 7) / 8;
+            chargeBytes(rowBytes);
+            chargeBytes(rowBytes);
+          }
+          if (name.getName().equals("LZWDecode") || name.getName().equals("LZW")) {
+            int earlyChange = decodeInt(params, COSName.EARLY_CHANGE, 1);
+            if (earlyChange != 0 && earlyChange != 1) throw invalidDecodeParameters();
+          }
+        }
+        case "CCITTFaxDecode", "CCF" -> {
+          int columns = decodeInt(params, COSName.COLUMNS, 1728);
+          int rows = decodeInt(params, COSName.ROWS, 0);
+          int height = image.getInt(COSName.HEIGHT, COSName.H);
+          if (rows < 0) throw invalidDecodeParameters();
+          // CCITTFaxFilter uses Height when both values are positive, otherwise their maximum.
+          int effectiveRows = rows > 0 && height > 0 ? height : Math.max(rows, height);
+          VduImageLimits.checkDimensions(columns, effectiveRows);
+          long rowBytes = (Math.addExact((long) columns, 7)) / 8;
+          chargeBytes(Math.multiplyExact(rowBytes, effectiveRows));
+          chargeBytes(rowBytes);
+          // CCITTFaxDecoderStream also allocates two int[columns + 2] change arrays.
+          chargeBytes(Math.multiplyExact(Math.addExact((long) columns, 2), 8));
+        }
+        case "DCTDecode", "DCT", "ASCIIHexDecode", "AHx", "ASCII85Decode", "A85",
+            "RunLengthDecode", "RL" -> {
+          // JPEG dimensions are inspected separately. The other filters use fixed buffers.
+        }
+        default -> throw new IOException("VDU cannot safely bound this PDF image codec");
+      }
+    }
+  }
+
+  private static COSBase unambiguousEntry(COSDictionary dictionary, COSName key, COSName alias)
+      throws IOException {
+    if (dictionary.containsKey(key) && dictionary.containsKey(alias)) {
+      throw invalidDecodeParameters();
+    }
+    return dictionary.getDictionaryObject(key, alias);
+  }
+
+  private static int decodeInt(COSDictionary parameters, COSName key, int fallback)
+      throws IOException {
+    COSBase value = parameters.getDictionaryObject(key);
+    if (value == null) return fallback;
+    if (!(value instanceof COSNumber number) || !Float.isFinite(number.floatValue())
+        || number.longValue() != number.intValue() || number.floatValue() != number.intValue()) {
+      throw invalidDecodeParameters();
+    }
+    return number.intValue();
+  }
+
+  private static IOException invalidDecodeParameters() {
+    return new IOException(
+        "VDU PDF image decode parameters exceed allocation limits or are unsafe");
   }
 
   private static void checkJpegHeader(InputStream encoded, COSDictionary image) throws IOException {

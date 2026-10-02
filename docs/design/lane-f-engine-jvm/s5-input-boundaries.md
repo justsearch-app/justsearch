@@ -21,6 +21,7 @@ resources. A rejection is latched because PDFBox can swallow operator IOExceptio
 | ImageLegibility -> scale/grayscale/Laplacian | The only caller supplies an already guarded image. Analysis first bounds the long edge to 512, before allocating grayscale rows and Laplacian responses. |
 | PDF image XObjects, including forms, annotation appearances, Type 3 content, patterns and transparency groups | `BoundedPdfRenderer.drawImage` charges source dimensions before `super.drawImage` can decode. Reservations cover source samples, RGB conversion and transfer/stencil conversion. Color-key masks reserve two additional rasters. Nested content uses the same drawer and document counter. |
 | Inline PDF images | `processOperator(BI)` charges the image dictionary before PDFBox constructs PDInlineImage and inflates its data. Both long and abbreviated dictionary keys are checked. |
+| Filter decode parameters, including inline images and explicit/soft masks | `checkFilters` validates every filter/parameter pair before a decoder or JPEG-header prefilter runs. Full/abbreviated aliases may not conflict; parameter arrays must correspond to filter arrays. Flate/LZW predictors validate integral Colors, BitsPerComponent and Columns, use checked row arithmetic and reserve both row buffers in four-byte pixel equivalents against the same document counter. CCITT validates its effective dimensions and reserves its output/row buffers and two column-change arrays. Only codecs with established parameter allocation behavior are permitted; ambiguous or unknown combinations fail closed. |
 | JPEG codestream dimensions | The JPEG header is inspected without decoding and must match the already bounded dictionary. Inline multi-filter JPEGs are refused before construction. JPX and JBIG2 are refused before decoding because their allocation dimensions cannot be established by this guard. |
 | Explicit image masks and image soft masks | Dictionary recursion checks and charges each mask, rejects cycles, then checks the composed rectangle using the maximum source/mask width and maximum source/mask height. Two composed rasters are reserved for the scaled gray mask and ARGB output before any image decode. |
 | Image placement and smooth scaling, including pattern stencil paint/mask rasters | `drawImage` bounds the CTM-transformed unit rectangle at device DPI before PDFBox's un-clipped composition/scaling. Three destination rasters are reserved. Source conversion/inversion is included in the source reservation. |
@@ -53,7 +54,7 @@ the saved boundary, independently of later watch registration/removal.
 | Entry route | Producer and consumer enforcement |
 | --- | --- |
 | Initial scan, recorded directory scan and force/manual directory reindex | `WorkerScanOps.preVisitDirectory` prunes excluded descendants, but not the requested root. Filename and request-specific excludes are applied during visitation. Each EnqueueEntry carries `withinRoot(root)`. |
-| Live watcher CREATE/MODIFY | `WorkerMethvinWatcher.handleUpsert` checks `shouldSkipWithinRoot(path, witness.root())`; the witnessed WorkerIngestService route repeats the check and retains that root. |
+| Live watcher CREATE/MODIFY | Every supported WorkerMethvinWatcher constructor uses a WitnessedUpsertSink or enqueues within the subscription root directly. The unwitnessed service/callback overloads were removed. `handleUpsert` checks `shouldSkipWithinRoot(path, witness.root())`; the witnessed WorkerIngestService route repeats the check and retains that root. |
 | Queued-job replacement, maintenance resubmission and retry | SqliteJobQueue enqueue/reenqueue SQL preserves the old ingestion_root when maintenance supplies none. A new rooted admission replaces it with its actual boundary. Polling returns that persisted boundary; current watchers are never used as a fallback. |
 | Reconciliation and candidate discovery | SyncDirectoryOps prunes excluded descendants and filenames. Its queued entries retain the sync root. WorkerIngestService's candidate/root convergence retains that root in captured entries. |
 | Manual explicit-file submission or recorded single-file scan | WorkerIngestService.submitBatch uses the file itself as the boundary. Single-file scans retain their file root. This preserves intentional file submissions without checking unrelated ancestors. |
@@ -104,8 +105,8 @@ Run the focused checks first, then each affected module's full tests and hygiene
 ```powershell
 ./gradlew.bat :modules:app-services:test --tests '*VduImageLimitsTest' --tests '*VduProcessorAbstentionTest'
 ./gradlew.bat :modules:worker-core:test --tests '*IngestionSkipPolicyTest'
-./gradlew.bat :modules:worker-services:test --tests '*ArchiveExtractionLimitsTest' --tests '*PolicyDrivenFormatCapabilityTest' --tests '*WorkerIngestionAuthorityTest' --tests '*WorkerMethvinWatcherTest' --tests '*WorkerScanOpsTest' --tests '*SyncDirectoryOpsWalkSkipPolicyTest' --tests '*SyncDirectoryOpsCandidateDiscoveryTest' --tests '*WorkerIngestServiceCandidateReconciliationTest' --tests '*JobBatchExtractorForcedPathTest' --tests '*IndexingLoopTest' --tests '*IndexingLoopRestartTest' --tests '*IndexingLoopCutoverPauseTest' --tests '*AdversarialCorpusIngestionTest'
-./gradlew.bat :modules:indexer-worker:test --tests '*LegacyIngestionBoundaryTest' --tests '*JobQueueTest' --tests '*JobQueueMigrationTest' --tests '*SwitchBufferVersionTest'
+./gradlew.bat :modules:worker-services:test --tests '*ArchiveExtractionLimitsTest' --tests '*PolicyDrivenFormatCapabilityTest' --tests '*WorkerIngestionAuthorityTest' --tests '*WorkerMethvinWatcherTest' --tests '*WorkerWatcherEventOwnershipTest' --tests '*WorkerScanOpsTest' --tests '*SyncDirectoryOpsWalkSkipPolicyTest' --tests '*SyncDirectoryOpsCandidateDiscoveryTest' --tests '*WorkerIngestServiceCandidateReconciliationTest' --tests '*JobBatchExtractorForcedPathTest' --tests '*IndexingLoopTest' --tests '*IndexingLoopRestartTest' --tests '*IndexingLoopCutoverPauseTest' --tests '*AdversarialCorpusIngestionTest'
+./gradlew.bat :modules:indexer-worker:test --tests '*LegacyIngestionBoundaryTest' --tests '*WatcherConstructorBoundaryTest' --tests '*JobQueueTest' --tests '*JobQueueMigrationTest' --tests '*SwitchBufferVersionTest'
 ./gradlew.bat :modules:app-services:test :modules:worker-core:test :modules:worker-services:test :modules:indexer-worker:test
 ./gradlew.bat :modules:app-services:spotlessCheck :modules:worker-core:spotlessCheck :modules:worker-services:spotlessCheck :modules:indexer-worker:spotlessCheck
 ```
@@ -202,3 +203,73 @@ created under tmp/s5n for isolated checks and removed afterwards.
 S5n changes are limited to WorkerIngestService.java,
 WorkerIngestServiceCandidateReconciliationTest.java, BoundedPdfRenderer.java,
 VduImageLimitsTest.java, LegacyIngestionBoundaryTest.java and this handoff map.
+
+## S5n2 independent-review follow-up
+
+Both findings were verified against HEAD before editing.
+
+- I1: Filter.getDecodeParams, Predictor, LZWFilter, CCITTFaxFilter and
+  CCITTFaxDecoderStream were inspected at the pinned PDFBox 3.0.6 tag, including
+  [Predictor](https://raw.githubusercontent.com/apache/pdfbox/3.0.6/pdfbox/src/main/java/org/apache/pdfbox/filter/Predictor.java)
+  (the earlier reviewer could not retrieve its pinned source). Width and
+  Height do not constrain predictor buffers or fax Columns. BoundedPdfRenderer now
+  guards these independent parameters, filter arrays and inline aliases before decode,
+  and charges the buffers to the shared budget. Unsupported or ambiguous codecs/
+  parameter shapes are refused. VduImageLimitsTest adds real Flate/LZW XObjects,
+  inline images, explicit/soft masks, checked integer conversion, fax dimensions,
+  shared buffer-budget rejection and positive decoded-sample assertions.
+- I2: The compatibility constructors adapted witnessed delivery into a two-argument
+  callback, and WorkerIngestService queued that callback with a null root. Those
+  unwitnessed callbacks and the service overload were removed; all supported
+  constructors now retain the subscription. Production composition and its ownership
+  test use the witnessed signature. WatcherConstructorBoundaryTest exercises CREATE
+  through all six constructors with an empty SQLite queue per case, restart, actual
+  consumer admission, exclusions below the root and excluded ancestors above it.
+  Reflection accesses the existing package-private consumer without changing its API.
+
+Observed S5n2 checks (isolated components, not module builds):
+
+- Actual VDU sources and VduImageLimitsTest compiled with javac against PDFBox 3.0.6.
+  The final JUnit run passed **26 tests**, zero failures/skips, exit 0.
+- Actual WorkerMethvinWatcher, SQLite queue, consumer authority and dependencies,
+  WorkerMethvinWatcherTest and WatcherConstructorBoundaryTest compiled with javac.
+  The final JUnit run passed **19 tests**, zero failures/skips, exit 0. All six
+  constructor cases run in the SQLite test. The ownership test's changed call was
+  checked against the actual witnessed method and its in-scope Subscription variable;
+  its full module compilation remains pending.
+- Four new VDU regression methods ran against HEAD's exact renderer in disposable
+  classes. All four failed, exit 1, with Expected java.io.IOException to be thrown,
+  but nothing was thrown: XObject parameters, inline parameters, shared predictor
+  buffer charges and conflicting parameter aliases. No huge-buffer fixture was
+  executed against the unguarded renderer.
+- A disposable watcher mutation restoring unrooted admission in the six-argument
+  constructor made the real SQLite consumer regression fail, exit 1, with expected
+  ADMIT but was SKIP_DONE. The new callback API requires a witness, so this mutation
+  recreates the old queue behavior rather than restoring the removed signature.
+- Initial isolated fixtures exposed two harness/setup errors: a single synthetic
+  raster reservation exceeded the per-raster cap (corrected to four bounded copies),
+  and relative temp paths disagreed with the watcher's absolute paths (the new test
+  normalizes its root; the final watcher run uses an absolute scratch temp directory).
+  The old watcher suite's first relative-temp run had 12 passes and 6 failures;
+  the final absolute-temp run passed all 18 existing methods.
+- git diff --check passed. No Gradle, Node unit tests, dev stack or commits ran.
+  Disposable sources, dependencies, classes and databases stayed under tmp/s5n2
+  and were removed after verification.
+
+The final runtime commands were (with jars/classes prepared in ignored scratch):
+
+```powershell
+java -Xmx768m '-Djava.awt.headless=true' '-Djava.io.tmpdir=F:\justsearch-public\.claude\worktrees\lane-f-s5\tmp\s5n2' -cp 'tmp/s5n2/classes;tmp/s5n2/lib/*' org.junit.platform.console.ConsoleLauncher execute --select-class io.justsearch.app.services.vdu.VduImageLimitsTest --details summary --disable-banner
+java -Xmx768m --enable-native-access=ALL-UNNAMED '-Djava.io.tmpdir=F:\justsearch-public\.claude\worktrees\lane-f-s5\tmp\s5n2' '-Dorg.sqlite.tmpdir=F:\justsearch-public\.claude\worktrees\lane-f-s5\tmp\s5n2' -cp 'tmp/s5n2/classes;tmp/s5n2/lib/*' org.junit.platform.console.ConsoleLauncher execute --select-class io.justsearch.indexerworker.services.WorkerMethvinWatcherTest --select-class io.justsearch.indexerworker.services.WatcherConstructorBoundaryTest --details summary --disable-banner
+```
+
+Full module compilation, tests and spotless remain with the orchestrator. This round's
+focused commands, followed by full affected-module tests and spotless, are:
+
+```powershell
+./gradlew.bat :modules:app-services:test --tests '*VduImageLimitsTest'
+./gradlew.bat :modules:worker-services:test --tests '*WorkerMethvinWatcherTest' --tests '*WorkerWatcherEventOwnershipTest'
+./gradlew.bat :modules:indexer-worker:test --tests '*WatcherConstructorBoundaryTest'
+./gradlew.bat :modules:app-services:test :modules:worker-services:test :modules:indexer-worker:test
+./gradlew.bat :modules:app-services:spotlessCheck :modules:worker-services:spotlessCheck :modules:indexer-worker:spotlessCheck
+```

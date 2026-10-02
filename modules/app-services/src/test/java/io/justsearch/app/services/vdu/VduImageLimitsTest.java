@@ -15,7 +15,10 @@ import java.util.zip.DeflaterOutputStream;
 import javax.imageio.ImageIO;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSDictionary;
+import org.apache.pdfbox.cos.COSInteger;
 import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.cos.COSNull;
+import org.apache.pdfbox.filter.FilterFactory;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDFormContentStream;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -30,6 +33,7 @@ import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceRGB;
 import org.apache.pdfbox.pdmodel.graphics.color.PDPattern;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.form.PDTransparencyGroup;
+import org.apache.pdfbox.pdmodel.graphics.image.CCITTFactory;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.graphics.pattern.PDTilingPattern;
 import org.apache.pdfbox.pdmodel.graphics.shading.PDShadingType2;
@@ -39,6 +43,212 @@ import org.junit.jupiter.api.io.TempDir;
 
 class VduImageLimitsTest {
   @TempDir Path tempDir;
+
+  @Test
+  void predictorParametersAreCheckedBeforeXObjectDecoding() throws Exception {
+    for (COSName filter : new COSName[] {COSName.FLATE_DECODE, COSName.LZW_DECODE}) {
+      for (boolean array : new boolean[] {false, true}) {
+        Path path = predictorPdf(filter.getName() + array, filter, predictor(8193), array, null);
+        assertRejectedImage(path, "decode parameters");
+      }
+    }
+  }
+
+  @Test
+  void predictorParametersAreCheckedBeforeExplicitAndSoftMaskDecoding() throws Exception {
+    for (COSName key : new COSName[] {COSName.MASK, COSName.SMASK}) {
+      for (COSName filter : new COSName[] {COSName.FLATE_DECODE, COSName.LZW_DECODE}) {
+        Path path = predictorPdf(key.getName() + filter.getName(), filter,
+            predictor(200_000_000), true, key);
+        assertRejectedImage(path, "decode parameters");
+      }
+    }
+  }
+
+  @Test
+  void inlinePredictorParametersAndAbbreviatedArraysAreCheckedBeforeConstruction()
+      throws Exception {
+    for (String filter : new String[] {"Fl", "LZW"}) {
+      for (boolean array : new boolean[] {false, true}) {
+        Path path = tempDir.resolve("inline-predictor-" + filter + array + ".pdf");
+        try (var document = new PDDocument()) {
+          var page = new PDPage(new PDRectangle(72, 72));
+          document.addPage(page);
+          var stream = new PDStream(document);
+          String params = "<< /Predictor 12 /Colors 1 /BitsPerComponent 8 /Columns 8193 >>";
+          String dictionary = array ? "/F [/AHx /" + filter + "] /DP [null " + params + "]"
+              : "/Filter /" + filter + " /DecodeParms " + params;
+          var compressed = new ByteArrayOutputStream();
+          FilterFactory.INSTANCE.getFilter(filter).encode(
+              new ByteArrayInputStream(new byte[] {0, 127}), compressed, new COSDictionary(), 0);
+          try (var output = stream.createOutputStream()) {
+            output.write(("q 10 0 0 10 0 0 cm BI /W 1 /H 1 /CS /G /BPC 8 "
+                + dictionary + " ID\n").getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            if (array) {
+              output.write(java.util.HexFormat.of().formatHex(compressed.toByteArray())
+                  .getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+              output.write('>');
+            } else {
+              output.write(compressed.toByteArray());
+            }
+            output.write("\nEI Q\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+          }
+          page.setContents(stream);
+          document.save(path.toFile());
+        }
+        assertRejectedImage(path, "decode parameters");
+      }
+    }
+  }
+
+  @Test
+  void predictorArithmeticAndFaxDimensionsCannotWrapOrHideIndependentAllocations()
+      throws Exception {
+    var overflow = predictor(1);
+    overflow.setItem(COSName.COLUMNS, COSInteger.get(4_294_967_297L));
+    assertRejectedImage(predictorPdf("overflow", COSName.FLATE_DECODE, overflow, false, null),
+        "decode parameters");
+    for (COSName parameter : new COSName[] {COSName.COLORS, COSName.BITS_PER_COMPONENT}) {
+      var params = predictor(1);
+      params.setInt(parameter, Integer.MAX_VALUE);
+      assertRejectedImage(
+          predictorPdf(parameter.getName(), COSName.LZW_DECODE, params, false, null),
+          "decode parameters");
+    }
+    var fax = new COSDictionary();
+    fax.setInt(COSName.COLUMNS, 200_000_000);
+    assertRejectedImage(predictorPdf("fax", COSName.CCITTFAX_DECODE, fax, false, null),
+        "allocation limit");
+  }
+
+  @Test
+  void predictorBuffersShareTheDocumentAllocationBudget() throws Exception {
+    try (var document = new PDDocument()) {
+      var renderer = new BoundedPdfRenderer(document);
+      renderer.chargeRaster(8000, 1999, 4); // Leaves 32,000 pixels for source and decode buffers.
+      var image = image(document, 1, 1, true);
+      var params = predictor(8192);
+      params.setInt(COSName.COLORS, 32);
+      params.setInt(COSName.BITS_PER_COMPONENT, 16);
+      image.getCOSObject().setItem(COSName.DECODE_PARMS, params);
+      var page = new PDPage(new PDRectangle(72, 72));
+      document.addPage(page);
+      try (var content = new PDPageContentStream(document, page)) {
+        content.drawImage(image, 0, 0, 10, 10);
+      }
+      IOException failure = assertThrows(IOException.class, () -> {
+        renderer.renderImageWithDPI(0, PdfImageRenderer.DEFAULT_DPI);
+        renderer.requireWithinLimits();
+      });
+      assertTrue(failure.getMessage().contains("decoded PDF image pixels"));
+    }
+  }
+
+  @Test
+  void ordinaryPredictorParametersStillRender() throws Exception {
+    for (COSName filter : new COSName[] {COSName.FLATE_DECODE, COSName.LZW_DECODE}) {
+      for (boolean array : new boolean[] {false, true}) {
+        String name = "ordinary-predictor-" + filter.getName() + array;
+        Path path = predictorPdf(name, filter, predictor(1), array, null);
+        try (var files = new TempFileManager(tempDir.resolve(name + "-render"));
+            var renderer = new PdfImageRenderer(files)) {
+          var pages = renderer.render(path);
+          assertEquals(1, pages.size());
+          // Verify gray samples, rather than PDFBox swallowing a decode error.
+          var rendered = ImageIO.read(pages.getFirst().toFile());
+          assertTrue((rendered.getRGB(5, rendered.getHeight() - 5) & 0xff) < 240);
+        }
+      }
+    }
+  }
+
+  private static COSDictionary predictor(int columns) {
+    var params = new COSDictionary();
+    params.setInt(COSName.PREDICTOR, 12);
+    params.setInt(COSName.COLORS, 1);
+    params.setInt(COSName.BITS_PER_COMPONENT, 8);
+    params.setInt(COSName.COLUMNS, columns);
+    return params;
+  }
+
+  @Test
+  void conflictingDecodeParameterAliasesAreRefusedBeforeDecoding() throws Exception {
+    Path path = tempDir.resolve("conflicting-predictor-aliases.pdf");
+    try (var document = new PDDocument()) {
+      var page = new PDPage(new PDRectangle(72, 72));
+      document.addPage(page);
+      var image = image(document, 1, 1, true);
+      image.getCOSObject().setItem(COSName.DECODE_PARMS, predictor(1));
+      image.getCOSObject().setItem(COSName.DP, predictor(8193));
+      try (var content = new PDPageContentStream(document, page)) {
+        content.drawImage(image, 0, 0, 10, 10);
+      }
+      document.save(path.toFile());
+    }
+    assertRejectedImage(path, "decode parameters");
+  }
+
+  @Test
+  void ordinaryFaxDimensionsStillRender() throws Exception {
+    Path path = tempDir.resolve("ordinary-fax.pdf");
+    try (var document = new PDDocument()) {
+      var page = new PDPage(new PDRectangle(72, 72));
+      document.addPage(page);
+      var image = CCITTFactory.createFromImage(document,
+          new BufferedImage(8, 8, BufferedImage.TYPE_BYTE_BINARY));
+      try (var content = new PDPageContentStream(document, page)) {
+        content.drawImage(image, 0, 0, 10, 10);
+      }
+      document.save(path.toFile());
+    }
+    try (var files = new TempFileManager(tempDir.resolve("ordinary-fax-render"));
+        var renderer = new PdfImageRenderer(files)) {
+      var pages = renderer.render(path);
+      assertEquals(1, pages.size());
+      var rendered = ImageIO.read(pages.getFirst().toFile());
+      assertTrue((rendered.getRGB(5, rendered.getHeight() - 5) & 0xff) < 240);
+    }
+  }
+
+  private Path predictorPdf(String name, COSName filter, COSDictionary params, boolean array,
+      COSName maskKey) throws Exception {
+    Path path = tempDir.resolve("predictor-" + name + ".pdf");
+    try (var document = new PDDocument()) {
+      var page = new PDPage(new PDRectangle(72, 72));
+      document.addPage(page);
+      var bytes = new ByteArrayOutputStream();
+      // The fax case deliberately has no usable fax data: preflight must reject its dimensions
+      // before trying that decoder. Predictor fixtures contain real Flate or LZW data.
+      COSName encoding = COSName.CCITTFAX_DECODE.equals(filter) ? COSName.FLATE_DECODE : filter;
+      FilterFactory.INSTANCE.getFilter(encoding).encode(
+          new ByteArrayInputStream(new byte[] {0, 127}), bytes, new COSDictionary(), 0);
+      COSArray filters = new COSArray();
+      filters.add(COSName.ASCII_HEX_DECODE);
+      filters.add(filter);
+      COSArray parameters = new COSArray();
+      parameters.add(COSNull.NULL);
+      parameters.add(params);
+      byte[] encoded = array ? (java.util.HexFormat.of().formatHex(bytes.toByteArray()) + ">")
+          .getBytes(java.nio.charset.StandardCharsets.US_ASCII) : bytes.toByteArray();
+      var source = new PDImageXObject(document, new ByteArrayInputStream(encoded),
+          array ? filters : filter, 1, 1, 8, PDDeviceGray.INSTANCE);
+      source.getCOSObject().setItem(COSName.DECODE_PARMS, array ? parameters : params);
+      var drawn = source;
+      if (maskKey != null) {
+        drawn = image(document, 1, 1, false);
+        if (COSName.MASK.equals(maskKey)) {
+          source.setStencil(true);
+          source.setBitsPerComponent(1);
+        }
+        drawn.getCOSObject().setItem(maskKey, source);
+      }
+      try (var content = new PDPageContentStream(document, page)) {
+        content.drawImage(drawn, 0, 0, 10, 10);
+      }
+      document.save(path.toFile());
+    }
+    return path;
+  }
 
   @Test
   void smallPageRejectsOversizedImageXObjectAndImageInsideForm() throws Exception {
