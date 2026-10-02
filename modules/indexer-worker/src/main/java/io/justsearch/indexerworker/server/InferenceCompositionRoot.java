@@ -875,7 +875,7 @@ public final class InferenceCompositionRoot {
           variant.modelFile());
       return Optional.of(assembly);
     } catch (Exception e) {
-      retireFailedIndexHandle(sessions, e);
+      retireFailedHandle(sessions, e);
       // Tempdoc 710 Wave 2 Move 1: widened from OrtException — ModelCapabilityResolver throws
       // IllegalStateException under justsearch.models.capability_contract_strict, and that must
       // degrade this lane to Optional.empty() the same way a session-creation failure does, not
@@ -918,7 +918,7 @@ public final class InferenceCompositionRoot {
           cfg.ai().capabilityContractStrict(), variant.modelFile());
       return Optional.of(assembly);
     } catch (Exception e) {
-      retireFailedIndexHandle(sessions, e);
+      retireFailedHandle(sessions, e);
       log.error("NER composition failed — NER will be unavailable", e);
       return Optional.empty();
     }
@@ -959,7 +959,7 @@ public final class InferenceCompositionRoot {
       BgeM3Assembly assembly = BgeM3Encoder.buildAssembly(sessions, capturedConfig);
       return Optional.of(assembly);
     } catch (Exception e) {
-      retireFailedIndexHandle(sessions, e);
+      retireFailedHandle(sessions, e);
       log.warn(
           "Failed to initialize BGE-M3 encoder, falling back to SPLADE: {}", e.getMessage());
       log.debug("Failed to initialize BGE-M3 encoder (stack trace)", e);
@@ -1004,7 +1004,7 @@ public final class InferenceCompositionRoot {
           variant.modelFile());
       return Optional.of(assembly);
     } catch (Exception e) {
-      retireFailedIndexHandle(sessions, e);
+      retireFailedHandle(sessions, e);
       log.warn("Failed to initialize SPLADE encoder (non-fatal): {}", e.getMessage());
       log.debug("Failed to initialize SPLADE encoder (stack trace)", e);
       return Optional.empty();
@@ -1101,6 +1101,10 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
+      handles.add(sessions);
+      policies.put(
+          EncoderRole.RERANKER,
+          ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, hardware, variant));
       // Tempdoc 710 Move 2: the reranker lane was structurally absent from observability (no
       // registerEncoder, S-B3). CrossEncoderReranker lives in the `reranker` module, which does
       // not depend on worker-core (where EncoderProfileAccumulator/OperationalMetrics live), so
@@ -1113,13 +1117,9 @@ public final class InferenceCompositionRoot {
       sessions.setOrtRunRecorder(rerankerProfiler::recordOrtCall);
       RerankerAssembly assembly = CrossEncoderReranker.buildAssembly(sessions,
           attempted.tokenizer().path(), attempted.model().path(), rerankCfg.maxSequenceLength());
-      handles.add(assembly.sessions());
-      policies.put(
-          EncoderRole.RERANKER,
-          ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, hardware, variant));
       return new QueryComposition(Optional.of(assembly), attempted);
     } catch (Exception e) {
-      retireFailedQueryHandle(sessions, e);
+      retireFailedHandle(sessions, e);
       log.warn("Failed to initialize search reranker (non-fatal): {}", e.getMessage());
       log.debug("Failed to initialize search reranker (stack trace)", e);
       return new QueryComposition(Optional.empty(), attempted);
@@ -1153,6 +1153,8 @@ public final class InferenceCompositionRoot {
               variant,
               () -> false,
               events);
+      handles.add(sessions);
+      policies.put(EncoderRole.CITATION, policy);
       // Tempdoc 710 Move 2: the citation lane was likewise structurally absent from
       // observability. Same reasoning as composeRerankerRole above — CitationScorer lives in
       // the `reranker` module, so registration + choke-point binding happens here.
@@ -1173,11 +1175,9 @@ public final class InferenceCompositionRoot {
             variant.modelFile().toAbsolutePath().normalize(),
             selection.fingerprint("citation-scorer").sha());
       }
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.CITATION, policy);
       return new QueryComposition(Optional.of(assembly), attempted);
     } catch (Exception e) {
-      retireFailedQueryHandle(sessions, e);
+      retireFailedHandle(sessions, e);
       log.warn("Citation scorer init failed (non-fatal): {}", e.getMessage());
       log.debug("Citation scorer init failed (stack trace)", e);
       return new QueryComposition(Optional.empty(), attempted);
@@ -1193,7 +1193,7 @@ public final class InferenceCompositionRoot {
 
   }
 
-  private static void retireFailedIndexHandle(SessionHandle sessions, Exception cause) {
+  private static void retireFailedHandle(SessionHandle sessions, Exception cause) {
     if (sessions == null) return;
     try {
       sessions.close();
@@ -1201,17 +1201,6 @@ public final class InferenceCompositionRoot {
       cause.addSuppressed(closeFailure);
     }
     // The surface already owns the handle, including a refused close, for shutdown/recovery retry.
-  }
-
-  private static void retireFailedQueryHandle(SessionHandle sessions, Exception cause) {
-    if (sessions == null) return;
-    try {
-      sessions.close();
-      if (sessions.retirementStatus() == SessionHandle.RetirementStatus.RETIRED) return;
-    } catch (RuntimeException closeFailure) {
-      cause.addSuppressed(closeFailure);
-    }
-    throw new IllegalStateException("Failed query assembly retained its native session", cause);
   }
 
   private static VariantSelection witnessedVariant(QueryRoleSelection.Role role,
