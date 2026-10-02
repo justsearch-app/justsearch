@@ -2,20 +2,77 @@
 package io.justsearch.adapters.lucene.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.configuration.AppliedConfigurationVersion;
 import io.justsearch.configuration.ConfigKey;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.configuration.resolved.ConfigApplyScopes;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class IndexRuntimeConfigurationTest extends RuntimeTestBase {
+  @Test
+  void capturedHybridControlsParticipateInSuccessorAppliedIdentity() {
+    var baseline = Map.of(
+        "index.hybrid.fusion_strategy", "cc",
+        "index.hybrid.branch_fusion_strategy", "cc",
+        "index.hybrid.chunk_leg_recall_complete_enabled", "true",
+        "index.hybrid.chunk_leg_recall_complete_top_n", "5");
+    var changes = Map.ofEntries(
+        Map.entry("index.hybrid.vector_skip_min_chars", "100"),
+        Map.entry("index.hybrid.vector_skip_min_df_fraction", "0.2"),
+        Map.entry("index.hybrid.cc_weight_sparse", "0.21"),
+        Map.entry("index.hybrid.cc_weight_dense", "0.21"),
+        Map.entry("index.hybrid.cc_weight_splade", "0.21"),
+        Map.entry("index.hybrid.adaptive_weights_enabled", "true"),
+        Map.entry("index.hybrid.branch_fusion_strategy", "rrf"),
+        Map.entry("index.hybrid.branch_cc_zero_exclude", "false"),
+        Map.entry("index.hybrid.branch_cc_weight_whole", "0.21"),
+        Map.entry("index.hybrid.branch_cc_weight_chunk", "0.21"),
+        Map.entry("index.hybrid.branch_chunk_min_weight_multiplier", "0.21"),
+        Map.entry("index.hybrid.branch_ramp.full_weight_max_tokens", "512"),
+        Map.entry("index.hybrid.branch_ramp.zero_weight_min_tokens", "8192"),
+        Map.entry("index.hybrid.chunk_cc_weight_sparse", "0.21"),
+        Map.entry("index.hybrid.chunk_cc_weight_dense", "0.21"),
+        Map.entry("index.hybrid.chunk_cc_weight_splade", "0.21"),
+        Map.entry("index.hybrid.chunk_cc_zero_exclude", "true"),
+        Map.entry("index.hybrid.chunk_collapse_limit_multiplier", "3"),
+        Map.entry("index.hybrid.chunk_leg_recall_complete_enabled", "false"),
+        Map.entry("index.hybrid.chunk_leg_recall_complete_top_n", "7"),
+        Map.entry("index.hybrid.chunk_branch_requires_base_results", "false"));
+    Map<String, Object> before;
+    try (var serving = runtime(IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)),
+        tempDir.resolve("hybrid-serving"), config(baseline))) {
+      before = serving.appliedConfigurationValues();
+    }
+    assertTrue(before.keySet().containsAll(changes.keySet()), "all captured query inputs are declared");
+    String identityA = AppliedConfigurationVersion.digest(IndexRuntimeConfiguration.dependencies(), before);
+    for (var change : changes.entrySet()) {
+      assertEquals(ConfigApplyScopes.ApplyScope.Kind.RESTART_REQUIRED,
+          ConfigApplyScopes.scopeFor(change.getKey()).kind(), change.getKey());
+      var desired = new LinkedHashMap<>(baseline);
+      desired.put(change.getKey(), change.getValue());
+      try (var successor = runtime(IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)),
+          tempDir.resolve("hybrid-" + change.getKey()), config(desired))) {
+        var after = successor.appliedConfigurationValues();
+        assertNotEquals(before.get(change.getKey()), after.get(change.getKey()), change.getKey());
+        assertNotEquals(identityA,
+            AppliedConfigurationVersion.digest(IndexRuntimeConfiguration.dependencies(), after),
+            change.getKey());
+      }
+    }
+  }
+
 
   @Test
   void deferredUpgradePreservesAppliedConfiguration() {

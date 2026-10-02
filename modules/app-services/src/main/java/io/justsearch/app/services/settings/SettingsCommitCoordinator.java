@@ -705,15 +705,19 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
             Map.of("component", "encoders"));
       }
       boolean restartRequired = !changedKeys.restartRequired().isEmpty();
-      // API_PORT is the only restart-required value this settings candidate can write. If an
+      // These are the restart-required selectors this settings candidate can write. If an
       // unrelated process source drifted since boot, refuse before touching a component owner.
-      if (!Set.of("justsearch.api.port").containsAll(changedKeys.restartRequired())) {
+      if (!Set.of("justsearch.api.port", "justsearch.index.base_path")
+          .containsAll(changedKeys.restartRequired())) {
         throw refused("RESTART_SOURCE_DRIFT",
             "A restart-required process source changed; restart before applying settings",
             Map.of("keys", List.copyOf(changedKeys.restartRequired())));
       }
       ResolvedConfig servingResolved = changedKeys.restartRequired().contains("justsearch.api.port")
           ? resolved.retainingApiPortFrom(serving) : resolved;
+      if (changedKeys.restartRequired().contains("justsearch.index.base_path")) {
+        servingResolved = servingResolved.retainingIndexBasePathFrom(serving);
+      }
       if (!changedKeys.component().isEmpty() || chatComponentChanged
           || candidateContext.hasChatProfile() || candidateContext.forceGenerativeRefresh()) {
         var affected = new java.util.TreeMap<String, Set<String>>(changedKeys.component());
@@ -751,6 +755,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           throw refused("ENCODER_SELECTION_REQUIRED",
               "Encoder owner did not prepare a query-role selection", Map.of());
         }
+        queryRoles = preparedComponents.queryRoleSelection().orElseThrow();
+      } else if (preparedComponents != null && preparedComponents.queryRoleSelection().isPresent()) {
+        // A shared dependency may select encoders through another governed primary owner.
         queryRoles = preparedComponents.queryRoleSelection().orElseThrow();
       }
       // The physical candidate and its exact file identities exist before final serialization.

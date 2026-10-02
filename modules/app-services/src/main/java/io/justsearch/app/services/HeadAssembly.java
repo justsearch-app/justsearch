@@ -76,6 +76,11 @@ public final class HeadAssembly implements AutoCloseable {
       EnvRegistry.SERVER_PORT.configKey(),
       EnvRegistry.CONTEXT_SIZE.configKey(),
       EnvRegistry.GPU_LAYERS.configKey(),
+      EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED.configKey(),
+      EnvRegistry.LLM_SLOTS.configKey(),
+      EnvRegistry.LLM_KV_TYPE.configKey(),
+      EnvRegistry.USE_THINKING.configKey(),
+      EnvRegistry.REASONING_BUDGET.configKey(),
       EnvRegistry.CHAT_PROFILE.configKey());
 
   // §10 endpoint: bootstrap holds typed phase records (capabilities/services/substrateGraph/
@@ -521,7 +526,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.inferenceManager = manager;
     if (generativeObservation != null && (manager != null || !inferenceConfigured)) {
       String version = manager == null ? generativeAbsentVersion(rc, liteMode)
-          : generativeAppliedVersion(manager.currentConfig());
+          : generativeAppliedVersion(manager.currentConfig(), rc);
       generativeObservation.setDesiredVersion(version);
       generativeObservation.setAppliedVersion(version);
     }
@@ -1848,8 +1853,11 @@ public final class HeadAssembly implements AutoCloseable {
         2);
   }
 
-  static String generativeAppliedVersion(io.justsearch.app.inference.InferenceConfig config) {
+  /** Value identity shared by settings preparation, verified activation and same-config recovery. */
+  public static String generativeAppliedVersion(io.justsearch.app.inference.InferenceConfig config,
+      ResolvedConfig resolved) {
     Objects.requireNonNull(config, "config");
+    Objects.requireNonNull(resolved, "resolved");
     var values = new java.util.LinkedHashMap<String, Object>();
     // A constructed manager proves these existence gates were accepted at composition.
     values.put(EnvRegistry.LLM_ENABLED.configKey(), true);
@@ -1862,6 +1870,14 @@ public final class HeadAssembly implements AutoCloseable {
     values.put(EnvRegistry.CONTEXT_SIZE.configKey(), config.contextSize());
     values.put(EnvRegistry.GPU_LAYERS.configKey(), config.gpuLayers());
     values.put(EnvRegistry.CHAT_PROFILE.configKey(), config.chatProfileId());
+    // These launch controls live in the same resolved snapshot used to compose the server,
+    // rather than in InferenceConfig. Recovery supplies the retained physical launch snapshot.
+    values.put(EnvRegistry.LLM_SLOTS.configKey(), resolved.ai().llmSlots());
+    values.put(EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED.configKey(),
+        resolved.ai().gpuAccelerationAllowed());
+    values.put(EnvRegistry.LLM_KV_TYPE.configKey(), resolved.ai().llmKvType());
+    values.put(EnvRegistry.USE_THINKING.configKey(), resolved.ai().useThinking());
+    values.put(EnvRegistry.REASONING_BUDGET.configKey(), resolved.ai().reasoningBudget());
     // vduMode is a runtime procedure mode, not a declared configuration key. The existing
     // inference mode projection observes it; this applied-config digest deliberately does not.
     return AppliedConfigurationVersion.digest(GENERATIVE_DEPENDENCIES, values);

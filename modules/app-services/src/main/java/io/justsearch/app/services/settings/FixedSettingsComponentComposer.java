@@ -21,6 +21,9 @@ import org.slf4j.LoggerFactory;
 /** Fixed boot composition for owner-created settings candidates and one registry publication. */
 public final class FixedSettingsComponentComposer implements SettingsComponentComposer {
   private static final Logger LOG = LoggerFactory.getLogger(FixedSettingsComponentComposer.class);
+  // Apply relationships are distinct from captured-value/digest dependencies. In particular,
+  // query model paths appear in the index's boot projection, but QueryRoleSet replacement is
+  // owned by encoders and retains the serving Lucene runtime and index-time EncoderSet.
   public interface Owner {
     PreparedOwner prepare(UiSettings candidate, ResolvedConfig desired, Set<String> changedKeys);
 

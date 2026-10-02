@@ -112,8 +112,10 @@ final class SettingsCommitCoordinatorTest {
     }
   }
 
-  @Test
-  void queryOwnerSelectionIsSerializedOnlyAfterPhysicalPreparation() throws Exception {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void queryOwnerSelectionIsSerializedOnlyAfterPhysicalPreparation(boolean sharedDependency)
+      throws Exception {
     Path settingsPath = temp.resolve("query-owner-settings.json");
     Path modelDir = temp.resolve("citation-model");
     var selection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
@@ -127,7 +129,7 @@ final class SettingsCommitCoordinatorTest {
         ComposeEvidence.Mode.IN_PLACE,
         "candidate_fits_after_source_release", 10L, 20L);
     SettingsComponentComposer components = (candidate, desired, affected) -> {
-      assertEquals(Set.of("encoders"), affected.keySet());
+      assertEquals(Set.of(sharedDependency ? "generative" : "encoders"), affected.keySet());
       assertFalse(Files.exists(settingsPath));
       preparedOwner.set(true);
       return new SettingsComponentComposer.Prepared() {
@@ -154,7 +156,8 @@ final class SettingsCommitCoordinatorTest {
           candidate -> OperationResult.success("prepared"), () -> false, components);
       var runner = runner(operations, owner);
       UiSettings candidate = new UiSettings();
-      candidate.setCitationScorerModelPath(modelDir.toString());
+      if (sharedDependency) candidate.setContextLength(config.get().ai().contextSize() + 1024);
+      else candidate.setCitationScorerModelPath(modelDir.toString());
       var attempt = runner.accept(request(OperationKind.RECONFIGURE));
 
       var result = runner.start(attempt, handle -> OperationExecution.finished(
@@ -438,6 +441,40 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void installerProjectionRefusesGpuPolicyDriftBeforeOwnersOrPointer() {
+    String policy = "policy.gpu_acceleration_enabled";
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        temp.resolve("installer-policy-drift.json"));
+    var initial = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+        .putDefault(policy, "true").build();
+    var desired = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+        .putDefault(policy, "false").build();
+    var config = new ConfigStore(initial);
+    var components = org.mockito.Mockito.mock(SettingsComponentComposer.class);
+    var restarts = new AtomicInteger();
+    var owner = new SettingsCommitCoordinator(settings, config, restarts::incrementAndGet,
+        candidate -> desired, candidate -> OperationResult.success("prepared"),
+        settings::replacePrepared, () -> false, components);
+    owner.inspectRecovery(List.of());
+    String key = OperationKeys.generate(CLOCK);
+    UiSettings candidate = new UiSettings();
+    var reservation = owner.reserve(716, key, currentWitness(settings));
+
+    var refused = assertThrows(SettingsCommitOwner.Refused.class,
+        () -> owner.prepareInstallerGenerationProjection(reservation, candidate,
+            new ProjectionControl(), installerPlan(key, candidate)));
+
+    assertEquals("RESTART_SOURCE_DRIFT", refused.response().errorCode().orElseThrow());
+    assertEquals(List.of(policy), refused.response().errorDetails().get("keys"));
+    assertSame(initial, config.get());
+    assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+    assertFalse(Files.exists(settings.settingsPath()));
+    assertEquals(0, restarts.get());
+    org.mockito.Mockito.verifyNoInteractions(components);
+    owner.releaseAfterTerminal(716);
+  }
+
+  @Test
   void installerProjectionRefusesModelPathsMissingOrContradictingAcceptedPlan() {
     for (boolean missingCitation : List.of(true, false)) {
       var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
@@ -527,8 +564,10 @@ final class SettingsCommitCoordinatorTest {
         String changedValue = "justsearch.rerank.top_k".equals(property)
             ? Integer.toString(config.get().ai().reranker().topK() + 1) : testCase[1];
         System.setProperty(property, changedValue);
-        var components = new FixedSettingsComponentComposer(org.mockito.Mockito.mock(
-            io.justsearch.core.component.EngineComponentRegistry.class));
+        var registry = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.class);
+        org.mockito.Mockito.when(registry.snapshot()).thenReturn(
+            new io.justsearch.core.component.EngineComponentSnapshot(0, List.of()));
+        var components = new FixedSettingsComponentComposer(registry);
         components.seal();
         var owner = new SettingsCommitCoordinator(settings, config, () -> {},
             candidateSettings -> OperationResult.success("prepared"), () -> false, components);
@@ -738,6 +777,8 @@ final class SettingsCommitCoordinatorTest {
       var initial = ConfigStoreRebuilder.prepare(settings.load());
       var config = new ConfigStore(initial);
       var registry = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.class);
+      org.mockito.Mockito.when(registry.snapshot()).thenReturn(
+          new io.justsearch.core.component.EngineComponentSnapshot(0, List.of()));
       var lease = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.ApplyLease.class);
       org.mockito.Mockito.when(registry.tryApply()).thenReturn(
           new io.justsearch.core.component.EngineComponentRegistry.ApplyAttempt.Acquired(lease));
@@ -789,6 +830,8 @@ final class SettingsCommitCoordinatorTest {
       var initial = ConfigStoreRebuilder.prepare(settings.load());
       var config = new ConfigStore(initial);
       var registry = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.class);
+      org.mockito.Mockito.when(registry.snapshot()).thenReturn(
+          new io.justsearch.core.component.EngineComponentSnapshot(0, List.of()));
       var lease = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.ApplyLease.class);
       org.mockito.Mockito.when(registry.tryApply()).thenReturn(
           new io.justsearch.core.component.EngineComponentRegistry.ApplyAttempt.Acquired(lease));
@@ -999,6 +1042,88 @@ final class SettingsCommitCoordinatorTest {
       assertEquals(new SettingsWitness(1, attempt.accepted().key()), settings.inspect().witness());
       assertEquals(OperationState.RUNNING,
           operations.find(attempt.accepted().key()).orElseThrow().state());
+      assertEquals(1, restarts.get());
+    }
+  }
+
+  @Test
+  void snapshotBoundHybridDriftRefusesBeforeUnrelatedSettingsPublication() throws Exception {
+    Path settingsPath = temp.resolve("hybrid-drift-settings.json");
+    AtomicInteger restarts = new AtomicInteger();
+    try (var operations = operations("hybrid-drift")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var initial = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+          .putDefault("index.hybrid.vector_skip_min_chars", "4").build();
+      var desired = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+          .putDefault("index.hybrid.vector_skip_min_chars", "100").build();
+      var config = new ConfigStore(initial);
+      var owner = new SettingsCommitCoordinator(settings, config, restarts::incrementAndGet,
+          candidate -> desired, candidate -> OperationResult.success("prepared"),
+          settings::replacePrepared);
+      var runner = runner(operations, owner);
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()))));
+
+      assertFalse(result.response().success());
+      assertEquals(OperationState.FAILED, result.record().state());
+      assertEquals("RESTART_SOURCE_DRIFT", result.response().errorCode().orElseThrow());
+      assertEquals(List.of("index.hybrid.vector_skip_min_chars"),
+          result.response().errorDetails().get("keys"));
+      assertSame(initial, config.get());
+      assertEquals(4, config.get().hybridSearch().vectorSkipMinChars());
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      assertFalse(Files.exists(settingsPath));
+      assertEquals(0, restarts.get());
+    }
+  }
+
+  @Test
+  void indexPathChangeCommitsForRestartWhileServingRootAndTraceStayAtA() throws Exception {
+    Path settingsPath = temp.resolve("restart-index-settings.json");
+    Path indexA = Files.createDirectory(temp.resolve("index-a"));
+    Path indexB = Files.createDirectory(temp.resolve("index-b"));
+    assertNull(SettingsPatch.validateIndexPath(indexB.toString()));
+    AtomicInteger restarts = new AtomicInteger();
+    AtomicReference<String> committedKey = new AtomicReference<>();
+    try (var operations = operations("restart-index")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var prior = new UiSettings();
+      prior.setIndexBasePath(indexA.toString());
+      settings.replacePrepared(settings.prepareExact(prior, new SettingsWitness(0, null)));
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(prior));
+      var servingPath = config.get().paths().indexBasePath();
+      var servingTrace = config.get().resolution("justsearch.index.base_path");
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {
+        assertEquals(new SettingsWitness(1, committedKey.get()), settings.inspect().witness());
+        assertEquals(OperationState.COMPLETE,
+            operations.find(committedKey.get()).orElseThrow().state());
+        assertEquals(servingPath, config.get().paths().indexBasePath());
+        restarts.incrementAndGet();
+      }, candidate -> OperationResult.success("prepared"));
+      var runner = runner(operations, owner);
+      var candidate = settings.load();
+      candidate.setIndexBasePath(indexB.toString());
+      var request = request(OperationKind.RECONFIGURE);
+      var attempt = runner.accept(request);
+      committedKey.set(attempt.accepted().key());
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertTrue(result.response().success());
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertEquals(Boolean.TRUE, result.response().structuredData().get("restartScheduled"));
+      assertEquals(1, restarts.get());
+      assertEquals(indexB.toString(), settings.inspect().settings().getIndexBasePath());
+      assertEquals(servingPath, config.get().paths().indexBasePath());
+      assertEquals(servingTrace, config.get().resolution("justsearch.index.base_path"));
+      assertEquals(indexB, ConfigStoreRebuilder.prepare(settings.load()).paths().indexBasePath(),
+          "successor boot must select committed B");
+      runner.start(runner.accept(request), ignored -> {
+        throw new AssertionError("recorded reconfigure must not execute again");
+      });
       assertEquals(1, restarts.get());
     }
   }

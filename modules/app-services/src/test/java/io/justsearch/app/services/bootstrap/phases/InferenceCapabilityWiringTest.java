@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.inference.InferenceLifecycleManager;
+import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.ModeTransitionListener;
 import io.justsearch.app.inference.telemetry.TransitionReason;
 import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
@@ -21,6 +22,7 @@ import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.TestEngineComponents;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +59,30 @@ final class InferenceCapabilityWiringTest {
     assertEquals(ComponentState.ABSENT, fixture.handle().snapshot().state());
     assertEquals(RuntimeStatus.REASON_ENGINE_UP_FOR_BACKGROUND,
         fixture.handle().snapshot().reasonCode());
+  }
+
+  @Test
+  void verifiedBackgroundVersionPublicationRetainsTheHeldPhysicalCause() {
+    Fixture fixture = fixture(Mode.ONLINE, false, null);
+    fixture.handle().transition(ComponentState.FAILED, "inference.crashed", "physical cause");
+    fixture.handle().setAppliedVersion("A");
+    var inference = new InferenceConfig(tmp.resolve("server"), tmp.resolve("model"), null,
+        8081, 4096, 0, false);
+    var resolved = ResolvedConfig.builder().build();
+    doAnswer(invocation -> {
+      java.util.function.BiConsumer<InferenceConfig, ResolvedConfig> publication = invocation.getArgument(0);
+      publication.accept(inference, resolved);
+      return true;
+    }).when(fixture.manager()).withVerifiedServingConfiguration(any());
+
+    transitionListener(fixture.manager()).onModeTransition(
+        Mode.OFFLINE, Mode.ONLINE, TransitionReason.USER_SWITCH);
+
+    assertEquals(ComponentState.ABSENT, fixture.handle().snapshot().state());
+    assertEquals("inference.crashed", fixture.handle().snapshot().reasonCode());
+    assertEquals("physical cause", fixture.handle().snapshot().evidence());
+    assertEquals(io.justsearch.app.services.HeadAssembly.generativeAppliedVersion(inference, resolved),
+        fixture.handle().snapshot().appliedVersion());
   }
 
   @Test
@@ -214,7 +240,8 @@ final class InferenceCapabilityWiringTest {
       InferenceLifecycleManager manager = mock(InferenceLifecycleManager.class);
       when(manager.getCurrentMode()).thenAnswer(ignored -> mode.get());
       InferenceCapabilityWiring.attachInferenceModeListener(
-          manager, handle, intent.spec(), reconciler);
+          manager, handle, intent.spec(), reconciler,
+          new java.util.concurrent.locks.ReentrantReadWriteLock());
       return new Fixture(manager, handle, intent, mode);
     } catch (Exception failure) {
       throw new AssertionError("Failed to compose fixture", failure);

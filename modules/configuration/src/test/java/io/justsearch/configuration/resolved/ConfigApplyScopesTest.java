@@ -36,26 +36,62 @@ final class ConfigApplyScopesTest {
         "index.boosts", "{\"a\":1}",
         "index.vector.hnsw.m", "16",
         "justsearch.api.port", "8080",
-        "index.hybrid.adaptive_weights_enabled", "false");
+        "justsearch.qu.enabled", "false");
     ResolvedConfig sameValueDifferentSource = config(
         "index.boosts", "{\"a\":1}",
         "index.vector.hnsw.m", "16",
         "justsearch.api.port", "8080",
-        "index.hybrid.adaptive_weights_enabled", "false");
+        "justsearch.qu.enabled", "false");
     assertTrue(ConfigApplyScopes.classify(before, sameValueDifferentSource).isNoOp());
 
     ResolvedConfig after = config(
         "index.boosts", "{\"b\":1}",
         "index.vector.hnsw.m", "32",
         "justsearch.api.port", "9090",
-        "index.hybrid.adaptive_weights_enabled", "true");
+        "justsearch.qu.enabled", "true");
     ConfigApplyScopes.ChangedKeys changed = ConfigApplyScopes.classify(before, after);
     assertEquals(java.util.Set.of("index.boosts"), changed.component().get("index"));
     assertEquals(java.util.Set.of("index.vector.hnsw.m"), changed.generationBound());
     assertEquals(java.util.Set.of("justsearch.api.port"), changed.restartRequired());
-    assertEquals(java.util.Set.of("index.hybrid.adaptive_weights_enabled"), changed.hot());
+    assertEquals(java.util.Set.of("justsearch.qu.enabled"), changed.hot());
     assertEquals(4, changed.all().size());
     assertFalse(changed.isNoOp());
+  }
+
+  @Test
+  void changingSnapshotBoundQueryThresholdRequiresRestart() {
+    var changed = ConfigApplyScopes.classify(
+        config("index.hybrid.vector_skip_min_chars", "4"),
+        config("index.hybrid.vector_skip_min_chars", "100"));
+    assertEquals(java.util.Set.of("index.hybrid.vector_skip_min_chars"),
+        changed.restartRequired());
+    assertTrue(changed.hot().isEmpty());
+    assertTrue(changed.component().isEmpty());
+  }
+
+  @Test
+  void sharedGpuPolicyRequiresRestartInsteadOfQueryOwnerComposition() {
+    String key = "policy.gpu_acceleration_enabled";
+    var changed = ConfigApplyScopes.classify(config(key, "true"), config(key, "false"));
+    assertEquals(java.util.Set.of(key), changed.restartRequired());
+    assertTrue(changed.component().isEmpty());
+    assertTrue(changed.hot().isEmpty());
+    assertTrue(changed.generationBound().isEmpty());
+  }
+
+  @Test
+  void indexPathRetentionKeepsServingValueAndTraceWhilePublishingOtherValues() {
+    var serving = config("justsearch.index.base_path", "index-a", "justsearch.api.port", "8080");
+    var desired = config("justsearch.index.base_path", "index-b", "justsearch.api.port", "9090");
+    var retained = desired.retainingIndexBasePathFrom(serving);
+    assertEquals(serving.paths().indexBasePath(), retained.paths().indexBasePath());
+    assertEquals(serving.resolution("justsearch.index.base_path"),
+        retained.resolution("justsearch.index.base_path"));
+    assertEquals(9090, retained.ports().apiPort());
+    assertEquals(desired.resolution("justsearch.api.port"), retained.resolution("justsearch.api.port"));
+    var bothRetained = retained.retainingApiPortFrom(serving);
+    assertEquals(8080, bothRetained.ports().apiPort());
+    assertEquals(serving.paths().indexBasePath(), bothRetained.paths().indexBasePath());
   }
 
   @Test
