@@ -615,14 +615,14 @@ Older `VDU_UPDATE`, `VDU_MARK_PROCESSING`, `VDU_MARK_FAILED` and
 
 ### Cutover policy for failed jobs
 
-By default, permanently failed indexing jobs do **not** block auto-cutover (failures remain visible via status and keep the system “unhealthy”).
+By default, native cutover refuses unsuperseded failed indexing jobs and keeps Blue active. The failed-job budget defaults to `0`; an unreadable failed count also refuses cutover.
 
-Optional guardrail:
+Operator override:
 
 - `JUSTSEARCH_INDEX_MIGRATION_CUTOVER_MAX_FAILED_JOBS` /
   `-Dindex.migration.cutover.max_failed_jobs=<N>`
 
-If configured, the Worker blocks cutover and marks the migration `FAILED` when `failed_count > N` at cutover drain time (keeps Blue active).
+For `N >= 0`, the Engine blocks native cutover and marks the migration `FAILED` when `failed_count > N` at cutover drain time (keeps Blue active). An explicit `-1` disables this budget. Recorded migrations use their exact accepted-version gap decision.
 
 ### Deadlines
 

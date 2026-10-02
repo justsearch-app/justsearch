@@ -306,7 +306,7 @@ These are the key runtime knobs that affect schema compatibility and migration b
   - `-Djustsearch.index.parity.allow_mismatch=true` — not set by default anywhere (tempdoc 915 removed
     the Head's unconditional set-sites); an operator sets this explicitly to open a known-divergent
     index read-only for diagnosis.
-- **Cutover guardrail (optional)**:
+- **Cutover failed-job budget**:
   - `JUSTSEARCH_INDEX_MIGRATION_CUTOVER_MAX_FAILED_JOBS` /
     `-Dindex.migration.cutover.max_failed_jobs=<n>`
-  - Default `-1` (do not block auto-cutover based on failed jobs count)
+  - Default `0` (refuse native cutover with unsuperseded failed jobs); an explicit `-1` disables the budget

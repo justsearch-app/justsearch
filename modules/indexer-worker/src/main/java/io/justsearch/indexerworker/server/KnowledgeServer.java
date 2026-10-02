@@ -138,7 +138,7 @@ public final class KnowledgeServer implements Closeable {
   private Path buildingIndexPath;
   private volatile IndexGenerationManager indexGenerationManager;
   private IndexGenerationManager.BootOwnership generationBootOwnership;
-  private IndexGenerationManager.BootDisposition generationBootDisposition;
+  private volatile IndexGenerationManager.BootDisposition generationBootDisposition;
   /** Replay settlement is valid only for this exact active generation. */
   private volatile String replaySettledGeneration;
   private List<RootBinding> bootRootBindings = List.of();
@@ -377,15 +377,15 @@ public final class KnowledgeServer implements Closeable {
   private DevReloadManager devReloadManager;
   private io.justsearch.telemetry.TracingBootstrap tracingBootstrap;
   private Thread sentinelThread;
-  private Thread migrationEnumeratorThread;
-  private Thread migrationCutoverThread;
+  private volatile Thread migrationEnumeratorThread;
+  private volatile Thread migrationCutoverThread;
   private MigrationTransitionBarrier.Hook migrationTransitionHook;
   private volatile boolean running;
   private volatile Consumer<Throwable> terminalWriterFaultHandler =
       failure -> log.error("Terminal writer failure has no Engine fault handler", failure);
   private volatile Runnable migrationRestartAction =
       () -> log.warn("Promoted generation requires an Engine restart; no process owner is installed");
-  private int migrationCutoverMaxFailedJobs = -1;
+  private int migrationCutoverMaxFailedJobs = 0;
   /**
    * Tempdoc 819: set when this boot started a corruption-recovery rebuild (the active generation
    * was recovered to EMPTY and a green is being rebuilt from source). Read once, when the embedding
@@ -3231,6 +3231,7 @@ public final class KnowledgeServer implements Closeable {
    * {@link DefaultWorkerAppServices} with non-null indexingLoop / ingestService).
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
+    svc.ingestService().setProjectionSemanticDeferralSupplier(() -> recordedCandidateInPlace);
     // 343: Wire resolved config supplier for search config status reporting.
     svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());
@@ -7109,8 +7110,8 @@ public final class KnowledgeServer implements Closeable {
     return KnowledgeServerMigrationOps.parseMigrationState(raw);
   }
 
-  private void startMigrationCutoverMonitorBestEffort() {
-    if (migrationCutoverThread != null) {
+  private synchronized void startMigrationCutoverMonitorBestEffort() {
+    if (migrationCutoverThread != null && migrationCutoverThread.isAlive()) {
       return;
     }
     migrationCutoverThread =
@@ -7494,6 +7495,20 @@ public final class KnowledgeServer implements Closeable {
 
   private boolean beginBuildingLive(String buildingGeneration, String operationKey)
       throws IOException {
+    // A committed monitor can still be notifying the recorded owner after pointer publication.
+    // Let it finish outside the runtime lock before reusing either migration thread slot.
+    if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED) {
+      try {
+        for (Thread previous : new Thread[] {migrationEnumeratorThread, migrationCutoverThread}) {
+          if (previous == null) continue;
+          previous.join(10_000);
+          if (previous.isAlive()) return false;
+        }
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        return false;
+      }
+    }
     ServingView retired;
     DefaultWorkerAppServices prepared = null;
     RunningRuntime green = null;
@@ -7505,6 +7520,25 @@ public final class KnowledgeServer implements Closeable {
     boolean enumerateSources;
     runtimeSwapLock.lock();
     try {
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED
+          && activeIndexPath != null && indexGenerationManager != null) {
+        String activeGeneration = activeIndexPath.getFileName().toString();
+        var settled = indexGenerationManager.readStateBestEffort();
+        if (settled != null && activeGeneration.equals(settled.active_generation())
+            && buildingGeneration.equals(settled.building_generation())
+            && (settled.previous_generation() == null
+                || activeGeneration.equals(settled.previous_generation()))
+            && activeGeneration.equals(replaySettledGeneration)
+            && activeGeneration.equals(rootReconciliationSettledGeneration)) {
+          // The new build's previous pointer may alias its source. A distinct retained
+          // predecessor still refuses reuse; its retirement certified settlement and capacity.
+          generationBootDisposition = IndexGenerationManager.BootDisposition.NATIVE;
+          generationBootOwnership = new IndexGenerationManager.BootOwnership.Native();
+          recordedCandidate = null;
+          recordedCandidateFingerprint = null;
+          candidateServiceConfiguration = null;
+        }
+      }
       if (closeStarted || encoderRecoveryReservation != null
           || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()
           || !running || rebuildBrakeExhausted || indexGenerationManager == null
@@ -8057,6 +8091,7 @@ public final class KnowledgeServer implements Closeable {
                         embeddingCompatController = candidateEmbeddingCompatController;
                         candidateEmbeddingCompatController = null;
                         startupConfiguration = recordedCandidate.configuration();
+                        serviceConfiguration = candidateServiceConfiguration;
                         initialModelSelection = promotedSelection;
                         candidateModels = null;
                         recordedCandidateInPlace = false;
@@ -8306,8 +8341,9 @@ public final class KnowledgeServer implements Closeable {
     startMigrationEnumeratorBestEffort(rc, true);
   }
 
-  private void startMigrationEnumeratorBestEffort(ResolvedConfig rc, boolean enumerateFiles) {
-    if (migrationEnumeratorThread != null) {
+  private synchronized void startMigrationEnumeratorBestEffort(
+      ResolvedConfig rc, boolean enumerateFiles) {
+    if (migrationEnumeratorThread != null && migrationEnumeratorThread.isAlive()) {
       return;
     }
     migrationEnumeratorRunning.set(true);

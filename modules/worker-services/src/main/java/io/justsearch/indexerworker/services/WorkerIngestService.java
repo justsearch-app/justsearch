@@ -144,6 +144,7 @@ public final class WorkerIngestService {
           .toArray(java.util.concurrent.locks.ReentrantLock[]::new);
   private WorkerMutationAdmission mutationAdmission;
   private Object mutationOwner;
+  private java.util.function.BooleanSupplier projectionSemanticDeferral = () -> false;
   private final MigrationControlOps migrationOps;
   private final WorkerUpgradeQuiescence upgradeQuiescence;
   private final IndexSettleOps settleOps;
@@ -266,6 +267,11 @@ public final class WorkerIngestService {
     }
   }
 
+  /** The composing owner supplies the serving mode used by admitted no-file writes. */
+  public void setProjectionSemanticDeferralSupplier(java.util.function.BooleanSupplier supplier) {
+    projectionSemanticDeferral = java.util.Objects.requireNonNull(supplier, "supplier");
+  }
+
   /** D1-9 no-file port. Durable receipts remain refused until D2-5's covering-commit owner lands. */
   public io.justsearch.app.api.indexing.ProjectionReceipt applyProjection(
       io.justsearch.app.api.indexing.AcceptedProjection projection,
@@ -289,6 +295,7 @@ public final class WorkerIngestService {
           throw WorkerServiceException.unavailable("Serving projection writer is unavailable");
         }
         String generationId = captureServingGeneration(ctx);
+        boolean semanticDeferred = projectionSemanticDeferral.getAsBoolean();
         String building = switchBufferOps.buildingGenerationForFileAdmission();
         if (building != null) {
           if (!(jobQueue instanceof SwitchBufferCapableQueue buffer)) {
@@ -311,7 +318,10 @@ public final class WorkerIngestService {
         serving.commitOps().maybeRefreshBlocking();
         return new io.justsearch.app.api.indexing.ProjectionReceipt(
             projection.sourceId(), projection.documentId(), projection.sourceRevision(),
-            generationId, io.justsearch.app.api.indexing.ProjectionReceipt.Visibility.NRT);
+            generationId, semanticDeferred
+                    && projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT
+                ? io.justsearch.app.api.indexing.ProjectionReceipt.Visibility.TEXT_ONLY_SEMANTIC_AT_ACTIVATION
+                : io.justsearch.app.api.indexing.ProjectionReceipt.Visibility.NRT);
       } finally {
         stripe.unlock();
       }

@@ -1498,7 +1498,7 @@ public final class ResolvedConfigBuilder {
             resolveBoolean("justsearch.prod", false)),
         normalizeIntegrityCheck(resolveString("index.integrity_check", null)),
         normalizeRecoveryPolicy(resolveString("index.recovery.policy", null)),
-        Math.max(-1, resolveInt("index.migration.cutover.max_failed_jobs", -1)),
+        Math.max(-1, resolveInt("index.migration.cutover.max_failed_jobs", 0)),
         resolveString("index.directory.type", null),
         resolveNullableInt("index.merge.tiered.segs_per_tier"),
         resolveNullableInt("index.merge.tiered.max_merged_segment_mb"),
