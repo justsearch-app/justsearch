@@ -17,6 +17,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -315,6 +316,37 @@ final class EngineTestHarness implements AutoCloseable {
   /** Independent NRT read: neither the exact parent nor any of its chunks may survive deletion. */
   boolean awaitDocumentAbsent(String docId, long timeoutMs) throws Exception {
     return awaitIndexAbsent(documentAndChunks(docId), timeoutMs);
+  }
+
+  /** Long enough for several chunks; every chunk retains the fixture's single-token marker. */
+  static String chunkedContent(String marker) {
+    return ("Chunk deletion witness " + marker + " carries searchable source text. "
+        + "Each paragraph must survive indexing until the parent is deleted or replaced.\n\n")
+        .repeat(100);
+  }
+
+  /** Independent read of the mutation target, requiring old-marker chunks before their removal. */
+  boolean awaitIngestChunks(String docId, String marker, boolean requireGreen, long timeoutMs)
+      throws Exception {
+    Query chunks = new BooleanQuery.Builder()
+        .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, docId)), BooleanClause.Occur.FILTER)
+        .add(new TermQuery(new Term(SchemaFields.CHUNK_CONTENT, marker.toLowerCase(Locale.ROOT))),
+            BooleanClause.Occur.MUST)
+        .build();
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      try (var view = captureServingView()) {
+        boolean green = !view.ingestRuntime().openedIndexPath()
+            .equals(view.searchRuntime().openedIndexPath());
+        if ((!requireGreen || green)
+            && view.ingestRuntime().readPathOps().search(chunks, 1, Set.of(), null, null).totalHits()
+                >= 2) {
+          return true;
+        }
+      }
+      Thread.sleep(100);
+    }
+    return false;
   }
 
   /** Replacement keeps the parent id, but must retire the old text in parent and chunk rows. */

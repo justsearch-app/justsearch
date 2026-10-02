@@ -69,7 +69,7 @@ final class EngineSwitchingFenceBufferingTest {
 
     String blueMarker = "BM" + UUID.randomUUID().toString().replace("-", "");
     Path blueFile = watchedRoot.resolve("blue.txt");
-    Files.writeString(blueFile, "hello " + blueMarker);
+    Files.writeString(blueFile, EngineTestHarness.chunkedContent(blueMarker));
     for (int i = 0; i < BACKLOG_FILES; i++) {
       Files.writeString(watchedRoot.resolve("backlog-" + i + ".txt"), "switching backlog " + i);
     }
@@ -93,8 +93,22 @@ final class EngineSwitchingFenceBufferingTest {
 
     assertTrue(
         engine.client().startMigration("system_test_switching", TestEngineContexts.FOREGROUND).accepted(), "startMigration must be accepted");
+    assertTrue(
+        engine.client().pauseMigration("chunk_delete_witness", TestEngineContexts.FOREGROUND),
+        "migration must pause while the replay-target chunk witness is established");
     assertTrue(engine.awaitLiveGreen(60_000), "live Green preparation must complete before restart");
     engine.restart();
+
+    assertEquals(
+        1,
+        engine.client().submitBatch(List.of(blueFile), TestEngineContexts.FOREGROUND).getAcceptedCount(),
+        "the delete target must be admitted to paused Green before replay");
+    assertTrue(
+        engine.awaitIngestChunks(blueDocId, blueMarker, true, 120_000),
+        "the exact replay target must have multiple old-marker chunks in Green before DELETE");
+    assertTrue(
+        engine.client().resumeMigration(TestEngineContexts.FOREGROUND),
+        "migration may resume after the Green chunk witness");
 
     assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(), "requestCutover must be accepted");
     assertTrue(awaitMigrationState("SWITCHING", 60_000), "migration_state must reach SWITCHING");

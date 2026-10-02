@@ -66,7 +66,7 @@ final class EngineVduMigrationReplayTest {
 
     String blueMarker = marker("blue");
     String replacementMarker = marker("replacement");
-    Files.writeString(source, "initial blue source " + blueMarker);
+    Files.writeString(source, EngineTestHarness.chunkedContent(blueMarker));
     writeWatchedRoots(dataDir, watchedRoot);
 
     engine = EngineTestHarness.start(dataDir);
@@ -114,6 +114,9 @@ final class EngineVduMigrationReplayTest {
     assertTrue(
         awaitBuildingIndexed(1, 120_000),
         "Green must contain the parent and the ordinary queue must drain before replay is tested");
+    assertTrue(
+        engine.awaitIngestChunks(PathNormalizer.normalizeKey(source), blueMarker, true, 120_000),
+        "the exact Green replay target must have multiple old-marker chunks before replacement");
 
     closeEngine();
     Files.writeString(source, "replacement source from resumed enumeration " + replacementMarker);
@@ -136,6 +139,9 @@ final class EngineVduMigrationReplayTest {
         requireBuffered(queuePath, seeded.key()),
         "an ineligible real KnowledgeServer boot must retain the exact durable VDU version");
     assertTrue(engine.awaitSearchable(blueMarker, 5_000), "the paused boot still serves Blue");
+    assertTrue(
+        engine.awaitIngestChunks(docId, blueMarker, true, 30_000),
+        "the old-marker chunks must survive in paused Green until replay becomes eligible");
 
     assertTrue(
         engine.client().resumeMigration(TestEngineContexts.FOREGROUND),

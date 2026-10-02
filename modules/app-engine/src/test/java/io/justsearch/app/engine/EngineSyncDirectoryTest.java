@@ -136,7 +136,7 @@ final class EngineSyncDirectoryTest {
   @DisplayName("syncDirectory prunes orphan documents")
   void syncPrunesOrphans() throws Exception {
     Path orphanFile = syncTestDir.resolve("orphan-file.txt");
-    Files.writeString(orphanFile, "This file will become an orphan - unique keyword: xyzorphan123");
+    Files.writeString(orphanFile, EngineTestHarness.chunkedContent("xyzorphan123"));
 
     long baseline = docCount();
     assertEquals(
@@ -152,6 +152,11 @@ final class EngineSyncDirectoryTest {
         harness.awaitDocumentAbsent(
             io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(orphanFile), 250),
         "the independent index read must see the exact parent before prune");
+    assertTrue(
+        harness.awaitIngestChunks(
+            io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(orphanFile),
+            "xyzorphan123", false, 30_000),
+        "the exact orphan parent must have multiple indexed chunks before prune");
 
     Files.delete(orphanFile);
     assertFalse(Files.exists(orphanFile), "file should be deleted from disk");
@@ -180,7 +185,7 @@ final class EngineSyncDirectoryTest {
   @DisplayName("syncDirectory handles both additions and deletions")
   void syncHandlesBothAdditionsAndDeletions() throws Exception {
     Path toDelete = syncTestDir.resolve("to-delete.txt");
-    Files.writeString(toDelete, "File to delete - keyword: deleteme789");
+    Files.writeString(toDelete, EngineTestHarness.chunkedContent("deleteme789"));
 
     long baseline = docCount();
     assertEquals(
@@ -194,6 +199,11 @@ final class EngineSyncDirectoryTest {
         harness.awaitDocumentAbsent(
             io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(toDelete), 250),
         "the independent index read must see the exact parent before deletion");
+    assertTrue(
+        harness.awaitIngestChunks(
+            io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(toDelete),
+            "deleteme789", false, 30_000),
+        "the exact parent must have multiple indexed chunks before deletion");
 
     Path newFile = syncTestDir.resolve("brand-new.txt");
     Files.writeString(newFile, "Brand new file - keyword: brandnew456");

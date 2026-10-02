@@ -231,6 +231,7 @@ final class EngineReadWhileWriteTest {
                       // Exercise both dispatch families and verify one increment per actual call.
                       boolean healthy = client.isHealthy(TestEngineContexts.FOREGROUND);
                       SearchResponse response = client.search("concurrent caller probe", 5, TestEngineContexts.FOREGROUND);
+                      EngineTestHarness.requireExecutedSearch(response);
                       // This phase has an empty index; a successful search must return no hits.
                       if (healthy && response.getResultsCount() == 0) {
                         successCount.incrementAndGet();
