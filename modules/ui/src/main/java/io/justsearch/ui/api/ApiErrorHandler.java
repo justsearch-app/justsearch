@@ -81,20 +81,31 @@ public final class ApiErrorHandler {
     public static Map<String, Object> toResponse(ApiErrorCode code, Exception e) {
         String message = sanitizeMessage(e != null ? e.getMessage() : null);
         var response = buildTypedResponse(message, code);
-        if (executorRefusal(e) != null) response.put("retrySafe", false);
+        if (executorRefusal(e) != null || admissionRefusal(e) != null) response.put("retrySafe", false);
         return response;
     }
 
     /** Unwrap asynchronous transport wrappers without treating arbitrary nested failures as refusal. */
     public static io.justsearch.core.execution.EngineExecutorRejectedException executorRefusal(Throwable failure) {
+        failure = unwrapAsyncFailure(failure);
+        return failure instanceof io.justsearch.core.execution.EngineExecutorRejectedException refused
+            ? refused : null;
+    }
+
+    public static io.justsearch.app.api.EngineAdmissionException admissionRefusal(Throwable failure) {
+        failure = unwrapAsyncFailure(failure);
+        return failure instanceof io.justsearch.app.api.EngineAdmissionException refused
+            ? refused : null;
+    }
+
+    private static Throwable unwrapAsyncFailure(Throwable failure) {
         var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
         while ((failure instanceof java.util.concurrent.CompletionException
                 || failure instanceof java.util.concurrent.ExecutionException)
                 && failure.getCause() != null && seen.add(failure)) {
             failure = failure.getCause();
         }
-        return failure instanceof io.justsearch.core.execution.EngineExecutorRejectedException refused
-            ? refused : null;
+        return failure;
     }
 
     /** Common HTTP status/header projection, also used by the JSON-RPC envelope writer. */
@@ -108,6 +119,12 @@ public final class ApiErrorHandler {
 
     public static boolean writeExecutorRefusal(io.javalin.http.Context ctx, Exception failure,
             Telemetry telemetry) {
+        var admission = admissionRefusal(failure);
+        if (admission != null) {
+            recordError(telemetry, resolve(admission), routeOf(ctx));
+            RequestEngineWork.writeRefusal(ctx, admission);
+            return true;
+        }
         var refused = executorRefusal(failure);
         if (refused == null) return false;
         executorRefusalStatus(ctx, refused);
@@ -264,6 +281,13 @@ public final class ApiErrorHandler {
         if (e instanceof io.justsearch.core.execution.EngineExecutorRejectedException refused) {
             return refused.reason() == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED
                 ? ApiErrorCode.SERVICE_UNAVAILABLE : ApiErrorCode.ADMISSION_ENGINE_LIMIT;
+        }
+        if (e instanceof io.justsearch.app.api.EngineAdmissionException refused) {
+            return switch (refused.reason()) {
+                case CONTEXT_LIMIT -> ApiErrorCode.ADMISSION_CONTEXT_LIMIT;
+                case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT;
+                case FROZEN, WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE;
+            };
         }
 
         // IndexRuntimeIOException: surface the specific reason

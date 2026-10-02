@@ -375,11 +375,21 @@ final class RootLifecycleOps {
         Path normalized = path.toAbsolutePath().normalize();
         log.info("Removing watched root: {} (stopping watcher, deleting from index)", normalized);
 
-        // Tempdoc 626 §Axis-A — unregister the Worker-side watcher (the sole event source).
+        // Stop every watcher whose persisted root will be removed, including nested roots.
         try {
-            workerWatchFn.unwatch(normalized.toString(), engineContext);
+            var rootsToUnwatch = new java.util.TreeSet<Path>();
+            rootsToUnwatch.add(normalized);
+            watchedRoots.keySet().stream().filter(root -> root.startsWith(normalized))
+                    .forEach(rootsToUnwatch::add);
+            for (Path root : rootsToUnwatch) {
+                workerWatchFn.unwatch(root.toString(), engineContext);
+            }
+        } catch (io.justsearch.app.api.EngineAdmissionException
+                | io.justsearch.core.execution.EngineExecutorRejectedException e) {
+            throw e;
         } catch (RuntimeException e) {
-            log.debug("Worker unwatch failed for {}: {}", normalized, e.getMessage());
+            log.warn("Worker unwatch failed for {}", normalized, e);
+            return -1;
         }
 
         // 2. Call the index port to delete indexed data
@@ -389,20 +399,24 @@ final class RootLifecycleOps {
 
             if (!response.getError().isEmpty()) {
                 log.error("deleteByPath RPC returned error: {}", response.getError());
+                return -1;
             } else {
                 deletedJobs = (int) response.getDeletedJobs();
                 log.info("deleteByPath RPC success: {} jobs deleted", deletedJobs);
             }
+        } catch (io.justsearch.app.api.EngineAdmissionException
+                | io.justsearch.core.execution.EngineExecutorRejectedException e) {
+            throw e;
         } catch (CircuitBreakerOpenException e) {
             log.debug(
                     "removeWatchedPath deleteByPath rejected by circuit breaker for {}", normalized);
-            // Continue to update local state even if circuit breaker rejected
+            return -1;
         } catch (Exception e) {
             log.error("deleteByPath RPC failed for: {}", normalized, e);
-            // Continue to update local state even if RPC fails
+            return -1;
         }
 
-        // 3. Update local state (even if RPC failed - user wanted to remove)
+        // Retain persisted roots until all cleanup succeeds so incomplete removal can be retried.
         watchedRootsState.removeRootAndNested(normalized);
         watchedRootsState.persist();
 

@@ -45,6 +45,38 @@ class McpProtocolHandlerTest {
 
   @Test
   @SuppressWarnings("unchecked")
+  void wrappedAdmissionRefusalKeepsRpcIdentityAndRetryDelay() throws Exception {
+    var adapter = mock(KnowledgeHttpApiAdapter.class);
+    when(adapter.openSearch(any(), any(EngineContext.class))).thenThrow(
+        new java.util.concurrent.CompletionException(new java.util.concurrent.ExecutionException(
+            new io.justsearch.app.api.EngineAdmissionException(
+                io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 7))));
+    var ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
+    when(ctx.body()).thenReturn("""
+        {"jsonrpc":"2.0","id":"admission-7","method":"tools/call",
+         "params":{"name":"justsearch_search","arguments":{"query":"test"}}}
+        """);
+    when(ctx.contentType(anyString())).thenReturn(ctx);
+    when(ctx.status(anyInt())).thenReturn(ctx);
+    var response = ArgumentCaptor.forClass(String.class);
+    when(ctx.result(response.capture())).thenReturn(ctx);
+
+    handlerOver(adapter).handlePost(ctx);
+
+    var wire = MAPPER.readValue(response.getValue(), Map.class);
+    assertEquals("admission-7", wire.get("id"));
+    assertFalse(wire.containsKey("result"));
+    var error = (Map<String, Object>) wire.get("error");
+    var data = (Map<String, Object>) error.get("data");
+    assertEquals("ADMISSION_ENGINE_LIMIT", data.get("errorCode"));
+    assertEquals(false, data.get("retrySafe"));
+    verify(ctx).status(429);
+    verify(ctx).header("Retry-After", "7");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
   void wrappedExecutorRefusalKeepsRpcIdentityAndExplicitlyDisallowsAutomaticReplay() throws Exception {
     for (var reason : List.of(
         io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,

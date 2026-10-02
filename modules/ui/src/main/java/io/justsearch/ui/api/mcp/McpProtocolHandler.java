@@ -188,6 +188,13 @@ public final class McpProtocolHandler {
       writeError(ctx, requestId, -32000, refused.getMessage(),
           io.justsearch.ui.api.RequestEngineWork.errorCode(refused), false);
     } catch (Exception e) {
+      var admissionRefusal = io.justsearch.ui.api.ApiErrorHandler.admissionRefusal(e);
+      if (admissionRefusal != null) {
+        io.justsearch.ui.api.RequestEngineWork.status(ctx, admissionRefusal);
+        writeError(ctx, requestId, -32000, admissionRefusal.getMessage(),
+            io.justsearch.ui.api.RequestEngineWork.errorCode(admissionRefusal), false);
+        return;
+      }
       var executorRefusal = io.justsearch.ui.api.ApiErrorHandler.executorRefusal(e);
       if (executorRefusal != null) {
         io.justsearch.ui.api.ApiErrorHandler.executorRefusalStatus(ctx, executorRefusal);

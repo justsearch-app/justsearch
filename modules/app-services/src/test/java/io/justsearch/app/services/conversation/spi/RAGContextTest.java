@@ -315,12 +315,20 @@ final class RAGContextTest {
   }
 
   @Test
-  @DisplayName("FALLBACK_FAILED retrieval mode → terminalError immediately (no batch retry)")
+  @DisplayName("Document port fallback failure is terminal without a second batch fetch")
   void fallbackFailedTerminal() {
-    var failed =
-        new ContextResult("", 0, 0, 0, List.of(), "FALLBACK_FAILED", "all_failed", false, List.of());
-    var docs = new TrackingDocs();
-    docs.retrieveResult = failed;
+    var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+    org.mockito.Mockito.when(client.retrieveContext(
+        org.mockito.ArgumentMatchers.any(RetrieveContextParams.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenThrow(new IllegalStateException("index unavailable"));
+    org.mockito.Mockito.when(client.fetchDocuments(
+        org.mockito.ArgumentMatchers.anyList(),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenThrow(new IllegalStateException("index unavailable"));
+    // Use the real producer: it returns an empty mode with FALLBACK_FAILED as the reason.
+    var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+        Runnable::run, Runnable::run, () -> client);
     var injector = new RAGContext(docs);
 
     InjectorResult r =
@@ -328,7 +336,9 @@ final class RAGContextTest {
 
     assertTrue(r.terminalError().isPresent());
     assertEquals("FETCH_FAILED", r.terminalError().get().payload().get("errorCode"));
-    assertEquals(0, docs.fetchBatchCalls, "FALLBACK_FAILED must not retry fetchBatch");
+    org.mockito.Mockito.verify(client, org.mockito.Mockito.times(1)).fetchDocuments(
+        org.mockito.ArgumentMatchers.eq(List.of("doc-1")),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
   }
 
   @Test

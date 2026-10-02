@@ -66,6 +66,30 @@ final class OperationsControllerTest {
   }
 
   @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  @SuppressWarnings("unchecked")
+  void handlerCapacityRefusalKeepsTypedCodeWithoutPromisingSafeReplay(boolean undo) {
+    var refusal = new java.util.concurrent.CompletionException(
+        new io.justsearch.app.api.EngineAdmissionException(
+            io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3));
+    when(dispatcher.dispatch(any(), any(), any(), any(), any(EngineContext.class))).thenThrow(refusal);
+    when(dispatcher.undo(any(), any(), any(), any(), any(EngineContext.class))).thenThrow(refusal);
+    String input = undo ? "{\"executionId\":\"exec-1\"}" : "{\"args\":{}}";
+    Context ctx = mockContext("core.ping-backend", input);
+    when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
+
+    if (undo) controller.handleUndo(ctx); else controller.handleInvoke(ctx);
+
+    verify(ctx).status(429);
+    verify(ctx).header("Retry-After", "3");
+    var response = ArgumentCaptor.forClass(Object.class);
+    verify(ctx).json(response.capture());
+    var body = (Map<String, Object>) response.getValue();
+    assertEquals("ADMISSION_ENGINE_LIMIT", body.get("errorCode"));
+    assertEquals(false, body.get("retrySafe"));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.CsvSource({"true,true", "TRUE,true", "false,false", "invalid,false"})
   void reindexQueryIsAuthoritativeAndControlFieldsStayOutsideArguments(String query, boolean force) throws Exception {
     String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());

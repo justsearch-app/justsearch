@@ -419,7 +419,7 @@ public final class RAGContext implements ContextInjector {
 
     // Fallback to whole-document fetch when chunks are unavailable or empty.
     if (context == null || context.isBlank() || chunksUsed == 0) {
-      if ("FALLBACK_FAILED".equals(retrievalMode)) {
+      if ("FALLBACK_FAILED".equals(retrievalModeReason)) {
         Map<String, Object> err = errorPayload("RAG context retrieval failed", "FETCH_FAILED");
         err.put("docIds", docIds);
         return InjectorResult.terminalError(new SseEvent("error", err));

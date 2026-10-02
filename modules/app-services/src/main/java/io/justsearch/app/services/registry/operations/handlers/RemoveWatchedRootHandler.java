@@ -23,8 +23,8 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>Args shape: {@code {"path": string, "collection"?: string}}. Returns
  * {@code structuredData.deletedJobs} with the int returned by the underlying
- * service (number of deleted jobs from the queue, or -1 on error per
- * IndexingService docstring).
+ * service on success. A negative count reports incomplete removal, per the
+ * IndexingService error-sentinel contract.
  */
 public final class RemoveWatchedRootHandler implements OperationHandler {
 
@@ -72,12 +72,18 @@ public final class RemoveWatchedRootHandler implements OperationHandler {
     try {
       Path p = Paths.get(pathArg);
       int deletedJobs = indexing.removeWatchedRoot(collection, p, engineContext);
+      if (deletedJobs < 0) {
+        return OperationResult.failure("Remove watched root incomplete: " + p + "; retry removal");
+      }
       return OperationResult.success(
           "Removed watched root " + p + " (" + deletedJobs + " jobs deleted)",
           Map.of(
               "path", p.toAbsolutePath().toString(),
               "collection", collection,
               "deletedJobs", deletedJobs));
+    } catch (io.justsearch.app.api.EngineAdmissionException
+        | io.justsearch.core.execution.EngineExecutorRejectedException e) {
+      throw e;
     } catch (Exception e) {
       log.error("RemoveWatchedRootHandler: removeWatchedRoot threw", e);
       return OperationResult.failure("Remove watched root failed: " + e.getMessage());
