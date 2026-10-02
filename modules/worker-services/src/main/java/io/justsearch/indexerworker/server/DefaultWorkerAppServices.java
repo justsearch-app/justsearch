@@ -129,6 +129,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       return ownsLoop && ownsWatcher && !closed;
     }
 
+    boolean ownsLoop() {
+      return ownsLoop && !closed;
+    }
+
     synchronized boolean ownsWatcher() {
       return ownsWatcher && !closed;
     }
@@ -1222,12 +1226,18 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireEmbeddingProvider(EmbeddingProvider provider) {
-    if (indexingLoop != null && candidateConfiguration == null) {
+    if (indexingLoop != null && candidateConfiguration == null && producerOwnership.ownsLoop()) {
       indexingLoop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
     }
-    embeddingProviderTarget.accept(provider);
+    if (producerOwnership.ownsLoop()) {
+      embeddingProviderTarget.accept(provider);
+    } else {
+      // An unpublished successor borrows the incumbent's loop and notification target.
+      searchService.setEmbeddingProvider(provider);
+      healthService.setEmbeddingProvider(provider);
+    }
     // 309 §33: Propagate future GPU-transition embedding reloads to SearchOrchestrator.
-    if (indexingLoop != null && candidateConfiguration == null) {
+    if (indexingLoop != null && candidateConfiguration == null && producerOwnership.ownsLoop()) {
       indexingLoop
           .getEmbeddingLifecycle()
           .setEmbeddingProviderChangeListener(embeddingProviderTarget);
@@ -1434,7 +1444,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   @Override
   public void addEmbeddingProviderChangeListener(
       java.util.function.Consumer<EmbeddingProvider> listener) {
-    if (indexingLoop != null && candidateConfiguration == null && listener != null) {
+    if (indexingLoop != null && candidateConfiguration == null && producerOwnership.ownsLoop()
+        && listener != null) {
       indexingLoop.getEmbeddingLifecycle().addEmbeddingProviderChangeListener(listener);
     }
   }
@@ -1443,7 +1454,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireEmbeddingCompatController(EmbeddingCompatibilityController ecc) {
-    if (indexingLoop != null && candidateConfiguration == null) {
+    if (indexingLoop != null && candidateConfiguration == null && producerOwnership.ownsLoop()) {
       indexingLoop.getEmbeddingLifecycle().setEmbeddingCompatController(ecc);
     }
     searchService.setEmbeddingCompatController(ecc);

@@ -15,12 +15,14 @@ import io.justsearch.core.execution.EngineExecutorSpec.Kind;
 import io.justsearch.core.execution.EngineExecutorSpec.Mode;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
+import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.extract.ExtractionConfiguration;
 import io.justsearch.indexerworker.extract.ExtractionMetricCatalog;
 import io.justsearch.indexerworker.extract.OcrMetricCatalog;
 import io.justsearch.indexerworker.loop.IndexingPipelineMetricCatalog;
 import io.justsearch.indexerworker.loop.IngestionOutcomeMetricCatalog;
+import io.justsearch.indexerworker.loop.EmbeddingProviderLifecycle;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.services.WorkerWatcherMetricCatalog;
@@ -44,6 +46,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 final class DefaultWorkerAppServicesProducerTransferTest {
 
@@ -384,6 +388,145 @@ final class DefaultWorkerAppServicesProducerTransferTest {
     }
   }
 
+  @ParameterizedTest
+  @CsvSource({"true,false", "true,true", "false,false", "false,true"})
+  void successorControllerPreparationPreservesBorrowedProducerUntilTransfer(
+      boolean installer, boolean query, @TempDir Path tempDir) throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices incumbent = installer
+          ? fixture.newCandidateIncumbent() : fixture.newIncumbent();
+      var controllerA = mock(EmbeddingCompatibilityController.class, "controller-A");
+      var controllerB = mock(EmbeddingCompatibilityController.class, "controller-B");
+      when(controllerA.allowEmbeddingWrites()).thenReturn(true);
+      incumbent.wireEmbeddingCompatController(controllerA);
+      wireProducerEmbeddings(incumbent, installer, controllerB);
+      EmbeddingProviderLifecycle lifecycle = producerLifecycle(incumbent);
+      DefaultWorkerAppServices successor = prepareSuccessor(fixture, incumbent, query);
+      try {
+        assertNull(field(successor, "candidateConfiguration"));
+        assertSame(controllerB, lifecycle.embeddingCompatController());
+        // KnowledgeServer post-construction wiring applies A before restoring B locally.
+        successor.wireEmbeddingCompatController(controllerA);
+        assertSame(controllerA, field(successor.searchService(), "embeddingCompatController"));
+        assertSame(controllerB, lifecycle.embeddingCompatController());
+        assertFalse(lifecycle.allowEmbeddingWrites(), "Green must keep B's write gate");
+        successor.wireEmbeddingCompatController(controllerB);
+        try (var transfer = incumbent.prepareProducerTransferTo(successor)) {
+          transfer.install();
+        }
+        successor.wireEmbeddingCompatController(controllerA);
+        assertSame(controllerA, lifecycle.embeddingCompatController());
+        assertTrue(lifecycle.allowEmbeddingWrites(), "the transferred owner may change its gate");
+        incumbent.wireEmbeddingCompatController(controllerB);
+        assertSame(controllerA, lifecycle.embeddingCompatController(),
+            "the retired service must not reconfigure its former producer");
+      } finally {
+        successor.close();
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"true,false", "true,true", "false,false", "false,true"})
+  void failedSuccessorControllerWiringAndAbandonmentPreserveBorrowedProducer(
+      boolean installer, boolean query, @TempDir Path tempDir) throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices incumbent = installer
+          ? fixture.newCandidateIncumbent() : fixture.newIncumbent();
+      var controllerA = mock(EmbeddingCompatibilityController.class, "controller-A");
+      var controllerB = mock(EmbeddingCompatibilityController.class, "controller-B");
+      when(controllerA.allowEmbeddingWrites()).thenReturn(true);
+      incumbent.wireEmbeddingCompatController(controllerA);
+      wireProducerEmbeddings(incumbent, installer, controllerB);
+      EmbeddingProviderLifecycle lifecycle = producerLifecycle(incumbent);
+      DefaultWorkerAppServices successor = prepareSuccessor(fixture, incumbent, query);
+      var search = spy(successor.searchService());
+      var wiringFailure = new IllegalStateException("successor-local wiring failed before B restoration");
+      doThrow(wiringFailure).when(search).setEmbeddingCompatController(controllerA);
+      Field searchField = DefaultWorkerAppServices.class.getDeclaredField("searchService");
+      searchField.setAccessible(true);
+      searchField.set(successor, search);
+      try {
+        assertSame(wiringFailure, assertThrows(IllegalStateException.class,
+            () -> successor.wireEmbeddingCompatController(controllerA)));
+        assertSame(controllerB, lifecycle.embeddingCompatController());
+        assertFalse(lifecycle.allowEmbeddingWrites());
+      } finally {
+        successor.close();
+      }
+      assertSame(controllerB, lifecycle.embeddingCompatController(),
+          "abandonment must leave the incumbent's exact controller installed");
+      assertFalse(lifecycle.allowEmbeddingWrites());
+      assertFalse(fixture.watcherExecutor.isShutdown());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"true,false", "true,true", "false,false", "false,true"})
+  void successorProviderAndListenerPreparationPreservesBorrowedProducer(
+      boolean installer, boolean query, @TempDir Path tempDir) throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices incumbent = installer
+          ? fixture.newCandidateIncumbent() : fixture.newIncumbent();
+      var providerB = mock(EmbeddingProvider.class, "provider-B");
+      when(providerB.isAvailable()).thenReturn(true);
+      if (installer) incumbent.wireCandidateProducer(providerB, EncoderBindings.Snapshot.empty());
+      else incumbent.wireEmbeddingProvider(providerB);
+      var incumbentQuery = queryEmbeddingProvider(incumbent);
+      EmbeddingProviderLifecycle lifecycle = producerLifecycle(incumbent);
+      Object listener = field(lifecycle, "embeddingProviderChangeListener");
+      Object notificationTarget = field(incumbent, "embeddingProviderTarget");
+      Object currentNotification = field(notificationTarget, "current");
+      DefaultWorkerAppServices successor = prepareSuccessor(fixture, incumbent, query);
+      var localProvider = mock(EmbeddingProvider.class, "successor-local-provider");
+      var notifications = new AtomicInteger();
+      try {
+        successor.wireEmbeddingProvider(localProvider);
+        successor.addEmbeddingProviderChangeListener(ignored -> notifications.incrementAndGet());
+        assertSame(localProvider, queryEmbeddingProvider(successor));
+        assertSame(incumbentQuery, queryEmbeddingProvider(incumbent));
+        assertSame(providerB, lifecycle.embeddingProvider());
+        assertSame(listener, field(lifecycle, "embeddingProviderChangeListener"));
+        assertSame(currentNotification, field(notificationTarget, "current"));
+        invokeDeclared(lifecycle, "notifyEmbeddingProviderChange",
+            new Class<?>[] {EmbeddingProvider.class}, providerB);
+        assertEquals(0, notifications.get(), "preparation must not register a producer listener");
+        try (var transfer = incumbent.prepareProducerTransferTo(successor)) {
+          transfer.install();
+        }
+        successor.wireEmbeddingProvider(localProvider);
+        successor.addEmbeddingProviderChangeListener(ignored -> notifications.incrementAndGet());
+        assertSame(localProvider, lifecycle.embeddingProvider());
+        invokeDeclared(lifecycle, "notifyEmbeddingProviderChange",
+            new Class<?>[] {EmbeddingProvider.class}, localProvider);
+        assertEquals(1, notifications.get());
+      } finally {
+        successor.close();
+      }
+    }
+  }
+
+  @Test
+  void newlyOwnedGreenLoopCanBeWiredBeforeWatcherTransfer(@TempDir Path tempDir) throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices incumbent = fixture.newIncumbent();
+      var controllerA = mock(EmbeddingCompatibilityController.class, "controller-A");
+      var controllerB = mock(EmbeddingCompatibilityController.class, "controller-B");
+      incumbent.wireEmbeddingCompatController(controllerA);
+      DefaultWorkerAppServices green = DefaultWorkerAppServices.prepareNativeGreen(
+          fixture.executors, fixture.nativeGreenContext(), () -> true, null,
+          incumbent.indexingPacing(), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+          fixture.configuration, null, incumbent);
+      try {
+        green.wireEmbeddingCompatController(controllerB);
+        assertSame(controllerB, producerLifecycle(green).embeddingCompatController());
+        assertSame(controllerA, producerLifecycle(incumbent).embeddingCompatController());
+      } finally {
+        green.close();
+      }
+    }
+  }
+
   @Test
   void candidateProducerBindingsStayDetachedUntilTransfer(@TempDir Path tempDir)
       throws Exception {
@@ -617,8 +760,33 @@ final class DefaultWorkerAppServicesProducerTransferTest {
 
   private static EmbeddingProvider producerEmbeddingProvider(DefaultWorkerAppServices services)
       throws ReflectiveOperationException {
+    return producerLifecycle(services).embeddingProvider();
+  }
+
+  private static EmbeddingProviderLifecycle producerLifecycle(DefaultWorkerAppServices services)
+      throws ReflectiveOperationException {
     var loop = (io.justsearch.indexerworker.loop.IndexingLoop) field(services, "indexingLoop");
-    return loop.getEmbeddingLifecycle().embeddingProvider();
+    return loop.getEmbeddingLifecycle();
+  }
+
+  private static DefaultWorkerAppServices prepareSuccessor(
+      Fixture fixture, DefaultWorkerAppServices incumbent, boolean query) {
+    return query ? incumbent.prepareQueryServingSuccessor(fixture.greenContext(),
+        incumbent.chunkRerankerConfig(), incumbent.citationScorerConfig())
+        : incumbent.prepareServingSuccessor(fixture.greenContext());
+  }
+
+  private static void wireProducerEmbeddings(DefaultWorkerAppServices incumbent,
+      boolean installer, EmbeddingCompatibilityController controller) {
+    var provider = mock(EmbeddingProvider.class, "available-Green-provider");
+    when(provider.isAvailable()).thenReturn(true);
+    if (installer) {
+      incumbent.wireCandidateProducer(provider, EncoderBindings.Snapshot.empty());
+      incumbent.wireCandidateEmbeddingCompatController(controller);
+    } else {
+      incumbent.wireEmbeddingProvider(provider);
+      incumbent.wireEmbeddingCompatController(controller);
+    }
   }
 
   private static Object field(Object target, String name) throws ReflectiveOperationException {
