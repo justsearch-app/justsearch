@@ -52,7 +52,7 @@ public final class PruneOps {
    * @param pathPrefix the path prefix to scan (e.g. "C:\Users\docs\")
    * @param abortChecker optional checker that returns true to abort the operation
    * @param throttleBatchSize number of documents to check between throttle sleeps
-   * @return number of orphan candidates pruned (owned children are also deleted), or -1 if aborted
+   * @return number of individually verified orphan documents pruned, or -1 if aborted
    */
   public int pruneByPathPrefix(String pathPrefix, BooleanSupplier abortChecker, int throttleBatchSize) {
     return pruneByPathPrefix(pathPrefix, abortChecker, throttleBatchSize, path -> {});
@@ -155,14 +155,23 @@ public final class PruneOps {
           if (docId == null || docId.isBlank()) {
             continue;
           }
-          // A pathless chunk's owner supplies its backing path even after the parent is removed.
-          // Explicit paths take precedence; other legacy documents fall back to doc_id.
+          // Explicit paths take precedence. For a pathless chunk, resolve the exact owner's
+          // stored path before falling back to its legacy filesystem ID if no path is available.
           if (filePath == null || filePath.isBlank()) {
-            filePath =
-                "true".equals(docFields.get(SchemaFields.IS_CHUNK))
-                        && parentDocId != null && !parentDocId.isBlank()
-                    ? parentDocId
-                    : docId;
+            filePath = docId;
+            if ("true".equals(docFields.get(SchemaFields.IS_CHUNK))
+                && parentDocId != null && !parentDocId.isBlank()) {
+              filePath = parentDocId;
+              var ownerDocs = searcher.search(new TermQuery(new Term(idField, parentDocId)), 1);
+              if (ownerDocs.scoreDocs.length > 0) {
+                String ownerPath = SearchResultFormatter.extractFromStoredFields(
+                    storedFields, ownerDocs.scoreDocs[0].doc, false, Set.of(SchemaFields.PATH))
+                    .get(SchemaFields.PATH);
+                if (ownerPath != null && !ownerPath.isBlank()) {
+                  filePath = ownerPath;
+                }
+              }
+            }
           }
           if (!normalizePathPrefix(filePath).startsWith(normalized)) {
             continue;
@@ -170,12 +179,9 @@ public final class PruneOps {
 
           // Check if file still exists
           if (!Files.exists(Path.of(filePath))) {
-            if (parentDocId != null && !parentDocId.isBlank() && !parentDocId.equals(docId)) {
-              indexingCoordinator.deleteByIdAndChunks(parentDocId);
-              indexingCoordinator.deleteById(docId);
-            } else {
-              indexingCoordinator.deleteByIdAndChunks(docId);
-            }
+            // Ownership fields never authorize deletion of another document. Parents and chunks
+            // are independently selected and checked, including divergent explicit child paths.
+            indexingCoordinator.deleteById(docId);
             pruned++;
             confirmedDeletionSink.accept(filePath);
             log.debug("pruneByPathPrefix: deleted orphan document: {}", docId);
