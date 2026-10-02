@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, collect, projectionIdentity, qualityGateVerdict, reprojectRecord, tableVerdicts } from './e-run.mjs';
+import { ROOT, collect, latestRecords, projectionIdentity, qualityGateVerdict, reprojectRecord, tableVerdicts } from './e-run.mjs';
 
 const values = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/jseval/lane-f/test/fixtures/values-before-e0.json'), 'utf8')).values;
 const report = current => ({ dataset: 'beir/scifact', mode: 'hybrid', current, baseline: .65, floor: .63,
@@ -11,14 +11,83 @@ const record = arm => ({ arm, groups: ['E1'], id: `fixture-${arm}`, pairIdentity
   projectionIdentity: projectionIdentity(values), commands: [], runIds: [], metrics: {}, gaps: {},
   clauses: { 'SearchTrace-shape': true, 'workflow-evidence-citations-cancellation': true, 'allowed-differences': true } });
 function qualityRecords(mainNdcg, branchNdcg) {
-  return Object.fromEntries([['main', mainNdcg], ['branch', branchNdcg]].map(([arm, current]) => {
+  const records = Object.fromEntries([['main', mainNdcg], ['branch', branchNdcg]].map(([arm, current]) => {
     const r = record(arm);
+    if (arm === 'main') r.id = referenceId;
     r.metrics.scifactHybridNdcg10 = current;
     r.clauses['baseline-quality'] = qualityGateVerdict(report(current));
     return [`E1/${arm}`, r];
   }));
+  records['E1/quality-reference'] = records['E1/main'];
+  return records;
 }
 const clause = (records, name) => tableVerdicts(records, values).find(r => r.clause === name)?.verdict;
+
+const referenceId = '2026-10-01T16-27-42-378Z-0c6510b3';
+const referenceNdcg = .7588375946421915;
+function evidenceFixture(t, branchNdcg = .70) {
+  fs.mkdirSync(path.join(ROOT, 'tmp'), { recursive: true });
+  const root = fs.mkdtempSync(path.join(ROOT, 'tmp/e-quality-reference-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const save = (arm, id, current, startedAt) => {
+    const dir = path.join(root, 'docs/design/lane-f-engine-jvm/evidence/E/e1-quality', arm);
+    fs.mkdirSync(dir, { recursive: true });
+    const r = { ...record(arm), id, startedAt, endedAt: startedAt, raw: path.join(root, 'raw', id),
+      recordFile: path.join(dir, `${id}.json`), metrics: { scifactHybridNdcg10: current } };
+    r.clauses['baseline-quality'] = true;
+    fs.writeFileSync(r.recordFile, JSON.stringify(r));
+    const index = path.join(dir, 'index.json');
+    const entries = fs.existsSync(index) ? JSON.parse(fs.readFileSync(index)).runs : [];
+    fs.writeFileSync(index, JSON.stringify({ runs: [...entries, { record: r.recordFile }] }));
+    return r;
+  };
+  const reference = save('main', referenceId, referenceNdcg, '2026-10-01T16:27:43Z');
+  save('branch', 'branch', branchNdcg, '2026-10-02T01:00:00Z');
+  return { root, reference, save };
+}
+
+test('E1 pinned quality rejects 0.70 even when latest MAIN is a newer 0.70 capture', t => {
+  const { root, save } = evidenceFixture(t);
+  save('main', 'newer-main', .70, '2026-10-02T02:00:00Z');
+  const records = latestRecords(root);
+  assert.equal(records['E1/main'].id, 'newer-main');
+  const row = tableVerdicts(records, values).find(r => r.clause === 'paired-quality');
+  assert.equal(row.verdict, 'fail');
+  assert.match(row.sources, new RegExp(referenceId));
+});
+
+test('E1 latestRecords selecting a different MAIN cannot change the pinned quality verdict', t => {
+  const { root, save } = evidenceFixture(t, .75);
+  const before = clause(latestRecords(root), 'paired-quality');
+  assert.equal(before, 'pass');
+  save('main', 'newer-main', .70, '2026-10-02T02:00:00Z');
+  assert.equal(clause(latestRecords(root), 'paired-quality'), before);
+  save('main', 'even-newer-main', .90, '2026-10-02T03:00:00Z');
+  assert.equal(clause(latestRecords(root), 'paired-quality'), before);
+});
+
+test('E1 missing pinned record is a gap even with a passing latest MAIN capture', t => {
+  const { root, reference, save } = evidenceFixture(t, .80);
+  save('main', 'newer-main', .80, '2026-10-02T02:00:00Z');
+  // Keep its index entry: absence must still be a clause gap rather than a substituted capture.
+  fs.unlinkSync(reference.recordFile);
+  const row = tableVerdicts(latestRecords(root), values).find(r => r.clause === 'paired-quality');
+  assert.equal(row.verdict, 'unmeasurable');
+  assert.match(row.reason, new RegExp(referenceId));
+});
+
+test('E1 pinned record recovers its metric from raw; missing both never falls back to another capture', t => {
+  const { root, reference, save } = evidenceFixture(t);
+  save('main', 'newer-main', .70, '2026-10-02T02:00:00Z');
+  delete reference.metrics.scifactHybridNdcg10;
+  fs.writeFileSync(reference.recordFile, JSON.stringify(reference));
+  assert.equal(clause(latestRecords(root), 'paired-quality'), 'unmeasurable');
+  fs.mkdirSync(reference.raw, { recursive: true });
+  fs.writeFileSync(path.join(reference.raw, 'relevance-gate.json'), JSON.stringify(report(referenceNdcg)));
+  const before = fs.readFileSync(reference.recordFile, 'utf8');
+  assert.equal(clause(latestRecords(root), 'paired-quality'), 'fail');
+  assert.equal(fs.readFileSync(reference.recordFile, 'utf8'), before);
+});
 
 test('E1 paired quality fails the historical-floor counterexample independently of the ratchet', () => {
   const records = qualityRecords(.80, .64);

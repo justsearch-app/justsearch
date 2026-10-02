@@ -87,7 +87,9 @@ recovery exercise remains E7, with §16's artifact disposition.
 
 ### 0.1 Corrections found while running (appended per run)
 
-- **2026-10-02, root:** E1 `paired-quality` clause requires branch hybrid beir/scifact nDCG@10 >= the frozen MAIN E1 reference - 0.01; pre-declared before the parity-build branch run.
+- **2026-10-02, root:** E1 `paired-quality` clause requires branch hybrid beir/scifact nDCG@10 >= pinned MAIN E1 `2026-10-01T16-27-42-378Z-0c6510b3` - 0.01; pre-declared before the parity-build branch run.
+
+- **2026-10-02, root:** review I1 correction pins that record id and retained value in scoring code; newer MAIN captures cannot replace it. Missing the pinned record or its metric in both the record and raw report is a gap. Changing the reference requires a deliberate code edit and a dated entry here.
 
 - **2026-10-01, E2/E3 MAIN idle `2026-10-01T07-51-03-944Z-ed7d2af6`:**
   zero chunk completions despite primary/document-embedding/SPLADE progress
@@ -138,16 +140,24 @@ recovery exercise remains E7, with §16's artifact disposition.
 ## 1. Values instantiated before the first run (17.7)
 
 E1 `paired-quality` (pre-declared 2026-10-02 before the parity-build branch run)
-requires branch hybrid nDCG@10 on `beir/scifact` >= the frozen MAIN E1 record
-used by the paired table minus **0.01**. The current reference is
+requires branch hybrid nDCG@10 on `beir/scifact` >= the pinned MAIN E1 record
+minus **0.01**. Scoring code fixes the reference id and retained value;
+`latestRecords()` selecting a newer MAIN capture never changes this reference.
+The pinned reference is
 [`2026-10-01T16-27-42-378Z-0c6510b3`](../evidence/E/e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json),
 whose raw `relevance-gate.json` reports **0.7588375946421915**. Five valid MAIN
 captures on 2026-10-01 ranged from 0.7543 to 0.7606 (range 0.0064), rounded
 up to the absolute allowance 0.01. The existing `baseline-quality` historical
 ratchet remains a separate required clause. Missing either measured value is
-`unmeasurable` with a gap, never pass. Collection retains the hybrid SciFact
-value in record metrics; offline reprojection recovers it from retained raw reports
-for older records without changing acquisition identities.
+`unmeasurable` with a gap, never pass. The scorer loads the pinned record by id
+from the MAIN E1 evidence directory and uses its `scifactHybridNdcg10` metric,
+recovering it from that record's raw `relevance-gate.json` when needed. If the
+pinned record is absent, or neither record nor raw report supplies the metric,
+the clause is a gap; the retained constant is a receipt, never a numeric fallback.
+Changing the reference later requires a deliberate code edit plus a dated
+section 0.1 entry. Collection retains the hybrid SciFact value in record metrics;
+offline reprojection recovers it from retained raw reports for older records
+without changing acquisition identities.
 
 Every value below is written into `evidence/E/values.json` **before** the first gate run, with
 its source, and the file's hash is in the run records. A value that changes after a diff is seen
@@ -593,7 +603,7 @@ pinned surfaces still match main.
 
 | run | paired section 16 group | procedure and required result |
 |---|---|---|
-| E1 | search quality and workflow fixture | Run jseval quality comparison and the pinned fixture on both arms. Require separate `baseline-quality` (historical ratchet) and `paired-quality` (branch hybrid beir/scifact nDCG@10 >= frozen MAIN E1 reference - 0.01) clauses, SearchTrace shape, deterministic evidence/citation/cancellation equality, and only the three predeclared difference classes. Missing quality values are unmeasurable, never pass. |
+| E1 | search quality and workflow fixture | Run jseval quality comparison and the pinned fixture on both arms. Require separate `baseline-quality` (historical ratchet) and `paired-quality` (branch hybrid beir/scifact nDCG@10 >= the pinned MAIN E1 reference named in section 1 - 0.01) clauses, SearchTrace shape, deterministic evidence/citation/cancellation equality, and only the three predeclared difference classes. Missing quality values are unmeasurable, never pass. |
 | E2 | search and agent response times during bulk indexing | Run idle-agent and scripted-agent loads on both arms while bulk indexing. Compare admitted search/API p95; count reason-coded rejections under the owner ceiling, with candidate timeout/5xx/terminal errors as failure and MAIN outcomes retained as baseline facts. |
 | E3 | indexing speed | Measure per-stage completed/s over active intervals of at least 60 seconds under the same foreground loads; require 0.90 of each positive split stage rate while queries continue. Zero/missing split stages are not compared; no comparable stage is unmeasurable. Require positive measurable branch chunk progress when chunk work was pending, plus 0.90 of any positive split chunk rate; report zero MAIN chunk progress as baseline starvation. Extra branch stages are gains. Keep docs/s and chunks/s as metrics. |
 | E4 | memory budget and no-crash soak | Sum Engine, llama-server and children commit charge against section 8 and split, report working set, measure live-after-GC trend and zero crashes across the owner-duration indexing/agent/reconfigure soak. |

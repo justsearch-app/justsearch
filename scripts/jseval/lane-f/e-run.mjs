@@ -239,6 +239,11 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
     });
 }
 
+// Changing this reference requires a deliberate scoring edit and a dated stages/E.md entry.
+// The retained value identifies the receipt; missing record/raw metrics are gaps, not a fallback.
+const E1_QUALITY_REFERENCE = Object.freeze({
+  id: '2026-10-01T16-27-42-378Z-0c6510b3', scifactHybridNdcg10: 0.7588375946421915,
+});
 const E1_QUALITY_NOISE_ABS = 0.01;
 const CLAUSES = {
   E1: ['baseline-quality', 'paired-quality', 'SearchTrace-shape', 'workflow-evidence-citations-cancellation', 'allowed-differences'],
@@ -466,7 +471,11 @@ const BRANCH_ONLY_CLAUSES = new Set(['no-timeout-or-5xx', 'chunk-progress-under-
 export function tableVerdicts(records, values) {
   const output = [];
   const pair = (group, clause, evaluate) => {
-    const arms = ['main', 'branch'].map(arm => records[`${group}/${arm}`]);
+    const pinnedQuality = group === 'E1' && clause === 'paired-quality';
+    const reference = records['E1/quality-reference'];
+    const main = pinnedQuality ? reference?.id === E1_QUALITY_REFERENCE.id && reference.arm === 'main'
+      && reference.groups?.includes('E1') ? reference : undefined : records[`${group}/main`];
+    const arms = [main, records[`${group}/branch`]];
     // Timeout/5xx is a property of the arm under test. The split arm's own timeouts are the baseline
     // it is compared against (2026-10-01: main timed out a chat stream and its searches after the
     // scripted window); they are reported in the reason, not counted as a failed comparison.
@@ -498,7 +507,7 @@ export function tableVerdicts(records, values) {
       reason: [...(projectionMismatch ? ['Projection identity mismatch: reproject both arms with the current scorer before comparing'] : []),
         ...(clause === 'no-timeout-or-5xx' && arms[0] ? [`main baseline outcomes ${JSON.stringify(arms[0].metrics?.wireOutcomesByWorkload ?? arms[0].metrics?.wireOutcomes)}`] : []),
         ...(clause === 'zero-crashes' && arms[0] ? [`main baseline crashes ${JSON.stringify(arms[0].metrics?.crashesByWindow ?? arms[0].metrics?.crashEvidence?.events)}`] : []),
-        ...(group === 'E1' && clause === 'paired-quality' ? [arms.every(r => finite(r?.metrics?.scifactHybridNdcg10))
+        ...(pinnedQuality ? [`pinned MAIN E1 ${E1_QUALITY_REFERENCE.id} (retained nDCG@10 ${E1_QUALITY_REFERENCE.scifactHybridNdcg10})`, arms.every(r => finite(r?.metrics?.scifactHybridNdcg10))
           ? `hybrid beir/scifact nDCG@10: branch ${arms[1].metrics.scifactHybridNdcg10} >= MAIN ${arms[0].metrics.scifactHybridNdcg10} - ${E1_QUALITY_NOISE_ABS}`
           : 'Missing hybrid beir/scifact nDCG@10 for MAIN or branch'] : []),
         ...arms.map(r => r?.gaps?.[clause]).filter(Boolean)].join('; ') || 'paired clause and frozen values' });
@@ -551,12 +560,35 @@ function filesUnder(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory()
     ? filesUnder(path.join(dir, e.name)) : [path.join(dir, e.name)]);
 }
+function loadQualityReference(file) {
+  if (!fs.existsSync(file)) return undefined;
+  const reference = read(file);
+  if (reference.id !== E1_QUALITY_REFERENCE.id || reference.arm !== 'main'
+    || !reference.groups?.includes('E1')) return undefined;
+  reference.recordFile = file;
+  reference.metrics ??= {};
+  if (!finite(reference.metrics.scifactHybridNdcg10)) {
+    delete reference.metrics.scifactHybridNdcg10;
+    const gate = reference.raw && path.join(reference.raw, 'relevance-gate.json');
+    if (gate && fs.existsSync(gate)) {
+      const report = read(gate);
+      if (report.dataset === 'beir/scifact' && report.mode === 'hybrid' && finite(report.current))
+        reference.metrics.scifactHybridNdcg10 = report.current;
+    }
+  }
+  return reference;
+}
 export function latestRecords(root) {
   const records = {};
+  const referenceFile = path.resolve(root, EVIDENCE, 'e1-quality/main', `${E1_QUALITY_REFERENCE.id}.json`);
+  const reference = loadQualityReference(referenceFile);
+  if (reference) records['E1/quality-reference'] = reference;
   const windows = { main: {}, branch: {} };
   const workloads = { main: {}, branch: {} };
   for (const file of filesUnder(path.join(root, EVIDENCE)).filter(f => path.basename(f) === 'index.json')) {
     for (const entry of read(file).runs ?? []) {
+      // An absent pinned reference is a paired-quality gap, even if its index entry remains.
+      if (path.resolve(entry.record) === referenceFile && !fs.existsSync(referenceFile)) continue;
       const record = read(entry.record);
       if (record.groups.includes('E4') && (!windows[record.arm][record.window]
         || windows[record.arm][record.window].startedAt < record.startedAt)) windows[record.arm][record.window] = record;
@@ -900,6 +932,10 @@ export async function main(argv = process.argv.slice(2), root = ROOT) {
         for (const file of r.workloadRecords ?? r.windowRecords ?? [r.recordFile]) pairedFiles.add(file);
       }
     }
+    const reference = records['E1/quality-reference'];
+    if (records['E1/branch'] && reference?.endedAt && reference.rawFiles?.length
+      && reference.rawFiles.every(file => fs.existsSync(file) && fs.statSync(file).isFile()))
+      pairedFiles.add(reference.recordFile);
     const projected = [];
     for (const file of pairedFiles) {
       try { projected.push([file, reprojectRecord(file, values, true)]); } catch (e) { throw new Error(`Table refused stale projection; reproject both arms: ${file}: ${e.message}`); }
