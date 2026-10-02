@@ -48,16 +48,20 @@ final class RecoverComponentHandlerTest {
 
   @Test
   void mapsExecutorAdmissionRefusalToTheSameEngineLimitContract() {
+    var refusal = new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, 1);
     var handler =
         new RecoverComponentHandler(
             () ->
                 name -> {
-                  throw new EngineAdmissionException(
-                      EngineAdmissionException.Reason.ENGINE_LIMIT, 1);
+                  throw refusal;
                 });
 
-    assertFailure(handler.execute("{\"name\":\"index\"}", TestEngineContexts.internal()),
-        ApiErrorCode.ADMISSION_ENGINE_LIMIT, true);
+    // Merge f09566a32 preserves the typed refusal for the common error writer.
+    var thrown = assertThrows(EngineAdmissionException.class,
+        () -> handler.execute("{\"name\":\"index\"}", TestEngineContexts.internal()));
+    assertSame(refusal, thrown);
+    assertEquals(EngineAdmissionException.Reason.ENGINE_LIMIT, thrown.reason());
+    assertEquals(1, thrown.retryAfterSeconds());
   }
 
   @Test
