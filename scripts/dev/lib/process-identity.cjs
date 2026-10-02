@@ -51,7 +51,7 @@
  */
 'use strict';
 
-const { spawnSync } = require('node:child_process');
+const { spawnSync, execFile } = require('node:child_process');
 
 /**
  * The ONE process-table projection. `remove-worktree.cjs` consumes this same constant so the two
@@ -213,6 +213,8 @@ function readProcessTable({ platform = process.platform, exec = spawnSync, now =
     res = exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', PROCESS_TABLE_PS_COMMAND], {
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
+      timeout: 5000,
+      windowsHide: true,
     });
   } catch (err) {
     return { ok: false, reason: `process-table query threw: ${String(err?.message || err).slice(0, 200)}` };
@@ -383,7 +385,19 @@ function isVerifiedMatch(result) {
   return result?.verdict === IDENTITY.MATCH;
 }
 
+/** Bounded, non-blocking capture for supervisors that must keep observing child exits. */
+async function readProcessTableAsync({ platform = process.platform, exec = execFile, now = Date.now } = {}) {
+  if (platform !== 'win32') return readProcessTable({ platform });
+  const result = await new Promise(resolve => {
+    exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', PROCESS_TABLE_PS_COMMAND],
+      { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 5000, windowsHide: true },
+      (error, stdout) => resolve({ status: error ? 1 : 0, stdout }));
+  });
+  return readProcessTable({ platform, exec: () => result, now });
+}
+
 module.exports = {
+  readProcessTableAsync,
   PROCESS_TABLE_PS_COMMAND,
   IDENTITY,
   DEFAULT_MAX_TABLE_AGE_MS,

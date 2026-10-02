@@ -21,7 +21,8 @@ const { spawn, spawnSync, execFile } = require('child_process');
 // can't break the build/Engine JVMs. Injected into every JVM spawn's env below.
 const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'));
 const { engineJavaLaunch } = require('./lib/engine-java-launch.cjs');
-const { engineIdentity, startStopExitCensus } = require('./lib/stop-exit-census.cjs');
+const { engineIdentityAsync, startStopExitCensus } = require('./lib/stop-exit-census.cjs');
+const { observeEngineExit } = require('./lib/engine-exit-observer.cjs');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const uiWebDir = path.resolve(repoRoot, 'modules', 'ui-web');
@@ -1011,6 +1012,11 @@ function forceKillEngineTree(pid) {
   }
 }
 
+function cleanupRegisteredChildrenForSupervisorState(state, dataDir, inspect, terminate) {
+  return state === engineSupervisor.STATES.EXHAUSTED
+    ? cleanupRegisteredChildrenForTerminal(dataDir, inspect, terminate) : [];
+}
+
 /** Terminal-only cleanup of children whose three recorded OS identity axes still match. */
 function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectProcessIdentity, terminate = terminatePid) {
   let children;
@@ -1027,6 +1033,8 @@ function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectProcessI
       outcomes.push({ id: child?.id, outcome: 'dead' });
       continue;
     }
+    // ProcessHandle stores millisecond starts; Windows StartTime retains sub-ms ticks.
+    // Compare their common represented millisecond, with no tolerance across births.
     const expectedStart = Date.parse(child?.startedAt);
     const actualStart = Date.parse(identity.startedAt);
     const expectedExe = normalizeExecutable(child?.executable);
@@ -1036,7 +1044,7 @@ function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectProcessI
       outcomes.push({ id: child?.id, outcome: 'unknown-identity' });
       continue;
     }
-    if (Math.abs(expectedStart - actualStart) > 1000 || expectedExe !== actualExe) {
+    if (expectedStart !== actualStart || expectedExe !== actualExe) {
       outcomes.push({ id: child?.id, outcome: 'identity-mismatch' });
       continue;
     }
@@ -1058,8 +1066,9 @@ function inspectProcessIdentity(pid) {
     '[pscustomobject]@{executable=$p.Path;startedAt=$p.StartTime.ToUniversalTime().ToString("o");alive=$true}|ConvertTo-Json -Compress',
   ].join(';');
   const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script, String(pid)], {
-    encoding: 'utf8', windowsHide: true,
+    encoding: 'utf8', windowsHide: true, timeout: 5000,
   });
+  if (result.error) return null;
   if (result.status !== 0) return { alive: false };
   try { return JSON.parse(result.stdout); } catch { return null; }
 }
@@ -2148,6 +2157,7 @@ async function cmdStart(opts) {
   );
 
   let backend = spawnEngineChild(apiPortRequested);
+  let backendExitObserver = observeEngineExit(backend);
 
   const spawnFrontend = () => {
     if (harnessFrontendCommand) {
@@ -2307,7 +2317,7 @@ async function cmdStart(opts) {
   );
 
   const runJson = {
-    exitCensusEngine: engineIdentity(backend.pid, dataDir),
+    exitCensusEngine: await engineIdentityAsync(backend.pid, dataDir),
     schemaVersion: 1,
     runId,
     startedAt,
@@ -2665,6 +2675,7 @@ async function cmdStart(opts) {
   const finishSupervision = async (state, exitCode, reason) => {
     supervising = false;
     clearSupervisorTimers();
+    cleanupRegisteredChildrenForSupervisorState(state, dataDir);
     await publishSupervisorState(state, { reason });
     onExit();
     process.exit(exitCode != null && exitCode !== 0 ? exitCode : 0);
@@ -2840,7 +2851,10 @@ async function cmdStart(opts) {
     // resolve through it. Whatever is actually bound is written back below, so a port that could not
     // be reused produces a corrected record instead of a lie.
     backend = spawnEngineChild(apiPortActual);
-    attachEngineExitHandler(backend);
+    backendExitObserver = observeEngineExit(backend);
+    const startedChild = backend;
+    const exitObserver = backendExitObserver;
+    attachEngineExitHandler(exitObserver);
     // The start deadline applies HERE and not to the first boot, and the distinction is real rather
     // than convenient: `start` is synchronous for its caller, so a first incarnation that never
     // publishes a port already fails the command with an error a human reads. A RESTART has no such
@@ -2850,16 +2864,20 @@ async function cmdStart(opts) {
       portTimeoutMs: Math.min(supervisionPolicy.startDeadlineMs, portEmitTimeoutMs),
       readyTimeoutMs: Math.min(supervisionPolicy.startDeadlineMs, backendReadyTimeoutMs),
     });
+    if (backend !== startedChild || exitObserver.exited) return;
     apiPortActual = next.apiPort;
     manifestInstanceId = next.instanceId;
     runJson.apiPortActual = apiPortActual;
     runJson.apiBaseUrl = `http://127.0.0.1:${apiPortActual}`;
     runJson.pids.backendRootPid = backend.pid;
-    runJson.exitCensusEngine = engineIdentity(backend.pid, dataDir);
+    const capturedIdentity = await engineIdentityAsync(startedChild.pid, dataDir);
+    if (backend !== startedChild || exitObserver.exited) return;
+    runJson.exitCensusEngine = capturedIdentity;
     runJson.incarnation = incarnation;
     runJson.resourceClaims.apiPort = apiPortActual;
     runJson.resourceClaims.runtimeManifestInstanceId = manifestInstanceId;
     await writeJsonAtomic(runPath, runJson);
+    if (backend !== startedChild || exitObserver.exited) return;
     await enterRunning();
   };
 
@@ -2980,8 +2998,8 @@ async function cmdStart(opts) {
     }
   };
 
-  function attachEngineExitHandler(child) {
-    child.on('exit', (code) => {
+  function attachEngineExitHandler(observer) {
+    observer.activate((code) => {
       onEngineExit(code).catch((err) => {
         process.stderr.write(`[dev-runner] supervisor failed: ${err?.stack ?? err}\n`);
         onExit();
@@ -2990,8 +3008,8 @@ async function cmdStart(opts) {
     });
   }
 
-  attachEngineExitHandler(backend);
-  await enterRunning();
+  if (!backendExitObserver.exited) await enterRunning();
+  attachEngineExitHandler(backendExitObserver);
 
   frontend.on('exit', (code) => {
     if (reaping) return; // deliberate reap owns teardown + exit
@@ -3425,6 +3443,7 @@ if (require.main === module) {
       waitForEngineHandleRelease,
       forceKillEngineTree,
       cleanupRegisteredChildrenForTerminal,
+      cleanupRegisteredChildrenForSupervisorState,
       engineSupervisor,
       // Tempdoc 819 §D: graceful ordered-shutdown-before-taskkill helpers.
       postLifecycleShutdown,

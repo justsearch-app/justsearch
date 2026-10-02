@@ -142,6 +142,76 @@ final class PersistentExtractionSandboxTest {
 
   @Test
   @Timeout(40)
+  void gracefulCloseEndsLiveChildWithZeroExitWithoutForceKill() throws Exception {
+    Process realChild = new ProcessBuilder(javaCommand(ExtractionSandboxChild.class)).start();
+    Process observed =
+        org.mockito.Mockito.mock(
+            Process.class, org.mockito.AdditionalAnswers.delegatesTo(realChild));
+    try (var sandbox = sandbox(javaCommand(ExtractionSandboxChild.class), Duration.ofSeconds(30))) {
+      try (var spawns =
+          org.mockito.Mockito.mockConstruction(
+              ProcessBuilder.class,
+              (builder, context) ->
+                  org.mockito.Mockito.when(builder.start()).thenReturn(observed))) {
+        sandbox.extract(file("graceful-close.txt"));
+        assertTrue(realChild.isAlive(), "exercise a live registered child at shutdown");
+        sandbox.close();
+        assertFalse(realChild.isAlive());
+        assertEquals(0, realChild.exitValue(), "EOF shutdown must be a clean OS exit");
+        org.mockito.Mockito.verify(observed, org.mockito.Mockito.never()).destroyForcibly();
+      }
+    } finally {
+      if (realChild.isAlive()) realChild.destroyForcibly();
+      assertTrue(realChild.waitFor(5, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  @Timeout(40)
+  void gracefulCloseForceKillsChildIgnoringEofOnlyAfterGracePeriod() throws Exception {
+    Process realChild = new ProcessBuilder(javaCommand(IgnoringShutdownChild.class)).start();
+    Process observed =
+        org.mockito.Mockito.mock(
+            Process.class, org.mockito.AdditionalAnswers.delegatesTo(realChild));
+    var forcedAt = new java.util.concurrent.atomic.AtomicLong();
+    org.mockito.Mockito.doAnswer(
+            kill -> {
+              forcedAt.set(System.nanoTime());
+              return realChild.destroyForcibly();
+            })
+        .when(observed)
+        .destroyForcibly();
+    try (var sandbox = sandbox(javaCommand(IgnoringShutdownChild.class), Duration.ofSeconds(30))) {
+      try (var spawns =
+          org.mockito.Mockito.mockConstruction(
+              ProcessBuilder.class,
+              (builder, context) ->
+                  org.mockito.Mockito.when(builder.start()).thenReturn(observed))) {
+        sandbox.extract(file("ignores-close.txt"));
+        assertTrue(realChild.isAlive());
+        long started = System.nanoTime();
+        sandbox.close();
+        assertFalse(realChild.isAlive());
+        org.mockito.Mockito.verify(observed).destroyForcibly();
+        assertTrue(
+            forcedAt.get() - started
+                >= TimeUnit.MILLISECONDS.toNanos(
+                    PersistentExtractionSandbox.GRACEFUL_CLOSE_WAIT_MS),
+            "force kill must follow the complete grace period");
+        assertTrue(
+            System.nanoTime() - started < TimeUnit.SECONDS.toNanos(15),
+            "child cleanup must fit the host stop budget");
+        assertNotEquals(0, realChild.exitValue(), "forced child exit must remain abnormal");
+        if (File.separatorChar == '\\') assertEquals(1, realChild.exitValue());
+      }
+    } finally {
+      if (realChild.isAlive()) realChild.destroyForcibly();
+      assertTrue(realChild.waitFor(5, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  @Timeout(40)
   void interruptedCallerStillConfirmsRealChildRetirement() throws Exception {
     PersistentExtractionSandbox sandbox =
         sandbox(javaCommand(ScriptedChild.class), Duration.ofSeconds(10));
@@ -174,13 +244,28 @@ final class PersistentExtractionSandboxTest {
         new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
             javaCommand(ExtractionSandboxChild.class), TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(), Duration.ofSeconds(30), 1, 500, null, registry);
-    sandbox.extract(file("registered.txt"));
-    assertEquals(1, owned.size());
-    ManagedChild child = owned.getFirst();
-    assertEquals(ManagedChild.Kind.EXTRACTION, child.kind());
-    assertTrue(ProcessHandle.of(child.pid()).orElseThrow().isAlive());
-
-    sandbox.close();
+    ManagedChild child;
+    try (sandbox) {
+      sandbox.extract(file("registered.txt"));
+      assertEquals(1, owned.size());
+      child = owned.getFirst();
+      assertEquals(ManagedChild.Kind.EXTRACTION, child.kind());
+      String declaredCommand = String.join("\0", javaCommand(ExtractionSandboxChild.class)) + "\0";
+      String expectedDeclaredHash =
+          java.util.HexFormat.of()
+              .formatHex(
+                  java.security.MessageDigest.getInstance("SHA-256")
+                      .digest(declaredCommand.getBytes(StandardCharsets.UTF_8)));
+      assertEquals(expectedDeclaredHash, child.declaredConfigHash());
+      assertTrue(child.realizedArgvHash().matches("[0-9a-f]{64}"));
+      assertNotEquals(
+          child.declaredConfigHash(),
+          child.realizedArgvHash(),
+          "the realized argv adds the parent PID to the declared command");
+      String wire = JsonMapper.builder().build().writeValueAsString(child);
+      assertTrue(wire.contains("\"declaredConfigHash\":\"" + expectedDeclaredHash + "\""));
+      assertTrue(ProcessHandle.of(child.pid()).orElseThrow().isAlive());
+    }
 
     assertTrue(owned.isEmpty(), "confirmed child death removes the persisted ownership record");
     assertTrue(ProcessHandle.of(child.pid()).isEmpty()
@@ -373,7 +458,9 @@ final class PersistentExtractionSandboxTest {
                 ExtractionMetricCatalog.SANDBOX_RESTART_TOTAL,
                 ExtractionSandboxRestartTags.of(PersistentExtractionSandbox.REASON_TIMEOUT)));
 
-        assertEquals("next-after-timeout.txt", sandbox.extract(file("next-after-timeout.txt")).result().content());
+        assertEquals(
+            "next-after-timeout.txt",
+            sandbox.extract(file("next-after-timeout.txt")).result().content());
         assertEquals(2L, sandbox.spawnCount(), "the killed child must be replaced, not reused");
       }
     }
@@ -391,7 +478,8 @@ final class PersistentExtractionSandboxTest {
           failure.getMessage().contains("exited with code 3"),
           "failure reason must carry the child exit code; got: " + failure.getMessage());
 
-      assertEquals("next-after-exit.txt", sandbox.extract(file("next-after-exit.txt")).result().content());
+      assertEquals(
+          "next-after-exit.txt", sandbox.extract(file("next-after-exit.txt")).result().content());
       assertEquals(2L, sandbox.spawnCount());
     }
   }
@@ -524,7 +612,8 @@ final class PersistentExtractionSandboxTest {
       var failure = assertThrows(SandboxExtractionException.class,
           () -> sandbox.extract(file("unread.txt")));
       assertTrue(failure.getCause() instanceof java.util.concurrent.RejectedExecutionException);
-      assertTrue(firstPid.get() > 0, "rejection must occur after actual parser spawn and frame write");
+      assertTrue(
+          firstPid.get() > 0, "rejection must occur after actual parser spawn and frame write");
       assertFalse(ProcessHandle.of(firstPid.get()).map(ProcessHandle::isAlive).orElse(false));
       assertEquals(1, sandbox.restartCount());
       release.countDown();
@@ -560,7 +649,8 @@ final class PersistentExtractionSandboxTest {
           (builder, context) -> org.mockito.Mockito.when(builder.start()).thenReturn(retained))) {
         assertThrows(IllegalStateException.class, () -> sandbox.extract(file("hang.txt")));
         assertTrue(realChild.isAlive());
-        assertEquals(realChild.pid(), sandbox.firstChildPid(), "retain exact live child in its slot");
+        assertEquals(
+            realChild.pid(), sandbox.firstChildPid(), "retain exact live child in its slot");
         assertThrows(IllegalStateException.class, () -> sandbox.extract(file("blocked.txt")));
         assertEquals(1, spawns.constructed().size(), "retiring slot cannot spawn a replacement");
         assertEquals(1, sandbox.spawnCount());
@@ -787,6 +877,14 @@ final class PersistentExtractionSandboxTest {
     }
     @Override public boolean isAlive() { return alive; }
     @Override public long pid() { return 424243L; }
+  }
+
+  public static final class IgnoringShutdownChild {
+    public static void main(String[] args) throws Exception {
+      ScriptedChild.main(args);
+      // The protocol loop returned on EOF, but this child refuses to complete shutdown.
+      Thread.sleep(60_000L);
+    }
   }
 
   public static final class SlowStartingChild {

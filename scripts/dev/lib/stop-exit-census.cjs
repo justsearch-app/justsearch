@@ -22,6 +22,9 @@ function engineIdentity(pid, dataDir, table = identity.readProcessTable()) {
   return executable ? { pid: Number(pid), creationFileTimeUtc: row.CreationFileTimeUtc, executable,
     cmdlineFingerprint: command, role: 'engine', creationTimeSource: 'CIM' } : null;
 }
+async function engineIdentityAsync(pid, dataDir) {
+  return engineIdentity(pid, dataDir, await identity.readProcessTableAsync());
+}
 function exitTargets(run, manifest, observed = []) {
   const targets = [], gaps = [];
   const engine = run.exitCensusEngine;
@@ -113,4 +116,4 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     return exitResult(input, output, outputFile);
   } };
 }
-module.exports = { fileTimeFromInstant, engineIdentity, exitTargets, exitResult, startStopExitCensus };
+module.exports = { fileTimeFromInstant, engineIdentity, engineIdentityAsync, exitTargets, exitResult, startStopExitCensus };

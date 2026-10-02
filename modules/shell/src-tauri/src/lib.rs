@@ -1274,6 +1274,12 @@ impl supervisor::Actuator for ShellActuator {
     }
 }
 
+fn cleanup_after_supervision(outcome: &supervisor::Outcome, data_dir: &std::path::Path) {
+    if matches!(outcome, supervisor::Outcome::Exhausted { .. }) {
+        cleanup_registered_children_for_terminal(data_dir);
+    }
+}
+
 /// Start supervising the Engine on an OS thread.
 ///
 /// An OS thread, following the split this file already uses for the stdout drain and the manifest
@@ -1289,6 +1295,7 @@ pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>
         let policy = supervisor::load_policy();
         let mut sup = supervisor::Supervisor::new(policy);
         let outcome = supervisor::run_supervision(&mut sup, &mut actuator);
+        cleanup_after_supervision(&outcome, &actuator.data_dir);
         match outcome {
             supervisor::Outcome::Exhausted { reason, .. } => {
                 // The current host state already carries the terminal result. B13 uses owned
@@ -1927,6 +1934,24 @@ mod tests {
             executable: identity["executable"].as_str().unwrap().to_string(),
         };
         (child, record)
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn exhaustion_cleans_registered_children() {
+        let dir = tempdir().unwrap();
+        fs::create_dir(dir.path().join("runtime")).unwrap();
+        let (mut child, record) = owned_sleep_child();
+        let manifest = serde_json::json!({ "schemaVersion": 2, "children": [{
+            "pid": record.pid, "startedAt": record.started_at, "executable": record.executable
+        }] });
+        fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
+        cleanup_after_supervision(&supervisor::Outcome::Cancelled, dir.path());
+        assert!(child.try_wait().unwrap().is_none());
+        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
+            reason: "restart budget exhausted".into(), exit_code: 1,
+        }, dir.path());
+        assert!(child.try_wait().unwrap().is_some());
     }
 
     #[cfg(windows)]

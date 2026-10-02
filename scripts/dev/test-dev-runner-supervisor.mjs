@@ -40,6 +40,7 @@ const {
   buildStopReport,
   computeOwnershipVerdict,
   cleanupRegisteredChildrenForTerminal,
+  cleanupRegisteredChildrenForSupervisorState,
   checkHttp200,
   fetchJsonHttp,
   essentialReadyEpoch,
@@ -483,22 +484,31 @@ function testTerminalChildCleanupRequiresAllIdentityAxes() {
         { id: 'match', pid: 101, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
         { id: 'reused', pid: 102, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
         { id: 'unrelated', pid: 103, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
+        { id: 'near-reuse', pid: 105, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
         { id: 'unknown', pid: 104, startedAt: '2026-09-08T10:00:00.000Z', executable: 'C:\\bin\\llama.exe' },
       ],
     }));
     const identities = new Map([
-      [101, { alive: true, startedAt: '2026-09-08T10:00:00.500Z', executable: 'c:\\bin\\llama.exe' }],
+      [101, { alive: true, startedAt: '2026-09-08T10:00:00.0004567Z', executable: 'c:\\bin\\llama.exe' }],
       [102, { alive: true, startedAt: '2026-09-08T11:00:00.000Z', executable: 'c:\\bin\\llama.exe' }],
       [103, { alive: true, startedAt: '2026-09-08T10:00:00.000Z', executable: 'c:\\other\\java.exe' }],
+      [105, { alive: true, startedAt: '2026-09-08T10:00:00.999Z', executable: 'c:\\bin\\llama.exe' }],
       [104, { alive: true }],
     ]);
     const killed = [];
-    const outcomes = cleanupRegisteredChildrenForTerminal(
+    for (const state of ['starting', 'running', 'stopping', 'restarting']) {
+      assert.deepEqual(cleanupRegisteredChildrenForSupervisorState(
+        state, dataDir, (pid) => identities.get(pid), (pid) => { killed.push(pid); return true; },
+      ), []);
+    }
+    assert.deepEqual(killed, [], 'recoverable states preserve registered children');
+    const outcomes = cleanupRegisteredChildrenForSupervisorState(
+      'exhausted',
       dataDir, (pid) => identities.get(pid), (pid) => { killed.push(pid); return true; },
     );
-    assert.deepEqual(killed, [101]);
+    assert.deepEqual(killed, [101], 'exhaustion releases only the identity-matched child');
     assert.deepEqual(outcomes.map((o) => o.outcome), [
-      'terminated', 'identity-mismatch', 'identity-mismatch', 'unknown-identity',
+      'terminated', 'identity-mismatch', 'identity-mismatch', 'identity-mismatch', 'unknown-identity',
     ]);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

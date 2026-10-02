@@ -58,6 +58,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   static final int DEFAULT_MAX_STDERR_BYTES = 64 * 1024;
   /** Requests one child handles before it is recycled — the leak guard (design decision 1). */
   static final int DEFAULT_MAX_REQUESTS_PER_CHILD = 500;
+  static final long GRACEFUL_CLOSE_WAIT_MS = 2_000L;
 
   static final String REASON_TIMEOUT = "timeout";
   static final String REASON_CRASH = "crash";
@@ -520,7 +521,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
               io.justsearch.app.api.runtime.ManagedChild.Kind.EXTRACTION,
               "stdio",
               null,
-              null,
+              hashArgv(command),
               hashArgv(argv));
       childRegistry.register(registered);
     } catch (IOException | RuntimeException failure) {
@@ -537,7 +538,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   @Override
   public void close() {
     closed = true;
-    List<String> survivors = killAll();
+    List<String> survivors = stopAllGracefully();
     shutdownAndCancelQueued(readers);
     try {
       readers.awaitTermination(5, TimeUnit.SECONDS);
@@ -563,12 +564,63 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     }
   }
 
+  /** Design 7.3 step 4 closes after extraction drain; EOF ends the child's serve loop normally. */
+  private List<String> stopAllGracefully() {
+    // One pool-wide grace window, not two seconds per child. The host deadline is 15 seconds
+    // (supervision-contract.v1.json); force confirmation and reader drain keep their existing
+    // bounds.
+    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(GRACEFUL_CLOSE_WAIT_MS);
+    for (Slot slot : allSlots) {
+      Child child = slot.child;
+      if (child != null && child.retirementReason == null) child.closeInput();
+    }
+    return killAll(deadline);
+  }
+
+  private static KillOutcome exitCodeAfterGracefulClose(Child child, long deadline) {
+    long started = System.nanoTime();
+    boolean interrupted = Thread.interrupted();
+    try {
+      while (child.process.isAlive()) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) break;
+        try {
+          child.process.waitFor(remaining, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+          interrupted = true;
+        }
+      }
+      if (child.process.isAlive()) {
+        KillOutcome forced = exitCodeAfterKill(child);
+        return new KillOutcome(
+            forced.exited(),
+            forced.exitCode(),
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
+            interrupted || forced.interrupted());
+      }
+      return new KillOutcome(
+          true,
+          child.process.exitValue(),
+          TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
+          interrupted);
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
+  }
+
   private List<String> killAll() {
+    return killAll(0);
+  }
+
+  private List<String> killAll(long gracefulDeadline) {
     List<String> survivors = new ArrayList<>();
     for (Slot slot : allSlots) {
       Child child = slot.child;
       if (child != null) {
-        KillOutcome kill = exitCodeAfterKill(child);
+        KillOutcome kill =
+            gracefulDeadline != 0 && child.retirementReason == null
+                ? exitCodeAfterGracefulClose(child, gracefulDeadline)
+                : exitCodeAfterKill(child);
         if (!kill.exited()) {
           survivors.add("pid=" + child.pid + " " + kill);
         } else {
@@ -669,10 +721,14 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
 
     void close() {
       stderr.stop();
+      closeInput();
+    }
+
+    void closeInput() {
       try {
         stdin.close();
       } catch (IOException e) {
-        // The pipe is already broken when the child is gone; nothing to recover.
+        // EOF may race child exit; the bounded wait/force path confirms termination.
       }
     }
   }

@@ -9,7 +9,13 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Persisted identity of a child process owned by the Engine. */
+/**
+ * Persisted identity of a child process owned by the Engine.
+ *
+ * <p>Both kinds publish a SHA-256 declared launch-configuration hash and a separate realized argv
+ * hash. Extraction hashes the configured command before adding the incarnation's parent PID;
+ * llama-server hashes applied inputs before launch fallback adjusts argv.
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ManagedChild(
     String id,
@@ -81,8 +87,9 @@ public record ManagedChild(
 
   /** Compare every destructive-action identity axis, preserving unknown live identities. */
   public IdentityMatch identityOf(ProcessHandle handle) {
-    Optional<Instant> liveStart = handle.info().startInstant();
-    Optional<String> liveCommand = handle.info().command();
+    ProcessHandle.Info observed = handle.info();
+    Optional<Instant> liveStart = observed.startInstant();
+    Optional<String> liveCommand = observed.command();
     if (liveStart.isEmpty() || liveCommand.isEmpty()) return IdentityMatch.UNKNOWN;
     final Instant recordedStart;
     try {
@@ -90,7 +97,8 @@ public record ManagedChild(
     } catch (RuntimeException invalid) {
       return IdentityMatch.UNKNOWN;
     }
-    if (Math.abs(liveStart.get().toEpochMilli() - recordedStart.toEpochMilli()) > 1_000L
+    if (handle.pid() != pid
+        || !liveStart.get().equals(recordedStart)
         || !normalizePath(Path.of(liveCommand.get())).equals(executable)) {
       return IdentityMatch.MISMATCH;
     }
