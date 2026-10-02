@@ -86,6 +86,18 @@ public final class WorkerSearchService {
   private static final int MAX_CONTENT_CHARS =
       io.justsearch.ipc.grpc.GrpcMessageLimits.MAX_DOCUMENT_CONTENT_CHARS;
 
+  /** Per-call result budget, matching BoundedDocumentFetch's default page budget. */
+  static final long MAX_FETCH_DOCUMENT_BYTES =
+      io.justsearch.ipc.grpc.GrpcMessageLimits.MAX_INBOUND_MESSAGE_BYTES / 4L;
+
+  /**
+   * Independent work cap: at most 16,384 field lookups (content plus three metadata fields).
+   * Small or missing documents may exceed the pager's conservative 13-ID page size; actual result
+   * bytes decide how many fit. This cap prevents tiny missing-result rows from admitting hundreds
+   * of thousands of index lookups within the byte budget. Cancellation is polled between rows.
+   */
+  static final int MAX_FETCH_DOCUMENT_IDS = 4_096;
+
   /** Default/max slice sizes for FetchDocumentSlice. */
   private static final int DEFAULT_SLICE_CHARS = 20_000;
   private static final int MAX_SLICE_CHARS = 200_000;
@@ -611,13 +623,25 @@ public final class WorkerSearchService {
     try (var ignored = openRequestMdc(ctx)) {
     log.debug("FetchDocuments request: {} doc_ids", request.getDocIdsCount());
 
+    if (request.getDocIdsCount() > MAX_FETCH_DOCUMENT_IDS) {
+      throw WorkerServiceException.resourceExhausted(
+          "FetchDocuments accepts at most " + MAX_FETCH_DOCUMENT_IDS + " doc_ids per call; page the request");
+    }
+    if (ctx.cancelled()) {
+      throw WorkerServiceException.cancelled("FetchDocuments cancelled");
+    }
+
     try {
       // Ensure index is refreshed for latest data
       commitOps.maybeRefresh();
 
       FetchDocumentsResponse.Builder response = FetchDocumentsResponse.newBuilder();
+      long responseBytes = 0;
 
       for (String docId : request.getDocIdsList()) {
+        if (ctx.cancelled()) {
+          throw WorkerServiceException.cancelled("FetchDocuments cancelled");
+        }
         // Normalize docId to match indexed format (lowercase on Windows)
         String normalizedDocId = PathNormalizer.normalizePath(docId);
 
@@ -653,12 +677,24 @@ public final class WorkerSearchService {
           doc.setError(e.getMessage() != null ? e.getMessage() : "Unknown error");
         }
 
-        response.addDocuments(doc.build());
+        if (ctx.cancelled()) {
+          throw WorkerServiceException.cancelled("FetchDocuments cancelled");
+        }
+        DocumentContent document = doc.build();
+        responseBytes += com.google.protobuf.CodedOutputStream.computeMessageSize(
+            FetchDocumentsResponse.DOCUMENTS_FIELD_NUMBER, document);
+        if (responseBytes > MAX_FETCH_DOCUMENT_BYTES) {
+          throw WorkerServiceException.resourceExhausted(
+              "FetchDocuments result exceeds " + MAX_FETCH_DOCUMENT_BYTES + " bytes; page the request");
+        }
+        response.addDocuments(document);
       }
 
       log.debug("FetchDocuments completed: {} documents", response.getDocumentsCount());
       return response.build();
 
+    } catch (WorkerServiceException e) {
+      throw e;
     } catch (RuntimeException e) {
       log.error("FetchDocuments failed", e);
       throw WorkerServiceException.internal("FetchDocuments failed: " + e.getMessage());

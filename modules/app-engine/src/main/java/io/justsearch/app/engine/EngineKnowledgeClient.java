@@ -95,6 +95,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private final ExecutorService backgroundCallThreads;
   private final ExecutorService foregroundStreamThreads;
   private final ExecutorService backgroundStreamThreads;
+  // Admission bounds these live subscriptions; this index lets transport close find idle flows.
+  private final java.util.Set<BoundedHandoff<?>> indexingSubscriptions =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
+  private final AtomicBoolean transportClosing = new AtomicBoolean();
   private final java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
       servingLeaseSupplier;
   private final ThreadLocal<WorkerAppServices> taskServices = new ThreadLocal<>();
@@ -1457,6 +1461,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     // stops the job queue outright — no enqueue, no dequeue, no markDone — so one browser tab that
     // stopped reading its SSE stream would halt indexing for the entire machine for five seconds
     // per frame. The flow fails instead; the bridge re-subscribes and gets a fresh snapshot.
+    final io.justsearch.app.api.EngineWorkHandle subscriptionOwner;
+    try {
+      subscriptionOwner = work.retain();
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
     final BoundedHandoff<IndexingJobsFrame> flow;
     try {
       flow =
@@ -1465,18 +1476,19 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                   indexingJobsHandoff(
                       onFrame,
                       onError,
-                      body -> executeOwnedStream(work, body, true, view.fork())));
+                      body -> executeOwnedStream(subscriptionOwner, body, true, view.fork())));
     } catch (RuntimeException | Error failure) {
-      view.release();
+      try { subscriptionOwner.close(); }
+      finally { view.release(); }
       throw failure;
     }
     try {
       FlowCancelSignal cancel = new FlowCancelSignal();
-      var subscriptionOwner = work.retain();
       var registration = new AtomicReference<io.justsearch.app.api.EngineWorkHandle.Registration>();
       var retirementListener = new AtomicReference<Runnable>();
       Runnable closedListener = () -> {};
       flow.onClose(() -> {
+        indexingSubscriptions.remove(flow);
         try {
           cancel.cancel();
         } finally {
@@ -1494,6 +1506,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           }
         }
       });
+      indexingSubscriptions.add(flow);
+      if (cancel.isCancelled()) indexingSubscriptions.remove(flow);
+      if (transportClosing.get()) {
+        flow.close();
+        throw engineLimit();
+      }
       Runnable removeRetirementListener = view.onRetirement(() ->
           flow.fail(WorkerServiceException.unavailable("Index serving view retired")));
       if (!retirementListener.compareAndSet(null, removeRetirementListener)) {
@@ -1505,10 +1523,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       if (cancel.isCancelled()) cancellation.close();
       if (cancel.isCancelled()) return flow::close;
       CallContext ctx = new CallContext(traceId, requestId, cancel,
-          work.context(), enqueueProvenance(work.context()), () -> work.retain()::close);
-      // If the pool refuses the PRODUCER after the flow's delivery thread was accepted, the flow
-      // must be closed on the way out: leaving it open would leak a delivery thread that polls an
-      // empty queue for the life of the process, for a subscription that never started.
+          work.context(), enqueueProvenance(work.context()), () -> subscriptionOwner.retain()::close);
+      // Startup and finite delivery drains share the bounded stream pool. Idle subscriptions
+      // occupy no threads, and a busy drain yields so queued startups can make progress.
+      // Refusal still closes the flow and releases its subscription and serving-view ownership.
       submitProducerOrClose(
           flow,
           () -> {
@@ -1561,7 +1579,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                 .setInsert(latest.getDelta().getUpdate())).build();
           }
           return latest;
-        });
+        }, true);
   }
 
   private static String indexingJobsPath(IndexingJobsFrame frame) {
@@ -1582,7 +1600,16 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   @Override
   protected void closeTransport() {
+    transportClosing.set(true);
     Throwable failure = null;
+    for (var flow : indexingSubscriptions) {
+      try {
+        flow.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        if (failure == null) failure = cleanupFailure;
+        else if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
+      }
+    }
     for (var registration : List.of(foregroundStreamRegistration,
         backgroundStreamRegistration, foregroundCallRegistration, backgroundCallRegistration,
         deadlineRegistration)) {

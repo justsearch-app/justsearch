@@ -331,7 +331,8 @@ final class EngineKnowledgeClientServingViewLifetimeTest {
       assertTrue(entered.await(3, TimeUnit.SECONDS));
       retirement.get().run();
       release.countDown();
-      awaitClosed(closed, 3);
+      awaitClosed(closed, 2);
+      assertEquals(2, closed.get(), "idle subscription and startup each release their captured view");
       assertTrue(error.get() instanceof io.justsearch.indexerworker.services.WorkerServiceException);
       assertTrue(retirement.get() == null, "closed flow deregisters its retirement listener");
     } finally {

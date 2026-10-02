@@ -27,6 +27,51 @@ import org.junit.jupiter.api.Timeout;
 final class IndexingJobsCoalescingTest {
 
   @Test
+  void busyDeliveryYieldsToQueuedSubscriptionStartup() throws Exception {
+    var startup = new CountDownLatch(1);
+    var failure = new AtomicReference<Throwable>();
+    var flowRef = new AtomicReference<BoundedHandoff<IndexingJobsFrame>>();
+    var delivery = new DelayedDeliveryExecutor();
+    var flow = EngineKnowledgeClient.indexingJobsHandoff(frame -> {
+      // Replenish the queue on every delivery so the feed never goes idle.
+      flowRef.get().publish(insert(frame.getSeq() + 256, "path-" + frame.getSeq(), "PENDING"));
+    }, failure::set, delivery);
+    flowRef.set(flow);
+    try {
+      for (int i = 0; i < BoundedHandoff.DEFAULT_CAPACITY; i++) {
+        assertTrue(flow.publish(insert(i, "initial-" + i, "PENDING")));
+      }
+      delivery.start();
+      delivery.owner.execute(startup::countDown);
+      assertTrue(startup.await(2, TimeUnit.SECONDS),
+          "a continuously replenished feed must yield its thread to queued startup work");
+      assertNull(failure.get());
+    } finally {
+      flow.close();
+      delivery.close();
+    }
+  }
+
+  @Test
+  void deliveryRefusalFailsAndClosesTheFlowOnce() {
+    var failure = new AtomicReference<Throwable>();
+    var reports = new java.util.concurrent.atomic.AtomicInteger();
+    var closed = new java.util.concurrent.atomic.AtomicInteger();
+    var refusal = new java.util.concurrent.RejectedExecutionException("stream pool full");
+    var flow = EngineKnowledgeClient.indexingJobsHandoff(frame -> {}, cause -> {
+      reports.incrementAndGet();
+      failure.set(cause);
+    }, command -> { throw refusal; });
+    flow.onClose(closed::incrementAndGet);
+    assertFalse(flow.publish(snapshot(1)));
+    org.junit.jupiter.api.Assertions.assertSame(refusal, failure.get());
+    assertFalse(flow.publish(snapshot(2)));
+    flow.close();
+    assertEquals(1, reports.get());
+    assertEquals(1, closed.get());
+  }
+
+  @Test
   void largeSinglePathBurstCoalescesIntoLatestInsert() throws Exception {
     var delivered = new CopyOnWriteArrayList<IndexingJobsFrame>();
     var deliveredOne = new CountDownLatch(1);
@@ -219,20 +264,26 @@ final class IndexingJobsCoalescingTest {
       return thread;
     });
     private final AtomicReference<Runnable> captured = new AtomicReference<>();
+    private boolean started;
 
     @Override
-    public void execute(Runnable command) {
+    public synchronized void execute(Runnable command) {
+      if (started) {
+        owner.execute(command);
+        return;
+      }
       if (!captured.compareAndSet(null, command)) {
         throw new IllegalStateException("delivery runnable submitted more than once");
       }
     }
 
-    void start() {
-      var command = captured.get();
+    synchronized void start() {
+      var command = captured.getAndSet(null);
       if (command == null) {
         throw new IllegalStateException("delivery runnable was not captured");
       }
       owner.execute(command);
+      started = true;
     }
 
     @Override
