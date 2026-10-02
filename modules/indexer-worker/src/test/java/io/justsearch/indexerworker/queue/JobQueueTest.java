@@ -80,7 +80,9 @@ final class JobQueueTest {
     jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file)));
     var maintenance = jobQueue.pollPending(1).getFirst();
     assertEquals(root, maintenance.ingestionRoot());
-    jobQueue.markDone(maintenance.path());
+    assertTrue(jobQueue.markClaimDone(maintenance,
+        IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "fixture.indexed",
+            IngestionRetryPolicy.NONE), null));
     var retry = jobQueue.reenqueue(JobQueue.EnqueueEntry.stat(file));
     assertEquals(1, retry.accepted());
     assertEquals("DONE", retry.previousState());

@@ -161,85 +161,94 @@ final class KnowledgeServerQueryPreparationTransactionTest {
       policyDrift = failure == Failure.POLICY_DRIFT;
       query = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 512L);
       composition = query.composition();
-      composition.when(() -> InferenceCompositionRoot.composeQueryRoles(
-          any(), any(), any(), any(), any())).thenAnswer(call -> {
-            var projection = call.<EncoderConfigurationProjection>getArgument(0);
-            var selection = call.<QueryRoleSelection>getArgument(1);
-            var fresh = query.freshSurface(false);
-            boolean citationSelected = selection.citation().state() == QueryRoleSelection.State.SELECTED;
-            var citation = citationSelected ? query.freshSurface(true) : null;
-            var handles = new ArrayList<>(fresh.handles());
-            if (citation != null) handles.addAll(citation.handles());
-            var adapted = new InferenceSurface(Optional.empty(), Optional.empty(), fresh.reranker(),
-                citation == null ? Optional.empty() : citation.reranker(),
-                Optional.empty(), Optional.empty(), null, handles,
-                new InferenceSurface.ComponentObservation(Optional.of(projection.queryDigest()),
-                    citationSelected ? Set.of(EncoderRole.RERANKER, EncoderRole.CITATION)
-                        : Set.of(EncoderRole.RERANKER), Set.of(), Optional.of(selection)));
-            composed.add(adapted);
-            return adapted;
+      try {
+        composition.when(() -> InferenceCompositionRoot.composeQueryRoles(
+            any(), any(), any(), any(), any())).thenAnswer(call -> {
+              var projection = call.<EncoderConfigurationProjection>getArgument(0);
+              var selection = call.<QueryRoleSelection>getArgument(1);
+              var fresh = query.freshSurface(false);
+              boolean citationSelected = selection.citation().state() == QueryRoleSelection.State.SELECTED;
+              var citation = citationSelected ? query.freshSurface(true) : null;
+              var handles = new ArrayList<>(fresh.handles());
+              if (citation != null) handles.addAll(citation.handles());
+              var adapted = new InferenceSurface(Optional.empty(), Optional.empty(), fresh.reranker(),
+                  citation == null ? Optional.empty() : citation.reranker(),
+                  Optional.empty(), Optional.empty(), null, handles,
+                  new InferenceSurface.ComponentObservation(Optional.of(projection.queryDigest()),
+                      citationSelected ? Set.of(EncoderRole.RERANKER, EncoderRole.CITATION)
+                          : Set.of(EncoderRole.RERANKER), Set.of(), Optional.of(selection)));
+              composed.add(adapted);
+              return adapted;
+            });
+
+        settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+            dir.resolve("settings.json"));
+        settings.replacePrepared(settings.prepareExact(new UiSettings(), witnessA, query.selection));
+        bytesA = Files.readAllBytes(settings.settingsPath());
+        exactA = query.configuration;
+        config = new ConfigStore(exactA);
+
+        var registry = mock(EngineComponentRegistry.class);
+        var encoderA = query.component.snapshot();
+        var indexSpec = new io.justsearch.core.component.ComponentSpec("index", true,
+            KnowledgeServer.componentDependencies(),
+            io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
+            java.time.Duration.ofSeconds(60), 2);
+        // Resolve static dependency methods before beginning Mockito's instance stubbing.
+        var registrySnapshot = new EngineComponentSnapshot(0, List.of(
+            new EngineComponentSnapshot.Component(indexSpec,
+                io.justsearch.core.component.ComponentState.READY, null,
+                encoderA.stateSince(), encoderA.stateSinceMonotonicNanos(), "index-a", "index-a",
+                null, 0, null),
+            new EngineComponentSnapshot.Component(
+                new io.justsearch.core.component.ComponentSpec("encoders", false,
+                    InferenceCompositionRoot.componentDependencies(),
+                    encoderA.spec().composeCapability(), encoderA.spec().startDeadline(), 2),
+                encoderA.state(), encoderA.reasonCode(), encoderA.stateSince(),
+                encoderA.stateSinceMonotonicNanos(), encoderA.appliedVersion(),
+                encoderA.desiredVersion(), null, 0, null)));
+        when(registry.snapshot()).thenReturn(registrySnapshot);
+        when(registry.tryApply())
+            .thenReturn(new EngineComponentRegistry.ApplyAttempt.Acquired(applyLease));
+        when(registry.prepareBatch(anyMap())).thenReturn(registryBatch);
+        if (failure == Failure.VALIDATION) {
+          doThrow(marker).when(registryBatch).validate();
+        }
+        var components = new FixedSettingsComponentComposer(registry);
+        components.register("encoders", queryOwner());
+        if (policyDrift) {
+          components.register("generative", (ignoredCandidate, ignoredDesired, ignoredKeys) -> {
+            throw new AssertionError("Policy drift must be refused before generative preparation");
           });
+        }
+        if (failure == Failure.LATER_OWNER) {
+          components.register("generative", (ignoredCandidate, ignoredDesired, ignoredKeys) -> {
+            throw (RuntimeException) marker;
+          });
+        }
+        components.seal();
 
-      settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
-          dir.resolve("settings.json"));
-      settings.replacePrepared(settings.prepareExact(new UiSettings(), witnessA, query.selection));
-      bytesA = Files.readAllBytes(settings.settingsPath());
-      exactA = query.configuration;
-      config = new ConfigStore(exactA);
-
-      var registry = mock(EngineComponentRegistry.class);
-      var encoderA = query.component.snapshot();
-      var indexSpec = new io.justsearch.core.component.ComponentSpec("index", true,
-          KnowledgeServer.componentDependencies(),
-          io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
-          java.time.Duration.ofSeconds(60), 2);
-      when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0, List.of(
-          new EngineComponentSnapshot.Component(indexSpec,
-              io.justsearch.core.component.ComponentState.READY, null,
-              encoderA.stateSince(), encoderA.stateSinceMonotonicNanos(), "index-a", "index-a",
-              null, 0, null),
-          new EngineComponentSnapshot.Component(
-              new io.justsearch.core.component.ComponentSpec("encoders", false,
-                  InferenceCompositionRoot.componentDependencies(),
-                  encoderA.spec().composeCapability(), encoderA.spec().startDeadline(), 2),
-              encoderA.state(), encoderA.reasonCode(), encoderA.stateSince(),
-              encoderA.stateSinceMonotonicNanos(), encoderA.appliedVersion(),
-              encoderA.desiredVersion(), null, 0, null))));
-      when(registry.tryApply())
-          .thenReturn(new EngineComponentRegistry.ApplyAttempt.Acquired(applyLease));
-      when(registry.prepareBatch(anyMap())).thenReturn(registryBatch);
-      if (failure == Failure.VALIDATION) {
-        doThrow(marker).when(registryBatch).validate();
+        coordinator = coordinator(dir, components, failure == Failure.REPLACEMENT ? marker : null);
+        coordinator.inspectRecovery(List.of());
+        reservation = coordinator.reserve(
+            reservationId, OperationKeys.generate(Clock.systemUTC()), witnessA);
+        attemptControl = attemptControl(failure != Failure.CANCELLATION);
+        candidate = settings.load();
+        Path modelDir = dir.resolve(citationPath ? "candidate-citation" : "candidate-reranker");
+        Files.createDirectories(modelDir);
+        Files.writeString(
+            modelDir.resolve(citationPath ? "model.onnx" : "model_fp16.onnx"),
+            "candidate-model", StandardCharsets.UTF_8);
+        Files.writeString(
+            modelDir.resolve("tokenizer.json"), "candidate-tokenizer", StandardCharsets.UTF_8);
+        if (citationPath) candidate.setCitationScorerModelPath(modelDir.toString());
+        else candidate.setRerankerModelPath(modelDir.toString());
+      } catch (Exception | Error failureDuringConstruction) {
+        composition.close();
+        try { query.close(); }
+        catch (Exception | Error cleanup) { failureDuringConstruction.addSuppressed(cleanup); }
+        throw failureDuringConstruction;
       }
-      var components = new FixedSettingsComponentComposer(registry);
-      components.register("encoders", queryOwner());
-      if (policyDrift) {
-        components.register("generative", (ignoredCandidate, ignoredDesired, ignoredKeys) -> {
-          throw new AssertionError("Policy drift must be refused before generative preparation");
-        });
-      }
-      if (failure == Failure.LATER_OWNER) {
-        components.register("generative", (ignoredCandidate, ignoredDesired, ignoredKeys) -> {
-          throw (RuntimeException) marker;
-        });
-      }
-      components.seal();
-
-      coordinator = coordinator(dir, components, failure == Failure.REPLACEMENT ? marker : null);
-      coordinator.inspectRecovery(List.of());
-      reservation = coordinator.reserve(
-          reservationId, OperationKeys.generate(Clock.systemUTC()), witnessA);
-      attemptControl = attemptControl(failure != Failure.CANCELLATION);
-      candidate = settings.load();
-      Path modelDir = dir.resolve(citationPath ? "candidate-citation" : "candidate-reranker");
-      Files.createDirectories(modelDir);
-      Files.writeString(
-          modelDir.resolve(citationPath ? "model.onnx" : "model_fp16.onnx"),
-          "candidate-model", StandardCharsets.UTF_8);
-      Files.writeString(
-          modelDir.resolve("tokenizer.json"), "candidate-tokenizer", StandardCharsets.UTF_8);
-      if (citationPath) candidate.setCitationScorerModelPath(modelDir.toString());
-      else candidate.setRerankerModelPath(modelDir.toString());
     }
 
     private FixedSettingsComponentComposer.Owner queryOwner() {
@@ -392,9 +401,11 @@ final class KnowledgeServerQueryPreparationTransactionTest {
     }
 
     @Override public void close() throws Exception {
-      coordinator.releaseAfterTerminal(reservationId);
-      composition.close();
-      query.close();
+      try { coordinator.releaseAfterTerminal(reservationId); }
+      finally {
+        composition.close();
+        query.close();
+      }
     }
   }
 

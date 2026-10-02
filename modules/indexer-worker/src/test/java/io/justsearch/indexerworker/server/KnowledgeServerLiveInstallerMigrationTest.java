@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.server;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -88,7 +89,13 @@ final class KnowledgeServerLiveInstallerMigrationTest {
   void settledInstallerCanRecoverItsPromotedEncodersWithoutAnotherMigration(@TempDir Path tempDir)
       throws Exception {
     try (Fixture fixture = new Fixture(tempDir)) {
+      String lastApplied = fixture.encoder.snapshot().appliedVersion();
+      assertNotNull(lastApplied);
       fixture.promoteInstaller(false);
+      assertEquals(lastApplied, fixture.encoder.snapshot().appliedVersion(),
+          "known-missing B retains the last successful applied version");
+      assertNotEquals(lastApplied, fixture.encoder.snapshot().desiredVersion(),
+          "B's desired projection differs from the historical applied projection");
       assertNotNull(field(fixture.server, "recordedCandidate"), "the operation still owns settlement");
       assertTrue(Files.exists(fixture.sourcePath), "a nonterminal receipt retains the predecessor");
       fixture.encoder.transition(ComponentState.FAILED, "encoders.failed", "native failure");
@@ -116,6 +123,7 @@ final class KnowledgeServerLiveInstallerMigrationTest {
       // The selected reranker has no tokenizer. Its exact known-missing plan is recoverable
       // to DEGRADED without loading models or opening an external process.
       assertEquals(ComponentRecoveryAction.Outcome.DEGRADED, result.outcome(), result::toString);
+      assertEquals(lastApplied, fixture.encoder.snapshot().appliedVersion());
       assertTrue(promoted.isClosed());
       try (var serving = fixture.server.captureServingView()) {
         assertTrue(serving.encoderSet() != promoted);

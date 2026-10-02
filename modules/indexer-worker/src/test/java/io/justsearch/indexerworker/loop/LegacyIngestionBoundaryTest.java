@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.loop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionSkipPolicy;
@@ -74,9 +75,9 @@ class LegacyIngestionBoundaryTest {
         assertNull(entry.ingestionRoot());
         assertEquals(1, queue.enqueueEntries(List.of(entry)));
         var claim = queue.pollPending(1).getFirst();
-        assertEquals(SourceAdmissionAction.SKIP_DONE,
-            new WorkerIngestionAuthority().admit(claim).action());
-        queue.markDone(file);
+        var admission = new WorkerIngestionAuthority().admit(claim);
+        assertEquals(SourceAdmissionAction.SKIP_DONE, admission.action());
+        assertTrue(queue.markClaimDone(claim, admission.outcome(), null));
         // A new explicit request states that this file, rather than an inferred volume, is scope.
         assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(file))));
         assertEquals(SourceAdmissionAction.ADMIT,

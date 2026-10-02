@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
 import io.justsearch.indexerworker.services.CallContext;
@@ -455,7 +456,8 @@ final class DocumentIdentityBootImportTest {
     try (SqliteJobQueue queue =
         new SqliteJobQueue(layout.dataDir().resolve("jobs.db"))) {
       queue.open();
-      assertEquals(1, queue.enqueue(List.of(source)));
+      assertEquals(1, queue.enqueueEntries(List.of(
+          JobQueue.EnqueueEntry.stat(source).withinRoot(source))));
     }
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
@@ -465,7 +467,7 @@ final class DocumentIdentityBootImportTest {
     server.start();
 
     try {
-      awaitGreenUid(docId, blueUid, Duration.ofSeconds(15));
+      awaitGreenUid(docId, blueUid, Duration.ofSeconds(15), barrier::cancel);
       try (SqliteDocumentIdentityStore probe =
           new SqliteDocumentIdentityStore(layout.dataDir().resolve("jobs.db"))) {
         assertEquals(
@@ -479,6 +481,11 @@ final class DocumentIdentityBootImportTest {
 
   private void awaitGreenUid(String docId, String expectedUid, Duration timeout)
       throws Exception {
+    awaitGreenUid(docId, expectedUid, timeout, () -> {});
+  }
+
+  private void awaitGreenUid(String docId, String expectedUid, Duration timeout,
+      Runnable beforeDiagnostics) throws Exception {
     long deadline = System.nanoTime() + timeout.toNanos();
     String observed = null;
     while (System.nanoTime() < deadline) {
@@ -492,6 +499,8 @@ final class DocumentIdentityBootImportTest {
       }
       Thread.sleep(100L);
     }
+    // A pointer barrier owns the generation-state guard. Release it before diagnostics read state.
+    beforeDiagnostics.run();
     assertEquals(
         expectedUid,
         observed,
