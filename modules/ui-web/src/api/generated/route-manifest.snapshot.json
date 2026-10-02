@@ -2,7 +2,7 @@
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
   "count": 245,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:5159d9dc9277aeaf546da78b6bb04a2d7ca161d906a4d3158742c0c48969a469",
+  "routeDigest": "sha256:e13b8e9f427885e5dac57759ac9fdae077cbdcadc1ac0d2395b2233805397c16",
   "routes": [
     {
       "method": "GET",
@@ -2461,7 +2461,9 @@
       "queryParameters": [],
       "responseSchemas": {
         "200": "lifecycle-snapshot.v2.json",
-        "403": "api-error-response.v1.json"
+        "403": "api-error-response.v1.json",
+        "429": "api-error-response.v1.json",
+        "503": "api-error-response.v1.json"
       },
       "lifecycle": null
     },
@@ -3366,6 +3368,7 @@
       "responseSchemas": {
         "200": "runtime-manifest-public.v2.json",
         "403": "api-error-response.v1.json",
+        "429": "api-error-response.v1.json",
         "500": "api-error-response.v1.json",
         "503": "api-error-response.v1.json"
       },
@@ -3442,7 +3445,9 @@
       "queryParameters": [],
       "responseSchemas": {
         "200": "runtime-live-response.v1.json",
-        "403": "api-error-response.v1.json"
+        "403": "api-error-response.v1.json",
+        "429": "api-error-response.v1.json",
+        "503": "api-error-response.v1.json"
       },
       "lifecycle": null
     },
@@ -3474,6 +3479,7 @@
       "responseSchemas": {
         "200": "runtime-manifest-public.v2.json",
         "403": "api-error-response.v1.json",
+        "429": "api-error-response.v1.json",
         "500": "api-error-response.v1.json",
         "503": "api-error-response.v1.json"
       },
@@ -3507,7 +3513,8 @@
       "responseSchemas": {
         "200": "runtime-ready-response.v1.json",
         "403": "api-error-response.v1.json",
-        "503": "runtime-ready-response.v1.json"
+        "429": "api-error-response.v1.json",
+        "503": "runtime-ready-unavailable-response.v1.json"
       },
       "lifecycle": null
     },

@@ -259,6 +259,11 @@ export interface RuntimeReadyResponse {
   ready: boolean;
 }
 
+/**
+ * A readiness probe failure or an Engine admission refusal.
+ */
+export type RuntimeReadyUnavailableResponse = RuntimeReadyResponse | ApiErrorResponse;
+
 export type getWellKnownRuntimeManifestResponse200 = {
   data: RuntimeManifestPublic
   status: 200
@@ -267,6 +272,11 @@ export type getWellKnownRuntimeManifestResponse200 = {
 export type getWellKnownRuntimeManifestResponse403 = {
   data: ApiErrorResponse
   status: 403
+}
+
+export type getWellKnownRuntimeManifestResponse429 = {
+  data: ApiErrorResponse
+  status: 429
 }
 
 export type getWellKnownRuntimeManifestResponse500 = {
@@ -282,7 +292,7 @@ export type getWellKnownRuntimeManifestResponse503 = {
 export type getWellKnownRuntimeManifestResponseSuccess = (getWellKnownRuntimeManifestResponse200) & {
   headers: Headers;
 };
-export type getWellKnownRuntimeManifestResponseError = (getWellKnownRuntimeManifestResponse403 | getWellKnownRuntimeManifestResponse500 | getWellKnownRuntimeManifestResponse503) & {
+export type getWellKnownRuntimeManifestResponseError = (getWellKnownRuntimeManifestResponse403 | getWellKnownRuntimeManifestResponse429 | getWellKnownRuntimeManifestResponse500 | getWellKnownRuntimeManifestResponse503) & {
   headers: Headers;
 };
 
@@ -370,10 +380,20 @@ export type getRuntimeLivenessResponse403 = {
   status: 403
 }
 
+export type getRuntimeLivenessResponse429 = {
+  data: ApiErrorResponse
+  status: 429
+}
+
+export type getRuntimeLivenessResponse503 = {
+  data: ApiErrorResponse
+  status: 503
+}
+
 export type getRuntimeLivenessResponseSuccess = (getRuntimeLivenessResponse200) & {
   headers: Headers;
 };
-export type getRuntimeLivenessResponseError = (getRuntimeLivenessResponse403) & {
+export type getRuntimeLivenessResponseError = (getRuntimeLivenessResponse403 | getRuntimeLivenessResponse429 | getRuntimeLivenessResponse503) & {
   headers: Headers;
 };
 
@@ -413,6 +433,11 @@ export type getRuntimeManifestResponse403 = {
   status: 403
 }
 
+export type getRuntimeManifestResponse429 = {
+  data: ApiErrorResponse
+  status: 429
+}
+
 export type getRuntimeManifestResponse500 = {
   data: ApiErrorResponse
   status: 500
@@ -426,7 +451,7 @@ export type getRuntimeManifestResponse503 = {
 export type getRuntimeManifestResponseSuccess = (getRuntimeManifestResponse200) & {
   headers: Headers;
 };
-export type getRuntimeManifestResponseError = (getRuntimeManifestResponse403 | getRuntimeManifestResponse500 | getRuntimeManifestResponse503) & {
+export type getRuntimeManifestResponseError = (getRuntimeManifestResponse403 | getRuntimeManifestResponse429 | getRuntimeManifestResponse500 | getRuntimeManifestResponse503) & {
   headers: Headers;
 };
 
@@ -466,15 +491,20 @@ export type getRuntimeReadinessResponse403 = {
   status: 403
 }
 
+export type getRuntimeReadinessResponse429 = {
+  data: ApiErrorResponse
+  status: 429
+}
+
 export type getRuntimeReadinessResponse503 = {
-  data: RuntimeReadyResponse
+  data: RuntimeReadyUnavailableResponse
   status: 503
 }
 
 export type getRuntimeReadinessResponseSuccess = (getRuntimeReadinessResponse200) & {
   headers: Headers;
 };
-export type getRuntimeReadinessResponseError = (getRuntimeReadinessResponse403 | getRuntimeReadinessResponse503) & {
+export type getRuntimeReadinessResponseError = (getRuntimeReadinessResponse403 | getRuntimeReadinessResponse429 | getRuntimeReadinessResponse503) & {
   headers: Headers;
 };
 
@@ -514,10 +544,20 @@ export type getLifecycleStatusResponse403 = {
   status: 403
 }
 
+export type getLifecycleStatusResponse429 = {
+  data: ApiErrorResponse
+  status: 429
+}
+
+export type getLifecycleStatusResponse503 = {
+  data: ApiErrorResponse
+  status: 503
+}
+
 export type getLifecycleStatusResponseSuccess = (getLifecycleStatusResponse200) & {
   headers: Headers;
 };
-export type getLifecycleStatusResponseError = (getLifecycleStatusResponse403) & {
+export type getLifecycleStatusResponseError = (getLifecycleStatusResponse403 | getLifecycleStatusResponse429 | getLifecycleStatusResponse503) & {
   headers: Headers;
 };
 

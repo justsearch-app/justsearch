@@ -27,6 +27,13 @@ ids, policy rows with no registered route, public routes without complete respon
 internal routes leaking into the SDK. Canonical response schemas live in `SSOT/schemas/` and are
 served by `SchemaController` as well as embedded into the SDK projection.
 
+Manifest (including its well-known mirror), readiness, liveness, and status declare
+admission capacity refusal as `429` with `api-error-response.v1.json`. Frozen admission
+also returns an API-error body with `503`. Readiness's `503` uses
+`runtime-ready-unavailable-response.v1.json`, a union of the readiness probe body and
+the API-error body; its `200` retains `runtime-ready-response.v1.json`. Health is
+exempt from Engine admission and retains its lifecycle snapshot body for `503`.
+
 The projection currently contains exactly six read-only operations: runtime manifest and mirror,
 readiness, liveness, health, and status. See [Runtime Contract](runtime-contract.md#generated-node-client)
 for package scope and regeneration commands.

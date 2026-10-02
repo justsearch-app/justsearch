@@ -422,9 +422,10 @@ public final class McpToolSurface {
                       // Tempdoc 811 (C-2a) — optional collection tag. Server-side validation in
                       // IngestTool is the guard; this schema only advertises the argument.
                       "collection",
-                          prop(
-                              "string",
-                              "Optional collection tag for the indexed documents. Omit to inherit"
+                          orderedMap(
+                              "type", List.of("string", "null"),
+                              "description",
+                              "Optional collection tag for the indexed documents. Omit or pass null to inherit"
                                   + " the containing indexed root's collection, or 'mcp-ingest'"
                                   + " for paths outside every indexed root. The app-internal"
                                   + " collections 'justsearch-help' and 'agent-history' are"
@@ -2162,6 +2163,7 @@ public final class McpToolSurface {
         && e.getCause() instanceof Exception cause && seen.add(e)) {
       e = cause;
     }
+    if (e instanceof io.justsearch.app.api.EngineAdmissionException refused) throw refused;
     String detail = e.getMessage() != null ? e.getMessage() : "no additional detail";
     String message = tool
         + " failed: "

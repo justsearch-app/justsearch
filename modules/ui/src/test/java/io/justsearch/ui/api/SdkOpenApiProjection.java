@@ -87,7 +87,9 @@ final class SdkOpenApiProjection {
     Map<String, Object> responses = new LinkedHashMap<>();
     for (var response : contract.responseSchemas().entrySet()) {
       String schemaName = componentName(response.getValue());
-      schemas.computeIfAbsent(schemaName, ignored -> loadSchema(response.getValue(), schemaName));
+      if (!schemas.containsKey(schemaName)) {
+        loadSchema(response.getValue(), schemaName, schemas);
+      }
       Map<String, Object> mediaType =
           Map.of("schema", Map.of("$ref", "#/components/schemas/" + schemaName));
       Map<String, Object> responseObject = new LinkedHashMap<>();
@@ -104,6 +106,7 @@ final class SdkOpenApiProjection {
       case 200 -> "Successful response.";
       case 403 -> "Rejected because the Host header is not loopback.";
       case 500 -> "Sanitized internal application failure.";
+      case 429 -> "Engine admission capacity refusal; see Retry-After.";
       case 503 -> "Valid lifecycle-unavailable response.";
       default -> "HTTP " + status + " response.";
     };
@@ -114,31 +117,39 @@ final class SdkOpenApiProjection {
   }
 
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> loadSchema(String filename, String componentName) {
+  private static void loadSchema(
+      String filename, String componentName, Map<String, Object> schemas) {
     String resource = "/SSOT/schemas/" + filename;
     try (InputStream input = SdkOpenApiProjection.class.getResourceAsStream(resource)) {
       if (input == null) throw new IllegalStateException("SDK schema missing from classpath: " + resource);
       Map<String, Object> schema = MAPPER.readValue(input, Map.class);
-      rewriteLocalRefs(schema, componentName);
+      schemas.put(componentName, schema);
+      rewriteLocalRefs(schema, componentName, schemas);
       schema.remove("$schema");
       schema.remove("$id");
-      return schema;
     } catch (IOException e) {
       throw new IllegalStateException("Failed to load SDK schema: " + resource, e);
     }
   }
 
   @SuppressWarnings("unchecked")
-  private static void rewriteLocalRefs(Object value, String componentName) {
+  private static void rewriteLocalRefs(
+      Object value, String componentName, Map<String, Object> schemas) {
     if (value instanceof Map<?, ?> raw) {
       Map<String, Object> map = (Map<String, Object>) raw;
       Object ref = map.get("$ref");
       if (ref instanceof String text && text.startsWith("#/$defs/")) {
         map.put("$ref", "#/components/schemas/" + componentName + text.substring(1));
+      } else if (ref instanceof String text && text.matches("[a-z0-9-]+\\.v\\d+\\.json")) {
+        String referencedComponent = componentName(text);
+        if (!schemas.containsKey(referencedComponent)) {
+          loadSchema(text, referencedComponent, schemas);
+        }
+        map.put("$ref", "#/components/schemas/" + referencedComponent);
       }
-      for (Object child : map.values()) rewriteLocalRefs(child, componentName);
+      for (Object child : map.values()) rewriteLocalRefs(child, componentName, schemas);
     } else if (value instanceof List<?> list) {
-      for (Object child : list) rewriteLocalRefs(child, componentName);
+      for (Object child : list) rewriteLocalRefs(child, componentName, schemas);
     }
   }
 }

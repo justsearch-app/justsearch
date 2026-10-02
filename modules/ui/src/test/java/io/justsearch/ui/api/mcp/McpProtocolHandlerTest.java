@@ -45,6 +45,51 @@ class McpProtocolHandlerTest {
 
   @Test
   @SuppressWarnings("unchecked")
+  void downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay() throws Exception {
+    for (var reason : io.justsearch.app.api.EngineAdmissionException.Reason.values()) {
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+      for (RuntimeException failure : List.of(
+          refusal, new java.util.concurrent.CompletionException(refusal),
+          new java.util.concurrent.CompletionException(
+              new java.util.concurrent.ExecutionException(refusal)))) {
+        var adapter = mock(KnowledgeHttpApiAdapter.class);
+        when(adapter.openSearch(any(), any(EngineContext.class))).thenThrow(failure);
+        var ctx = mock(Context.class);
+        when(ctx.path()).thenReturn("/mcp");
+        when(ctx.body()).thenReturn("""
+            {"jsonrpc":"2.0","id":"admission-7","method":"tools/call",
+             "params":{"name":"justsearch_search","arguments":{"query":"test"}}}
+            """);
+        when(ctx.contentType(anyString())).thenReturn(ctx);
+        when(ctx.status(anyInt())).thenReturn(ctx);
+        var response = ArgumentCaptor.forClass(String.class);
+        when(ctx.result(response.capture())).thenReturn(ctx);
+        handlerOver(adapter).handlePost(ctx);
+        var wire = MAPPER.readValue(response.getValue(), Map.class);
+        assertEquals("admission-7", wire.get("id"));
+        assertFalse(wire.containsKey("result"));
+        var error = (Map<String, Object>) wire.get("error");
+        assertEquals(-32000, error.get("code"));
+        var data = (Map<String, Object>) error.get("data");
+        String expectedCode = switch (reason) {
+          case CONTEXT_LIMIT -> "ADMISSION_CONTEXT_LIMIT";
+          case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+          case FROZEN -> "UPGRADE_PREPARING";
+          case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
+        };
+        assertEquals(expectedCode, data.get("errorCode"));
+        assertEquals(false, data.get("retrySafe"));
+        boolean capacity = reason == io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+        verify(ctx).status(capacity ? 429 : 503);
+        if (capacity) verify(ctx).header("Retry-After", "7");
+        else verify(ctx, never()).header(eq("Retry-After"), anyString());
+      }
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
   void wrappedExecutorRefusalKeepsRpcIdentityAndExplicitlyDisallowsAutomaticReplay() throws Exception {
     for (var reason : List.of(
         io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
@@ -396,7 +441,12 @@ class McpProtocolHandlerTest {
         "collection stays optional — omitting it inherits the root collection or mcp-ingest");
     @SuppressWarnings("unchecked")
     Map<String, Object> collectionProp = (Map<String, Object>) ingestProps.get("collection");
-    assertEquals("string", collectionProp.get("type"));
+    assertEquals(List.of("string", "null"), collectionProp.get("type"));
+    var ingestOperation = new AgentToolsOperationCatalog().definitions().stream()
+        .filter(op -> op.id().value().equals("core.ingest-files")).findFirst().orElseThrow();
+    var enforcedCollectionType = MAPPER.readTree(ingestOperation.intf().inputs())
+        .at("/properties/collection/type");
+    assertEquals(enforcedCollectionType, MAPPER.valueToTree(collectionProp.get("type")));
     assertTrue(
         ((String) collectionProp.get("description")).contains("mcp-ingest"),
         "the schema must name the out-of-root default so an agent knows what it gets");

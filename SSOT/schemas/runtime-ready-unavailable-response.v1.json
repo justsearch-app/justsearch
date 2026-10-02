@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssot.justsearch/v1/schemas/runtime-ready-unavailable-response.v1.json",
+  "title": "JustSearch runtime readiness unavailable response",
+  "description": "A readiness probe failure or an Engine admission refusal.",
+  "oneOf": [
+    { "$ref": "runtime-ready-response.v1.json" },
+    { "$ref": "api-error-response.v1.json" }
+  ]
+}

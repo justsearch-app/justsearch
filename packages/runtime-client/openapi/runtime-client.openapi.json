@@ -376,6 +376,15 @@
         "required" : [ "ready", "lifecycle", "instanceId" ],
         "title" : "JustSearch runtime readiness response",
         "type" : "object"
+      },
+      "runtime-ready-unavailable-response" : {
+        "description" : "A readiness probe failure or an Engine admission refusal.",
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/runtime-ready-response"
+        }, {
+          "$ref" : "#/components/schemas/api-error-response"
+        } ],
+        "title" : "JustSearch runtime readiness unavailable response"
       }
     }
   },
@@ -409,6 +418,16 @@
               }
             },
             "description" : "Rejected because the Host header is not loopback."
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description" : "Engine admission capacity refusal; see Retry-After."
           },
           "500" : {
             "content" : {
@@ -509,6 +528,26 @@
               }
             },
             "description" : "Rejected because the Host header is not loopback."
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description" : "Engine admission capacity refusal; see Retry-After."
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description" : "Valid lifecycle-unavailable response."
           }
         },
         "summary" : "GET /api/runtime/live",
@@ -544,6 +583,16 @@
               }
             },
             "description" : "Rejected because the Host header is not loopback."
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description" : "Engine admission capacity refusal; see Retry-After."
           },
           "500" : {
             "content" : {
@@ -600,11 +649,21 @@
             },
             "description" : "Rejected because the Host header is not loopback."
           },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description" : "Engine admission capacity refusal; see Retry-After."
+          },
           "503" : {
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/runtime-ready-response"
+                  "$ref" : "#/components/schemas/runtime-ready-unavailable-response"
                 }
               }
             },
@@ -644,6 +703,26 @@
               }
             },
             "description" : "Rejected because the Host header is not loopback."
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description" : "Engine admission capacity refusal; see Retry-After."
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description" : "Valid lifecycle-unavailable response."
           }
         },
         "summary" : "GET /api/status",
