@@ -207,7 +207,7 @@ export function parseYamlContributions(builderPath) {
 
   // putYaml("configKey", root, "yamlPath") — first arg is the config key
   const putYamlPattern =
-    /putYaml(?:Int|Long|Boolean|Double|FromNode|FromNodeLower)?\(\s*"([^"]+)"\s*,/g;
+    /putYaml(?:IntClampedFromNode|IntFromNode|Int|Long|Boolean|Double|FromNode|FromNodeLower)?\(\s*"([^"]+)"\s*,/g;
   for (const match of text.matchAll(putYamlPattern)) {
     yamlKeys.add(match[1]);
   }

@@ -138,8 +138,13 @@ Each SSE frame carries an `event:` name and a JSON `data:` payload.
 shape-specific enrichment.
 
 Controller SSE errors use the `error` event with an `error` message, `errorCode`, `errorClass`,
-and `retryable`, with no `i18nKey`. This envelope covers malformed bodies and mid-run controller
-failures.
+and `retryable`, with no `i18nKey`. This envelope covers malformed bodies and non-cancellation
+mid-run controller failures.
+
+Cancellation SSE errors use the `error` event with `message`, `errorCode`, and `reasonCode`.
+When `ChatController` catches `EngineWorkCancelledException`, `errorCode` is `SERVICE_UNAVAILABLE`
+and `reasonCode` carries the cancellation reason. This envelope has no `error`, `errorClass`, `retryable`, or `i18nKey`;
+clients read the cancellation message from `message`.
 
 Engine/injector SSE errors use the `error` event with an `error` message, `errorCode`, and
 `i18nKey`. Clients must not assume `i18nKey` is present on every error event.

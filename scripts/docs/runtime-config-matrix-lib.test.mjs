@@ -9,6 +9,7 @@ import {
   censusJavaEnumConstants,
   parseConfigKeys,
   parseEnvRegistry,
+  parseYamlContributions,
   renderMatrixMarkdown,
 } from "./runtime-config-matrix-lib.mjs";
 
@@ -194,6 +195,53 @@ test("overlapping ConfigKey declarations inherit the operator sources and preced
   });
 });
 
+test("typed YAML node helpers retain YAML in both mixed-source declarations", () => {
+  for (const helper of ["putYamlIntFromNode", "putYamlIntClampedFromNode"]) {
+    withFixture(({ root, envRegistryPath, configKeyPath, builderPath, configApplyPath }) => {
+      writeFileSync(configKeyPath, `enum ConfigKey {
+        OVERLAPPING("justsearch.normal", LifecycleStage.PERMANENT);
+      }`);
+      writeFileSync(builderPath, `${helper}(\n "justsearch.normal", node, "normal"${
+        helper === "putYamlIntClampedFromNode" ? ", 0, 2" : ""});`);
+      assert.deepEqual(parseYamlContributions(builderPath).yamlKeys, ["justsearch.normal"], helper);
+      const model = buildMatrixModel({ repoRoot: root, envRegistryPath, configKeyPath,
+        builderPath, configApplyPath });
+      for (const declaration of ["EnvRegistry.NORMAL", "ConfigKey.OVERLAPPING"]) {
+        const row = model.rows.find((item) => item.declaration === declaration);
+        assert.equal(row.yamlKey, "justsearch.normal", helper);
+        assert.equal(row.precedenceNotes, "sysprop > env > YAML > default", helper);
+      }
+    });
+  }
+});
+
+test("real resolver YAML helper calls are represented in the matrix", () => {
+  const builderPath = new URL(
+    "../../modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java",
+    import.meta.url);
+  const source = readFileSync(builderPath, "utf8");
+  const extracted = new Set(parseYamlContributions(builderPath).yamlKeys);
+  // Independent call census catches future typed helper omissions.
+  for (const call of source.matchAll(/\bputYaml\w*\(\s*"([^"]+)"\s*,/g)) {
+    assert.ok(extracted.has(call[1]), `missing YAML contribution: ${call[0]}`);
+  }
+  const model = buildMatrixModel();
+  for (const key of ["search.mcp_delivery.budget_bytes",
+    "search.mcp_delivery.entity_carriage_max_chars", "search.mcp_framing.thin_result_floor_bytes"]) {
+    assert.ok(source.includes(`"${key}"`));
+    assert.ok(extracted.has(key), `real resolver must contribute YAML for ${key}`);
+    for (const row of model.rows.filter((item) => item.sysprop === key)) {
+      assert.equal(row.yamlKey, key);
+      assert.equal(row.precedenceNotes, "sysprop > env > YAML > default");
+    }
+    assert.equal(model.rows.filter((item) => item.sysprop === key).length, 2);
+  }
+  for (const helper of ["putYamlIntFromNode", "putYamlIntClampedFromNode"]) {
+    const body = source.split(`private void ${helper}(`)[1].split("\n  }")[0];
+    assert.match(body, /put\(key, ORDINAL_YAML, "yaml"/);
+  }
+});
+
 test("schema recovery guide uses emitted lifecycle reasons and preserves marker compatibility", () => {
   const guide = readRepoFile("docs/explanation/11-index-schema-migration.md");
   const section = guide.split("### A `FAIL_CLOSED` refusal")[1].split("\n### ")[0];
@@ -246,6 +294,16 @@ test("conversation failure contract distinguishes controller, engine and pre-str
   }
   assert.doesNotMatch(controllerError, /i18nKey/);
   assert.match(controllerClaim, /no `i18nKey`/);
+  const cancelled = controller.split("catch (io.justsearch.app.api.EngineWorkCancelledException cancelled)")[1]
+    .split("} catch")[0];
+  assert.ok(cancelled.includes('new SseEvent("error", Map.of('));
+  const cancellationClaim = doc.split("Cancellation SSE errors")[1]?.split("\n\n")[0] ?? "";
+  const fields = [...cancelled.matchAll(/"(\w+)"\s*,/g)].map((match) => match[1]);
+  assert.deepEqual(fields, ["error", "message", "errorCode", "reasonCode"]);
+  for (const field of fields.slice(1)) {
+    assert.ok(cancellationClaim.includes(`\`${field}\``), `cancellation claim must include ${field}`);
+  }
+  assert.match(cancellationClaim, /no `error`, `errorClass`, `retryable`, or `i18nKey`/);
   const engine = readRepoFile(
     "modules/app-services/src/main/java/io/justsearch/app/services/conversation/ConversationEngine.java");
   const engineError = engine.split("private static void emitError(")[1]
