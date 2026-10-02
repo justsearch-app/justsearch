@@ -1004,6 +1004,88 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void snapshotBoundHybridDriftRefusesBeforeUnrelatedSettingsPublication() throws Exception {
+    Path settingsPath = temp.resolve("hybrid-drift-settings.json");
+    AtomicInteger restarts = new AtomicInteger();
+    try (var operations = operations("hybrid-drift")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var initial = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+          .putDefault("index.hybrid.vector_skip_min_chars", "4").build();
+      var desired = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+          .putDefault("index.hybrid.vector_skip_min_chars", "100").build();
+      var config = new ConfigStore(initial);
+      var owner = new SettingsCommitCoordinator(settings, config, restarts::incrementAndGet,
+          candidate -> desired, candidate -> OperationResult.success("prepared"),
+          settings::replacePrepared);
+      var runner = runner(operations, owner);
+      var attempt = runner.accept(request(OperationKind.RECONFIGURE));
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate("dark", List.of()))));
+
+      assertFalse(result.response().success());
+      assertEquals(OperationState.FAILED, result.record().state());
+      assertEquals("RESTART_SOURCE_DRIFT", result.response().errorCode().orElseThrow());
+      assertEquals(List.of("index.hybrid.vector_skip_min_chars"),
+          result.response().errorDetails().get("keys"));
+      assertSame(initial, config.get());
+      assertEquals(4, config.get().hybridSearch().vectorSkipMinChars());
+      assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+      assertFalse(Files.exists(settingsPath));
+      assertEquals(0, restarts.get());
+    }
+  }
+
+  @Test
+  void indexPathChangeCommitsForRestartWhileServingRootAndTraceStayAtA() throws Exception {
+    Path settingsPath = temp.resolve("restart-index-settings.json");
+    Path indexA = Files.createDirectory(temp.resolve("index-a"));
+    Path indexB = Files.createDirectory(temp.resolve("index-b"));
+    assertNull(SettingsPatch.validateIndexPath(indexB.toString()));
+    AtomicInteger restarts = new AtomicInteger();
+    AtomicReference<String> committedKey = new AtomicReference<>();
+    try (var operations = operations("restart-index")) {
+      var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
+      var prior = new UiSettings();
+      prior.setIndexBasePath(indexA.toString());
+      settings.replacePrepared(settings.prepareExact(prior, new SettingsWitness(0, null)));
+      var config = new ConfigStore(ConfigStoreRebuilder.prepare(prior));
+      var servingPath = config.get().paths().indexBasePath();
+      var servingTrace = config.get().resolution("justsearch.index.base_path");
+      var owner = new SettingsCommitCoordinator(settings, config, () -> {
+        assertEquals(new SettingsWitness(1, committedKey.get()), settings.inspect().witness());
+        assertEquals(OperationState.COMPLETE,
+            operations.find(committedKey.get()).orElseThrow().state());
+        assertEquals(servingPath, config.get().paths().indexBasePath());
+        restarts.incrementAndGet();
+      }, candidate -> OperationResult.success("prepared"));
+      var runner = runner(operations, owner);
+      var candidate = settings.load();
+      candidate.setIndexBasePath(indexB.toString());
+      var request = request(OperationKind.RECONFIGURE);
+      var attempt = runner.accept(request);
+      committedKey.set(attempt.accepted().key());
+
+      var result = runner.start(attempt, handle -> OperationExecution.finished(
+          runner.applySettings(handle, currentWitness(settings), candidate)));
+
+      assertTrue(result.response().success());
+      assertEquals(OperationState.COMPLETE, result.record().state());
+      assertEquals(Boolean.TRUE, result.response().structuredData().get("restartScheduled"));
+      assertEquals(1, restarts.get());
+      assertEquals(indexB.toString(), settings.inspect().settings().getIndexBasePath());
+      assertEquals(servingPath, config.get().paths().indexBasePath());
+      assertEquals(servingTrace, config.get().resolution("justsearch.index.base_path"));
+      assertEquals(indexB, ConfigStoreRebuilder.prepare(settings.load()).paths().indexBasePath(),
+          "successor boot must select committed B");
+      runner.start(runner.accept(request), ignored -> {
+        throw new AssertionError("recorded reconfigure must not execute again");
+      });
+      assertEquals(1, restarts.get());
+    }
+  }
+
+  @Test
   void restartRequiredPortCompletesBeforeSchedulingOneRequestedRestart() throws Exception {
     Path settingsPath = temp.resolve("restart-port-settings.json");
     AtomicInteger restarts = new AtomicInteger();

@@ -705,15 +705,19 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
             Map.of("component", "encoders"));
       }
       boolean restartRequired = !changedKeys.restartRequired().isEmpty();
-      // API_PORT is the only restart-required value this settings candidate can write. If an
+      // These are the restart-required selectors this settings candidate can write. If an
       // unrelated process source drifted since boot, refuse before touching a component owner.
-      if (!Set.of("justsearch.api.port").containsAll(changedKeys.restartRequired())) {
+      if (!Set.of("justsearch.api.port", "justsearch.index.base_path")
+          .containsAll(changedKeys.restartRequired())) {
         throw refused("RESTART_SOURCE_DRIFT",
             "A restart-required process source changed; restart before applying settings",
             Map.of("keys", List.copyOf(changedKeys.restartRequired())));
       }
       ResolvedConfig servingResolved = changedKeys.restartRequired().contains("justsearch.api.port")
           ? resolved.retainingApiPortFrom(serving) : resolved;
+      if (changedKeys.restartRequired().contains("justsearch.index.base_path")) {
+        servingResolved = servingResolved.retainingIndexBasePathFrom(serving);
+      }
       if (!changedKeys.component().isEmpty() || chatComponentChanged
           || candidateContext.hasChatProfile() || candidateContext.forceGenerativeRefresh()) {
         var affected = new java.util.TreeMap<String, Set<String>>(changedKeys.component());

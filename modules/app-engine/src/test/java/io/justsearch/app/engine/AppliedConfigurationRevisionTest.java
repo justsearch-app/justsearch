@@ -4,15 +4,25 @@ package io.justsearch.app.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.app.api.operations.AppliedIndexGeneration;
 import io.justsearch.app.api.operations.IndexTargetSnapshot;
+import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.inference.InferenceLifecycleManager;
+import io.justsearch.app.services.GenerativeSettingsComponentOwner;
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentSpec;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentSnapshot;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
@@ -23,8 +33,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 final class AppliedConfigurationRevisionTest {
+  @TempDir Path directory;
   private static final List<String> COMPONENTS =
       List.of("api", "encoders", "generative", "index");
 
@@ -43,6 +55,57 @@ final class AppliedConfigurationRevisionTest {
       assertNotEquals(expected, AppliedConfigurationRevision.digest(
           snapshot(7, COMPONENTS, changed, false), generation), component);
     }
+  }
+
+  @Test
+  void eachGenerativeLaunchControlChangesPublishedComponentAndEngineRevision() throws Exception {
+    var controls = Map.of(
+        "justsearch.llm.slots", "2",
+        "justsearch.llm.kv_type", "q8_0",
+        "justsearch.llm.use_thinking", "true",
+        "justsearch.llm.reasoning_budget", "512");
+    String before = preparedGenerativeVersion(controls);
+    var applied = appliedVersions();
+    applied.put("generative", before);
+    var generation = generation("generation-a", "{}");
+    String revision = AppliedConfigurationRevision.digest(
+        snapshot(1, COMPONENTS, applied, false), generation);
+
+    for (var change : Map.of(
+        "justsearch.llm.slots", "3",
+        "justsearch.llm.kv_type", "f16",
+        "justsearch.llm.use_thinking", "false",
+        "justsearch.llm.reasoning_budget", "256").entrySet()) {
+      var changed = new LinkedHashMap<>(controls);
+      changed.put(change.getKey(), change.getValue());
+      String after = preparedGenerativeVersion(changed);
+      assertNotEquals(before, after, change.getKey());
+      var nextApplied = new LinkedHashMap<>(applied);
+      nextApplied.put("generative", after);
+      assertNotEquals(revision, AppliedConfigurationRevision.digest(
+          snapshot(1, COMPONENTS, nextApplied, false), generation), change.getKey());
+    }
+  }
+
+  private String preparedGenerativeVersion(Map<String, String> controls) throws Exception {
+    var builder = ResolvedConfig.builder().putDefault("justsearch.llm.enabled", "true");
+    controls.forEach(builder::putDefault);
+    var desired = builder.build();
+    var manager = mock(InferenceLifecycleManager.class);
+    var prepared = mock(InferenceLifecycleManager.PreparedConfigApply.class);
+    when(manager.prepareResolvedConfig(any(), eq(desired), eq(true), eq(false))).thenReturn(prepared);
+    when(prepared.targetsOnline()).thenReturn(true);
+    var handle = mock(ComponentHandle.class);
+    var before = component("generative", "A", false);
+    var staging = component("generative", "A", true, ComponentState.RELOADING);
+    when(handle.snapshot()).thenReturn(before, staging);
+    when(handle.transitionIfUnchanged(eq(before), eq(ComponentState.RELOADING), any(), any()))
+        .thenReturn(true);
+    var settings = new UiSettings();
+    settings.setChatEnabled(true);
+    var candidate = new GenerativeSettingsComponentOwner(manager, handle, directory, false)
+        .prepare(settings, desired, controls.keySet());
+    return candidate.observation().appliedVersion();
   }
 
   @Test

@@ -42,8 +42,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -326,7 +326,7 @@ public class InferenceLifecycleManager
   /** Performs exactly one monitor-admitted retry of the same physical applied configuration. */
   public ComponentRecoveryAction.Result recoverComponent(
       ComponentRecoveryAction.Request request,
-      Function<InferenceConfig, String> appliedVersionOf) throws Exception {
+      BiFunction<InferenceConfig, ResolvedConfig, String> appliedVersionOf) throws Exception {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(appliedVersionOf, "appliedVersionOf");
     final LlamaServerOps.StartRequest retry;
@@ -345,7 +345,8 @@ public class InferenceLifecycleManager
       recoveryGeneration = runner.generation();
       if (retry == null
           || !Objects.equals(
-              expected.appliedVersion(), appliedVersionOf.apply(retry.context().inference()))
+              expected.appliedVersion(), appliedVersionOf.apply(
+                  retry.context().inference(), retry.context().resolved()))
           || !request.begin()) {
         return ComponentRecoveryAction.Result.REFUSED;
       }
