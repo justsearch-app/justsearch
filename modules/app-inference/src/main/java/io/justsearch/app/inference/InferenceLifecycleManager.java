@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -528,6 +529,25 @@ public class InferenceLifecycleManager
 
   public InferenceConfig currentConfig() {
     return configuredInference();
+  }
+
+  /**
+   * Publishes from the verified managed launch while its lifecycle owner cannot change. A desired
+   * Offline configuration, an external server, or a private precommit candidate is not serving proof.
+   * Callers acquire the shared publication lock only inside this callback.
+   */
+  public boolean withVerifiedServingConfiguration(
+      BiConsumer<InferenceConfig, ResolvedConfig> publication) {
+    Objects.requireNonNull(publication, "publication");
+    synchronized (runner.lock()) {
+      if (closed || precommitComposition || preparedConfigApply != null
+          || runner.currentMode() != Mode.ONLINE) return false;
+      var started = serverOps.activeStartResult().orElse(null);
+      if (started == null
+          || started.disposition() == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL) return false;
+      publication.accept(started.context().inference(), started.context().resolved());
+      return true;
+    }
   }
 
   /** The managed server's profile, or retained configuration while Offline. */

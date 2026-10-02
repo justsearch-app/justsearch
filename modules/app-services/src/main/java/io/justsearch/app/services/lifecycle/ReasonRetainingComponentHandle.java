@@ -36,6 +36,19 @@ public final class ReasonRetainingComponentHandle implements ComponentHandle {
     return delegate.snapshot();
   }
 
+  /** Builds a coherent version/state projection with the same cause retention as transitions. */
+  public static EngineComponentSnapshot.Component appliedObservation(
+      EngineComponentSnapshot.Component expected, ComponentState state, String reasonCode,
+      String evidence, String appliedVersion) {
+    boolean retained = ReasonRetention.retainHeld(
+        expected.reasonCode(), reasonCode, RegistryBackedCapability.healthOf(state));
+    return new EngineComponentSnapshot.Component(
+        expected.spec(), state, retained ? expected.reasonCode() : reasonCode,
+        expected.stateSince(), expected.stateSinceMonotonicNanos(), appliedVersion,
+        expected.desiredVersion(), expected.lastCompose(), expected.recoveryAttempts(),
+        retained ? expected.evidence() : evidence);
+  }
+
   /** Complete owner-prepared rows already include their reason and evidence policy. */
   @Override
   public io.justsearch.core.component.EngineComponentRegistry.PreparedBatch prepareReplacement(

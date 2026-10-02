@@ -3,6 +3,9 @@ package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -13,16 +16,35 @@ import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.app.api.operations.AppliedIndexGeneration;
 import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.Mode;
+import io.justsearch.app.api.ModeTransitionException;
+import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.settings.SettingsCandidateContext;
+import io.justsearch.app.api.settings.SettingsWitness;
+import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
+import io.justsearch.app.inference.VerifiedLlamaTestServer;
+import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
 import io.justsearch.app.services.GenerativeSettingsComponentOwner;
+import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.services.bootstrap.phases.InferenceCapabilityWiring;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
+import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
+import io.justsearch.app.services.settings.FixedSettingsComponentComposer;
+import io.justsearch.app.services.settings.UiSettingsStore;
+import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentRecoveryAction;
 import io.justsearch.core.component.ComponentSpec;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentSnapshot;
+import io.justsearch.core.context.RetainedStateBudget;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
@@ -32,8 +54,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 final class AppliedConfigurationRevisionTest {
   @TempDir Path directory;
@@ -106,6 +131,171 @@ final class AppliedConfigurationRevisionTest {
     var candidate = new GenerativeSettingsComponentOwner(manager, handle, directory, false)
         .prepare(settings, desired, controls.keySet());
     return candidate.observation().appliedVersion();
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "justsearch.llm.slots,3",
+      "justsearch.llm.kv_type,f16",
+      "justsearch.llm.use_thinking,false",
+      "justsearch.llm.reasoning_budget,256"
+  })
+  void deferredRefreshPublishesVerifiedBAndRecoversThatIdentity(String key, String value)
+      throws Exception {
+    exerciseDeferredRefresh(key, value, null);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"health", "witness"})
+  void rejectedDeferredStartupCannotPromoteDesiredIdentity(String failure) throws Exception {
+    exerciseDeferredRefresh("justsearch.llm.kv_type", "f16", failure);
+  }
+
+  private void exerciseDeferredRefresh(String key, String value, String rejected) throws Exception {
+    Path executable = Files.writeString(directory.resolve("llama-server.exe"), "server");
+    Path model = Files.writeString(directory.resolve("chat.gguf"), "model");
+    var controls = new LinkedHashMap<>(Map.of(
+        "justsearch.llm.slots", "2", "justsearch.llm.kv_type", "q8_0",
+        "justsearch.llm.use_thinking", "true", "justsearch.llm.reasoning_budget", "512"));
+    var resolvedA = launchConfiguration(controls, executable, model);
+    controls.put(key, value);
+    var resolvedB = launchConfiguration(controls, executable, model);
+    var inference = InferenceConfig.fromResolvedConfig(resolvedA, directory);
+    var config = new ConfigStore(resolvedA);
+    var budget = new RetainedStateBudget();
+    budget.declare(DefaultEngineComponentRegistry.ATTEMPTED_CONFIGURATIONS, 1, "test");
+    try (var server = new VerifiedLlamaTestServer();
+        var executors = new TestEngineExecutors();
+        var registry = new DefaultEngineComponentRegistry(budget, config.publicationLock());
+        var manager = new InferenceLifecycleManager(executors, inference,
+            InferenceTelemetryEvents.noop(), ManagedChildRegistry.noop(), resolvedA)) {
+      for (String name : List.of("api", "index", "encoders")) {
+        registry.register(component(name, name + "-applied", false).spec())
+            .setAppliedVersion(name + "-applied");
+      }
+      var handle = new ReasonRetainingComponentHandle(
+          registry.register(component("generative", "A", false).spec()));
+      String versionA = HeadAssembly.generativeAppliedVersion(inference, resolvedA);
+      handle.setAppliedVersion(versionA);
+      handle.setDesiredVersion(versionA);
+      var settings = new UiSettings();
+      settings.setChatEnabled(true);
+      var settingsStore = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+          directory.resolve("settings.json"));
+      settingsStore.replacePrepared(settingsStore.prepareExact(settings, new SettingsWitness(0, null)));
+      InferenceCapabilityWiring.attachInferenceModeListener(manager, handle,
+          new RuntimeSpecStore(settingsStore), null, config.publicationLock());
+      manager.switchToOnlineMode();
+      var activeGeneration = generation("generation-a", "{}");
+      String revisionA = AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration);
+      server.failServing();
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+
+      var composer = new FixedSettingsComponentComposer(registry);
+      composer.register("generative",
+          new GenerativeSettingsComponentOwner(manager, handle, directory, false));
+      composer.seal();
+      var prepared = composer.prepare(settings, resolvedB, Map.of("generative", Set.of(key)),
+          new SettingsCandidateContext(null, true));
+      prepared.withOwnerLocks(() -> {
+        config.publicationLock().writeLock().lock();
+        try {
+          prepared.validate();
+          prepared.install();
+        } finally {
+          config.publicationLock().writeLock().unlock();
+        }
+      });
+      prepared.notifyObservers();
+      prepared.retire();
+      assertEquals(1, server.starts(), "Offline refresh must defer the physical launch");
+      assertEquals(versionA, handle.snapshot().appliedVersion());
+      String versionB = handle.snapshot().desiredVersion();
+      assertNotEquals(versionA, versionB, key);
+      assertEquals(revisionA, AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration));
+      server.onHealth(() -> {
+        assertFalse(server.verified());
+        assertEquals(versionA, handle.snapshot().appliedVersion(), "health has not verified B yet");
+        // A newer desired observation is not proof of what this physical attempt launched.
+        // Copying desiredVersion instead of hashing the verified context must fail this test.
+        if (rejected == null) handle.setDesiredVersion("unapplied-c");
+      });
+      if (rejected != null) {
+        if (rejected.equals("health")) server.rejectNextHealth();
+        else server.rejectNextWitness();
+        assertThrows(ModeTransitionException.class, manager::switchToOnlineMode);
+        assertEquals(versionA, handle.snapshot().appliedVersion());
+        assertEquals(versionB, handle.snapshot().desiredVersion());
+        assertEquals(revisionA, AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration));
+        return;
+      }
+      List<EngineComponentSnapshot.Component> ready = new ArrayList<>();
+      try (var subscription = registry.subscribe(snapshot -> {
+        var row = snapshot.components().stream()
+            .filter(component -> component.spec().name().equals("generative"))
+            .findFirst().orElseThrow();
+        if (row.state() == ComponentState.READY) {
+          assertTrue(server.verified());
+          ready.add(row);
+        }
+      })) {
+        manager.switchToOnlineMode();
+      }
+      assertSame(resolvedB, server.lastResolved());
+      assertEquals(versionB, handle.snapshot().appliedVersion(), key);
+      assertEquals("unapplied-c", handle.snapshot().desiredVersion());
+      assertEquals(ComponentState.READY, handle.snapshot().state());
+      assertFalse(ready.isEmpty());
+      ready.forEach(row -> assertEquals(versionB, row.appliedVersion(), "READY and B publish together"));
+      String revisionB = AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration);
+      assertNotEquals(revisionA, revisionB, key);
+      server.onHealth(() -> assertEquals(versionB, handle.snapshot().appliedVersion()));
+      server.failServing();
+      var request = new RegistryRecoveryRequest(handle);
+      var recovered = manager.recoverComponent(request, HeadAssembly::generativeAppliedVersion);
+      assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, recovered.outcome());
+      assertSame(resolvedB, server.lastResolved());
+      assertEquals(3, server.starts(), "one recovery must launch the same B once");
+      assertEquals(versionB, handle.snapshot().appliedVersion());
+      assertEquals(revisionB, AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration));
+    }
+  }
+
+  private ResolvedConfig launchConfiguration(Map<String, String> controls, Path executable, Path model) {
+    var builder = ResolvedConfig.builder()
+        .putDefault("justsearch.llm.enabled", "true")
+        .putDefault("justsearch.server.exe", executable.toString())
+        .put("justsearch.llm.model_path", 400, "yaml", null, model.toString())
+        .putDefault("justsearch.context.size", "4096")
+        .putDefault("justsearch.gpu.layers", "0")
+        .putDefault("justsearch.data.dir", directory.toString())
+        .putDefault("justsearch.mmproj.model", "none");
+    controls.forEach(builder::putDefault);
+    return builder.build();
+  }
+
+  private static final class RegistryRecoveryRequest implements ComponentRecoveryAction.Request {
+    private final ComponentHandle handle;
+    private final EngineComponentSnapshot.Component expected;
+    private EngineComponentSnapshot.Component admitted;
+    private RegistryRecoveryRequest(ComponentHandle handle) {
+      this.handle = handle;
+      this.expected = handle.snapshot();
+    }
+    @Override public EngineComponentSnapshot.Component expected() { return expected; }
+    @Override public EngineComponentSnapshot.Component current() { return handle.snapshot(); }
+    @Override public Optional<EngineComponentSnapshot.Component> admitted() {
+      return Optional.ofNullable(admitted);
+    }
+    @Override public boolean begin() {
+      admitted = handle.tryBeginRecovery(expected, "inference.starting", "recovery").orElse(null);
+      return admitted != null;
+    }
+    @Override public Optional<EngineComponentSnapshot.Component> complete(
+        EngineComponentSnapshot.Component current, ComponentState state, String reason, String evidence) {
+      return handle.tryTransitionIfUnchanged(current, state, reason, evidence);
+    }
+    @Override public boolean cancelled() { return false; }
   }
 
   @Test

@@ -1852,7 +1852,8 @@ public final class HeadAssembly implements AutoCloseable {
         2);
   }
 
-  static String generativeAppliedVersion(io.justsearch.app.inference.InferenceConfig config,
+  /** Value identity shared by settings preparation, verified activation and same-config recovery. */
+  public static String generativeAppliedVersion(io.justsearch.app.inference.InferenceConfig config,
       ResolvedConfig resolved) {
     Objects.requireNonNull(config, "config");
     Objects.requireNonNull(resolved, "resolved");

@@ -5,11 +5,16 @@ import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.telemetry.TransitionReason;
+import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentRegistry;
+import java.util.Objects;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Projects inference intent and physical runtime observations onto the Engine's generative
@@ -53,14 +58,16 @@ public final class InferenceCapabilityWiring {
       InferenceLifecycleManager manager,
       ComponentHandle generativeComponent,
       RuntimeSpecStore runtimeSpecStore,
-      RuntimeReconciler runtimeReconciler) {
+      RuntimeReconciler runtimeReconciler,
+      ReentrantReadWriteLock publicationLock) {
     if (manager == null || generativeComponent == null) {
       return;
     }
+    Objects.requireNonNull(publicationLock, "publicationLock");
 
     // Mirror initial state synchronously BEFORE forwarding transitions (R3 discipline).
     deriveAndApply(manager, generativeComponent, runtimeSpecStore, null,
-        TransitionReason.UNKNOWN, Observation.INITIAL);
+        TransitionReason.UNKNOWN, Observation.INITIAL, publicationLock);
 
     // Tempdoc 837 S5 (§D.2 option c): subscribe to the REASON-bearing listener so an OFFLINE landing
     // can say WHY. The 2-arg ModeChangeListener cannot carry it, and moving TransitionReason into
@@ -68,13 +75,13 @@ public final class InferenceCapabilityWiring {
     manager.addModeTransitionListener(
         (from, to, reason) ->
             deriveAndApply(manager, generativeComponent, runtimeSpecStore, to, reason,
-                Observation.MODE_TRANSITION));
+                 Observation.MODE_TRANSITION, publicationLock));
 
     if (runtimeReconciler != null) {
       runtimeReconciler.addSpecChangeListener(
           () ->
               deriveAndApply(manager, generativeComponent, runtimeSpecStore, null,
-                  TransitionReason.UNKNOWN, Observation.SPEC_CHANGE));
+                   TransitionReason.UNKNOWN, Observation.SPEC_CHANGE, publicationLock));
     }
   }
 
@@ -91,7 +98,8 @@ public final class InferenceCapabilityWiring {
       RuntimeSpecStore runtimeSpecStore,
       Mode observedDestination,
       TransitionReason reason,
-      Observation observation) {
+      Observation observation,
+      ReentrantReadWriteLock publicationLock) {
     while (true) {
       var expected = component.snapshot();
       boolean requested = runtimeSpecStore != null && runtimeSpecStore.load().chatEnabled();
@@ -102,6 +110,29 @@ public final class InferenceCapabilityWiring {
       Projection projection = derive(expected.state(), current, requested, reason, observation);
       if (projection == null) {
         return;
+      }
+      if (current == Mode.ONLINE) {
+        EngineComponentRegistry.PreparedBatch[] prepared = {null};
+        boolean verified = manager.withVerifiedServingConfiguration((inference, resolved) -> {
+          String version = HeadAssembly.generativeAppliedVersion(inference, resolved);
+          publicationLock.writeLock().lock();
+          try {
+            if (!expected.equals(component.snapshot())) return;
+            var replacement = ReasonRetainingComponentHandle.appliedObservation(
+                expected, projection.state(), projection.reasonCode(), projection.evidence(), version);
+            var batch = component.prepareReplacement(replacement);
+            batch.validate();
+            batch.install();
+            prepared[0] = batch;
+          } finally {
+            publicationLock.writeLock().unlock();
+          }
+        });
+        if (verified) {
+          if (prepared[0] == null) continue;
+          prepared[0].notifyObservers();
+          return;
+        }
       }
       if (component.transitionIfUnchanged(
           expected, projection.state(), projection.reasonCode(), projection.evidence())) {
