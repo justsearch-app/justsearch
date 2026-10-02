@@ -62,7 +62,7 @@ export function checkCoverage({ workflowText, registry, consultRegister, require
       const ids = [...command.matchAll(/--gate\s+([\w,-]+)/g)].flatMap((m) => m[1].split(','));
       if (/--self-test\b/.test(command)) {
         for (const id of ids.length ? ids : known) fixtures.add(id);
-      } else if (/--mode\s+gate\b/.test(command) && !/--(?:fixture|repo-root)\b/.test(command)) {
+      } else if (/--mode\s+gate\b/.test(command) && !/--(?:fixture|repo-root|preflight|explain|suggest-changeset|help)\b/.test(command)) {
         for (const id of ids.length ? ids : known) production.add(id);
       }
     }

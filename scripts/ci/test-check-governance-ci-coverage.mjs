@@ -19,12 +19,30 @@ test('fixture tests cannot substitute for production enforcement', () => {
 });
 test('only required hosted gate-mode production commands count', () => {
   const command = 'node scripts/governance/run.mjs --gate engine-port --mode gate';
-  assert.deepEqual(check(command).issues, []);
+  for (const productionCommand of [command, 'node scripts/governance/run.mjs --mode gate']) {
+    const result = check(productionCommand);
+    assert.equal(result.rows[0].production, true, productionCommand);
+    assert.deepEqual(result.issues, []);
+  }
   assert.equal(check(command, '    continue-on-error: true\n').issues.length, 1);
   assert.equal(check(command.replace('--mode gate', '--mode warn')).issues.length, 1);
   assert.equal(check(command + ' --fixture tmp/tree').issues.length, 1);
   assert.equal(check('node scripts/governance/gates/engine-port/enforcer.test.mjs').issues.length, 1);
 });
+for (const option of ['--preflight HEAD', '--explain engine-port', '--suggest-changeset', '--help']) {
+  for (const selection of ['--gate engine-port --mode gate', '--mode gate']) {
+    for (const position of ['before', 'after']) {
+      const args = position === 'before' ? `${option} ${selection}` : `${selection} ${option}`;
+      test(`${option} ${position} ${selection} receives no production credit`, () => {
+        const result = check(`node scripts/governance/run.mjs ${args}`);
+        assert.equal(result.rows[0].production, false, args);
+        assert.equal(result.rows[0].fixtures, false, args);
+        assert.equal(result.issues.length, 1, args);
+        assert.match(result.issues[0], /engine-port: no required hosted production invocation/);
+      });
+    }
+  }
+}
 test('the checked-in workflow enforces engine-port on production', () => {
   const text = fs.readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8');
   const r = checkCoverage({ workflowText: text, registry: { gates: [{ id: 'engine-port' }] },
