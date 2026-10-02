@@ -276,6 +276,31 @@ public final class InferenceCompositionRoot {
             .gpu().arenaCapBytes();
   }
 
+  /** Both source owners retire during generation replacement; count only their realized sessions. */
+  static Long sourceGenerationReleasableBytes(EncoderSet index, QueryRoleSet query) {
+    Long indexBytes = index == null || index.isClosed() ? Long.valueOf(0L)
+        : sourceArenaCapBytes(index.surfaceForOwner());
+    Long queryBytes = query == null || query.isClosed() ? Long.valueOf(0L)
+        : sourceArenaCapBytes(query.surfaceForOwner());
+    if (indexBytes == null || queryBytes == null) return null;
+    return withCompositionHeadroom(Math.addExact(indexBytes, queryBytes));
+  }
+
+  private static Long sourceArenaCapBytes(InferenceSurface surface) {
+    long arenaCapBytes = 0L;
+    for (SessionHandle handle : surface.handles()) {
+      if (!handle.isGpuAvailable()) continue;
+      EncoderRole role = surface.handleRoles().entrySet().stream()
+          .filter(entry -> entry.getValue() == handle).map(Map.Entry::getKey)
+          .findFirst().orElse(null);
+      ModelSessionPolicy policy = role == null || surface.policies() == null ? null
+          : surface.policies().models().get(role);
+      if (policy == null) return null;
+      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
+    }
+    return arenaCapBytes;
+  }
+
   private static long withCompositionHeadroom(long arenaCapBytes) {
     long headroomBytes = arenaCapBytes / 10L + (arenaCapBytes % 10L == 0L ? 0L : 1L);
     return Math.addExact(arenaCapBytes, headroomBytes);
@@ -532,7 +557,7 @@ public final class InferenceCompositionRoot {
     QueryPlan citationPlan = resolveCitationPlan(currentQueryProjection.citation(), hardware,
         null, null,
         null, querySelection.citation());
-    List<SessionHandle> handles = new ArrayList<>();
+    CompositionHandles handles = new CompositionHandles();
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
     EnumSet<EncoderRole> requestedRoles = EnumSet.noneOf(EncoderRole.class);
     requestedRoles.addAll(currentQuery.requestedRoles());
@@ -635,10 +660,10 @@ public final class InferenceCompositionRoot {
         splade,
         bgeM3,
         snapshot,
-        handles,
+        handles.sessions(),
         InferenceSurface.ComponentObservation.composed(
             projection.withQueryFrom(currentQueryProjection).digest(), requestedRoles,
-            presentRoles, Optional.of(querySelection)));
+            presentRoles, Optional.of(querySelection)), handles.roles());
   }
 
   /** Pure pre-admission validation; the physical owner calls this before retirement. */
@@ -674,7 +699,7 @@ public final class InferenceCompositionRoot {
     Objects.requireNonNull(projection, "projection");
     Objects.requireNonNull(selection, "selection");
     ResolvedConfig cfg = projection.config();
-    List<SessionHandle> handles = new ArrayList<>();
+    CompositionHandles handles = new CompositionHandles();
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
     EnumSet<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
     QueryPlan rerankerPlan = resolveRerankerPlan(projection.reranker(), hardware, null, null,
@@ -694,10 +719,10 @@ public final class InferenceCompositionRoot {
     citation.ifPresent(ignored -> present.add(EncoderRole.CITATION));
     return new InferenceSurface(Optional.empty(), Optional.empty(), reranker, citation,
         Optional.empty(), Optional.empty(),
-        new PolicySnapshot(RuntimePolicyResolver.resolve(cfg, hardware), policies), handles,
+        new PolicySnapshot(RuntimePolicyResolver.resolve(cfg, hardware), policies), handles.sessions(),
         InferenceSurface.ComponentObservation.composed(projection.queryDigest(), requested,
             present, Optional.of(new QueryRoleSelection(rerankerComposition.attemptedRole(),
-                citationComposition.attemptedRole()))));
+                citationComposition.attemptedRole()))), handles.roles());
   }
 
   private static IndexCompositionPlan captureIndexPlan(
@@ -811,7 +836,7 @@ public final class InferenceCompositionRoot {
       RuntimePolicy runtime,
       IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
@@ -825,8 +850,9 @@ public final class InferenceCompositionRoot {
               + " search disabled.");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
-      SessionHandle sessions =
+      sessions =
           composeCapturedHandle(
               EncoderRole.EMBEDDING.consumerName(),
               runtime,
@@ -834,14 +860,15 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
+      handles.add(EncoderRole.EMBEDDING, sessions);
+      policies.put(EncoderRole.EMBEDDING, rolePlan.policy());
       EmbeddingAssembly assembly = OnnxEmbeddingEncoder.buildAssembly(sessions,
           rolePlan.metadataDirectory(), embedCfg.contextLength(),
           embedCfg.lateChunkingContextLength(), cfg.ai().capabilityContractStrict(),
           variant.modelFile());
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.EMBEDDING, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedHandle(sessions, e);
       // Tempdoc 710 Wave 2 Move 1: widened from OrtException — ModelCapabilityResolver throws
       // IllegalStateException under justsearch.models.capability_contract_strict, and that must
       // degrade this lane to Optional.empty() the same way a session-creation failure does, not
@@ -860,7 +887,7 @@ public final class InferenceCompositionRoot {
       RuntimePolicy runtime,
       IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
@@ -872,17 +899,19 @@ public final class InferenceCompositionRoot {
       log.info("NER: no variant resolved; NER will be unavailable.");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
-      SessionHandle sessions =
+      sessions =
           composeCapturedHandle(EncoderRole.NER.consumerName(), runtime, rolePlan.policy(),
               variant, arbiter, events);
+      handles.add(EncoderRole.NER, sessions);
+      policies.put(EncoderRole.NER, rolePlan.policy());
       NerAssembly assembly = io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
           sessions, rolePlan.metadataDirectory(), nerCfg.maxSequenceLength(),
           cfg.ai().capabilityContractStrict(), variant.modelFile());
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.NER, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedHandle(sessions, e);
       log.error("NER composition failed — NER will be unavailable", e);
       return Optional.empty();
     }
@@ -893,7 +922,7 @@ public final class InferenceCompositionRoot {
       RuntimePolicy runtime,
       IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
@@ -905,8 +934,9 @@ public final class InferenceCompositionRoot {
       log.warn("BGE-M3: no variant resolved; falling back to SPLADE");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
-      SessionHandle sessions =
+      sessions =
           composeCapturedHandle(
               EncoderRole.BGE_M3.consumerName(),
               runtime,
@@ -914,14 +944,15 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
+      handles.add(EncoderRole.BGE_M3, sessions);
+      policies.put(EncoderRole.BGE_M3, rolePlan.policy());
       BgeM3Config capturedConfig = new BgeM3Config(bgeCfg.enabled(),
           rolePlan.metadataDirectory(), bgeCfg.maxSequenceLength(), bgeCfg.gpuEnabled(),
           bgeCfg.gpuDeviceId(), bgeCfg.gpuMemLimitBytes());
       BgeM3Assembly assembly = BgeM3Encoder.buildAssembly(sessions, capturedConfig);
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.BGE_M3, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedHandle(sessions, e);
       log.warn(
           "Failed to initialize BGE-M3 encoder, falling back to SPLADE: {}", e.getMessage());
       log.debug("Failed to initialize BGE-M3 encoder (stack trace)", e);
@@ -934,7 +965,7 @@ public final class InferenceCompositionRoot {
       RuntimePolicy runtime,
       IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
@@ -946,8 +977,9 @@ public final class InferenceCompositionRoot {
       log.info("SPLADE: no variant resolved; sparse retrieval disabled.");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
-      SessionHandle sessions =
+      sessions =
           composeCapturedHandle(
               EncoderRole.SPLADE.consumerName(),
               runtime,
@@ -955,16 +987,17 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
+      handles.add(EncoderRole.SPLADE, sessions);
+      policies.put(EncoderRole.SPLADE, rolePlan.policy());
       SpladeConfig capturedConfig = new SpladeConfig(spladeCfg.enabled(),
           rolePlan.metadataDirectory(), spladeCfg.maxSequenceLength(), spladeCfg.gpuEnabled(),
           spladeCfg.gpuDeviceId(), spladeCfg.gpuMemLimitBytes(), spladeCfg.queryMode(),
           spladeCfg.activation());
       SpladeAssembly assembly = SpladeEncoder.buildAssembly(sessions, capturedConfig,
           variant.modelFile());
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.SPLADE, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedHandle(sessions, e);
       log.warn("Failed to initialize SPLADE encoder (non-fatal): {}", e.getMessage());
       log.debug("Failed to initialize SPLADE encoder (stack trace)", e);
       return Optional.empty();
@@ -1042,7 +1075,7 @@ public final class InferenceCompositionRoot {
       ResolvedConfig cfg,
       HardwareProfile hardware,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       OrtSessionTelemetryEvents events,
       QueryPlan plan) {
@@ -1061,6 +1094,10 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
+      handles.add(EncoderRole.RERANKER, sessions);
+      policies.put(
+          EncoderRole.RERANKER,
+          ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, hardware, variant));
       // Tempdoc 710 Move 2: the reranker lane was structurally absent from observability (no
       // registerEncoder, S-B3). CrossEncoderReranker lives in the `reranker` module, which does
       // not depend on worker-core (where EncoderProfileAccumulator/OperationalMetrics live), so
@@ -1073,13 +1110,9 @@ public final class InferenceCompositionRoot {
       sessions.setOrtRunRecorder(rerankerProfiler::recordOrtCall);
       RerankerAssembly assembly = CrossEncoderReranker.buildAssembly(sessions,
           attempted.tokenizer().path(), attempted.model().path(), rerankCfg.maxSequenceLength());
-      handles.add(assembly.sessions());
-      policies.put(
-          EncoderRole.RERANKER,
-          ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, hardware, variant));
       return new QueryComposition(Optional.of(assembly), attempted);
     } catch (Exception e) {
-      retireFailedQueryHandle(sessions, e);
+      retireFailedHandle(sessions, e);
       log.warn("Failed to initialize search reranker (non-fatal): {}", e.getMessage());
       log.debug("Failed to initialize search reranker (stack trace)", e);
       return new QueryComposition(Optional.empty(), attempted);
@@ -1090,7 +1123,7 @@ public final class InferenceCompositionRoot {
       CitationScorerConfig citationCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       OrtSessionTelemetryEvents events,
       GenerationModelSelection selection,
@@ -1113,6 +1146,8 @@ public final class InferenceCompositionRoot {
               variant,
               () -> false,
               events);
+      handles.add(EncoderRole.CITATION, sessions);
+      policies.put(EncoderRole.CITATION, policy);
       // Tempdoc 710 Move 2: the citation lane was likewise structurally absent from
       // observability. Same reasoning as composeRerankerRole above — CitationScorer lives in
       // the `reranker` module, so registration + choke-point binding happens here.
@@ -1133,11 +1168,9 @@ public final class InferenceCompositionRoot {
             variant.modelFile().toAbsolutePath().normalize(),
             selection.fingerprint("citation-scorer").sha());
       }
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.CITATION, policy);
       return new QueryComposition(Optional.of(assembly), attempted);
     } catch (Exception e) {
-      retireFailedQueryHandle(sessions, e);
+      retireFailedHandle(sessions, e);
       log.warn("Citation scorer init failed (non-fatal): {}", e.getMessage());
       log.debug("Citation scorer init failed (stack trace)", e);
       return new QueryComposition(Optional.empty(), attempted);
@@ -1153,15 +1186,26 @@ public final class InferenceCompositionRoot {
 
   }
 
-  private static void retireFailedQueryHandle(SessionHandle sessions, Exception cause) {
+  private record CompositionHandles(
+      List<SessionHandle> sessions, Map<EncoderRole, SessionHandle> roles) {
+    private CompositionHandles() {
+      this(new ArrayList<>(), new EnumMap<>(EncoderRole.class));
+    }
+
+    private void add(EncoderRole role, SessionHandle handle) {
+      sessions.add(handle);
+      roles.put(role, handle);
+    }
+  }
+
+  private static void retireFailedHandle(SessionHandle sessions, Exception cause) {
     if (sessions == null) return;
     try {
       sessions.close();
-      if (sessions.retirementStatus() == SessionHandle.RetirementStatus.RETIRED) return;
     } catch (RuntimeException closeFailure) {
       cause.addSuppressed(closeFailure);
     }
-    throw new IllegalStateException("Failed query assembly retained its native session", cause);
+    // The surface already owns the handle, including a refused close, for shutdown/recovery retry.
   }
 
   private static VariantSelection witnessedVariant(QueryRoleSelection.Role role,

@@ -3597,20 +3597,13 @@ public final class KnowledgeServer implements Closeable {
   }
 
   /**
-   * A's own device footprint under the estimator that sizes B, so retirement is chosen only when it
-   * can release what B needs. Zero when A has no native set; {@code null} when A's generation
-   * selection is unknown (legacy boot), which refuses retirement if B cannot fit beside A.
+   * A's realized device footprint, so retirement is chosen only when it can release what B needs.
+   * Missing policies for owned GPU sessions return unknown rather than guessing from configuration.
    */
-  private Long sourceReleasableDeviceBytes(HardwareProfile hardware, InstallContract contract,
-      Path modelsDir) {
-    EncoderSet source = initialEncoderSet;
-    if (source == null || source.isClosed()) return 0L;
-    GenerationModelSelection selection = initialModelSelection;
-    ResolvedConfig configuration = startupConfiguration;
-    if (selection == null || configuration == null) return null;
-    return InferenceCompositionRoot.estimateCandidateFootprintBytes(
-        EncoderConfigurationProjection.from(configuration, selection), hardware, contract, modelsDir,
-        selection);
+  private Long sourceReleasableDeviceBytes(HardwareProfile ignoredHardware,
+      InstallContract ignoredContract, Path ignoredModelsDir) {
+    return InferenceCompositionRoot.sourceGenerationReleasableBytes(
+        initialEncoderSet, initialQueryRoleSet);
   }
 
   /** Preserves the encoder's unaffected fields while preparing one coherent lifecycle revision. */
