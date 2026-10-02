@@ -168,6 +168,13 @@ public interface IngestServiceCalls {
   /** {@code IngestService/WatchRoot}. */
   io.justsearch.ipc.WatchRootResponse watchRoot(io.justsearch.ipc.WatchRootRequest request);
 
+  /** The actual watcher registration owns removal protection beyond unary caller completion. */
+  default io.justsearch.ipc.WatchRootResponse watchRoot(
+      io.justsearch.ipc.WatchRootRequest request, WatchedRootsState.RootProducerFence fence) {
+    return fence.run(() -> watchRoot(request),
+        () -> io.justsearch.ipc.WatchRootResponse.newBuilder().setWatching(false).build());
+  }
+
   /** {@code IngestService/UnwatchRoot}. */
   io.justsearch.ipc.UnwatchRootResponse unwatchRoot(io.justsearch.ipc.UnwatchRootRequest request);
 }

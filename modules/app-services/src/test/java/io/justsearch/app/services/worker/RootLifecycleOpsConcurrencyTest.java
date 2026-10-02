@@ -192,6 +192,113 @@ final class RootLifecycleOpsConcurrencyTest {
   }
 
   @Test
+  void queuedLegacyScansCannotModifyReplacementRoot() throws Exception {
+    for (String entry : java.util.List.of("initial", "unlabelled", "forced", "excluded", "restored")) {
+      Path root = Files.createDirectories(tempDir.resolve("replacement-" + entry));
+      Path rootsFile = tempDir.resolve("replacement-" + entry + ".json");
+      Map<Path, Instant> roots = new ConcurrentHashMap<>();
+      var state = new WatchedRootsState(roots, new WatchedRootsStore(rootsFile, null));
+      var queued = new java.util.ArrayList<java.util.function.Consumer<EngineContext>>();
+      var collections = new java.util.ArrayList<String>();
+      var sync = mock(SyncOps.class);
+      var ops = new RootLifecycleOps(roots, state,
+          () -> entry.equals("excluded") ? ExcludeMatcher.fromRawJson("[\"*.tmp\"]", false) : ExcludeMatcher.empty(),
+          (path, collection, mode, globs, progress, context) -> {
+            collections.add(collection);
+            var terminal = io.justsearch.ipc.ScanRootProgress.newBuilder().setFilesAdmitted(1).setComplete(true).build();
+            progress.accept(terminal);
+            return terminal;
+          }, watcher(ConcurrentHashMap.newKeySet(), path -> {}), (path, context) -> deleted(),
+          (id, context) -> null, sync, mock(ExecutorService.class),
+          (body, context) -> queued.add(body));
+      var context = TestEngineContexts.internal();
+      if (entry.equals("initial")) ops.addWatchedRoot("A", root, context);
+      else if (entry.equals("unlabelled")) ops.addWatchedPath(root, context);
+      else {
+        state.register(root, "A", false);
+        state.persist();
+        if (entry.equals("restored")) ops.reindexPersistedRoots(context);
+        else ops.reindexWatchedRoots(entry.equals("forced"), context);
+      }
+      assertEquals(1, queued.size(), entry + ": the original producer must really be queued");
+      var old = queued.getFirst();
+      assertEquals(1, ops.removeWatchedPath(root, context));
+      ops.addWatchedRoot("B", root, context);
+      assertEquals(2, queued.size());
+      old.accept(context);
+      assertTrue(collections.isEmpty(), entry + ": old work must not admit under its stale collection");
+      assertEquals(WatchedRootsStore.NEVER_INDEXED, roots.get(root));
+      assertFalse(state.isWalkCompleted(root), entry + ": old work must not complete the replacement root");
+      assertEquals("B", state.getCollection(root));
+      var loaded = new WatchedRootsState(new ConcurrentHashMap<>(), new WatchedRootsStore(rootsFile, null));
+      loaded.loadPersistedRoots();
+      assertFalse(loaded.isWalkCompleted(root));
+      assertEquals("B", loaded.getCollection(root));
+      org.mockito.Mockito.verify(sync, org.mockito.Mockito.never()).pruneMissing(
+          org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+      queued.getLast().accept(context);
+      assertEquals(java.util.List.of("B"), collections);
+      assertTrue(state.isWalkCompleted(root), "the replacement's own producer must still run");
+    }
+  }
+
+  @Test
+  void concurrentAddDoesNotDuplicateInitializationBetweenWorkerExitAndCallerReturn() throws Exception {
+    Path root = Files.createDirectories(tempDir.resolve("initializing"));
+    Map<Path, Instant> roots = new ConcurrentHashMap<>();
+    var state = new WatchedRootsState(roots, new WatchedRootsStore(tempDir.resolve("initializing.json"), null));
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var watches = new java.util.concurrent.atomic.AtomicInteger();
+    var queued = new java.util.ArrayList<java.util.function.Consumer<EngineContext>>();
+    var watcher = new RootLifecycleOps.WorkerWatchFn() {
+      @Override
+      public void watch(String path, String collection, EngineContext context) {
+        watches.incrementAndGet();
+      }
+
+      @Override
+      public void watch(String path, String collection, EngineContext context, WatchedRootsState.RootProducerFence fence) {
+        fence.run(() -> {
+          watch(path, collection, context);
+          return null;
+        }, () -> null);
+        if (watches.get() == 1) {
+          entered.countDown();
+          await(release);
+        }
+      }
+
+      @Override
+      public void unwatch(String path, EngineContext context) {}
+    };
+    var ops = new RootLifecycleOps(roots, state, ExcludeMatcher::empty,
+        (path, collection, mode, globs, progress, context) -> null, watcher,
+        (path, context) -> deleted(), (id, context) -> null, mock(SyncOps.class), mock(ExecutorService.class),
+        (body, context) -> queued.add(body));
+    var first = new FutureTask<Void>(() -> {
+      ops.addWatchedRoot("A", root, TestEngineContexts.internal());
+      return null;
+    });
+    var firstThread = new Thread(first);
+    try {
+      firstThread.start();
+      assertTrue(entered.await(2, TimeUnit.SECONDS));
+      ops.addWatchedRoot("B", root, TestEngineContexts.internal());
+      assertEquals(1, watches.get());
+      assertTrue(queued.isEmpty());
+      assertEquals("A", state.getCollection(root));
+      release.countDown();
+      first.get(2, TimeUnit.SECONDS);
+      assertEquals(1, queued.size());
+      assertFalse(state.isInitializationPending(root));
+    } finally {
+      release.countDown();
+      firstThread.join(2_000);
+    }
+  }
+
+  @Test
   void failedPersistenceRetainsLiveAndDurableRemovalObligation() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("persist-failure"));
     Path rootsFile = tempDir.resolve("persist-failure.json");

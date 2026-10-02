@@ -118,6 +118,10 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
   public void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext) {
     try (var work = admission == null ? null : admission.attach(engineContext)) {
       runOwned(body, sink, work == null ? engineContext : work.context(), work);
+    } catch (RuntimeException failure) {
+      SseEvent refusal = ConversationEngine.refusalEvent(failure);
+      if (refusal == null) throw failure;
+      sink.accept(refusal);
     }
   }
 
@@ -318,6 +322,7 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
           return record.content();
         }
       } catch (Exception e) {
+        io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
         LOG.debug("Document fetch failed for {}; trying direct filesystem", docId, e);
       }
     }

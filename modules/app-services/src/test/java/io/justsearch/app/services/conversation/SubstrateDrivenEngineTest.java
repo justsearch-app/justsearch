@@ -473,6 +473,130 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
+  void documentInjectorRefusalsTerminateRealSummaryDispatch() {
+    for (String path : List.of("single", "batch", "hierarchical", "range", "display-range", "line-range", "item", "citation", "result-set")) {
+      for (String reason : List.of("context", "engine", "executor")) {
+        for (boolean wrapped : List.of(false, true)) {
+          for (boolean direct : List.of(false, true)) {
+            RuntimeException refusal = reason.equals("executor")
+                ? new io.justsearch.core.execution.EngineExecutorRejectedException(
+                    io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT, "documents", 7)
+                : new io.justsearch.app.api.EngineAdmissionException(
+                    reason.equals("context") ? io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
+                        : io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 7);
+            RuntimeException failure = wrapped ? new java.util.concurrent.CompletionException(
+                new java.util.concurrent.ExecutionException(refusal)) : refusal;
+            var docs = summaryDocuments(failure, direct);
+            var llm = new ScriptedAi(List.of("ungrounded"));
+            var shape = summaryShape(path);
+            var engine = summaryEngine(shape, docs, llm);
+            var events = new ArrayList<SseEvent>();
+            engine.run(shape.id(), summaryBody(path), Audience.USER, events::add,
+                io.justsearch.app.services.TestEngineContexts.internal());
+            assertEquals(0, llm.calls.size(), path + ": refusal must terminate before the LLM");
+            var errors = events.stream().filter(e -> e.name().equals("error")).toList();
+            assertEquals(1, errors.size(), path);
+            assertEquals(reason.equals("context") ? "ADMISSION_CONTEXT_LIMIT" : "ADMISSION_ENGINE_LIMIT",
+                errors.get(0).payload().get("errorCode"), path);
+            assertEquals(7, errors.get(0).payload().get("retryAfterSeconds"));
+            assertEquals(false, errors.get(0).payload().get("retrySafe"));
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void ordinaryDocumentFailuresRetainSummaryFallbacks() {
+    for (String path : List.of("single", "batch", "hierarchical", "range", "item", "citation", "result-set")) {
+      var docs = summaryDocuments(new IllegalStateException("index unavailable"), false);
+      var llm = new ScriptedAi(List.of("ordinary fallback"));
+      var shape = summaryShape(path);
+      var body = new java.util.LinkedHashMap<>(summaryBody(path));
+      if (path.equals("single") || path.equals("hierarchical")) body.put("content", "inline fallback");
+      var events = new ArrayList<SseEvent>();
+      summaryEngine(shape, docs, llm).run(shape.id(), body, Audience.USER, events::add,
+          io.justsearch.app.services.TestEngineContexts.internal());
+      boolean fallback = List.of("single", "hierarchical", "citation", "result-set").contains(path);
+      assertEquals(fallback ? 1 : 0, llm.calls.size(), path);
+      if (!fallback) {
+        String code = path.equals("batch") ? "NO_CONTENT" : path.equals("item") ? "ITEM_UNAVAILABLE" : "DOC_UNAVAILABLE";
+        assertTrue(events.stream().anyMatch(e -> code.equals(e.payload().get("errorCode"))), path);
+      }
+    }
+  }
+
+  private ConversationEngine summaryEngine(ConversationShape shape,
+      io.justsearch.app.api.DocumentService docs, OnlineAiService llm) {
+    if (shape.id().equals(io.justsearch.app.services.conversation.shapes.HierarchicalSummarizeShape.ID)) {
+      return new ConversationEngine(ConversationShapeCatalog.of("core", List.of(shape)),
+          List.of(new HierarchicalShapeRunner(() -> llm, () -> docs)),
+          PromptContributorRegistry.of(List.of()), ContextInjectorRegistry.of(List.of()),
+          StreamConsumerRegistry.of(List.of()), IterationControllerRegistry.of(List.of()), () -> llm);
+    }
+    return newEngine(shape, List.of(io.justsearch.app.services.conversation.spi.SummarizationStyle.INSTANCE),
+        List.of(new io.justsearch.app.services.conversation.spi.DocAccess(docs),
+            new io.justsearch.app.services.conversation.spi.BatchDocAccess(docs),
+            new io.justsearch.app.services.conversation.spi.SelectionContextInjector(docs)),
+        List.of(new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(docs),
+            io.justsearch.app.services.conversation.spi.SummaryDoneEnricher.INSTANCE,
+            io.justsearch.app.services.conversation.spi.BatchSummaryDoneEnricher.INSTANCE), List.of(), llm);
+  }
+
+  private static ConversationShape summaryShape(String path) {
+    return path.equals("batch") ? io.justsearch.app.services.conversation.shapes.BatchSummarizeShape.definition()
+        : path.equals("hierarchical") ? io.justsearch.app.services.conversation.shapes.HierarchicalSummarizeShape.definition()
+            : io.justsearch.app.services.conversation.shapes.SummarizeShape.definition();
+  }
+
+  private static io.justsearch.app.api.DocumentService summaryDocuments(RuntimeException failure, boolean direct) {
+    if (direct) {
+      var docs = org.mockito.Mockito.mock(io.justsearch.app.api.DocumentService.class);
+      org.mockito.Mockito.when(docs.fetch(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+          .thenAnswer(call -> {
+            String id = call.getArgument(0);
+            if (id.equals("doc")) throw failure;
+            return java.util.concurrent.CompletableFuture.completedFuture(
+                new io.justsearch.app.api.DocumentService.DocumentRecord(id, "healthy document", Map.of()));
+          });
+      org.mockito.Mockito.when(docs.fetchBatch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any()))
+          .thenThrow(failure);
+      return docs;
+    }
+    var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+    org.mockito.Mockito.when(client.fetchDocuments(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any()))
+        .thenAnswer(call -> {
+          List<String> ids = call.getArgument(0);
+          if (ids.contains("doc")) throw failure;
+          return io.justsearch.ipc.FetchDocumentsResponse.newBuilder().addDocuments(
+              io.justsearch.ipc.DocumentContent.newBuilder().setDocId(ids.getFirst())
+                  .setFound(true).setContent("healthy document")).build();
+        });
+    return new io.justsearch.app.services.worker.RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
+  }
+
+  private static Map<String, Object> summaryBody(String path) {
+    if (path.equals("single") || path.equals("hierarchical")) return Map.of("docId", "doc");
+    if (path.equals("batch")) return Map.of("docIds", List.of("doc"));
+    Map<String, Object> selection = switch (path) {
+      case "range", "display-range", "line-range" -> Map.of("kind", "text-range",
+          "address", path.equals("range")
+              ? Map.of("coords", "canonical", "docId", "doc", "startChar", 0, "endChar", 5)
+              : path.equals("display-range")
+                  ? Map.of("coords", "display", "docId", "doc", "viewId", "preview-doc", "displayStart", 0, "displayEnd", 5)
+                  : Map.of("coords", "lines", "docId", "doc", "startLine", 0, "endLine", 0),
+          "selectionText", "slice", "hostEntity", Map.of("kind", "doc", "id", "doc"));
+      case "item" -> Map.of("kind", "item", "itemKind", "search-hit", "itemId", "doc");
+      case "citation" -> Map.of("kind", "citation", "citation",
+          Map.of("parentDocId", "doc", "startChar", 0, "endChar", 5, "excerpt", "inline excerpt"));
+      case "result-set" -> Map.of("kind", "result-set", "items",
+          List.of(Map.of("id", "healthy", "kind", "search-hit"), Map.of("id", "doc", "kind", "search-hit")));
+      default -> throw new AssertionError(path);
+    };
+    return Map.of("selection", selection);
+  }
+
+  @Test
   @DisplayName("E1: StreamConsumer donePayloadEntries merge into the done event payload")
   void doneEntriesMerged() {
     var enricher =

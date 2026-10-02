@@ -288,6 +288,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 }
 
                 @Override
+                public void watch(String rootPath, String collection, EngineContext engineContext,
+                        WatchedRootsState.RootProducerFence fence) {
+                    watchRoot(rootPath, collection, engineContext, fence);
+                }
+
+                @Override
                 public void unwatch(String rootPath, EngineContext engineContext) {
                     unwatchRoot(rootPath, engineContext);
                 }
@@ -1673,6 +1679,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * delivery via the Methvin watcher.
      */
     public io.justsearch.ipc.WatchRootResponse watchRoot(String rootPath, String collection, EngineContext engineContext) {
+        return watchRoot(rootPath, collection, engineContext,
+                watchedRootsState.captureRootProducer(Path.of(rootPath), false));
+    }
+
+    private io.justsearch.ipc.WatchRootResponse watchRoot(String rootPath, String collection,
+            EngineContext engineContext, WatchedRootsState.RootProducerFence fence) {
         Objects.requireNonNull(rootPath, "rootPath");
         io.justsearch.ipc.WatchRootRequest.Builder builder =
                 io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(rootPath);
@@ -1681,7 +1693,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         }
         io.justsearch.ipc.WatchRootRequest request = builder.build();
         return executeIngestRpc(
-                "watchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.watchRoot(request), engineContext);
+                "watchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.watchRoot(request, fence), engineContext);
     }
 
     /** Tempdoc 418 Phase B — removes a Worker watcher subscription. Idempotent. */

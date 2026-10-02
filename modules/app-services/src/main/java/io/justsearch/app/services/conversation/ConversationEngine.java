@@ -1085,7 +1085,7 @@ public final class ConversationEngine {
   /** Output of {@link #runInjectors}: accumulated messages + whether any injector aborted. */
   private record InjectorRunResult(List<Map<String, Object>> messages, boolean terminated) {}
 
-  private static SseEvent refusalEvent(Throwable failure) {
+  static SseEvent refusalEvent(Throwable failure) {
     RuntimeException refused = io.justsearch.app.services.worker.EngineRefusals.find(failure);
     String code;
     int retryAfter;

@@ -55,6 +55,18 @@ public final class WatchedRootsState {
 
   private long retirementRevision;
   private final Map<Path, Long> retiredRoots = new java.util.HashMap<>();
+  private final Map<Path, Object> initializations = new java.util.HashMap<>();
+
+  synchronized Object beginInitialization(Path root) {
+    if (initializations.containsKey(root)) return null;
+    Object ticket = new Object();
+    initializations.put(root, ticket);
+    return ticket;
+  }
+
+  synchronized void endInitialization(Path root, Object ticket) {
+    initializations.remove(root, ticket);
+  }
 
   /** Capture before submission; the fence belongs to the actual producer, not its caller's wait. */
   public synchronized RootProducerFence captureRootProducer(Path root, boolean watchedOnly) {
@@ -273,6 +285,7 @@ public final class WatchedRootsState {
 
   synchronized void removeRootAndNested(Path normalizedRoot) {
     retiredRoots.put(normalizedRoot, ++retirementRevision);
+    initializations.keySet().removeIf(root -> root.startsWith(normalizedRoot));
     walkErrors.keySet().removeIf(p -> p.startsWith(normalizedRoot));
     watchedRoots.remove(normalizedRoot);
     walkCompleted.remove(normalizedRoot);
@@ -303,6 +316,7 @@ public final class WatchedRootsState {
   /** Clears all watched roots and walk errors, then persists the empty state. */
   synchronized void clearAll() {
     watchedRoots.clear();
+    initializations.clear();
     walkErrors.clear();
     walkCompleted.clear();
     deleteDetectionUnverified.clear();
