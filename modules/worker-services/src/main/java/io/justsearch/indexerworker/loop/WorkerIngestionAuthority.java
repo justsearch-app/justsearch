@@ -14,12 +14,23 @@ import java.nio.file.Path;
 /** Single Worker-side authority for source admission and freshness classification. */
 final class WorkerIngestionAuthority {
   SourceAdmission admit(Path filePath) throws IOException {
-    // Legacy rows and explicit file submissions have no directory boundary. Do not invent one
-    // from the volume or from a watcher whose registration may have changed since admission.
+    // A direct file admission has no directory policy boundary.
     return admit(filePath, null);
   }
 
   SourceAdmission admit(io.justsearch.indexerworker.queue.JobQueue.IndexJob job) throws IOException {
+    if (job.ingestionRoot() == null) {
+      // Pre-boundary queue and switch-buffer records cannot distinguish explicit files from
+      // directory discoveries. Retire this admission before any source read; a fresh scan,
+      // witnessed event or explicit-file request can admit it again with its actual boundary.
+      return SourceAdmission.terminal(
+          SourceAdmissionAction.SKIP_DONE,
+          outcome(
+              IngestionOutcomeClass.SKIPPED_POLICY,
+              IngestionReasonCodes.MISSING_INGESTION_BOUNDARY,
+              IngestionRetryPolicy.NONE,
+              "Missing ingestion policy boundary; fresh admission required"));
+    }
     return admit(job.path(), job.ingestionRoot());
   }
 

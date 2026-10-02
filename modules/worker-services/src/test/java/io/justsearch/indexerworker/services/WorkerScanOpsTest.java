@@ -66,6 +66,26 @@ final class WorkerScanOpsTest {
   }
 
   @Test
+  void explicitlyRequestedExcludedNameRootKeepsItsOwnBoundary() throws Exception {
+    io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(
+        new io.justsearch.indexerworker.ingest.IngestionSkipPolicy(null, null,
+            java.util.Set.of("private")));
+    try {
+      Path root = Files.createDirectories(tempDir.resolve("private").resolve("private"));
+      Path publicFile = Files.writeString(root.resolve("notes.txt"), "public content");
+      Files.writeString(Files.createDirectory(root.resolve("private")).resolve("notes.txt"),
+          "excluded content");
+      RecordingQueue queue = new RecordingQueue();
+      new WorkerScanOps(queue).scan(new WorkerScanOps.ScanRequest(
+          root, null, WorkerScanOps.ScanMode.INITIAL, List.of()), progress -> {});
+      assertEquals(List.of(publicFile), queue.enqueuedPaths);
+      assertEquals(root, queue.enqueuedEntries.getFirst().ingestionRoot());
+    } finally {
+      io.justsearch.indexerworker.ingest.IngestionSkipPolicy.resetToDefaults();
+    }
+  }
+
+  @Test
   void skipsConfiguredSkipDirectories() throws Exception {
     Path root = tempDir.resolve("project");
     Files.createDirectories(root.resolve(".git").resolve("objects"));

@@ -248,7 +248,7 @@ final class WorkerScanOps {
             }
             if (excludedByOwnership(request, dir)) return FileVisitResult.SKIP_SUBTREE;
             String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
-            if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
+            if (!dir.equals(root) && IngestionSkipPolicy.isSkippedDirectoryName(name)) {
               return FileVisitResult.SKIP_SUBTREE;
             }
             currentDir[0] = displayDirectory(dir, root);

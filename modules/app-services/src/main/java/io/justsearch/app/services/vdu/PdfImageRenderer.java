@@ -32,7 +32,7 @@ public class PdfImageRenderer implements AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(PdfImageRenderer.class);
 
     /** DPI for rendering. 100 DPI is sufficient for VLM OCR (~50% faster than 150 DPI). */
-    private static final int DEFAULT_DPI = 100;
+    static final int DEFAULT_DPI = 100;
 
     /** Maximum pages to process per PDF (prevent runaway processing). */
     private static final int MAX_PAGES = 50;
@@ -75,6 +75,13 @@ public class PdfImageRenderer implements AutoCloseable {
                 if (documentPixels > VduImageLimits.MAX_DOCUMENT_PIXELS) {
                     throw new IOException("VDU document pixels exceed allocation limit");
                 }
+            }
+
+            // Reserve both page rasters for every selected page before allocating the first.
+            for (int page = 0; page < pageCount; page++) {
+                var box = document.getPage(page).getCropBox();
+                renderer.chargeRaster(box.getWidth() * (DEFAULT_DPI / 72f),
+                    box.getHeight() * (DEFAULT_DPI / 72f), 2);
             }
 
             if (pageCount < totalPages) {

@@ -37,6 +37,7 @@ public final class IngestionReasonCodes {
   public static final String EXTRACTION_DROPOUT_UNRECOVERED = "EXTRACTION_DROPOUT_UNRECOVERED";
 
   public static final String SKIPPED_TEMP_OR_SYSTEM = "SKIPPED_TEMP_OR_SYSTEM";
+  public static final String MISSING_INGESTION_BOUNDARY = "MISSING_INGESTION_BOUNDARY";
   public static final String UNCHANGED = "UNCHANGED";
   public static final String NON_REGULAR_SOURCE = "NON_REGULAR_SOURCE";
   public static final String MISSING_AT_PROCESSING = "MISSING_AT_PROCESSING";

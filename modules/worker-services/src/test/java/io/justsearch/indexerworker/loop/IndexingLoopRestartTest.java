@@ -166,7 +166,7 @@ final class IndexingLoopRestartTest {
     CountDownLatch releaseWrite = new CountDownLatch(1);
     AtomicBoolean ownerObservedInterrupt = new AtomicBoolean();
     AtomicBoolean shutdownCommitObservedInterrupt = new AtomicBoolean(true);
-    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, null);
+    JobQueue.IndexJob claim = rootedJob(file, null);
     AtomicBoolean claimIssued = new AtomicBoolean();
     when(queue.pollPending(anyInt())).thenAnswer(call ->
         claimIssued.compareAndSet(false, true) ? List.of(claim) : List.of());
@@ -482,5 +482,9 @@ final class IndexingLoopRestartTest {
     Field f = IndexingLoop.class.getDeclaredField(name);
     f.setAccessible(true);
     return f.getLong(loop);
+  }
+
+  private static JobQueue.IndexJob rootedJob(Path file, String collection) {
+    return new JobQueue.IndexJob(file, collection, null, null, null, null, false, null, file);
   }
 }

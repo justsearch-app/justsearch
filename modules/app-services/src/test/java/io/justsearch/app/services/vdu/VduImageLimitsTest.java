@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.zip.DeflaterOutputStream;
 import javax.imageio.ImageIO;
 import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.cos.COSDictionary;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDFormContentStream;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -23,8 +24,13 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.common.PDStream;
 import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceGray;
 import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceRGB;
+import org.apache.pdfbox.pdmodel.graphics.color.PDColor;
+import org.apache.pdfbox.pdmodel.graphics.color.PDPattern;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.apache.pdfbox.pdmodel.graphics.form.PDTransparencyGroup;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.pdmodel.graphics.pattern.PDTilingPattern;
+import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -79,6 +85,111 @@ class VduImageLimitsTest {
       }
       assertRejectedImage(path, "allocation limit");
     }
+  }
+
+  @Test
+  void oppositeAspectRatioMasksRejectCompositionBeforeDecoding() throws Exception {
+    for (COSName maskKey : new COSName[] {COSName.SMASK, COSName.MASK}) {
+      Path path = maskedPdf("opposite-" + maskKey.getName(), maskKey, 8192, 1, 1, 8192, 1);
+      assertRejectedImage(path, "image pixels exceed allocation limit");
+    }
+  }
+
+  @Test
+  void compositionAndScalingShareTheDocumentAllocationBudget() throws Exception {
+    // Both sources are small. Each composition nevertheless creates two 4000x4000 rasters;
+    // repeated draws must charge these against the same budget as page/source allocations.
+    Path path = maskedPdf("aggregate-composition", COSName.SMASK, 4000, 1, 1, 4000, 3);
+    assertRejectedImage(path, "decoded PDF image pixels");
+  }
+
+  @Test
+  void ordinaryOppositeAspectRatioMasksStillRender() throws Exception {
+    for (COSName maskKey : new COSName[] {COSName.SMASK, COSName.MASK}) {
+      Path path = maskedPdf("ordinary-" + maskKey.getName(), maskKey, 8, 1, 1, 8, 1);
+      try (var files = new TempFileManager(tempDir.resolve("ordinary-" + maskKey.getName()));
+          var renderer = new PdfImageRenderer(files)) {
+        assertEquals(1, renderer.render(path).size());
+      }
+    }
+  }
+
+  @Test
+  void transparencyGroupsAndGraphicsMasksChargeIntermediateRasters() throws Exception {
+    for (boolean graphicsMask : new boolean[] {false, true}) {
+      Path path = tempDir.resolve("group-budget-" + graphicsMask + ".pdf");
+      try (var document = new PDDocument()) {
+        var page = new PDPage(new PDRectangle(2000, 2000));
+        document.addPage(page);
+        var group = new PDTransparencyGroup(document);
+        group.setBBox(new PDRectangle(2000, 2000));
+        group.setResources(new PDResources());
+        var attributes = new COSDictionary();
+        attributes.setItem(COSName.S, COSName.TRANSPARENCY);
+        attributes.setBoolean(COSName.I, true);
+        group.getCOSObject().setItem(COSName.GROUP, attributes);
+        try (var groupContent = new PDFormContentStream(group)) {
+          groupContent.addRect(0, 0, 2000, 2000);
+          groupContent.fill();
+        }
+        try (var content = new PDPageContentStream(document, page)) {
+          if (graphicsMask) {
+            var mask = new COSDictionary();
+            mask.setItem(COSName.S, COSName.ALPHA);
+            mask.setItem(COSName.G, group);
+            var state = new PDExtendedGraphicsState();
+            state.getCOSObject().setItem(COSName.SMASK, mask);
+            content.setGraphicsStateParameters(state);
+            for (int i = 0; i < 3; i++) {
+              content.addRect(0, 0, 2000, 2000);
+              content.fill();
+            }
+          } else {
+            for (int i = 0; i < 4; i++) content.drawForm(group);
+          }
+        }
+        document.save(path.toFile());
+      }
+      assertRejectedImage(path, "decoded PDF image pixels");
+    }
+  }
+
+  @Test
+  void tilingPatternIsCheckedBeforeCellAllocation() throws Exception {
+    Path path = tempDir.resolve("pattern-budget.pdf");
+    try (var document = new PDDocument()) {
+      var page = new PDPage(new PDRectangle(72, 72));
+      page.setResources(new PDResources());
+      document.addPage(page);
+      var pattern = new PDTilingPattern();
+      pattern.setBBox(new PDRectangle(72, 72));
+      pattern.setXStep(28000);
+      pattern.setYStep(1);
+      pattern.setPaintType(PDTilingPattern.PAINT_COLORED);
+      pattern.setResources(new PDResources());
+      var name = page.getResources().add(pattern);
+      try (var content = new PDPageContentStream(document, page)) {
+        content.setNonStrokingColor(new PDColor(name, new PDPattern(page.getResources())));
+        content.addRect(0, 0, 72, 72);
+        content.fill();
+      }
+      document.save(path.toFile());
+    }
+    assertRejectedImage(path, "allocation limit");
+  }
+
+  @Test
+  void oversizedImagePlacementIsRejectedBeforeSmoothScaling() throws Exception {
+    Path path = tempDir.resolve("oversized-placement.pdf");
+    try (var document = new PDDocument()) {
+      var page = new PDPage(new PDRectangle(72, 72));
+      document.addPage(page);
+      try (var content = new PDPageContentStream(document, page)) {
+        content.drawImage(image(document, 10, 10, false), 0, 0, 1, 28000);
+      }
+      document.save(path.toFile());
+    }
+    assertRejectedImage(path, "allocation limit");
   }
 
   @Test
@@ -203,6 +314,27 @@ class VduImageLimitsTest {
     try (var document = new PDDocument()) {
       for (int i = 0; i < pages; i++) {
         document.addPage(new PDPage(new PDRectangle(width, height)));
+      }
+      document.save(path.toFile());
+    }
+    return path;
+  }
+
+  private Path maskedPdf(String name, COSName maskKey, int width, int height,
+      int maskWidth, int maskHeight, int draws) throws IOException {
+    Path path = tempDir.resolve(name + ".pdf");
+    try (var document = new PDDocument()) {
+      var page = new PDPage(new PDRectangle(72, 72));
+      document.addPage(page);
+      var source = image(document, width, height, false);
+      var mask = image(document, maskWidth, maskHeight, true);
+      if (maskKey.equals(COSName.MASK)) {
+        mask.setStencil(true);
+        mask.setBitsPerComponent(1);
+      }
+      source.getCOSObject().setItem(maskKey, mask);
+      try (var content = new PDPageContentStream(document, page)) {
+        for (int i = 0; i < draws; i++) content.drawImage(source, 0, 0, 10, 10);
       }
       document.save(path.toFile());
     }

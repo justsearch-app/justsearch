@@ -111,18 +111,18 @@ public final class IngestionSkipPolicy {
     return INSTANCE.get().shouldSkipName(path);
   }
 
-  /** Applies directory exclusions from the admitting root through the file's parent. */
+  /** Applies directory exclusions below the admitting root through the file's parent. */
   public static boolean shouldSkipWithinRoot(Path path, Path root) {
     if (shouldSkip(path)) return true;
     if (path == null || root == null) return false;
     Path absolute = path.toAbsolutePath().normalize();
     Path boundary = root.toAbsolutePath().normalize();
     if (!absolute.startsWith(boundary)) return true;
-    for (Path parent = absolute.getParent(); parent != null && parent.startsWith(boundary);
+    for (Path parent = absolute.getParent();
+        parent != null && parent.startsWith(boundary) && !parent.equals(boundary);
         parent = parent.getParent()) {
       if (parent.getFileName() != null
           && isSkippedDirectoryName(parent.getFileName().toString())) return true;
-      if (parent.equals(boundary)) break;
     }
     return false;
   }

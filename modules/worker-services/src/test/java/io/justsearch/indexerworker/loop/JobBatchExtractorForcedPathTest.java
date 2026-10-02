@@ -149,7 +149,7 @@ final class JobBatchExtractorForcedPathTest {
     Path file = Files.writeString(tempDir.resolve("recorded-forced.txt"), "same");
     Set<String> legacyMarks = ConcurrentHashMap.newKeySet();
     Harness h = newHarness(legacyMarks);
-    var claim = new JobQueue.IndexJob(file, null, null, "recorded", "unit", 1L, true);
+    var claim = new JobQueue.IndexJob(file, null, null, "recorded", "unit", 1L, true, null, file);
     h.extractor().extractAll(List.of(claim));
     verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong());
     verify(h.contentExtractor()).extractArtifact(file);
@@ -162,7 +162,7 @@ final class JobBatchExtractorForcedPathTest {
     Set<String> legacyMarks = ConcurrentHashMap.newKeySet();
     legacyMarks.add(forcedKey(file));
     Harness h = newHarness(legacyMarks);
-    var claim = new JobQueue.IndexJob(file, null, null, "recorded", "unit", 1L, false);
+    var claim = new JobQueue.IndexJob(file, null, null, "recorded", "unit", 1L, false, null, file);
     h.extractor().extractAll(List.of(claim));
     verify(h.documentFieldOps()).isUnmodified(eq(forcedKey(file)), anyLong());
     verify(h.contentExtractor(), never()).extractArtifact(any());
@@ -178,6 +178,18 @@ final class JobBatchExtractorForcedPathTest {
   }
 
   @Test
+  void legacyClaimWithoutBoundaryStopsBeforeExtractionAndHashing() throws Exception {
+    Path file = Files.writeString(tempDir.resolve("legacy.txt"), "legacy content");
+    Harness h = newHarness(ConcurrentHashMap.newKeySet());
+    var claim = new JobQueue.IndexJob(file, null);
+
+    assertEquals(List.of(), h.extractor().extractAll(List.of(claim)));
+
+    verify(h.contentExtractor(), never()).extractArtifact(any());
+    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong());
+  }
+
+  @Test
   @DisplayName("forced: an untouched file is re-extracted instead of skipped as UNCHANGED")
   void forcedPathIsReExtractedEvenThoughNothingChanged() throws Exception {
     Path file = Files.writeString(tempDir.resolve("doc.txt"), "unchanged content");
@@ -185,7 +197,7 @@ final class JobBatchExtractorForcedPathTest {
     forcedPaths.add(forcedKey(file));
     Harness h = newHarness(forcedPaths);
 
-    h.extractor().extractAll(List.of(new JobQueue.IndexJob(file, null)));
+    h.extractor().extractAll(List.of(rootedJob(file, null)));
 
     verify(h.contentExtractor()).extractArtifact(file);
     verify(h.journal(), never()).recordOutcomeSafely(any(), eq("UNCHANGED"), any());
@@ -202,7 +214,7 @@ final class JobBatchExtractorForcedPathTest {
     Harness h = newHarness(ConcurrentHashMap.newKeySet());
 
     List<ExtractedJob> extracted =
-        h.extractor().extractAll(List.of(new JobQueue.IndexJob(file, null)));
+        h.extractor().extractAll(List.of(rootedJob(file, null)));
 
     // The inverse arm: identical file, identical mocks, empty forced set. Without this, the test
     // above could pass because extraction always runs, proving nothing about the force.
@@ -219,7 +231,7 @@ final class JobBatchExtractorForcedPathTest {
     Path file = Files.writeString(tempDir.resolve("changed-collection.txt"), "unchanged content");
     Harness h = newHarness(ConcurrentHashMap.newKeySet());
     indexedCollection(h, "old");
-    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "new");
+    JobQueue.IndexJob claim = rootedJob(file, "new");
 
     h.extractor().extractAll(List.of(claim));
 
@@ -235,7 +247,7 @@ final class JobBatchExtractorForcedPathTest {
     Path file = Files.writeString(tempDir.resolve("default-to-named.txt"), "unchanged content");
     Harness h = newHarness(ConcurrentHashMap.newKeySet());
     indexedCollection(h, null);
-    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "docs");
+    JobQueue.IndexJob claim = rootedJob(file, "docs");
 
     h.extractor().extractAll(List.of(claim));
 
@@ -252,7 +264,7 @@ final class JobBatchExtractorForcedPathTest {
         Files.writeString(tempDir.resolve("default-collection.txt"), "unchanged content");
     Harness h = newHarness(ConcurrentHashMap.newKeySet());
     indexedCollection(h, "old");
-    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, null);
+    JobQueue.IndexJob claim = rootedJob(file, null);
 
     h.extractor().extractAll(List.of(claim));
 
@@ -266,7 +278,7 @@ final class JobBatchExtractorForcedPathTest {
     Path file = Files.writeString(tempDir.resolve("same-collection.txt"), "unchanged content");
     Harness h = newHarness(ConcurrentHashMap.newKeySet());
     indexedCollection(h, "docs");
-    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "docs");
+    JobQueue.IndexJob claim = rootedJob(file, "docs");
     doAnswer(invocation -> {
           ((Runnable) invocation.getArgument(2)).run();
           return null;
@@ -291,7 +303,7 @@ final class JobBatchExtractorForcedPathTest {
             tempDir.resolve("blank-default-collection.txt"), "unchanged content");
     Harness h = newHarness(ConcurrentHashMap.newKeySet());
     indexedCollection(h, null);
-    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "");
+    JobQueue.IndexJob claim = rootedJob(file, "");
 
     List<ExtractedJob> extracted = h.extractor().extractAll(List.of(claim));
 
@@ -310,7 +322,7 @@ final class JobBatchExtractorForcedPathTest {
     when(h.documentFieldOps().getDocumentFieldOrThrow(
             anyString(), eq(SchemaFields.COLLECTION)))
         .thenThrow(new IOException("collection field unavailable"));
-    JobQueue.IndexJob claim = new JobQueue.IndexJob(file, "docs");
+    JobQueue.IndexJob claim = rootedJob(file, "docs");
     doAnswer(invocation -> {
           ((Runnable) invocation.getArgument(2)).run();
           return null;
@@ -334,7 +346,7 @@ final class JobBatchExtractorForcedPathTest {
     Path unchanged = Files.writeString(tempDir.resolve("unchanged.txt"), "same");
     Harness unchangedHarness = newHarness(ConcurrentHashMap.newKeySet());
 
-    unchangedHarness.extractor().extractAll(List.of(new JobQueue.IndexJob(unchanged, null)));
+    unchangedHarness.extractor().extractAll(List.of(rootedJob(unchanged, null)));
 
     InOrder unchangedOrder =
         inOrder(unchangedHarness.identityStore(), unchangedHarness.documentFieldOps());
@@ -348,7 +360,7 @@ final class JobBatchExtractorForcedPathTest {
     forcedPaths.add(forcedKey(forced));
     Harness forcedHarness = newHarness(forcedPaths);
 
-    forcedHarness.extractor().extractAll(List.of(new JobQueue.IndexJob(forced, null)));
+    forcedHarness.extractor().extractAll(List.of(rootedJob(forced, null)));
 
     InOrder forcedOrder =
         inOrder(forcedHarness.identityStore(), forcedHarness.contentExtractor());
@@ -366,7 +378,7 @@ final class JobBatchExtractorForcedPathTest {
     Harness h = newHarness(ConcurrentHashMap.newKeySet(), identityStore);
 
     List<ExtractedJob> extracted =
-        h.extractor().extractAll(List.of(new JobQueue.IndexJob(file, null)));
+        h.extractor().extractAll(List.of(rootedJob(file, null)));
 
     assertEquals(List.of(), extracted, "no artifact may escape without a persisted identity");
     verify(h.contentExtractor(), never()).extractArtifact(any());
@@ -406,7 +418,7 @@ final class JobBatchExtractorForcedPathTest {
     forcedPaths.add(forcedKey(submitted));
     Harness h = newHarness(forcedPaths);
 
-    h.extractor().extractAll(List.of(new JobQueue.IndexJob(submitted, null)));
+    h.extractor().extractAll(List.of(rootedJob(submitted, null)));
 
     verify(h.contentExtractor()).extractArtifact(submitted);
     verify(h.journal(), never()).recordOutcomeSafely(any(), eq("UNCHANGED"), any());
@@ -425,7 +437,7 @@ final class JobBatchExtractorForcedPathTest {
     forcedPaths.add(preP3Key(submitted));
     Harness h = newHarness(forcedPaths);
 
-    h.extractor().extractAll(List.of(new JobQueue.IndexJob(submitted, null)));
+    h.extractor().extractAll(List.of(rootedJob(submitted, null)));
 
     // This is the failure mode P3 removes, pinned as a standing negative control: reverting any
     // marker to the pre-P3 derivation makes the test above fail with exactly this behaviour.
@@ -435,5 +447,9 @@ final class JobBatchExtractorForcedPathTest {
         Set.of(preP3Key(submitted)),
         forcedPaths,
         "nothing consumed the mark — the force was silent");
+  }
+
+  private static JobQueue.IndexJob rootedJob(Path file, String collection) {
+    return new JobQueue.IndexJob(file, collection, null, null, null, null, false, null, file);
   }
 }

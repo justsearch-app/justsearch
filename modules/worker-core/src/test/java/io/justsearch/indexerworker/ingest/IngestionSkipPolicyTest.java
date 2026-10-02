@@ -35,6 +35,11 @@ final class IngestionSkipPolicyTest {
     assertTrue(IngestionSkipPolicy.shouldSkipWithinRoot(root.resolve("private/notes.txt"), root));
     assertTrue(IngestionSkipPolicy.shouldSkipWithinRoot(root.resolve("private/.env"), root));
     assertFalse(IngestionSkipPolicy.shouldSkipWithinRoot(root.resolve("public/notes.txt"), root));
+    Path excludedNameRoot = root.resolve("private");
+    assertFalse(IngestionSkipPolicy.shouldSkipWithinRoot(
+        excludedNameRoot.resolve("notes.txt"), excludedNameRoot));
+    assertFalse(IngestionSkipPolicy.shouldSkipWithinRoot(
+        root.resolve("private/notes.txt"), root.resolve("private/notes.txt")));
     assertTrue(IngestionSkipPolicy.shouldSkipWithinRoot(root.resolveSibling("outside.txt"), root));
   }
 
