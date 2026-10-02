@@ -12,8 +12,10 @@ import io.justsearch.ort.SessionHandle;
 import io.justsearch.reranker.RerankerAssembly;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -46,6 +48,7 @@ import java.util.TreeMap;
  * @param policies snapshot of {@link PolicySnapshot} for the roles whose variant resolved
  * @param handles every {@link SessionHandle} the surface owns; iterated for shutdown
  * @param componentObservation config digest and requested/missing-role composition evidence
+ * @param handleRoles native handles by role, including handles whose assembly failed
  */
 public record InferenceSurface(
     Optional<EmbeddingAssembly> embedding,
@@ -56,7 +59,8 @@ public record InferenceSurface(
     Optional<BgeM3Assembly> bgeM3,
     PolicySnapshot policies,
     List<SessionHandle> handles,
-    ComponentObservation componentObservation)
+    ComponentObservation componentObservation,
+    Map<EncoderRole, SessionHandle> handleRoles)
     implements AutoCloseable {
 
   /** Back-compatible test constructor. Its observation is explicitly unknown, never ready. */
@@ -84,6 +88,36 @@ public record InferenceSurface(
   public InferenceSurface {
     handles = List.copyOf(handles);
     Objects.requireNonNull(componentObservation, "componentObservation");
+    handleRoles = Map.copyOf(handleRoles);
+  }
+
+  /** Compatibility constructor for callers that only have successful assembly role evidence. */
+  public InferenceSurface(
+      Optional<EmbeddingAssembly> embedding,
+      Optional<NerAssembly> ner,
+      Optional<RerankerAssembly> reranker,
+      Optional<RerankerAssembly> citation,
+      Optional<SpladeAssembly> splade,
+      Optional<BgeM3Assembly> bgeM3,
+      PolicySnapshot policies,
+      List<SessionHandle> handles,
+      ComponentObservation componentObservation) {
+    this(embedding, ner, reranker, citation, splade, bgeM3, policies, handles,
+        componentObservation, assemblyHandles(embedding, ner, reranker, citation, splade, bgeM3));
+  }
+
+  private static Map<EncoderRole, SessionHandle> assemblyHandles(
+      Optional<EmbeddingAssembly> embedding, Optional<NerAssembly> ner,
+      Optional<RerankerAssembly> reranker, Optional<RerankerAssembly> citation,
+      Optional<SpladeAssembly> splade, Optional<BgeM3Assembly> bgeM3) {
+    Map<EncoderRole, SessionHandle> roles = new EnumMap<>(EncoderRole.class);
+    embedding.map(EmbeddingAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.EMBEDDING, h));
+    ner.map(NerAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.NER, h));
+    reranker.map(RerankerAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.RERANKER, h));
+    citation.map(RerankerAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.CITATION, h));
+    splade.map(SpladeAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.SPLADE, h));
+    bgeM3.map(BgeM3Assembly::sessions).ifPresent(h -> roles.put(EncoderRole.BGE_M3, h));
+    return roles;
   }
 
   /** Records a boot selection failure without changing the composed roles or their handles. */
@@ -100,7 +134,7 @@ public record InferenceSurface(
     missing.addAll(unavailable);
     return new InferenceSurface(embedding, ner, reranker, citation, splade, bgeM3, policies,
         handles, new ComponentObservation(componentObservation.configurationDigest(),
-            requested, missing, componentObservation.querySelection()));
+            requested, missing, componentObservation.querySelection()), handleRoles);
   }
 
   /** Transfers the two independently replaceable query roles away from index-role lifetime. */
@@ -110,9 +144,26 @@ public record InferenceSurface(
         && !componentObservation.configurationDigest().orElseThrow().equals(projection.digest())) {
       throw new IllegalStateException("Composed surface and owner projection disagree");
     }
+    for (SessionHandle handle : handleRoles.values()) {
+      if (handles.stream().filter(owned -> owned == handle).count() != 1
+          || handleRoles.values().stream().filter(named -> named == handle).count() != 1) {
+        throw new IllegalStateException("Role must own exactly one distinct surface handle");
+      }
+    }
+    assemblyHandles(embedding, ner, reranker, citation, splade, bgeM3).forEach((role, handle) -> {
+      if (handleRoles.get(role) != handle) {
+        throw new IllegalStateException("Assembly and native handle role disagree");
+      }
+    });
     List<SessionHandle> namedQueryHandles = new ArrayList<>();
     reranker.ifPresent(assembly -> namedQueryHandles.add(assembly.sessions()));
     citation.ifPresent(assembly -> namedQueryHandles.add(assembly.sessions()));
+    for (EncoderRole role : EnumSet.of(EncoderRole.RERANKER, EncoderRole.CITATION)) {
+      SessionHandle handle = handleRoles.get(role);
+      if (handle != null && namedQueryHandles.stream().noneMatch(named -> named == handle)) {
+        namedQueryHandles.add(handle);
+      }
+    }
     for (SessionHandle named : namedQueryHandles) {
       if (namedQueryHandles.stream().filter(candidate -> candidate == named).count() != 1
           || handles.stream().filter(candidate -> candidate == named).count() != 1) {
@@ -134,10 +185,18 @@ public record InferenceSurface(
     return new Partition(
         new InferenceSurface(embedding, ner, Optional.empty(), Optional.empty(), splade, bgeM3,
             policyFor(indexRoles), indexHandles,
-            observationFor(indexRoles, projection.indexDigest(), false)),
+            observationFor(indexRoles, projection.indexDigest(), false), handlesFor(indexRoles)),
         new InferenceSurface(Optional.empty(), Optional.empty(), reranker, citation,
             Optional.empty(), Optional.empty(), policyFor(queryRoles), queryHandles,
-            observationFor(queryRoles, projection.queryDigest(), true)));
+            observationFor(queryRoles, projection.queryDigest(), true), handlesFor(queryRoles)));
+  }
+
+  private Map<EncoderRole, SessionHandle> handlesFor(Set<EncoderRole> roles) {
+    Map<EncoderRole, SessionHandle> selected = new EnumMap<>(EncoderRole.class);
+    handleRoles.forEach((role, handle) -> {
+      if (roles.contains(role)) selected.put(role, handle);
+    });
+    return selected;
   }
 
   private PolicySnapshot policyFor(Set<EncoderRole> roles) {

@@ -287,17 +287,10 @@ public final class InferenceCompositionRoot {
   }
 
   private static Long sourceArenaCapBytes(InferenceSurface surface) {
-    Map<EncoderRole, SessionHandle> assemblies = new EnumMap<>(EncoderRole.class);
-    surface.embedding().ifPresent(a -> assemblies.put(EncoderRole.EMBEDDING, a.sessions()));
-    surface.ner().ifPresent(a -> assemblies.put(EncoderRole.NER, a.sessions()));
-    surface.bgeM3().ifPresent(a -> assemblies.put(EncoderRole.BGE_M3, a.sessions()));
-    surface.splade().ifPresent(a -> assemblies.put(EncoderRole.SPLADE, a.sessions()));
-    surface.reranker().ifPresent(a -> assemblies.put(EncoderRole.RERANKER, a.sessions()));
-    surface.citation().ifPresent(a -> assemblies.put(EncoderRole.CITATION, a.sessions()));
     long arenaCapBytes = 0L;
     for (SessionHandle handle : surface.handles()) {
       if (!handle.isGpuAvailable()) continue;
-      EncoderRole role = assemblies.entrySet().stream()
+      EncoderRole role = surface.handleRoles().entrySet().stream()
           .filter(entry -> entry.getValue() == handle).map(Map.Entry::getKey)
           .findFirst().orElse(null);
       ModelSessionPolicy policy = role == null || surface.policies() == null ? null
@@ -564,7 +557,7 @@ public final class InferenceCompositionRoot {
     QueryPlan citationPlan = resolveCitationPlan(currentQueryProjection.citation(), hardware,
         null, null,
         null, querySelection.citation());
-    List<SessionHandle> handles = new ArrayList<>();
+    CompositionHandles handles = new CompositionHandles();
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
     EnumSet<EncoderRole> requestedRoles = EnumSet.noneOf(EncoderRole.class);
     requestedRoles.addAll(currentQuery.requestedRoles());
@@ -667,10 +660,10 @@ public final class InferenceCompositionRoot {
         splade,
         bgeM3,
         snapshot,
-        handles,
+        handles.sessions(),
         InferenceSurface.ComponentObservation.composed(
             projection.withQueryFrom(currentQueryProjection).digest(), requestedRoles,
-            presentRoles, Optional.of(querySelection)));
+            presentRoles, Optional.of(querySelection)), handles.roles());
   }
 
   /** Pure pre-admission validation; the physical owner calls this before retirement. */
@@ -706,7 +699,7 @@ public final class InferenceCompositionRoot {
     Objects.requireNonNull(projection, "projection");
     Objects.requireNonNull(selection, "selection");
     ResolvedConfig cfg = projection.config();
-    List<SessionHandle> handles = new ArrayList<>();
+    CompositionHandles handles = new CompositionHandles();
     TreeMap<EncoderRole, ModelSessionPolicy> policies = new TreeMap<>();
     EnumSet<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
     QueryPlan rerankerPlan = resolveRerankerPlan(projection.reranker(), hardware, null, null,
@@ -726,10 +719,10 @@ public final class InferenceCompositionRoot {
     citation.ifPresent(ignored -> present.add(EncoderRole.CITATION));
     return new InferenceSurface(Optional.empty(), Optional.empty(), reranker, citation,
         Optional.empty(), Optional.empty(),
-        new PolicySnapshot(RuntimePolicyResolver.resolve(cfg, hardware), policies), handles,
+        new PolicySnapshot(RuntimePolicyResolver.resolve(cfg, hardware), policies), handles.sessions(),
         InferenceSurface.ComponentObservation.composed(projection.queryDigest(), requested,
             present, Optional.of(new QueryRoleSelection(rerankerComposition.attemptedRole(),
-                citationComposition.attemptedRole()))));
+                citationComposition.attemptedRole()))), handles.roles());
   }
 
   private static IndexCompositionPlan captureIndexPlan(
@@ -843,7 +836,7 @@ public final class InferenceCompositionRoot {
       RuntimePolicy runtime,
       IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
@@ -867,7 +860,7 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
-      handles.add(sessions);
+      handles.add(EncoderRole.EMBEDDING, sessions);
       policies.put(EncoderRole.EMBEDDING, rolePlan.policy());
       EmbeddingAssembly assembly = OnnxEmbeddingEncoder.buildAssembly(sessions,
           rolePlan.metadataDirectory(), embedCfg.contextLength(),
@@ -894,7 +887,7 @@ public final class InferenceCompositionRoot {
       RuntimePolicy runtime,
       IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
@@ -911,7 +904,7 @@ public final class InferenceCompositionRoot {
       sessions =
           composeCapturedHandle(EncoderRole.NER.consumerName(), runtime, rolePlan.policy(),
               variant, arbiter, events);
-      handles.add(sessions);
+      handles.add(EncoderRole.NER, sessions);
       policies.put(EncoderRole.NER, rolePlan.policy());
       NerAssembly assembly = io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
           sessions, rolePlan.metadataDirectory(), nerCfg.maxSequenceLength(),
@@ -929,7 +922,7 @@ public final class InferenceCompositionRoot {
       RuntimePolicy runtime,
       IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
@@ -951,7 +944,7 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
-      handles.add(sessions);
+      handles.add(EncoderRole.BGE_M3, sessions);
       policies.put(EncoderRole.BGE_M3, rolePlan.policy());
       BgeM3Config capturedConfig = new BgeM3Config(bgeCfg.enabled(),
           rolePlan.metadataDirectory(), bgeCfg.maxSequenceLength(), bgeCfg.gpuEnabled(),
@@ -972,7 +965,7 @@ public final class InferenceCompositionRoot {
       RuntimePolicy runtime,
       IndexCompositionPlan.RolePlan rolePlan,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       Set<EncoderRole> requestedRoles,
       OrtSessionTelemetryEvents events) {
@@ -994,7 +987,7 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
-      handles.add(sessions);
+      handles.add(EncoderRole.SPLADE, sessions);
       policies.put(EncoderRole.SPLADE, rolePlan.policy());
       SpladeConfig capturedConfig = new SpladeConfig(spladeCfg.enabled(),
           rolePlan.metadataDirectory(), spladeCfg.maxSequenceLength(), spladeCfg.gpuEnabled(),
@@ -1082,7 +1075,7 @@ public final class InferenceCompositionRoot {
       ResolvedConfig cfg,
       HardwareProfile hardware,
       GpuArbiter arbiter,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       OrtSessionTelemetryEvents events,
       QueryPlan plan) {
@@ -1101,7 +1094,7 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
-      handles.add(sessions);
+      handles.add(EncoderRole.RERANKER, sessions);
       policies.put(
           EncoderRole.RERANKER,
           ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, hardware, variant));
@@ -1130,7 +1123,7 @@ public final class InferenceCompositionRoot {
       CitationScorerConfig citationCfg,
       ResolvedConfig cfg,
       HardwareProfile hardware,
-      List<SessionHandle> handles,
+      CompositionHandles handles,
       Map<EncoderRole, ModelSessionPolicy> policies,
       OrtSessionTelemetryEvents events,
       GenerationModelSelection selection,
@@ -1153,7 +1146,7 @@ public final class InferenceCompositionRoot {
               variant,
               () -> false,
               events);
-      handles.add(sessions);
+      handles.add(EncoderRole.CITATION, sessions);
       policies.put(EncoderRole.CITATION, policy);
       // Tempdoc 710 Move 2: the citation lane was likewise structurally absent from
       // observability. Same reasoning as composeRerankerRole above — CitationScorer lives in
@@ -1191,6 +1184,18 @@ public final class InferenceCompositionRoot {
       Objects.requireNonNull(attemptedRole, "attemptedRole");
     }
 
+  }
+
+  private record CompositionHandles(
+      List<SessionHandle> sessions, Map<EncoderRole, SessionHandle> roles) {
+    private CompositionHandles() {
+      this(new ArrayList<>(), new EnumMap<>(EncoderRole.class));
+    }
+
+    private void add(EncoderRole role, SessionHandle handle) {
+      sessions.add(handle);
+      roles.put(role, handle);
+    }
   }
 
   private static void retireFailedHandle(SessionHandle sessions, Exception cause) {

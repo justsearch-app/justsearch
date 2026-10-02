@@ -38,17 +38,20 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 final class InferenceCompositionRootQueryFailureOwnershipTest {
-  @Test
-  void indexAndQueryRefusalsRemainOwnedAfterBootPartition(@TempDir Path dir) throws Exception {
-    assertQueryFailureOwnership(dir, true, null, true);
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void indexAndQueryRefusalsRemainOwnedAfterBootPartition(boolean throwOnRefusal, @TempDir Path dir)
+      throws Exception {
+    assertQueryFailureOwnership(dir, true, null, throwOnRefusal);
   }
 
   @ParameterizedTest
@@ -156,7 +159,16 @@ final class InferenceCompositionRootQueryFailureOwnershipTest {
       }
       if (fullComposition) {
         assertTrue(surface.embedding().isPresent(), "the earlier usable index assembly survives");
-        var partition = surface.partitionQueryRoles(projection);
+        var partition = surface.withUnavailableQueryRoles(
+            Set.of(EncoderRole.RERANKER, EncoderRole.CITATION)).partitionQueryRoles(projection);
+        assertEquals(List.of(sessions.get(EncoderRole.EMBEDDING), sessions.get(EncoderRole.NER)),
+            partition.index().handles());
+        assertEquals(List.of(sessions.get(EncoderRole.RERANKER), sessions.get(EncoderRole.CITATION)),
+            partition.query().handles());
+        assertEquals(Set.of(EncoderRole.EMBEDDING, EncoderRole.NER),
+            partition.index().policies().models().keySet());
+        assertEquals(Set.of(EncoderRole.RERANKER, EncoderRole.CITATION),
+            partition.query().policies().models().keySet());
         var ownedHandles = new ArrayList<>(partition.index().handles());
         ownedHandles.addAll(partition.query().handles());
         assertEquals(surface.handles(), ownedHandles, "boot must transfer every retained handle");
@@ -164,10 +176,19 @@ final class InferenceCompositionRootQueryFailureOwnershipTest {
         var indexOwner = new EncoderSet(partition.index(),
             new EncoderSet.ModelIdentity(absent, absent, absent, false, 768));
         var queryOwner = new QueryRoleSet(partition.query());
-        indexOwner.close();
         queryOwner.close();
-        assertTrue(indexOwner.isClosed());
         assertTrue(queryOwner.isClosed());
+        assertFalse(indexOwner.isClosed(), "query retirement must retain the index owner");
+        verify(sessions.get(EncoderRole.RERANKER), times(2)).close();
+        verify(sessions.get(EncoderRole.CITATION), times(2)).close();
+        verify(sessions.get(EncoderRole.EMBEDDING), never()).close();
+        verify(sessions.get(EncoderRole.NER)).close();
+        assertEquals(SessionHandle.RetirementStatus.ACTIVE,
+            sessions.get(EncoderRole.EMBEDDING).retirementStatus());
+        assertEquals(SessionHandle.RetirementStatus.REFUSED,
+            sessions.get(EncoderRole.NER).retirementStatus());
+        indexOwner.close();
+        assertTrue(indexOwner.isClosed());
       } else {
         var owner = new QueryRoleSet(surface);
         assertFalse(owner.isClosed());
