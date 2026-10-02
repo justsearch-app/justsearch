@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
@@ -43,13 +45,13 @@ public final class PruneOps {
   }
 
   /**
-   * Prunes orphaned documents whose IDs start with the given path prefix and whose backing files no
+   * Prunes orphaned documents whose paths start with the given prefix and whose backing files no
    * longer exist on disk.
    *
    * @param pathPrefix the path prefix to scan (e.g. "C:\Users\docs\")
    * @param abortChecker optional checker that returns true to abort the operation
    * @param throttleBatchSize number of documents to check between throttle sleeps
-   * @return number of documents pruned, or -1 if aborted
+   * @return number of orphan candidates pruned (owned children are also deleted), or -1 if aborted
    */
   public int pruneByPathPrefix(String pathPrefix, BooleanSupplier abortChecker, int throttleBatchSize) {
     return pruneByPathPrefix(pathPrefix, abortChecker, throttleBatchSize, path -> {});
@@ -90,12 +92,18 @@ public final class PruneOps {
     IndexSearcher searcher = null;
     try {
       searcher = mgr.acquire();
-      Query query = new PrefixQuery(new Term(idField, normalized));
+      Query query = new BooleanQuery.Builder()
+          .add(new PrefixQuery(new Term(SchemaFields.PATH, normalized)), BooleanClause.Occur.SHOULD)
+          // Legacy documents may have only a filesystem doc_id. Validate the stored path below
+          // before applying this fallback so an ID cannot pull another backing path into scope.
+          .add(new PrefixQuery(new Term(idField, normalized)), BooleanClause.Occur.SHOULD)
+          .setMinimumNumberShouldMatch(1)
+          .build();
 
       // Stored-field visitor: we need doc_id for deletion and path for file existence check.
       // Avoid decoding large stored fields (content).
       org.apache.lucene.index.StoredFields storedFields = searcher.storedFields();
-      Set<String> storedAllowlist = Set.of(idField, SchemaFields.PATH);
+      Set<String> storedAllowlist = Set.of(idField, SchemaFields.PATH, SchemaFields.PARENT_DOC_ID);
 
       // Page through results to avoid allocating a potentially huge ScoreDoc[] (Integer.MAX_VALUE).
       final int batchSize = 10_000;
@@ -140,10 +148,19 @@ public final class PruneOps {
           if (filePath == null || filePath.isBlank()) {
             filePath = docId;
           }
+          if (!normalizePathPrefix(filePath).startsWith(normalized)) {
+            continue;
+          }
 
           // Check if file still exists
           if (!Files.exists(Path.of(filePath))) {
-            indexingCoordinator.deleteById(docId);
+            String parentDocId = docFields.get(SchemaFields.PARENT_DOC_ID);
+            if (parentDocId != null && !parentDocId.isBlank() && !parentDocId.equals(docId)) {
+              indexingCoordinator.deleteByIdAndChunks(parentDocId);
+              indexingCoordinator.deleteById(docId);
+            } else {
+              indexingCoordinator.deleteByIdAndChunks(docId);
+            }
             pruned++;
             confirmedDeletionSink.accept(filePath);
             log.debug("pruneByPathPrefix: deleted orphan document: {}", docId);

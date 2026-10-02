@@ -78,19 +78,17 @@ final class ComponentsFactory {
       throws IOException {
     ResolvedConfig rc = resolvedConfig;
     ResolvedConfig.Index idx = rc.index();
-    boolean ephemeral = indexPath == null;
-    // Path resolution: prefer explicit indexPath, then ResolvedConfig paths, then legacy fallback.
-    Path resolvedPath = indexPath;
-    if (resolvedPath == null && rc.paths() != null) {
-      resolvedPath = rc.paths().indexBasePath();
-    }
-    if (resolvedPath == null) {
-      resolvedPath = fallbackIndexPath;
-    }
-    if (resolvedPath == null) {
+    // A null explicit path means auto-temp, regardless of configured persistent paths.
+    // Record ownership only after allocating the directory that this open may delete.
+    Path resolvedPath;
+    boolean ephemeral;
+    if (indexPath == null) {
       resolvedPath = Files.createTempDirectory("justsearch-ephemeral-index-");
+      ephemeral = true;
     } else {
+      resolvedPath = indexPath;
       Files.createDirectories(resolvedPath);
+      ephemeral = false;
     }
 
     Directory dir = null;
@@ -419,6 +417,9 @@ final class ComponentsFactory {
       } catch (Exception ex) {
         log.warn("Cleanup failed: dir.close(): {}", ex.getMessage());
       }
+      if (ephemeral) {
+        deleteOwnedEphemeralPath(resolvedPath);
+      }
 
       if (e instanceof IOException ioe) {
         throw ioe;
@@ -427,6 +428,24 @@ final class ComponentsFactory {
         throw re;
       }
       throw new IOException("Failed to build Lucene components", e);
+    }
+  }
+
+  static void deleteOwnedEphemeralPath(Path path) {
+    if (path == null || !Files.exists(path)) return;
+    try (var stream = Files.walk(path)) {
+      stream
+          .sorted(java.util.Comparator.reverseOrder())
+          .forEach(
+              p -> {
+                try {
+                  Files.deleteIfExists(p);
+                } catch (IOException e) {
+                  log.warn("Ephemeral index cleanup failed: {}", e.getMessage());
+                }
+              });
+    } catch (IOException e) {
+      log.debug("Ephemeral index walk failed: {}", e.getMessage());
     }
   }
 

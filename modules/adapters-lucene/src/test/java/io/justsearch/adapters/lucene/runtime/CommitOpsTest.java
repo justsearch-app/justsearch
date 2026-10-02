@@ -20,9 +20,13 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.store.FilterDirectory;
 import org.apache.lucene.store.MMapDirectory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -169,8 +173,10 @@ class CommitOpsTest extends LuceneExecutorTestBase {
     RuntimeSession session = new RuntimeSession(schemaWith(() -> () -> Map.of(), metadata -> {}));
     CommitOps ops = new CommitOps(session, LuceneRuntimeTypes.BuildState.COMPLETE);
     ops.setCommitCompletedListener(reason -> callCount.incrementAndGet());
+    session.pendingDocs.set(3L);
 
     assertThrows(RuntimeException.class, () -> ops.commitAndTrack(CommitReason.INDEXING_LOOP_IDLE));
+    assertEquals(3L, session.pendingDocs.get(), "failed commits must retain pending signals");
     assertEquals(0, callCount.get(),
         "listener must NOT fire when commit() throws — caller should not see a 'completed' event for a failed commit");
   }
@@ -227,6 +233,80 @@ class CommitOpsTest extends LuceneExecutorTestBase {
       // unwrapped. In production, the facade's ensureStarted()/guardWritable() prevents
       // reaching a closed writer.
       assertThrows(RuntimeException.class, ops::commit);
+    }
+  }
+
+  // -- commit accounting tests --
+
+  @Test
+  void postCommitWriteRemainsPendingAndNextTimerTickMakesItDurable() throws Exception {
+    RuntimeSession session = new RuntimeSession(
+        schemaWith(() -> () -> Map.of(), metadata -> {}), testLuceneExecutors());
+    session.resolvedConfig = new io.justsearch.configuration.resolved.ResolvedConfigBuilder()
+        .put("index.commit.timer_interval_ms", 500, "jvm_arg", "test", "1")
+        .build();
+    AtomicReference<IndexWriter> currentWriter = new AtomicReference<>();
+    AtomicBoolean injectWrite = new AtomicBoolean();
+    // Lucene has published and synced the commit before this hook writes B, but CommitOps has
+    // not yet retired A's pending signal. A disk reader below proves B is outside that commit.
+    try (var dir = new FilterDirectory(new MMapDirectory(tempDir)) {
+      @Override
+      public void syncMetaData() throws IOException {
+        super.syncMetaData();
+        // prepareCommit also syncs metadata before segments_N exists; inject only after publish.
+        if (injectWrite.get() && DirectoryReader.indexExists(this)
+            && injectWrite.compareAndSet(true, false)) {
+          currentWriter.get().addDocument(new Document());
+          session.pendingDocs.incrementAndGet();
+        }
+      }
+    }; var writer = new IndexWriter(dir, new IndexWriterConfig())) {
+      currentWriter.set(writer);
+      session.snapshot = new LifecycleSnapshot(dir, writer, null, tempDir, false, null);
+      writer.addDocument(new Document()); // A
+      session.pendingDocs.incrementAndGet();
+      injectWrite.set(true);
+      CommitOps ops = new CommitOps(session, LuceneRuntimeTypes.BuildState.COMPLETE);
+      CountDownLatch firstTick = new CountDownLatch(1);
+      CountDownLatch releaseFirstTick = new CountDownLatch(1);
+      CountDownLatch secondTick = new CountDownLatch(1);
+      AtomicInteger commits = new AtomicInteger();
+      AtomicLong pendingAfterFirst = new AtomicLong(-1L);
+      ops.setCommitCompletedListener(reason -> {
+        if (commits.incrementAndGet() == 1) {
+          pendingAfterFirst.set(session.pendingDocs.get());
+          firstTick.countDown();
+          try {
+            if (!releaseFirstTick.await(5, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("test did not release first timer tick");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+          }
+        } else {
+          secondTick.countDown();
+        }
+      });
+      try {
+        ops.startCommitTimer();
+        assertTrue(firstTick.await(5, TimeUnit.SECONDS), "first timer commit must finish");
+        assertFalse(injectWrite.get(), "the durability-boundary hook must write B");
+        try (var reader = DirectoryReader.open(dir)) {
+          assertEquals(1, reader.numDocs(), "first commit covers only A");
+        }
+        assertTrue(writer.hasUncommittedChanges(), "B must still need a covering commit");
+        assertEquals(1L, pendingAfterFirst.get(), "post-commit B must remain pending");
+        releaseFirstTick.countDown();
+        assertTrue(secondTick.await(5, TimeUnit.SECONDS), "a later timer tick must commit B");
+        try (var reader = DirectoryReader.open(dir)) {
+          assertEquals(2, reader.numDocs(), "B must become durable without any further writes");
+        }
+        assertEquals(0L, session.pendingDocs.get());
+      } finally {
+        releaseFirstTick.countDown();
+        ops.stopCommitTimer();
+      }
     }
   }
 

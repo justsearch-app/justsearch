@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
  * <ul>
  *   <li>Deletes documents when backing file no longer exists</li>
  *   <li>Preserves documents when file still exists</li>
- *   <li>Handles chunk documents (path#chunk_N)</li>
+ *   <li>Handles chunk documents with opaque IDs and legacy path IDs</li>
  *   <li>Respects abort checker (user activity)</li>
  *   <li>Throttles to avoid I/O spikes</li>
  *   <li>Path normalization (Windows case-insensitivity)</li>
@@ -68,7 +68,9 @@ class PruneByPathPrefixTest extends LuceneExecutorTestBase {
         new FieldDef("doc_uid", "keyword", false, true, List.of("sort", "tiebreak"), null, null, false),
         // Content and path
         new FieldDef("content", "text", true, false, List.of("highlight"), null, "icu", false),
-        new FieldDef("path", "keyword", true, true, List.of("filter", "sort"), null, null, false)
+        new FieldDef("path", "keyword", true, true, List.of("filter", "sort"), null, null, false),
+        new FieldDef("is_chunk", "keyword", true, true, List.of("filter"), null, null, false),
+        new FieldDef("parent_doc_id", "keyword", true, true, List.of("filter"), null, null, false)
     ));
   }
 
@@ -265,14 +267,16 @@ class PruneByPathPrefixTest extends LuceneExecutorTestBase {
           "content", "main content",
           "path", basePath)));
 
-      // Chunk documents (path#chunk_N format)
-      String chunk0 = basePath + "#chunk_0";
-      String chunk1 = basePath + "#chunk_1";
-      String chunk2 = basePath + "#chunk_2";
+      // Production chunks use opaque IDs unrelated to their backing filesystem path.
+      String chunk0 = "chunk:" + java.util.UUID.randomUUID();
+      String chunk1 = "chunk:" + java.util.UUID.randomUUID();
+      String chunk2 = "chunk:" + java.util.UUID.randomUUID();
 
-      runtime.indexingCoordinator().indexSingle(doc(chunk0, Map.of("content", "chunk 0", "path", basePath)));
-      runtime.indexingCoordinator().indexSingle(doc(chunk1, Map.of("content", "chunk 1", "path", basePath)));
-      runtime.indexingCoordinator().indexSingle(doc(chunk2, Map.of("content", "chunk 2", "path", basePath)));
+      for (String chunkId : List.of(chunk0, chunk1, chunk2)) {
+        runtime.indexingCoordinator().indexSingle(doc(chunkId, Map.of(
+            "content", "chunk content", "path", basePath,
+            "is_chunk", "true", "parent_doc_id", basePath)));
+      }
       commitAndRefresh();
 
       // Delete the backing file
@@ -292,6 +296,44 @@ class PruneByPathPrefixTest extends LuceneExecutorTestBase {
       assertEquals(null, runtime.documentFieldOps().getDocumentField(chunk0, "content"));
       assertEquals(null, runtime.documentFieldOps().getDocumentField(chunk1, "content"));
       assertEquals(null, runtime.documentFieldOps().getDocumentField(chunk2, "content"));
+      assertEquals(0, runtime.indexCountOps().docCount());
+      assertEquals(0, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+    }
+
+    @Test
+    void prunesOpaqueChunksWhoseParentWasAlreadyRemoved() throws Exception {
+      Path file = createTestFile("docs/already-removed.txt");
+      String parent = normalizePath(file);
+      String chunkId = "chunk:" + java.util.UUID.randomUUID();
+      runtime.indexingCoordinator().indexSingle(doc(parent, Map.of("content", "parent", "path", parent)));
+      runtime.indexingCoordinator().indexSingle(doc(chunkId, Map.of(
+          "content", "orphan chunk", "path", parent,
+          "is_chunk", "true", "parent_doc_id", parent)));
+      runtime.indexingCoordinator().deleteById(parent);
+      commitAndRefresh();
+      assertEquals(1, runtime.indexCountOps().docCount());
+      Files.delete(file);
+
+      assertEquals(1, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(chunkId, "content"));
+      assertEquals(0, runtime.indexCountOps().docCount());
+    }
+
+    @Test
+    void pruningParentDeletesOwnedChunksWithoutTheirOwnPath() throws Exception {
+      Path file = createTestFile("docs/legacy-chunk.txt");
+      String parent = normalizePath(file);
+      String chunkId = "chunk:" + java.util.UUID.randomUUID();
+      runtime.indexingCoordinator().indexSingle(doc(parent, Map.of("content", "parent", "path", parent)));
+      runtime.indexingCoordinator().indexSingle(doc(chunkId, Map.of(
+          "content", "legacy chunk", "is_chunk", "true", "parent_doc_id", parent)));
+      commitAndRefresh();
+      Files.delete(file);
+
+      assertEquals(1, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(0, runtime.indexCountOps().docCount(), "parent deletion must include owned chunks");
     }
 
     @Test
@@ -519,6 +561,22 @@ class PruneByPathPrefixTest extends LuceneExecutorTestBase {
   @Nested
   @DisplayName("Edge Cases")
   class EdgeCases {
+
+    @Test
+    void legacyFallbackPrunesMissingPathsWithoutCrossingBackingPathScope() throws Exception {
+      String legacyId = normalizePath(testFilesDir.resolve("docs/legacy.txt"));
+      String misleadingId = normalizePath(testFilesDir.resolve("docs/misleading.txt"));
+      String otherBackingPath = normalizePath(indexDir.resolve("absent-outside-scope.txt"));
+      runtime.indexingCoordinator().indexSingle(doc(legacyId, Map.of("content", "legacy")));
+      runtime.indexingCoordinator().indexSingle(doc(misleadingId, Map.of(
+          "content", "outside scope", "path", otherBackingPath)));
+      commitAndRefresh();
+
+      assertEquals(1, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(legacyId, "content"));
+      assertEquals("outside scope", runtime.documentFieldOps().getDocumentField(misleadingId, "content"));
+    }
 
     @Test
     @DisplayName("handles empty index")
