@@ -615,6 +615,7 @@ final class KnowledgeServerQuerySettingsOwnerTest {
 
     org.mockito.MockedStatic<InferenceCompositionRoot> composition() {
       var mocked = mockStatic(InferenceCompositionRoot.class);
+      mocked.when(InferenceCompositionRoot::componentDependencies).thenCallRealMethod();
       mocked.when(() -> InferenceCompositionRoot.estimateQueryFootprintBytes(any(), any(), any()))
           .thenReturn(1024L);
       mocked.when(() -> InferenceCompositionRoot.sourceQueryReleasableBytes(any())).thenReturn(1024L);

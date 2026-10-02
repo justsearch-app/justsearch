@@ -2596,7 +2596,11 @@ public final class KnowledgeServer implements Closeable {
       }
     } else {
       var physical = encoderPublication(owner, queryOwner, configuration, initialModelSelection);
-      if (!Objects.equals(expected.appliedVersion(), physical.appliedVersion())
+      // A coherent known-missing owner cannot publish a new applied version. Promotion preserves
+      // the last successful version in the lifecycle row; it is historical, not B's physical digest.
+      if (!physical.coherent()
+          || (physical.appliedVersion() != null
+              && !Objects.equals(expected.appliedVersion(), physical.appliedVersion()))
           || !Objects.equals(expected.desiredVersion(), physical.desiredVersion())) {
         throw new IOException("Encoder lifecycle row differs from its physical owner");
       }
