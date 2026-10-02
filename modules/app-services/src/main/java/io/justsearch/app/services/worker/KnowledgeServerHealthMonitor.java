@@ -87,6 +87,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   private final EngineExecutorRegistry.Registration recoveryExecutorRegistration;
   private final ExecutorService recoveryExecutor;
   private final LongSupplier nowMs;
+  private final LongSupplier ownerClockNanos;
   private final BootRecoveryPolicy recoveryPolicy;
   private final Function<String, String> environment;
   /** Wall-clock (epoch ms) of the previous tick; {@code -1} until the first tick. */
@@ -117,7 +118,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   // Slot retention is bounded independently of progress/deadline publications in the registry.
   private volatile RecoveryOwner recoveryOwner;
 
-  private record RecoveryOwner(String component, long startedAtNanos) {}
+  private record RecoveryOwner(String component, long startedAtNanos, long deadlineNanos) {}
 
   private static final class ComponentEpisode {
     int recoveredBaseline;
@@ -181,12 +182,25 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       LongSupplier nowMs,
       BootRecoveryPolicy recoveryPolicy,
       Function<String, String> environment) {
+    this(processExecutors, bootstrap, pollIntervalMs, nowMs, recoveryPolicy, environment,
+        System::nanoTime);
+  }
+
+  KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
+      KnowledgeServerBootstrap bootstrap,
+      long pollIntervalMs,
+      LongSupplier nowMs,
+      BootRecoveryPolicy recoveryPolicy,
+      Function<String, String> environment,
+      LongSupplier ownerClockNanos) {
     if (bootstrap == null) {
       throw new IllegalArgumentException("bootstrap must not be null");
     }
     this.bootstrap = bootstrap;
     this.pollIntervalMs = pollIntervalMs > 0 ? pollIntervalMs : DEFAULT_POLL_INTERVAL_MS;
     this.nowMs = nowMs;
+    this.ownerClockNanos = Objects.requireNonNull(ownerClockNanos, "ownerClockNanos");
     this.recoveryPolicy = recoveryPolicy != null ? recoveryPolicy : BootRecoveryPolicy.defaults();
     this.environment = Objects.requireNonNull(environment, "environment");
     Objects.requireNonNull(processExecutors, "processExecutors");
@@ -388,7 +402,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
 
   /** Arms a late handover without adding another timer or a second recovery authority. */
   public void observeInitialStartup(CompletableFuture<?> startup) {
-    this.initialOwnerObservedAtNanos = System.nanoTime();
+    this.initialOwnerObservedAtNanos = ownerClockNanos.getAsLong();
     this.initialStartup = Objects.requireNonNull(startup, "startup");
     this.initialHandoverPending = true;
   }
@@ -488,14 +502,14 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   /** An occupied physical slot prevents replacement, but cannot indefinitely prevent restart. */
   private boolean retainedOwnerDeadlineExceeded(
       EngineComponentSnapshot.Component row, boolean sameComponentOnly) {
-    long deadline = row.spec().startDeadline().toNanos();
-    if (deadline == 0) return false;
+    long now = ownerClockNanos.getAsLong();
+    long initialDeadline = row.spec().startDeadline().toNanos();
     if ("index".equals(row.spec().name()) && initialOwnerPending()
-        && System.nanoTime() - initialOwnerObservedAtNanos >= deadline) return true;
+        && initialDeadline != 0 && now - initialOwnerObservedAtNanos >= initialDeadline) return true;
     var owner = recoveryOwner;
     return owner != null && recoveryAttemptRunning.get()
         && (!sameComponentOnly || owner.component().equals(row.spec().name()))
-        && System.nanoTime() - owner.startedAtNanos() >= deadline;
+        && owner.deadlineNanos() != 0 && now - owner.startedAtNanos() >= owner.deadlineNanos();
   }
 
   private boolean recoveryBudgetExhausted(
@@ -634,7 +648,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
         return ComponentRecoveryAuthority.Outcome.EXHAUSTED;
       }
       if (binding.action() == null) return ComponentRecoveryAuthority.Outcome.OWNER_UNAVAILABLE;
-      recoveryOwner = new RecoveryOwner(name, System.nanoTime());
+      recoveryOwner = new RecoveryOwner(name, ownerClockNanos.getAsLong(),
+          binding.handle().spec().startDeadline().toNanos());
       recoveryExecutor.execute(() -> attemptComponentRecovery(binding, operatorRequested));
       handedOff = true;
       return ComponentRecoveryAuthority.Outcome.ACCEPTED;

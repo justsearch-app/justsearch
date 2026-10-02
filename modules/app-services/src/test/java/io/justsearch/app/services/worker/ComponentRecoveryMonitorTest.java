@@ -582,6 +582,114 @@ final class ComponentRecoveryMonitorTest {
   }
 
   @Test
+  void unrelatedRecoveryUsesItsOwnLongerDeadlineBeforeEscalatingEssentialFailure()
+      throws Exception {
+    assertOptionalOwnerRetention(Duration.ofSeconds(60), Duration.ofSeconds(180),
+        Duration.ofSeconds(70), true);
+  }
+
+  @Test
+  void stuckOptionalOwnerUsesItsOwnShorterDeadlineToUnblockEssentialEscalation()
+      throws Exception {
+    assertOptionalOwnerRetention(Duration.ofSeconds(180), Duration.ofSeconds(60),
+        Duration.ofSeconds(59), true);
+  }
+
+  @Test
+  void unrelatedRecoveryCompletingWithinItsDeadlineLeavesIndexLocalRecoveryAvailable()
+      throws Exception {
+    assertOptionalOwnerRetention(Duration.ofSeconds(60), Duration.ofSeconds(180),
+        Duration.ofSeconds(70), false);
+  }
+
+  private void assertOptionalOwnerRetention(Duration indexDeadline, Duration optionalDeadline,
+      Duration indexFailureAt, boolean ownerStuck) throws Exception {
+    try (var components = new TestEngineComponents()) {
+      var index = components.register(spec("index", true, indexDeadline, 2));
+      var optional = components.register(spec("generative", false, optionalDeadline, 2));
+      index.transition(ComponentState.READY, null, "index still serving");
+      optional.transition(ComponentState.FAILED, LifecycleReasonCode.INFERENCE_CRASHED.code(),
+          "optional owner lost");
+      var nowNanos = new AtomicLong();
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      var optionalCalls = new AtomicInteger();
+      var indexCalls = new AtomicInteger();
+      var escalations = new AtomicInteger();
+      var actionFailure = new AtomicReference<Throwable>();
+      ComponentRecoveryAction action = request -> {
+        assertTrue(request.begin());
+        if ("generative".equals(request.expected().spec().name())) {
+          optionalCalls.incrementAndGet();
+          entered.countDown();
+          assertTrue(release.await(5, TimeUnit.SECONDS));
+          return recovered(request, optional, null, "optional owner returned");
+        }
+        assertEquals("index", request.expected().spec().name());
+        indexCalls.incrementAndGet();
+        return recovered(request, index, null, "index local recovery succeeded");
+      };
+      try (var monitor = monitor(components, bootstrapWithoutClient(), nowNanos::get)) {
+        monitor.componentRecoveryBindings(bindings(components, observed(actionFailure, action)),
+            row -> {
+              assertEquals("index", row.spec().name());
+              escalations.incrementAndGet();
+            });
+        try {
+          assertEquals(ComponentRecoveryAuthority.Outcome.ACCEPTED,
+              monitor.requestComponentRecovery("generative"));
+          assertTrue(entered.await(5, TimeUnit.SECONDS));
+          nowNanos.set(indexFailureAt.toNanos());
+          monitor.tick();
+          assertEquals(0, escalations.get(), "optional recovery alone cannot escalate");
+          index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
+              "new recoverable index failure");
+
+          monitor.tick();
+
+          assertEquals(0, escalations.get(),
+              "an unrelated owner still within its own deadline must not trigger restart");
+          assertEquals(ComponentState.STARTING, optional.snapshot().state());
+          assertEquals(0, index.snapshot().recoveryAttempts());
+          assertTrue(monitor.recoveryAttemptRunningForTest());
+          nowNanos.set(optionalDeadline.toNanos() - 1);
+          monitor.tick();
+          assertEquals(0, escalations.get(), "the occupied owner's complete deadline applies");
+          assertEquals(ComponentState.STARTING, optional.snapshot().state());
+
+          if (ownerStuck) {
+            nowNanos.incrementAndGet();
+            monitor.tick();
+            monitor.tick();
+            assertEquals(1, escalations.get(), "a genuinely stuck owner must permit escalation");
+            assertEquals(ComponentState.FAILED, optional.snapshot().state());
+            assertEquals(ComponentState.FAILED, index.snapshot().state());
+            assertEquals(0, index.snapshot().recoveryAttempts());
+            assertTrue(monitor.recoveryAttemptRunningForTest(),
+                "escalation must leave the physical slot owned until its action returns");
+          }
+        } finally {
+          release.countDown();
+          awaitIdle(monitor);
+        }
+        if (!ownerStuck) {
+          monitor.tick();
+          awaitIdle(monitor);
+          assertEquals(ComponentState.READY, index.snapshot().state());
+          assertEquals(1, index.snapshot().recoveryAttempts());
+          assertEquals(1, indexCalls.get());
+          assertEquals(0, escalations.get(), "normal completion must preserve local index recovery");
+        } else {
+          assertEquals(0, indexCalls.get());
+        }
+        assertEquals(1, optionalCalls.get());
+        assertEquals(1, optional.snapshot().recoveryAttempts());
+        assertNoAsyncFailure(actionFailure);
+      }
+    }
+  }
+
+  @Test
   void retainedOwnerEscalationRetriesOnNextTickAndHonorsConcurrentReady() throws Exception {
     for (boolean recoverDuringPublication : new boolean[] {false, true}) {
       try (var components = new TestEngineComponents()) {
@@ -1420,6 +1528,15 @@ final class ComponentRecoveryMonitorTest {
   private KnowledgeServerHealthMonitor monitor(TestEngineComponents components,
       KnowledgeServerBootstrap bootstrap) {
     return monitor(components, bootstrap, BootRecoveryPolicy.defaults(), System::currentTimeMillis);
+  }
+
+  private KnowledgeServerHealthMonitor monitor(TestEngineComponents components,
+      KnowledgeServerBootstrap bootstrap, java.util.function.LongSupplier ownerClockNanos) {
+    var monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L,
+        System::currentTimeMillis, BootRecoveryPolicy.defaults(),
+        io.justsearch.configuration.SystemAccess::rawEnvVar, ownerClockNanos);
+    monitor.componentRegistry(components);
+    return monitor;
   }
 
   private KnowledgeServerHealthMonitor monitor(TestEngineComponents components,
