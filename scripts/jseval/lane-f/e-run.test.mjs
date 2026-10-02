@@ -110,7 +110,7 @@ test('E4 collector excludes offline streams; wire failures stay separate from wo
   fs.writeFileSync(path.join(raw, 'summary.json'), JSON.stringify({ search_load: { errors: 0 } }));
   fs.writeFileSync(path.join(raw, 'workload.json'), JSON.stringify({ requests: [{ status: 200, durationMs: 8,
     streamed: true, terminal: { doneCount: 0, errorCount: 1, eof: true, errorCode: 'AI_OFFLINE' } }] }));
-  const r = { ...record('main', ['E4']), gaps: {}, commands: [{ label: 'soak-cycle-1', code: 0 }] };
+  const r = { ...record('main', ['E4']), gaps: {}, commands: [{ label: 'soak-cycle-1', code: 0, minutes: 55, startedAt: '2026-10-01T20:49:57.957Z', endedAt: '2026-10-01T21:44:57.973Z' }] };
   r.clauses['index-agent-reconfigure-workload'] = true;
   collect({ record: r, raw, values });
   assert.equal(r.metrics.agentP95, undefined);
@@ -582,4 +582,22 @@ test('ordinary workload records wire refusals and terminates on its owned stop m
     assert.ok(observed.slice(1).every(r => r.options.headers['X-JustSearch-Session'] === 'wire-fixture-token'));
     assert.ok(!text.includes('wire-fixture-token'));
   } finally { globalThis.fetch = originalFetch; }
+});
+test('E4 workload clause: a window-cut cycle covering the window counts; a short or failed cycle does not', t => {
+  const raw = fs.mkdtempSync(path.join(ROOT, 'tmp/e-soak-cover-'));
+  t.after(() => fs.rmSync(raw, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(raw, 'summary.json'), JSON.stringify({ search_load: { errors: 0 } }));
+  fs.writeFileSync(path.join(raw, 'workload.json'), JSON.stringify({ requests: [{ status: 200, durationMs: 300 }] }));
+  const start = '2026-10-01T20:49:57.957Z';
+  const cases = [
+    [{ code: null, signal: 'SIGTERM', cancellationCause: 'fixed-window-end', endedAt: '2026-10-01T21:44:57.973Z' }, true],
+    [{ code: null, signal: 'SIGTERM', cancellationCause: 'fixed-window-end', endedAt: '2026-10-01T21:09:57.957Z' }, undefined],
+    [{ code: 1, endedAt: '2026-10-01T21:44:57.973Z' }, undefined],
+  ];
+  for (const [cycle, expected] of cases) {
+    const r = { ...record('main', ['E4']), gaps: {}, commands: [{ label: 'soak-cycle-1', minutes: 55, startedAt: start, ...cycle }] };
+    r.clauses['index-agent-reconfigure-workload'] = true;
+    collect({ record: r, raw, values });
+    assert.equal(r.clauses['index-agent-reconfigure-workload'], expected, JSON.stringify(cycle));
+  }
 });

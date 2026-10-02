@@ -698,8 +698,18 @@ export function collect(context) {
   // Legacy unbounded load records have no validated per-stage population.
   if (r.groups.includes('E4')) {
     const completedCycles = r.commands.filter(c => /^soak-cycle-/.test(c.label) && c.code === 0);
-    const workload = completedCycles.length && loads.length && calls.length
-      ? true : undefined;
+    // A soak cycle is one ingest-and-enrich pass, which on main does not finish inside a 55-minute
+    // window; the fixed window cuts it (cancellationCause fixed-window-end). The workload clause asks
+    // whether indexing, the agent loop and the reconfigures ran for the window, so a cycle cut by the
+    // window counts, provided the cycles together cover the window (2026-10-02: main E4 windows
+    // recorded completedSoakCycles 0 and the clause could never be met).
+    const workloadCycles = r.commands.filter(c => /^soak-cycle-/.test(c.label)
+      && (c.code === 0 || c.cancellationCause === 'fixed-window-end'));
+    const coveredMs = workloadCycles.reduce((sum, c) => sum + (Date.parse(c.endedAt) - Date.parse(c.startedAt) || 0), 0);
+    const windowMinutes = workloadCycles[0]?.minutes;
+    const covered = Number.isFinite(windowMinutes) && coveredMs >= windowMinutes * 60000 - 60000;
+    const workload = covered && loads.length && calls.length ? true : undefined;
+    r.metrics.workloadCoverage = { cycles: workloadCycles.length, completed: completedCycles.length, coveredMs, windowMinutes };
     const wire = soakWire({ ...r, raw: context.raw }, calls, loads);
     r.clauses['no-timeout-or-5xx'] = wire.check;
     r.gaps['no-timeout-or-5xx'] = [...wire.gaps, ...(wire.check === false

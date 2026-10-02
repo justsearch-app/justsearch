@@ -123,7 +123,7 @@ test('table refuses mixed or stale projection identities independently of acquis
 
 test('general E4 projection preserves terminal violations at cancellation and keeps MAIN coverage separate', t => {
   const raw = scratch(t), r = { ...record('main', ['E4']), raw };
-  r.commands = [{ label: 'soak-cycle-1', code: 0 }]; r.clauses['index-agent-reconfigure-workload'] = true;
+  r.commands = [{ label: 'soak-cycle-1', code: 0, minutes: 55, startedAt: '2026-10-01T20:49:57.957Z', endedAt: '2026-10-01T21:44:57.973Z' }]; r.clauses['index-agent-reconfigure-workload'] = true;
   const error = { status: 200, streamed: true, durationMs: 8, windowBoundary: true,
     cancellationCause: 'fixed-window-end', error: 'TRANSPORT_FAILURE',
     terminal: { errorCount: 1, doneCount: 0, eof: false, errorCode: 'LLM_ERROR' } };
