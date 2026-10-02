@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -175,13 +177,13 @@ final class EngineSoakTest {
       + " one")
   void repeatedOpenAndCloseReleasesEverythingItOpened(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
+    Set<Thread> unrelatedEngineThreads = liveEngineThreads();
     engine = EngineTestHarness.start(dataDir, commitConfig());
     indexCorpus(tempDir, "soak-restart");
     assertTrue(
         engine.awaitSearchable("engine soak probe", 180_000),
         "the corpus must be searchable before the first cycle");
 
-    int engineThreadsBefore = liveEngineThreads();
     int allThreadsBefore = Thread.getAllStackTraces().size();
 
     for (int cycle = 0; cycle < RESTART_CYCLES; cycle++) {
@@ -215,10 +217,10 @@ final class EngineSoakTest {
     // rather than statistical. Polled because shutdownNow interrupts; the threads die shortly
     // after, not synchronously.
     assertTrue(
-        awaitEngineThreadsAtMost(engineThreadsBefore, 30_000),
+        awaitOnlyBaselineEngineThreads(unrelatedEngineThreads, 30_000),
         "every engine-owned thread pool must be gone after " + RESTART_CYCLES
             + " open/close cycles and a final close; " + liveEngineThreads()
-            + " engine-* threads are still live (was " + engineThreadsBefore + " at the start)");
+            + " are still live (pre-start threads: " + unrelatedEngineThreads + ")");
 
     // The looser backstop for everything NOT named engine-*: the index half's own loop, merge and
     // scheduler threads. The bound is generous on purpose — JIT, GC and ForkJoin populations move
@@ -312,26 +314,22 @@ final class EngineSoakTest {
   }
 
   /** Live threads owned by {@code EngineKnowledgeClient}'s three named pools. */
-  private static int liveEngineThreads() {
-    int count = 0;
-    for (Thread t : Thread.getAllStackTraces().keySet()) {
-      if (t.isAlive() && t.getName().startsWith("engine-")) {
-        count++;
-      }
-    }
-    return count;
+  private static Set<Thread> liveEngineThreads() {
+    return Thread.getAllStackTraces().keySet().stream()
+        .filter(t -> t.isAlive() && t.getName().startsWith("engine-"))
+        .collect(Collectors.toSet());
   }
 
-  private static boolean awaitEngineThreadsAtMost(int ceiling, long timeoutMs)
+  private static boolean awaitOnlyBaselineEngineThreads(Set<Thread> baseline, long timeoutMs)
       throws InterruptedException {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
-      if (liveEngineThreads() <= ceiling) {
+      if (baseline.containsAll(liveEngineThreads())) {
         return true;
       }
       Thread.sleep(100);
     }
-    return liveEngineThreads() <= ceiling;
+    return baseline.containsAll(liveEngineThreads());
   }
 
   /**
