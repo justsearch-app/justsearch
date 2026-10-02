@@ -694,8 +694,8 @@
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "SQLite WAL schema v21",
-      "currentVersion": 21,
+      "format": "SQLite WAL schema v22",
+      "currentVersion": 22,
       "readableLegacyVersions": [
         0,
         1,
@@ -717,7 +717,8 @@
         17,
         18,
         19,
-        20
+        20,
+        21
       ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
       "versionSource": { "file": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java", "symbol": "TARGET_VERSION" },

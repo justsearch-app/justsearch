@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.splade;
 
+import io.justsearch.core.execution.InferenceRequest;
 import ai.djl.huggingface.tokenizers.Encoding;
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
 import ai.djl.modality.nlp.DefaultVocabulary;
@@ -263,12 +264,13 @@ public final class SpladeEncoder implements Closeable {
    * @throws OrtException if ONNX inference fails
    */
   public Map<String, Float> encode(String text) throws OrtException {
-    return encode(text, LocalSessionAcquisition.foreground());
+    return encode(text, InferenceRequest.foreground());
   }
 
   /** Encodes a query using its admitted scheduling and cancellation authority. */
-  public Map<String, Float> encode(String text, SessionAcquisitionRequest acquisition)
+  public Map<String, Float> encode(String text, InferenceRequest request)
       throws OrtException {
+    var acquisition = SessionAcquisitionRequest.from(request);
     acquisition.remainingNanos();
     long tTok = System.nanoTime();
     Encoding encoding = tokenizer.encode(text);

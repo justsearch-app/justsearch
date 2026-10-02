@@ -154,10 +154,6 @@ final class SyncDirectoryOps {
    * Force mode admits every eligible disk file while retaining the same strict A scan and deletion
    * proof.
    */
-  RootDifference discoverCandidateDifference(String rootPath, boolean force) throws IOException {
-    return discoverCandidateDifference(rootPath, force, () -> false);
-  }
-
   RootDifference discoverCandidateDifference(
       String rootPath, boolean force, java.util.function.BooleanSupplier cancelled)
       throws IOException {

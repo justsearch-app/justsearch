@@ -13,11 +13,6 @@ import java.nio.file.Path;
 
 /** Single Worker-side authority for source admission and freshness classification. */
 final class WorkerIngestionAuthority {
-  SourceAdmission admit(Path filePath) throws IOException {
-    // A direct file admission has no directory policy boundary.
-    return admit(filePath, null);
-  }
-
   SourceAdmission admit(io.justsearch.indexerworker.queue.JobQueue.IndexJob job) throws IOException {
     if (job.ingestionRoot() == null) {
       // Pre-boundary queue and switch-buffer records cannot distinguish explicit files from

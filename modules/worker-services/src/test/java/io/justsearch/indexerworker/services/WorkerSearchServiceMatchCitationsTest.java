@@ -2,6 +2,7 @@ package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -75,9 +76,9 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
     Mockito.when(embeddings.isAvailable()).thenReturn(true);
     Mockito.when(embeddings.embedQuery(Mockito.anyString(), Mockito.any()))
         .thenAnswer(invocation -> {
-          var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(1);
+          var authority = (InferenceRequest) invocation.getArgument(1);
           assertEquals(deadline, authority.deadlineNanos());
-          assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+          assertEquals(InferenceRequest.Urgency.BACKGROUND,
               authority.urgency());
           if (branch.equals("sentence")) {
             cancelled.set(true);
@@ -87,9 +88,9 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
         });
     Mockito.when(embeddings.embedDocument(Mockito.anyString(), Mockito.any()))
         .thenAnswer(invocation -> {
-          var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(1);
+          var authority = (InferenceRequest) invocation.getArgument(1);
           assertEquals(deadline, authority.deadlineNanos());
-          assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+          assertEquals(InferenceRequest.Urgency.BACKGROUND,
               authority.urgency());
           cancelled.set(true);
           authority.remainingNanos();
@@ -100,7 +101,7 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
       citationMatchOps(service).setCrossEncoderProducer(
           (sentences, passages, ids, threshold, budget, authority) -> {
             assertEquals(deadline, authority.deadlineNanos());
-            assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+            assertEquals(InferenceRequest.Urgency.BACKGROUND,
                 authority.urgency());
             cancelled.set(true);
             authority.remainingNanos();

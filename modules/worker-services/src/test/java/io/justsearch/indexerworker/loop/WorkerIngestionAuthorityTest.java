@@ -70,7 +70,7 @@ class WorkerIngestionAuthorityTest {
     IngestionSkipPolicy.installResolved(new IngestionSkipPolicy(null, null, Set.of("private")));
     assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(claim).action());
     assertEquals(SourceAdmissionAction.ADMIT,
-        authority.admit(Files.writeString(root.resolve("public.txt"), "public")).action());
+        authority.admit(Files.writeString(root.resolve("public.txt"), "public"), null).action());
   }
 
   private static JobQueue.IndexJob rooted(Path file, Path root) {

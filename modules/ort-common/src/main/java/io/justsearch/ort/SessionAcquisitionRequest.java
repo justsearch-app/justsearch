@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ort;
 
+import io.justsearch.core.execution.InferenceRequest;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
@@ -16,6 +17,14 @@ public record SessionAcquisitionRequest(
   public SessionAcquisitionRequest {
     Objects.requireNonNull(urgency, "urgency");
     Objects.requireNonNull(cancellationRequested, "cancellationRequested");
+  }
+
+  /** Maps caller facts at the native owner boundary, retaining the live cancellation signal. */
+  public static SessionAcquisitionRequest from(InferenceRequest request) {
+    return new SessionAcquisitionRequest(
+        request.urgency() == InferenceRequest.Urgency.FOREGROUND
+            ? Urgency.FOREGROUND : Urgency.BACKGROUND,
+        request.deadlineNanos(), request.cancellationRequested());
   }
 
   /**

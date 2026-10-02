@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.reranker;
 
+import io.justsearch.core.execution.InferenceRequest;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
@@ -130,8 +131,8 @@ public final class CitationScorer implements Closeable {
       double threshold,
       long deadlineMs) {
     return scoreAll(sentences, chunkTexts, chunkDocIds, threshold, deadlineMs,
-        SessionAcquisitionRequest.within(SessionAcquisitionRequest.Urgency.FOREGROUND,
-            SessionAcquisitionRequest.MAX_TIMEOUT));
+        InferenceRequest.within(InferenceRequest.Urgency.FOREGROUND,
+            SessionAcquisitionRequest.MAX_TIMEOUT, () -> false));
   }
 
   /** Scores with caller authority while retaining the local partial-scoring budget. */
@@ -141,7 +142,8 @@ public final class CitationScorer implements Closeable {
       List<String> chunkDocIds,
       double threshold,
       long deadlineMs,
-      SessionAcquisitionRequest authority) {
+      InferenceRequest request) {
+    var authority = SessionAcquisitionRequest.from(request);
     authority.remainingNanos();
 
     long startNanos = System.nanoTime();

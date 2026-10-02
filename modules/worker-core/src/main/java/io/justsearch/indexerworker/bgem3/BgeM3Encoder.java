@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.bgem3;
 
+import io.justsearch.core.execution.InferenceRequest;
 import ai.djl.huggingface.tokenizers.Encoding;
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
 import ai.onnxruntime.OnnxTensor;
@@ -158,11 +159,12 @@ public class BgeM3Encoder implements AutoCloseable {
    * @throws OrtException if ONNX inference fails
    */
   public BgeM3Output encode(String text) throws OrtException {
-    return encode(text, LocalSessionAcquisition.foreground());
+    return encode(text, InferenceRequest.foreground());
   }
 
   /** Encodes a query using its admitted scheduling and cancellation authority. */
-  public BgeM3Output encode(String text, SessionAcquisitionRequest acquisition) throws OrtException {
+  public BgeM3Output encode(String text, InferenceRequest request) throws OrtException {
+    var acquisition = SessionAcquisitionRequest.from(request);
     acquisition.remainingNanos();
     return encodeBatchInternal(List.of(text), acquisition).get(0);
   }

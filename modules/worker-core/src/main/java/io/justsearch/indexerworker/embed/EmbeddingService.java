@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.embed;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.aibackend.backend.AiBackend;
 import io.justsearch.aibackend.backend.BackendException;
 import io.justsearch.aibackend.local.LocalIntentTranslatorV2.EmbeddingRequest;
@@ -240,7 +241,8 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
   }
 
   @Override
-  public float[] embedDocument(String text, io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+  public float[] embedDocument(String text, InferenceRequest request) {
+    var acquisition = io.justsearch.ort.SessionAcquisitionRequest.from(request);
     ChunkedEmbedding result = embedWithChunks(documentPrefix + text, acquisition);
     return result == null ? null : result.primaryVector();
   }
@@ -256,7 +258,8 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
   }
 
   @Override
-  public float[] embedQuery(String text, io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+  public float[] embedQuery(String text, InferenceRequest request) {
+    var acquisition = io.justsearch.ort.SessionAcquisitionRequest.from(request);
     ChunkedEmbedding result = embedWithChunks(queryPrefix + text, acquisition);
     return result == null ? null : result.primaryVector();
   }

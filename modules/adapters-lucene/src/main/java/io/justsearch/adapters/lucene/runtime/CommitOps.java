@@ -62,7 +62,7 @@ public final class CommitOps {
 
   /**
    * Build state for the next commit. Single producer ({@link #commitWithBuildState}),
-   * single consumer (this class — read by {@link #commit()} and the scheduled timer).
+   * single consumer (this class — read by {@link #commit(CommitReason)} and the scheduled timer).
    * Tempdoc 406 Gap B: location enforces scope. The field deliberately lives here, not
    * on RuntimeContext, so other ops cannot mutate it.
    */
@@ -74,18 +74,9 @@ public final class CommitOps {
         initialBuildState != null ? initialBuildState : LuceneRuntimeTypes.BuildState.COMPLETE;
   }
 
-  /**
-   * Commits pending changes with optional metadata stamping.
-   *
-   * @return elapsed time in milliseconds for the Lucene commit operation
-   */
-  long commit() {
-    return commit(null).elapsedMs();
-  }
+  record CommitResult(long elapsedMs, long pendingDocs) {}
 
-  private record CommitResult(long elapsedMs, long pendingDocs) {}
-
-  private CommitResult commit(CommitReason trackedReason) {
+  CommitResult commit(CommitReason trackedReason) {
     boolean metaEnabled = session.commitMetadataEnabled;
     Map<String, String> ud;
     if (metaEnabled) {
@@ -147,7 +138,7 @@ public final class CommitOps {
 
   /**
    * Commits pending changes and tracks timing, counters, and telemetry.
-   * This is the full commit operation — the existing commit() method is the low-level Lucene commit.
+   * This is the full commit operation — the commit(CommitReason) method is the low-level Lucene commit.
    */
   public void commitAndTrack() {
     commitAndTrack(CommitReason.UNKNOWN);

@@ -103,7 +103,7 @@ class CommitOpsTest extends LuceneExecutorTestBase {
       session.commitMetadataEnabled = true;
       CommitOps ops = new CommitOps(session, LuceneRuntimeTypes.BuildState.BUILDING);
 
-      long elapsed = ops.commit();
+      long elapsed = ops.commit(null).elapsedMs();
       assertTrue(elapsed >= 0, "elapsed should be non-negative");
       assertEquals(1, validatorCalls.get(), "validator should be called once");
 
@@ -131,7 +131,7 @@ class CommitOpsTest extends LuceneExecutorTestBase {
       session.commitMetadataEnabled = false;
       CommitOps ops = new CommitOps(session, LuceneRuntimeTypes.BuildState.COMPLETE);
 
-      long elapsed = ops.commit();
+      long elapsed = ops.commit(null).elapsedMs();
       assertTrue(elapsed >= 0);
       assertEquals(0, validatorCalls.get(), "validator should not be called when disabled");
 
@@ -236,7 +236,7 @@ class CommitOpsTest extends LuceneExecutorTestBase {
       // AlreadyClosedException is a RuntimeException (not IOException), so it propagates
       // unwrapped. In production, the facade's ensureStarted()/guardWritable() prevents
       // reaching a closed writer.
-      assertThrows(RuntimeException.class, ops::commit);
+      assertThrows(RuntimeException.class, () -> ops.commit(null));
     }
   }
 

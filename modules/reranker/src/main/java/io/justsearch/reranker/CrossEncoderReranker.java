@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.reranker;
 
+import io.justsearch.core.execution.InferenceRequest;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
@@ -160,13 +161,14 @@ public final class CrossEncoderReranker implements Closeable {
    *     errored
    */
   public RerankedResult rerank(String query, List<String> documents, long deadlineMs) {
-    return rerank(query, documents, deadlineMs, SessionAcquisitionRequest.within(
-        SessionAcquisitionRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(30)));
+    return rerank(query, documents, deadlineMs, InferenceRequest.within(
+        InferenceRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(30), () -> false));
   }
 
   /** Reranks with the admitted caller's native waiting and cancellation authority. */
   public RerankedResult rerank(String query, List<String> documents, long deadlineMs,
-      SessionAcquisitionRequest authority) {
+      InferenceRequest request) {
+    var authority = SessionAcquisitionRequest.from(request);
     long startNanos = System.nanoTime();
     authority.remainingNanos();
     long localDeadline = startNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(

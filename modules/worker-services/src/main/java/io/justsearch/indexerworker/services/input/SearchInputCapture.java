@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services.input;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
@@ -101,12 +102,12 @@ public final class SearchInputCapture {
   public SearchInputs capture(
       SearchRequest request, boolean allowQueryEmbeddings, String compatReasonCode) {
     return capture(request, allowQueryEmbeddings, compatReasonCode,
-        io.justsearch.indexerworker.inference.LocalSessionAcquisition.foreground());
+        InferenceRequest.foreground());
   }
 
   public SearchInputs capture(
       SearchRequest request, boolean allowQueryEmbeddings, String compatReasonCode,
-      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
     Objects.requireNonNull(request, "request");
 
     EncoderSnapshot snap = encoderSnapshots.snapshot();
@@ -292,7 +293,7 @@ public final class SearchInputCapture {
       String compatReasonCode,
       BgeM3Output bgeQueryOutput,
       EmbeddingProvider embeddingProvider,
-      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
     acquisition.remainingNanos();
     if (!vectorList.isEmpty()) {
       return new VectorEncoding.Success(new ArrayList<>(vectorList), "explicit");
@@ -338,7 +339,7 @@ public final class SearchInputCapture {
       BgeM3Output bgeQueryOutput,
       SpladeEncoder onnxEncoder,
       SpladeIdfQueryEncoder idfEncoder,
-      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
     acquisition.remainingNanos();
     if (bgeQueryOutput != null && bgeQueryOutput.sparseWeights() != null) {
       Map<String, Float> weights =

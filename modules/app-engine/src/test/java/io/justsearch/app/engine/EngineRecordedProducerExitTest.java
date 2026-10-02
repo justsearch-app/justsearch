@@ -205,7 +205,7 @@ final class EngineRecordedProducerExitTest {
       var second = new RecordedRootPlan.Root(directory.resolve("second"), null, true, false, List.of(), List.of());
       var plan = new RecordedRootPlan("generation", captured ? List.of(first, second) : List.of(first));
       var result = (captured
-          ? client.enumerateCapturedRoots(plan, "recorded-child", 1, request.context(), new CancelToken())
+          ? client.enumerateCapturedRoots(plan, "recorded-child", 1, request.context(), new CancelToken(), false)
           : client.enumerateRecordedRoot(plan, "recorded-child", 1, request.context(), new CancelToken())).toCompletableFuture();
       assertTrue(cleanupEntered.await(3, TimeUnit.SECONDS));
       var field = KnowledgeClient.class.getDeclaredField("walkExecutor");

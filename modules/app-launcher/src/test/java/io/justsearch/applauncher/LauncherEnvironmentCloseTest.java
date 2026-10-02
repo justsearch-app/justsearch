@@ -259,6 +259,9 @@ final class LauncherEnvironmentCloseTest {
           Mockito.CALLS_REAL_METHODS)) {
         stores.when(() -> io.justsearch.app.observability.operations.SqliteOperationStore.unopened(
             tempDir.resolve("operations.db"))).thenReturn(store, replacementStore);
+        // Q10 (merge 1c63db01c): CALLS_REAL_METHODS records the setup call too.
+        // Count only launcher attempts while retaining the sequential store stubbing.
+        stores.clearInvocations();
         try {
           assertSame(initializationFailure,
               assertThrows(java.io.IOException.class, () -> LauncherEnvironment.create("smoke")));

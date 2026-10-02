@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.app.api.EngineWorkCancelledException;
 import io.justsearch.app.services.worker.IpcTelemetry;
@@ -169,8 +170,8 @@ final class EngineKnowledgeClientExecutorTest {
         assertTrue(semaphore.getQueueLength() > 0, "real encoder must reach native GPU queue");
         assertInferenceOwnsAdmissionWithTextSlotAvailable(admission);
         assertEquals(1, load.inFlight());
-        assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.FOREGROUND,
-            context.get().nativeAcquisition().urgency());
+        assertEquals(InferenceRequest.Urgency.FOREGROUND,
+            context.get().inferenceRequest().urgency());
         assertTrue(context.get().deadlineNanos() - System.nanoTime()
             < TimeUnit.SECONDS.toNanos(3), "Engine deadline must replace the five-minute horizon");
         if (owner != null) {
@@ -327,8 +328,8 @@ final class EngineKnowledgeClientExecutorTest {
         assertTrue(semaphore.getQueueLength() > 0, "citation encoder must reach native GPU queue");
         assertInferenceOwnsAdmissionWithTextSlotAvailable(admission);
         assertEquals(1, load.inFlight());
-        assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.FOREGROUND,
-            context.get().nativeAcquisition().urgency());
+        assertEquals(InferenceRequest.Urgency.FOREGROUND,
+            context.get().inferenceRequest().urgency());
         assertTrue(context.get().deadlineNanos() - System.nanoTime()
             < TimeUnit.SECONDS.toNanos(3), "Engine deadline must reach citation matching");
         if (owner != null) {
@@ -375,12 +376,12 @@ final class EngineKnowledgeClientExecutorTest {
         new io.justsearch.reranker.RerankerTokenizer.EncodedBatch(
             new long[][] {{1}}, new long[][] {{1}}, new long[][] {{0}}, 1, 1, 0, 1));
     var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
-    var authority = io.justsearch.ort.SessionAcquisitionRequest.within(
-        io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND, Duration.ofSeconds(10),
+    var authority = InferenceRequest.within(
+        InferenceRequest.Urgency.BACKGROUND, Duration.ofSeconds(10),
         cancelled::get);
     when(sessions.acquire(any())).thenAnswer(invocation -> {
       var request = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(0);
-      assertEquals(authority.urgency(), request.urgency());
+      assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND, request.urgency());
       if (localBudget) {
         assertTrue(request.deadlineNanos() - authority.deadlineNanos() < 0);
         // Simulate a waiter expiring under the scorer's earlier budget, with the caller still live.

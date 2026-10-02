@@ -2162,13 +2162,10 @@ public final class WorkerIngestService {
       return resp.build();
     }
     try {
-      tools.jackson.databind.ObjectMapper mapper =
-          new tools.jackson.databind.json.JsonMapper();
+      var serialized = snap.toJson();
       resp.setConfigStatus("ok");
-      resp.setRuntimePolicyJson(mapper.writeValueAsString(snap.runtime()));
-      for (var entry : snap.models().entrySet()) {
-        resp.putModelPoliciesJson(entry.getKey().name(), mapper.writeValueAsString(entry.getValue()));
-      }
+      resp.setRuntimePolicyJson(serialized.runtime());
+      resp.putAllModelPoliciesJson(serialized.models());
       return resp.build();
     } catch (RuntimeException e) {
       log.warn("getSessionPolicies: JSON serialization failed", e);

@@ -391,7 +391,7 @@ final class EngineKnowledgeClientServingViewLifetimeTest {
     try (var registry = registry();
         var client = client(registry, aServices, selected::get)) {
       var result = client.enumerateCapturedRoots(plan, "operation-a", 7,
-          TestEngineContexts.FOREGROUND, new io.justsearch.app.services.worker.CancelToken());
+          TestEngineContexts.FOREGROUND, new io.justsearch.app.services.worker.CancelToken(), false);
       if (!firstEntered.await(3, TimeUnit.SECONDS)) {
         result.toCompletableFuture().join();
         throw new AssertionError("recorded root worker never entered A");

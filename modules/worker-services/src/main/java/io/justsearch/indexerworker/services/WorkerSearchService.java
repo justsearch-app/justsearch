@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.ipc.logging.MdcContext;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
@@ -496,9 +497,10 @@ public final class WorkerSearchService {
             log.debug("Search cancelled by caller: {}", e.getMessage());
           }
           throw e;
-        } catch (io.justsearch.ort.SessionAcquireDeadlineExceededException e) {
-          throw WorkerServiceException.deadlineExceeded(e.getMessage());
         } catch (RuntimeException e) {
+          if (e instanceof InferenceRequest.DeadlineExceeded) {
+            throw WorkerServiceException.deadlineExceeded(e.getMessage());
+          }
           EngineFutures.rethrowExecutorRefusal(e);
           EngineFutures.rethrowCancellation(e);
           metrics.recordSearchFailed();
@@ -530,7 +532,7 @@ public final class WorkerSearchService {
         long deadlineMs = request.getDeadlineMs();
         CrossEncoderReranker.RerankedResult result = reranker.rerank(
             request.getQuery(), docTexts, deadlineMs > 0 ? deadlineMs : 200,
-            (ctx == null ? CallContext.none() : ctx).nativeAcquisition());
+            (ctx == null ? CallContext.none() : ctx).inferenceRequest());
 
         RerankResponse.Builder resp = RerankResponse.newBuilder()
             .setSkipped(result.skipped())
@@ -547,9 +549,10 @@ public final class WorkerSearchService {
           }
         }
         return resp.build();
-      } catch (io.justsearch.ort.SessionAcquireDeadlineExceededException e) {
-        throw WorkerServiceException.deadlineExceeded(e.getMessage());
       } catch (RuntimeException e) {
+        if (e instanceof InferenceRequest.DeadlineExceeded) {
+          throw WorkerServiceException.deadlineExceeded(e.getMessage());
+        }
         EngineFutures.rethrowCancellation(e);
         log.error("Rerank failed", e);
         throw WorkerServiceException.internal("Rerank failed: " + e.getMessage());
@@ -932,10 +935,11 @@ public final class WorkerSearchService {
         return ragContextOps.executeRetrieval(
             request, new HashSet<>(docIds), topK, maxContextTokens,
             compat.allowed(), compat.reasonCode(), normalizedCallContext.engineContext().urgency(),
-            normalizedCallContext.childLifetime(), normalizedCallContext.nativeAcquisition());
-      } catch (io.justsearch.ort.SessionAcquireDeadlineExceededException e) {
-        throw WorkerServiceException.deadlineExceeded(e.getMessage());
+            normalizedCallContext.childLifetime(), normalizedCallContext.inferenceRequest());
       } catch (RuntimeException e) {
+        if (e instanceof InferenceRequest.DeadlineExceeded) {
+          throw WorkerServiceException.deadlineExceeded(e.getMessage());
+        }
         EngineFutures.rethrowExecutorRefusal(e);
         EngineFutures.rethrowCancellation(e);
         log.error("RetrieveContext failed", e);
@@ -970,12 +974,13 @@ public final class WorkerSearchService {
             request.getChunkIndicesList(),
             request.getPassageTextsList(),
             request.getSimilarityThreshold(),
-            (ctx == null ? CallContext.none() : ctx).nativeAcquisition());
-      } catch (io.justsearch.ort.SessionAcquireDeadlineExceededException e) {
-        throw WorkerServiceException.deadlineExceeded(e.getMessage());
+            (ctx == null ? CallContext.none() : ctx).inferenceRequest());
       } catch (WorkerServiceException e) {
         throw e;
       } catch (RuntimeException e) {
+        if (e instanceof InferenceRequest.DeadlineExceeded) {
+          throw WorkerServiceException.deadlineExceeded(e.getMessage());
+        }
         EngineFutures.rethrowExecutorRefusal(e);
         EngineFutures.rethrowCancellation(e);
         log.error("MatchCitations failed", e);

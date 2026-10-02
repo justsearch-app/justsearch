@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.core.execution.InferenceRequest;
+
 /**
  * Per-call context a caller supplies to a worker service method.
  *
@@ -83,11 +85,11 @@ public record CallContext(String traceId, String requestId, CancelSignal cancel,
   }
 
   /** Explicit scheduling authority shared by every native attempt within this call. */
-  public io.justsearch.ort.SessionAcquisitionRequest nativeAcquisition() {
-    return new io.justsearch.ort.SessionAcquisitionRequest(
+  public InferenceRequest inferenceRequest() {
+    return new InferenceRequest(
         engineContext.urgency() == io.justsearch.core.context.EngineContext.Urgency.FOREGROUND
-            ? io.justsearch.ort.SessionAcquisitionRequest.Urgency.FOREGROUND
-            : io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+            ? InferenceRequest.Urgency.FOREGROUND
+            : InferenceRequest.Urgency.BACKGROUND,
         this == NONE
             ? System.nanoTime() + java.time.Duration.ofMinutes(5).toNanos()
             : deadlineNanos,

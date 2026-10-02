@@ -12,6 +12,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -85,9 +86,9 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
         none.provenance(), none.childLifetime(), deadline);
     var reranker = mock(CrossEncoderReranker.class);
     when(reranker.rerank(anyString(), anyList(), anyLong(), any())).thenAnswer(invocation -> {
-      var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(3);
+      var authority = (InferenceRequest) invocation.getArgument(3);
       assertEquals(deadline, authority.deadlineNanos());
-      assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+      assertEquals(InferenceRequest.Urgency.BACKGROUND,
           authority.urgency());
       assertFalse(authority.cancellationRequested().getAsBoolean());
       cancelled.set(true);
@@ -102,11 +103,14 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
         () -> service.rerank(request, call));
   }
 
-  @Test
-  void nativeAcquisitionDeadlineKeepsDeadlineStatus() {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void nativeAcquisitionDeadlineKeepsDeadlineStatus(boolean callerCheck) {
     var reranker = mock(CrossEncoderReranker.class);
     when(reranker.rerank(anyString(), anyList(), anyLong(), any())).thenThrow(
-        new io.justsearch.ort.SessionAcquireDeadlineExceededException("native deadline"));
+        callerCheck
+            ? new InferenceRequest.DeadlineExceededException("caller deadline")
+            : new io.justsearch.ort.SessionAcquireDeadlineExceededException("native deadline"));
     service.setSearchReranker(reranker);
     var request = RerankRequest.newBuilder().setQuery("query").addDocumentTexts("doc").build();
     var failure = org.junit.jupiter.api.Assertions.assertThrows(WorkerServiceException.class,

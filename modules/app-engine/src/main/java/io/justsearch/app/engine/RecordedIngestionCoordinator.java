@@ -441,11 +441,6 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
   }
 
-  /** Bind only the current EngineKnowledgeClient's bounded recorded adapter. */
-  void bindProducer(Producer producer) {
-    bindProducer(producer, producer);
-  }
-
   /** Watched-root reindex must revalidate membership at the actual producer entry. */
   void bindProducer(Producer producer, Producer watchedRootProducer) {
     synchronized (lock) {

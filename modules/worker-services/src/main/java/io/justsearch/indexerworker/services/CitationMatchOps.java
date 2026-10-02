@@ -14,7 +14,7 @@ import io.justsearch.indexerworker.util.VectorUtils;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.CitationMatchEntry;
 import io.justsearch.ipc.MatchCitationsResponse;
-import io.justsearch.ort.SessionAcquisitionRequest;
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.reranker.CitationScorer;
 import io.justsearch.reranker.CitationScorerConfig;
 import java.io.IOException;
@@ -104,7 +104,7 @@ final class CitationMatchOps {
         List<String> passageDocIds,
         double threshold,
         long deadlineMs,
-        SessionAcquisitionRequest acquisition);
+        InferenceRequest acquisition);
   }
 
   CitationMatchOps(ReadPathOps readPathOps, CommitOps commitOps, EmbeddingProvider embeddingProvider) {
@@ -202,18 +202,8 @@ final class CitationMatchOps {
       List<String> chunkDocIds,
       List<Integer> chunkIndices,
       List<String> passageTexts,
-      double requestedThreshold) {
-    return execute(answerText, chunkDocIds, chunkIndices, passageTexts, requestedThreshold,
-        io.justsearch.indexerworker.inference.LocalSessionAcquisition.foreground());
-  }
-
-  MatchCitationsResponse execute(
-      String answerText,
-      List<String> chunkDocIds,
-      List<Integer> chunkIndices,
-      List<String> passageTexts,
       double requestedThreshold,
-      SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
     acquisition.remainingNanos();
     long startTime = System.currentTimeMillis();
     double threshold = effectiveThreshold(requestedThreshold);
@@ -372,7 +362,7 @@ final class CitationMatchOps {
   }
 
   /** Caller cancellation/deadline cannot become fallback or an application error response. */
-  private static void rethrowStoppedCall(Exception failure, SessionAcquisitionRequest acquisition) {
+  private static void rethrowStoppedCall(Exception failure, InferenceRequest acquisition) {
     acquisition.remainingNanos();
     EngineFutures.rethrowExecutorRefusal(failure);
     EngineFutures.rethrowCancellation(failure);
@@ -450,7 +440,7 @@ final class CitationMatchOps {
       int sentenceCount,
       long deadlineMs,
       String answerText,
-      SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
     acquisition.remainingNanos();
     boolean anyLookupNeeded = false;
     int sourceCount = Math.min(chunkDocIds.size(), chunkIndices.size());
@@ -539,7 +529,7 @@ final class CitationMatchOps {
    * @return chunk content text, or null if not found
    */
   private String lookupChunkContent(
-      String parentDocId, int chunkIndex, SessionAcquisitionRequest acquisition) {
+      String parentDocId, int chunkIndex, InferenceRequest acquisition) {
     try {
       acquisition.remainingNanos();
       // Query by parent_doc_id only (term-indexed keyword), fetch enough to find the right chunk

@@ -81,7 +81,7 @@ final class EngineRecordedIngestionProducerTest {
     var admission = new EngineAdmissionController(8, 8, 1);
     try (var registry = new DefaultEngineExecutorRegistry();
         var client = client(registry, () -> services(ingest), admission, 5_000)) {
-      var result = client.enumerateCapturedRoots(plan, KEY, EPOCH, TestEngineContexts.FOREGROUND, new CancelToken())
+      var result = client.enumerateCapturedRoots(plan, KEY, EPOCH, TestEngineContexts.FOREGROUND, new CancelToken(), false)
           .toCompletableFuture().get(5, TimeUnit.SECONDS);
       var expected = terminalReason.isEmpty() ? JobQueue.WalkEnumerationOutcome.COMPLETE
           : terminalReason.equals("CLIENT_CANCELLED") ? JobQueue.WalkEnumerationOutcome.CANCELLED

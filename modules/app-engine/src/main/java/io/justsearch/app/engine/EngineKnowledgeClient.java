@@ -1271,18 +1271,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     return roots.captureRootProducer(plan.roots().getFirst().path(), watchedOnly);
   }
 
-  /** One captured epoch spans every frozen root; each stage waits for its actual walk and delivery exit. */
-  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateCapturedRoots(RecordedRootPlan plan,
-      String operationKey, long epoch, EngineContext context, CancelToken cancellation) {
-    return enumerateCapturedRoots(plan, operationKey, epoch, context, cancellation, false);
-  }
-
   CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateWatchedCapturedRoots(RecordedRootPlan plan,
       String operationKey, long epoch, EngineContext context, CancelToken cancellation) {
     return enumerateCapturedRoots(plan, operationKey, epoch, context, cancellation, true);
   }
 
-  private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateCapturedRoots(RecordedRootPlan plan,
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateCapturedRoots(RecordedRootPlan plan,
       String operationKey, long epoch, EngineContext context, CancelToken cancellation, boolean watchedOnly) {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");

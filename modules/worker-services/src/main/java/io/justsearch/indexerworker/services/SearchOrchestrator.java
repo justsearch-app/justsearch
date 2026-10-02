@@ -189,7 +189,7 @@ public final class SearchOrchestrator {
       CallContext ctx) {
     CallContext call = ctx == null ? CallContext.none() : ctx;
     SearchInputs inputs = capture.capture(request, allowQueryEmbeddings, compatReasonCode,
-        call.nativeAcquisition());
+        call.inferenceRequest());
     afterCapture.accept(inputs);
     abortIfCancelled(call, "capture");
     SearchDecision decision = planner.plan(inputs);

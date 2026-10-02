@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.adapters.lucene.runtime.ChunkSearchOps;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
@@ -236,18 +237,8 @@ final class RagContextOps {
       io.justsearch.ipc.RetrieveContextRequest request,
       Set<String> docIds, int topK, int maxContextTokens,
       boolean allowQueryEmbeddings, String compatibilityReason,
-      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
-    return executeRetrieval(request, docIds, topK, maxContextTokens, allowQueryEmbeddings,
-        compatibilityReason, urgency, childLifetime,
-        io.justsearch.indexerworker.inference.LocalSessionAcquisition.foreground());
-  }
-
-  RetrieveContextResponse executeRetrieval(
-      io.justsearch.ipc.RetrieveContextRequest request,
-      Set<String> docIds, int topK, int maxContextTokens,
-      boolean allowQueryEmbeddings, String compatibilityReason,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
-      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
     acquisition.remainingNanos();
 
     String question = request.getQuestion();
@@ -447,7 +438,7 @@ final class RagContextOps {
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     return searchChunksWithMeta(question, docIds, topK, maxContextTokens, allowQueryEmbeddings,
         compatibilityReason, ragFilters, excludedChunks, urgency, childLifetime,
-        io.justsearch.indexerworker.inference.LocalSessionAcquisition.foreground());
+        InferenceRequest.foreground());
   }
 
   private ChunkContextResult searchChunksWithMeta(
@@ -456,7 +447,7 @@ final class RagContextOps {
       LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
       List<io.justsearch.ipc.ChunkRef> excludedChunks,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
-      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
     acquisition.remainingNanos();
     // stage_id is cleaned up by the outer MdcContext.request() scope in WorkerSearchService
     MDC.put("stage_id", "retrieve");
@@ -1283,7 +1274,7 @@ final class RagContextOps {
    */
   private ChunkRerankResult rerankChunks(
       String question, List<LuceneRuntimeTypes.SearchHit> hits,
-      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
 
     var config = chunkRerankerConfig;
     if (config == null || hits.size() < config.minHitsThreshold()) {
@@ -1415,19 +1406,9 @@ final class RagContextOps {
    * Selects the final chunk set using the configured diversification strategy.
    */
   List<LuceneRuntimeTypes.SearchHit> diversifyChunks(
-      String question,
-      float[] queryVector,
-      List<LuceneRuntimeTypes.SearchHit> hits,
-      int targetK,
-      boolean allowQueryEmbeddings) {
-    return diversifyChunks(question, queryVector, hits, targetK, allowQueryEmbeddings,
-        io.justsearch.indexerworker.inference.LocalSessionAcquisition.foreground());
-  }
-
-  private List<LuceneRuntimeTypes.SearchHit> diversifyChunks(
       String question, float[] queryVector, List<LuceneRuntimeTypes.SearchHit> hits,
       int targetK, boolean allowQueryEmbeddings,
-      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
 
     String mode = resolvedConfigSupplier.get().rag().diversifyMode();
     if ("mmr".equals(mode)) {
@@ -1456,20 +1437,10 @@ final class RagContextOps {
    *
    * <p>Falls back to position-based diversification when embeddings are unavailable or fail.
    */
-  List<LuceneRuntimeTypes.SearchHit> diversifyByMmr(
-      String question,
-      float[] queryVector,
-      List<LuceneRuntimeTypes.SearchHit> hits,
-      int targetK,
-      boolean allowQueryEmbeddings) {
-    return diversifyByMmr(question, queryVector, hits, targetK, allowQueryEmbeddings,
-        io.justsearch.indexerworker.inference.LocalSessionAcquisition.foreground());
-  }
-
   private List<LuceneRuntimeTypes.SearchHit> diversifyByMmr(
       String question, float[] queryVector, List<LuceneRuntimeTypes.SearchHit> hits,
       int targetK, boolean allowQueryEmbeddings,
-      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+      InferenceRequest acquisition) {
 
     if (hits.size() <= targetK) {
       return hits;
