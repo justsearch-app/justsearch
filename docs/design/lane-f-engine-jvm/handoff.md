@@ -5,6 +5,34 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 the current queue, revision, lease, and blocking decisions; D1 owns design and
 acceptance evidence. The brief does not narrow the remaining lane scope.
 
+## Review-and-fix campaign 2026-10-02 evening (read first; supersedes "Next steps" below where they differ)
+
+Root: Claude session `5ea56bf3`. Delegation ran through the agent-system tool (`F:/agent-private`,
+project `justsearch-lane-f`, Codex Sol/Luna roles; fast mode turned off at ~20:40 by owner request).
+Full ledger with every finding id, verdict and evidence path: `F:/agent-sandbox/js-lane-f/ledger.md`.
+
+- **Done:** the build-fix branch was verified and merged (`409b1926b`). Four review waves (46 areas)
+  found about 90 findings. Fix packages each ran build, independent challenger review and rework
+  until approved, or were accepted under the root's stopping rule (no fix-introduced regression; one
+  final round for sibling paths, then the residue becomes a recorded follow-up).
+- **Integration (not on the lane branch):** branch `codex/lane-f-integration` (worktree
+  `.claude/worktrees/lane-f-integration`) = this lane head plus 23 accepted fix branches and two
+  integration fixes (`b946e3af8` archive preflight, `5ea0a529f` S3/S6 test reconciliation).
+  Production-conflict merges were independently reviewed. **Gradle was skipped by owner instruction
+  (18:40): nothing on it has been compiled or tested.** Next step: one `build -x test`, then the full
+  suite on that branch, fix compile and test failures, then fast-forward the lane. Only after that,
+  the branch E re-measurement (the hosted death-observability fix is in P1).
+- **Owner decisions (19:50):** P4 (Lucene-commit/SQL crash window) deferred to a follow-up; X07
+  (jseval instrument bugs) fixed after stage E; E7 deferred with a recorded gap (destination: next
+  signed release).
+- **Parked, needing designs (not integrated):** generation GC (S1 + Q9), enrichment consistency (Q12),
+  dev-runner process ownership (Q15 + S8 + SUP drafts on `codex/lane-f-fix3-s8`).
+- **Recorded follow-ups:** untrusted-input hardening (PDF decode and archive preflight residuals),
+  root-removal and refusal residuals, governance CI coverage residual, the pathless-chunk orphan gap,
+  P1 supervision residuals, watched-root escape X05-F1. S7 (agent tooling, based on `main`) needs its
+  own PR and the owner's go-ahead.
+- **Codex:** weekly usage was 61% at 19:45 (resets 2026-10-07 00:26); owner chose to keep going.
+
 ## Takeover 2026-10-02 (next root starts here)
 
 The owner is handing the lane from the Claude root (session `73335075`, 2026-09-30 to 2026-10-02) to a
