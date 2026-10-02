@@ -181,7 +181,7 @@ class McpProtocolHandlerTest {
     @SuppressWarnings("unchecked")
     Map<String, Object> resourcesCap = (Map<String, Object>) caps.get("resources");
     assertEquals(Boolean.FALSE, resourcesCap.get("listChanged"));
-    assertEquals(Boolean.TRUE, resourcesCap.get("subscribe"));
+    assertEquals(Boolean.FALSE, resourcesCap.get("subscribe"));
 
     // Tempdoc 655 (agent-legibility layer): initialize now carries the MCP `instructions` steering
     // field — the one server-level surface an autonomous agent reads at tool-selection time. It must
@@ -196,6 +196,39 @@ class McpProtocolHandlerTest {
     assertTrue(
         instr.toLowerCase().contains("prefer"),
         "instructions must be comparative (when to prefer the index), not a bare feature list");
+  }
+
+  @Test
+  void resourceSubscriptionsAreRejectedWithoutRetainingCallerUris() throws Exception {
+    Context init = mock(Context.class);
+    when(init.path()).thenReturn("/mcp");
+    when(init.body()).thenReturn(
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}");
+    var sessionId = ArgumentCaptor.forClass(String.class);
+    when(init.header(eq("Mcp-Session-Id"), sessionId.capture())).thenReturn(init);
+    when(init.contentType(anyString())).thenReturn(init);
+    when(init.result(anyString())).thenReturn(init);
+    handler.handlePost(init);
+    assertTrue(handler.clientIdentity(sessionId.getValue()).isPresent());
+
+    for (String method : List.of("resources/subscribe", "resources/unsubscribe")) {
+      for (int i = 0; i < 32; i++) {
+        Context ctx = mock(Context.class);
+        when(ctx.path()).thenReturn("/mcp");
+        when(ctx.header("Mcp-Session-Id")).thenReturn(sessionId.getValue());
+        when(ctx.body()).thenReturn(MAPPER.writeValueAsString(Map.of(
+            "jsonrpc", "2.0", "id", i, "method", method,
+            "params", Map.of("uri", "justsearch://arbitrary/" + i + "x".repeat(8192)))));
+        var response = ArgumentCaptor.forClass(String.class);
+        when(ctx.contentType(anyString())).thenReturn(ctx);
+        when(ctx.result(response.capture())).thenReturn(ctx);
+        handler.handlePost(ctx);
+        var wire = MAPPER.readTree(response.getValue());
+        assertEquals(i, wire.get("id").asInt());
+        assertFalse(wire.has("result"));
+        assertEquals(-32601, wire.get("error").get("code").asInt());
+      }
+    }
   }
 
   /**

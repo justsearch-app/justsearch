@@ -2,12 +2,15 @@
 package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.services.worker.IpcTelemetry;
+import io.justsearch.app.services.bootstrap.BootstrapInferenceFactory;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
@@ -19,11 +22,22 @@ import io.justsearch.ipc.SearchResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Lane F stage A item A6 — the ports as direct calls, exercised end to end in one JVM.
@@ -71,6 +85,160 @@ final class EngineRootInProcessPortsTest {
 
   private static void publishConfig(Path dataDir, Path indexBase) throws Exception {
     EngineTestHarness.publishConfig(dataDir, indexBase, java.util.Map.of());
+  }
+
+  @Test
+  void generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation(@TempDir Path tempDir)
+      throws Exception {
+    assertGenerationPacing(tempDir, false, 0, 3);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3})
+  void generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(
+      int scenario, @TempDir Path tempDir) throws Exception {
+    assertGenerationPacing(tempDir, true, scenario, scenario + 1);
+  }
+
+  private void assertGenerationPacing(Path tempDir, boolean deferIndexStart,
+      int firstScenario, int scenarioLimit) throws Exception {
+    Path dataDir = tempDir.resolve("generation-data");
+    publishConfig(dataDir, dataDir.resolve("index"));
+    KnowledgeServer[] built = new KnowledgeServer[1];
+    root = new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+        org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+        (gpu, executors, ingestion, indexComponent, encoderComponent) -> {
+          built[0] = new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(gpu),
+              io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent);
+          return built[0];
+        }, 30_000, 5_000);
+    var client = deferIndexStart ? null : root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+    var load = deferIndexStart ? null : built[0].foregroundLoad();
+    var pacing = deferIndexStart ? null : built[0].appServices().indexingPacing();
+    if (!deferIndexStart) assertSame(load, pacing.foregroundLoad());
+    var release = new AtomicReference<CountDownLatch>();
+    var allReleases = new CopyOnWriteArrayList<CountDownLatch>();
+    var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    try (var handlers = Executors.newVirtualThreadPerTaskExecutor()) {
+      server.setExecutor(handlers);
+      server.createContext("/health", exchange -> {
+        exchange.sendResponseHeaders(200, -1);
+        exchange.close();
+      });
+      server.createContext("/props", exchange -> {
+        byte[] body = "{\"model_alias\":\"test-model\",\"n_ctx\":4096}".getBytes();
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+      });
+      server.createContext("/v1/chat/completions", exchange -> {
+        CountDownLatch finish = release.get();
+        try (exchange) {
+          exchange.getRequestBody().readAllBytes();
+          exchange.sendResponseHeaders(200, 0);
+          var body = exchange.getResponseBody();
+          body.write("data: {\"choices\":[{\"delta\":{\"content\":\"started\"}}]}\n\n".getBytes());
+          body.flush();
+          try { finish.await(); }
+          catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+          body.write("data: [DONE]\n\n".getBytes());
+        }
+      });
+      server.start();
+      var config = new io.justsearch.configuration.resolved.ResolvedConfigBuilder();
+      config.putDefault("justsearch.home", tempDir.toString());
+      config.putDefault("justsearch.server.exe", Files.writeString(tempDir.resolve("llama-server.exe"), "fixture").toString());
+      config.put("justsearch.llm.model_path", 400, "env_var", "test",
+          Files.writeString(tempDir.resolve("model.gguf"), "fixture").toString());
+      config.putDefault("justsearch.server.port", Integer.toString(server.getAddress().getPort()));
+      config.putDefault("justsearch.context.size", "4096");
+      config.putDefault("justsearch.gpu.layers", "0");
+      config.putDefault("justsearch.ai.disabled", "false");
+      config.putDefault("justsearch.llm.enabled", "true");
+      try (var manager = BootstrapInferenceFactory.createInferenceManager(root.executors(), true,
+          config.build(), tempDir.toString(), null, org.slf4j.LoggerFactory.getLogger(getClass()))) {
+        assertNotNull(manager);
+        manager.switchToOnlineMode();
+        // A producer that already exited must not be resurrected by later gate publication.
+        if (deferIndexStart) {
+          var completed = root.admission().admit(TestEngineContexts.FOREGROUND, false);
+          Runnable finished = BootstrapInferenceFactory.generationLifetime(root.executors()).apply(completed);
+          completed.close();
+          finished.run();
+          finished.run();
+          assertEquals(0, root.admission().activeWorkCount());
+        }
+        for (int scenario = firstScenario; scenario < scenarioLimit; scenario++) {
+          boolean detached = scenario == 3;
+          boolean foreground = scenario != 1 && !detached;
+          boolean cancel = scenario == 2;
+          var context = detached ? io.justsearch.app.services.intent.EngineProvenance.internal(
+              "generation-detach", io.justsearch.core.context.EngineContext.Survival.DURABLE,
+              io.justsearch.core.context.EngineContext.Urgency.FOREGROUND)
+              : foreground ? TestEngineContexts.FOREGROUND : TestEngineContexts.BACKGROUND;
+          var front = root.admission().admit(context, false);
+          var drained = new CountDownLatch(1);
+          front.onCompletion(drained::countDown);
+          try {
+            long beforeGeneration = 0;
+            if (!deferIndexStart) {
+              // Retrieval enters the real port once and completes before generation starts.
+              long beforeRetrieval = load.startedTotal();
+              client.search("empty generation retrieval", 10, front.context());
+              assertEquals(beforeRetrieval + (foreground ? 1 : 0), load.startedTotal());
+              assertEquals(0, load.inFlight());
+              beforeGeneration = load.startedTotal();
+            }
+            var firstChunk = new CountDownLatch(1);
+            var finish = new CountDownLatch(1);
+            allReleases.add(finish);
+            release.set(finish);
+            var terminal = new CompletableFuture<Throwable>();
+            manager.stream(List.of(Map.of("role", "user", "content", "answer")), null, 32,
+                chunk -> firstChunk.countDown(), null, ignored -> {}, null,
+                ignored -> terminal.complete(null), terminal::complete, null, true, front);
+            assertTrue(firstChunk.await(5, TimeUnit.SECONDS));
+            if (deferIndexStart) {
+              assertEquals(null, built[0], "generation is streaming before index construction");
+              if (detached) front.waitingClientGone();
+              front.close(); // The producer owns its work while the gate is unavailable.
+              client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+              load = built[0].foregroundLoad();
+              pacing = built[0].appServices().indexingPacing();
+              assertSame(load, pacing.foregroundLoad());
+              assertEquals(1, finish.getCount(), "upstream generation outlives index startup");
+            }
+            assertEquals(foreground ? 1 : 0, load.inFlight());
+            assertEquals(beforeGeneration + (foreground ? 1 : 0), load.startedTotal());
+            // Ignore retrieval cooldown: pacing must still see active foreground generation.
+            var afterCooldown = new io.justsearch.indexerworker.loop.pacing.IndexingPacing(load, 20, 0);
+            assertEquals(foreground, afterCooldown.foregroundBusy());
+            if (foreground) assertTrue(pacing.foregroundBusy());
+            front.close();
+            if (cancel) front.cancel("test-cancelled");
+            else finish.countDown();
+            Throwable outcome = terminal.get(5, TimeUnit.SECONDS);
+            if (cancel) assertInstanceOf(io.justsearch.app.api.EngineWorkCancelledException.class, outcome);
+            else assertEquals(null, outcome);
+            assertTrue(drained.await(5, TimeUnit.SECONDS));
+            assertEquals(0, load.inFlight());
+            assertFalse(afterCooldown.foregroundBusy());
+            if (cancel) assertEquals(1, finish.getCount(), "upstream has not finished its response");
+            finish.countDown();
+          } finally {
+            front.close();
+            allReleases.forEach(CountDownLatch::countDown);
+          }
+        }
+      } finally {
+        allReleases.forEach(CountDownLatch::countDown);
+        server.stop(0);
+      }
+    } finally {
+      root.close();
+      root.processResources().close();
+      root = null;
+    }
   }
 
   @Test

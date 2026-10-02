@@ -73,12 +73,97 @@ public final class EngineRoot implements WorkerHost {
   private final EngineResourcePolicy resources;
   private final EngineAdmissionController admission;
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
+  private final Object generationLock = new Object();
+  private final java.util.Set<GenerationLifetime> generations = new java.util.HashSet<>();
+  private ForegroundLoadGate foregroundLoadGate; // Guarded by generationLock.
   private final io.justsearch.core.component.EngineComponentRegistry components;
   private final io.justsearch.core.component.ComponentHandle indexComponent;
   private final io.justsearch.core.component.ComponentHandle encoderComponent;
 
   /** Process lifetime, deliberately independent of the restartable index-half close. */
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
+
+  /** Carries the pacing callback through existing bootstrap wiring without exposing the gauge. */
+  private final class GenerationExecutors implements io.justsearch.core.execution.EngineExecutorRegistry,
+      io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.GenerationLifetimeSource {
+    private final io.justsearch.core.execution.EngineExecutorRegistry delegate;
+
+    private GenerationExecutors(io.justsearch.core.execution.EngineExecutorRegistry delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override public java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable>
+        generationLifetime() {
+      return EngineRoot.this::beginGeneration;
+    }
+
+    @Override public Registration register(io.justsearch.core.execution.EngineExecutorSpec spec) {
+      return delegate.register(spec);
+    }
+    @Override public Limits limits(io.justsearch.core.execution.EngineExecutorSpec.Kind kind) {
+      return delegate.limits(kind);
+    }
+    @Override public int maxConcurrentWork() { return delegate.maxConcurrentWork(); }
+    @Override public int retryAfterSeconds() { return delegate.retryAfterSeconds(); }
+    @Override public io.justsearch.core.execution.EngineExecutorSnapshot snapshot() {
+      return delegate.snapshot();
+    }
+    @Override public void close() { delegate.close(); }
+  }
+
+  /** Track actual producers even while the API is serving before index composition. */
+  private Runnable beginGeneration(io.justsearch.app.api.EngineWorkHandle work) {
+    var generation = new GenerationLifetime(work.retain());
+    try {
+      synchronized (generationLock) {
+        generation.attach(foregroundLoadGate);
+        generations.add(generation);
+      }
+      return generation::close;
+    } catch (RuntimeException | Error failure) {
+      generation.close();
+      throw failure;
+    }
+  }
+
+  /** Publication and actual-exit removal cannot race to lose or resurrect foreground demand. */
+  private void publishForegroundLoadGate(ForegroundLoadGate gate) {
+    synchronized (generationLock) {
+      foregroundLoadGate = gate;
+      for (GenerationLifetime generation : generations) generation.attach(gate);
+    }
+  }
+
+  private final class GenerationLifetime implements AutoCloseable {
+    private final io.justsearch.app.api.EngineWorkHandle work;
+    private Runnable gateRelease;
+    private boolean closed;
+
+    private GenerationLifetime(io.justsearch.app.api.EngineWorkHandle work) { this.work = work; }
+
+    // Called only under generationLock. The gate reads current urgency, including detachment
+    // before publication, and remains the only producer of the existing indexing gauge.
+    private void attach(ForegroundLoadGate gate) {
+      Runnable previous = gateRelease;
+      gateRelease = null;
+      if (previous != null) previous.run();
+      if (gate != null) gateRelease = gate.callOwned(work, lifetime -> lifetime.retain());
+    }
+
+    @Override public void close() {
+      Runnable release;
+      synchronized (generationLock) {
+        if (closed) return;
+        closed = true;
+        generations.remove(this);
+        release = gateRelease;
+        gateRelease = null;
+      }
+      // Completion callbacks may call other root services; do not invoke them under our lock.
+      try { if (release != null) release.run(); }
+      finally { work.close(); }
+    }
+  }
 
   /** Final process teardown is separate from this host's restartable index close. */
   public io.justsearch.app.api.EngineProcessResources processResources() { return processResources; }
@@ -461,7 +546,7 @@ public final class EngineRoot implements WorkerHost {
       return owner == null ? null : owner.retainedEncoderCount();
     });
     this.admission = processResources.admission();
-    this.executors = processResources.executors();
+    this.executors = new GenerationExecutors(processResources.executors());
     this.components = processResources.components();
     this.indexComponent = new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(
         components.register(new io.justsearch.core.component.ComponentSpec("index", true,
@@ -530,10 +615,13 @@ public final class EngineRoot implements WorkerHost {
       }
       this.server = started;
     }
+    // THE gauge the indexing loop paces off, rather than IndexingPacing's pre-start orphan.
+    ForegroundLoadGate gate = new ForegroundLoadGate(started.foregroundLoad());
     started.onTerminalWriterFailure(
         failure -> acceptTerminalWriterFailure(started, failure));
     started.onMigrationRestart(() -> requestRestart(started));
     try {
+      publishForegroundLoadGate(gate);
       started.installProjectionSeedSources(projectionSeedSources);
       started.bindBootRootBindings(authority.roots().snapshotBindings());
       if (startContext != null) started.bindIndexStartContext(startContext);
@@ -552,16 +640,15 @@ public final class EngineRoot implements WorkerHost {
       }
       if (closed) {
         synchronized (terminalWriterFaultOwnerLock) {
-          if (this.server == started) this.server = null;
+          if (this.server == started) {
+            this.server = null;
+            publishForegroundLoadGate(null);
+          }
         }
       }
       throw failure;
     }
 
-    // THE gauge the indexing loop paces off, read from the field that owns it rather than from
-    // IndexingPacing: the pacing field starts as IndexingPacing.unthrottled(), whose gauge is a
-    // fresh orphan, and is only replaced with the real policy partway through start().
-    ForegroundLoadGate gate = new ForegroundLoadGate(started.foregroundLoad());
     EngineKnowledgeClient built =
         new EngineKnowledgeClient(executors, started::appServices, gate, deadlineMs, batchSize, telemetry,
             () -> requestRestart(started), admission, authority.roots(),
@@ -1007,7 +1094,10 @@ public final class EngineRoot implements WorkerHost {
         throw new IllegalStateException("Interrupted confirming in-process index close", e);
       }
       synchronized (terminalWriterFaultOwnerLock) {
-        if (server == s) server = null;
+        if (server == s) {
+          server = null;
+          publishForegroundLoadGate(null);
+        }
       }
     }
   }
