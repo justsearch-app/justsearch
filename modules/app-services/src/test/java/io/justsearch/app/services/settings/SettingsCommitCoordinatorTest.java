@@ -774,7 +774,7 @@ final class SettingsCommitCoordinatorTest {
       var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsPath);
       settings.replacePrepared(settings.prepareExact(new UiSettings(), new SettingsWitness(0, null)));
       byte[] originalBytes = Files.readAllBytes(settingsPath);
-      var initial = ConfigStoreRebuilder.prepare(settings.load());
+      var initial = io.justsearch.configuration.resolved.ResolvedConfig.builder().build();
       var config = new ConfigStore(initial);
       var registry = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.class);
       org.mockito.Mockito.when(registry.snapshot()).thenReturn(
@@ -786,19 +786,27 @@ final class SettingsCommitCoordinatorTest {
       org.mockito.Mockito.when(first.observation()).thenReturn(
           org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentSnapshot.Component.class));
       var components = new FixedSettingsComponentComposer(registry);
-      components.register("generative", (candidate, desired, keys) -> first);
+      components.register("generative", (candidate, desired, keys) -> {
+        assertEquals(Set.of("justsearch.context.size"), keys);
+        return first;
+      });
       components.register("index", (candidate, desired, keys) -> {
+        assertEquals(Set.of("index.directory.type"), keys);
         throw new SettingsCommitOwner.Refused(OperationResult.failure(
             "Index candidate refused", "COMPONENT_PREPARATION_REQUIRED",
             Map.of("component", "index"), false));
       });
       components.seal();
+      // Merge ae1576125 makes base_path restart-required; use an index component key instead.
       var owner = new SettingsCommitCoordinator(settings, config, () -> {},
-          candidate -> OperationResult.success("prepared"), () -> false, components);
+          candidate -> io.justsearch.configuration.resolved.ResolvedConfig.builder()
+              .putDefault("justsearch.context.size", Integer.toString(candidate.getContextLength()))
+              .putDefault("index.directory.type", "niofs").build(),
+          candidate -> OperationResult.success("prepared"), settings::replacePrepared,
+          () -> false, components);
       var runner = runner(operations, owner);
       UiSettings candidate = settings.load();
       candidate.setContextLength(initial.ai().contextSize() + 1024);
-      candidate.setIndexBasePath(temp.resolve("different-index").toString());
       var attempt = runner.accept(request(OperationKind.RECONFIGURE));
 
       var result = runner.start(attempt, handle -> OperationExecution.finished(
