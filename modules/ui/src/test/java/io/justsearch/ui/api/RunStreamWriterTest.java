@@ -308,6 +308,54 @@ final class RunStreamWriterTest {
   }
 
   @Test
+  void repeatedReconnectsRetainOnlyLiveRetirementRegistrations() {
+    RunChannel run = openAsk("run-reconnects");
+    Harness live = new Harness(null, null);
+    assertTrue(
+        RunStreamWriter.attach(live.client, run, live.scheduler, HEARTBEAT_SECONDS).isPresent());
+    int baseline = retirementRegistrationCount(run);
+    assertEquals(1, baseline);
+
+    for (int i = 0; i < 128; i++) {
+      Harness reconnect = new Harness(null, null);
+      assertTrue(
+          RunStreamWriter.attach(
+                  reconnect.client, run, reconnect.scheduler, HEARTBEAT_SECONDS)
+              .isPresent());
+      assertEquals(baseline + 1, retirementRegistrationCount(run));
+      assertEquals(2, run.observerCount());
+      reconnect.simulateClientClose();
+      reconnect.simulateClientClose();
+      assertFalse(run.retired(), "the run must remain live throughout reconnect history");
+      assertEquals(1, run.observerCount());
+      assertEquals(
+          baseline,
+          retirementRegistrationCount(run),
+          "disconnected clients must not remain in the run's retirement list: " + i);
+      assertTrue(reconnect.connectionFuture().isDone());
+      verify(reconnect.heartbeatFuture).cancel(false);
+      verify(reconnect.client).close();
+    }
+
+    registry.retire(run.id());
+    assertEquals(0, retirementRegistrationCount(run));
+    assertEquals(0, run.observerCount());
+    assertTrue(live.connectionFuture().isDone());
+    verify(live.client).close();
+    verify(live.heartbeatFuture).cancel(false);
+  }
+
+  private static int retirementRegistrationCount(RunChannel run) {
+    try {
+      var field = run.getClass().getSuperclass().getDeclaredField("retireListeners");
+      field.setAccessible(true);
+      return ((List<?>) field.get(run)).size();
+    } catch (ReflectiveOperationException failure) {
+      throw new AssertionError("cannot inspect retained retirement registrations", failure);
+    }
+  }
+
+  @Test
   @DisplayName("a close during run_started cannot create an observer or heartbeat")
   void closeDuringRunStartedReleasesBeforeResourcesAreCreated() {
     RunChannel run = openAsk("run-close-during-primer");
@@ -328,6 +376,7 @@ final class RunStreamWriterTest {
     assertEquals(List.of(RunStreamWriter.RUN_STARTED_EVENT), h.eventNames());
     assertEquals(1, creatorGone.get(), "the creator transition is one-shot");
     assertEquals(0, run.observerCount(), "the close happened before subscription creation");
+    assertEquals(0, retirementRegistrationCount(run));
     verify(h.scheduler, never())
         .scheduleAtFixedRate(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
     assertTrue(h.connectionFuture().isDone(), "the pre-created request future completes on close");
@@ -360,6 +409,7 @@ final class RunStreamWriterTest {
     verify(h.scheduler, never())
         .scheduleAtFixedRate(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
     assertTrue(h.connectionFuture().isDone());
+    assertEquals(0, retirementRegistrationCount(run));
   }
 
   @Test

@@ -153,8 +153,8 @@ public final class RunChannelObservation implements RunObservation {
     }
 
     @Override
-    public void onRetire(Runnable listener) {
-      channel.onRetire(listener);
+    public Runnable onRetire(Runnable listener) {
+      return channel.onRetire(listener);
     }
 
     @Override

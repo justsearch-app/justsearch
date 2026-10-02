@@ -21,6 +21,56 @@ final class RunRetirementRegistrationTest {
   private static final int ROUNDS = 10_000;
 
   @Test
+  void unregisterIsIdempotentAndIndependentForDuplicateListeners() throws Exception {
+    var registry = new RunChannelRegistry();
+    RunChannel run =
+        registry.open(
+            new RunId("unregister"),
+            new RunDescriptor("core.test", "", 1),
+            RunChannelPolicy.conversational());
+    var calls = new AtomicInteger();
+    Runnable listener = calls::incrementAndGet;
+    Runnable keep = run.onRetire(listener);
+    var field = AbstractRunChannel.class.getDeclaredField("retireListeners");
+    field.setAccessible(true);
+    var retained = (java.util.List<?>) field.get(run);
+    for (int i = 0; i < ROUNDS; i++) {
+      Runnable unregister = run.onRetire(listener);
+      assertEquals(2, retained.size());
+      unregister.run();
+      unregister.run();
+      assertEquals(1, retained.size(), "unregistered callbacks must leave the owner list");
+    }
+    registry.retire(run.id());
+    keep.run();
+    keep.run();
+    assertEquals(1, calls.get(), "only the registration left live may fire");
+    assertTrue(retained.isEmpty());
+    Runnable late = run.onRetire(listener);
+    late.run();
+    late.run();
+    assertEquals(2, calls.get(), "an already retired run still invokes a late callback once");
+    assertTrue(retained.isEmpty());
+  }
+
+  @Test
+  void unregisterAfterRetirementSnapshotCancelsCallbackBeforeNotification() {
+    var registry = new RunChannelRegistry();
+    RunChannel run =
+        registry.open(
+            new RunId("unregister-snapshot"),
+            new RunDescriptor("core.test", "", 1),
+            RunChannelPolicy.conversational());
+    var calls = new AtomicInteger();
+    Runnable unregister = run.onRetire(calls::incrementAndGet);
+    var listeners = ((AbstractRunChannel) run).markRetired();
+    assertEquals(1, listeners.size(), "callback was already captured for retirement delivery");
+    unregister.run();
+    AbstractRunChannel.notifyRetired(listeners);
+    assertEquals(0, calls.get(), "disconnect may cancel a captured callback that has not begun");
+  }
+
+  @Test
   void concurrentRegistrationAndRetirementDeliverEveryListenerExactlyOnce() throws Exception {
     var registry = new RunChannelRegistry();
     var callbacks = new AtomicInteger();
