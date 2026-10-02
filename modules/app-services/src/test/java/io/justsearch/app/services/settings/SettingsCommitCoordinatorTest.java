@@ -112,8 +112,10 @@ final class SettingsCommitCoordinatorTest {
     }
   }
 
-  @Test
-  void queryOwnerSelectionIsSerializedOnlyAfterPhysicalPreparation() throws Exception {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void queryOwnerSelectionIsSerializedOnlyAfterPhysicalPreparation(boolean sharedDependency)
+      throws Exception {
     Path settingsPath = temp.resolve("query-owner-settings.json");
     Path modelDir = temp.resolve("citation-model");
     var selection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
@@ -127,7 +129,7 @@ final class SettingsCommitCoordinatorTest {
         ComposeEvidence.Mode.IN_PLACE,
         "candidate_fits_after_source_release", 10L, 20L);
     SettingsComponentComposer components = (candidate, desired, affected) -> {
-      assertEquals(Set.of("encoders"), affected.keySet());
+      assertEquals(Set.of(sharedDependency ? "generative" : "encoders"), affected.keySet());
       assertFalse(Files.exists(settingsPath));
       preparedOwner.set(true);
       return new SettingsComponentComposer.Prepared() {
@@ -154,7 +156,8 @@ final class SettingsCommitCoordinatorTest {
           candidate -> OperationResult.success("prepared"), () -> false, components);
       var runner = runner(operations, owner);
       UiSettings candidate = new UiSettings();
-      candidate.setCitationScorerModelPath(modelDir.toString());
+      if (sharedDependency) candidate.setContextLength(config.get().ai().contextSize() + 1024);
+      else candidate.setCitationScorerModelPath(modelDir.toString());
       var attempt = runner.accept(request(OperationKind.RECONFIGURE));
 
       var result = runner.start(attempt, handle -> OperationExecution.finished(
@@ -527,8 +530,10 @@ final class SettingsCommitCoordinatorTest {
         String changedValue = "justsearch.rerank.top_k".equals(property)
             ? Integer.toString(config.get().ai().reranker().topK() + 1) : testCase[1];
         System.setProperty(property, changedValue);
-        var components = new FixedSettingsComponentComposer(org.mockito.Mockito.mock(
-            io.justsearch.core.component.EngineComponentRegistry.class));
+        var registry = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.class);
+        org.mockito.Mockito.when(registry.snapshot()).thenReturn(
+            new io.justsearch.core.component.EngineComponentSnapshot(0, List.of()));
+        var components = new FixedSettingsComponentComposer(registry);
         components.seal();
         var owner = new SettingsCommitCoordinator(settings, config, () -> {},
             candidateSettings -> OperationResult.success("prepared"), () -> false, components);
@@ -738,6 +743,8 @@ final class SettingsCommitCoordinatorTest {
       var initial = ConfigStoreRebuilder.prepare(settings.load());
       var config = new ConfigStore(initial);
       var registry = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.class);
+      org.mockito.Mockito.when(registry.snapshot()).thenReturn(
+          new io.justsearch.core.component.EngineComponentSnapshot(0, List.of()));
       var lease = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.ApplyLease.class);
       org.mockito.Mockito.when(registry.tryApply()).thenReturn(
           new io.justsearch.core.component.EngineComponentRegistry.ApplyAttempt.Acquired(lease));
@@ -789,6 +796,8 @@ final class SettingsCommitCoordinatorTest {
       var initial = ConfigStoreRebuilder.prepare(settings.load());
       var config = new ConfigStore(initial);
       var registry = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.class);
+      org.mockito.Mockito.when(registry.snapshot()).thenReturn(
+          new io.justsearch.core.component.EngineComponentSnapshot(0, List.of()));
       var lease = org.mockito.Mockito.mock(io.justsearch.core.component.EngineComponentRegistry.ApplyLease.class);
       org.mockito.Mockito.when(registry.tryApply()).thenReturn(
           new io.justsearch.core.component.EngineComponentRegistry.ApplyAttempt.Acquired(lease));

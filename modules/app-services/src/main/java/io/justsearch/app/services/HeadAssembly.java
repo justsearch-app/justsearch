@@ -76,6 +76,7 @@ public final class HeadAssembly implements AutoCloseable {
       EnvRegistry.SERVER_PORT.configKey(),
       EnvRegistry.CONTEXT_SIZE.configKey(),
       EnvRegistry.GPU_LAYERS.configKey(),
+      EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED.configKey(),
       EnvRegistry.LLM_SLOTS.configKey(),
       EnvRegistry.LLM_KV_TYPE.configKey(),
       EnvRegistry.USE_THINKING.configKey(),
@@ -1872,6 +1873,8 @@ public final class HeadAssembly implements AutoCloseable {
     // These launch controls live in the same resolved snapshot used to compose the server,
     // rather than in InferenceConfig. Recovery supplies the retained physical launch snapshot.
     values.put(EnvRegistry.LLM_SLOTS.configKey(), resolved.ai().llmSlots());
+    values.put(EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED.configKey(),
+        resolved.ai().gpuAccelerationAllowed());
     values.put(EnvRegistry.LLM_KV_TYPE.configKey(), resolved.ai().llmKvType());
     values.put(EnvRegistry.USE_THINKING.configKey(), resolved.ai().useThinking());
     values.put(EnvRegistry.REASONING_BUDGET.configKey(), resolved.ai().reasoningBudget());

@@ -756,6 +756,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
               "Encoder owner did not prepare a query-role selection", Map.of());
         }
         queryRoles = preparedComponents.queryRoleSelection().orElseThrow();
+      } else if (preparedComponents != null && preparedComponents.queryRoleSelection().isPresent()) {
+        // A shared dependency may select encoders through another governed primary owner.
+        queryRoles = preparedComponents.queryRoleSelection().orElseThrow();
       }
       // The physical candidate and its exact file identities exist before final serialization.
       var prepared = store.prepareExact(preparedCandidate, next, queryRoles);

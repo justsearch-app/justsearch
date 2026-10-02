@@ -21,6 +21,7 @@ import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
+import io.justsearch.configuration.resolved.ConfigApplyScopes;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.component.ComponentSpec;
 import io.justsearch.core.component.ComposeEvidence;
@@ -44,8 +45,76 @@ final class FixedSettingsComponentComposerTest {
       ComposeEvidence.Mode.IN_PLACE, "candidate_fits_after_source_release", 10L, 20L);
 
   @Test
+  void sharedPolicyDispatchesEveryDeclaredOwnerInOneBatch() {
+    String key = "policy.gpu_acceleration_enabled";
+    var before = ResolvedConfig.builder().putDefault(key, "true").build();
+    var after = ResolvedConfig.builder().putDefault(key, "false").build();
+    var affected = ConfigApplyScopes.classify(before, after).component();
+    assertEquals(Map.of("encoders", Set.of(key)), affected);
+    var registry = emptyRegistry();
+    when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0, List.of(
+        declared("encoders", Set.of(key)), declared("generative", Set.of(key)),
+        declared("index", Set.of("unrelated")))));
+    var lease = mock(EngineComponentRegistry.ApplyLease.class);
+    var batch = mock(EngineComponentRegistry.PreparedBatch.class);
+    when(registry.tryApply()).thenReturn(new Acquired(lease));
+    when(registry.prepareBatch(anyMap())).thenReturn(batch);
+    var query = mock(FixedSettingsComponentComposer.QueryRolePreparedOwner.class);
+    when(query.selection()).thenReturn(new QueryRoleSelection(
+        QueryRoleSelection.Role.disabled(), QueryRoleSelection.Role.disabled()));
+    when(query.composition()).thenReturn(java.util.Optional.of(QUERY_COMPOSITION));
+    when(query.observation()).thenReturn(declared("encoders", Set.of(key)));
+    var generative = new RecordingOwner("generative");
+    var composer = new FixedSettingsComponentComposer(registry);
+    composer.register("encoders", (candidate, desired, keys) -> {
+      assertEquals(Set.of(key), keys);
+      return query;
+    });
+    composer.register("generative", (candidate, desired, keys) -> {
+      assertEquals(Set.of(key), keys);
+      return generative.prepare(candidate, desired, keys);
+    });
+    composer.seal();
+
+    var prepared = composer.prepare(CANDIDATE, after, affected);
+    assertEquals(1, generative.preparedCount);
+    prepared.validate();
+    prepared.install();
+    prepared.notifyObservers();
+    prepared.retire();
+    verify(registry).prepareBatch(org.mockito.ArgumentMatchers.argThat(
+        rows -> rows.keySet().equals(Set.of("encoders", "generative"))));
+    verify(batch).install();
+    verify(query).install();
+    assertEquals(1, generative.prepared.installCount);
+    verify(lease).close();
+  }
+
+  @Test
+  void missingSharedConsumerRefusesBeforeTakingApplyPermit() {
+    String key = "policy.gpu_acceleration_enabled";
+    var registry = emptyRegistry();
+    when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0,
+        List.of(declared("generative", Set.of(key)))));
+    var composer = new FixedSettingsComponentComposer(registry);
+    composer.register("encoders", new RecordingOwner("encoders"));
+    composer.seal();
+    var refused = assertThrows(SettingsCommitOwner.Refused.class,
+        () -> composer.prepare(CANDIDATE, DESIRED, Map.of("encoders", Set.of(key))));
+    assertEquals("COMPONENT_PREPARATION_REQUIRED", refused.response().errorCode().orElseThrow());
+    assertEquals("generative", refused.response().errorDetails().get("component"));
+    verify(registry, never()).tryApply();
+  }
+
+  private static EngineComponentSnapshot.Component declared(String name, Set<String> keys) {
+    var spec = new ComponentSpec(name, false, keys, BESIDE, Duration.ofSeconds(1), 1);
+    return new EngineComponentSnapshot.Component(spec, READY, null, Instant.EPOCH, 0,
+        "applied-" + name, "desired-" + name, null, 0, null);
+  }
+
+  @Test
   void missingPhysicalOwnerRefusesWithAComponentCodeBeforeTakingApplyPermit() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     FixedSettingsComponentComposer composer = new FixedSettingsComponentComposer(registry);
     composer.seal();
 
@@ -59,7 +128,7 @@ final class FixedSettingsComponentComposerTest {
 
   @Test
   void encoderOwnerMustSupplyASelectionBeforeItsObservationCanCommit() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
     when(registry.tryApply()).thenReturn(new Acquired(lease));
     FixedSettingsComponentComposer composer = new FixedSettingsComponentComposer(registry);
@@ -76,7 +145,7 @@ final class FixedSettingsComponentComposerTest {
 
   @Test
   void encoderOwnerSelectionIsExposedByThePreparedComposite() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
     EngineComponentRegistry.PreparedBatch batch = mock(EngineComponentRegistry.PreparedBatch.class);
     AtomicReference<Map<String, EngineComponentSnapshot.Component>> replacements =
@@ -110,7 +179,7 @@ final class FixedSettingsComponentComposerTest {
 
   @Test
   void secondOwnerPreparationFailureAbortsEarlierOwnerAndClosesExactApplyLease() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
     when(registry.tryApply()).thenReturn(new Acquired(lease));
 
@@ -133,7 +202,7 @@ final class FixedSettingsComponentComposerTest {
 
   @Test
   void installedFaultObservationFallsBetweenFirstAndSecondOwnerPreparation() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
     when(registry.tryApply()).thenReturn(new Acquired(lease));
     RecordingOwner first = new RecordingOwner("first");
@@ -157,7 +226,7 @@ final class FixedSettingsComponentComposerTest {
 
   @Test
   void restoredOwnerMayAnnotateFailureWithoutRetainingTheApplyPermit() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     EngineComponentRegistry.ApplyLease firstLease = mock(EngineComponentRegistry.ApplyLease.class);
     EngineComponentRegistry.ApplyLease secondLease = mock(EngineComponentRegistry.ApplyLease.class);
     when(registry.tryApply()).thenReturn(new Acquired(firstLease), new Acquired(secondLease));
@@ -181,7 +250,7 @@ final class FixedSettingsComponentComposerTest {
 
   @Test
   void precommitValidationRefusalAbortsAllOwnersAndLeavesInstallationUntouched() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
     EngineComponentRegistry.PreparedBatch batch = mock(EngineComponentRegistry.PreparedBatch.class);
     when(registry.tryApply()).thenReturn(new Acquired(lease));
@@ -209,7 +278,7 @@ final class FixedSettingsComponentComposerTest {
 
   @Test
   void failedOwnerCleanupRetainsTheApplyPermit() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
     EngineComponentRegistry.PreparedBatch batch = mock(EngineComponentRegistry.PreparedBatch.class);
     when(registry.tryApply()).thenReturn(new Acquired(lease));
@@ -234,7 +303,7 @@ final class FixedSettingsComponentComposerTest {
 
   @Test
   void successfulInstallUsesOneBatchAndNotifiesAndRetiresOutsidePublicationLock() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
     EngineComponentRegistry.PreparedBatch batch = mock(EngineComponentRegistry.PreparedBatch.class);
     ReentrantReadWriteLock publicationLock = new ReentrantReadWriteLock();
@@ -302,7 +371,7 @@ final class FixedSettingsComponentComposerTest {
 
   @Test
   void generationObservationJoinsSettingsOwnerInOnePrecommitBatch() {
-    EngineComponentRegistry registry = mock(EngineComponentRegistry.class);
+    EngineComponentRegistry registry = emptyRegistry();
     EngineComponentRegistry.ApplyLease lease = mock(EngineComponentRegistry.ApplyLease.class);
     EngineComponentRegistry.PreparedBatch batch = mock(EngineComponentRegistry.PreparedBatch.class);
     AtomicReference<Map<String, EngineComponentSnapshot.Component>> replacements =
@@ -335,6 +404,12 @@ final class FixedSettingsComponentComposerTest {
     verify(registry, times(1)).prepareBatch(anyMap());
     verify(batch, times(1)).install();
     verify(lease).close();
+  }
+
+  private static EngineComponentRegistry emptyRegistry() {
+    var registry = mock(EngineComponentRegistry.class);
+    when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0, List.of()));
+    return registry;
   }
 
   private static FixedSettingsComponentComposer composer(EngineComponentRegistry registry,

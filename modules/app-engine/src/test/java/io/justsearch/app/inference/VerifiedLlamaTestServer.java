@@ -3,10 +3,13 @@ package io.justsearch.app.inference;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.gpu.GpuCapabilities;
+import io.justsearch.gpu.GpuCapabilitiesService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +22,8 @@ import org.mockito.MockedConstruction;
 public final class VerifiedLlamaTestServer implements AutoCloseable {
   private final AtomicReference<LlamaServerOps.StartResult> active = new AtomicReference<>();
   private final List<LlamaServerOps.StartRequest> starts = new ArrayList<>();
+  private final List<List<String>> commands = new ArrayList<>();
+  private final MockedConstruction<GpuCapabilitiesService> gpuConstruction;
   private final MockedConstruction<LlamaServerOps> construction;
   private Consumer<BooleanSupplier> failure;
   private Runnable healthProbe = () -> {};
@@ -28,11 +33,20 @@ public final class VerifiedLlamaTestServer implements AutoCloseable {
 
   @SuppressWarnings("unchecked") // Constructor's physical failure callback is typed by the manager.
   public VerifiedLlamaTestServer() {
+    gpuConstruction = mockConstruction(GpuCapabilitiesService.class, (gpu, context) -> {
+      var effective = mock(GpuCapabilities.Effective.class);
+      when(gpu.snapshot()).thenReturn(new GpuCapabilities(null, null, effective));
+    });
     construction = mockConstruction(LlamaServerOps.class, (server, context) -> {
       failure = (Consumer<BooleanSupplier>) context.arguments().get(6);
       when(server.startLlamaServer(any())).thenAnswer(invocation -> {
         LlamaServerOps.StartRequest request = invocation.getArgument(0);
         starts.add(request);
+        // Exercise production argument assembly as well as effective layer selection. Only
+        // process creation and probes are replaced; dropping real cache/GPU flags must fail.
+        commands.add(LlamaServerOps.buildLaunchCommand(request.context().inference(),
+            request.context().resolved(), request.effectiveGpuLayers(),
+            ContextWindowPolicy.override(request.context().inference().contextSize(), null)));
         verified = false;
         String hash = ManagedLlamaConfigIdentity.declaredHash(request.context().inference(),
             request.context().resolved(), request.effectiveGpuLayers());
@@ -77,6 +91,10 @@ public final class VerifiedLlamaTestServer implements AutoCloseable {
   public boolean verified() { return verified; }
   public int starts() { return starts.size(); }
   public ResolvedConfig lastResolved() { return starts.getLast().context().resolved(); }
+  public List<String> lastCommand() { return commands.getLast(); }
   public void failServing() { failure.accept(() -> true); }
-  @Override public void close() { construction.close(); }
+  @Override public void close() {
+    try { construction.close(); }
+    finally { gpuConstruction.close(); }
+  }
 }

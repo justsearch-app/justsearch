@@ -132,6 +132,7 @@ final class KnowledgeServerQueryPreparationTransactionTest {
       config = new ConfigStore(exactA);
 
       var registry = mock(EngineComponentRegistry.class);
+      when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0, List.of()));
       when(registry.tryApply())
           .thenReturn(new EngineComponentRegistry.ApplyAttempt.Acquired(applyLease));
       when(registry.prepareBatch(anyMap())).thenReturn(registryBatch);

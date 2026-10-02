@@ -43,6 +43,7 @@ final class HeadAssemblyComponentRegistryTest {
         EnvRegistry.SERVER_PORT.configKey(),
         EnvRegistry.CONTEXT_SIZE.configKey(),
         EnvRegistry.GPU_LAYERS.configKey(),
+        EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED.configKey(),
         EnvRegistry.LLM_SLOTS.configKey(),
         EnvRegistry.LLM_KV_TYPE.configKey(),
         EnvRegistry.USE_THINKING.configKey(),
@@ -74,13 +75,15 @@ final class HeadAssemblyComponentRegistryTest {
         .putDefault("justsearch.llm.kv_type", "q8_0")
         .putDefault("justsearch.llm.use_thinking", "true")
         .putDefault("justsearch.llm.reasoning_budget", "512")
+        .putDefault("policy.gpu_acceleration_enabled", "true")
         .build();
     String version = HeadAssembly.generativeAppliedVersion(applied, before);
     java.util.Map.of(
         "justsearch.llm.slots", "3",
         "justsearch.llm.kv_type", "f16",
         "justsearch.llm.use_thinking", "false",
-        "justsearch.llm.reasoning_budget", "256").forEach((key, value) -> {
+        "justsearch.llm.reasoning_budget", "256",
+        "policy.gpu_acceleration_enabled", "false").forEach((key, value) -> {
           var builder = ResolvedConfig.builder();
           before.resolutions().forEach((name, resolution) ->
               builder.putDefault(name, resolution.value()));

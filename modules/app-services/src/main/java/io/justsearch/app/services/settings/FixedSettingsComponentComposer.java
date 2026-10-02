@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,16 +89,18 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
       java.util.function.Consumer<String> afterOwnerPrepared) {
     Objects.requireNonNull(candidateContext, "candidateContext");
     Objects.requireNonNull(afterOwnerPrepared, "afterOwnerPrepared");
+    Map<String, Set<String>> dependencies;
     Map<String, Owner> selected = new LinkedHashMap<>();
     synchronized (this) {
       if (!sealed) throw new IllegalStateException("Component owners are not sealed");
-      affected.keySet().stream().sorted().forEach(name -> {
+      dependencies = affectedDependencies(affected);
+      dependencies.keySet().stream().sorted().forEach(name -> {
         Owner owner = owners.get(name);
         if (owner == null) {
           throw new SettingsCommitOwner.Refused(OperationResult.failure(
-              "Runtime component owner is unavailable: " + name + " for " + affected.get(name),
+              "Runtime component owner is unavailable: " + name + " for " + dependencies.get(name),
               "COMPONENT_PREPARATION_REQUIRED",
-              Map.of("component", name, "keys", affected.get(name)), true));
+              Map.of("component", name, "keys", dependencies.get(name)), true));
         }
         selected.put(name, owner);
       });
@@ -117,7 +121,7 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
       ComposeEvidence composition = null;
       for (var entry : selected.entrySet()) {
         PreparedOwner owner = Objects.requireNonNull(
-            entry.getValue().prepare(candidate, desired, affected.get(entry.getKey()),
+            entry.getValue().prepare(candidate, desired, dependencies.get(entry.getKey()),
                 "generative".equals(entry.getKey()) ? candidateContext
                     : io.justsearch.app.api.settings.SettingsCandidateContext.NONE),
             "Prepared owner: " + entry.getKey());
@@ -151,6 +155,26 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
       }
       throw failure;
     }
+  }
+
+  private Map<String, Set<String>> affectedDependencies(Map<String, Set<String>> affected) {
+    Map<String, Set<String>> expanded = new TreeMap<>();
+    Set<String> changed = new TreeSet<>();
+    affected.forEach((name, keys) -> {
+      expanded.put(name, new TreeSet<>(keys));
+      changed.addAll(keys);
+    });
+    // The governed scope names the primary owner. Shared inputs must prepare every declared
+    // consumer in the same transaction; GPU policy, for example, shapes encoders and inference.
+    for (var component : registry.snapshot().components()) {
+      Set<String> keys = new TreeSet<>(component.spec().dependencyKeys());
+      keys.retainAll(changed);
+      if (!keys.isEmpty()) {
+        expanded.computeIfAbsent(component.spec().name(), ignored -> new TreeSet<>()).addAll(keys);
+      }
+    }
+    expanded.replaceAll((name, keys) -> Set.copyOf(keys));
+    return Map.copyOf(expanded);
   }
 
   private static EngineComponentSnapshot.Component withComposition(
