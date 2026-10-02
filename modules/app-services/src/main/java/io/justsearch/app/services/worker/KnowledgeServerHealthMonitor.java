@@ -522,13 +522,16 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   private boolean escalateRetainedFailures() {
     if (!recoveryAttemptRunning.get() && !initialOwnerPending()) return false;
     for (var row : componentRegistry.snapshot().components()) {
-      if (!row.spec().essential() || !eligibleForComponentRecovery(row)) continue;
+      if (!row.spec().essential()) continue;
+      boolean expiredUnavailableOwner = row.state() == ComponentState.UNAVAILABLE
+          && retainedOwnerDeadlineExceeded(row, true);
+      if (!eligibleForComponentRecovery(row) && !expiredUnavailableOwner) continue;
       boolean exhausted;
       synchronized (componentRecoveryLock) {
         var episode = componentEpisodes.get(row.spec().name());
         exhausted = recoveryBudgetExhausted(row, episode);
       }
-      boolean retained = retainedOwnerDeadlineExceeded(row, false);
+      boolean retained = expiredUnavailableOwner || retainedOwnerDeadlineExceeded(row, false);
       if (!exhausted && !retained && !immediateEscalation(row)) continue;
       String reason = row.reasonCode();
       String evidence = row.evidence();

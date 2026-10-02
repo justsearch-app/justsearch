@@ -582,6 +582,91 @@ final class ComponentRecoveryMonitorTest {
   }
 
   @Test
+  void initialUnavailableOwnerEscalatesAtItsRetentionDeadlineWithoutReplacement()
+      throws Exception {
+    try (var components = new TestEngineComponents()) {
+      var index = components.register(spec("index", true, Duration.ofSeconds(60), 2));
+      index.transition(ComponentState.READY, null, "initial owner published readiness");
+      var startup = new CompletableFuture<Void>();
+      var nowNanos = new AtomicLong();
+      var escalations = new AtomicInteger();
+      try (var monitor = monitor(components, bootstrapWithoutClient(), nowNanos::get)) {
+        monitor.componentRecoveryBindings(bindings(components, request -> {
+          throw new AssertionError("the initial owner must retain its physical open");
+        }), ignored -> escalations.incrementAndGet());
+        monitor.observeInitialStartup(startup);
+        assertTrue(index.transitionIfUnchanged(index.snapshot(), ComponentState.UNAVAILABLE,
+            LifecycleReasonCode.INDEX_FAILED.code(), "fresh contact observation failed"));
+        nowNanos.set(Duration.ofSeconds(60).toNanos() - 1);
+
+        monitor.tick();
+        assertEquals(ComponentState.UNAVAILABLE, index.snapshot().state());
+        assertEquals(0, escalations.get());
+        nowNanos.incrementAndGet();
+        monitor.tick();
+        monitor.tick();
+
+        assertEquals(ComponentState.FAILED, index.snapshot().state());
+        assertEquals(LifecycleReasonCode.INDEX_FAILED.code(), index.snapshot().reasonCode());
+        assertEquals(1, escalations.get());
+        assertEquals(0, index.snapshot().recoveryAttempts());
+        assertFalse(startup.isDone(), "deadline observation must not cancel physical ownership");
+      }
+    }
+  }
+
+  @Test
+  void expiredOptionalOwnerCannotOverwriteUnrelatedIndexObservations() throws Exception {
+    for (var state : new ComponentState[] {
+        ComponentState.STARTING, ComponentState.UNAVAILABLE, ComponentState.READY}) {
+      try (var components = new TestEngineComponents()) {
+        var index = components.register(spec("index", true, Duration.ofSeconds(180), 2));
+        var optional = components.register(spec("generative", false, Duration.ofSeconds(60), 2));
+        index.transition(state, null, "unrelated index observation");
+        optional.transition(ComponentState.FAILED, LifecycleReasonCode.INFERENCE_CRASHED.code(),
+            "optional owner lost");
+        var nowNanos = new AtomicLong();
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var escalations = new AtomicInteger();
+        var actionFailure = new AtomicReference<Throwable>();
+        ComponentRecoveryAction action = request -> {
+          assertEquals("generative", request.expected().spec().name());
+          assertTrue(request.begin());
+          entered.countDown();
+          assertTrue(release.await(5, TimeUnit.SECONDS));
+          return failed(request, optional, LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code(),
+              "optional owner eventually returned");
+        };
+        try (var monitor = monitor(components, bootstrapWithoutClient(), nowNanos::get)) {
+          monitor.componentRecoveryBindings(bindings(components, observed(actionFailure, action)),
+              ignored -> escalations.incrementAndGet());
+          try {
+            assertEquals(ComponentRecoveryAuthority.Outcome.ACCEPTED,
+                monitor.requestComponentRecovery("generative"));
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            nowNanos.set(Duration.ofSeconds(60).toNanos());
+
+            monitor.tick();
+            monitor.tick();
+
+            assertEquals(state, index.snapshot().state(), "only the matching owner can expire");
+            assertEquals(ComponentState.FAILED, optional.snapshot().state());
+            assertEquals(0, escalations.get(), "optional failure cannot restart a healthy index");
+            assertEquals(0, index.snapshot().recoveryAttempts());
+            assertTrue(monitor.recoveryAttemptRunningForTest());
+          } finally {
+            release.countDown();
+            awaitIdle(monitor);
+          }
+          assertEquals(1, optional.snapshot().recoveryAttempts());
+          assertNoAsyncFailure(actionFailure);
+        }
+      }
+    }
+  }
+
+  @Test
   void unrelatedRecoveryUsesItsOwnLongerDeadlineBeforeEscalatingEssentialFailure()
       throws Exception {
     assertOptionalOwnerRetention(Duration.ofSeconds(60), Duration.ofSeconds(180),
