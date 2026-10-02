@@ -97,3 +97,24 @@ reuses configuration cache, and changed PMD input invalidates correctly. Compare
 the full affected-module case identities/skips with baseline. Hosted execution
 and advisory-budget review remain with the root owner; installed Engine tiers
 still require separate authorization and are not part of this packet.
+
+## Root verification (2026-10-02, at `9b8412533`)
+
+Run by the lane root on Windows 11 / OpenJDK 25.0.2, one Gradle build at a
+time, idle stack. Logs under the worktree's gitignored `tmp/bf/`.
+
+| Check | Result |
+| --- | --- |
+| `spotlessCheck` (app-engine, app-launcher) | pass |
+| `EngineNativePointerBootMutationTest`, `--rerun-tasks --no-build-cache` | 2/2 pass, 0 skipped, suite 28.6 s (was a 180 s timeout green) |
+| Planted wrong journal snapshot in the post-pointer witness | fails as required: "post-pointer cancellation must retain the exact B journal snapshot"; file restored |
+| `:modules:app-engine:test` (full) | pass, 8 min 20 s |
+| `NativeInferenceContainmentTest`, no build cache | 3/3 pass (JUnit and ArchUnit engines) |
+| `:modules:app-launcher:test` (full) | pass |
+| `pmdIntegrationTest` twice, `--configuration-cache-problems=fail` | pass; second run "Configuration cache entry reused" |
+| `check-workflow-triggers`, `verify-unit-test-shard-policy` and its test | pass |
+| `build -x test` | pass |
+
+Not run here: the three-run warm performance comparison, the planted
+EncoderSet-absence graph for the ArchUnit presence guard, and hosted execution
+of the new platform-contracts entry (runs on the next push).
