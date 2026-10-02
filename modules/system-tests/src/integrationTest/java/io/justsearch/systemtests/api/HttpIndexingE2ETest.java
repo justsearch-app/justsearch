@@ -1,8 +1,8 @@
 package io.justsearch.systemtests.api;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import io.justsearch.systemtests.harness.IsolatedBackendFixture;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -35,12 +35,11 @@ import org.slf4j.LoggerFactory;
  *   <li>Remove root doesn't clean up documents</li>
  * </ul>
  *
- * <p>REQUIRES a running JustSearch server with worker available.
+ * <p>Starts an isolated lite-mode Engine on an ephemeral port for this class.
  *
  * <p>Run with:
  * <pre>
- *   ./gradlew :modules:system-tests:integrationTest --tests "*HttpIndexingE2ETest*" \
- *       -Djustsearch.api.port=9001
+ *   ./gradlew :modules:system-tests:integrationTest --tests "*HttpIndexingE2ETest*"
  * </pre>
  */
 @DisplayName("HTTP Indexing E2E Tests")
@@ -52,8 +51,7 @@ class HttpIndexingE2ETest {
 
     private static HttpClient client;
     private static int port;
-    private static boolean serverAvailable = false;
-    private static boolean workerAvailable = false;
+    private static final IsolatedBackendFixture BACKEND = new IsolatedBackendFixture();
 
     // Timeouts
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
@@ -72,22 +70,16 @@ class HttpIndexingE2ETest {
     private Path testFile;
 
     @BeforeAll
-    static void setup() {
-        port = Integer.getInteger("justsearch.api.port", 8080);
-        client = HttpClient.newBuilder()
-            .connectTimeout(CONNECT_TIMEOUT)
-            .build();
+    static void setup() throws Exception {
+        BACKEND.start();
+        port = BACKEND.port();
+        client = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
+        HttpHealthAssertions.assertIndexReady(client, port);
+    }
 
-        serverAvailable = checkServerAvailable();
-        if (!serverAvailable) {
-            log.warn("⚠️  Server not available at localhost:{}", port);
-            return;
-        }
-
-        workerAvailable = checkWorkerAvailable();
-        if (!workerAvailable) {
-            log.warn("⚠️  Worker not available - indexing tests will be skipped");
-        }
+    @AfterAll
+    static void teardown() {
+        BACKEND.stop();
     }
 
     @BeforeEach
@@ -100,7 +92,7 @@ class HttpIndexingE2ETest {
     @AfterEach
     void cleanupTempFolder() {
         // Remove root from server (if added)
-        if (tempFolder != null && serverAvailable) {
+        if (tempFolder != null) {
             try {
                 removeRoot(tempFolder.toAbsolutePath().toString());
                 log.debug("Removed root from server: {}", tempFolder);
@@ -120,39 +112,6 @@ class HttpIndexingE2ETest {
                 log.warn("Failed to delete temp folder: {}", e.getMessage());
             }
         }
-    }
-
-    private static boolean checkServerAvailable() {
-        try {
-            var resp = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/status"))
-                    .timeout(Duration.ofSeconds(2))
-                    .build(),
-                HttpResponse.BodyHandlers.ofString()
-            );
-            return resp.statusCode() == 200;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private static boolean checkWorkerAvailable() {
-        try {
-            var resp = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/health"))
-                    .timeout(REQUEST_TIMEOUT)
-                    .build(),
-                HttpResponse.BodyHandlers.ofString()
-            );
-            if (resp.statusCode() == 200) {
-                JsonNode json = MAPPER.readTree(resp.body());
-                String workerState = json.path("components").path("worker").path("state").asText("");
-                return "READY".equals(workerState);
-            }
-        } catch (Exception e) {
-            log.debug("Worker check failed: {}", e.getMessage());
-        }
-        return false;
     }
 
     // =========================================================================
@@ -428,8 +387,6 @@ class HttpIndexingE2ETest {
     @Order(1)
     @DisplayName("Add root folder and verify documents become searchable")
     void addRootAndVerifyDocumentsSearchable() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // 1. Create test file with unique content
         testFile = tempFolder.resolve("test-document-" + UNIQUE_MARKER + ".txt");
@@ -454,8 +411,6 @@ class HttpIndexingE2ETest {
     @Order(2)
     @DisplayName("Remove root folder and verify documents are deleted")
     void removeRootAndVerifyDocumentsDeleted() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // 1. Create and index a test file
         // NOTE: Search queries are parsed by Lucene queryparser. Avoid special chars (e.g. '-') in test markers.
@@ -489,8 +444,6 @@ class HttpIndexingE2ETest {
     @Order(3)
     @DisplayName("Reindex with force flag updates document content")
     void reindexWithForceUpdatesContent() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // 1. Create and index initial content
         // NOTE: Avoid '-' in markers (Lucene queryparser interprets it as NOT).
@@ -525,8 +478,6 @@ class HttpIndexingE2ETest {
     @Order(4)
     @DisplayName("Add root with empty folder succeeds without errors")
     void addRootWithEmptyFolderSucceeds() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // Folder is already empty (created in @BeforeEach)
         // Add empty folder as root - should succeed or gracefully handle without crashing
@@ -552,8 +503,6 @@ class HttpIndexingE2ETest {
     @Order(5)
     @DisplayName("Multiple files in folder are all indexed")
     void multipleFilesInFolderAreIndexed() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // 1. Create multiple test files
         String marker1 = "MultiFile1" + UUID.randomUUID().toString().substring(0, 8);
@@ -589,8 +538,6 @@ class HttpIndexingE2ETest {
     @Order(6)
     @DisplayName("Subfolder files are indexed recursively")
     void subfolderFilesAreIndexedRecursively() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // 1. Create nested folder structure
         Path subFolder = tempFolder.resolve("subfolder");

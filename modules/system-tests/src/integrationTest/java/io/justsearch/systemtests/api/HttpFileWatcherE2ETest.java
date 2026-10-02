@@ -1,8 +1,8 @@
 package io.justsearch.systemtests.api;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import io.justsearch.systemtests.harness.IsolatedBackendFixture;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -40,12 +40,11 @@ import org.slf4j.LoggerFactory;
  *   <li>Watcher debouncing breaks event delivery</li>
  * </ul>
  *
- * <p>REQUIRES a running JustSearch server with worker available.
+ * <p>Starts an isolated lite-mode Engine on an ephemeral port for this class.
  *
  * <p>Run with:
  * <pre>
- *   ./gradlew :modules:system-tests:integrationTest --tests "*HttpFileWatcherE2ETest*" \
- *       -Djustsearch.api.port=9001
+ *   ./gradlew :modules:system-tests:integrationTest --tests "*HttpFileWatcherE2ETest*"
  * </pre>
  *
  * <p><b>Note:</b> These tests may be flaky on Windows due to WatchService latency.
@@ -63,8 +62,7 @@ class HttpFileWatcherE2ETest {
 
     private static HttpClient client;
     private static int port;
-    private static boolean serverAvailable = false;
-    private static boolean workerAvailable = false;
+    private static final IsolatedBackendFixture BACKEND = new IsolatedBackendFixture();
 
     // Timeouts - generous for file watcher latency
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
@@ -78,22 +76,16 @@ class HttpFileWatcherE2ETest {
     private Path tempFolder;
 
     @BeforeAll
-    static void setup() {
-        port = Integer.getInteger("justsearch.api.port", 8080);
-        client = HttpClient.newBuilder()
-            .connectTimeout(CONNECT_TIMEOUT)
-            .build();
+    static void setup() throws Exception {
+        BACKEND.start();
+        port = BACKEND.port();
+        client = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
+        HttpHealthAssertions.assertIndexReady(client, port);
+    }
 
-        serverAvailable = checkServerAvailable();
-        if (!serverAvailable) {
-            log.warn("⚠️  Server not available at localhost:{}", port);
-            return;
-        }
-
-        workerAvailable = checkWorkerAvailable();
-        if (!workerAvailable) {
-            log.warn("⚠️  Worker not available - file watcher tests will be skipped");
-        }
+    @AfterAll
+    static void teardown() {
+        BACKEND.stop();
     }
 
     @BeforeEach
@@ -106,7 +98,7 @@ class HttpFileWatcherE2ETest {
     @AfterEach
     void cleanupTempFolder() {
         // Remove root from server (if added)
-        if (tempFolder != null && serverAvailable) {
+        if (tempFolder != null) {
             try {
                 removeRoot(tempFolder.toAbsolutePath().toString());
                 log.debug("Removed root from server: {}", tempFolder);
@@ -126,39 +118,6 @@ class HttpFileWatcherE2ETest {
                 log.warn("Failed to delete temp folder: {}", e.getMessage());
             }
         }
-    }
-
-    private static boolean checkServerAvailable() {
-        try {
-            var resp = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/status"))
-                    .timeout(Duration.ofSeconds(2))
-                    .build(),
-                HttpResponse.BodyHandlers.ofString()
-            );
-            return resp.statusCode() == 200;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private static boolean checkWorkerAvailable() {
-        try {
-            var resp = client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/health"))
-                    .timeout(REQUEST_TIMEOUT)
-                    .build(),
-                HttpResponse.BodyHandlers.ofString()
-            );
-            if (resp.statusCode() == 200) {
-                JsonNode json = MAPPER.readTree(resp.body());
-                String workerState = json.path("components").path("worker").path("state").asText("");
-                return "READY".equals(workerState);
-            }
-        } catch (Exception e) {
-            log.debug("Worker check failed: {}", e.getMessage());
-        }
-        return false;
     }
 
     // =========================================================================
@@ -419,8 +378,6 @@ class HttpFileWatcherE2ETest {
     @Order(1)
     @DisplayName("New file created AFTER adding root becomes searchable via watcher")
     void newFileCreatedAfterAddingRootBecomesSearchable() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // 1. Add EMPTY root folder first (starts watcher)
         boolean added = addRoot(tempFolder.toAbsolutePath().toString());
@@ -453,8 +410,6 @@ class HttpFileWatcherE2ETest {
     @Order(2)
     @DisplayName("Modified file content is updated in index via watcher")
     void modifiedFileContentUpdatedViaWatcher() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // 1. Create initial file in temp folder
         String initialMarker = "WatcherModifyInitial" + UUID.randomUUID().toString().substring(0, 8);
@@ -494,8 +449,6 @@ class HttpFileWatcherE2ETest {
     @Order(3)
     @DisplayName("Deleted file is removed from index via watcher")
     void deletedFileRemovedFromIndexViaWatcher() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // 1. Create initial file in temp folder
         String marker = "WatcherDeleteTest" + UUID.randomUUID().toString().substring(0, 8);
@@ -534,8 +487,6 @@ class HttpFileWatcherE2ETest {
     @Order(4)
     @DisplayName("File created in subdirectory is indexed via watcher")
     void fileCreatedInSubdirectoryIndexedViaWatcher() throws Exception {
-        assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-        assumeTrue(workerAvailable, "❌ Worker not available");
 
         // 1. Create subdirectory BEFORE adding root
         Path subFolder = tempFolder.resolve("watched-subfolder");

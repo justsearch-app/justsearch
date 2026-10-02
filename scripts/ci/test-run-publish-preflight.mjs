@@ -7,7 +7,15 @@ import {
   commandForPlatform,
   executeLocalSubsets,
 } from './run-publish-preflight.mjs';
-import { validatePublicCiLocalRepro } from './lib/public-ci-local-repro.mjs';
+import { loadPublicCiLocalRepro, validatePublicCiLocalRepro } from './lib/public-ci-local-repro.mjs';
+
+const repositoryManifest = loadPublicCiLocalRepro();
+const lifecycle = repositoryManifest.contexts.filter((entry) => entry.check === 'Engine lifecycle tests (model-free)');
+assert.equal(lifecycle.length, 1, 'the required lifecycle check needs exactly one reproduction entry');
+assert.equal(lifecycle[0].mode, 'local-subset');
+assert.deepEqual(lifecycle[0].commands, [
+  './gradlew.bat :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain',
+]);
 
 const signalPolicy = {
   workflows: [{ blocking: true, requiredStatusChecks: ['Local', 'Hosted'] }],
