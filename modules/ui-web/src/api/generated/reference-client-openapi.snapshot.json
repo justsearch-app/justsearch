@@ -42,6 +42,9 @@
       },
       "runtime-ready-response": {
         "$ref": "/api/schemas/runtime-ready-response.v1.json"
+      },
+      "runtime-ready-unavailable-response": {
+        "$ref": "/api/schemas/runtime-ready-unavailable-response.v1.json"
       }
     }
   },
@@ -67,6 +70,16 @@
             "description": "Successful response."
           },
           "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "429": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3610,6 +3623,26 @@
               }
             },
             "description": "Error response."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
           }
         },
         "summary": "GET /api/runtime/live",
@@ -3647,6 +3680,16 @@
             "description": "Successful response."
           },
           "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "429": {
             "content": {
               "application/json": {
                 "schema": {
@@ -3723,11 +3766,21 @@
             },
             "description": "Error response."
           },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
           "503": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/runtime-ready-response"
+                  "$ref": "#/components/schemas/runtime-ready-unavailable-response"
                 }
               }
             },
@@ -3830,6 +3883,26 @@
             "description": "Successful response."
           },
           "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -4154,7 +4227,7 @@
   },
   "x-justsearch-route-source": {
     "routeCount": 245,
-    "routeDigest": "sha256:5159d9dc9277aeaf546da78b6bb04a2d7ca161d906a4d3158742c0c48969a469"
+    "routeDigest": "sha256:e13b8e9f427885e5dac57759ac9fdae077cbdcadc1ac0d2395b2233805397c16"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

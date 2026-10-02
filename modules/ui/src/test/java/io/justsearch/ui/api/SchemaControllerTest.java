@@ -55,6 +55,41 @@ final class SchemaControllerTest {
   }
 
   @Test
+  void servedReadinessUnavailableSchemaValidatesWithoutExternalSchemas() throws Exception {
+    Context ctx = mock(Context.class);
+    when(ctx.pathParam("name")).thenReturn("runtime-ready-unavailable-response.v1.json");
+    when(ctx.contentType(anyString())).thenReturn(ctx);
+    when(ctx.header(anyString(), anyString())).thenReturn(ctx);
+    controller.handle(ctx);
+    var body = org.mockito.ArgumentCaptor.forClass(byte[].class);
+    verify(ctx).result(body.capture());
+    verify(ctx, never()).status(404);
+    var mapper = new ObjectMapper();
+    var served = mapper.readTree(body.getValue());
+    assertEquals("#/$defs/ReadinessResponse", served.at("/oneOf/0/$ref").asString());
+    assertEquals("#/$defs/ApiErrorResponse", served.at("/oneOf/1/$ref").asString());
+    var registry = com.networknt.schema.SchemaRegistry.withDefaultDialect(
+        com.networknt.schema.SpecificationVersion.DRAFT_2020_12);
+    var context = new com.networknt.schema.SchemaContext(
+        registry.getDialect(com.networknt.schema.SpecificationVersion.DRAFT_2020_12.getDialectId()),
+        registry);
+    var schema = context.newSchema(
+        com.networknt.schema.SchemaLocation.of(
+            "http://127.0.0.1/api/schemas/runtime-ready-unavailable-response.v1.json"),
+        served, null);
+    assertTrue(schema.validate(mapper.readTree("""
+        {"ready":false,"lifecycle":null,"instanceId":null}
+        """)).isEmpty());
+    assertTrue(schema.validate(mapper.readTree("""
+        {"error":"Engine work refused: FROZEN","errorCode":"UPGRADE_PREPARING",
+         "errorClass":"TRANSIENT","retryable":true,"retrySafe":true}
+        """)).isEmpty());
+    for (String invalid : java.util.List.of("{}", "{\"ready\":false}", "{\"error\":\"refused\"}")) {
+      assertFalse(schema.validate(mapper.readTree(invalid)).isEmpty(), invalid);
+    }
+  }
+
+  @Test
   void advertisedRecoverySchemaIsServedWithConditionArguments() throws Exception {
     Context ctx = mock(Context.class);
     when(ctx.pathParam("name")).thenReturn("condition-recovery-index.v1.json");

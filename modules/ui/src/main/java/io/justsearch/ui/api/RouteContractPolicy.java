@@ -187,6 +187,7 @@ final class RouteContractPolicy {
               Map.of(
                   200, "runtime-manifest-public.v2.json",
                   403, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json",
                   500, "api-error-response.v1.json",
                   503, "api-error-response.v1.json")),
           contract(
@@ -197,6 +198,7 @@ final class RouteContractPolicy {
               Map.of(
                   200, "runtime-manifest-public.v2.json",
                   403, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json",
                   500, "api-error-response.v1.json",
                   503, "api-error-response.v1.json")),
           contract(
@@ -207,13 +209,18 @@ final class RouteContractPolicy {
               Map.of(
                   200, "runtime-ready-response.v1.json",
                   403, "api-error-response.v1.json",
-                  503, "runtime-ready-response.v1.json")),
+                  429, "api-error-response.v1.json",
+                  503, "runtime-ready-unavailable-response.v1.json")),
           contract(
               "GET",
               "/api/runtime/live",
               Stability.PUBLIC_CONTRACT,
               "getRuntimeLiveness",
-              Map.of(200, "runtime-live-response.v1.json", 403, "api-error-response.v1.json")),
+              Map.of(
+                  200, "runtime-live-response.v1.json",
+                  403, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json",
+                  503, "api-error-response.v1.json")),
           contract(
               "GET",
               "/api/health",
@@ -228,7 +235,11 @@ final class RouteContractPolicy {
               "/api/status",
               Stability.PUBLIC_CONTRACT,
               "getLifecycleStatus",
-              Map.of(200, "lifecycle-snapshot.v2.json", 403, "api-error-response.v1.json")));
+              Map.of(
+                  200, "lifecycle-snapshot.v2.json",
+                  403, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json",
+                  503, "api-error-response.v1.json")));
 
   private static final Map<String, Contract> BY_KEY = index(CONTRACTS);
 

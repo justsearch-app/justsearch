@@ -88,6 +88,7 @@ public final class SchemaController {
           // Tempdoc 899 D6: canonical schemas for the six-operation runtime client projection.
           "runtime-manifest-public.v2.json",
           "runtime-ready-response.v1.json",
+          "runtime-ready-unavailable-response.v1.json",
           "runtime-live-response.v1.json",
           "lifecycle-snapshot.v2.json",
           "api-error-response.v1.json");

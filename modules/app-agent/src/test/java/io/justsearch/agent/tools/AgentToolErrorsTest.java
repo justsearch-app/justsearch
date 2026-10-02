@@ -4,10 +4,17 @@ package io.justsearch.agent.tools;
 import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
+import io.justsearch.agent.EngineContextTestFixtures;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ApiErrorCode;
+import io.justsearch.app.api.EngineAdmissionException;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -133,6 +140,55 @@ class AgentToolErrorsTest {
             "core_ingest_files", "Ingest error", new IllegalStateException("port already bound"));
     assertEquals(ApiErrorCode.INTERNAL_ERROR, codeOf(r));
     assertEquals("Ingest error: port already bound", r.message());
+  }
+
+  @Test
+  @DisplayName("direct and future-wrapped admission refusals retain their identity for the transport")
+  void admissionRefusalsEscapeClassification() {
+    for (var reason : EngineAdmissionException.Reason.values()) {
+      var refusal = new EngineAdmissionException(reason, 7);
+      for (Throwable failure : new Throwable[] {
+          refusal,
+          new CompletionException(refusal),
+          new ExecutionException(refusal),
+          new CompletionException(new ExecutionException(refusal)),
+          new ExecutionException(new CompletionException(refusal))
+      }) {
+        assertSame(refusal, assertThrows(EngineAdmissionException.class,
+            () -> AgentToolErrors.classify("core_browse_folders", "Browse error", failure)));
+      }
+    }
+  }
+
+  @Test
+  void siblingHandlersPreserveAdmissionRefusals() {
+    var refusal = new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, 7);
+    String path = Path.of(".").toAbsolutePath().normalize().resolve("q13-admission")
+        .toString().replace("\\", "\\\\");
+    for (RuntimeException failure : new RuntimeException[] {
+        refusal, new CompletionException(new ExecutionException(refusal))
+    }) {
+      var search = new SearchTool((request, context) -> { throw failure; });
+      assertSame(refusal, assertThrows(EngineAdmissionException.class,
+          () -> search.execute("{\"query\":\"test\"}", EngineContextTestFixtures.AGENT_LOOP)));
+
+      var read = new ReadDocumentTool((docId, offset, maxChars, context) -> { throw failure; });
+      String readArguments = "{\"path\":\"" + path + "\"}";
+      assertSame(refusal, assertThrows(EngineAdmissionException.class,
+          () -> read.execute(readArguments, EngineContextTestFixtures.AGENT_LOOP)));
+
+      var asyncRead = new ReadDocumentTool((docId, offset, maxChars, context) ->
+          CompletableFuture.failedFuture(failure));
+      assertSame(refusal, assertThrows(EngineAdmissionException.class,
+          () -> asyncRead.execute(readArguments, EngineContextTestFixtures.AGENT_LOOP)));
+
+      var files = new FileOperationsTool(context -> { throw failure; },
+          (mappings, context) -> { throw new AssertionError("Refusal must prevent file effects"); },
+          mock(FileOperationLog.class));
+      String fileArguments = "{\"operations\":[{\"op\":\"MKDIR\",\"destination\":\"" + path + "\"}]}";
+      assertSame(refusal, assertThrows(EngineAdmissionException.class,
+          () -> files.execute(fileArguments, EngineContextTestFixtures.AGENT_LOOP)));
+    }
   }
 
   @Test

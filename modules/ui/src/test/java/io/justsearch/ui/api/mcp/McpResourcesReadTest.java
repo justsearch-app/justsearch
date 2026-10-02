@@ -4,6 +4,8 @@ import io.justsearch.core.context.EngineContext;
 import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -42,6 +44,40 @@ final class McpResourcesReadTest {
       Clock.fixed(Instant.parse("2026-08-14T12:00:00Z"), ZoneId.of("UTC"));
 
   private static final List<String> EXPECTED_KEY_ORDER = List.of("uri", "mimeType", "text");
+
+  @Test
+  void optionalAnswerStatusPreservesWrappedAdmissionRefusal() {
+    var adapter = mock(KnowledgeHttpApiAdapter.class);
+    var refusal = new io.justsearch.app.api.EngineAdmissionException(
+        io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 7);
+    when(adapter.status(any(EngineContext.class))).thenThrow(
+        new java.util.concurrent.CompletionException(
+            new java.util.concurrent.ExecutionException(refusal)));
+    var ctrl = mock(KnowledgeSearchController.class);
+    when(ctrl.getAdapter()).thenReturn(adapter);
+    var result = new io.justsearch.app.api.DocumentService.ContextResult(
+        "evidence", 1, 1, 0, List.of(), "HYBRID", "OK", false, List.of());
+    assertSame(refusal, assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
+        () -> surface(ctrl).buildAnswerContent(
+            result, "test", McpDeliveryFraming.Settings.OFF, TestRequestContexts.mcp("s1"))));
+  }
+
+  @Test
+  void ordinaryResourceFailuresRetainTheirContentFallback() {
+    var adapter = mock(KnowledgeHttpApiAdapter.class);
+    when(adapter.status(any(EngineContext.class))).thenThrow(new IllegalStateException("offline"));
+    when(adapter.search(any(), any(EngineContext.class))).thenThrow(new IllegalStateException("offline"));
+    var ctrl = mock(KnowledgeSearchController.class);
+    when(ctrl.getAdapter()).thenReturn(adapter);
+    for (String uri : List.of("justsearch://index/summary", "justsearch://index/top-sources",
+        "justsearch://index/top-entities", "justsearch://resource/some-id")) {
+      var content = soleContent(surface(ctrl).readResource(uri, TestRequestContexts.mcp("s1")));
+      assertKeyOrder(content);
+      assertEquals("Error: offline", content.get("text"));
+    }
+    assertTrue(surface(ctrl).getPrompt("search_files", Map.of("topic", "test"),
+        TestRequestContexts.mcp("s1")).toString().contains("index status unknown"));
+  }
 
   private static McpToolSurface surface(KnowledgeSearchController ctrl) {
     return new McpToolSurface(
