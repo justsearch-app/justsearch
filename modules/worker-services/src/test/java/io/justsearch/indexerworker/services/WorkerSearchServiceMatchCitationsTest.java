@@ -63,6 +63,108 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
     assertTrue(citationMatchOps(service).isCitationScorerActive());
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"sentence", "window", "scorer"})
+  void citationBranchesPreserveAdmittedAuthorityAndCancellation(String branch) throws Exception {
+    var cancelled = new AtomicBoolean();
+    var none = CallContext.none();
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+    var call = new CallContext(null, null, cancelled::get, none.engineContext(),
+        none.provenance(), none.childLifetime(), deadline);
+    var embeddings = Mockito.mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
+    Mockito.when(embeddings.isAvailable()).thenReturn(true);
+    Mockito.when(embeddings.embedQuery(Mockito.anyString(), Mockito.any()))
+        .thenAnswer(invocation -> {
+          var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(1);
+          assertEquals(deadline, authority.deadlineNanos());
+          assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+              authority.urgency());
+          if (branch.equals("sentence")) {
+            cancelled.set(true);
+            authority.remainingNanos();
+          }
+          return new float[] {1, 0};
+        });
+    Mockito.when(embeddings.embedDocument(Mockito.anyString(), Mockito.any()))
+        .thenAnswer(invocation -> {
+          var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(1);
+          assertEquals(deadline, authority.deadlineNanos());
+          assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+              authority.urgency());
+          cancelled.set(true);
+          authority.remainingNanos();
+          throw new AssertionError("window embedding ignored cancellation");
+        });
+    var service = new WorkerSearchService(lifecycle, embeddings);
+    if (branch.equals("scorer")) {
+      citationMatchOps(service).setCrossEncoderProducer(
+          (sentences, passages, ids, threshold, budget, authority) -> {
+            assertEquals(deadline, authority.deadlineNanos());
+            assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+                authority.urgency());
+            cancelled.set(true);
+            authority.remainingNanos();
+            throw new AssertionError("citation scorer ignored cancellation");
+          });
+    }
+    var request = MatchCitationsRequest.newBuilder().setAnswerText("The claim is supported.")
+        .addChunkDocIds("source").addChunkIndices(0).addPassageTexts("Supporting passage.")
+        .build();
+    assertThrows(java.util.concurrent.CancellationException.class,
+        () -> service.matchCitations(request, call));
+    Mockito.verify(embeddings, Mockito.never()).embedQuery(Mockito.anyString());
+    Mockito.verify(embeddings, Mockito.never()).embedDocument(Mockito.anyString());
+    if (branch.equals("scorer")) {
+      Mockito.verify(embeddings, Mockito.never()).embedQuery(Mockito.anyString(), Mockito.any());
+      Mockito.verify(embeddings, Mockito.never()).embedDocument(Mockito.anyString(), Mockito.any());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"scorer", "embedding", "lookup"})
+  void cancellationFailuresEscapeCitationFallbackAndErrorResponses(String branch) throws Exception {
+    var cancellation = new java.util.concurrent.CancellationException("producer cancelled");
+    var wrapped = new java.util.concurrent.CompletionException(cancellation);
+    var embeddings = Mockito.mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
+    Mockito.when(embeddings.isAvailable()).thenReturn(true);
+    Mockito.when(embeddings.embedQuery(Mockito.anyString(), Mockito.any())).thenThrow(wrapped);
+    var service = new WorkerSearchService(lifecycle, embeddings);
+    if (branch.equals("scorer")) {
+      citationMatchOps(service).setCrossEncoderProducer(
+          (sentences, passages, ids, threshold, budget, authority) -> { throw wrapped; });
+    } else if (branch.equals("lookup")) {
+      var reads = Mockito.mock(io.justsearch.adapters.lucene.runtime.ReadPathOps.class);
+      Mockito.when(reads.search(Mockito.any(), Mockito.anyInt(), Mockito.anySet(),
+          Mockito.any(), Mockito.any())).thenThrow(wrapped);
+      var runtime = Mockito.mock(RunningRuntime.class, Mockito.RETURNS_DEEP_STUBS);
+      Mockito.when(runtime.readPathOps()).thenReturn(reads);
+      service = new WorkerSearchService(runtime, embeddings);
+    }
+    var target = service;
+    var request = MatchCitationsRequest.newBuilder().setAnswerText("The claim is supported.")
+        .addChunkDocIds("source").addChunkIndices(0)
+        .addPassageTexts(branch.equals("lookup") ? "" : "Supporting passage.").build();
+    assertSame(cancellation, assertThrows(java.util.concurrent.CancellationException.class,
+        () -> target.matchCitations(request, CallContext.none())));
+    if (branch.equals("scorer") || branch.equals("lookup")) {
+      Mockito.verify(embeddings, Mockito.never()).embedQuery(Mockito.anyString(), Mockito.any());
+    }
+  }
+
+  @Test
+  void callerDeadlineCannotBecomeCitationErrorResponse() throws Exception {
+    var none = CallContext.none();
+    var service = new WorkerSearchService(lifecycle);
+    var expired = new CallContext(null, null, none.cancel(), none.engineContext(),
+        none.provenance(), none.childLifetime(), System.nanoTime() - 1);
+    var request = MatchCitationsRequest.newBuilder().setAnswerText("The claim is supported.")
+        .addChunkDocIds("source").addChunkIndices(0).addPassageTexts("Supporting passage.")
+        .build();
+    var failure = assertThrows(WorkerServiceException.class,
+        () -> service.matchCitations(request, expired));
+    assertEquals(WorkerServiceException.Status.DEADLINE_EXCEEDED, failure.status());
+  }
+
   // ==================== Edge/error case tests ====================
 
   @Nested
@@ -156,7 +258,7 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
       List<Double> observedThresholds = new ArrayList<>();
       citationMatchOps(service)
           .setCrossEncoderProducer(
-              (sentences, passages, passageDocIds, threshold, deadlineMs) -> {
+               (sentences, passages, passageDocIds, threshold, deadlineMs, acquisition) -> {
                 observedThresholds.add(threshold);
                 return new CitationScorer.ScoringResult(
                     List.of(), sentences.size(), 0, 1L, sentences.size());

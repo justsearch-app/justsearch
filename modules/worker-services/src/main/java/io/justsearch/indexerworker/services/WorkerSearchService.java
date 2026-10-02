@@ -933,8 +933,15 @@ public final class WorkerSearchService {
             request.getChunkDocIdsList(),
             request.getChunkIndicesList(),
             request.getPassageTextsList(),
-            request.getSimilarityThreshold());
+            request.getSimilarityThreshold(),
+            (ctx == null ? CallContext.none() : ctx).nativeAcquisition());
+      } catch (io.justsearch.ort.SessionAcquireDeadlineExceededException e) {
+        throw WorkerServiceException.deadlineExceeded(e.getMessage());
+      } catch (WorkerServiceException e) {
+        throw e;
       } catch (RuntimeException e) {
+        EngineFutures.rethrowExecutorRefusal(e);
+        EngineFutures.rethrowCancellation(e);
         log.error("MatchCitations failed", e);
         throw WorkerServiceException.internal("MatchCitations failed: " + e.getMessage());
       }

@@ -161,6 +161,189 @@ final class EngineKnowledgeClientExecutorTest {
     field.set(handle, value);
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+      "false,sentence", "true,sentence", "false,window", "true,window",
+      "false,scorer", "true,scorer"
+  })
+  void engineBudgetCancelsRealCitationWaiterAndReleasesOwnership(boolean abandon, String branch)
+      throws Exception {
+    var model = java.nio.file.Path.of("missing", "model_fp16.onnx");
+    var variant = io.justsearch.configuration.model.VariantSelection.optimal(model,
+        io.justsearch.configuration.model.ModelPrecision.FP16,
+        io.justsearch.configuration.model.ExecutionProvider.CUDA);
+    var policy = new io.justsearch.ort.ModelSessionPolicy(variant,
+        new io.justsearch.ort.ModelSessionPolicy.Gpu(512L * 1024 * 1024, 0,
+            java.util.Optional.empty()),
+        new io.justsearch.ort.ModelSessionPolicy.Cpu(
+            ai.onnxruntime.OrtSession.SessionOptions.OptLevel.BASIC_OPT),
+        new io.justsearch.ort.ModelSessionPolicy.Lifecycle(true, false, 0),
+        new io.justsearch.ort.ModelSessionPolicy.RunOptions(true));
+    var nativeHandle = io.justsearch.ort.OrtSessionAssembler.buildManager("citation-waiter",
+        new io.justsearch.ort.Composition(io.justsearch.ort.RuntimePolicy.defaults(), policy,
+            new io.justsearch.ort.ModelArtifacts(model, model)), () -> true);
+    var gpu = mock(ai.onnxruntime.OrtSession.class);
+    setNativeField(nativeHandle, "gpuSession", gpu);
+    setNativeField(nativeHandle, "gpuAvailable", true);
+    setNativeField(nativeHandle, "gpuSessionAttempted", true);
+    var held = nativeHandle.acquire(io.justsearch.ort.SessionAcquisitionRequest.within(
+        io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND, Duration.ofSeconds(5)));
+    var tokenizer = mock(ai.djl.huggingface.tokenizers.HuggingFaceTokenizer.class);
+    var encoding = mock(ai.djl.huggingface.tokenizers.Encoding.class);
+    when(tokenizer.encode(any(String.class))).thenReturn(encoding);
+    when(encoding.getIds()).thenReturn(new long[] {0, 1});
+    when(encoding.getAttentionMask()).thenReturn(new long[] {1, 1});
+    when(encoding.getTypeIds()).thenReturn(new long[] {0, 0});
+    var embedding = io.justsearch.indexerworker.embed.EmbeddingService.createWithBackend(
+        new io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend(
+            new io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder(nativeHandle,
+                new io.justsearch.indexerworker.embed.onnx.EmbeddingShape(8, false,
+                    io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoder.PoolingStrategy.MEAN_POOL,
+                    8, 0), tokenizer), 1, 8),
+        new io.justsearch.indexerworker.embed.EmbeddingConfig(true, model.getParent(), "onnx",
+            true, 0, 512L * 1024 * 1024, 8, false, 8), null, "", "");
+    String answer = "The claim is supported.";
+    if (branch.equals("window")) {
+      // A cached sentence reaches the real document encoder without first waiting on query encoding.
+      var cache = embedding.getClass().getDeclaredMethod("putCacheEntryForTesting", String.class,
+          io.justsearch.indexerworker.embed.EmbeddingService.ChunkedEmbedding.class, long.class);
+      cache.setAccessible(true);
+      cache.invoke(embedding, answer,
+          new io.justsearch.indexerworker.embed.EmbeddingService.ChunkedEmbedding(
+              new float[] {1, 0}, java.util.List.of(), 1), System.currentTimeMillis() + 60_000);
+    }
+    var runtime = mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    var workerService = new WorkerSearchService(runtime, embedding);
+    io.justsearch.reranker.CitationScorer scorer = null;
+    if (branch.equals("scorer")) {
+      var pairs = mock(io.justsearch.reranker.RerankerTokenizer.class);
+      when(pairs.encodePairsStrict(any(String.class), any(String[].class))).thenReturn(
+          new io.justsearch.reranker.RerankerTokenizer.EncodedBatch(
+              new long[][] {{1}}, new long[][] {{1}}, new long[][] {{0}}, 1, 1, 0, 1));
+      scorer = new io.justsearch.reranker.CitationScorer(nativeHandle,
+          new io.justsearch.reranker.RerankerShape(8, false), pairs);
+      workerService.setCitationScorer(scorer);
+      workerService.setCitationScorerConfig(
+          new io.justsearch.reranker.CitationScorerConfig(true, null, 0.5, 8, 5_000));
+    }
+    var context = new AtomicReference<io.justsearch.indexerworker.services.CallContext>();
+    var search = mock(WorkerSearchService.class);
+    when(search.matchCitations(any(), any())).thenAnswer(invocation -> {
+      var call = (io.justsearch.indexerworker.services.CallContext) invocation.getArgument(1);
+      context.set(call);
+      return workerService.matchCitations(invocation.getArgument(0), call);
+    });
+    var services = mock(WorkerAppServices.class);
+    when(services.searchService()).thenReturn(search);
+    var view = mock(KnowledgeServer.ServingLease.class);
+    when(view.services()).thenReturn(services);
+    var load = new ForegroundLoad();
+    var admission = new EngineAdmissionController(1, 1, 1);
+    try (var registry = registry(1, 1, 1, 4);
+        var client = new EngineKnowledgeClient(registry, () -> services,
+            new ForegroundLoadGate(load), 1_000, 100, IpcTelemetry.noop(), () -> {}, admission,
+            io.justsearch.app.services.worker.WatchedRootsState.inMemory(), () -> view)) {
+      var owner = abandon ? admission.admit(TestEngineContexts.FOREGROUND, false) : null;
+      try {
+        var caller = new java.util.concurrent.FutureTask<>(() -> client.matchCitations(answer,
+            java.util.List.of("source"), java.util.List.of(0),
+            java.util.List.of("Supporting passage."), 0.5,
+            owner == null ? TestEngineContexts.FOREGROUND : owner.context()));
+        Thread.ofVirtual().start(caller);
+        var field = nativeHandle.getClass().getDeclaredField("gpuInferenceSemaphore");
+        field.setAccessible(true);
+        var semaphore = (java.util.concurrent.Semaphore) field.get(nativeHandle);
+        long queueDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (semaphore.getQueueLength() == 0 && !caller.isDone()
+            && System.nanoTime() < queueDeadline) Thread.sleep(1);
+        assertTrue(semaphore.getQueueLength() > 0, "citation encoder must reach native GPU queue");
+        assertEquals(1, load.inFlight());
+        assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.FOREGROUND,
+            context.get().nativeAcquisition().urgency());
+        assertTrue(context.get().deadlineNanos() - System.nanoTime()
+            < TimeUnit.SECONDS.toNanos(3), "Engine deadline must reach citation matching");
+        if (owner != null) {
+          owner.cancel("citation_abandoned");
+          owner.close();
+        }
+        var terminal = assertThrows(java.util.concurrent.ExecutionException.class,
+            () -> caller.get(3, TimeUnit.SECONDS));
+        if (abandon) assertTrue(terminal.getCause() instanceof EngineWorkCancelledException);
+        else assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+            ((io.justsearch.app.api.knowledge.KnowledgeClientException) terminal.getCause()).status());
+        long exitDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while ((admission.activeWorkCount() != 0 || load.inFlight() != 0)
+            && System.nanoTime() < exitDeadline) Thread.sleep(1);
+        assertEquals(0, admission.activeWorkCount(), "citation waiter must release admission promptly");
+        assertEquals(0, load.inFlight(), "citation waiter must release foreground load promptly");
+        assertEquals(0, semaphore.availablePermits(), "indexing lease still owns the GPU");
+        assertEquals(0, semaphore.getQueueLength(), "discarded citation must leave the queue");
+        org.mockito.Mockito.verify(view, org.mockito.Mockito.timeout(1_000)).close();
+        org.mockito.Mockito.verify(gpu, org.mockito.Mockito.never()).run(
+            org.mockito.ArgumentMatchers.anyMap());
+        org.mockito.Mockito.verify(gpu, org.mockito.Mockito.never()).run(
+            org.mockito.ArgumentMatchers.anyMap(), any(ai.onnxruntime.OrtSession.RunOptions.class));
+        org.mockito.Mockito.verify(gpu, org.mockito.Mockito.never()).close();
+      } finally {
+        if (owner != null) owner.close();
+        // Unblock the uncancellable implementation if the regression assertion fails.
+        held.close();
+      }
+    } finally {
+      held.close();
+      if (scorer != null) scorer.close();
+      embedding.close();
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void citationScorerPreservesCallerAuthorityAndLocalPartialBudget(boolean localBudget)
+      throws Exception {
+    var sessions = mock(io.justsearch.ort.SessionHandle.class);
+    var tokenizer = mock(io.justsearch.reranker.RerankerTokenizer.class);
+    when(tokenizer.encodePairsStrict(any(String.class), any(String[].class))).thenReturn(
+        new io.justsearch.reranker.RerankerTokenizer.EncodedBatch(
+            new long[][] {{1}}, new long[][] {{1}}, new long[][] {{0}}, 1, 1, 0, 1));
+    var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+    var authority = io.justsearch.ort.SessionAcquisitionRequest.within(
+        io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND, Duration.ofSeconds(10),
+        cancelled::get);
+    when(sessions.acquire(any())).thenAnswer(invocation -> {
+      var request = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(0);
+      assertEquals(authority.urgency(), request.urgency());
+      if (localBudget) {
+        assertTrue(request.deadlineNanos() - authority.deadlineNanos() < 0);
+        // Simulate a waiter expiring under the scorer's earlier budget, with the caller still live.
+        while (request.deadlineNanos() - System.nanoTime() > 0) {
+          Thread.sleep(1);
+        }
+      } else {
+        assertEquals(authority.deadlineNanos(), request.deadlineNanos());
+        cancelled.set(true);
+      }
+      request.remainingNanos();
+      throw new AssertionError("native acquisition ignored its authority");
+    });
+    try (var scorer = new io.justsearch.reranker.CitationScorer(sessions,
+        new io.justsearch.reranker.RerankerShape(8, false), tokenizer)) {
+      if (localBudget) {
+        var result = scorer.scoreAll(java.util.List.of("claim"), java.util.List.of("passage"),
+            java.util.List.of("source"), 0.5, 500, authority);
+        assertEquals(0, result.sentencesScored());
+        assertEquals(0, result.sentencesMatched());
+        assertTrue(result.matches().isEmpty());
+        authority.remainingNanos();
+      } else {
+        assertThrows(java.util.concurrent.CancellationException.class,
+            () -> scorer.scoreAll(java.util.List.of("claim"), java.util.List.of("passage"),
+                java.util.List.of("source"), 0.5, 0, authority));
+      }
+      org.mockito.Mockito.verify(sessions).acquire(any());
+    }
+  }
+
   @Test
   void deadlineRetainsExactServingViewUntilWorkerActuallyExits() throws Exception {
     var entered = new CountDownLatch(1);

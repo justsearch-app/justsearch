@@ -332,7 +332,8 @@ class CitationMatchOpsLiteralPassageTest extends io.justsearch.adapters.lucene.r
       List<String> passages,
       List<String> passageDocIds,
       double threshold,
-      long deadlineMs) {
+      long deadlineMs,
+      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
 
     List<CitationScorer.ScoredMatch> matches = new ArrayList<>();
     int matched = 0;
