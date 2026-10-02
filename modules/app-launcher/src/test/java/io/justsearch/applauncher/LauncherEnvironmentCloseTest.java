@@ -216,6 +216,41 @@ final class LauncherEnvironmentCloseTest {
   }
 
   @Test
+  void failedOperationsInitializationCannotReleaseLauncherInstanceLock() throws Exception {
+    System.setProperty("justsearch.data.dir", tempDir.toString());
+    var resources = Mockito.mock(io.justsearch.app.api.EngineProcessResources.class);
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors()) {
+      Mockito.when(resources.executors()).thenReturn(executors);
+      LauncherEnvironment.installFactories(
+          () -> Mockito.mock(io.justsearch.app.config.ConfigManagerBootstrap.class),
+          () -> resources,
+          (owner, dataDir, profile) -> new LocalTelemetry(owner, dataDir, 1_000, "launcher-test", profile,
+              "metrics.ndjson", List.of(io.justsearch.telemetry.JvmMetricCatalog.catalogFor("launcher"))),
+          (owner, telemetry, config, operations) -> { throw new AssertionError("assembly must not start"); });
+      var store = Mockito.mock(io.justsearch.app.observability.operations.SqliteOperationStore.class);
+      var initializationFailure = new java.io.IOException("injected operations initialization failure");
+      var closeFailure = new java.io.IOException("native operations owner still open");
+      Mockito.doThrow(initializationFailure).when(store).open();
+      Mockito.doThrow(closeFailure).when(store).close();
+      try (var stores = Mockito.mockStatic(io.justsearch.app.observability.operations.SqliteOperationStore.class);
+          var locks = Mockito.mockConstruction(io.justsearch.app.util.AppInstanceLock.class)) {
+        stores.when(() -> io.justsearch.app.observability.operations.SqliteOperationStore.unopened(
+            tempDir.resolve("operations.db"))).thenReturn(store);
+        assertSame(initializationFailure,
+            assertThrows(java.io.IOException.class, () -> LauncherEnvironment.create("smoke")));
+        assertEquals(1, initializationFailure.getSuppressed().length);
+        assertSame(closeFailure, initializationFailure.getSuppressed()[0]);
+        var lock = locks.constructed().getFirst();
+        Mockito.verify(lock).acquire();
+        Mockito.verify(lock, Mockito.never()).close();
+        var order = Mockito.inOrder(store);
+        order.verify(store).open();
+        order.verify(store).close();
+      }
+    }
+  }
+
+  @Test
   void failedHeadCleanupAfterDrainStillClosesDependenciesAndPreservesFailures() throws Exception {
     var telemetry = Mockito.mock(LocalTelemetry.class);
     var environment = allocateEnvironment(telemetry, "previous-config", "false", tempDir.resolve("cleanup"));

@@ -15,6 +15,7 @@ import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.engine.EngineAdmissionController;
 import io.justsearch.app.engine.EngineShutdownSequence;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
+import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.app.services.HeadAssembly;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.ShutdownOutcome;
@@ -22,18 +23,121 @@ import io.justsearch.app.util.AppInstanceLock;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.ui.api.LocalApiServer;
 import io.justsearch.ui.runtime.RuntimeManifestPublisher;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.AdditionalAnswers;
+import org.mockito.Mockito;
 
 @DisplayName("HeadlessApp ordered shutdown wiring")
 final class HeadlessAppShutdownWiringTest {
+
+  @ParameterizedTest
+  @ValueSource(strings = {"sql", "runtime", "error"})
+  void failedOperationsInitializationRetainsStartupOwnerAndInstanceLockUntilRetry(
+      String cleanupKind, @TempDir Path tempDir) throws Exception {
+    Path path = tempDir.resolve("operations.db");
+    var owner = new AtomicReference<io.justsearch.app.api.operations.OperationStore>();
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    IOException initializationFailure = new IOException("injected initialization failure");
+    Throwable closeFailure = switch (cleanupKind) {
+      case "sql" -> new SQLException("injected native close failure");
+      case "runtime" -> new IllegalStateException("injected native close failure");
+      case "error" -> new AssertionError("injected native close failure");
+      default -> throw new IllegalArgumentException(cleanupKind);
+    };
+    try (AppInstanceLock instanceLock = new AppInstanceLock(tempDir)) {
+      instanceLock.acquire();
+      try (Connection acquired = DriverManager.getConnection("jdbc:sqlite:" + path)) {
+        Connection faulting = mock(Connection.class, AdditionalAnswers.delegatesTo(acquired));
+        Mockito.doThrow(closeFailure).when(faulting).close();
+        SqliteOperationStore store = SqliteOperationStore.unopened(path);
+        Field factory = SqliteOperationStore.class.getDeclaredField("connectionFactory");
+        factory.setAccessible(true);
+        factory.set(store, Proxy.newProxyInstance(factory.getType().getClassLoader(),
+            new Class<?>[] {factory.getType()}, (proxy, method, args) -> faulting));
+        Field hook = SqliteOperationStore.class.getDeclaredField("hook");
+        hook.setAccessible(true);
+        hook.set(store, Proxy.newProxyInstance(hook.getType().getClassLoader(),
+            new Class<?>[] {hook.getType()}, (proxy, method, args) -> {
+              if ("before-journal-mode".equals(args[0])) {
+                org.junit.jupiter.api.Assertions.assertSame(store, owner.get(),
+                    "Headless startup must own cleanup before initialization");
+                try (Statement writer = acquired.createStatement()) {
+                  writer.execute("BEGIN IMMEDIATE");
+                }
+                throw initializationFailure;
+              }
+              return null;
+            }));
+        try (var stores = Mockito.mockStatic(SqliteOperationStore.class, Mockito.CALLS_REAL_METHODS)) {
+          stores.when(() -> SqliteOperationStore.unopened(path)).thenReturn(store);
+          try {
+            org.junit.jupiter.api.Assertions.assertSame(initializationFailure,
+                assertThrows(IOException.class, () -> HeadlessApp.openOperationsForStartup(path, owner)));
+            org.junit.jupiter.api.Assertions.assertSame(store, owner.get());
+            Mockito.verify(faulting, Mockito.times(2)).close();
+            assertFalse(acquired.isClosed());
+            assertThrows(io.justsearch.app.api.operations.OperationStoreException.class,
+                store::historySinceMillis);
+            boolean operationsClosed = HeadlessApp.closeOperationsForStartupCleanup(owner.get(), true);
+            assertFalse(operationsClosed, "failed cleanup must never count as closed ownership");
+            HeadlessApp.closeStartupResourcesAndInstanceLock(resources, instanceLock, operationsClosed);
+            Mockito.verifyNoInteractions(resources);
+            assertTrue(instanceLock.isHeld());
+            try (AppInstanceLock replacement = new AppInstanceLock(tempDir)) {
+              assertThrows(AppInstanceLock.AppInstanceLockException.class, replacement::acquire);
+            }
+            try (Connection replacement = DriverManager.getConnection("jdbc:sqlite:" + path);
+                Statement writer = replacement.createStatement()) {
+              writer.execute("PRAGMA busy_timeout = 0");
+              SQLException busy = assertThrows(SQLException.class, () -> writer.execute("BEGIN IMMEDIATE"));
+              assertEquals(5, busy.getErrorCode() & 0xff);
+
+              doAnswer(invocation -> {
+                acquired.close();
+                return null;
+              }).when(faulting).close();
+              operationsClosed = HeadlessApp.closeOperationsForStartupCleanup(owner.get(), true);
+              assertTrue(operationsClosed);
+              assertTrue(acquired.isClosed());
+              writer.execute("BEGIN IMMEDIATE");
+              writer.execute("ROLLBACK");
+              HeadlessApp.closeStartupResourcesAndInstanceLock(resources, instanceLock, operationsClosed);
+              Mockito.verify(resources).close();
+              assertFalse(instanceLock.isHeld());
+            }
+            try (AppInstanceLock replacement = new AppInstanceLock(tempDir)) {
+              replacement.acquire();
+              assertTrue(replacement.isHeld());
+            }
+          } finally {
+            doAnswer(invocation -> {
+              acquired.close();
+              return null;
+            }).when(faulting).close();
+            store.close();
+          }
+        }
+      }
+    }
+  }
 
   @Test
   void uncaughtFailureHardStopsAfterCrashReportingWithoutEnteringJvmShutdown(@TempDir Path tempDir) {

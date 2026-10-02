@@ -51,6 +51,42 @@ final class SqliteOperationStoreTransactionFailureTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"sql", "runtime", "error"})
+  void ordinaryFailedCloseRefusesOperationsUntilNativeCloseSucceeds(String cleanupKind)
+      throws Exception {
+    try (var store = new SqliteOperationStore(temp.resolve("ordinary-close.db"), CLOCK, ignored -> {})) {
+      Connection realConnection = connection(store);
+      Connection faulting = mock(Connection.class, AdditionalAnswers.delegatesTo(realConnection));
+      Throwable closeFailure = cleanupFailure(cleanupKind, "injected ordinary close failure");
+      doThrow(closeFailure).when(faulting).close();
+      setConnection(store, faulting);
+      try {
+        Throwable observed = assertThrows(
+            cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
+        assertSame(closeFailure, cleanupKind.equals("sql") ? observed.getCause() : observed);
+        assertFalse(realConnection.isClosed());
+        OperationStoreException refused = assertThrows(OperationStoreException.class,
+            () -> store.find(OperationKeys.generate(CLOCK)));
+        assertEquals(OperationStoreException.Code.STORAGE_FAILED, refused.code());
+        verify(faulting).close();
+        doAnswer(invocation -> {
+          realConnection.close();
+          return null;
+        }).when(faulting).close();
+        store.close();
+        assertTrue(realConnection.isClosed());
+        verify(faulting, times(2)).close();
+      } finally {
+        doAnswer(invocation -> {
+          realConnection.close();
+          return null;
+        }).when(faulting).close();
+        store.close();
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"sql", "runtime", "error"})
   void commitFailureKeepsPrimaryAndCleanupFailuresAndRetiresUncertainConnection(String cleanupKind)
       throws Exception {
     Path dbPath = temp.resolve("operations.db");

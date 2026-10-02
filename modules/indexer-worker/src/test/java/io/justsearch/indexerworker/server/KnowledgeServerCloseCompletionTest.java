@@ -632,6 +632,75 @@ final class KnowledgeServerCloseCompletionTest {
     order.verify(rootLock).close();
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"schema", "snapshot", "wiring", "available"})
+  void failedDisambiguationCleanupRetainsProductionCandidatesUntilShutdownRetry(
+      String failurePoint, @TempDir Path tempDir) throws Exception {
+    var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(tempDir.resolve("data")), null);
+    var rootLock = org.mockito.Mockito.mock(io.justsearch.indexerworker.util.IndexRootLock.class);
+    var lockField = KnowledgeServer.class.getDeclaredField("indexRootLock");
+    lockField.setAccessible(true);
+    lockField.set(server, rootLock);
+    var initializationFailure = new java.sql.SQLException("injected " + failurePoint + " failure");
+    var closeFailure = new java.io.IOException("disambiguation connection still live");
+    var wired = new java.util.concurrent.atomic.AtomicInteger();
+    java.util.function.Consumer<io.justsearch.indexerworker.disambiguation.DisambiguationService> wiring =
+        candidate -> {
+          wired.incrementAndGet();
+          if (failurePoint.equals("wiring")) throw new IllegalStateException("injected wiring failure");
+        };
+    var ownersField = KnowledgeServer.class.getDeclaredField("disambiguationCleanupOwners");
+    ownersField.setAccessible(true);
+    var published = failurePoint.equals("available");
+    try (var constructed = org.mockito.Mockito.mockConstruction(
+        io.justsearch.indexerworker.disambiguation.DisambiguationService.class, (candidate, context) -> {
+          if (failurePoint.equals("schema") || failurePoint.equals("snapshot")) {
+            org.mockito.Mockito.doAnswer(invocation -> {
+              assertTrue(((java.util.List<?>) ownersField.get(server)).contains(candidate),
+                  "cleanup registration must precede fallible initialization");
+              throw initializationFailure;
+            }).when(candidate).open();
+          }
+          org.mockito.Mockito.doThrow(closeFailure).when(candidate).close();
+        })) {
+      try {
+        server.initializeDisambiguationService(tempDir.resolve("data"), wiring);
+        server.initializeDisambiguationService(tempDir.resolve("data"), wiring);
+        var candidate = constructed.constructed().getLast();
+        org.junit.jupiter.api.Assertions.assertEquals(2, constructed.constructed().size());
+        org.junit.jupiter.api.Assertions.assertEquals(2, ((java.util.List<?>) ownersField.get(server)).size());
+        assertTrue(((java.util.List<?>) ownersField.get(server)).contains(candidate));
+        if (published) assertSame(candidate, server.disambiguationService);
+        else org.junit.jupiter.api.Assertions.assertNull(server.disambiguationService);
+        if (failurePoint.equals("schema") || failurePoint.equals("snapshot")) {
+          org.junit.jupiter.api.Assertions.assertEquals(0, wired.get());
+          org.mockito.Mockito.verify(candidate).close();
+        }
+        java.io.IOException refusal = assertThrows(java.io.IOException.class, server::close);
+        assertSame(closeFailure, refusal.getCause());
+        assertFalse(server.awaitClosed(0));
+        assertSame(rootLock, lockField.get(server));
+        assertTrue(((java.util.List<?>) ownersField.get(server)).contains(candidate));
+        org.junit.jupiter.api.Assertions.assertNull(server.disambiguationService);
+        org.mockito.Mockito.verify(rootLock, org.mockito.Mockito.never()).close();
+
+        for (var retained : constructed.constructed()) org.mockito.Mockito.doNothing().when(retained).close();
+        server.close();
+        assertTrue(server.awaitClosed(0));
+        assertTrue(((java.util.List<?>) ownersField.get(server)).isEmpty());
+        org.junit.jupiter.api.Assertions.assertNull(lockField.get(server));
+        for (var retained : constructed.constructed()) {
+          org.mockito.Mockito.verify(retained, org.mockito.Mockito.times(published ? 2 : 3)).close();
+        }
+        org.mockito.Mockito.verify(rootLock).close();
+      } finally {
+        for (var candidate : constructed.constructed()) org.mockito.Mockito.doNothing().when(candidate).close();
+        server.close();
+      }
+    }
+  }
+
   @Test
   void failedIndexLockCloseRetainsOwnerAndShutdownRemainsIncomplete(@TempDir Path tempDir) throws Exception {
     var server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),

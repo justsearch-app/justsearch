@@ -159,7 +159,7 @@ final class LauncherEnvironment implements AutoCloseable {
     ConfigStore installedStore = null;
     io.justsearch.app.api.EngineProcessResources createdResources = null;
     LocalTelemetry createdTelemetry = null;
-    io.justsearch.app.api.operations.OperationStore createdOperations = null;
+    io.justsearch.app.observability.operations.SqliteOperationStore createdOperations = null;
     io.justsearch.app.util.AppInstanceLock createdInstanceLock = null;
     try {
       System.setProperty("justsearch.config", profilePath.toString());
@@ -186,8 +186,9 @@ final class LauncherEnvironment implements AutoCloseable {
       createdInstanceLock = new io.justsearch.app.util.AppInstanceLock(PlatformPaths.resolveDataDir());
       createdInstanceLock.acquire();
       createdResources.recordDataVersions(PlatformPaths.resolveDataDir());
-      createdOperations = new io.justsearch.app.observability.operations.SqliteOperationStore(
+      createdOperations = io.justsearch.app.observability.operations.SqliteOperationStore.unopened(
           PlatformPaths.resolveDataDir().resolve("operations.db"));
+      createdOperations.open();
       this.HeadAssembly = appFacadeFactory.create(
           createdResources, createdTelemetry, createdConfig, createdOperations);
       this.operations = createdOperations;
@@ -200,8 +201,9 @@ final class LauncherEnvironment implements AutoCloseable {
     } catch (Exception | Error failure) {
       boolean operationsClosed = createdOperations == null;
       if (createdOperations != null) {
-        try { createdOperations.close(); operationsClosed = true; } catch (IOException closeFailure) {
-          failure.addSuppressed(closeFailure);
+        try { createdOperations.close(); operationsClosed = true; }
+        catch (IOException | RuntimeException | Error closeFailure) {
+          if (closeFailure != failure) failure.addSuppressed(closeFailure);
         }
       }
       if (operationsClosed && createdInstanceLock != null) createdInstanceLock.close();
