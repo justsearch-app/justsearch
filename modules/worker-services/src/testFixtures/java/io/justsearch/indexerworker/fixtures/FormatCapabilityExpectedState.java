@@ -197,8 +197,9 @@ public final class FormatCapabilityExpectedState {
                   "JUSTSEARCH_PPTX_SLIDE_MARKER",
                   "JUSTSEARCH_PPTX_SPEAKER_NOTES_MARKER"),
               counts(0, 0, 0),
-              0,
-              0,
+              // S5 (b74f2aa83) records the package's embedded parser callback and depth.
+              1,
+              1,
               EmbeddedIdentityExpectation.NOT_APPLICABLE,
               Classification.PASS,
               FailureClass.NONE,

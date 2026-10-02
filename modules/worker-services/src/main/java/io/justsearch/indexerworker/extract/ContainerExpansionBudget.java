@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -43,7 +44,15 @@ final class ContainerExpansionBudget {
         Math.max(1, compressedBytes) * policy.maxCompressionRatio());
   }
 
-  void inspect(Path file) throws IOException, ContentExtractor.BudgetExceededException {
+  void inspect(Path file) throws IOException, ContentExtractor.ExtractionException {
+    try {
+      inspectZip(file);
+    } catch (ZipException | EOFException malformed) {
+      throw new ContentExtractor.ExtractionException("Malformed ZIP container", malformed);
+    }
+  }
+
+  private void inspectZip(Path file) throws IOException, ContentExtractor.BudgetExceededException {
     boolean zipSignature;
     try (InputStream input = Files.newInputStream(file)) {
       byte[] magic = input.readNBytes(4);

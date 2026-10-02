@@ -446,7 +446,9 @@ final class EngineKnowledgeClientExecutorTest {
     when(newLease.services()).thenReturn(newServices);
     var selected = new AtomicReference<>(oldLease);
     var admission = new EngineAdmissionController(8, 8, 1);
-    try (var registry = registry(2, 2, 1, 4);
+    // S6 (ee0f0806b) splits foreground capacity between text and inference. Retain two text
+    // workers so the successor can run while the expired old-view worker still owns its lease.
+    try (var registry = registry(4, 2, 1, 4);
         var client = new EngineKnowledgeClient(registry, () -> newServices,
             new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100,
             IpcTelemetry.noop(), () -> {}, admission,

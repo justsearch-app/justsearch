@@ -75,6 +75,8 @@ final class EmbeddedResourceBudget implements EmbeddedDocumentExtractor {
         expansion.inspect(spool);
       } catch (ContentExtractor.BudgetExceededException limit) {
         fail(limit.reasonCode());
+      } catch (ContentExtractor.ExtractionException malformed) {
+        throw new SAXException("Malformed embedded container", malformed);
       }
       try (TikaInputStream bounded = TikaInputStream.get(spool)) {
         delegate.parseEmbedded(bounded, handler, metadata, outputHtml);
