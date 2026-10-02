@@ -4,14 +4,17 @@ package io.justsearch.app.services.diagnostics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.contract.wire.LifecycleState;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -20,6 +23,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 final class DiagnosticsServiceImplRedactionTest {
 
@@ -129,6 +134,68 @@ final class DiagnosticsServiceImplRedactionTest {
       }
       try (var in = zipFile.getInputStream(ai)) {
         assertEquals("AI home event\n", new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void zipContinuesAfterMalformedAndTruncatedRotations(boolean distinctAiHome) throws Exception {
+    String prefix = "logs";
+    if (distinctAiHome) {
+      Path dataDir = Files.createDirectories(tempHome.resolve("data"));
+      System.setProperty("justsearch.data.dir", dataDir.toString());
+      Files.createDirectories(dataDir.resolve("logs"));
+      Files.writeString(dataDir.resolve("logs/engine.log"), "data engine event\n");
+      prefix = "ai/logs";
+    }
+    Path logs = Files.createDirectories(tempHome.resolve("logs"));
+    Files.writeString(logs.resolve("000-malformed.log.gz"), "not a gzip header");
+    String input =
+        ("private: C:\\Users\\Alice\\Private\\secret.txt\n"
+            + "safe decoded event\n").repeat(1024);
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    try (var gzip = new GZIPOutputStream(bytes)) {
+      gzip.write(input.getBytes(StandardCharsets.UTF_8));
+    }
+    byte[] compressed = bytes.toByteArray();
+    // The truncated footer fails after decompression has already written a redacted prefix.
+    Files.write(logs.resolve("001-truncated.log.gz"),
+        Arrays.copyOf(compressed, compressed.length - 8));
+    Files.write(logs.resolve("002-healthy.log.gz"), compressed);
+    byte[] malformedText = Arrays.copyOf(input.getBytes(StandardCharsets.UTF_8), input.length() + 1);
+    malformedText[malformedText.length - 1] = (byte) 0xff;
+    Files.write(logs.resolve("003-malformed.log"), malformedText);
+    Files.writeString(logs.resolve("engine.log"), "active engine event\n");
+
+    Path zip = new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+        .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+      assertNull(zipFile.getEntry(prefix + "/000-malformed.log.gz"));
+      ZipEntry active = zipFile.getEntry(prefix + "/engine.log");
+      assertNotNull(active);
+      try (var in = zipFile.getInputStream(active)) {
+        assertEquals("active engine event\n", new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      }
+      for (String name : new String[] {"001-truncated.log.gz", "002-healthy.log.gz"}) {
+        ZipEntry rotation = zipFile.getEntry(prefix + "/" + name);
+        assertNotNull(rotation);
+        try (var in = new GZIPInputStream(zipFile.getInputStream(rotation))) {
+          String redacted = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+          assertTrue(redacted.contains("safe decoded event"));
+          assertFalse(redacted.contains("Alice"));
+          assertFalse(redacted.contains("secret.txt"));
+        }
+      }
+      ZipEntry note = zipFile.getEntry("notes/" + prefix.replace('/', '-') + "-collection.txt");
+      assertNotNull(note);
+      try (var in = zipFile.getInputStream(note)) {
+        String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(content.contains("000-malformed.log.gz: omitted or truncated"));
+        assertTrue(content.contains("001-truncated.log.gz: omitted or truncated"));
+        assertTrue(content.contains("003-malformed.log: omitted or truncated"));
+        assertFalse(content.contains("002-healthy.log.gz"));
+        assertFalse(content.contains(tempHome.toString()));
       }
     }
   }

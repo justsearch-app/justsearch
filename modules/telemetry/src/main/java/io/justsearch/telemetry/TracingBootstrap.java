@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 public final class TracingBootstrap implements AutoCloseable {
 	private static final Logger log = LoggerFactory.getLogger(TracingBootstrap.class);
 	private static TracingBootstrap indexingBootstrap;
-	private static boolean indexingShutdownHookRegistered;
 	private final SdkTracerProvider tracerProvider;
 	private boolean processLifetime;
 
@@ -34,7 +33,7 @@ public final class TracingBootstrap implements AutoCloseable {
 	 * Creates or reuses the process-owned tracing bootstrap for indexing pipeline profiling.
 	 *
 	 * <p>The first successful installation fixes the output directory and sampler for this JVM.
-	 * Physical index shutdown only flushes spans; the JVM shutdown hook closes the provider.
+	 * Physical index shutdown only flushes spans; ordered Engine teardown closes the provider.
 	 *
 	 * @param dataDir the data directory for trace file output
 	 * @param healthState health state for export monitoring (may be null)
@@ -48,16 +47,6 @@ public final class TracingBootstrap implements AutoCloseable {
 			? Sampler.traceIdRatioBased(0.01)
 			: Sampler.alwaysOn();
 		TracingBootstrap candidate = new TracingBootstrap(dataDir, healthState, sampler);
-		try {
-			if (!indexingShutdownHookRegistered) {
-				Runtime.getRuntime().addShutdownHook(
-					new Thread(TracingBootstrap::shutdownIndexing, "engine-index-tracing-shutdown"));
-				indexingShutdownHookRegistered = true;
-			}
-		} catch (RuntimeException | Error failure) {
-			candidate.close();
-			throw failure;
-		}
 		candidate.processLifetime = true;
 		indexingBootstrap = candidate;
 		return candidate;
@@ -133,7 +122,7 @@ public final class TracingBootstrap implements AutoCloseable {
 
 	/**
 	 * Index components only flush their process-owned provider when retiring. Global telemetry
-	 * cannot be registered again during local recovery, so its exporter closes at JVM shutdown.
+	 * cannot be registered again during local recovery, so ordered Engine teardown closes it.
 	 */
 	@Override
 	public void close() {
@@ -141,7 +130,7 @@ public final class TracingBootstrap implements AutoCloseable {
 		else tracerProvider.close();
 	}
 
-	/** Final process teardown for index-installed tracing; never call during local recovery. */
+	/** Final teardown after all Engine span producers drain; never call during local recovery. */
 	public static synchronized void shutdownIndexing() {
 		if (indexingBootstrap == null) return;
 		try {

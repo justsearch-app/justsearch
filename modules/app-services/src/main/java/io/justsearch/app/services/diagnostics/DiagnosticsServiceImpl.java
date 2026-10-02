@@ -319,8 +319,9 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
           gzip.write(redactPaths(line).getBytes(StandardCharsets.UTF_8));
           gzip.write('\n');
         }
+      } finally {
+        zos.closeEntry();
       }
-      zos.closeEntry();
     }
   }
 
@@ -329,15 +330,18 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
     if (file == null || !Files.isRegularFile(file)) return;
     ZipEntry ze = new ZipEntry(entryName);
     ze.setTime(Files.getLastModifiedTime(file).toMillis());
-    zos.putNextEntry(ze);
     try (BufferedReader reader = Files.newBufferedReader(file)) {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        zos.write(redactPaths(line).getBytes(StandardCharsets.UTF_8));
-        zos.write('\n');
+      zos.putNextEntry(ze);
+      try {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          zos.write(redactPaths(line).getBytes(StandardCharsets.UTF_8));
+          zos.write('\n');
+        }
+      } finally {
+        zos.closeEntry();
       }
     }
-    zos.closeEntry();
   }
 
   private static void addFileTailRedacted(ZipOutputStream zos, Path file, String entryName) {
@@ -381,30 +385,65 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
     zos.closeEntry();
   }
 
-  private static void addDirectoryRedacted(ZipOutputStream zos, Path dir, String entryPrefix) {
+  private static void addDirectoryRedacted(ZipOutputStream zos, Path dir, String entryPrefix)
+      throws IOException {
     if (dir == null || !Files.isDirectory(dir)) return;
+    List<Path> files = new ArrayList<>();
+    List<String> notes = new ArrayList<>();
     try {
       Files.walkFileTree(
           dir,
           new SimpleFileVisitor<>() {
             @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                throws IOException {
-              if (file == null || !Files.isRegularFile(file)) return FileVisitResult.CONTINUE;
-              Path rel = dir.relativize(file);
-              String name = rel.toString().replace('\\', '/');
-              String fullEntry = entryPrefix + "/" + name;
-              if (name.endsWith(".gz")) {
-                addGzipRedacted(zos, file, fullEntry);
-              } else {
-                addFileRedactedStreaming(zos, file, fullEntry);
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+              if (Files.isRegularFile(file)) files.add(file);
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException failure) {
+              notes.add(logEntryName(dir, file, entryPrefix) + ": omitted (unreadable).\n");
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path directory, IOException failure) {
+              if (failure != null) {
+                notes.add(logEntryName(dir, directory, entryPrefix)
+                    + ": directory collection incomplete.\n");
               }
               return FileVisitResult.CONTINUE;
             }
           });
-    } catch (Exception e) {
-      log.warn("Failed to include directory in diagnostics export: {}", dir, e);
+    } catch (IOException e) {
+      notes.add(entryPrefix + ": directory collection incomplete.\n");
+      log.warn("Failed to enumerate directory in diagnostics export: {}", dir, e);
     }
+    // Stable ordering also keeps each failed rotation's entry and note reproducible.
+    files.sort(Comparator.comparing(file -> logEntryName(dir, file, entryPrefix)));
+    for (Path file : files) {
+      String fullEntry = logEntryName(dir, file, entryPrefix);
+      try {
+        if (fullEntry.endsWith(".gz")) {
+          addGzipRedacted(zos, file, fullEntry);
+        } else {
+          addFileRedactedStreaming(zos, file, fullEntry);
+        }
+      } catch (IOException e) {
+        // The file helpers finish any opened ZIP entry before returning a read failure. A
+        // decoded prefix remains redacted and recompressed; never copy the original gzip.
+        notes.add(fullEntry + ": omitted or truncated (unreadable log).\n");
+        log.warn("Failed to include log in diagnostics export: {}", file, e);
+      }
+    }
+    if (!notes.isEmpty()) {
+      addBytesRedacted(zos, String.join("", notes).getBytes(StandardCharsets.UTF_8),
+          "notes/" + entryPrefix.replace('/', '-') + "-collection.txt");
+    }
+  }
+
+  private static String logEntryName(Path dir, Path file, String entryPrefix) {
+    return entryPrefix + "/" + dir.relativize(file).toString().replace('\\', '/');
   }
 
   private static Path resolveMachinePolicyPath() {
