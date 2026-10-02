@@ -8,6 +8,7 @@ import ai.onnxruntime.OrtSession;
 import io.justsearch.ort.OnnxSessionCache;
 import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.SessionAcquisitionRequest;
+import io.justsearch.ort.SessionAcquireDeadlineExceededException;
 import io.justsearch.ort.SessionHandle;
 import java.io.Closeable;
 import java.nio.LongBuffer;
@@ -128,10 +129,26 @@ public final class CitationScorer implements Closeable {
       List<String> chunkDocIds,
       double threshold,
       long deadlineMs) {
+    return scoreAll(sentences, chunkTexts, chunkDocIds, threshold, deadlineMs,
+        SessionAcquisitionRequest.within(SessionAcquisitionRequest.Urgency.FOREGROUND,
+            SessionAcquisitionRequest.MAX_TIMEOUT));
+  }
+
+  /** Scores with caller authority while retaining the local partial-scoring budget. */
+  public ScoringResult scoreAll(
+      List<String> sentences,
+      List<String> chunkTexts,
+      List<String> chunkDocIds,
+      double threshold,
+      long deadlineMs,
+      SessionAcquisitionRequest authority) {
+    authority.remainingNanos();
 
     long startNanos = System.nanoTime();
     long deadlineNanos =
-        deadlineMs > 0 ? startNanos + deadlineMs * 1_000_000L : Long.MAX_VALUE;
+        deadlineMs > 0 ? startNanos + Math.min(
+            java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(deadlineMs),
+            SessionAcquisitionRequest.MAX_TIMEOUT.toNanos()) : Long.MAX_VALUE;
 
     if (sentences.isEmpty() || chunkTexts.isEmpty()) {
       return new ScoringResult(List.of(), sentences.size(), 0, 0, 0);
@@ -143,7 +160,8 @@ public final class CitationScorer implements Closeable {
     String[] chunksArray = chunkTexts.toArray(new String[0]);
 
     for (int si = 0; si < sentences.size(); si++) {
-      if (System.nanoTime() > deadlineNanos) {
+      authority.remainingNanos();
+      if (deadlineNanos != Long.MAX_VALUE && deadlineNanos - System.nanoTime() <= 0) {
         log.debug(
             "Citation scoring deadline exceeded after {} of {} sentences", si, sentences.size());
         break;
@@ -157,7 +175,8 @@ public final class CitationScorer implements Closeable {
       try {
         BestOf best =
             scoreSentence(chunksArray, deadlineNanos,
-                sub -> scoreSentenceAgainstChunks(sentence, sub, deadlineNanos));
+                sub -> scoreSentenceAgainstChunks(sentence, sub, deadlineNanos, authority));
+        authority.remainingNanos();
         if (!best.complete()) {
           // The deadline cut this sentence's sweep short. It is NOT reported as scored, and it
           // mints no match: a partial sweep's "best" is the best of an arbitrary prefix of the
@@ -177,6 +196,12 @@ public final class CitationScorer implements Closeable {
                   best.index() < chunkDocIds.size() ? chunkDocIds.get(best.index()) : "",
                   best.score()));
         }
+      } catch (SessionAcquireDeadlineExceededException e) {
+        // The admitted deadline is terminal; only the scorer's own earlier budget can return
+        // partial coverage. A cut-short sentence must never be counted as scored.
+        authority.remainingNanos();
+        if (deadlineNanos != Long.MAX_VALUE && deadlineNanos - System.nanoTime() <= 0) break;
+        throw e;
       } catch (OrtException e) {
         log.warn("Citation scoring failed for sentence {}", si, e);
       } catch (RerankerTokenizer.PairTooLongException e) {
@@ -187,6 +212,7 @@ public final class CitationScorer implements Closeable {
       }
     }
 
+    authority.remainingNanos();
     long totalMs = (System.nanoTime() - startNanos) / 1_000_000;
     log.debug(
         "Citation scoring completed: {} of {} sentences scored against {} passages, {} matches"
@@ -256,8 +282,9 @@ public final class CitationScorer implements Closeable {
    * <p>Mirrors the reranker pattern: one query (sentence) scored against N documents (chunks).
    */
   private List<Float> scoreSentenceAgainstChunks(String sentence, String[] chunks,
-      long deadlineNanos)
+      long deadlineNanos, SessionAcquisitionRequest authority)
       throws OrtException {
+    authority.remainingNanos();
 
     RerankerTokenizer.EncodedBatch batch = tokenizer.encodePairsStrict(sentence, chunks);
 
@@ -281,11 +308,12 @@ public final class CitationScorer implements Closeable {
         inputs.put("token_type_ids", tokenTypeIdsTensor);
       }
 
-      long acquisitionDeadline = deadlineNanos == Long.MAX_VALUE
-          ? System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30)
-          : deadlineNanos;
+      long now = System.nanoTime();
+      long localRemaining = deadlineNanos == Long.MAX_VALUE
+          ? java.util.concurrent.TimeUnit.SECONDS.toNanos(30) : deadlineNanos - now;
       var acquisition = new SessionAcquisitionRequest(
-          SessionAcquisitionRequest.Urgency.FOREGROUND, acquisitionDeadline, () -> false);
+          authority.urgency(), now + Math.min(authority.deadlineNanos() - now, localRemaining),
+          authority.cancellationRequested());
       try (var lease = sessions.acquire(acquisition)) {
         // Tempdoc 710 Move 2: lease.run() is the ORT choke point — records elapsed time via
         // the recorder bound by the composition root (InferenceCompositionRoot).

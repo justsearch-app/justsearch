@@ -76,6 +76,76 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
     return result;
   }
 
+  @Test
+  void rerankPropagatesAdmittedDeadlineUrgencyAndLiveCancellation() {
+    var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+    var none = CallContext.none();
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+    var call = new CallContext(null, null, cancelled::get, none.engineContext(),
+        none.provenance(), none.childLifetime(), deadline);
+    var reranker = mock(CrossEncoderReranker.class);
+    when(reranker.rerank(anyString(), anyList(), anyLong(), any())).thenAnswer(invocation -> {
+      var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(3);
+      assertEquals(deadline, authority.deadlineNanos());
+      assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+          authority.urgency());
+      assertFalse(authority.cancellationRequested().getAsBoolean());
+      cancelled.set(true);
+      org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.CancellationException.class,
+          authority::remainingNanos);
+      throw new java.util.concurrent.CancellationException("admitted rerank cancelled");
+    });
+    service.setSearchReranker(reranker);
+    var request = RerankRequest.newBuilder().setQuery("query").addDocumentTexts("doc")
+        .setDeadlineMs(30_000).build();
+    org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.CancellationException.class,
+        () -> service.rerank(request, call));
+  }
+
+  @Test
+  void nativeAcquisitionDeadlineKeepsDeadlineStatus() {
+    var reranker = mock(CrossEncoderReranker.class);
+    when(reranker.rerank(anyString(), anyList(), anyLong(), any())).thenThrow(
+        new io.justsearch.ort.SessionAcquireDeadlineExceededException("native deadline"));
+    service.setSearchReranker(reranker);
+    var request = RerankRequest.newBuilder().setQuery("query").addDocumentTexts("doc").build();
+    var failure = org.junit.jupiter.api.Assertions.assertThrows(WorkerServiceException.class,
+        () -> service.rerank(request, CallContext.none()));
+    assertEquals(WorkerServiceException.Status.DEADLINE_EXCEEDED, failure.status());
+  }
+
+  @Test
+  void realRerankerPassesLiveCancellationAndEarlierDeadlineToNativeAcquisition() throws Exception {
+    var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+    var none = CallContext.none();
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+    var call = new CallContext(null, null, cancelled::get, none.engineContext(),
+        none.provenance(), none.childLifetime(), deadline);
+    var sessions = mock(io.justsearch.ort.SessionHandle.class);
+    when(sessions.environment()).thenReturn(ai.onnxruntime.OrtEnvironment.getEnvironment());
+    var tokenizer = mock(io.justsearch.reranker.RerankerTokenizer.class);
+    when(tokenizer.encodePairs(anyString(), any(String[].class))).thenReturn(
+        new io.justsearch.reranker.RerankerTokenizer.EncodedBatch(
+            new long[][] {{1}}, new long[][] {{1}}, new long[][] {{0}}, 1, 1, 0, 1));
+    when(sessions.acquire(any())).thenAnswer(invocation -> {
+      var authority = (io.justsearch.ort.SessionAcquisitionRequest) invocation.getArgument(0);
+      assertEquals(deadline, authority.deadlineNanos(), "native wait uses earlier Engine deadline");
+      assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+          authority.urgency());
+      assertFalse(authority.cancellationRequested().getAsBoolean());
+      cancelled.set(true);
+      authority.remainingNanos();
+      throw new AssertionError("native acquisition ignored live cancellation");
+    });
+    service.setSearchReranker(new CrossEncoderReranker(sessions,
+        new io.justsearch.reranker.RerankerShape(8, false), tokenizer));
+    var request = RerankRequest.newBuilder().setQuery("query").addDocumentTexts("doc")
+        .setDeadlineMs(30_000).build();
+    org.junit.jupiter.api.Assertions.assertThrows(java.util.concurrent.CancellationException.class,
+        () -> service.rerank(request, call));
+    org.mockito.Mockito.verify(sessions).acquire(any());
+  }
+
   @Nested
   @DisplayName("without reranker wired")
   class WithoutReranker {
@@ -100,7 +170,7 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
     @BeforeEach
     void wireReranker() {
       CrossEncoderReranker mockReranker = mock(CrossEncoderReranker.class);
-      when(mockReranker.rerank(anyString(), anyList(), anyLong()))
+      when(mockReranker.rerank(anyString(), anyList(), anyLong(), any()))
           .thenReturn(
               new CrossEncoderReranker.RerankedResult(
                   List.of(1, 0, 2), List.of(0.3f, 0.9f, 0.1f), RerankSkipCause.NONE, 42));
@@ -130,7 +200,7 @@ class WorkerSearchServiceRerankTest extends io.justsearch.adapters.lucene.runtim
 
     private void wireSkip(RerankSkipCause cause) {
       CrossEncoderReranker mockReranker = mock(CrossEncoderReranker.class);
-      when(mockReranker.rerank(anyString(), anyList(), anyLong()))
+      when(mockReranker.rerank(anyString(), anyList(), anyLong(), any()))
           .thenReturn(
               new CrossEncoderReranker.RerankedResult(List.of(0, 1), List.of(), cause, 150));
       service.setSearchReranker(mockReranker);

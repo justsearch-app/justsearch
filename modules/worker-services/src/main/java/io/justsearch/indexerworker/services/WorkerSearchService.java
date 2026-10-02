@@ -496,6 +496,8 @@ public final class WorkerSearchService {
             log.debug("Search cancelled by caller: {}", e.getMessage());
           }
           throw e;
+        } catch (io.justsearch.ort.SessionAcquireDeadlineExceededException e) {
+          throw WorkerServiceException.deadlineExceeded(e.getMessage());
         } catch (RuntimeException e) {
           EngineFutures.rethrowExecutorRefusal(e);
           EngineFutures.rethrowCancellation(e);
@@ -527,7 +529,8 @@ public final class WorkerSearchService {
         List<String> docTexts = request.getDocumentTextsList();
         long deadlineMs = request.getDeadlineMs();
         CrossEncoderReranker.RerankedResult result = reranker.rerank(
-            request.getQuery(), docTexts, deadlineMs > 0 ? deadlineMs : 200);
+            request.getQuery(), docTexts, deadlineMs > 0 ? deadlineMs : 200,
+            (ctx == null ? CallContext.none() : ctx).nativeAcquisition());
 
         RerankResponse.Builder resp = RerankResponse.newBuilder()
             .setSkipped(result.skipped())
@@ -544,7 +547,10 @@ public final class WorkerSearchService {
           }
         }
         return resp.build();
+      } catch (io.justsearch.ort.SessionAcquireDeadlineExceededException e) {
+        throw WorkerServiceException.deadlineExceeded(e.getMessage());
       } catch (RuntimeException e) {
+        EngineFutures.rethrowCancellation(e);
         log.error("Rerank failed", e);
         throw WorkerServiceException.internal("Rerank failed: " + e.getMessage());
       }
@@ -926,7 +932,9 @@ public final class WorkerSearchService {
         return ragContextOps.executeRetrieval(
             request, new HashSet<>(docIds), topK, maxContextTokens,
             compat.allowed(), compat.reasonCode(), normalizedCallContext.engineContext().urgency(),
-            normalizedCallContext.childLifetime());
+            normalizedCallContext.childLifetime(), normalizedCallContext.nativeAcquisition());
+      } catch (io.justsearch.ort.SessionAcquireDeadlineExceededException e) {
+        throw WorkerServiceException.deadlineExceeded(e.getMessage());
       } catch (RuntimeException e) {
         EngineFutures.rethrowExecutorRefusal(e);
         EngineFutures.rethrowCancellation(e);
@@ -961,8 +969,15 @@ public final class WorkerSearchService {
             request.getChunkDocIdsList(),
             request.getChunkIndicesList(),
             request.getPassageTextsList(),
-            request.getSimilarityThreshold());
+            request.getSimilarityThreshold(),
+            (ctx == null ? CallContext.none() : ctx).nativeAcquisition());
+      } catch (io.justsearch.ort.SessionAcquireDeadlineExceededException e) {
+        throw WorkerServiceException.deadlineExceeded(e.getMessage());
+      } catch (WorkerServiceException e) {
+        throw e;
       } catch (RuntimeException e) {
+        EngineFutures.rethrowExecutorRefusal(e);
+        EngineFutures.rethrowCancellation(e);
         log.error("MatchCitations failed", e);
         throw WorkerServiceException.internal("MatchCitations failed: " + e.getMessage());
       }

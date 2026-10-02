@@ -239,6 +239,12 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
     return embed(documentPrefix + text);
   }
 
+  @Override
+  public float[] embedDocument(String text, io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+    ChunkedEmbedding result = embedWithChunks(documentPrefix + text, acquisition);
+    return result == null ? null : result.primaryVector();
+  }
+
   /**
    * Generates an embedding for a search query, prepending the task instruction prefix.
    *
@@ -247,6 +253,12 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
    */
   public float[] embedQuery(String text) {
     return embed(queryPrefix + text);
+  }
+
+  @Override
+  public float[] embedQuery(String text, io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+    ChunkedEmbedding result = embedWithChunks(queryPrefix + text, acquisition);
+    return result == null ? null : result.primaryVector();
   }
 
   /**
@@ -270,6 +282,13 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
    * @return Chunked embedding result, or null if unavailable
    */
   public ChunkedEmbedding embedWithChunks(String text) {
+    return embedWithChunks(text,
+        io.justsearch.indexerworker.inference.LocalSessionAcquisition.foreground());
+  }
+
+  private ChunkedEmbedding embedWithChunks(
+      String text, io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+    acquisition.remainingNanos();
     if (closed.get()) {
       events.onInvokeFailure(
           EmbeddingTelemetryEvents.Operation.SINGLE,
@@ -311,7 +330,9 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
     events.onCacheMiss();
 
     // Note: We no longer truncate text - the EmbeddingActor handles chunking internally
-    try (AiBackend.Session session = backend.createSession()) {
+    try (AiBackend.Session session = backend
+        instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx
+        ? onnx.createSession(acquisition) : backend.createSession()) {
       EmbeddingRequest request = new EmbeddingRequest(
           text,
           "",  // locale

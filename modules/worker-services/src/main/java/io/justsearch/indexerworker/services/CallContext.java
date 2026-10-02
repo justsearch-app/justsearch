@@ -24,10 +24,8 @@ package io.justsearch.indexerworker.services;
  *   <li>{@code provenance} — the application-owned originator projection for durable ingestion.
  * </ul>
  *
- * <p><b>No deadline field, deliberately.</b> No worker-side code reads a call deadline today —
- * the deadline is a caller-side property (the Head's {@code RpcDeadlineCategory}) that the
- * transport enforces. Stage A item A6 re-homes it onto the port call, which is where it has a
- * reader; seeding an unread field here would be residue, not re-homing.
+ * <p>The absolute monotonic deadline reaches native acquisition along with urgency and the
+ * cooperative cancellation signal. Already-issued native work retains its lease until exit.
  *
  * <p>Between A3 and A9 the {@code Delegating*Service} adapters built this from the two worker-core
  * interceptors, so production behaviour stayed byte-identical across the change. Item A9 deleted
@@ -37,7 +35,17 @@ package io.justsearch.indexerworker.services;
 public record CallContext(String traceId, String requestId, CancelSignal cancel,
     io.justsearch.core.context.EngineContext engineContext,
     io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance provenance,
-    io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
+    io.justsearch.core.execution.EngineTaskLifetime childLifetime,
+    long deadlineNanos) {
+
+  /** Local bounded authority for maintenance and callers without an Engine budget. */
+  public CallContext(String traceId, String requestId, CancelSignal cancel,
+      io.justsearch.core.context.EngineContext engineContext,
+      io.justsearch.indexerworker.queue.JobQueue.EnqueueProvenance provenance,
+      io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
+    this(traceId, requestId, cancel, engineContext, provenance, childLifetime,
+        System.nanoTime() + java.time.Duration.ofMinutes(5).toNanos());
+  }
 
   /** Normalises a null cancellation signal to {@link CancelSignal#NEVER}. */
   public CallContext {
@@ -72,6 +80,18 @@ public record CallContext(String traceId, String requestId, CancelSignal cancel,
   /** Whether the caller has abandoned this call. */
   public boolean cancelled() {
     return cancel.isCancelled();
+  }
+
+  /** Explicit scheduling authority shared by every native attempt within this call. */
+  public io.justsearch.ort.SessionAcquisitionRequest nativeAcquisition() {
+    return new io.justsearch.ort.SessionAcquisitionRequest(
+        engineContext.urgency() == io.justsearch.core.context.EngineContext.Urgency.FOREGROUND
+            ? io.justsearch.ort.SessionAcquisitionRequest.Urgency.FOREGROUND
+            : io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND,
+        this == NONE
+            ? System.nanoTime() + java.time.Duration.ofMinutes(5).toNanos()
+            : deadlineNanos,
+        this::cancelled);
   }
 
   /** Registers a handler to run if the caller abandons this call. */

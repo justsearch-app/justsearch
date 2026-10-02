@@ -113,7 +113,7 @@ public record ModelSessionPolicy(
 
   /**
    * CPU-session options. Today's only field is {@link OptLevel}, derived from
-   * {@code variant.precision()} × {@code variant.executionProvider()} per the rule that
+   * {@code variant.precision()} with the CPU execution provider per the rule that
    * {@link ModelSessionPolicyResolver#deriveCpuOptLevel} encodes.
    *
    * @param optLevel graph-optimisation level applied to the CPU session
@@ -137,7 +137,7 @@ public record ModelSessionPolicy(
    * Session-granular per Q1 resolution; {@link OrtSessionAssembler} constructs a single
    * {@code RunOptions} instance per session from these values.
    *
-   * @param arenaShrinkage enable {@code memory.enable_memory_arena_shrinkage=gpu:0} (default
+   * @param arenaShrinkage enable memory arena shrinkage on {@link Gpu#cudaDeviceId()} (default
    *     true; 394 item 4 explored per-session disable then reverted)
    */
   public record RunOptions(boolean arenaShrinkage) {}

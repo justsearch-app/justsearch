@@ -32,6 +32,29 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Focused semaphore-ownership tests using a mocked native ORT session boundary. */
 final class NativeSessionHandleGpuWaiterCancellationTest {
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void cooperativeCancellationBeforeRunRetainsLeaseUntilOwnerCloses(boolean pinned)
+      throws Exception {
+    var gpu = mock(OrtSession.class);
+    var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+    try (var handle = gpuHandle(gpu)) {
+      var request = SessionAcquisitionRequest.within(
+          SessionAcquisitionRequest.Urgency.FOREGROUND, Duration.ofSeconds(2), cancelled::get);
+      try (var lease = handle.acquire(request)) {
+        cancelled.set(true);
+        assertThrows(CancellationException.class, () -> {
+          if (pinned) lease.runPinned(java.util.Map.of(), java.util.Map.of());
+          else lease.run(java.util.Map.of());
+        });
+        org.mockito.Mockito.verifyNoInteractions(gpu);
+        assertEquals(0, semaphore(handle).availablePermits(),
+            "cancellation does not release an issued lease");
+      }
+      assertEquals(1, semaphore(handle).availablePermits());
+    }
+  }
+
   @Test
   void gpuReleaseWaitsForCreationAndClosesPublishedSession() throws Exception {
     OrtSession gpu = mock(OrtSession.class);

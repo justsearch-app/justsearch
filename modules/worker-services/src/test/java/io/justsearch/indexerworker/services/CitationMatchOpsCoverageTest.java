@@ -225,7 +225,8 @@ class CitationMatchOpsCoverageTest extends io.justsearch.adapters.lucene.runtime
       List<String> passages,
       List<String> passageDocIds,
       double threshold,
-      long deadlineMs) {
+      long deadlineMs,
+      io.justsearch.ort.SessionAcquisitionRequest acquisition) {
     return new CitationScorer.ScoringResult(List.of(), sentences.size(), 0, 1L, sentences.size());
   }
 
