@@ -128,6 +128,7 @@ public final class SearchInputCapture {
                 request.getMode());
     boolean chunkAwarePotential =
         resolvedConfigSupplier.get().search().chunkAwareEnabled()
+            && !queryString.isBlank()
             && request.getCursor().isBlank()
             && request.getQuerySyntax()
                 != io.justsearch.ipc.SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE
@@ -138,7 +139,10 @@ public final class SearchInputCapture {
       hasChunkDocs =
           !documentFieldOps.queryDocIdsByField(SchemaFields.IS_CHUNK, "true", 1).isEmpty();
     }
-    var corpusProfile = indexCountOps.getOrComputeCorpusProfile();
+    var corpusProfile =
+        hasChunkDocs
+            ? indexCountOps.getOrComputeCorpusProfile()
+            : io.justsearch.adapters.lucene.runtime.CorpusProfile.EMPTY;
     CorpusCapabilities corpus =
         new CorpusCapabilities(
             hasChunkDocs,

@@ -44,6 +44,8 @@ public final class NdjsonAppendStore<T> {
   private final Path storeFile;
   private final Class<T> type;
   private final StoreCipher cipher;
+  private final FeatureSnapshotLookup lookup;
+  private final boolean initializeOnAppend;
 
   /**
    * @param storeFile the NDJSON file (its parent directory is created if absent)
@@ -58,9 +60,22 @@ public final class NdjsonAppendStore<T> {
    * {@link StoreCipher#disabled()} is passthrough (the DERIVED/legacy/test path).
    */
   public NdjsonAppendStore(Path storeFile, Class<T> type, StoreCipher cipher) {
+    this(storeFile, type, cipher, true);
+  }
+
+  /** Production capture borrows the generation maintained by the process backfill owner. */
+  public static NdjsonAppendStore<FeatureSnapshot> observedFeatureSnapshots(
+      Path file, StoreCipher cipher) {
+    return new NdjsonAppendStore<>(file, FeatureSnapshot.class, cipher, false);
+  }
+
+  private NdjsonAppendStore(
+      Path storeFile, Class<T> type, StoreCipher cipher, boolean initializeOnAppend) {
     this.storeFile = storeFile;
     this.type = type;
     this.cipher = Objects.requireNonNull(cipher, "cipher");
+    this.lookup = type == FeatureSnapshot.class ? new FeatureSnapshotLookup(storeFile, cipher) : null;
+    this.initializeOnAppend = initializeOnAppend;
     try {
       Files.createDirectories(storeFile.getParent());
     } catch (IOException e) {
@@ -77,16 +92,57 @@ public final class NdjsonAppendStore<T> {
                   MAPPER.writeValueAsString(
                       new PersistedRecord<>(CURRENT_SCHEMA_VERSION, record)))
               + "\n";
-      Files.writeString(
-          storeFile, line, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
-          StandardOpenOption.APPEND);
+      if (lookup != null && record instanceof FeatureSnapshot snapshot) {
+        // A leading separator isolates a fresh snapshot even after a crash-truncated final line.
+        lookup.append(snapshot, () -> appendLine("\n" + line), initializeOnAppend, this::backfill);
+      } else {
+        appendLine(line);
+      }
     } catch (Exception e) {
       log.warn("Failed to persist {} record: {}", type.getSimpleName(), e.getMessage());
       log.debug("Record persist failure (stack trace)", e);
     }
   }
 
-  /** Reads all records (diagnostic/test; the single-user store stays small). */
+  private void appendLine(String line) throws IOException {
+    Files.writeString(storeFile, line, StandardCharsets.UTF_8,
+        StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+  }
+
+  /** Streaming legacy backfill, retried by the background owner until a generation is complete. */
+  public synchronized void initializeLookup() throws IOException {
+    if (lookup == null) return;
+    lookup.initialize(this::backfill);
+  }
+
+  private void backfill(FeatureSnapshotLookup.SnapshotWriter writer) throws IOException {
+    if (!Files.exists(storeFile)) return;
+    try (var reader = Files.newBufferedReader(storeFile, StandardCharsets.UTF_8)) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (Thread.currentThread().isInterrupted()) throw new IOException("Feedback backfill interrupted");
+        if (!line.isBlank()) writer.append((FeatureSnapshot) parseRecord(line));
+      }
+    }
+  }
+
+  Runnable onLookupInvalidation(Runnable listener) {
+    if (lookup == null) throw new IllegalStateException("Identity lookup requires feature snapshots");
+    return lookup.onInvalidation(listener);
+  }
+
+  boolean lookupInitialized() throws IOException {
+    return lookup == null || lookup.initialized();
+  }
+
+  /** Resolves one captured identity without reading or locking the archival stream. */
+  public java.util.Optional<String> resolveStableDocId(String interactionId, String sourceDocId)
+      throws IOException {
+    if (lookup == null) throw new IllegalStateException("Identity lookup requires feature snapshots");
+    return lookup.resolve(interactionId, sourceDocId);
+  }
+
+  /** Reads archival records for offline label projection, backup and diagnostics. */
   public synchronized List<T> readAll() throws IOException {
     List<T> out = new ArrayList<>();
     if (!Files.exists(storeFile)) {
@@ -95,31 +151,37 @@ public final class NdjsonAppendStore<T> {
     if (cipher.enabled() && cipher.locked()) {
       return out; // sealed + locked: empty until unlock (mirrors RunEventStore)
     }
-    for (String line : Files.readAllLines(storeFile, StandardCharsets.UTF_8)) {
-      if (line.isBlank()) {
-        continue;
+    try (var reader = Files.newBufferedReader(storeFile, StandardCharsets.UTF_8)) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (line.isBlank()) {
+          continue;
+        }
+        out.add(parseRecord(line));
       }
-      JsonNode root = MAPPER.readTree(cipher.open(line));
-      JsonNode version = root.get("schemaVersion");
-      if (version == null) {
-        out.add(MAPPER.treeToValue(root, type));
-        continue;
-      }
-      if (!version.isInt()) {
-        throw new IOException("feedback record schemaVersion must be an integer");
-      }
-      int observed = version.intValue();
-      if (observed > CURRENT_SCHEMA_VERSION) {
-        throw new UnsupportedStoreVersionException(
-            "feedback-records", observed, CURRENT_SCHEMA_VERSION);
-      }
-      JsonNode record = root.get("record");
-      if (observed != CURRENT_SCHEMA_VERSION || record == null) {
-        throw new IOException("unsupported feedback record envelope");
-      }
-      out.add(MAPPER.treeToValue(record, type));
     }
     return out;
+  }
+
+  private T parseRecord(String line) throws IOException {
+    JsonNode root = MAPPER.readTree(cipher.open(line));
+    JsonNode version = root.get("schemaVersion");
+    if (version == null) {
+      return MAPPER.treeToValue(root, type);
+    }
+    if (!version.isInt()) {
+      throw new IOException("feedback record schemaVersion must be an integer");
+    }
+    int observed = version.intValue();
+    if (observed > CURRENT_SCHEMA_VERSION) {
+      throw new UnsupportedStoreVersionException(
+          "feedback-records", observed, CURRENT_SCHEMA_VERSION);
+    }
+    JsonNode record = root.get("record");
+    if (observed != CURRENT_SCHEMA_VERSION || record == null) {
+      throw new IOException("unsupported feedback record envelope");
+    }
+    return MAPPER.treeToValue(record, type);
   }
 
   /** The backing NDJSON file path (package-private for tests / diagnostics). */
