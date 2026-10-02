@@ -36,6 +36,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Lane F stage A item A6 — the ports as direct calls, exercised end to end in one JVM.
@@ -88,6 +90,18 @@ final class EngineRootInProcessPortsTest {
   @Test
   void generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation(@TempDir Path tempDir)
       throws Exception {
+    assertGenerationPacing(tempDir, false, 0, 3);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3})
+  void generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(
+      int scenario, @TempDir Path tempDir) throws Exception {
+    assertGenerationPacing(tempDir, true, scenario, scenario + 1);
+  }
+
+  private void assertGenerationPacing(Path tempDir, boolean deferIndexStart,
+      int firstScenario, int scenarioLimit) throws Exception {
     Path dataDir = tempDir.resolve("generation-data");
     publishConfig(dataDir, dataDir.resolve("index"));
     KnowledgeServer[] built = new KnowledgeServer[1];
@@ -98,10 +112,10 @@ final class EngineRootInProcessPortsTest {
               io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent);
           return built[0];
         }, 30_000, 5_000);
-    var client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
-    var load = built[0].foregroundLoad();
-    var pacing = built[0].appServices().indexingPacing();
-    assertSame(load, pacing.foregroundLoad());
+    var client = deferIndexStart ? null : root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+    var load = deferIndexStart ? null : built[0].foregroundLoad();
+    var pacing = deferIndexStart ? null : built[0].appServices().indexingPacing();
+    if (!deferIndexStart) assertSame(load, pacing.foregroundLoad());
     var release = new AtomicReference<CountDownLatch>();
     var allReleases = new CopyOnWriteArrayList<CountDownLatch>();
     var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -145,20 +159,36 @@ final class EngineRootInProcessPortsTest {
           config.build(), tempDir.toString(), null, org.slf4j.LoggerFactory.getLogger(getClass()))) {
         assertNotNull(manager);
         manager.switchToOnlineMode();
-        for (int scenario = 0; scenario < 3; scenario++) {
-          boolean foreground = scenario != 1;
+        // A producer that already exited must not be resurrected by later gate publication.
+        if (deferIndexStart) {
+          var completed = root.admission().admit(TestEngineContexts.FOREGROUND, false);
+          Runnable finished = BootstrapInferenceFactory.generationLifetime(root.executors()).apply(completed);
+          completed.close();
+          finished.run();
+          finished.run();
+          assertEquals(0, root.admission().activeWorkCount());
+        }
+        for (int scenario = firstScenario; scenario < scenarioLimit; scenario++) {
+          boolean detached = scenario == 3;
+          boolean foreground = scenario != 1 && !detached;
           boolean cancel = scenario == 2;
-          var context = foreground ? TestEngineContexts.FOREGROUND : TestEngineContexts.BACKGROUND;
+          var context = detached ? io.justsearch.app.services.intent.EngineProvenance.internal(
+              "generation-detach", io.justsearch.core.context.EngineContext.Survival.DURABLE,
+              io.justsearch.core.context.EngineContext.Urgency.FOREGROUND)
+              : foreground ? TestEngineContexts.FOREGROUND : TestEngineContexts.BACKGROUND;
           var front = root.admission().admit(context, false);
           var drained = new CountDownLatch(1);
           front.onCompletion(drained::countDown);
           try {
-            // Retrieval enters the real port once and completes before generation starts.
-            long beforeRetrieval = load.startedTotal();
-            client.search("empty generation retrieval", 10, front.context());
-            assertEquals(beforeRetrieval + (foreground ? 1 : 0), load.startedTotal());
-            assertEquals(0, load.inFlight());
-            long beforeGeneration = load.startedTotal();
+            long beforeGeneration = 0;
+            if (!deferIndexStart) {
+              // Retrieval enters the real port once and completes before generation starts.
+              long beforeRetrieval = load.startedTotal();
+              client.search("empty generation retrieval", 10, front.context());
+              assertEquals(beforeRetrieval + (foreground ? 1 : 0), load.startedTotal());
+              assertEquals(0, load.inFlight());
+              beforeGeneration = load.startedTotal();
+            }
             var firstChunk = new CountDownLatch(1);
             var finish = new CountDownLatch(1);
             allReleases.add(finish);
@@ -168,6 +198,16 @@ final class EngineRootInProcessPortsTest {
                 chunk -> firstChunk.countDown(), null, ignored -> {}, null,
                 ignored -> terminal.complete(null), terminal::complete, null, true, front);
             assertTrue(firstChunk.await(5, TimeUnit.SECONDS));
+            if (deferIndexStart) {
+              assertEquals(null, built[0], "generation is streaming before index construction");
+              if (detached) front.waitingClientGone();
+              front.close(); // The producer owns its work while the gate is unavailable.
+              client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+              load = built[0].foregroundLoad();
+              pacing = built[0].appServices().indexingPacing();
+              assertSame(load, pacing.foregroundLoad());
+              assertEquals(1, finish.getCount(), "upstream generation outlives index startup");
+            }
             assertEquals(foreground ? 1 : 0, load.inFlight());
             assertEquals(beforeGeneration + (foreground ? 1 : 0), load.startedTotal());
             // Ignore retrieval cooldown: pacing must still see active foreground generation.
