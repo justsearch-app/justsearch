@@ -42,6 +42,156 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(15)
 final class EngineKnowledgeClientServingViewLifetimeTest {
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void cancellingQueuedSubscriptionTasksReleasesAdmissionAndServingViews(boolean delivery)
+      throws Exception {
+    var ingest = mock(WorkerIngestService.class);
+    var publishers = new java.util.concurrent.CopyOnWriteArrayList<
+        java.util.function.Consumer<IndexingJobsFrame>>();
+    var started = new CountDownLatch(5);
+    doAnswer(invocation -> {
+      publishers.add(invocation.getArgument(1));
+      started.countDown();
+      return null;
+    }).when(ingest).subscribeIndexingJobs(any(), any(), any());
+    var services = services(null, ingest);
+    var leases = new ServingLeaseTracker(services);
+    var admission = new EngineAdmissionController(16, 16, 1);
+    var errors = new AtomicInteger();
+    var frames = new AtomicInteger();
+    var completions = new AtomicInteger();
+    var releasePool = new CountDownLatch(1);
+    var streams = new java.util.ArrayList<KnowledgeClient.IndexingJobsStream>();
+    try (var registry = registry(4, 16);
+        var client = new EngineKnowledgeClient(registry, () -> services,
+            new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100, IpcTelemetry.noop(),
+            () -> {}, admission, WatchedRootsState.inMemory(), leases::open)) {
+      try {
+        var pool = backgroundStreamPool(client);
+        if (!delivery) occupyPool(pool, releasePool);
+        for (int i = 0; i < 5; i++) {
+          streams.add(client.subscribeIndexingJobs(frame -> frames.incrementAndGet(),
+              failure -> {
+                org.junit.jupiter.api.Assertions.assertInstanceOf(
+                    java.util.concurrent.CancellationException.class, failure);
+                errors.incrementAndGet();
+              }, completions::incrementAndGet, TestEngineContexts.BACKGROUND));
+        }
+        if (delivery) {
+          assertTrue(started.await(3, TimeUnit.SECONDS));
+          occupyPool(pool, releasePool);
+          assertEquals(5, leases.active.get(), "normal startup return keeps each subscription view");
+          for (var publish : publishers) {
+            publish.accept(IndexingJobsFrame.newBuilder()
+                .setSnapshot(io.justsearch.ipc.IndexingJobsSnapshot.getDefaultInstance()).build());
+          }
+        }
+        assertEquals(5, admission.activeWorkCount());
+        assertEquals(10, leases.active.get(), "five subscriptions plus five never-started task views");
+        var queued = List.copyOf(pool.getQueue());
+        assertEquals(5, queued.size());
+        for (var task : queued) {
+          assertTrue(((java.util.concurrent.Future<?>) task).cancel(false));
+        }
+        // The blockers are still parked: no queued producer or delivery body can clean up for us.
+        assertEquals(1L, releasePool.getCount());
+        assertTrue(pool.getQueue().isEmpty());
+        assertEquals(0, admission.activeWorkCount());
+        leases.assertReleasedExactlyOnce();
+        assertEquals(5, errors.get());
+        assertEquals(0, frames.get());
+        assertEquals(0, completions.get(), "normal producer return must not complete a live stream");
+        if (!delivery) verify(ingest, never()).subscribeIndexingJobs(any(), any(), any());
+        streams.forEach(KnowledgeClient.IndexingJobsStream::close);
+        leases.assertReleasedExactlyOnce();
+        assertEquals(5, errors.get(), "later handle close must not repeat terminal failure");
+      } finally {
+        releasePool.countDown();
+        streams.forEach(KnowledgeClient.IndexingJobsStream::close);
+      }
+    }
+  }
+
+  @Test
+  void clientCloseReleasesQueuedSubscriptionOwnersWithoutClosingHandles() throws Exception {
+    var services = mock(WorkerAppServices.class);
+    var leases = new ServingLeaseTracker(services);
+    var admission = new EngineAdmissionController(16, 16, 1);
+    var releasePool = new CountDownLatch(1);
+    var streams = new java.util.ArrayList<KnowledgeClient.IndexingJobsStream>();
+    try (var registry = registry(4, 16);
+        var client = new EngineKnowledgeClient(registry, () -> services,
+            new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100, IpcTelemetry.noop(),
+            () -> {}, admission, WatchedRootsState.inMemory(), leases::open)) {
+      try {
+        var pool = backgroundStreamPool(client);
+        occupyPool(pool, releasePool);
+        for (int i = 0; i < 5; i++) {
+          streams.add(client.subscribeIndexingJobs(frame -> {
+            throw new AssertionError("queued producer must never deliver");
+          }, failure -> {}, () -> {}, TestEngineContexts.BACKGROUND));
+        }
+        assertEquals(5, pool.getQueue().size());
+        assertEquals(5, admission.activeWorkCount());
+        assertEquals(10, leases.active.get());
+        client.close();
+        assertEquals(1L, releasePool.getCount(), "shutdown assertions run before pool blockers exit");
+        assertEquals(0, admission.activeWorkCount());
+        leases.assertReleasedExactlyOnce();
+        verify(services, never()).ingestService();
+        streams.forEach(KnowledgeClient.IndexingJobsStream::close);
+        leases.assertReleasedExactlyOnce();
+      } finally {
+        releasePool.countDown();
+        streams.forEach(KnowledgeClient.IndexingJobsStream::close);
+      }
+    }
+  }
+
+  private static java.util.concurrent.ThreadPoolExecutor backgroundStreamPool(
+      EngineKnowledgeClient client) throws Exception {
+    var field = EngineKnowledgeClient.class.getDeclaredField("backgroundStreamThreads");
+    field.setAccessible(true);
+    return (java.util.concurrent.ThreadPoolExecutor) field.get(client);
+  }
+
+  private static void occupyPool(java.util.concurrent.ThreadPoolExecutor pool, CountDownLatch release)
+      throws InterruptedException {
+    var entered = new CountDownLatch(pool.getCorePoolSize());
+    for (int i = 0; i < pool.getCorePoolSize(); i++) {
+      pool.execute(() -> {
+        entered.countDown();
+        await(release);
+      });
+    }
+    assertTrue(entered.await(3, TimeUnit.SECONDS));
+  }
+
+  private static final class ServingLeaseTracker {
+    private final WorkerAppServices services;
+    private final AtomicInteger active = new AtomicInteger();
+    private final List<KnowledgeServer.ServingLease> opened = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    ServingLeaseTracker(WorkerAppServices services) { this.services = services; }
+
+    KnowledgeServer.ServingLease open() {
+      var lease = mock(KnowledgeServer.ServingLease.class);
+      active.incrementAndGet();
+      opened.add(lease);
+      when(lease.services()).thenReturn(services);
+      when(lease.fork()).thenAnswer(ignored -> open());
+      when(lease.onRetirement(any())).thenReturn(() -> {});
+      doAnswer(ignored -> { active.decrementAndGet(); return null; }).when(lease).close();
+      return lease;
+    }
+
+    void assertReleasedExactlyOnce() {
+      assertEquals(0, active.get(), "every captured serving lease returns to baseline");
+      opened.forEach(lease -> verify(lease).close());
+    }
+  }
+
   @Test
   void encoderRuntimeSnapshotKeepsPolicyAndProbeOnAThroughBPublication() throws Exception {
     var policyEntered = new CountDownLatch(1);
@@ -377,11 +527,15 @@ final class EngineKnowledgeClientServingViewLifetimeTest {
   }
 
   private static DefaultEngineExecutorRegistry registry() {
+    return registry(2, 4);
+  }
+
+  private static DefaultEngineExecutorRegistry registry(int backgroundThreads, int queueCapacity) {
     return new DefaultEngineExecutorRegistry(
         new EngineResourcePolicy(Map.of(
             "perContextLimit", 16, "aggregateLimit", 16, "retryAfterSeconds", 1,
-            "foregroundThreads", 2, "foregroundQueue", 4,
-            "backgroundThreads", 2, "backgroundQueue", 4,
+            "foregroundThreads", 2, "foregroundQueue", queueCapacity,
+            "backgroundThreads", backgroundThreads, "backgroundQueue", queueCapacity,
             "timerRegistrations", 32, "directMemoryMiB", 1), new RetainedStateBudget()),
         Duration.ofMillis(100));
   }

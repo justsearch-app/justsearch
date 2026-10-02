@@ -3,6 +3,8 @@ package io.justsearch.app.engine;
 
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -369,6 +371,20 @@ final class BoundedHandoff<T> implements AutoCloseable {
     } finally {
       close();
     }
+  }
+
+  /**
+   * A task cancelled before entry cannot report failure from its body. Its exceptional exit must
+   * close this flow too. Normal task return is not completion of a live change-feed subscription.
+   */
+  void observeTaskExit(CompletionStage<?> exit) {
+    exit.whenComplete((ignored, failure) -> {
+      if (failure != null && !closed.get()) {
+        Throwable cause = failure instanceof CompletionException && failure.getCause() != null
+            ? failure.getCause() : failure;
+        fail(cause);
+      }
+    });
   }
 
   /**

@@ -942,7 +942,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private void submitProducerOrClose(BoundedHandoff<?> flow, Runnable producer,
       io.justsearch.app.api.EngineWorkHandle work, CallView view) {
     try {
-      executeOwnedStream(work, producer, false, view);
+      flow.observeTaskExit(executeOwnedStream(work, producer, false, view));
     } catch (java.util.concurrent.RejectedExecutionException e) {
       flow.close();
       throw engineLimit();
@@ -1468,6 +1468,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       view.release();
       throw failure;
     }
+    // On-demand delivery starts only after publish; install its flow reference before startup.
+    var deliveryFlow = new AtomicReference<BoundedHandoff<IndexingJobsFrame>>();
     final BoundedHandoff<IndexingJobsFrame> flow;
     try {
       flow =
@@ -1476,7 +1478,9 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                   indexingJobsHandoff(
                       onFrame,
                       onError,
-                      body -> executeOwnedStream(subscriptionOwner, body, true, view.fork())));
+                      body -> deliveryFlow.get().observeTaskExit(
+                          executeOwnedStream(subscriptionOwner, body, true, view.fork()))));
+      deliveryFlow.set(flow);
     } catch (RuntimeException | Error failure) {
       try { subscriptionOwner.close(); }
       finally { view.release(); }
