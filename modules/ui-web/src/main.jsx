@@ -68,6 +68,7 @@ import { startMessageCatalogs } from './i18n'
 import './shell-v0/index.ts'
 import { appLog } from './utils/logger.ts'
 import { authorizedFetch } from './shell-v0/api/authorizedFetch.ts'
+import { stopAiStateStore } from './shell-v0/state/aiStateStore.ts'
 
 // Global unhandled error capture — log-only, no UI notification
 window.addEventListener('unhandledrejection', (event) => {
@@ -118,8 +119,8 @@ async function bootstrap() {
 
   // Production boot: <jf-shell> directly. SurfaceCatalog booted up-front
   // so the rail has data on first paint.
-  const { resolveBootWithRecovery } = await import('./boot/desktopRecovery.ts')
-  const resolvedApiBase = await resolveBootWithRecovery(document.getElementById('root'))
+  const { resolveBootWithRecovery, mountBootApplication } = await import('./boot/desktopRecovery.ts')
+  const resolvedApiBase = await resolveBootWithRecovery(document.getElementById('root'), stopAiStateStore)
   if (!resolvedApiBase) {
     appLog.error('Unable to resolve JustSearch backend API base')
     return
@@ -448,10 +449,9 @@ async function bootstrap() {
   }
 
   const root = document.getElementById('root')
-  root.innerHTML = ''
   const shell = document.createElement('jf-shell')
   shell.setAttribute('api-base', apiBase)
-  root.appendChild(shell)
+  mountBootApplication(root, shell)
 
   // Tempdoc 669 — demo/recording mode. Dismisses every currently-registered,
   // not-yet-dismissed walkthrough (the first-run "Welcome to JustSearch" tour

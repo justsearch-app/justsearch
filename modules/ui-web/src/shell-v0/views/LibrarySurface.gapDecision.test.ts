@@ -88,6 +88,65 @@ describe('Library recorded migration gap decision', () => {
     el.remove();
   });
 
+  it.each(['before', 'during'])('releases an invalidated gap read that finishes %s the next migration read', async (completion) => {
+    const nextKey = '0194f72c-0000-7000-8000-000000000002';
+    let finishOld!: (response: Response) => void;
+    let finishNext!: (response: Response) => void;
+    const oldRead = new Promise<Response>((resolve) => { finishOld = resolve; });
+    const nextRead = new Promise<Response>((resolve) => { finishNext = resolve; });
+    const fetch = vi.fn().mockImplementation(async (path: string) => {
+      if (path === `/api/operation-history/${key}`) return oldRead;
+      if (path === `/api/operation-history/${nextKey}`) return nextRead;
+      return new Response('{}', { status: 503 });
+    });
+    const host = { platform: { capabilities: new Set<string>() },
+      data: { fetch, invokeOperation: vi.fn() } } as unknown as PluginHostApi;
+    const feed = (migrationState: string, operationKey: string) => __feedForTest({
+      status: { worker: { migration: {
+        migrationState, buildingGenerationId: `g-${operationKey}`,
+      } } } as unknown as StatusSnapshot,
+    });
+    const outcome = (unitId: string) => new Response(JSON.stringify({
+      state: 'running', historySince: 0, phase: 'awaiting_acceptance',
+      result: { gapListHash: hash, gaps: [{ unitId, reason: 'PARSER_FAILED' }] },
+    }));
+    let now = 10_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    feed('AWAITING_ACCEPTANCE', key);
+    const el = document.createElement('jf-library-surface') as LibrarySurface;
+    el.host_ = host;
+    document.body.appendChild(el);
+    await pump(el);
+    expect(fetch.mock.calls.filter(([path]) => path === `/api/operation-history/${key}`)).toHaveLength(1);
+
+    feed('MIGRATING', key);
+    await pump(el);
+    if (completion === 'before') {
+      finishOld(outcome('obsolete-gap'));
+      await pump(el);
+    }
+    feed('AWAITING_ACCEPTANCE', nextKey);
+    await pump(el);
+    expect(fetch.mock.calls.filter(([path]) => path === `/api/operation-history/${nextKey}`)).toHaveLength(1);
+    if (completion === 'during') {
+      finishOld(outcome('obsolete-gap'));
+      await pump(el);
+    }
+    expect(el.gapDecision).toBeNull();
+    now += 5_000;
+    feed('AWAITING_ACCEPTANCE', nextKey);
+    await pump(el);
+    expect(fetch.mock.calls.filter(([path]) => path === `/api/operation-history/${nextKey}`)).toHaveLength(1);
+    finishNext(outcome('current-gap'));
+    await pump(el);
+    expect(el.gapDecision?.reindexKey).toBe(nextKey);
+    expect(el.shadowRoot?.textContent).toContain('current-gap: PARSER_FAILED');
+    expect(el.shadowRoot?.textContent).not.toContain('obsolete-gap');
+    expect(Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? [])
+      .some((button) => button.getAttribute('label') === 'Accept gaps and activate')).toBe(true);
+    el.remove();
+  });
+
   it('does not retain an operation error that completes after navigation', async () => {
     const rejectDecisions: Array<(reason: Error) => void> = [];
     const invoke = vi.fn().mockImplementation(() => new Promise<{ success: boolean }>((_resolve, reject) => {

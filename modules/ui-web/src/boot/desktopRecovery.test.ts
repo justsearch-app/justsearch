@@ -12,7 +12,7 @@ vi.mock('../api/http', () => ({ resolveApiEndpoint: mocks.endpoint }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }));
 
-import { resolveBootWithRecovery } from './desktopRecovery.js';
+import { mountBootApplication, resolveBootWithRecovery } from './desktopRecovery.js';
 import { __resetForTest } from '../shell-v0/state/appUpdateState.js';
 import type { EngineRecovery } from '../shell-v0/components/EngineRecovery.js';
 
@@ -64,10 +64,50 @@ describe('desktop boot recovery', () => {
   });
 
   it('removes the recovery surface when the real API is available', async () => {
+    mocks.invoke.mockImplementation(async (command) => command === 'supervisor_state'
+      ? { ...terminal, state: 'running' } : { state: 'up_to_date', currentVersion: '1.0' });
     mocks.endpoint.mockResolvedValue({ baseUrl: 'http://127.0.0.1:40404' });
     const root = document.getElementById('root')!;
     expect(await resolveBootWithRecovery(root)).toBe('http://127.0.0.1:40404');
     expect(root.querySelector('jf-engine-recovery')).toBeNull();
+  });
+
+  it('replaces a running shell with terminal recovery without a successor binding', async () => {
+    mocks.invoke.mockImplementation(async (command) => command === 'supervisor_state'
+      ? { ...terminal, state: 'running' } : { state: 'up_to_date', currentVersion: '1.0' });
+    mocks.endpoint.mockResolvedValue({ baseUrl: 'http://127.0.0.1:40404' });
+    const root = document.getElementById('root')!;
+    await resolveBootWithRecovery(root);
+    const shell = document.createElement('jf-shell');
+    root.replaceChildren(shell);
+    expect(shell.isConnected).toBe(true);
+    const onState = mocks.listen.mock.calls.find(([name]) => name === 'justsearch://supervisor-state')![1];
+    onState({ payload: { ...terminal, state: 'restarting' } });
+    expect(shell.isConnected).toBe(true);
+    onState({ payload: terminal });
+    const recovery = root.querySelector('jf-engine-recovery') as EngineRecovery;
+    expect(recovery).not.toBeNull();
+    expect(shell.isConnected).toBe(false);
+    await recovery.updateComplete;
+    expect(recovery.shadowRoot?.textContent).toContain('JustSearch could not restart');
+    expect(recovery.shadowRoot?.textContent).toContain('Try connecting again');
+    expect(recovery.shadowRoot?.textContent).toContain('Check for updates');
+  });
+
+  it('preserves exhaustion that arrives while the application is still mounting', async () => {
+    mocks.invoke.mockImplementation(async (command) => command === 'supervisor_state'
+      ? { ...terminal, state: 'running' } : { state: 'up_to_date', currentVersion: '1.0' });
+    mocks.endpoint.mockResolvedValue({ baseUrl: 'http://127.0.0.1:40404' });
+    const root = document.getElementById('root')!;
+    await resolveBootWithRecovery(root);
+    const onState = mocks.listen.mock.calls.find(([name]) => name === 'justsearch://supervisor-state')![1];
+    onState({ payload: terminal });
+    const shell = document.createElement('jf-shell');
+    mountBootApplication(root, shell);
+    expect(shell.isConnected).toBe(false);
+    const recovery = root.querySelector('jf-engine-recovery') as EngineRecovery;
+    await recovery.updateComplete;
+    expect(recovery.shadowRoot?.textContent).toContain('JustSearch could not restart');
   });
 
   it('keeps an update failure visible and allows checking again', async () => {

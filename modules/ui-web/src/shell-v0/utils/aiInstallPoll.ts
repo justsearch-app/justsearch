@@ -124,7 +124,7 @@ type Listener = (snapshot: AiInstallSnapshot) => void;
 
 const listeners = new Set<Listener>();
 let timer: number | null = null;
-let running = false;
+let controller: AbortController | null = null;
 let apiBase = '';
 let last: AiInstallSnapshot = { install: null, runtime: null, packs: null };
 
@@ -161,9 +161,9 @@ export function pollIntervalFor(snapshot: AiInstallSnapshot): number {
   return SLOW_INTERVAL_MS;
 }
 
-async function fetchJson<T>(path: string): Promise<T | null> {
+async function fetchJson<T>(path: string, current: AbortController): Promise<T | null> {
   try {
-    const res = await authorizedFetch((apiBase || '') + path);
+    const res = await authorizedFetch((apiBase || '') + path, { signal: current.signal });
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
@@ -171,12 +171,13 @@ async function fetchJson<T>(path: string): Promise<T | null> {
   }
 }
 
-async function fetchOnce(): Promise<void> {
+async function fetchOnce(current: AbortController): Promise<void> {
   const [install, runtime, packs] = await Promise.all([
-    fetchJson<InstallStatus>('/api/ai/install/status'),
-    fetchJson<AiRuntimeStatus>('/api/ai/runtime/status'),
-    fetchJson<PackImportStatus>('/api/ai/packs/status'),
+    fetchJson<InstallStatus>('/api/ai/install/status', current),
+    fetchJson<AiRuntimeStatus>('/api/ai/runtime/status', current),
+    fetchJson<PackImportStatus>('/api/ai/packs/status', current),
   ]);
+  if (controller !== current) return;
   // Retain last-known-good per field on a transient failure — a single bad tick must never
   // regress an already-known field back to null (that regression is what stranded BrainSurface
   // on "Connecting…" before this module existed).
@@ -185,7 +186,10 @@ async function fetchOnce(): Promise<void> {
     runtime: runtime ?? last.runtime,
     packs: packs ?? last.packs,
   };
-  for (const l of listeners) l(last);
+  for (const l of listeners) {
+    if (controller !== current) return;
+    l(last);
+  }
 }
 
 /**
@@ -194,25 +198,28 @@ async function fetchOnce(): Promise<void> {
  * failed tick retains last-known-good and schedules the next one exactly like a successful tick, so
  * no code path can stop retrying because prior attempts failed (tempdoc 663 §O).
  */
-async function tick(): Promise<void> {
+async function tick(current: AbortController): Promise<void> {
+  if (controller !== current) return;
   timer = null;
-  await fetchOnce();
-  schedule();
+  await fetchOnce(current);
+  schedule(current);
 }
 
-function schedule(): void {
-  if (!running || timer !== null) return;
-  timer = window.setTimeout(() => void tick(), pollIntervalFor(last));
+function schedule(current: AbortController): void {
+  if (controller !== current || timer !== null) return;
+  timer = window.setTimeout(() => void tick(current), pollIntervalFor(last));
 }
 
 function ensureRunning(): void {
-  if (running) return;
-  running = true;
-  void tick();
+  if (controller) return;
+  controller = new AbortController();
+  void tick(controller);
 }
 
 function stop(): void {
-  running = false;
+  const obsolete = controller;
+  controller = null;
+  obsolete?.abort();
   if (timer !== null) {
     window.clearTimeout(timer);
     timer = null;
@@ -238,7 +245,7 @@ export function subscribeAiInstall(listener: Listener): () => void {
 export function setAiInstallApiBase(base: string): void {
   if (apiBase !== base) {
     apiBase = base;
-    if (running) {
+    if (controller) {
       stop();
       ensureRunning();
     }
