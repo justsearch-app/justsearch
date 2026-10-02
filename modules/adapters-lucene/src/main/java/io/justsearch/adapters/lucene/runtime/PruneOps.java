@@ -19,6 +19,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.index.Term;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,13 +98,22 @@ public final class PruneOps {
           // Legacy documents may have only a filesystem doc_id. Validate the stored path below
           // before applying this fallback so an ID cannot pull another backing path into scope.
           .add(new PrefixQuery(new Term(idField, normalized)), BooleanClause.Occur.SHOULD)
+          .add(
+              new BooleanQuery.Builder()
+                  .add(new PrefixQuery(new Term(SchemaFields.PARENT_DOC_ID, normalized)),
+                      BooleanClause.Occur.FILTER)
+                  .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
+                      BooleanClause.Occur.FILTER)
+                  .build(),
+              BooleanClause.Occur.SHOULD)
           .setMinimumNumberShouldMatch(1)
           .build();
 
       // Stored-field visitor: we need doc_id for deletion and path for file existence check.
       // Avoid decoding large stored fields (content).
       org.apache.lucene.index.StoredFields storedFields = searcher.storedFields();
-      Set<String> storedAllowlist = Set.of(idField, SchemaFields.PATH, SchemaFields.PARENT_DOC_ID);
+      Set<String> storedAllowlist =
+          Set.of(idField, SchemaFields.PATH, SchemaFields.PARENT_DOC_ID, SchemaFields.IS_CHUNK);
 
       // Page through results to avoid allocating a potentially huge ScoreDoc[] (Integer.MAX_VALUE).
       final int batchSize = 10_000;
@@ -141,12 +151,18 @@ public final class PruneOps {
                   storedFields, scoreDoc.doc, false, storedAllowlist);
           String docId = docFields.get(idField);
           String filePath = docFields.get(SchemaFields.PATH);
+          String parentDocId = docFields.get(SchemaFields.PARENT_DOC_ID);
           if (docId == null || docId.isBlank()) {
             continue;
           }
-          // Fall back to doc_id if path field is missing (legacy docs)
+          // A pathless chunk's owner supplies its backing path even after the parent is removed.
+          // Explicit paths take precedence; other legacy documents fall back to doc_id.
           if (filePath == null || filePath.isBlank()) {
-            filePath = docId;
+            filePath =
+                "true".equals(docFields.get(SchemaFields.IS_CHUNK))
+                        && parentDocId != null && !parentDocId.isBlank()
+                    ? parentDocId
+                    : docId;
           }
           if (!normalizePathPrefix(filePath).startsWith(normalized)) {
             continue;
@@ -154,7 +170,6 @@ public final class PruneOps {
 
           // Check if file still exists
           if (!Files.exists(Path.of(filePath))) {
-            String parentDocId = docFields.get(SchemaFields.PARENT_DOC_ID);
             if (parentDocId != null && !parentDocId.isBlank() && !parentDocId.equals(docId)) {
               indexingCoordinator.deleteByIdAndChunks(parentDocId);
               indexingCoordinator.deleteById(docId);

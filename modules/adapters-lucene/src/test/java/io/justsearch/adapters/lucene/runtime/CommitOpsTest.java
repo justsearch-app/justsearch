@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
@@ -26,6 +27,9 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.store.FilterDirectory;
 import org.apache.lucene.store.MMapDirectory;
 import org.junit.jupiter.api.Test;
@@ -237,6 +241,193 @@ class CommitOpsTest extends LuceneExecutorTestBase {
   }
 
   // -- commit accounting tests --
+
+  @Test
+  void coordinatorRmwAfterPrimaryCommitIsCommittedByTimer() throws Exception {
+    try (var runtime = openAccountingRuntime()) {
+      runtime.indexingCoordinator().indexSingle(accountingDoc("one"));
+      runtime.commitOps().commitAndTrack(CommitReason.INDEXING_LOOP_BUFFER);
+      assertEquals(0L, runtime.session().pendingDocs.get());
+
+      assertTrue(runtime.indexingCoordinator().updateDocument("one", Map.of(SchemaFields.TITLE, "enriched")));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals("enriched", runtime.documentFieldOps().getDocumentField("one", SchemaFields.TITLE));
+      assertEquals("before", committedField(runtime, "one", SchemaFields.TITLE));
+      assertEquals(1L, runtime.session().pendingDocs.get(), "the production RMW must signal its write");
+
+      commitPendingByTimer(runtime);
+      assertEquals("enriched", committedField(runtime, "one", SchemaFields.TITLE));
+      assertEquals(0L, runtime.session().pendingDocs.get());
+    }
+  }
+
+  @Test
+  void coordinatorBatchAndRenameAccountEachSuccessfulRmwAndIgnoreMissingDocuments() throws Exception {
+    try (var runtime = openAccountingRuntime()) {
+      runtime.indexingCoordinator().indexSingle(accountingDoc("one"));
+      runtime.indexingCoordinator().indexSingle(accountingDoc("two"));
+      runtime.commitOps().commitAndTrack(CommitReason.INDEXING_LOOP_BUFFER);
+      assertFalse(runtime.indexingCoordinator().updateDocument("missing", Map.of(SchemaFields.TITLE, "ignored")));
+      assertFalse(runtime.indexingCoordinator().updateDocument("one", Map.of()));
+      assertEquals(0L, runtime.session().pendingDocs.get());
+
+      var result = runtime.indexingCoordinator().updateDocumentsBatch(List.of(
+          Map.entry("one", Map.of(SchemaFields.TITLE, "first")),
+          Map.entry("missing", Map.of(SchemaFields.TITLE, "ignored")),
+          Map.entry("two", Map.of(SchemaFields.TITLE, "second"))));
+      assertEquals(2, result.updatedCount());
+      assertEquals(1, result.notFoundCount());
+      assertEquals(2L, runtime.session().pendingDocs.get());
+      runtime.commitOps().commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+
+      assertEquals(1, runtime.indexingCoordinator().updateDocumentPaths("one", "renamed"));
+      assertEquals(1L, runtime.session().pendingDocs.get(), "rename shares the RMW accounting path");
+      assertEquals(0, runtime.indexingCoordinator().updateDocumentPaths("missing", "ignored"));
+      assertEquals(1L, runtime.session().pendingDocs.get());
+      commitPendingByTimer(runtime);
+      assertEquals("renamed", committedField(runtime, "renamed", SchemaFields.PATH));
+    }
+  }
+
+  @Test
+  void successfulRmwBeforePartialBatchFailureRemainsPendingAndBecomesDurable() throws Exception {
+    try (var runtime = openAccountingRuntime()) {
+      runtime.indexingCoordinator().indexSingle(accountingDoc("one"));
+      runtime.indexingCoordinator().indexSingle(accountingDoc("two"));
+      runtime.commitOps().commitAndTrack(CommitReason.INDEXING_LOOP_BUFFER);
+
+      var failure = assertThrows(IndexRuntimeIOException.class,
+          () -> runtime.indexingCoordinator().updateDocumentsBatch(List.of(
+              Map.entry("one", Map.of(SchemaFields.TITLE, "applied before failure")),
+              Map.entry("two", Map.of(SchemaFields.EMBEDDING_STATUS, "COMPLETED")))));
+      assertTrue(failure.getMessage().contains("status_without_artifact"));
+      assertEquals(1L, runtime.session().pendingDocs.get(), "successful prefix must survive batch failure");
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals("applied before failure", runtime.documentFieldOps().getDocumentField("one", SchemaFields.TITLE));
+      assertEquals("before", runtime.documentFieldOps().getDocumentField("two", SchemaFields.TITLE));
+      assertEquals("before", committedField(runtime, "one", SchemaFields.TITLE));
+
+      commitPendingByTimer(runtime);
+      assertEquals("applied before failure", committedField(runtime, "one", SchemaFields.TITLE));
+      assertEquals("before", committedField(runtime, "two", SchemaFields.TITLE));
+    }
+  }
+
+  private RunningRuntime openAccountingRuntime() {
+    var config = new io.justsearch.configuration.resolved.ResolvedConfigBuilder()
+        .put("index.commit.timer_interval_ms", 500, "jvm_arg", "test", "1")
+        .put("index.commit.meta.enabled", 500, "jvm_arg", "test", "false")
+        .build();
+    var runtime = schemaWith(() -> () -> Map.of(), metadata -> {}).atPath(tempDir)
+        .withConfig(config).withExecutorRegistrations(testLuceneExecutors()).open();
+    runtime.commitOps().stopCommitTimer();
+    return runtime;
+  }
+
+  private static IndexDocument accountingDoc(String id) {
+    return new IndexDocument(Map.of(
+        SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id + "#0", SchemaFields.PATH, id,
+        SchemaFields.CONTENT, "body", SchemaFields.TITLE, "before"));
+  }
+
+  private static String committedField(RunningRuntime runtime, String id, String field) throws IOException {
+    try (var reader = DirectoryReader.open(runtime.session().snapshot.directory())) {
+      var docs = new IndexSearcher(reader).search(new TermQuery(new Term(SchemaFields.DOC_ID, id)), 1);
+      assertEquals(1, docs.scoreDocs.length);
+      return reader.storedFields().document(docs.scoreDocs[0].doc).get(field);
+    }
+  }
+
+  private static void commitPendingByTimer(RunningRuntime runtime) throws InterruptedException {
+    CountDownLatch committed = new CountDownLatch(1);
+    runtime.commitOps().setCommitCompletedListener(reason -> {
+      if (reason == CommitReason.TIMER) committed.countDown();
+    });
+    try {
+      runtime.commitOps().startCommitTimer();
+      assertTrue(committed.await(5, TimeUnit.SECONDS), "timer must commit without another primary batch");
+    } finally {
+      runtime.commitOps().stopCommitTimer();
+    }
+  }
+
+  @Test
+  void overlappingCommitsRetireEachPendingSignalOnlyOnce() throws Exception {
+    CountDownLatch firstPublished = new CountDownLatch(1);
+    CountDownLatch releaseFirst = new CountDownLatch(1);
+    CountDownLatch secondMetadataBuilt = new CountDownLatch(1);
+    AtomicInteger metadataCalls = new AtomicInteger();
+    RuntimeSession session = new RuntimeSession(schemaWith(() -> () -> Map.of(), metadata -> {
+      if (metadataCalls.incrementAndGet() == 2) secondMetadataBuilt.countDown();
+    }));
+    session.commitMetadataEnabled = true;
+    AtomicReference<IndexWriter> currentWriter = new AtomicReference<>();
+    AtomicBoolean injectWrite = new AtomicBoolean();
+    try (var dir = new FilterDirectory(new MMapDirectory(tempDir)) {
+      @Override
+      public void syncMetaData() throws IOException {
+        super.syncMetaData();
+        if (injectWrite.get() && DirectoryReader.indexExists(this)
+            && injectWrite.compareAndSet(true, false)) {
+          currentWriter.get().addDocument(new Document()); // B is outside the first commit.
+          session.pendingDocs.incrementAndGet();
+          firstPublished.countDown();
+          try {
+            if (!releaseFirst.await(5, TimeUnit.SECONDS)) {
+              throw new IOException("test did not release first commit");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(e);
+          }
+        }
+      }
+    }; var writer = new IndexWriter(dir, new IndexWriterConfig())) {
+      currentWriter.set(writer);
+      session.snapshot = new LifecycleSnapshot(dir, writer, null, tempDir, false, null);
+      writer.addDocument(new Document()); // A
+      session.pendingDocs.incrementAndGet();
+      injectWrite.set(true);
+      CommitOps ops = new CommitOps(session, LuceneRuntimeTypes.BuildState.COMPLETE);
+      AtomicReference<Throwable> failure = new AtomicReference<>();
+      Runnable commit = () -> {
+        try {
+          ops.commitAndTrack(CommitReason.INDEXING_LOOP_IDLE);
+        } catch (Throwable e) {
+          failure.compareAndSet(null, e);
+        }
+      };
+      Thread first = new Thread(commit, "first-accounting-commit");
+      Thread second = new Thread(commit, "second-accounting-commit");
+      try {
+        first.start();
+        assertTrue(firstPublished.await(5, TimeUnit.SECONDS));
+        assertEquals(2L, session.pendingDocs.get());
+        second.start();
+        assertTrue(secondMetadataBuilt.await(5, TimeUnit.SECONDS));
+        // Both the commit monitor and Lucene's writer monitor are held by the first caller.
+        // Without commit serialization, the second caller snapshots 2 before blocking in Lucene;
+        // the two callers then subtract 1 and 2 from the same total and leave a negative counter.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (second.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+          Thread.onSpinWait();
+        }
+        assertEquals(Thread.State.BLOCKED, second.getState());
+      } finally {
+        releaseFirst.countDown();
+        first.join(TimeUnit.SECONDS.toMillis(5));
+        second.join(TimeUnit.SECONDS.toMillis(5));
+      }
+      assertFalse(first.isAlive());
+      assertFalse(second.isAlive());
+      assertNull(failure.get());
+      assertEquals(2L, session.commitCount.get());
+      assertEquals(0L, session.pendingDocs.get(), "each commit must retire only its own snapshot");
+      try (var reader = DirectoryReader.open(dir)) {
+        assertEquals(2, reader.numDocs(), "the second commit must cover B");
+      }
+    }
+  }
 
   @Test
   void postCommitWriteRemainsPendingAndNextTimerTickMakesItDurable() throws Exception {
