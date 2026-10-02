@@ -441,6 +441,40 @@ final class SettingsCommitCoordinatorTest {
   }
 
   @Test
+  void installerProjectionRefusesGpuPolicyDriftBeforeOwnersOrPointer() {
+    String policy = "policy.gpu_acceleration_enabled";
+    var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        temp.resolve("installer-policy-drift.json"));
+    var initial = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+        .putDefault(policy, "true").build();
+    var desired = io.justsearch.configuration.resolved.ResolvedConfig.builder()
+        .putDefault(policy, "false").build();
+    var config = new ConfigStore(initial);
+    var components = org.mockito.Mockito.mock(SettingsComponentComposer.class);
+    var restarts = new AtomicInteger();
+    var owner = new SettingsCommitCoordinator(settings, config, restarts::incrementAndGet,
+        candidate -> desired, candidate -> OperationResult.success("prepared"),
+        settings::replacePrepared, () -> false, components);
+    owner.inspectRecovery(List.of());
+    String key = OperationKeys.generate(CLOCK);
+    UiSettings candidate = new UiSettings();
+    var reservation = owner.reserve(716, key, currentWitness(settings));
+
+    var refused = assertThrows(SettingsCommitOwner.Refused.class,
+        () -> owner.prepareInstallerGenerationProjection(reservation, candidate,
+            new ProjectionControl(), installerPlan(key, candidate)));
+
+    assertEquals("RESTART_SOURCE_DRIFT", refused.response().errorCode().orElseThrow());
+    assertEquals(List.of(policy), refused.response().errorDetails().get("keys"));
+    assertSame(initial, config.get());
+    assertEquals(new SettingsWitness(0, null), settings.inspect().witness());
+    assertFalse(Files.exists(settings.settingsPath()));
+    assertEquals(0, restarts.get());
+    org.mockito.Mockito.verifyNoInteractions(components);
+    owner.releaseAfterTerminal(716);
+  }
+
+  @Test
   void installerProjectionRefusesModelPathsMissingOrContradictingAcceptedPlan() {
     for (boolean missingCitation : List.of(true, false)) {
       var settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,

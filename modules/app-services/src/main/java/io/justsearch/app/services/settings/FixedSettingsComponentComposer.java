@@ -5,7 +5,6 @@ import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.QueryRoleSelection;
-import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentRegistry;
@@ -16,8 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,8 +24,6 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
   // Apply relationships are distinct from captured-value/digest dependencies. In particular,
   // query model paths appear in the index's boot projection, but QueryRoleSet replacement is
   // owned by encoders and retains the serving Lucene runtime and index-time EncoderSet.
-  private static final Map<String, Set<String>> SHARED_APPLY_OWNERS = Map.of(
-      EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED.configKey(), Set.of("encoders", "generative"));
   public interface Owner {
     PreparedOwner prepare(UiSettings candidate, ResolvedConfig desired, Set<String> changedKeys);
 
@@ -95,18 +90,16 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
       java.util.function.Consumer<String> afterOwnerPrepared) {
     Objects.requireNonNull(candidateContext, "candidateContext");
     Objects.requireNonNull(afterOwnerPrepared, "afterOwnerPrepared");
-    Map<String, Set<String>> dependencies;
     Map<String, Owner> selected = new LinkedHashMap<>();
     synchronized (this) {
       if (!sealed) throw new IllegalStateException("Component owners are not sealed");
-      dependencies = affectedDependencies(affected);
-      dependencies.keySet().stream().sorted().forEach(name -> {
+      affected.keySet().stream().sorted().forEach(name -> {
         Owner owner = owners.get(name);
         if (owner == null) {
           throw new SettingsCommitOwner.Refused(OperationResult.failure(
-              "Runtime component owner is unavailable: " + name + " for " + dependencies.get(name),
+              "Runtime component owner is unavailable: " + name + " for " + affected.get(name),
               "COMPONENT_PREPARATION_REQUIRED",
-              Map.of("component", name, "keys", dependencies.get(name)), true));
+              Map.of("component", name, "keys", affected.get(name)), true));
         }
         selected.put(name, owner);
       });
@@ -127,7 +120,7 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
       ComposeEvidence composition = null;
       for (var entry : selected.entrySet()) {
         PreparedOwner owner = Objects.requireNonNull(
-            entry.getValue().prepare(candidate, desired, dependencies.get(entry.getKey()),
+            entry.getValue().prepare(candidate, desired, affected.get(entry.getKey()),
                 "generative".equals(entry.getKey()) ? candidateContext
                     : io.justsearch.app.api.settings.SettingsCandidateContext.NONE),
             "Prepared owner: " + entry.getKey());
@@ -161,24 +154,6 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
       }
       throw failure;
     }
-  }
-
-  private Map<String, Set<String>> affectedDependencies(Map<String, Set<String>> affected) {
-    Map<String, Set<String>> expanded = new TreeMap<>();
-    Set<String> changed = new TreeSet<>();
-    affected.forEach((name, keys) -> {
-      expanded.put(name, new TreeSet<>(keys));
-      changed.addAll(keys);
-    });
-    // Only explicit shared apply relationships add owners. A missing required owner still
-    // refuses preparation; registered owner availability never determines dispatch semantics.
-    for (String key : changed) {
-      for (String name : SHARED_APPLY_OWNERS.getOrDefault(key, Set.of())) {
-        expanded.computeIfAbsent(name, ignored -> new TreeSet<>()).add(key);
-      }
-    }
-    expanded.replaceAll((name, keys) -> Set.copyOf(keys));
-    return Map.copyOf(expanded);
   }
 
   private static EngineComponentSnapshot.Component withComposition(

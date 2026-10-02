@@ -45,16 +45,19 @@ final class FixedSettingsComponentComposerTest {
       ComposeEvidence.Mode.IN_PLACE, "candidate_fits_after_source_release", 10L, 20L);
 
   @Test
-  void sharedPolicyDispatchesExplicitApplyOwnersInOneBatch() {
-    String key = "policy.gpu_acceleration_enabled";
-    var before = ResolvedConfig.builder().putDefault(key, "true").build();
-    var after = ResolvedConfig.builder().putDefault(key, "false").build();
+  void independentQueryAndGenerativeChangesDispatchInOneBatch() {
+    String queryKey = "justsearch.rerank.top_k";
+    String generativeKey = "justsearch.llm.slots";
+    var before = ResolvedConfig.builder().putDefault(queryKey, "10")
+        .putDefault(generativeKey, "2").build();
+    var after = ResolvedConfig.builder().putDefault(queryKey, "20")
+        .putDefault(generativeKey, "3").build();
     var affected = ConfigApplyScopes.classify(before, after).component();
-    assertEquals(Map.of("encoders", Set.of(key)), affected);
+    assertEquals(Map.of("encoders", Set.of(queryKey), "generative", Set.of(generativeKey)), affected);
     var registry = emptyRegistry();
     when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0, List.of(
-        declared("encoders", Set.of(key)), declared("generative", Set.of(key)),
-        declared("index", Set.of(key)))));
+        declared("encoders", Set.of(queryKey)), declared("generative", Set.of(generativeKey)),
+        declared("index", Set.of(queryKey)))));
     var lease = mock(EngineComponentRegistry.ApplyLease.class);
     var batch = mock(EngineComponentRegistry.PreparedBatch.class);
     when(registry.tryApply()).thenReturn(new Acquired(lease));
@@ -63,15 +66,15 @@ final class FixedSettingsComponentComposerTest {
     when(query.selection()).thenReturn(new QueryRoleSelection(
         QueryRoleSelection.Role.disabled(), QueryRoleSelection.Role.disabled()));
     when(query.composition()).thenReturn(java.util.Optional.of(QUERY_COMPOSITION));
-    when(query.observation()).thenReturn(declared("encoders", Set.of(key)));
+    when(query.observation()).thenReturn(declared("encoders", Set.of(queryKey)));
     var generative = new RecordingOwner("generative");
     var composer = new FixedSettingsComponentComposer(registry);
     composer.register("encoders", (candidate, desired, keys) -> {
-      assertEquals(Set.of(key), keys);
+      assertEquals(Set.of(queryKey), keys);
       return query;
     });
     composer.register("generative", (candidate, desired, keys) -> {
-      assertEquals(Set.of(key), keys);
+      assertEquals(Set.of(generativeKey), keys);
       return generative.prepare(candidate, desired, keys);
     });
     composer.seal();
@@ -91,15 +94,15 @@ final class FixedSettingsComponentComposerTest {
   }
 
   @Test
-  void missingSharedConsumerRefusesBeforeTakingApplyPermit() {
-    String key = "policy.gpu_acceleration_enabled";
+  void missingAffectedOwnerRefusesBeforeTakingApplyPermit() {
     var registry = emptyRegistry();
-    // Required shared dispatch is independent of registry snapshots and owner availability.
     var composer = new FixedSettingsComponentComposer(registry);
     composer.register("encoders", new RecordingOwner("encoders"));
     composer.seal();
     var refused = assertThrows(SettingsCommitOwner.Refused.class,
-        () -> composer.prepare(CANDIDATE, DESIRED, Map.of("encoders", Set.of(key))));
+        () -> composer.prepare(CANDIDATE, DESIRED,
+            Map.of("encoders", Set.of("justsearch.rerank.top_k"),
+                "generative", Set.of("justsearch.llm.slots"))));
     assertEquals("COMPONENT_PREPARATION_REQUIRED", refused.response().errorCode().orElseThrow());
     assertEquals("generative", refused.response().errorDetails().get("component"));
     verify(registry, never()).tryApply();

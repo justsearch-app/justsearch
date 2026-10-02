@@ -21,7 +21,6 @@ import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.settings.SettingsWitness;
-import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.VerifiedLlamaTestServer;
@@ -33,6 +32,11 @@ import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
 import io.justsearch.app.services.settings.FixedSettingsComponentComposer;
 import io.justsearch.app.services.settings.UiSettingsStore;
+import io.justsearch.app.services.worker.BootRecoveryPolicy;
+import io.justsearch.app.services.worker.ComponentRecoveryBinding;
+import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
+import io.justsearch.app.inference.telemetry.TransitionReason;
 import io.justsearch.configuration.resolved.ConfigApplyScopes;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -59,6 +63,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -142,8 +148,7 @@ final class AppliedConfigurationRevisionTest {
       "justsearch.llm.slots,3",
       "justsearch.llm.kv_type,f16",
       "justsearch.llm.use_thinking,false",
-      "justsearch.llm.reasoning_budget,256",
-      "policy.gpu_acceleration_enabled,false"
+      "justsearch.llm.reasoning_budget,256"
   })
   void deferredRefreshPublishesVerifiedBAndRecoversThatIdentity(String key, String value)
       throws Exception {
@@ -155,8 +160,7 @@ final class AppliedConfigurationRevisionTest {
       "justsearch.llm.slots,3",
       "justsearch.llm.kv_type,f16",
       "justsearch.llm.use_thinking,false",
-      "justsearch.llm.reasoning_budget,256",
-      "policy.gpu_acceleration_enabled,false"
+      "justsearch.llm.reasoning_budget,256"
   })
   void onlineRefreshPublishesVerifiedIdentityAndRecoversRetainedControls(String key, String value)
       throws Exception {
@@ -165,8 +169,68 @@ final class AppliedConfigurationRevisionTest {
 
   @ParameterizedTest
   @CsvSource({"health", "witness"})
-  void rejectedDeferredStartupCannotPromoteDesiredIdentity(String failure) throws Exception {
+  void rejectedDeferredActivationKeepsAUntilMonitorVerifiesB(String failure) throws Exception {
     exerciseDeferredRefresh("justsearch.llm.kv_type", "f16", failure);
+  }
+
+  @Test
+  void gpuPolicyAtSuccessorBootPublishesAndRecoversVerifiedIdentity() throws Exception {
+    Path executable = Files.writeString(directory.resolve("llama-server.exe"), "server");
+    Path model = Files.writeString(directory.resolve("chat.gguf"), "model");
+    var enabled = launchConfiguration(Map.of("justsearch.gpu.layers", "12",
+        "policy.gpu_acceleration_enabled", "true"), executable, model);
+    var disabled = launchConfiguration(Map.of("justsearch.gpu.layers", "12",
+        "policy.gpu_acceleration_enabled", "false"), executable, model);
+    var before = bootAndRecoverPolicy(enabled, disabled);
+    var after = bootAndRecoverPolicy(disabled, enabled);
+    assertNotEquals(before.get(0), after.get(0), "successor component identity includes policy");
+    assertNotEquals(before.get(1), after.get(1), "successor Engine revision includes policy");
+  }
+
+  private List<String> bootAndRecoverPolicy(ResolvedConfig serving, ResolvedConfig other)
+      throws Exception {
+    var inference = InferenceConfig.fromResolvedConfig(serving, directory);
+    var config = new ConfigStore(serving);
+    var budget = new RetainedStateBudget();
+    budget.declare(DefaultEngineComponentRegistry.ATTEMPTED_CONFIGURATIONS, 1, "test");
+    try (var server = new VerifiedLlamaTestServer();
+        var executors = new TestEngineExecutors();
+        var registry = new DefaultEngineComponentRegistry(budget, config.publicationLock());
+        var manager = new InferenceLifecycleManager(executors, inference,
+            InferenceTelemetryEvents.noop(), ManagedChildRegistry.noop(), serving)) {
+      for (String name : List.of("api", "index", "encoders")) {
+        registry.register(refreshSpec(name)).setAppliedVersion(name + "-applied");
+      }
+      var handle = new ReasonRetainingComponentHandle(registry.register(refreshSpec("generative")));
+      String version = HeadAssembly.generativeAppliedVersion(inference, serving);
+      handle.setAppliedVersion("unverified");
+      handle.setDesiredVersion(version);
+      var settings = new UiSettings();
+      settings.setChatEnabled(true);
+      var settingsStore = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+          directory.resolve("policy-settings.json"));
+      settingsStore.replacePrepared(settingsStore.prepareExact(settings, new SettingsWitness(0, null)));
+      InferenceCapabilityWiring.attachInferenceModeListener(manager, handle,
+          new RuntimeSpecStore(settingsStore), null, config.publicationLock());
+      server.onHealth(() -> assertEquals("unverified", handle.snapshot().appliedVersion()));
+      manager.switchToOnlineMode();
+      assertEquals(version, handle.snapshot().appliedVersion());
+      assertEquals(ComponentState.READY, handle.snapshot().state());
+      assertLaunchFlags(server, serving);
+      var activeGeneration = generation("generation-a", "{}");
+      String revision = AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration);
+      server.onHealth(() -> assertEquals(version, handle.snapshot().appliedVersion()));
+      config.swap(other);
+      server.failServing();
+      var result = manager.recoverComponent(new RegistryRecoveryRequest(handle),
+          HeadAssembly::generativeAppliedVersion);
+      assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
+      assertSame(serving, server.lastResolved());
+      assertLaunchFlags(server, serving);
+      assertEquals(version, handle.snapshot().appliedVersion());
+      assertEquals(revision, AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration));
+      return List.of(version, revision);
+    }
   }
 
   private void exerciseDeferredRefresh(String key, String value, String rejected) throws Exception {
@@ -181,8 +245,6 @@ final class AppliedConfigurationRevisionTest {
         "justsearch.llm.slots", "2", "justsearch.llm.kv_type", "q8_0",
         "justsearch.llm.use_thinking", "true", "justsearch.llm.reasoning_budget", "512",
         "policy.gpu_acceleration_enabled", "true"));
-    boolean policy = key.equals("policy.gpu_acceleration_enabled");
-    if (policy) controls.put("justsearch.gpu.layers", "12");
     var resolvedA = launchConfiguration(controls, executable, model);
     controls.put(key, value);
     var resolvedB = launchConfiguration(controls, executable, model);
@@ -195,12 +257,15 @@ final class AppliedConfigurationRevisionTest {
         var registry = new DefaultEngineComponentRegistry(budget, config.publicationLock());
         var manager = new InferenceLifecycleManager(executors, inference,
             InferenceTelemetryEvents.noop(), ManagedChildRegistry.noop(), resolvedA)) {
+      var handles = new LinkedHashMap<String, ComponentHandle>();
       for (String name : List.of("api", "index", "encoders")) {
-        registry.register(refreshSpec(name))
-            .setAppliedVersion(name + "-applied");
+        var componentHandle = registry.register(refreshSpec(name));
+        componentHandle.setAppliedVersion(name + "-applied");
+        handles.put(name, componentHandle);
       }
       var handle = new ReasonRetainingComponentHandle(
           registry.register(refreshSpec("generative")));
+      handles.put("generative", handle);
       String versionA = HeadAssembly.generativeAppliedVersion(inference, resolvedA);
       handle.setAppliedVersion(versionA);
       handle.setDesiredVersion(versionA);
@@ -216,7 +281,10 @@ final class AppliedConfigurationRevisionTest {
       var activeGeneration = generation("generation-a", "{}");
       String revisionA = AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration);
       if (deferred) {
-        server.failServing();
+        var offline = manager.prepareResolvedConfig(inference, resolvedA, false, false);
+        offline.withLifecycleLock(offline::installAfterSettingsCommit);
+        offline.notifyAfterSettingsCommit();
+        offline.retireAfterSettingsCommit();
         assertEquals(Mode.OFFLINE, manager.getCurrentMode());
       } else {
         server.onHealth(() -> {
@@ -228,26 +296,11 @@ final class AppliedConfigurationRevisionTest {
       var composer = new FixedSettingsComponentComposer(registry);
       composer.register("generative",
           new GenerativeSettingsComponentOwner(manager, handle, directory, false));
-      if (policy) {
-        var query = mock(FixedSettingsComponentComposer.QueryRolePreparedOwner.class);
-        when(query.selection()).thenReturn(new QueryRoleSelection(
-            QueryRoleSelection.Role.disabled(), QueryRoleSelection.Role.disabled()));
-        when(query.composition()).thenReturn(Optional.of(new ComposeEvidence(
-            ComposeEvidence.Mode.IN_PLACE, "test", 0L, 0L)));
-        when(query.observation()).thenReturn(registry.snapshot().components().stream()
-            .filter(row -> row.spec().name().equals("encoders")).findFirst().orElseThrow());
-        org.mockito.Mockito.doAnswer(invocation -> {
-          ((Runnable) invocation.getArgument(0)).run();
-          return null;
-        }).when(query).withOwnerLocks(any());
-        composer.register("encoders", (candidate, desired, keys) -> query);
-      }
       composer.seal();
       var affected = ConfigApplyScopes.classify(resolvedA, resolvedB).component();
-      assertEquals(Set.of(policy ? "encoders" : "generative"), affected.keySet());
-      // Online policy-only settings dispatch has no explicit generative refresh hint.
+      assertEquals(Set.of("generative"), affected.keySet());
       var prepared = composer.prepare(settings, resolvedB, affected,
-          policy && !deferred ? SettingsCandidateContext.NONE : new SettingsCandidateContext(null, true));
+          new SettingsCandidateContext(null, true));
       var swap = config.prepareSwap(resolvedB);
       prepared.withOwnerLocks(() -> {
         config.publicationLock().writeLock().lock();
@@ -278,10 +331,64 @@ final class AppliedConfigurationRevisionTest {
         if (rejected != null) {
           if (rejected.equals("health")) server.rejectNextHealth();
           else server.rejectNextWitness();
-          assertThrows(ModeTransitionException.class, manager::switchToOnlineMode);
+          assertThrows(ModeTransitionException.class,
+              () -> manager.switchToOnlineMode(TransitionReason.AUTO_START));
+          assertSame(resolvedB, server.lastResolved(), "the failed activation attempted accepted B");
+          assertFalse(server.verified());
           assertEquals(versionA, handle.snapshot().appliedVersion());
           assertEquals(versionB, handle.snapshot().desiredVersion());
           assertEquals(revisionA, AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration));
+          assertEquals(ComponentState.FAILED, handle.snapshot().state());
+          assertTrue(manager.componentRecoveryPending());
+          assertThrows(ModeTransitionException.class,
+              () -> manager.switchToOnlineMode(TransitionReason.AUTO_START));
+          assertEquals(2, server.starts(), "autonomous activation yields to recovery");
+          // A desired digest alone must never authorize retry of another accepted target.
+          handle.setDesiredVersion("unapplied-c");
+          assertEquals(ComponentRecoveryAction.Outcome.REFUSED,
+              manager.recoverComponent(new RegistryRecoveryRequest(handle),
+                  HeadAssembly::generativeAppliedVersion).outcome());
+          assertEquals(0, handle.snapshot().recoveryAttempts());
+          handle.setDesiredVersion(versionB);
+          config.swap(resolvedA);
+          server.onHealth(() -> {
+            assertFalse(server.verified());
+            assertEquals(versionA, handle.snapshot().appliedVersion());
+            assertEquals(revisionA, AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration));
+          });
+          var completed = new CompletableFuture<ComponentRecoveryAction.Result>();
+          var bindings = new LinkedHashMap<String, ComponentRecoveryBinding>();
+          handles.forEach((name, owner) -> bindings.put(name, new ComponentRecoveryBinding(owner,
+              name.equals("generative") ? request -> {
+                try {
+                  var result = manager.recoverComponent(request, HeadAssembly::generativeAppliedVersion);
+                  completed.complete(result);
+                  return result;
+                } catch (Exception failure) {
+                  completed.completeExceptionally(failure);
+                  throw failure;
+                }
+              } : null)));
+          try (var monitor = new KnowledgeServerHealthMonitor(executors,
+              mock(KnowledgeServerBootstrap.class), 20L, System::currentTimeMillis,
+              new BootRecoveryPolicy(2, 0L, 0L))) {
+            monitor.componentRegistry(registry);
+            monitor.componentRecoveryBindings(bindings, ignored -> {
+              throw new AssertionError("optional activation must not escalate");
+            });
+            monitor.start();
+            var result = completed.get(5, TimeUnit.SECONDS);
+            assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
+            assertEquals(handle.snapshot(), result.observation());
+            assertEquals(ComponentState.READY, handle.snapshot().state());
+            assertEquals(1, handle.snapshot().recoveryAttempts());
+            assertEquals(versionB, handle.snapshot().appliedVersion());
+            assertEquals(versionB, handle.snapshot().desiredVersion());
+            assertNotEquals(revisionA, AppliedConfigurationRevision.digest(registry.snapshot(), activeGeneration));
+            assertSame(resolvedB, server.lastResolved());
+            assertLaunchFlags(server, resolvedB);
+            assertEquals(3, server.starts(), "monitor retries the accepted B exactly once");
+          }
           return;
         }
         List<EngineComponentSnapshot.Component> ready = new ArrayList<>();

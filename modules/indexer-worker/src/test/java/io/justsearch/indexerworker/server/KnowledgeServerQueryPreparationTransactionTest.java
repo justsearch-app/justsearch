@@ -52,6 +52,37 @@ final class KnowledgeServerQueryPreparationTransactionTest {
   }
 
   @Test
+  void gpuPolicyDriftIsRefusedBeforeProductionQueryOwnerOrCommit(@TempDir Path dir)
+      throws Exception {
+    try (var f = new TransactionFixture(dir, Failure.POLICY_DRIFT, null)) {
+      String key = "policy.gpu_acceleration_enabled";
+      assertTrue(f.exactA.ai().gpuAccelerationAllowed());
+      var desired = new ResolvedConfigBuilder().putDefault("justsearch.data.dir", dir.toString())
+          .putDefault(key, "false").build();
+      var physicalRefusal = assertThrows(IllegalStateException.class,
+          () -> f.query.server.prepareQueryRoleSettings(f.candidate, desired, Set.of(key),
+              f.settings.inspect().queryRoles()));
+      assertEquals("Query-only settings cannot change index model ownership",
+          physicalRefusal.getMessage());
+
+      var refused = assertThrows(SettingsCommitOwner.Refused.class, f::apply);
+      assertEquals("RESTART_SOURCE_DRIFT", refused.response().errorCode().orElseThrow());
+      assertEquals(List.of(key), refused.response().errorDetails().get("keys"));
+      assertFalse(f.committed.get());
+      assertFalse(f.uncertain.get());
+      assertArrayEquals(f.bytesA, Files.readAllBytes(f.settings.settingsPath()));
+      assertEquals(f.witnessA, f.settings.inspect().witness());
+      assertEquals(f.query.selection, f.settings.inspect().queryRoles());
+      assertSame(f.exactA, f.config.get());
+      assertTrue(f.composed.isEmpty());
+      assertFalse(f.query.queryA.isClosed());
+      assertFalse(f.query.index.isClosed());
+      verify(f.registryBatch, never()).install();
+      verify(f.query.producer, never()).pauseProducerForCutover(anyLong());
+    }
+  }
+
+  @Test
   void laterPhysicalOwnerFailureRestoresExactQueryA(@TempDir Path dir) throws Exception {
     var marker = new IllegalStateException("later generative owner rejected B");
     try (var f = new TransactionFixture(dir, Failure.LATER_OWNER, marker)) {
@@ -95,7 +126,7 @@ final class KnowledgeServerQueryPreparationTransactionTest {
     }
   }
 
-  private enum Failure { NONE, LATER_OWNER, VALIDATION, CANCELLATION, REPLACEMENT }
+  private enum Failure { NONE, LATER_OWNER, VALIDATION, CANCELLATION, REPLACEMENT, POLICY_DRIFT }
 
   private static final class TransactionFixture implements AutoCloseable {
     private final KnowledgeServerQuerySettingsOwnerTest.QueryFixture query;
@@ -117,6 +148,7 @@ final class KnowledgeServerQueryPreparationTransactionTest {
     private final org.mockito.MockedStatic<InferenceCompositionRoot> composition;
     private final UiSettings candidate;
     private final boolean citationPath;
+    private final boolean policyDrift;
     private final long reservationId = 1L;
 
     TransactionFixture(Path dir, Failure failure, Throwable marker) throws Exception {
@@ -126,6 +158,7 @@ final class KnowledgeServerQueryPreparationTransactionTest {
     TransactionFixture(Path dir, Failure failure, Throwable marker, boolean citationPath)
         throws Exception {
       this.citationPath = citationPath;
+      policyDrift = failure == Failure.POLICY_DRIFT;
       query = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 512L);
       composition = query.composition();
       composition.when(() -> InferenceCompositionRoot.composeQueryRoles(
@@ -180,6 +213,11 @@ final class KnowledgeServerQueryPreparationTransactionTest {
       }
       var components = new FixedSettingsComponentComposer(registry);
       components.register("encoders", queryOwner());
+      if (policyDrift) {
+        components.register("generative", (ignoredCandidate, ignoredDesired, ignoredKeys) -> {
+          throw new AssertionError("Policy drift must be refused before generative preparation");
+        });
+      }
       if (failure == Failure.LATER_OWNER) {
         components.register("generative", (ignoredCandidate, ignoredDesired, ignoredKeys) -> {
           throw (RuntimeException) marker;
@@ -254,6 +292,7 @@ final class KnowledgeServerQueryPreparationTransactionTest {
       constructor.setAccessible(true);
       Function<UiSettings, ResolvedConfig> prepareConfig = ui -> new ResolvedConfigBuilder()
           .putDefault("justsearch.data.dir", dir.toString())
+          .putDefault("policy.gpu_acceleration_enabled", policyDrift ? "false" : "true")
           .putSettings("justsearch.rerank.model_path", ui.getRerankerModelPath())
           .putSettings("justsearch.citation.scorer.model_path", ui.getCitationScorerModelPath())
           .build();

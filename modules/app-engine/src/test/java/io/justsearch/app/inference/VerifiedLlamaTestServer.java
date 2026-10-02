@@ -21,6 +21,8 @@ import org.mockito.MockedConstruction;
 /** Process seam only: lifecycle transitions, verification and registry publication remain real. */
 public final class VerifiedLlamaTestServer implements AutoCloseable {
   private final AtomicReference<LlamaServerOps.StartResult> active = new AtomicReference<>();
+  private final AtomicReference<LlamaServerOps.StartRequest> retained = new AtomicReference<>();
+  private LlamaServerOps.StartResult failedOwner;
   private final List<LlamaServerOps.StartRequest> starts = new ArrayList<>();
   private final List<List<String>> commands = new ArrayList<>();
   private final MockedConstruction<GpuCapabilitiesService> gpuConstruction;
@@ -35,12 +37,18 @@ public final class VerifiedLlamaTestServer implements AutoCloseable {
   public VerifiedLlamaTestServer() {
     gpuConstruction = mockConstruction(GpuCapabilitiesService.class, (gpu, context) -> {
       var effective = mock(GpuCapabilities.Effective.class);
+      when(effective.totalVramBytes()).thenReturn(16L * 1024 * 1024 * 1024);
       when(gpu.snapshot()).thenReturn(new GpuCapabilities(null, null, effective));
     });
     construction = mockConstruction(LlamaServerOps.class, (server, context) -> {
       failure = (Consumer<BooleanSupplier>) context.arguments().get(6);
+      doAnswer(invocation -> {
+        retained.set(invocation.getArgument(0));
+        return null;
+      }).when(server).retainAttemptedStartRequest(any());
       when(server.startLlamaServer(any())).thenAnswer(invocation -> {
         LlamaServerOps.StartRequest request = invocation.getArgument(0);
+        retained.set(request);
         starts.add(request);
         // Exercise production argument assembly as well as effective layer selection. Only
         // process creation and probes are replaced; dropping real cache/GPU flags must fail.
@@ -62,18 +70,28 @@ public final class VerifiedLlamaTestServer implements AutoCloseable {
       doAnswer(ignored -> { active.set(null); return null; }).when(server).stopLlamaServer();
       doAnswer(ignored -> { checkHealth(); return null; }).when(server).waitForServerHealth(any());
       doAnswer(ignored -> { checkHealth(); return null; }).when(server).waitForServerHealthOnce(any());
-      doAnswer(ignored -> { verified = true; return null; })
+      doAnswer(ignored -> { retained.set(null); verified = true; return null; })
           .when(server).acceptVerifiedStart(any(), any());
-      when(server.recoveryStartRequest()).thenAnswer(ignored -> Optional.ofNullable(active.get())
-          .map(owner -> new LlamaServerOps.StartRequest(owner.context(), owner.adoptionPolicy())));
-      when(server.reserveRecoveryStart(any())).thenAnswer(invocation -> owns(invocation.getArgument(0)));
+      when(server.recoveryStartRequest()).thenAnswer(ignored -> {
+        var owner = active.get();
+        return owner == null ? Optional.ofNullable(retained.get()) : Optional.of(
+            new LlamaServerOps.StartRequest(owner.context(), owner.adoptionPolicy()));
+      });
+      when(server.reserveRecoveryStart(any())).thenAnswer(invocation -> {
+        LlamaServerOps.StartRequest request = invocation.getArgument(0);
+        if (!owns(request)) return false;
+        retained.set(request);
+        return true;
+      });
       when(server.ownsRecoveryAttempt(any())).thenAnswer(invocation -> owns(invocation.getArgument(0)));
+      when(server.componentRecoveryPending()).thenAnswer(ignored -> retained.get() != null
+          || active.get() != null && active.get() == failedOwner);
     });
   }
 
   private boolean owns(LlamaServerOps.StartRequest request) {
     var owner = active.get();
-    return owner != null && owner.context() == request.context()
+    return owner == null ? retained.get() == request : owner.context() == request.context()
         && owner.adoptionPolicy() == request.adoptionPolicy();
   }
 
@@ -92,7 +110,10 @@ public final class VerifiedLlamaTestServer implements AutoCloseable {
   public int starts() { return starts.size(); }
   public ResolvedConfig lastResolved() { return starts.getLast().context().resolved(); }
   public List<String> lastCommand() { return commands.getLast(); }
-  public void failServing() { failure.accept(() -> true); }
+  public void failServing() {
+    failedOwner = active.get();
+    failure.accept(() -> true);
+  }
   @Override public void close() {
     try { construction.close(); }
     finally { gpuConstruction.close(); }

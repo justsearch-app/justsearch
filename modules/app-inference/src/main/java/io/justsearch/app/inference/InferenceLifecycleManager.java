@@ -116,6 +116,9 @@ public class InferenceLifecycleManager
   private volatile PreparedConfigApply preparedConfigApply;
   private volatile boolean precommitComposition;
   private volatile boolean closed;
+  // Exact accepted Online activation, retained until verification/publication. This is distinct
+  // from an established applied runtime and never points at a private settings candidate.
+  private LlamaServerOps.StartRequest pendingAcceptedActivation;
 
   /** A null resolved snapshot exists only for the legacy constructor before context capture. */
   private record ConfiguredInference(
@@ -324,7 +327,7 @@ public class InferenceLifecycleManager
     }
   }
 
-  /** Performs exactly one monitor-admitted retry of the same physical applied configuration. */
+  /** Retries an established applied runtime or the exact failed activation of an accepted target. */
   public ComponentRecoveryAction.Result recoverComponent(
       ComponentRecoveryAction.Request request,
       BiFunction<InferenceConfig, ResolvedConfig, String> appliedVersionOf) throws Exception {
@@ -334,20 +337,24 @@ public class InferenceLifecycleManager
     final LlamaServerOps.StartResult physicalOwner;
     final long recoveryGeneration;
     final EngineComponentSnapshot.Component admitted;
+    final String retryVersion;
     synchronized (runner.lock()) {
       EngineComponentSnapshot.Component expected = request.expected();
       if (closed || request.cancelled()) return ComponentRecoveryAction.Result.SUPERSEDED;
       if (expected.state() != ComponentState.FAILED
+          || precommitComposition || preparedConfigApply != null
           || !sameRecoveryLineage(expected, request.current(), expected.recoveryAttempts())) {
         return ComponentRecoveryAction.Result.REFUSED;
       }
       retry = serverOps.recoveryStartRequest().orElse(null);
       physicalOwner = serverOps.activeStartResult().orElse(null);
       recoveryGeneration = runner.generation();
-      if (retry == null
-          || !Objects.equals(
-              expected.appliedVersion(), appliedVersionOf.apply(
-                  retry.context().inference(), retry.context().resolved()))
+      if (retry == null) return ComponentRecoveryAction.Result.REFUSED;
+      retryVersion = appliedVersionOf.apply(retry.context().inference(), retry.context().resolved());
+      boolean established = Objects.equals(expected.appliedVersion(), retryVersion);
+      boolean acceptedActivation = matchesAcceptedActivation(retry)
+          && Objects.equals(expected.desiredVersion(), retryVersion);
+      if ((!established && !acceptedActivation)
           || !request.begin()) {
         return ComponentRecoveryAction.Result.REFUSED;
       }
@@ -400,12 +407,16 @@ public class InferenceLifecycleManager
                   Mode.ONLINE,
                   runner.view().withPhase(Mode.ONLINE).withExternal(false)));
           EngineComponentSnapshot.Component terminal =
-              currentRecoveryOwner(request, admitted, retry);
+              currentRecoveryOwnerAfterVerification(request, admitted, retry, retryVersion);
           if (terminal == null) return ComponentRecoveryAction.Result.SUPERSEDED;
-          return request.complete(terminal, ComponentState.READY, null,
-                  "same-configuration generative recovery verified healthy")
+          var result = request.complete(terminal, ComponentState.READY, null,
+                  "accepted generative recovery verified healthy")
               .map(ComponentRecoveryAction.Result::recovered)
               .orElse(ComponentRecoveryAction.Result.SUPERSEDED);
+          if (result.outcome() == ComponentRecoveryAction.Outcome.RECOVERED) {
+            pendingAcceptedActivation = null;
+          }
+          return result;
         } catch (Exception failure) {
           LOG.error("Generative component recovery failed", failure);
           return completeRecoveryFailure(
@@ -415,6 +426,30 @@ public class InferenceLifecycleManager
     } finally {
       admissionHold.close();
     }
+  }
+
+  private boolean matchesAcceptedActivation(LlamaServerOps.StartRequest retry) {
+    var pending = pendingAcceptedActivation;
+    var target = configured;
+    return pending != null && pending.context() == retry.context()
+        && pending.adoptionPolicy() == retry.adoptionPolicy()
+        && target.inference() == retry.context().inference()
+        && target.resolved() == retry.context().resolved()
+        && target.policy() == retry.adoptionPolicy();
+  }
+
+  private EngineComponentSnapshot.Component currentRecoveryOwnerAfterVerification(
+      ComponentRecoveryAction.Request request, EngineComponentSnapshot.Component admitted,
+      LlamaServerOps.StartRequest retry, String verifiedVersion) {
+    var current = request.current();
+    // The Online listener publishes the verified launch identity with READY. Permit that exact
+    // A -> B promotion only here, after verification; all pre-verification fences still require A.
+    if (closed || request.cancelled() || !serverOps.ownsRecoveryAttempt(retry) || current == null
+        || !admitted.spec().equals(current.spec())
+        || !Objects.equals(admitted.desiredVersion(), current.desiredVersion())
+        || !Objects.equals(verifiedVersion, current.appliedVersion())
+        || admitted.recoveryAttempts() != current.recoveryAttempts()) return null;
+    return current;
   }
 
   private boolean samePhysicalRecoveryOwner(
@@ -706,6 +741,7 @@ public class InferenceLifecycleManager
           }
 
           var startRequest = configuredStartRequest();
+          pendingAcceptedActivation = startRequest;
           serverOps.retainAttemptedStartRequest(startRequest);
           // Validate BYO assets before attempting to start.
           try {
@@ -763,6 +799,7 @@ public class InferenceLifecycleManager
             var started = serverOps.startLlamaServer(startRequest);
             serverOps.waitForServerHealth(started);
             verifyAppliedServer(startRequest, started);
+            pendingAcceptedActivation = null;
             long elapsed = System.currentTimeMillis() - startupStart;
             LOG.info("Inference startup completed in {}ms", elapsed);
 

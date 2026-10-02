@@ -70,6 +70,16 @@ final class ConfigApplyScopesTest {
   }
 
   @Test
+  void sharedGpuPolicyRequiresRestartInsteadOfQueryOwnerComposition() {
+    String key = "policy.gpu_acceleration_enabled";
+    var changed = ConfigApplyScopes.classify(config(key, "true"), config(key, "false"));
+    assertEquals(java.util.Set.of(key), changed.restartRequired());
+    assertTrue(changed.component().isEmpty());
+    assertTrue(changed.hot().isEmpty());
+    assertTrue(changed.generationBound().isEmpty());
+  }
+
+  @Test
   void indexPathRetentionKeepsServingValueAndTraceWhilePublishingOtherValues() {
     var serving = config("justsearch.index.base_path", "index-a", "justsearch.api.port", "8080");
     var desired = config("justsearch.index.base_path", "index-b", "justsearch.api.port", "9090");
