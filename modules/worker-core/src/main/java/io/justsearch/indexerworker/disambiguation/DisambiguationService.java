@@ -43,19 +43,37 @@ public final class DisambiguationService implements Closeable {
   private final EntityClusterStore store;
   private volatile EntityClusterSnapshot snapshot = EntityClusterSnapshot.EMPTY;
   private final AtomicBoolean initialized = new AtomicBoolean(false);
+  private boolean needsClose;
 
   private static final DoubleMetaphone METAPHONE = new DoubleMetaphone();
 
   public DisambiguationService(Path dataDir) {
-    this.store = new EntityClusterStore(dataDir.resolve("entity-clusters.db"));
+    this(new EntityClusterStore(dataDir.resolve("entity-clusters.db")));
+  }
+
+  DisambiguationService(EntityClusterStore store) {
+    this.store = store;
   }
 
   /** Opens the SQLite store and builds the initial snapshot. */
-  public void open() throws SQLException, IOException {
-    store.open();
-    rebuildSnapshot();
-    initialized.set(true);
-    log.info("DisambiguationService initialized, snapshot has {} types", snapshotTypeCount());
+  public synchronized void open() throws SQLException, IOException {
+    if (needsClose) {
+      throw new SQLException("DisambiguationService requires successful close before reopening");
+    }
+    needsClose = true;
+    try {
+      store.open();
+      rebuildSnapshot();
+      log.info("DisambiguationService initialized, snapshot has {} types", snapshotTypeCount());
+      initialized.set(true);
+    } catch (SQLException | IOException | RuntimeException | Error failure) {
+      try {
+        close();
+      } catch (IOException | RuntimeException | Error closeFailure) {
+        if (closeFailure != failure) failure.addSuppressed(closeFailure);
+      }
+      throw failure;
+    }
   }
 
   /** Returns true if the service has been initialized. */
@@ -298,8 +316,11 @@ public final class DisambiguationService implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
-    store.close();
+  public synchronized void close() throws IOException {
     initialized.set(false);
+    snapshot = EntityClusterSnapshot.EMPTY;
+    needsClose = true;
+    store.close();
+    needsClose = false;
   }
 }

@@ -1,6 +1,7 @@
 package io.justsearch.indexerworker.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -8,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -19,6 +21,8 @@ import java.sql.Statement;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for the SqliteJobQueue schema migration system.
@@ -33,6 +37,44 @@ import org.junit.jupiter.api.io.TempDir;
 final class JobQueueMigrationTest {
 
   @TempDir Path tempDir;
+
+  @Test
+  void failedBackupPreservesLiveDatabaseAndCompletedBackup() throws Exception {
+    Path dbPath = tempDir.resolve("jobs.db");
+    Path bakPath = tempDir.resolve("jobs.db.bak");
+    Path tmpPath = tempDir.resolve("jobs.db.bak.tmp");
+    try (SqliteJobQueue queue = new SqliteJobQueue(dbPath)) {
+      queue.open();
+    }
+    Files.copy(dbPath, bakPath);
+    byte[] completedBackup = Files.readAllBytes(bakPath);
+    Files.writeString(tmpPath, "interrupted backup");
+
+    try (SqliteJobQueue queue = new SqliteJobQueue(dbPath)) {
+      queue.open();
+      Field field = SqliteJobQueue.class.getDeclaredField("connection");
+      field.setAccessible(true);
+      Connection connection = (Connection) field.get(queue);
+      try (Statement control = connection.createStatement()) {
+        // VACUUM cannot run in a transaction: fail after scratch reconciliation,
+        // before any replacement backup can be completed.
+        control.execute("BEGIN IMMEDIATE");
+        try {
+          SQLException failure = assertThrows(SQLException.class, queue::performBackup);
+          assertTrue(failure.getMessage().contains("within a transaction"));
+          assertArrayEquals(completedBackup, Files.readAllBytes(bakPath));
+          assertFalse(Files.exists(tmpPath), "only the abandoned scratch file should be removed");
+        } finally {
+          control.execute("ROLLBACK");
+        }
+        try (ResultSet version = control.executeQuery("PRAGMA user_version")) {
+          assertTrue(version.next());
+          assertEquals(SqliteSchema.TARGET_VERSION, version.getInt(1));
+        }
+      }
+      assertEquals(0, queue.queueDepth(), "the live queue must remain readable after backup failure");
+    }
+  }
 
   @Test
   void futureSchemaIsRefusedBeforeDdlAndDatabaseBytesRemainUnchanged() throws Exception {
@@ -295,8 +337,9 @@ final class JobQueueMigrationTest {
    *   <li>Import an active-index identity into the newly migrated V11 table</li>
    * </ol>
    */
-  @Test
-  void preV11BackupRestoreMigratesAndReconstructsDocumentIdentityFromIndexImport()
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void preV11BackupRestoreMigratesAndReconstructsDocumentIdentityFromIndexImport(boolean interrupted)
       throws Exception {
     Path dbPath = tempDir.resolve("jobs.db");
     Path bakPath = tempDir.resolve("jobs.db.bak");
@@ -338,15 +381,33 @@ final class JobQueueMigrationTest {
           """);
     }
 
-    // Step 2: Open SqliteJobQueue (triggers backup before migration)
-    SqliteJobQueue jobQueue = new SqliteJobQueue(dbPath);
-    jobQueue.open();
+    Path tmpPath = tempDir.resolve("jobs.db.bak.tmp");
+    if (interrupted) {
+      // Simulate death after VACUUM INTO, before the atomic replacement of a prior backup.
+      Files.copy(dbPath, bakPath);
+      try (Connection conn = DriverManager.getConnection(jdbcUrl);
+          Statement stmt = conn.createStatement()) {
+        stmt.execute("VACUUM INTO '" + tmpPath.toAbsolutePath().toString().replace("'", "''") + "'");
+      }
+      assertTrue(Files.size(tmpPath) > 0);
+    }
 
-    // Step 3: Assert jobs.db.bak exists
-    assertTrue(Files.exists(bakPath), "jobs.db.bak should be created before migration");
-    assertTrue(Files.size(bakPath) > 0, "Backup file should not be empty");
+    // Step 2: Reopen the old schema (triggers backup before migration).
+    try (SqliteJobQueue jobQueue = new SqliteJobQueue(dbPath)) {
+      jobQueue.open();
 
-    jobQueue.close();
+      // Step 3: Both migration and backup must preserve the source job.
+      assertTrue(Files.exists(bakPath), "jobs.db.bak should be created before migration");
+      assertTrue(Files.size(bakPath) > 0, "Backup file should not be empty");
+      assertFalse(Files.exists(tmpPath), "the scratch backup must be consumed");
+      assertEquals(1, jobQueue.queueDepth(), "the live database must retain its job");
+      try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + bakPath.toAbsolutePath());
+          Statement stmt = conn.createStatement();
+          ResultSet version = stmt.executeQuery("PRAGMA user_version")) {
+        assertTrue(version.next());
+        assertEquals(1, version.getInt(1), "the completed backup must retain the pre-migration schema");
+      }
+    }
 
     // Step 4: Copy backup to a restore path and open a new SqliteJobQueue
     Path restorePath = tempDir.resolve("restored.db");

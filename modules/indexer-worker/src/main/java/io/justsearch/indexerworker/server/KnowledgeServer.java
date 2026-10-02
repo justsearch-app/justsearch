@@ -357,6 +357,8 @@ public final class KnowledgeServer implements Closeable {
   private volatile IndexingPacing indexingPacing =
       IndexingPacing.unthrottled();
   io.justsearch.indexerworker.disambiguation.DisambiguationService disambiguationService;
+  private final List<io.justsearch.indexerworker.disambiguation.DisambiguationService>
+      disambiguationCleanupOwners = new ArrayList<>();
   // Only the not-yet-attached boot surface lives here; once attached EncoderSet owns it.
   private volatile InferenceSurface pendingInitialSurface;
   private volatile InferenceSurface pendingInitialQuerySurface;
@@ -4438,15 +4440,8 @@ public final class KnowledgeServer implements Closeable {
       }
 
       // Disambiguation
-      try {
-        var ds = new io.justsearch.indexerworker.disambiguation.DisambiguationService(dataDir);
-        ds.open();
-        disambiguationService = ds;
-        wireModelServices(modelWiringLeases, svc -> svc.wireDisambiguationService(ds));
-      } catch (Exception e) {
-        log.warn("Failed to initialize disambiguation service (non-fatal): {}", e.getMessage());
-        log.debug("Failed to initialize disambiguation service (stack trace)", e);
-      }
+      initializeDisambiguationService(dataDir,
+          ds -> wireModelServices(modelWiringLeases, svc -> svc.wireDisambiguationService(ds)));
 
       // 360: Search reranker (GPU-capable, in index component).
       var searchRerankConfig = encoderConfiguration.reranker();
@@ -6462,6 +6457,55 @@ public final class KnowledgeServer implements Closeable {
     return leases;
   }
 
+  void initializeDisambiguationService(Path dataDir,
+      Consumer<io.justsearch.indexerworker.disambiguation.DisambiguationService> wiring) {
+    var candidate = new io.justsearch.indexerworker.disambiguation.DisambiguationService(dataDir);
+    synchronized (disambiguationCleanupOwners) {
+      disambiguationCleanupOwners.add(candidate);
+    }
+    try {
+      candidate.open();
+      wiring.accept(candidate);
+      disambiguationService = candidate;
+    } catch (Exception failure) {
+      try {
+        candidate.close();
+        synchronized (disambiguationCleanupOwners) {
+          disambiguationCleanupOwners.remove(candidate);
+        }
+      } catch (IOException | RuntimeException | Error cleanupFailure) {
+        if (cleanupFailure != failure) failure.addSuppressed(cleanupFailure);
+      }
+      log.warn("Failed to initialize disambiguation service (non-fatal): {}", failure.getMessage());
+      log.debug("Failed to initialize disambiguation service (stack trace)", failure);
+    }
+  }
+
+  private void closeDisambiguationOwners() throws IOException {
+    synchronized (disambiguationCleanupOwners) {
+      // Published services share the same cleanup barrier as failed candidates.
+      if (disambiguationService != null && !disambiguationCleanupOwners.contains(disambiguationService)) {
+        disambiguationCleanupOwners.add(disambiguationService);
+      }
+      disambiguationService = null;
+      IOException refusal = null;
+      var owners = disambiguationCleanupOwners.iterator();
+      while (owners.hasNext()) {
+        try {
+          owners.next().close();
+          owners.remove();
+        } catch (IOException | RuntimeException | Error failure) {
+          if (refusal == null) {
+            refusal = new IOException("Disambiguation cleanup incomplete; server retained for retry", failure);
+          } else {
+            refusal.addSuppressed(failure);
+          }
+        }
+      }
+      if (refusal != null) throw refusal;
+    }
+  }
+
   private static void wireModelServices(List<ServingLease> leases,
       Consumer<WorkerAppServices> wiring) {
     for (ServingLease lease : leases) wiring.accept(lease.services());
@@ -6772,15 +6816,6 @@ public final class KnowledgeServer implements Closeable {
             }
           }
 
-          // Close disambiguation service (after indexing loop which uses it)
-          if (disambiguationService != null) {
-            try {
-              disambiguationService.close();
-            } catch (Exception e) {
-              log.warn("Error closing disambiguation service", e);
-            }
-          }
-
           // Phase 3c: OTel callback handles are managed by LocalTelemetry's gaugeHandles list
           // (each catalog gauge/observable-counter goes through registry.buildGauge/buildObservableCounter
           // which adds the handle there). LocalTelemetry.close() drains them on shutdown.
@@ -6828,6 +6863,10 @@ public final class KnowledgeServer implements Closeable {
 
           closePrepared = true;
         }
+
+        // The indexing loop has exited. Retry every retained candidate before releasing
+        // runtime/store ownership or signalling completed shutdown.
+        closeDisambiguationOwners();
 
         // A timed-out runtime still owns live Lucene children. Attempt both runtimes, but preserve
         // the enclosing stores, executor registrations and root lock if either needs a close retry.
