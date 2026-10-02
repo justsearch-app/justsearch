@@ -182,7 +182,17 @@ export class LiveCollector {
     this.snapshots.push(snapshot);
     // Atomic scope projection consumed by the existing PowerShell memory sampler.
     const temporary = `${this.scopeFile}.pending`;
-    save(temporary, { atMs: now, processes: records }); fs.renameSync(temporary, this.scopeFile);
+    save(temporary, { atMs: now, processes: records });
+    // Windows refuses to replace a file another process has open: the memory sampler reads the scope
+    // every tick, and one EPERM here cost E4 main window 2 its coverage (2026-10-02). Retry briefly;
+    // the sampler tolerates a scope up to 15 s old, so a short delay is safe.
+    for (let attempt = 0; ; attempt++) {
+      try { fs.renameSync(temporary, this.scopeFile); break; } catch (error) {
+        if (!['EPERM', 'EBUSY', 'EACCES'].includes(error.code) || attempt >= 40) throw error;
+        this.scopeReplaceRetries = (this.scopeReplaceRetries ?? 0) + 1;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+      }
+    }
     this.root = root; this.current = owned; this.manifest = manifest;
     this.tailLogs(); this.persist();
   }
@@ -238,7 +248,7 @@ export class LiveCollector {
   persist() { save(this.artifact, { startedAtMs: this.startMs, endedAtMs: this.endMs,
     snapshots: this.snapshots, errors: this.errors, diagnostics: this.diagnostics,
     reconfigures: this.reconfigures, processes: [...this.processes.values()], flags: [...this.flags],
-    dataDir: this.data, arm: this.arm }); }
+    dataDir: this.data, arm: this.arm, scopeReplaceRetries: this.scopeReplaceRetries ?? 0 }); }
   async loop() {
     while (!this.stopped) {
       try {
@@ -569,8 +579,10 @@ export async function childPathExperiment(context, reason) {
     const prepared = await requestLive(context, '/api/upgrade/prepare', {});
     result.prepared = prepared;
     result.response = await until(deadline, 'Upgrade shutdown accepted', async () => {
+      // Both arms' UpgradeController require schemaVersion 1 with the preparation id and nonce
+      // (E5 main failed with 'schemaVersion 1 is required', 2026-10-02).
       const response = await requestLive(context, '/api/upgrade/commit-shutdown', {
-        preparationId: prepared.preparationId, shutdownNonce: prepared.shutdownNonce });
+        schemaVersion: 1, preparationId: prepared.preparationId, shutdownNonce: prepared.shutdownNonce });
       return response.shutdownAccepted === true ? response : null;
     });
   }

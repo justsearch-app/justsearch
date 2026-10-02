@@ -708,9 +708,11 @@ export function collect(context) {
     const coveredMs = workloadCycles.reduce((sum, c) => sum + (Date.parse(c.endedAt) - Date.parse(c.startedAt) || 0), 0);
     const windowMinutes = workloadCycles[0]?.minutes;
     const covered = Number.isFinite(windowMinutes) && coveredMs >= windowMinutes * 60000 - 60000;
-    const workload = covered && loads.length && calls.length ? true : undefined;
     r.metrics.workloadCoverage = { cycles: workloadCycles.length, completed: completedCycles.length, coveredMs, windowMinutes };
     const wire = soakWire({ ...r, raw: context.raw }, calls, loads);
+    // A window-cut cycle writes no jseval summary; its search outcomes are the per-request journals
+    // (wire.search), so either counts as search-load evidence.
+    const workload = covered && (loads.length || wire.search.length) && calls.length ? true : undefined;
     r.clauses['no-timeout-or-5xx'] = wire.check;
     r.gaps['no-timeout-or-5xx'] = [...wire.gaps, ...(wire.check === false
       ? [`Wire outcomes: ${JSON.stringify(wire.outcomes)}; summary errors (overlapping journals): ${wire.summaryErrors}`] : [])].join('; ');
