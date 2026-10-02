@@ -18,6 +18,7 @@ public final class FeedbackLookupMaintenance implements AutoCloseable {
   private final NdjsonAppendStore<FeatureSnapshot> snapshots;
   private final StoreCipher cipher;
   private final UnlockDeferredScan scans;
+  private final Runnable stopWatching;
   private final long baseBackoffMs;
   private final CompletableFuture<Void> ready = new CompletableFuture<>();
   private volatile boolean closed;
@@ -29,10 +30,12 @@ public final class FeedbackLookupMaintenance implements AutoCloseable {
     snapshots = new NdjsonAppendStore<>(archive, FeatureSnapshot.class, cipher);
     baseBackoffMs = Math.min(MAX_BACKOFF_MS, TimeUnit.SECONDS.toMillis(executors.retryAfterSeconds()));
     scans = new UnlockDeferredScan(executors, "feedback-identity-lookup", this::initializeWithRetry);
+    stopWatching = snapshots.onLookupInvalidation(scans::schedule);
     try {
       scans.attachTo(keys);
       scans.schedule();
     } catch (RuntimeException | Error failure) {
+      stopWatching.run();
       scans.close();
       throw failure;
     }
@@ -74,6 +77,7 @@ public final class FeedbackLookupMaintenance implements AutoCloseable {
     closed = true;
     Thread active = worker;
     if (active != null && active != Thread.currentThread()) active.interrupt();
+    stopWatching.run();
     scans.close();
     ready.completeExceptionally(new IllegalStateException("Feedback lookup maintenance closed"));
   }

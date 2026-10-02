@@ -87,39 +87,48 @@ public final class NdjsonAppendStore<T> {
   /** Appends one record as an NDJSON line. Best-effort — never throws. */
   public synchronized void append(T record) {
     try {
-      if (initializeOnAppend) initializeLookup();
       String line =
           cipher.seal(
                   MAPPER.writeValueAsString(
                       new PersistedRecord<>(CURRENT_SCHEMA_VERSION, record)))
               + "\n";
       if (lookup != null && record instanceof FeatureSnapshot snapshot) {
-        // Publish conservative identity evidence first: an archive failure can omit a label,
-        // but must never leave a conflicting archival row resolving through a stale UID.
-        lookup.append(snapshot);
+        // A leading separator isolates a fresh snapshot even after a crash-truncated final line.
+        lookup.append(snapshot, () -> appendLine("\n" + line), initializeOnAppend, this::backfill);
+      } else {
+        appendLine(line);
       }
-      Files.writeString(
-          storeFile, line, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
-          StandardOpenOption.APPEND);
     } catch (Exception e) {
       log.warn("Failed to persist {} record: {}", type.getSimpleName(), e.getMessage());
       log.debug("Record persist failure (stack trace)", e);
     }
   }
 
+  private void appendLine(String line) throws IOException {
+    Files.writeString(storeFile, line, StandardCharsets.UTF_8,
+        StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+  }
+
   /** Streaming legacy backfill, retried by the background owner until a generation is complete. */
   public synchronized void initializeLookup() throws IOException {
     if (lookup == null) return;
-    lookup.initialize(writer -> {
-      if (!Files.exists(storeFile)) return;
-      try (var reader = Files.newBufferedReader(storeFile, StandardCharsets.UTF_8)) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          if (Thread.currentThread().isInterrupted()) throw new IOException("Feedback backfill interrupted");
-          if (!line.isBlank()) writer.append((FeatureSnapshot) parseRecord(line));
-        }
+    lookup.initialize(this::backfill);
+  }
+
+  private void backfill(FeatureSnapshotLookup.SnapshotWriter writer) throws IOException {
+    if (!Files.exists(storeFile)) return;
+    try (var reader = Files.newBufferedReader(storeFile, StandardCharsets.UTF_8)) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (Thread.currentThread().isInterrupted()) throw new IOException("Feedback backfill interrupted");
+        if (!line.isBlank()) writer.append((FeatureSnapshot) parseRecord(line));
       }
-    });
+    }
+  }
+
+  Runnable onLookupInvalidation(Runnable listener) {
+    if (lookup == null) throw new IllegalStateException("Identity lookup requires feature snapshots");
+    return lookup.onInvalidation(listener);
   }
 
   boolean lookupInitialized() throws IOException {

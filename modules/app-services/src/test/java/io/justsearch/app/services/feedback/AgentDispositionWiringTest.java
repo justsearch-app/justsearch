@@ -24,6 +24,32 @@ import org.junit.jupiter.api.io.TempDir;
 class AgentDispositionWiringTest {
 
   @Test
+  void asynchronousAgentCaptureSurvivesFailedHistoricalLookup(@TempDir Path dataDir) throws Exception {
+    Path archive = dataDir.resolve("feedback/feature-snapshots.ndjson");
+    java.nio.file.Files.createDirectories(archive.getParent());
+    String history = "invalid historical JSON\n";
+    java.nio.file.Files.writeString(archive, history);
+    var runs = new AgentRunStore(dataDir.resolve("runs"));
+    try (var registry = TestEngineExecutors.awaitingTermination();
+        var observer = new FeedbackObserver(registry)) {
+      AgentDispositionWiring.register(runs::addEventListener, dataDir, StoreCipher.disabled(),
+          new FeedbackCaptureSettings(dataDir), observer);
+      assertNotNull(runs.runEvents().appendEvent("new-session", "core.agent-run", "tool_exec_completed",
+          toolPayload()));
+      assertNotNull(runs.runEvents().appendEvent("new-session", "core.agent-run", "done", donePayload()));
+      drain(observer);
+      String captured = java.nio.file.Files.readString(archive).substring(history.length()).trim();
+      assertFalse(captured.isBlank(), "agent ranking features must survive an unavailable lookup");
+      var mapper = new tools.jackson.databind.ObjectMapper();
+      var snapshot = mapper.treeToValue(mapper.readTree(captured).get("record"), FeatureSnapshot.class);
+      assertEquals("new-session", snapshot.interactionId());
+      assertEquals(2, snapshot.hits().size());
+      assertEquals(0, new NdjsonAppendStore<>(dataDir.resolve("feedback/result-dispositions.ndjson"),
+          ResultDisposition.class).readAll().size(), "dispositions still fail closed until backfill succeeds");
+    }
+  }
+
+  @Test
   void productionRunEventEnvelopeCapturesFeaturesAndCitedShownAsynchronously(@TempDir Path dataDir)
       throws Exception {
     var runs = new AgentRunStore(dataDir.resolve("runs"));
@@ -126,7 +152,9 @@ class AgentDispositionWiringTest {
     new NdjsonAppendStore<>(archive, FeatureSnapshot.class).append(new FeatureSnapshot(
         "session", "q", 1L,
         List.of(new FeatureSnapshot.HitFeatures("uid", "path", 1, 1f, 0f, 0f, 1f, null))));
-    java.nio.file.Files.writeString(archive, "invalid historical JSON\n");
+    NdjsonAppendStoreTest.corruptArchiveWithoutChangingLength(archive);
+    org.junit.jupiter.api.Assertions.assertThrows(Exception.class,
+        new NdjsonAppendStore<>(archive, FeatureSnapshot.class)::readAll);
     emit(listener.get(), "session", "done", Map.of("sessionId", "session", "sources",
         List.of(Map.of("parentDocId", "path", "chunkIndex", 0))));
     var rows = new NdjsonAppendStore<>(dataDir.resolve("feedback/result-dispositions.ndjson"),

@@ -17,11 +17,53 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
 
 class FeedbackLookupMaintenanceTest {
+  @Test
+  void projectionFailureAfterReadinessResumesBackgroundRepairWithoutAnotherCapture(@TempDir Path dir)
+      throws Exception {
+    Path archive = dir.resolve("feature-snapshots.ndjson");
+    Files.writeString(archive, new ObjectMapper().writeValueAsString(new FeatureSnapshot(
+        "iid", "q", 1L, List.of(
+            new FeatureSnapshot.HitFeatures("uid-a", "path", 1, 1f, 0f, 0f, 1f, null)))) + "\n");
+    var cipher = spy(StoreCipher.disabled());
+    var observed = NdjsonAppendStore.observedFeatureSnapshots(archive, cipher);
+    try (var registry = TestEngineExecutors.awaitingTermination();
+        var maintenance = new FeedbackLookupMaintenance(registry, archive, cipher, DataKeyManager.disabled())) {
+      maintenance.ready().get(2, TimeUnit.SECONDS);
+      var failOnce = new AtomicBoolean(true);
+      doAnswer(invocation -> {
+        String plain = invocation.getArgument(0);
+        if (plain.contains("\"docUid\"") && failOnce.compareAndSet(true, false)) {
+          throw new IllegalStateException("temporary projection write failure");
+        }
+        return invocation.callRealMethod();
+      }).when(cipher).seal(anyString());
+      observed.append(new FeatureSnapshot("iid", "q", 2L, List.of(
+          new FeatureSnapshot.HitFeatures("uid-b", "path", 1, 1f, 0f, 0f, 1f, null),
+          new FeatureSnapshot.HitFeatures("fresh-uid", "fresh-path", 2, 1f, 0f, 0f, 1f, null))));
+      assertEquals(2, new NdjsonAppendStore<>(archive, FeatureSnapshot.class, cipher).readAll().size());
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      Optional<String> repaired;
+      do {
+        try {
+          repaired = observed.resolveStableDocId("iid", "fresh-path");
+        } catch (IOException unavailable) {
+          repaired = Optional.empty(); // Metadata may be retired while the replacement is built.
+        }
+        if (repaired.isPresent()) break;
+        Thread.sleep(10);
+      } while (System.nanoTime() < deadline);
+      assertEquals(Optional.of("fresh-uid"), repaired,
+          "a projection failure after successful boot must re-arm the owned repair obligation");
+      assertEquals(Optional.empty(), observed.resolveStableDocId("iid", "path"));
+    }
+  }
+
   @Test
   void transientFailureRetainsOneBackgroundRetryWithoutAnotherCapture(@TempDir Path dir)
       throws Exception {

@@ -12,23 +12,33 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
 /** Sealed, keyed identity projection. A lookup opens one row, never the snapshot archive. */
 final class FeatureSnapshotLookup {
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final Logger log = LoggerFactory.getLogger(FeatureSnapshotLookup.class);
   // Different archive handles (search, agent and restore) can update the same projection.
   private static final Object WRITES = new Object();
+  // Entries exist only while a process-owned maintenance registration is alive.
+  private static final Map<Path, List<Runnable>> INVALIDATION_LISTENERS = new HashMap<>();
+  private final Path archive;
   private final Path directory;
   private final StoreCipher cipher;
 
   FeatureSnapshotLookup(Path archive, StoreCipher cipher) {
+    this.archive = archive.toAbsolutePath().normalize();
     this.directory = archive.resolveSibling(archive.getFileName() + ".lookup");
     this.cipher = cipher;
   }
@@ -36,7 +46,11 @@ final class FeatureSnapshotLookup {
   boolean initialize(Initializer initializer) throws IOException {
     synchronized (WRITES) {
       if (cipher.enabled() && cipher.locked()) return false;
-      if (activeGeneration() != null) return true;
+      try {
+        if (activeGeneration() != null) return true;
+      } catch (IOException failure) {
+        log.debug("Feedback lookup metadata is unavailable; rebuilding from the archive", failure);
+      }
       Files.createDirectories(directory);
       // Retire unpublished generations left by process interruption before creating another.
       try (var abandoned = Files.newDirectoryStream(directory, "generation-*")) {
@@ -47,6 +61,7 @@ final class FeatureSnapshotLookup {
       try {
         initializer.run(snapshot -> append(generation, snapshot));
         if (Thread.currentThread().isInterrupted()) throw new IOException("Feedback backfill interrupted");
+        replace(generation.resolve("archive-size-v1"), Long.toString(archiveSize()));
         Files.writeString(generation.resolve("ready-v1"), "1\n", StandardCharsets.UTF_8);
         replace(directory.resolve("CURRENT"), generation.getFileName().toString());
         published = true;
@@ -71,12 +86,61 @@ final class FeatureSnapshotLookup {
     return !(cipher.enabled() && cipher.locked()) && activeGeneration() != null;
   }
 
-  void append(FeatureSnapshot snapshot) throws IOException {
+  @FunctionalInterface
+  interface ArchiveAppender {
+    void append() throws IOException;
+  }
+
+  Runnable onInvalidation(Runnable listener) {
     synchronized (WRITES) {
-      Path generation = activeGeneration();
-      if (generation == null) throw new IOException("Feedback lookup is not initialized");
-      append(generation, snapshot);
+      INVALIDATION_LISTENERS.computeIfAbsent(archive, ignored -> new ArrayList<>()).add(listener);
     }
+    return () -> {
+      synchronized (WRITES) {
+        List<Runnable> listeners = INVALIDATION_LISTENERS.get(archive);
+        if (listeners == null) return;
+        listeners.remove(listener);
+        if (listeners.isEmpty()) INVALIDATION_LISTENERS.remove(archive);
+      }
+    };
+  }
+
+  void append(FeatureSnapshot snapshot, ArchiveAppender archival,
+      boolean initializeOnAppend, Initializer initializer) throws IOException {
+    synchronized (WRITES) {
+      Generation generation = null;
+      try {
+        generation = activeGeneration();
+      } catch (Exception failure) {
+        log.debug("Feedback lookup unavailable before archival append", failure);
+      }
+      // Backfill shares this monitor across all handles. An accepted write cannot escape its scan.
+      // A larger archive invalidates the persisted coverage before any projection row changes.
+      try {
+        archival.append();
+      } catch (IOException | RuntimeException failure) {
+        notifyInvalidation(); // A partial archive write also invalidates coverage.
+        throw failure;
+      }
+      try {
+        if (generation != null) {
+          append(generation.path(), snapshot);
+          replace(generation.path().resolve("archive-size-v1"), Long.toString(archiveSize()));
+          return;
+        }
+        if (initializeOnAppend && initialize(initializer)) return;
+      } catch (Exception failure) {
+        // Never publish new coverage after failed projection maintenance. The archive survives,
+        // while both this process and reopened handles fail closed on the length mismatch.
+        log.warn("Feedback snapshot archived but identity lookup maintenance failed", failure);
+      }
+      notifyInvalidation();
+    }
+  }
+
+  private void notifyInvalidation() {
+    List<Runnable> listeners = INVALIDATION_LISTENERS.get(archive);
+    if (listeners != null) listeners.forEach(Runnable::run);
   }
 
   private void append(Path generation, FeatureSnapshot snapshot) throws IOException {
@@ -108,13 +172,15 @@ final class FeatureSnapshotLookup {
     if (interactionId == null || interactionId.isBlank()
         || sourceDocId == null || sourceDocId.isBlank()
         || (cipher.enabled() && cipher.locked())) return Optional.empty();
-    Path generation = activeGeneration();
+    Generation generation = activeGeneration();
     if (generation == null) return Optional.empty();
-    Resolution row = read(key(generation, interactionId, sourceDocId));
+    Resolution row = read(key(generation.path(), interactionId, sourceDocId));
     if (row == null || row.schemaVersion() != 1
         || !interactionId.equals(row.interactionId()) || !sourceDocId.equals(row.sourceDocId())
         || row.docUid() == null || row.docUid().isBlank()) return Optional.empty();
-    return Optional.of(row.docUid());
+    // An append may have invalidated coverage, or finished publishing conflicting evidence,
+    // while this row was being read. Compare the covered length as well as the generation path.
+    return generation.equals(activeGeneration()) ? Optional.of(row.docUid()) : Optional.empty();
   }
 
   private Resolution read(Path file) throws IOException {
@@ -122,17 +188,33 @@ final class FeatureSnapshotLookup {
     return MAPPER.readValue(cipher.open(Files.readString(file, StandardCharsets.UTF_8)), Resolution.class);
   }
 
-  private Path activeGeneration() throws IOException {
+  private Generation activeGeneration() throws IOException {
     Path current = directory.resolve("CURRENT");
+    Path generation;
     if (!Files.exists(current)) {
-      // A completed lookup from the previous format remains usable; incomplete prefixes do not.
-      return Files.exists(directory.resolve("ready-v1")) ? directory : null;
+      generation = directory;
+    } else {
+      String name = Files.readString(current, StandardCharsets.UTF_8);
+      if (!name.matches("generation-[a-f0-9-]{36}")) throw new IOException("Invalid feedback lookup generation");
+      generation = directory.resolve(name);
     }
-    String name = Files.readString(current, StandardCharsets.UTF_8);
-    if (!name.matches("generation-[a-f0-9-]{36}")) throw new IOException("Invalid feedback lookup generation");
-    Path generation = directory.resolve(name);
-    return Files.exists(generation.resolve("ready-v1")) ? generation : null;
+    Path coverage = generation.resolve("archive-size-v1");
+    // Older generations lack coverage and must be rebuilt before serving identities.
+    if (!Files.exists(generation.resolve("ready-v1")) || !Files.exists(coverage)) return null;
+    long covered;
+    try {
+      covered = Long.parseLong(Files.readString(coverage, StandardCharsets.UTF_8));
+    } catch (NumberFormatException failure) {
+      throw new IOException("Invalid feedback lookup coverage", failure);
+    }
+    return covered == archiveSize() ? new Generation(generation, covered) : null;
   }
+
+  private long archiveSize() throws IOException {
+    return Files.exists(archive) ? Files.size(archive) : 0L;
+  }
+
+  private record Generation(Path path, long archiveLength) {}
 
   private static void replace(Path file, String value) throws IOException {
     Path temporary = Files.createTempFile(file.getParent(), "lookup-", ".tmp");

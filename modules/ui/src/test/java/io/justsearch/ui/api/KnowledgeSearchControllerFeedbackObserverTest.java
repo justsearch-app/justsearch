@@ -33,6 +33,30 @@ import org.junit.jupiter.api.io.TempDir;
 
 class KnowledgeSearchControllerFeedbackObserverTest {
   @Test
+  void searchCaptureSurvivesFailedHistoricalLookup(@TempDir Path dir) throws Exception {
+    Path archive = dir.resolve("snapshots.ndjson");
+    String history = "invalid historical JSON\n";
+    Files.writeString(archive, history);
+    var snapshots = NdjsonAppendStore.observedFeatureSnapshots(
+        archive, io.justsearch.agent.api.encryption.StoreCipher.disabled());
+    try (var registry = TestEngineExecutors.awaitingTermination();
+        var observer = new FeedbackObserver(registry)) {
+      var controller = controller(observer);
+      inject(controller, "featureSnapshots", snapshots);
+      var ctx = context(Map.of("query", "needle", "pipeline", Map.of()));
+      controller.handleSearch(ctx);
+      verify(ctx).json(any());
+      drain(observer);
+      String captured = Files.readString(archive).substring(history.length()).trim();
+      assertFalse(captured.isBlank(), "UI ranking features must survive an unavailable lookup");
+      var mapper = new tools.jackson.databind.ObjectMapper();
+      var snapshot = mapper.treeToValue(mapper.readTree(captured).get("record"), FeatureSnapshot.class);
+      assertEquals("needle", snapshot.query());
+      assertThrows(Exception.class, snapshots::initializeLookup);
+    }
+  }
+
+  @Test
   void lockedBootResumesOnUnlockAndCapturesAHistoricalCitationWithoutAnotherSearch(@TempDir Path dir)
       throws Exception {
     var keys = new io.justsearch.app.services.encryption.DataKeyManager(
@@ -109,7 +133,9 @@ class KnowledgeSearchControllerFeedbackObserverTest {
       var snapshots = new NdjsonAppendStore<>(archive, FeatureSnapshot.class);
       snapshots.append(new FeatureSnapshot("iid", "q", 1L, List.of(
           new FeatureSnapshot.HitFeatures("uid", "path", 1, 1f, 0f, 0f, 1f, null))));
-      Files.writeString(archive, "invalid historical JSON\n");
+      // Preserve the coverage watermark while proving disposition handling never parses history.
+      Files.writeString(archive, "x".repeat(Math.toIntExact(Files.size(archive)) - 1) + "\n");
+      assertThrows(Exception.class, snapshots::readAll);
       var dispositions = new NdjsonAppendStore<>(dir.resolve("dispositions.ndjson"), ResultDisposition.class);
       var controller = controller(observer);
       inject(controller, "featureSnapshots", snapshots);
