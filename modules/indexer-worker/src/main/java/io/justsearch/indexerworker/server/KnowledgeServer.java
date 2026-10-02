@@ -6251,14 +6251,16 @@ public final class KnowledgeServer implements Closeable {
     for (int attempt = 0; attempt < 3; attempt++) {
       if (closeStarted || System.nanoTime() >= deadline) break;
       for (RootBinding binding : bootRootBindings) {
-        producer.ingestService().reconcileCommittedBootRoot(binding);
+        producer.ingestService().reconcileCommittedBootRoot(
+            binding, () -> closeStarted || System.nanoTime() >= deadline);
       }
       try {
         while (true) {
           active.commitOps().maybeRefreshBlocking();
           boolean rootsMatch = true;
           for (RootBinding binding : bootRootBindings) {
-            if (!producer.ingestService().committedBootRootConverged(binding)) {
+            if (!producer.ingestService().committedBootRootConverged(
+                binding, () -> closeStarted || System.nanoTime() >= deadline)) {
               rootsMatch = false;
               break;
             }
@@ -6292,7 +6294,8 @@ public final class KnowledgeServer implements Closeable {
             }
             boolean converged = true;
             for (RootBinding binding : bootRootBindings) {
-              if (!producer.ingestService().committedBootRootConverged(binding)) {
+              if (!producer.ingestService().committedBootRootConverged(
+                  binding, () -> closeStarted || System.nanoTime() >= deadline)) {
                 converged = false;
                 break;
               }

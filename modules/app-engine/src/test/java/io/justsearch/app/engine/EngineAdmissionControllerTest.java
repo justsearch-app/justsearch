@@ -23,6 +23,51 @@ import org.junit.jupiter.api.Test;
 
 final class EngineAdmissionControllerTest {
   @Test
+  void inferenceReservationCountsExactWorkUntilEveryOwnerExits() {
+    var admission = new EngineAdmissionController(2, 3, 1);
+    var context = context("a", EngineContext.Survival.INTERACTIVE);
+    var owner = admission.admit(context, false);
+    var child = owner.retain();
+    try {
+      try (var first = admission.attachInference(owner.context());
+          var second = admission.attachInference(owner.context())) {
+        assertEquals(first.context().workId(), second.context().workId());
+        assertEquals(1, admission.activeWorkCount());
+      }
+      owner.cancel("deadline_exceeded");
+      owner.close();
+      assertEquals(EngineAdmissionException.Reason.CONTEXT_LIMIT,
+          assertThrows(EngineAdmissionException.class, () -> admission.attachInference(context)).reason());
+      try (var text = admission.attach(context)) {
+        assertEquals(2, admission.activeWorkCount());
+      }
+      assertEquals(1, admission.activeWorkCount());
+    } finally {
+      owner.close();
+      child.close();
+    }
+    try (var replacement = admission.attachInference(context)) {
+      assertEquals(1, admission.activeWorkCount());
+    }
+    assertEquals(0, admission.activeWorkCount());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void oneSlotEnvelopeRefusesInferenceWithoutLeakingWork(boolean aggregate) {
+    var admission = new EngineAdmissionController(aggregate ? 8 : 1, aggregate ? 1 : 8, 1);
+    var context = context("a", EngineContext.Survival.INTERACTIVE);
+    assertThrows(EngineAdmissionException.class, () -> admission.attachInference(context));
+    assertEquals(0, admission.activeWorkCount());
+    try (var text = admission.attach(context)) {
+      assertEquals(1, admission.activeWorkCount());
+      assertThrows(EngineAdmissionException.class, () -> admission.attachInference(text.context()));
+      assertEquals(1, admission.activeWorkCount());
+    }
+    assertEquals(0, admission.activeWorkCount());
+  }
+
+  @Test
   void invalidFreezeCannotSplitLeaseAndWorkAdmission() {
     var admission = new EngineAdmissionController(2, 2, 1);
     for (String reason : new String[] {"x".repeat(257), "invalid\nreason", " "}) {

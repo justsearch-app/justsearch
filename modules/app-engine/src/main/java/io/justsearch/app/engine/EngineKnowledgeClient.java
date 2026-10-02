@@ -754,7 +754,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
       boolean inference, Function<Budget, T> body) {
-    var work = admission.attach(engineContext);
+    var work = inference ? admission.attachInference(engineContext) : admission.attach(engineContext);
     CallView view;
     try {
       view = captureCallView();

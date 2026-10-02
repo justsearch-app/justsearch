@@ -20,7 +20,6 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -67,6 +66,7 @@ final class SyncDirectoryOps {
   private final CloudPlaceholderRecorder cloudPlaceholderRecorder;
   private final ConfirmedDeletionMarker deletionMarker;
   private final int pathScanCap;
+  private final int pathCharCap;
 
   SyncDirectoryOps(
       ReadPathOps readPathOps,
@@ -96,7 +96,22 @@ final class SyncDirectoryOps {
       IndexingPacing indexingPacing,
       ConfirmedDeletionMarker deletionMarker,
       int pathScanCap) {
+    this(
+        readPathOps, pruneOps, commitOps, jobQueue, indexingPacing, deletionMarker,
+        pathScanCap, MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN);
+  }
+
+  SyncDirectoryOps(
+      ReadPathOps readPathOps,
+      PruneOps pruneOps,
+      CommitOps commitOps,
+      JobQueue jobQueue,
+      IndexingPacing indexingPacing,
+      ConfirmedDeletionMarker deletionMarker,
+      int pathScanCap,
+      int pathCharCap) {
     if (pathScanCap <= 0) throw new IllegalArgumentException("pathScanCap must be positive");
+    if (pathCharCap <= 0) throw new IllegalArgumentException("pathCharCap must be positive");
     this.readPathOps = readPathOps;
     this.pruneOps = pruneOps;
     this.commitOps = commitOps;
@@ -109,6 +124,7 @@ final class SyncDirectoryOps {
             : new ConfirmedDeletionMarker(
                 io.justsearch.indexerworker.identity.DocumentIdentityStore.UNAVAILABLE);
     this.pathScanCap = pathScanCap;
+    this.pathCharCap = pathCharCap;
   }
 
   /** A complete, bounded serving-index/disk difference. No queue or Lucene mutation occurs here. */
@@ -139,6 +155,13 @@ final class SyncDirectoryOps {
    * proof.
    */
   RootDifference discoverCandidateDifference(String rootPath, boolean force) throws IOException {
+    return discoverCandidateDifference(rootPath, force, () -> false);
+  }
+
+  RootDifference discoverCandidateDifference(
+      String rootPath, boolean force, java.util.function.BooleanSupplier cancelled)
+      throws IOException {
+    checkCancelled(cancelled);
     Path root;
     try {
       root = Path.of(rootPath).toAbsolutePath().normalize();
@@ -148,7 +171,8 @@ final class SyncDirectoryOps {
     RootIdentityLease identityLease = RootIdentity.hold(root);
     try {
       identityLease.requireCurrent();
-      Set<String> indexedPaths = getIndexedPathsUnderPrefixStrict(root.toString());
+      var budget = new PathBudget(pathCharCap);
+      Set<String> indexedPaths = getIndexedPathsUnderPrefixStrict(root.toString(), budget, cancelled);
       Set<String> seenDiskPaths = new HashSet<>();
       List<Path> eligibleFiles = new ArrayList<>();
       Files.walkFileTree(
@@ -157,7 +181,7 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                 throws IOException {
-              checkInterrupted();
+              checkCancelled(cancelled);
               if (!Files.isReadable(dir)) {
                 throw new IOException("Reconciliation directory is unreadable: " + dir);
               }
@@ -173,18 +197,22 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
                 throws IOException {
-              checkInterrupted();
+              checkCancelled(cancelled);
               if (attrs.isSymbolicLink()) {
                 throw new IOException("Reconciliation does not follow symbolic links: " + file);
               }
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
               String normalized = PathNormalizer.normalizeKey(file);
               if (!seenDiskPaths.add(normalized)) return FileVisitResult.CONTINUE;
+              budget.retain(normalized.length());
               requireBelowCap(seenDiskPaths.size(), "disk");
               if (!Files.isReadable(file)) {
                 throw new IOException("Reconciliation file is unreadable: " + file);
               }
               if (!IngestionSkipPolicy.shouldSkip(file) && !isCloudPlaceholder(file)) {
+                // Conservatively account for the Path's spelling and component storage as well
+                // as the separately retained normalized disk key.
+                budget.retain(2L * file.toString().length());
                 eligibleFiles.add(file.toAbsolutePath().normalize());
               }
               return FileVisitResult.CONTINUE;
@@ -193,6 +221,7 @@ final class SyncDirectoryOps {
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException failure)
                 throws IOException {
+              checkCancelled(cancelled);
               throw new IOException("Reconciliation walk could not read: " + file, failure);
             }
 
@@ -202,33 +231,48 @@ final class SyncDirectoryOps {
               if (failure != null) {
                 throw new IOException("Reconciliation walk was incomplete at: " + dir, failure);
               }
-              checkInterrupted();
+              checkCancelled(cancelled);
               return FileVisitResult.CONTINUE;
             }
           });
 
-      List<Path> additions = eligibleFiles.stream()
-          .filter(file -> force || !indexedPaths.contains(PathNormalizer.normalizeKey(file)))
-          .sorted(Comparator.comparing(PathNormalizer::normalizeKey))
-          .toList();
-      List<String> deletions = confirmedAbsentPaths(indexedPaths);
+      List<Path> additions = new ArrayList<>();
+      for (Path file : eligibleFiles) {
+        checkCancelled(cancelled);
+        if (force || !indexedPaths.contains(PathNormalizer.normalizeKey(file))) additions.add(file);
+      }
+      additions.sort(
+          (first, second) -> {
+            checkCancelledUnchecked(cancelled);
+            return PathNormalizer.normalizeKey(first).compareTo(PathNormalizer.normalizeKey(second));
+          });
+      List<String> deletions = confirmedAbsentPaths(indexedPaths, cancelled);
+      checkCancelled(cancelled);
       identityLease.requireCurrent();
       RootDifference difference =
-          new RootDifference(additions, deletions, identityLease.identity(), identityLease);
+          new RootDifference(
+              List.copyOf(additions), deletions, identityLease.identity(), identityLease);
       return difference;
     } catch (IOException | RuntimeException | Error failure) {
       try {
         identityLease.close();
       } catch (IOException cleanup) {
-        failure.addSuppressed(cleanup);
+        if (failure instanceof java.io.UncheckedIOException unchecked) {
+          unchecked.getCause().addSuppressed(cleanup);
+        } else {
+          failure.addSuppressed(cleanup);
+        }
       }
+      if (failure instanceof java.io.UncheckedIOException unchecked) throw unchecked.getCause();
       throw failure;
     }
   }
 
-  private static List<String> confirmedAbsentPaths(Set<String> indexedPaths) throws IOException {
+  private static List<String> confirmedAbsentPaths(
+      Set<String> indexedPaths, java.util.function.BooleanSupplier cancelled) throws IOException {
     List<String> absent = new ArrayList<>();
     for (String indexedPath : indexedPaths) {
+      checkCancelled(cancelled);
       Path path;
       try {
         path = Path.of(indexedPath);
@@ -241,11 +285,18 @@ final class SyncDirectoryOps {
         throw new IOException("Could not establish indexed path presence: " + indexedPath);
       }
     }
-    absent.sort(String::compareTo);
+    absent.sort(
+        (first, second) -> {
+          checkCancelledUnchecked(cancelled);
+          return first.compareTo(second);
+        });
+    checkCancelled(cancelled);
     return List.copyOf(absent);
   }
 
-  private Set<String> getIndexedPathsUnderPrefixStrict(String prefix) throws IOException {
+  private Set<String> getIndexedPathsUnderPrefixStrict(
+      String prefix, PathBudget budget,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
     if (readPathOps == null) throw new IOException("Serving index read path is unavailable");
     Set<String> paths = new LinkedHashSet<>();
     Set<String> cursors = new HashSet<>();
@@ -263,8 +314,8 @@ final class SyncDirectoryOps {
       String normalizedRootPrefix = PathNormalizer.normalizePathPrefix(root.toString());
       String cursor = null;
       do {
-        checkInterrupted();
-        var result = readPathOps.search(query, 10_000,
+        checkCancelled(cancelled);
+        var result = readPathOps.search(query, 256,
             Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID),
             LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, cursor);
         if (result == null) throw new IOException("Serving index path scan returned no result");
@@ -272,6 +323,7 @@ final class SyncDirectoryOps {
           throw new IOException("Serving index path scan exceeded cap " + pathScanCap);
         }
         for (var hit : result.hits()) {
+          checkCancelled(cancelled);
           // Projection source id is intentionally stored-only, so it cannot participate in the
           // Lucene query. Project it and exclude those legal no-file records before interpreting
           // DOC_ID as a filesystem path.
@@ -286,14 +338,19 @@ final class SyncDirectoryOps {
           if (!canonical.equals(storedPath)) {
             throw new IOException("Serving file document path metadata does not match its id");
           }
-          paths.add(canonical);
+          if (paths.add(canonical)) budget.retain(canonical.length());
           requireBelowCap(paths.size(), "index");
         }
         cursor = result.nextCursor();
         if (cursor != null && !cursor.isBlank() && !cursors.add(cursor)) {
           throw new IOException("Serving index path scan repeated its cursor");
         }
+        if (cursor != null && !cursor.isBlank()) {
+          requireBelowCap(cursors.size(), "cursor");
+          budget.retain(cursor.length());
+        }
       } while (cursor != null && !cursor.isBlank());
+      checkCancelled(cancelled);
       return paths;
     } catch (IOException incomplete) {
       throw incomplete;
@@ -329,6 +386,35 @@ final class SyncDirectoryOps {
   private static void checkInterrupted() throws IOException {
     if (Thread.currentThread().isInterrupted()) {
       throw new IOException("Reconciliation walk was interrupted");
+    }
+  }
+
+  static void checkCancelled(java.util.function.BooleanSupplier cancelled) throws IOException {
+    checkInterrupted();
+    if (cancelled.getAsBoolean()) throw new IOException("Reconciliation was cancelled");
+  }
+
+  private static void checkCancelledUnchecked(java.util.function.BooleanSupplier cancelled) {
+    try {
+      checkCancelled(cancelled);
+    } catch (IOException incomplete) {
+      throw new java.io.UncheckedIOException(incomplete);
+    }
+  }
+
+  private static final class PathBudget {
+    private final long maxChars;
+    private long retainedChars;
+
+    PathBudget(long maxChars) {
+      this.maxChars = maxChars;
+    }
+
+    void retain(long chars) throws IOException {
+      if (chars > maxChars - retainedChars) {
+        throw new IOException("Reconciliation retained path characters exceeded cap " + maxChars);
+      }
+      retainedChars += chars;
     }
   }
 

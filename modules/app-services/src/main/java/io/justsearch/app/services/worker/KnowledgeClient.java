@@ -349,7 +349,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     /** Dispatch seam for calls that may enter native inference, separate from text-only calls. */
     protected <T> T executeInferenceRpc(
-            String operation, RpcDeadlineCategory category, Function<SearchServiceCalls, T> rpc,
+            String operation, RpcDeadlineCategory category,
+            java.util.function.Function<SearchServiceCalls, T> rpc,
             EngineContext engineContext) {
         return executeSearchRpc(operation, category, rpc, engineContext);
     }

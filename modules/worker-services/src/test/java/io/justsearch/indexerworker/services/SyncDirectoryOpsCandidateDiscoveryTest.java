@@ -32,6 +32,53 @@ import org.junit.jupiter.api.io.TempDir;
 final class SyncDirectoryOpsCandidateDiscoveryTest {
   @TempDir Path tempDir;
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void strictDiscoverySharesCharacterBudgetAcrossIndexAndDisk(boolean force) throws Exception {
+    Path file = Files.writeString(tempDir.resolve("long-" + "a".repeat(160) + ".txt"), "text");
+    String normalized = PathNormalizer.normalizeKey(file);
+    // Disk alone fits (one normalized key plus conservative Path storage); index + disk does not.
+    var ops = new SyncDirectoryOps(paths(file), null, null, null,
+        IndexingPacing.unthrottled(), null, 200_000, 3 * normalized.length());
+
+    IOException failure = assertThrows(IOException.class,
+        () -> ops.discoverCandidateDifference(tempDir.toString(), force));
+
+    assertTrue(failure.getMessage().contains("path characters"), failure.getMessage());
+  }
+
+  @Test
+  void strictIndexCursorHistoryAlsoConsumesTheRetainedCharacterBudget() {
+    var reads = paths();
+    when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenReturn(new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0, "cursor".repeat(100)));
+    var ops = new SyncDirectoryOps(reads, null, null, null,
+        IndexingPacing.unthrottled(), null, 200_000, 128);
+
+    IOException failure = assertThrows(IOException.class,
+        () -> ops.discoverCandidateDifference(tempDir.toString(), true));
+
+    assertTrue(failure.getMessage().contains("path characters"), failure.getMessage());
+  }
+
+  @Test
+  void cooperativeExpiryDuringStrictIndexScanNeverReturnsAPartialSnapshot() {
+    var expired = new AtomicBoolean();
+    ReadPathOps reads = paths();
+    when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenAnswer(ignored -> {
+          expired.set(true);
+          return new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0);
+        });
+    var ops = new SyncDirectoryOps(reads, null, null, null, IndexingPacing.unthrottled(), null);
+
+    IOException failure = assertThrows(IOException.class,
+        () -> ops.discoverCandidateDifference(tempDir.toString(), true, expired::get));
+
+    assertTrue(failure.getMessage().contains("cancelled"));
+    assertTrue(!Thread.currentThread().isInterrupted(), "Expiry is cooperative, not an interrupt");
+  }
+
   @Test
   void discoversAddsAndConfirmedMissingCandidatesWithoutMutation() throws Exception {
     Path retained = Files.writeString(tempDir.resolve("retained.txt"), "retained");

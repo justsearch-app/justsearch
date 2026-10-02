@@ -443,6 +443,80 @@ final class EngineKnowledgeClientExecutorTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void reducedAggregateLimitReservesTextAdmissionAcrossInferenceLanes(boolean mixedLanes)
+      throws Exception {
+    var entered = new CountDownLatch(7);
+    var nativeBodies = new java.util.concurrent.atomic.AtomicInteger();
+    var release = new java.util.concurrent.CompletableFuture<Void>();
+    var search = mock(WorkerSearchService.class);
+    when(search.search(any(), any())).thenAnswer(invocation -> {
+      var request = (io.justsearch.ipc.SearchRequest) invocation.getArgument(0);
+      if (request.getQuery().equals("native")) {
+        nativeBodies.incrementAndGet();
+        entered.countDown();
+        release.join();
+      }
+      return SearchResponse.getDefaultInstance();
+    });
+    when(search.fetchDocuments(any(), any()))
+        .thenReturn(io.justsearch.ipc.FetchDocumentsResponse.getDefaultInstance());
+    var services = mock(WorkerAppServices.class);
+    when(services.searchService()).thenReturn(search);
+    // The shipped 16-thread foreground policy with the supported aggregate reduction to eight.
+    var admission = new EngineAdmissionController(16, 8, 1);
+    try (var registry = registry(16, 16, 16, 16);
+        var client = new EngineKnowledgeClient(registry, () -> services,
+            new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100, IpcTelemetry.noop(),
+            () -> {}, admission)) {
+      try {
+        var callers = new java.util.ArrayList<java.util.concurrent.FutureTask<String>>();
+        for (int i = 0; i < 8; i++) {
+          var context = io.justsearch.app.services.intent.EngineProvenance.internal("native-" + i,
+              io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+              mixedLanes && i % 2 == 0 ? io.justsearch.core.context.EngineContext.Urgency.BACKGROUND
+                  : io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
+          var caller = new java.util.concurrent.FutureTask<>(() -> {
+            try {
+              client.search(inferenceRequest(0), context);
+              return "completed";
+            } catch (EngineAdmissionException refusal) {
+              assertEquals(EngineAdmissionException.Reason.ENGINE_LIMIT, refusal.reason());
+              return "refused";
+            } catch (io.justsearch.app.api.knowledge.KnowledgeClientException expired) {
+              assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+                  expired.status());
+              return "expired";
+            }
+          });
+          callers.add(caller);
+          Thread.ofVirtual().start(caller);
+        }
+        assertTrue(entered.await(2, TimeUnit.SECONDS));
+        int refused = 0;
+        int expired = 0;
+        for (var caller : callers) {
+          String result = caller.get(3, TimeUnit.SECONDS);
+          if (result.equals("refused")) refused++;
+          if (result.equals("expired")) expired++;
+        }
+        assertEquals(1, refused, "Inference must leave one aggregate slot for text work");
+        assertEquals(7, expired);
+        assertEquals(7, nativeBodies.get());
+        assertEquals(7, admission.activeWorkCount(), "Expired issued work keeps its owners");
+        client.search("keyword", 10, TestEngineContexts.FOREGROUND);
+        client.fetchDocuments(java.util.List.of("doc"), TestEngineContexts.FOREGROUND);
+        assertEquals(7, admission.activeWorkCount());
+        assertFalse(release.isDone(), "Text availability must not depend on native progress");
+      } finally {
+        release.complete(null);
+      }
+    } finally {
+      release.complete(null);
+    }
+  }
+
   @Test
   void foregroundQueueLimitIsTypedAndDoesNotRunOnSubmittingThread() throws Exception {
     var firstEntered = new CountDownLatch(1);
