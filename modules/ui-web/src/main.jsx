@@ -118,7 +118,7 @@ async function bootstrap() {
 
   // Production boot: <jf-shell> directly. SurfaceCatalog booted up-front
   // so the rail has data on first paint.
-  const { resolveBootWithRecovery } = await import('./boot/desktopRecovery.ts')
+  const { resolveBootWithRecovery, mountBootApplication } = await import('./boot/desktopRecovery.ts')
   const resolvedApiBase = await resolveBootWithRecovery(document.getElementById('root'))
   if (!resolvedApiBase) {
     appLog.error('Unable to resolve JustSearch backend API base')
@@ -448,10 +448,9 @@ async function bootstrap() {
   }
 
   const root = document.getElementById('root')
-  root.innerHTML = ''
   const shell = document.createElement('jf-shell')
   shell.setAttribute('api-base', apiBase)
-  root.appendChild(shell)
+  mountBootApplication(root, shell)
 
   // Tempdoc 669 — demo/recording mode. Dismisses every currently-registered,
   // not-yet-dismissed walkthrough (the first-run "Welcome to JustSearch" tour

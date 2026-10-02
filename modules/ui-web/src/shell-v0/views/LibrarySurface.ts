@@ -859,6 +859,7 @@ export class LibrarySurface extends JfElement {
       this.gapDecision = null;
       this.gapDecisionError = null;
       this.gapRequestSerial++;
+      this.gapLoading = false;
       this.lastGapReadAtMs = 0;
     }
     if (gapKey && !this.gapLoading && Date.now() - this.lastGapReadAtMs >= 4_000) {
