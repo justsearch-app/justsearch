@@ -45,7 +45,7 @@ public final class NdjsonAppendStore<T> {
   private final Class<T> type;
   private final StoreCipher cipher;
   private final FeatureSnapshotLookup lookup;
-  private boolean lookupInitializationAttempted;
+  private final boolean initializeOnAppend;
 
   /**
    * @param storeFile the NDJSON file (its parent directory is created if absent)
@@ -60,10 +60,22 @@ public final class NdjsonAppendStore<T> {
    * {@link StoreCipher#disabled()} is passthrough (the DERIVED/legacy/test path).
    */
   public NdjsonAppendStore(Path storeFile, Class<T> type, StoreCipher cipher) {
+    this(storeFile, type, cipher, true);
+  }
+
+  /** Production capture borrows the generation maintained by the process backfill owner. */
+  public static NdjsonAppendStore<FeatureSnapshot> observedFeatureSnapshots(
+      Path file, StoreCipher cipher) {
+    return new NdjsonAppendStore<>(file, FeatureSnapshot.class, cipher, false);
+  }
+
+  private NdjsonAppendStore(
+      Path storeFile, Class<T> type, StoreCipher cipher, boolean initializeOnAppend) {
     this.storeFile = storeFile;
     this.type = type;
     this.cipher = Objects.requireNonNull(cipher, "cipher");
     this.lookup = type == FeatureSnapshot.class ? new FeatureSnapshotLookup(storeFile, cipher) : null;
+    this.initializeOnAppend = initializeOnAppend;
     try {
       Files.createDirectories(storeFile.getParent());
     } catch (IOException e) {
@@ -75,7 +87,7 @@ public final class NdjsonAppendStore<T> {
   /** Appends one record as an NDJSON line. Best-effort — never throws. */
   public synchronized void append(T record) {
     try {
-      initializeLookup();
+      if (initializeOnAppend) initializeLookup();
       String line =
           cipher.seal(
                   MAPPER.writeValueAsString(
@@ -95,20 +107,23 @@ public final class NdjsonAppendStore<T> {
     }
   }
 
-  /** One streaming legacy backfill, called by the background observer before new captures. */
+  /** Streaming legacy backfill, retried by the background owner until a generation is complete. */
   public synchronized void initializeLookup() throws IOException {
-    if (lookup == null || lookupInitializationAttempted || (cipher.enabled() && cipher.locked())) return;
-    lookupInitializationAttempted = true;
-    lookup.initialize(() -> {
+    if (lookup == null) return;
+    lookup.initialize(writer -> {
       if (!Files.exists(storeFile)) return;
       try (var reader = Files.newBufferedReader(storeFile, StandardCharsets.UTF_8)) {
         String line;
         while ((line = reader.readLine()) != null) {
           if (Thread.currentThread().isInterrupted()) throw new IOException("Feedback backfill interrupted");
-          if (!line.isBlank()) lookup.append((FeatureSnapshot) parseRecord(line));
+          if (!line.isBlank()) writer.append((FeatureSnapshot) parseRecord(line));
         }
       }
     });
+  }
+
+  boolean lookupInitialized() throws IOException {
+    return lookup == null || lookup.initialized();
   }
 
   /** Resolves one captured identity without reading or locking the archival stream. */

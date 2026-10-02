@@ -9,6 +9,7 @@ import io.javalin.http.Context;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.services.feedback.FeatureSnapshot;
 import io.justsearch.app.services.feedback.FeedbackObserver;
+import io.justsearch.app.services.feedback.FeedbackLookupMaintenance;
 import io.justsearch.app.services.feedback.NdjsonAppendStore;
 import io.justsearch.app.services.feedback.ResultDisposition;
 import io.justsearch.app.services.worker.KnowledgeClient;
@@ -31,6 +32,56 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class KnowledgeSearchControllerFeedbackObserverTest {
+  @Test
+  void lockedBootResumesOnUnlockAndCapturesAHistoricalCitationWithoutAnotherSearch(@TempDir Path dir)
+      throws Exception {
+    var keys = new io.justsearch.app.services.encryption.DataKeyManager(
+        new io.justsearch.app.services.encryption.EncryptionKeystore(dir));
+    keys.setup("passphrase".toCharArray());
+    var cipher = spy(new io.justsearch.agent.api.encryption.StoreCipher(keys));
+    Path archive = dir.resolve("snapshots.ndjson");
+    String legacy = cipher.seal(new tools.jackson.databind.ObjectMapper().writeValueAsString(
+        new FeatureSnapshot("historical", "q", 1L, List.of(
+            new FeatureSnapshot.HitFeatures("uid", "path", 1, 1f, 0f, 0f, 1f, null))))) + "\n";
+    Files.writeString(archive, legacy);
+    keys.lock();
+    var bootCheckedLocked = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      boolean locked = (Boolean) invocation.callRealMethod();
+      if (locked) bootCheckedLocked.countDown();
+      return locked;
+    }).when(cipher).locked();
+    doAnswer(invocation -> {
+      assertFalse(Thread.holdsLock(keys), "backfill must run outside the synchronized unlock listener");
+      return invocation.callRealMethod();
+    }).when(cipher).open(anyString());
+    try (var registry = TestEngineExecutors.awaitingTermination();
+        var observer = new FeedbackObserver(registry);
+        var maintenance = new FeedbackLookupMaintenance(registry, archive, cipher, keys)) {
+      assertTrue(bootCheckedLocked.await(2, TimeUnit.SECONDS));
+      assertFalse(maintenance.ready().isDone());
+      keys.unlock("passphrase".toCharArray());
+      maintenance.ready().get(5, TimeUnit.SECONDS);
+
+      var dispositions = new NdjsonAppendStore<>(dir.resolve("dispositions.ndjson"), ResultDisposition.class, cipher);
+      var controller = controller(observer);
+      inject(controller, "featureSnapshots", new NdjsonAppendStore<>(archive, FeatureSnapshot.class, cipher));
+      inject(controller, "dispositions", dispositions);
+      var ctx = context(Map.of("interactionId", "historical", "docId", "path", "kind", "OPENED",
+          "contributor", "chat-citation"));
+      controller.handleDisposition(ctx);
+      verify(ctx).status(204);
+      drain(observer);
+      var rows = dispositions.readAll();
+      assertEquals(1, rows.size());
+      assertEquals("uid", rows.getFirst().docId());
+      assertEquals(ResultDisposition.Contributor.USER_CITATION_CLICK, rows.getFirst().contributor());
+      assertEquals(legacy, Files.readString(archive), "unlock recovery must not require a new capture");
+    } finally {
+      keys.lock();
+    }
+  }
+
   @Test
   void searchRespondsWhileSnapshotPersistenceIsBlocked(@TempDir Path dir) throws Exception {
     try (var registry = TestEngineExecutors.awaitingTermination();

@@ -15,6 +15,107 @@ import org.junit.jupiter.api.io.TempDir;
 class NdjsonAppendStoreTest {
 
   @Test
+  void failedBackfillHidesThePrefixAndRetriesConflictingHistoryOnTheSameHandle(@TempDir Path dir)
+      throws Exception {
+    Path archive = dir.resolve("feature-snapshots.ndjson");
+    String first = line(snapshot("iid", "uid-a"));
+    String conflict = line(snapshot("iid", "uid-b"));
+    Files.writeString(archive, first + "invalid historical JSON\n" + conflict);
+    var store = new NdjsonAppendStore<>(archive, FeatureSnapshot.class);
+    assertThrows(Exception.class, store::initializeLookup);
+    assertEquals(java.util.Optional.empty(), store.resolveStableDocId("iid", "path"),
+        "readable prefix evidence is insufficient until the whole archive succeeds");
+    assertEquals(java.util.Optional.empty(),
+        new NdjsonAppendStore<>(archive, FeatureSnapshot.class).resolveStableDocId("iid", "path"));
+    store.append(snapshot("new-iid", "new-uid"));
+    assertEquals(java.util.Optional.empty(), store.resolveStableDocId("new-iid", "path"),
+        "an append cannot expose rows when historical initialization still fails");
+
+    Files.writeString(archive, first + conflict + line(snapshot("complete-iid", "complete-uid")));
+    store.initializeLookup();
+    assertEquals(java.util.Optional.empty(), store.resolveStableDocId("iid", "path"));
+    assertEquals(java.util.Optional.of("complete-uid"), store.resolveStableDocId("complete-iid", "path"));
+  }
+
+  @Test
+  void failedGenerationCannotContaminateARepairedArchive(@TempDir Path dir) throws Exception {
+    Path archive = dir.resolve("feature-snapshots.ndjson");
+    Files.writeString(archive, line(snapshot("iid", "discarded-prefix-uid")) + "invalid JSON\n");
+    var store = new NdjsonAppendStore<>(archive, FeatureSnapshot.class);
+    assertThrows(Exception.class, store::initializeLookup);
+    Files.writeString(archive, line(snapshot("iid", "repaired-uid")));
+    store.initializeLookup();
+    assertEquals(java.util.Optional.of("repaired-uid"), store.resolveStableDocId("iid", "path"),
+        "a retry must build from the complete repaired archive rather than merge a failed prefix");
+  }
+
+  @Test
+  void interruptedBackfillDoesNotPublishThePrefixAndCanRetry(@TempDir Path dir) throws Exception {
+    Path archive = dir.resolve("feature-snapshots.ndjson");
+    Files.writeString(archive, line(snapshot("iid", "uid-a")) + line(snapshot("iid", "uid-b"))
+        + line(snapshot("complete-iid", "complete-uid")));
+    var cipher = org.mockito.Mockito.spy(io.justsearch.agent.api.encryption.StoreCipher.disabled());
+    var reads = new java.util.concurrent.atomic.AtomicInteger();
+    org.mockito.Mockito.doAnswer(invocation -> {
+      if (reads.incrementAndGet() == 2) Thread.currentThread().interrupt();
+      return invocation.callRealMethod();
+    }).when(cipher).open(org.mockito.ArgumentMatchers.anyString());
+    var store = new NdjsonAppendStore<>(archive, FeatureSnapshot.class, cipher);
+    try {
+      assertThrows(IOException.class, store::initializeLookup);
+    } finally {
+      Thread.interrupted();
+    }
+    assertEquals(java.util.Optional.empty(), store.resolveStableDocId("iid", "path"));
+    store.initializeLookup();
+    assertEquals(java.util.Optional.empty(), store.resolveStableDocId("iid", "path"));
+    assertEquals(java.util.Optional.of("complete-uid"), store.resolveStableDocId("complete-iid", "path"));
+  }
+
+  private static String line(FeatureSnapshot snapshot) {
+    return new tools.jackson.databind.ObjectMapper().writeValueAsString(snapshot) + "\n";
+  }
+
+  @Test
+  void oneSnapshotResolvesAllHitsBeforePublishingAnIdentity(@TempDir Path dir) throws Exception {
+    var cipher = org.mockito.Mockito.spy(io.justsearch.agent.api.encryption.StoreCipher.disabled());
+    var store = new NdjsonAppendStore<>(dir.resolve("feature-snapshots.ndjson"), FeatureSnapshot.class, cipher);
+    store.initializeLookup();
+    var firstRead = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var visible = new java.util.concurrent.atomic.AtomicReference<>(java.util.Optional.<String>empty());
+    org.mockito.Mockito.doAnswer(invocation -> {
+      if (firstRead.compareAndSet(true, false)) visible.set(store.resolveStableDocId("iid", "path"));
+      return invocation.callRealMethod();
+    }).when(cipher).open(org.mockito.ArgumentMatchers.anyString());
+    store.append(new FeatureSnapshot("iid", "q", 1L, List.of(
+        new FeatureSnapshot.HitFeatures("uid-a", "path", 1, 1f, 0f, 0f, 1f, null),
+        new FeatureSnapshot.HitFeatures("uid-b", "path", 2, 1f, 0f, 0f, 1f, null))));
+    assertEquals(java.util.Optional.empty(), store.resolveStableDocId("iid", "path"));
+    assertEquals(java.util.Optional.empty(), visible.get(),
+        "a duplicate alias must never expose just the first hit's UID while resolving the snapshot");
+  }
+
+  @Test
+  void observationsCannotBypassTheOwnersBackfillRetryCadence(@TempDir Path dir) throws Exception {
+    Path archive = dir.resolve("feature-snapshots.ndjson");
+    String history = line(snapshot("iid", "uid-a")) + "invalid historical JSON\n"
+        + line(snapshot("iid", "uid-b"));
+    Files.writeString(archive, history);
+    var cipher = org.mockito.Mockito.spy(io.justsearch.agent.api.encryption.StoreCipher.disabled());
+    var observed = NdjsonAppendStore.observedFeatureSnapshots(archive, cipher);
+    for (int i = 0; i < 8; i++) observed.append(snapshot("new-" + i, "new-uid"));
+    org.mockito.Mockito.verify(cipher, org.mockito.Mockito.never()).open(org.mockito.ArgumentMatchers.anyString());
+    assertEquals(history, Files.readString(archive));
+    assertEquals(java.util.Optional.empty(), observed.resolveStableDocId("iid", "path"));
+
+    Files.writeString(archive, line(snapshot("iid", "uid-a")) + line(snapshot("iid", "uid-b")));
+    new NdjsonAppendStore<>(archive, FeatureSnapshot.class, cipher).initializeLookup();
+    observed.append(snapshot("new", "new-uid"));
+    assertEquals(java.util.Optional.of("new-uid"), observed.resolveStableDocId("new", "path"));
+    assertEquals(java.util.Optional.empty(), observed.resolveStableDocId("iid", "path"));
+  }
+
+  @Test
   void legacyLookupBackfillRunsOnceAndPreservesHistoricalIdentity(@TempDir Path dir)
       throws Exception {
     Path archive = dir.resolve("feature-snapshots.ndjson");

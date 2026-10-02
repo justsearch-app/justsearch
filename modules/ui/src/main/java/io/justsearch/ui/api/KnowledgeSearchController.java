@@ -241,11 +241,10 @@ public class KnowledgeSearchController {
         s = featureSnapshots;
         if (s == null) {
           s =
-              new NdjsonAppendStore<>(
+              NdjsonAppendStore.observedFeatureSnapshots(
                   PlatformPaths.resolveDataDir()
                       .resolve("feedback")
                       .resolve("feature-snapshots.ndjson"),
-                  FeatureSnapshot.class,
                   feedbackCipher);
           featureSnapshots = s;
         }

@@ -169,6 +169,7 @@ public final class HeadAssembly implements AutoCloseable {
   // /api/feedback/capture surface.
   private io.justsearch.app.services.feedback.FeedbackCaptureSettings feedbackCaptureSettings;
   private io.justsearch.app.services.feedback.FeedbackObserver feedbackObserver;
+  private io.justsearch.app.services.feedback.FeedbackLookupMaintenance feedbackLookupMaintenance;
 
   /** Tempdoc 629 (LAYER): the data-at-rest key manager (owns the DEK lifecycle for AUTHORED stores). */
   private final io.justsearch.app.services.encryption.DataKeyManager dataKeyManager;
@@ -766,16 +767,9 @@ public final class HeadAssembly implements AutoCloseable {
     this.feedbackCaptureSettings =
         new io.justsearch.app.services.feedback.FeedbackCaptureSettings(
             PlatformPaths.resolveDataDir());
-    this.feedbackObserver.observe(() -> {
-      try {
-        new io.justsearch.app.services.feedback.NdjsonAppendStore<>(
-            feedbackDir.resolve("feature-snapshots.ndjson"),
-            io.justsearch.app.services.feedback.FeatureSnapshot.class, feedbackCipher)
-            .initializeLookup();
-      } catch (java.io.IOException failure) {
-        log.debug("Feedback identity lookup backfill failed (non-fatal)", failure);
-      }
-    });
+    this.feedbackLookupMaintenance = new io.justsearch.app.services.feedback.FeedbackLookupMaintenance(
+        executors, feedbackDir.resolve("feature-snapshots.ndjson"), feedbackCipher, this.dataKeyManager);
+    acquiredOwners.add(this.feedbackLookupMaintenance);
 
     // Tempdoc 580 §17 P4 — the agent-citation contributor: each agent answer's grounding sources +
     // citations project to the ONE canonical disposition stream (CITED/SHOWN). Best-effort.
@@ -1824,6 +1818,10 @@ public final class HeadAssembly implements AutoCloseable {
     }
     try {
       RuntimeException failure = null;
+      if (feedbackLookupMaintenance != null) {
+        try { feedbackLookupMaintenance.close(); }
+        catch (RuntimeException closeFailure) { failure = closeFailure; }
+      }
       for (var scan : unlockScans) {
         try { scan.close(); }
         catch (RuntimeException closeFailure) {

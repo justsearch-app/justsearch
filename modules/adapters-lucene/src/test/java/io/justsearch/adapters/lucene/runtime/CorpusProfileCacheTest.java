@@ -24,6 +24,32 @@ import org.junit.jupiter.api.Test;
 
 class CorpusProfileCacheTest {
   @Test
+  void refreshBetweenVersionProbeAndProfilingUsesTheProfiledReadersVersion() throws Exception {
+    try (var directory = new ByteBuffersDirectory();
+        var writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()));
+        var original = DirectoryReader.open(writer)) {
+      writer.addDocument(new Document());
+      try (var refreshed = DirectoryReader.openIfChanged(original, writer)) {
+        var originalSearcher = new IndexSearcher(original);
+        var refreshedSearcher = spy(new IndexSearcher(refreshed));
+        var acquisitions = new AtomicInteger();
+        var bridge = mock(SearcherBridge.class);
+        doAnswer(invocation -> {
+          ReadPathOps.SearcherOperation<?> operation = invocation.getArgument(0);
+          // Both staleness probes borrow the old reader; the profiling acquisition sees refresh.
+          return operation.execute(acquisitions.incrementAndGet() <= 2 ? originalSearcher : refreshedSearcher);
+        }).when(bridge).withSearcher(any());
+        var counts = new IndexCountOps(bridge);
+        var profile = counts.getOrComputeCorpusProfile();
+        assertEquals(1, profile.parentDocCount(), "the traversal must use the refreshed reader");
+        assertSame(profile, counts.getOrComputeCorpusProfile(),
+            "an unchanged profiled reader must hit the cache, even when the preceding probe was older");
+        verify(refreshedSearcher, times(1)).count(any(Query.class));
+      }
+    }
+  }
+
+  @Test
   void concurrentMissesScanOnceAndReaderRefreshInvalidatesTheProfile() throws Exception {
     try (var directory = new ByteBuffersDirectory();
         var writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()));
