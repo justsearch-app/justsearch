@@ -34,7 +34,7 @@ final class RootLifecycleOpsIdempotencyTest {
   @Test
   void incompleteRemovalRetainsPersistedRootsUntilExplicitRetry() {
     for (String failure : java.util.List.of(
-        "unwatch", "nestedUnwatch", "delete", "error", "capacityUnwatch", "capacityDelete")) {
+        "unwatch", "nestedUnwatch", "delete", "error", "negativeCount", "capacityUnwatch", "capacityDelete")) {
       Path root = tempDir.resolve(failure).toAbsolutePath().normalize();
       Path nested = root.resolve("nested");
       Path rootsFile = tempDir.resolve(failure + ".json");
@@ -73,6 +73,9 @@ final class RootLifecycleOpsIdempotencyTest {
               if (failure.equals("delete")) throw new IllegalStateException("delete unavailable");
               if (failure.equals("error")) {
                 return io.justsearch.ipc.DeleteByPathResponse.newBuilder().setError("delete failed").build();
+              }
+              if (failure.equals("negativeCount")) {
+                return io.justsearch.ipc.DeleteByPathResponse.newBuilder().setDeletedJobs(-1).build();
               }
             }
             return io.justsearch.ipc.DeleteByPathResponse.newBuilder().setDeletedJobs(7).build();

@@ -397,8 +397,9 @@ final class RootLifecycleOps {
         try {
             DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
 
-            if (!response.getError().isEmpty()) {
-                log.error("deleteByPath RPC returned error: {}", response.getError());
+            if (!response.getError().isEmpty() || response.getDeletedJobs() < 0) {
+                log.error("deleteByPath RPC returned error: {} (deletedJobs={})",
+                        response.getError(), response.getDeletedJobs());
                 return -1;
             } else {
                 deletedJobs = (int) response.getDeletedJobs();
