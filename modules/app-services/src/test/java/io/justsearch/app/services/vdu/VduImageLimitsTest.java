@@ -13,8 +13,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.zip.DeflaterOutputStream;
 import javax.imageio.ImageIO;
-import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSDictionary;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDFormContentStream;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -22,14 +23,16 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.PDResources;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.common.PDStream;
+import org.apache.pdfbox.pdmodel.common.function.PDFunction;
+import org.apache.pdfbox.pdmodel.graphics.color.PDColor;
 import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceGray;
 import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceRGB;
-import org.apache.pdfbox.pdmodel.graphics.color.PDColor;
 import org.apache.pdfbox.pdmodel.graphics.color.PDPattern;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.form.PDTransparencyGroup;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.graphics.pattern.PDTilingPattern;
+import org.apache.pdfbox.pdmodel.graphics.shading.PDShadingType2;
 import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -151,6 +154,23 @@ class VduImageLimitsTest {
         document.save(path.toFile());
       }
       assertRejectedImage(path, "decoded PDF image pixels");
+    }
+  }
+
+  @Test
+  void repeatedShadingWithEmptyGraphicsMaskChargesEveryAllocation() throws Exception {
+    for (COSName subtype : new COSName[] {COSName.ALPHA, COSName.LUMINOSITY}) {
+      Path path = shadedPdf("shading-budget-" + subtype.getName(), 2000, 10, subtype);
+      assertRejectedImage(path, "decoded PDF image pixels");
+    }
+  }
+
+  @Test
+  void ordinaryShadingWithEmptyGraphicsMaskStillRenders() throws Exception {
+    Path path = shadedPdf("ordinary-shading", 72, 1, COSName.ALPHA);
+    try (var files = new TempFileManager(tempDir.resolve("ordinary-shading-render"));
+        var renderer = new PdfImageRenderer(files)) {
+      assertEquals(1, renderer.render(path).size());
     }
   }
 
@@ -339,6 +359,53 @@ class VduImageLimitsTest {
       document.save(path.toFile());
     }
     return path;
+  }
+
+  private Path shadedPdf(String name, float side, int draws, COSName maskSubtype) throws IOException {
+    Path path = tempDir.resolve(name + ".pdf");
+    try (var document = new PDDocument()) {
+      var page = new PDPage(new PDRectangle(side, side));
+      page.setResources(new PDResources());
+      document.addPage(page);
+      var group = new PDTransparencyGroup(document);
+      group.setBBox(new PDRectangle(side, side));
+      group.setResources(new PDResources());
+      var attributes = new COSDictionary();
+      attributes.setItem(COSName.S, COSName.TRANSPARENCY);
+      attributes.setBoolean(COSName.I, true);
+      group.getCOSObject().setItem(COSName.GROUP, attributes);
+      // No painting operators: incidental getPaint/drawImage calls cannot charge this mask.
+      try (var empty = group.getCOSObject().createOutputStream()) {}
+      var mask = new COSDictionary();
+      mask.setItem(COSName.S, maskSubtype);
+      mask.setItem(COSName.G, group);
+      var state = new PDExtendedGraphicsState();
+      state.getCOSObject().setItem(COSName.SMASK, mask);
+
+      var function = new COSDictionary();
+      function.setInt(COSName.FUNCTION_TYPE, 2);
+      function.setItem(COSName.DOMAIN, floats(0, 1));
+      function.setItem(COSName.C0, floats(0, 0, 0));
+      function.setItem(COSName.C1, floats(1, 1, 1));
+      function.setInt(COSName.N, 1);
+      var shading = new PDShadingType2(new COSDictionary());
+      shading.setShadingType(2);
+      shading.setColorSpace(PDDeviceRGB.INSTANCE);
+      shading.setCoords(floats(0, 0, side, 0));
+      shading.setFunction(PDFunction.create(function));
+      try (var content = new PDPageContentStream(document, page)) {
+        content.setGraphicsStateParameters(state);
+        for (int i = 0; i < draws; i++) content.shadingFill(shading);
+      }
+      document.save(path.toFile());
+    }
+    return path;
+  }
+
+  private static COSArray floats(float... values) {
+    var array = new COSArray();
+    array.setFloatArray(values);
+    return array;
   }
 
   private void assertRejectedImage(Path path, String reason) throws Exception {

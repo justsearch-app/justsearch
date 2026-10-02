@@ -25,7 +25,7 @@ resources. A rejection is latched because PDFBox can swallow operator IOExceptio
 | Explicit image masks and image soft masks | Dictionary recursion checks and charges each mask, rejects cycles, then checks the composed rectangle using the maximum source/mask width and maximum source/mask height. Two composed rasters are reserved for the scaled gray mask and ARGB output before any image decode. |
 | Image placement and smooth scaling, including pattern stencil paint/mask rasters | `drawImage` bounds the CTM-transformed unit rectangle at device DPI before PDFBox's un-clipped composition/scaling. Three destination rasters are reserved. Source conversion/inversion is included in the source reservation. |
 | Transparency groups and backdrops | `showTransparencyGroup` computes the transformed group box intersected with the current clipping path, adds outward-rounding allowance and reserves two rasters before the group's constructor allocates. Nested groups share the counter. |
-| Graphics-state soft masks, gray conversion and rotation adjustment | `getPaint`, `drawImage` and `showTransparencyGroup` charge the clipped mask group before PDFBox applies it. Four rasters cover group/backdrop, gray conversion and adjusted gray output. Page rotation can swap the dimensions. |
+| Graphics-state soft masks, gray conversion and rotation adjustment | `getPaint`, `drawImage`, `showTransparencyGroup` and `shadingFill` charge the clipped mask group before PDFBox applies it. Four rasters cover group/backdrop, gray conversion and adjusted gray output. Page rotation can swap the dimensions. |
 | Tiling pattern cell raster | `getPaint` checks the pattern steps, initial/pattern matrices and device DPI before calling PDFBox's tiling paint factory. Nested pattern content retains the same drawer/counter. |
 | Java2D drawing and shading tiles, PNG/JPEG encoding | Their destinations are the already bounded page, group, pattern, preparation or analysis rasters. Encoding does not introduce an untrusted-size bitmap decode. |
 
@@ -104,7 +104,7 @@ Run the focused checks first, then each affected module's full tests and hygiene
 ```powershell
 ./gradlew.bat :modules:app-services:test --tests '*VduImageLimitsTest' --tests '*VduProcessorAbstentionTest'
 ./gradlew.bat :modules:worker-core:test --tests '*IngestionSkipPolicyTest'
-./gradlew.bat :modules:worker-services:test --tests '*ArchiveExtractionLimitsTest' --tests '*PolicyDrivenFormatCapabilityTest' --tests '*WorkerIngestionAuthorityTest' --tests '*WorkerMethvinWatcherTest' --tests '*WorkerScanOpsTest' --tests '*SyncDirectoryOpsWalkSkipPolicyTest' --tests '*SyncDirectoryOpsCandidateDiscoveryTest' --tests '*JobBatchExtractorForcedPathTest' --tests '*IndexingLoopTest' --tests '*IndexingLoopRestartTest' --tests '*IndexingLoopCutoverPauseTest' --tests '*AdversarialCorpusIngestionTest'
+./gradlew.bat :modules:worker-services:test --tests '*ArchiveExtractionLimitsTest' --tests '*PolicyDrivenFormatCapabilityTest' --tests '*WorkerIngestionAuthorityTest' --tests '*WorkerMethvinWatcherTest' --tests '*WorkerScanOpsTest' --tests '*SyncDirectoryOpsWalkSkipPolicyTest' --tests '*SyncDirectoryOpsCandidateDiscoveryTest' --tests '*WorkerIngestServiceCandidateReconciliationTest' --tests '*JobBatchExtractorForcedPathTest' --tests '*IndexingLoopTest' --tests '*IndexingLoopRestartTest' --tests '*IndexingLoopCutoverPauseTest' --tests '*AdversarialCorpusIngestionTest'
 ./gradlew.bat :modules:indexer-worker:test --tests '*LegacyIngestionBoundaryTest' --tests '*JobQueueTest' --tests '*JobQueueMigrationTest' --tests '*SwitchBufferVersionTest'
 ./gradlew.bat :modules:app-services:test :modules:worker-core:test :modules:worker-services:test :modules:indexer-worker:test
 ./gradlew.bat :modules:app-services:spotlessCheck :modules:worker-core:spotlessCheck :modules:worker-services:spotlessCheck :modules:indexer-worker:spotlessCheck
@@ -157,3 +157,48 @@ extraction/admission and archive tests still require the orchestrator's module b
 - `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerIngestionAuthorityTest.java`
 - `modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerScanOpsTest.java`
 - `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LegacyIngestionBoundaryTest.java`
+
+## S5n independent-review follow-up
+
+All three findings were verified against the committed source.
+
+- I1: Candidate reconciliation still called the removed two-argument helper. It now passes
+  the validated root. The shared helper rechecks root-relative exclusions before queue
+  admission on every watcher/reconciliation route, and returns whether a job was admitted
+  so policy-skipped discoveries do not inflate the response's added count.
+  WorkerIngestServiceCandidateReconciliationTest now checks the captured entry's root,
+  ordinary/forced pruning with an excluded ancestor above the root, and a policy change
+  between discovery and the second admission. The original source cannot compile; the
+  added assertions also reject a superficial signature repair that loses the boundary
+  or bypasses the final policy check.
+- I2: PDFBox shadingFill applies a graphics soft mask directly, bypassing getPaint.
+  BoundedPdfRenderer now checks the rejection latch and reserves the mask's rasters before
+  delegating shadingFill. The pinned PageDrawer's other applySoftMaskToPaint callers are
+  covered by getPaint, drawImage or showTransparencyGroup.
+  VduImageLimitsTest#repeatedShadingWithEmptyGraphicsMaskChargesEveryAllocation uses a
+  valid axial shading and ten sh operators on a 2000-point square page, with empty alpha
+  and luminosity mask groups. No incidental painting operator can make the old guard
+  charge those groups. A small positive shading fixture retains ordinary rendering.
+- I3: The second historical payload reused a database whose first iteration had installed
+  an explicit-file boundary. Each unrooted replay case now uses its own database.
+  LegacyIngestionBoundaryTest#historicalReplayPreservesTheExistingBoundaryAcrossRestart
+  separately covers both historical payload formats over an existing directory boundary
+  and over an intentional explicit-file boundary. Replay preserves the existing boundary:
+  excluded descendants remain skipped, while explicit-file admission remains explicit.
+
+Observed S5n checks: isolated javac compilation of the actual VDU classes and updated
+VduImageLimitsTest passed. Its isolated JUnit run completed with **18 tests successful,
+zero failures/skips**, exit 0. The repeated-shading regression run against HEAD's
+committed renderer failed, exit 1, with **Expected java.io.IOException to be thrown,
+but nothing was thrown**. This confirms the stated allocation bypass in the old code.
+Only import ordering changed in that VDU test after the successful run.
+
+Candidate helper invocations and the worker/SQLite tests' imports, method names and
+signatures were checked against their real classes/interfaces. Their module compilation
+and runtime execution remain pending; no Gradle or Node unit tests were run. The focused
+build commands above include all three affected test classes. Scratch jars/classes were
+created under tmp/s5n for isolated checks and removed afterwards.
+
+S5n changes are limited to WorkerIngestService.java,
+WorkerIngestServiceCandidateReconciliationTest.java, BoundedPdfRenderer.java,
+VduImageLimitsTest.java, LegacyIngestionBoundaryTest.java and this handoff map.

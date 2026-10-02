@@ -373,7 +373,10 @@ public final class WorkerIngestService {
     }
   }
 
-  private void acceptWatcherUpsertUnderLease(String collection, Path path, Path root) {
+  private boolean acceptWatcherUpsertUnderLease(String collection, Path path, Path root) {
+    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)) {
+      return false;
+    }
     var entry = WorkerMethvinWatcher.entryForLiveEvent(path).withinRoot(root);
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration != null) {
@@ -385,6 +388,7 @@ public final class WorkerIngestService {
     } else if (jobQueue.enqueueEntries(List.of(entry), collection) != 1) {
       throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
     }
+    return true;
   }
 
   /** The watcher owns its deletion marker; this method owns its routing and effect fence. */
@@ -1491,8 +1495,7 @@ public final class WorkerIngestService {
         for (Path path : difference.additions()) {
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
-          acceptWatcherUpsertUnderLease(collection, path);
-          added++;
+          if (acceptWatcherUpsertUnderLease(collection, path, root)) added++;
         }
         for (String path : difference.deletions()) {
           requireCandidateSubscription(registry, root, subscription);

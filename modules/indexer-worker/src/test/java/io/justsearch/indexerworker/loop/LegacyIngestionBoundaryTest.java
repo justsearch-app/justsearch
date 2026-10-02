@@ -66,9 +66,9 @@ class LegacyIngestionBoundaryTest {
     Path file = Files.writeString(Files.createDirectory(root.resolve("private")).resolve("notes.txt"),
         "private content");
     IngestionSkipPolicy.installResolved(new IngestionSkipPolicy(null, null, Set.of("private")));
-    for (String payload : List.of(file.toString(), new SwitchBufferUpsert(file.toString(), null,
-        new JobQueue.EnqueueProvenance("system", "watcher")).encode())) {
-      try (var queue = new SqliteJobQueue(directory.resolve("replay.db"))) {
+    int payloadCase = 0;
+    for (String payload : historicalPayloads(file)) {
+      try (var queue = new SqliteJobQueue(directory.resolve("replay-" + payloadCase++ + ".db"))) {
         queue.open();
         var entry = SwitchBufferUpsert.decode(payload).entry();
         assertNull(entry.ingestionRoot());
@@ -81,6 +81,42 @@ class LegacyIngestionBoundaryTest {
         assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(file))));
         assertEquals(SourceAdmissionAction.ADMIT,
             new WorkerIngestionAuthority().admit(queue.pollPending(1).getFirst()).action());
+      }
+    }
+  }
+
+  @Test
+  void historicalReplayPreservesTheExistingBoundaryAcrossRestart() throws Exception {
+    Path root = Files.createDirectory(directory.resolve("watched"));
+    Path file = Files.writeString(Files.createDirectory(root.resolve("private")).resolve("notes.txt"),
+        "private content");
+    IngestionSkipPolicy.installResolved(new IngestionSkipPolicy(null, null, Set.of("private")));
+    int payloadCase = 0;
+    for (Path boundary : List.of(root, file)) {
+      for (String payload : historicalPayloads(file)) {
+        Path db = directory.resolve("rooted-replay-" + payloadCase++ + ".db");
+        try (var queue = new SqliteJobQueue(db)) {
+          queue.open();
+          assertEquals(1,
+              queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(boundary))));
+        }
+        try (var queue = new SqliteJobQueue(db)) {
+          queue.open();
+          var historical = SwitchBufferUpsert.decode(payload).entry();
+          assertNull(historical.ingestionRoot());
+          assertEquals(1, queue.enqueueEntries(List.of(historical)));
+          var claim = queue.pollPending(1).getFirst();
+          assertEquals(boundary, claim.ingestionRoot(),
+              "Replay must retain the prior admission boundary");
+          var admission = new WorkerIngestionAuthority().admit(claim);
+          assertEquals(
+              boundary.equals(file) ? SourceAdmissionAction.ADMIT : SourceAdmissionAction.SKIP_DONE,
+              admission.action());
+          if (boundary.equals(root)) {
+            assertEquals(IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM,
+                admission.outcome().reasonCode());
+          }
+        }
       }
     }
   }
@@ -102,5 +138,10 @@ class LegacyIngestionBoundaryTest {
       assertEquals(root, claim.ingestionRoot());
       assertEquals(SourceAdmissionAction.ADMIT, new WorkerIngestionAuthority().admit(claim).action());
     }
+  }
+
+  private static List<String> historicalPayloads(Path file) {
+    return List.of(file.toString(), new SwitchBufferUpsert(file.toString(), null,
+        new JobQueue.EnqueueProvenance("system", "watcher")).encode());
   }
 }

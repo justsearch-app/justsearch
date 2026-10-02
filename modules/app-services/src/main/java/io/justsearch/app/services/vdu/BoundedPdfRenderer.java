@@ -176,6 +176,15 @@ final class BoundedPdfRenderer extends PDFRenderer {
       }
 
       @Override
+      public void shadingFill(COSName shadingName) throws IOException {
+        requireWithinLimits();
+        // Unlike ordinary paint, shading applies the graphics mask directly in PageDrawer.
+        // Reserve its rasters before delegation, even when the mask group contains no operators.
+        chargeGraphicsMask();
+        super.shadingFill(shadingName);
+      }
+
+      @Override
       public void showTransparencyGroup(PDTransparencyGroup group) throws IOException {
         chargeGroup(group, getGraphicsState().getCurrentTransformationMatrix(), 2);
         chargeGraphicsMask();
