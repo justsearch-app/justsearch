@@ -8,6 +8,8 @@ import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.indexerworker.server.MigrationTransitionBarrier;
+import io.justsearch.indexing.SchemaFields;
+import io.justsearch.ipc.SearchResponse;
 import io.justsearch.ipc.StatusResponse;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -16,7 +18,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TermQuery;
 
 /**
  * Lane F stage A item A12 — the in-process replacement for the chaos tier's three-part rig
@@ -304,13 +312,61 @@ final class EngineTestHarness implements AutoCloseable {
     return awaitSearchCount(marker, timeoutMs, count -> count == 0);
   }
 
+  /** Independent NRT read: neither the exact parent nor any of its chunks may survive deletion. */
+  boolean awaitDocumentAbsent(String docId, long timeoutMs) throws Exception {
+    return awaitIndexAbsent(documentAndChunks(docId), timeoutMs);
+  }
+
+  /** Replacement keeps the parent id, but must retire the old text in parent and chunk rows. */
+  boolean awaitIndexedMarkerAbsent(String docId, String marker, long timeoutMs) throws Exception {
+    Query oldText = new BooleanQuery.Builder()
+        .add(new TermQuery(new Term(SchemaFields.CONTENT, marker)), BooleanClause.Occur.SHOULD)
+        .add(new TermQuery(new Term(SchemaFields.CHUNK_CONTENT, marker)), BooleanClause.Occur.SHOULD)
+        .build();
+    return awaitIndexAbsent(new BooleanQuery.Builder()
+        .add(documentAndChunks(docId), BooleanClause.Occur.FILTER)
+        .add(oldText, BooleanClause.Occur.MUST)
+        .build(), timeoutMs);
+  }
+
+  private static Query documentAndChunks(String docId) {
+    return new BooleanQuery.Builder()
+        .add(new TermQuery(new Term(SchemaFields.DOC_ID, docId)), BooleanClause.Occur.SHOULD)
+        .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, docId)), BooleanClause.Occur.SHOULD)
+        .build();
+  }
+
+  private boolean awaitIndexAbsent(Query query, long timeoutMs) throws Exception {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() < deadline) {
+      try (var view = captureServingView()) {
+        if (view.searchRuntime().readPathOps().search(query, 1, Set.of(), null, null).totalHits()
+            == 0) {
+          return true;
+        }
+      }
+      Thread.sleep(100);
+    }
+    return false;
+  }
+
+  static void requireExecutedSearch(SearchResponse response) {
+    if (!response.hasSearchTrace() || response.getSearchTrace().getDecisionKind().isBlank()
+        || "blocked".equals(response.getSearchTrace().getDecisionKind())
+        || "empty_query".equals(response.getSearchTrace().getDecisionKind())) {
+      throw new IllegalStateException("Search did not execute: " + response.getSearchTrace());
+    }
+  }
+
   private boolean awaitSearchCount(
       String marker, long timeoutMs, java.util.function.IntPredicate satisfied)
       throws InterruptedException {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
       try {
-        if (satisfied.test(client.search(marker, 10, TestEngineContexts.FOREGROUND).getResultsCount())) {
+        SearchResponse response = client.search(marker, 10, TestEngineContexts.FOREGROUND);
+        requireExecutedSearch(response);
+        if (satisfied.test(response.getResultsCount())) {
           return true;
         }
       } catch (RuntimeException stillSettling) {

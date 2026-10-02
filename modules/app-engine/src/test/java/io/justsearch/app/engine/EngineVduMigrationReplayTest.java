@@ -79,6 +79,9 @@ final class EngineVduMigrationReplayTest {
         "the source must be admitted to Blue");
     assertTrue(engine.awaitIndexed(1, 120_000), "the Blue source must finish indexing");
     assertTrue(engine.awaitSearchable(blueMarker, 60_000), "the Blue baseline must be searchable");
+    assertFalse(
+        engine.awaitIndexedMarkerAbsent(PathNormalizer.normalizeKey(source), blueMarker, 250),
+        "the independent index read must see the old marker before replacement");
 
     String activeBefore = engine.status().getMigration().getActiveGenerationId();
     assertFalse(activeBefore.isBlank(), "the Blue generation id must be visible");
@@ -149,6 +152,9 @@ final class EngineVduMigrationReplayTest {
     assertTrue(
         engine.awaitNotSearchable(blueMarker, 5_000),
         "the original seeded Green parent must have been replaced, not merely replayed onto");
+    assertTrue(
+        engine.awaitIndexedMarkerAbsent(docId, blueMarker, 5_000),
+        "an independent index read must find no old marker in the exact parent or its chunks");
     assertTrue(awaitBufferedDepth(queuePath, 0L, 60_000),
         "the committed VDU version must be removed without a restart");
     assertNotEquals(
@@ -160,6 +166,9 @@ final class EngineVduMigrationReplayTest {
     assertTrue(
         engine.awaitSearchable(replacementMarker, 60_000),
         "the replacement source preserved by VDU replay must survive a later reopen");
+    assertTrue(
+        engine.awaitIndexedMarkerAbsent(docId, blueMarker, 5_000),
+        "old parent and chunk text must stay absent after restart");
     assertEquals(0L, bufferedDepth(queuePath), "the removed legacy row must stay absent");
   }
 

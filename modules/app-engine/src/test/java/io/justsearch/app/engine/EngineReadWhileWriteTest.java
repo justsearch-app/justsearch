@@ -4,19 +4,24 @@ package io.justsearch.app.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.app.services.worker.IpcTelemetry;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.server.KnowledgeServer;
+import io.justsearch.indexerworker.util.PathNormalizer;
+import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.SearchResponse;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -108,6 +113,17 @@ final class EngineReadWhileWriteTest {
       + " consistent afterwards")
   void searchesSucceedWhileTheIndexIsBeingWritten(@TempDir Path tempDir) throws Exception {
     start(tempDir);
+    Path seed = tempDir.resolve("rww-seed.txt");
+    Files.writeString(seed, "read while write seed witness\n");
+    assertEquals(
+        1,
+        client.submitBatch(List.of(seed), TestEngineContexts.FOREGROUND).getAcceptedCount());
+    assertTrue(awaitSearchable("read while write seed witness", 60_000));
+    String seedId = PathNormalizer.normalizeKey(seed);
+    requireSeedHit(
+        client.search("read while write seed witness", 10, TestEngineContexts.FOREGROUND),
+        seedId);
+    assertSearchCompletesDuringHeldWrite(seedId);
     List<Path> corpus = writeCorpus(tempDir, CORPUS_SIZE);
 
     AtomicBoolean searching = new AtomicBoolean(true);
@@ -121,12 +137,9 @@ final class EngineReadWhileWriteTest {
             () -> {
               while (searching.get()) {
                 try {
-                  SearchResponse response = client.search("read while write probe", 10, TestEngineContexts.FOREGROUND);
-                  // Reading the payload is deliberate: a response object nobody touches would let
-                  // a half-built response pass for a successful search.
-                  if (response.getResultsCount() < 0) {
-                    throw new IllegalStateException("negative result count");
-                  }
+                  SearchResponse response =
+                      client.search("read while write seed witness", 10, TestEngineContexts.FOREGROUND);
+                  requireSeedHit(response, seedId);
                   completedSearches.incrementAndGet();
                 } catch (RuntimeException e) {
                   // Unlike the retired test, a failing search is a FAILURE, not a logged datapoint:
@@ -264,6 +277,61 @@ final class EngineReadWhileWriteTest {
   }
 
   // ---------------------------------------------------------------------------------------------
+
+  /** Hold a real RMW inside the single-writer dispatch lock, then issue a fresh independent read. */
+  private void assertSearchCompletesDuringHeldWrite(String seedId) throws Exception {
+    CountDownLatch writerEntered = new CountDownLatch(1);
+    CountDownLatch releaseWriter = new CountDownLatch(1);
+    Map<String, Object> updates = new AbstractMap<>() {
+      @Override
+      public boolean isEmpty() {
+        return false;
+      }
+
+      @Override
+      public Set<Entry<String, Object>> entrySet() {
+        // updateDocument consumes this map only after acquiring dispatchLock and finding the
+        // seeded parent. Holding here keeps an actual write in flight, without blocking readers.
+        writerEntered.countDown();
+        try {
+          releaseWriter.await();
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException("held write interrupted", interrupted);
+        }
+        return Map.<String, Object>of(SchemaFields.TITLE, "held write witness").entrySet();
+      }
+    };
+    ExecutorService witnesses = Executors.newFixedThreadPool(2);
+    try (var view = server.captureServingView()) {
+      var runtime = (RunningRuntime) view.ingestRuntime();
+      Future<Boolean> write = witnesses.submit(
+          () -> runtime.indexingCoordinator().updateDocument(seedId, updates));
+      try {
+        assertTrue(writerEntered.await(30, TimeUnit.SECONDS), "the real writer must enter RMW");
+        Future<SearchResponse> read = witnesses.submit(
+            () -> client.search("read while write seed witness", 10, TestEngineContexts.FOREGROUND));
+        // The deadline detects serialization, not a throughput target: the writer cannot finish
+        // until this assertion completes and the finally block releases it.
+        requireSeedHit(read.get(30, TimeUnit.SECONDS), seedId);
+        assertEquals(1L, releaseWriter.getCount(), "the write must still be held after the read");
+      } finally {
+        releaseWriter.countDown();
+        assertTrue(write.get(30, TimeUnit.SECONDS), "the held write must update the seeded parent");
+      }
+    } finally {
+      releaseWriter.countDown();
+      witnesses.shutdownNow();
+      assertTrue(witnesses.awaitTermination(30, TimeUnit.SECONDS), "witness callers must terminate");
+    }
+  }
+
+  private static void requireSeedHit(SearchResponse response, String seedId) {
+    EngineTestHarness.requireExecutedSearch(response);
+    if (response.getResultsList().stream().noneMatch(hit -> seedId.equals(hit.getId()))) {
+      throw new IllegalStateException("executed search did not retrieve seeded parent " + seedId);
+    }
+  }
 
   /**
    * Boots the Engine's index half through the {@link EngineRoot} test seam, so the test can read

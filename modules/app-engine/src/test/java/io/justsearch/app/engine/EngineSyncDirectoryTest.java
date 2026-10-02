@@ -148,6 +148,10 @@ final class EngineSyncDirectoryTest {
     assertTrue(
         harness.awaitSearchable("xyzorphan123", 30_000),
         "should find the orphan file before deletion");
+    assertFalse(
+        harness.awaitDocumentAbsent(
+            io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(orphanFile), 250),
+        "the independent index read must see the exact parent before prune");
 
     Files.delete(orphanFile);
     assertFalse(Files.exists(orphanFile), "file should be deleted from disk");
@@ -165,6 +169,10 @@ final class EngineSyncDirectoryTest {
     assertTrue(
         harness.awaitNotSearchable("xyzorphan123", 30_000),
         "orphan should not be searchable after prune");
+    assertTrue(
+        harness.awaitDocumentAbsent(
+            io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(orphanFile), 30_000),
+        "the exact orphan parent and all its chunks must be absent from the index");
   }
 
   @Test
@@ -182,6 +190,10 @@ final class EngineSyncDirectoryTest {
     assertTrue(harness.awaitIndexed(baseline + 1, 60_000), "the to-delete file should be indexed");
     assertTrue(
         harness.awaitSearchable("deleteme789", 30_000), "should find the file before operations");
+    assertFalse(
+        harness.awaitDocumentAbsent(
+            io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(toDelete), 250),
+        "the independent index read must see the exact parent before deletion");
 
     Path newFile = syncTestDir.resolve("brand-new.txt");
     Files.writeString(newFile, "Brand new file - keyword: brandnew456");
@@ -201,6 +213,10 @@ final class EngineSyncDirectoryTest {
     assertTrue(harness.awaitSearchable("brandnew456", 60_000), "new file should be searchable");
     assertTrue(
         harness.awaitNotSearchable("deleteme789", 30_000), "deleted file should not be searchable");
+    assertTrue(
+        harness.awaitDocumentAbsent(
+            io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(toDelete), 30_000),
+        "the deleted parent and all its chunks must be absent from the index");
   }
 
   // =========================================================================

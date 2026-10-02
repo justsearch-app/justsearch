@@ -84,6 +84,9 @@ final class EngineSwitchingFenceBufferingTest {
 
     String blueDocId = PathNormalizer.normalizeKey(blueFile);
     assertFalse(blueDocId.isBlank(), "the blue doc_id must normalize");
+    assertFalse(
+        engine.awaitDocumentAbsent(blueDocId, 250),
+        "the independent index read must see the exact Blue parent before DELETE");
 
     String activeBefore = engine.status().getMigration().getActiveGenerationId();
     assertFalse(activeBefore.isBlank(), "active_generation_id must be present");
@@ -154,6 +157,10 @@ final class EngineSwitchingFenceBufferingTest {
             + " switchBufferDepth=" + engine.status().getMigration().getSwitchBufferDepth()
             + " activeGenerationId=" + engine.status().getMigration().getActiveGenerationId());
 
+    assertTrue(
+        engine.awaitDocumentAbsent(blueDocId, 60_000),
+        "the replayed DELETE must remove the exact parent and all chunks from live Green");
+
     long drainDeadline = System.currentTimeMillis() + 60_000;
     while (System.currentTimeMillis() < drainDeadline
         && engine.status().getMigration().getSwitchBufferDepth() != 0L) {
@@ -168,6 +175,9 @@ final class EngineSwitchingFenceBufferingTest {
     assertTrue(engine.awaitSearchable(greenMarker, 60_000), "the replayed UPSERT must survive restart");
     assertTrue(engine.awaitSearchable(syncMarker, 60_000), "the replayed SYNC_ROOT must survive restart");
     assertTrue(engine.awaitNotSearchable(blueMarker, 60_000), "the replayed DELETE must survive restart");
+    assertTrue(
+        engine.awaitDocumentAbsent(blueDocId, 60_000),
+        "the deleted parent and all its chunks must remain absent after restart");
   }
 
   // =========================================================================
