@@ -68,6 +68,7 @@ import { startMessageCatalogs } from './i18n'
 import './shell-v0/index.ts'
 import { appLog } from './utils/logger.ts'
 import { authorizedFetch } from './shell-v0/api/authorizedFetch.ts'
+import { stopAiStateStore } from './shell-v0/state/aiStateStore.ts'
 
 // Global unhandled error capture — log-only, no UI notification
 window.addEventListener('unhandledrejection', (event) => {
@@ -119,7 +120,7 @@ async function bootstrap() {
   // Production boot: <jf-shell> directly. SurfaceCatalog booted up-front
   // so the rail has data on first paint.
   const { resolveBootWithRecovery, mountBootApplication } = await import('./boot/desktopRecovery.ts')
-  const resolvedApiBase = await resolveBootWithRecovery(document.getElementById('root'))
+  const resolvedApiBase = await resolveBootWithRecovery(document.getElementById('root'), stopAiStateStore)
   if (!resolvedApiBase) {
     appLog.error('Unable to resolve JustSearch backend API base')
     return

@@ -5,17 +5,27 @@ import type { EngineRecovery } from '../shell-v0/components/EngineRecovery.js';
 import { installBackendRestartBridge } from '../api/backendRestart.js';
 import { resolveBootApiBase } from './apiBase.js';
 
-const recoverySurfaces = new WeakMap<HTMLElement, EngineRecovery>();
+const recoverySurfaces = new WeakMap<HTMLElement, {
+  recovery: EngineRecovery;
+  teardown: () => void;
+}>();
 
 /** Keep terminal supervisor presentation authoritative while asynchronous shell boot finishes. */
 export function mountBootApplication(root: HTMLElement, application: HTMLElement): void {
-  const recovery = recoverySurfaces.get(root);
-  const presentation = recovery && isTerminal(recovery.supervisor) ? recovery : application;
+  const owner = recoverySurfaces.get(root);
+  let presentation = application;
+  if (owner && isTerminal(owner.recovery.supervisor)) {
+    owner.teardown();
+    presentation = owner.recovery;
+  }
   if (root.childNodes.length !== 1 || root.firstChild !== presentation) root.replaceChildren(presentation);
 }
 
 /** Resolve the API only after desktop recovery events can reach the boot surface. */
-export async function resolveBootWithRecovery(root: HTMLElement): Promise<string | null> {
+export async function resolveBootWithRecovery(
+  root: HTMLElement,
+  teardown: () => void = () => {},
+): Promise<string | null> {
   if (!isTauriRuntime()) {
     const base = await resolveBootApiBase();
     if (!base) {
@@ -30,13 +40,14 @@ export async function resolveBootWithRecovery(root: HTMLElement): Promise<string
 
   const { EngineRecovery } = await import('../shell-v0/components/EngineRecovery.js');
   const recovery = new EngineRecovery();
-  recoverySurfaces.set(root, recovery);
+  recoverySurfaces.set(root, { recovery, teardown });
   root.replaceChildren(recovery);
   let waitingForApi = false;
   await installSupervisorStateBridge((state) => {
     recovery.supervisor = state;
     if (isTerminal(state)) {
-      // This also disconnects the running Lit shell and tears down its subscriptions.
+      // Store-owned subscriptions outlive shell listeners, so release them explicitly.
+      teardown();
       if (recovery.parentElement !== root) root.replaceChildren(recovery);
       waitingForApi = true;
     }

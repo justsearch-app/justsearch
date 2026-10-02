@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   listen: vi.fn(),
   catalog: vi.fn(),
   endpoint: vi.fn(),
+  stopStore: vi.fn(),
 }));
 vi.mock('ses', () => ({}));
 vi.mock('../shell-v0/index.ts', () => ({}));
@@ -18,6 +19,13 @@ vi.mock('../api/http', () => ({ resolveApiEndpoint: mocks.endpoint, invalidateSe
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: mocks.listen }));
 vi.mock('../api/registry/SurfaceCatalogClient.ts', () => ({ bootSurfaceRegistry: mocks.catalog }));
+vi.mock('../shell-v0/state/aiStateStore.ts', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, stopAiStateStore: () => {
+    mocks.stopStore();
+    actual.stopAiStateStore();
+  } };
+});
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -51,4 +59,5 @@ it('the production entry point mounts recovery and does not boot API catalogs wi
   await recovery.updateComplete;
   expect(recovery.shadowRoot?.textContent).toContain('JustSearch could not restart');
   expect(mocks.catalog).not.toHaveBeenCalled();
+  expect(mocks.stopStore).toHaveBeenCalled();
 });

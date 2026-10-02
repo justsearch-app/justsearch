@@ -121,15 +121,74 @@ describe.each([
   });
 });
 
-it('coalesces immediate status refreshes with the current poll', async () => {
-  const pending = deferred<Response>();
-  mocks.send.mockReturnValue(pending.promise);
+it('queues one post-action status read and resolves refreshes only after it publishes', async () => {
+  const beforeAction = deferred<Response>();
+  const afterAction = deferred<Response>();
+  mocks.send.mockReturnValueOnce(beforeAction.promise).mockReturnValueOnce(afterAction.promise);
   const listener = vi.fn();
   subscribeStatus(listener);
   const first = refreshStatusNow();
   const second = refreshStatusNow();
+  let refreshed = false;
+  void first.then(() => { refreshed = true; });
   expect(mocks.send).toHaveBeenCalledTimes(1);
-  pending.resolve(new Response('{}'));
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(mocks.send).toHaveBeenCalledTimes(1);
+  beforeAction.resolve(new Response(JSON.stringify({ conversationProtection: { state: 'locked' } })));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(mocks.send).toHaveBeenCalledTimes(2);
+  expect(listener).toHaveBeenLastCalledWith({ conversationProtection: { state: 'locked' } });
+  expect(refreshed).toBe(false);
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(mocks.send).toHaveBeenCalledTimes(2);
+  afterAction.resolve(new Response(JSON.stringify({ conversationProtection: { state: 'unlocked' } })));
   await Promise.all([first, second]);
-  expect(listener).toHaveBeenCalledExactlyOnceWith({});
+  expect(listener).toHaveBeenCalledTimes(2);
+  expect(listener).toHaveBeenLastCalledWith({ conversationProtection: { state: 'unlocked' } });
+  expect(refreshed).toBe(true);
+});
+
+it('queues another fresh read for an action during the follow-up request', async () => {
+  const pending = Array.from({ length: 3 }, () => deferred<Response>());
+  for (const request of pending) mocks.send.mockReturnValueOnce(request.promise);
+  subscribeStatus(vi.fn());
+  const firstRefresh = refreshStatusNow();
+  pending[0]!.resolve(new Response('{}'));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(mocks.send).toHaveBeenCalledTimes(2);
+  const secondRefresh = refreshStatusNow();
+  let secondDone = false;
+  void secondRefresh.then(() => { secondDone = true; });
+  pending[1]!.resolve(new Response('{}'));
+  await firstRefresh;
+  await vi.advanceTimersByTimeAsync(0);
+  expect(mocks.send).toHaveBeenCalledTimes(3);
+  expect(secondDone).toBe(false);
+  pending[2]!.resolve(new Response('{}'));
+  await secondRefresh;
+  expect(secondDone).toBe(true);
+});
+
+it.each(['resubscribe', 'rebind'])('discards queued refreshes from the old lifecycle after %s', async (lifecycle) => {
+  const oldRequest = deferred<Response>();
+  const newRequest = deferred<Response>();
+  mocks.send.mockReturnValueOnce(oldRequest.promise).mockReturnValueOnce(newRequest.promise);
+  const unsubscribe = subscribeStatus(vi.fn());
+  const oldRefresh = refreshStatusNow();
+  const listener = vi.fn();
+  if (lifecycle === 'resubscribe') {
+    unsubscribe();
+    subscribeStatus(listener);
+  } else {
+    setStatusApiBase('http://replacement');
+    subscribeStatus(listener);
+  }
+  oldRequest.resolve(new Response('{}'));
+  await oldRefresh;
+  await vi.advanceTimersByTimeAsync(0);
+  expect(mocks.send).toHaveBeenCalledTimes(2);
+  expect(listener).not.toHaveBeenCalled();
+  newRequest.resolve(new Response(JSON.stringify({ uptimeMs: 456 })));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(listener).toHaveBeenCalledExactlyOnceWith({ uptimeMs: 456 });
 });
