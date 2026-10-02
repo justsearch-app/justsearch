@@ -276,6 +276,38 @@ public final class InferenceCompositionRoot {
             .gpu().arenaCapBytes();
   }
 
+  /** Both source owners retire during generation replacement; count only their realized sessions. */
+  static Long sourceGenerationReleasableBytes(EncoderSet index, QueryRoleSet query) {
+    Long indexBytes = index == null || index.isClosed() ? Long.valueOf(0L)
+        : sourceArenaCapBytes(index.surfaceForOwner());
+    Long queryBytes = query == null || query.isClosed() ? Long.valueOf(0L)
+        : sourceArenaCapBytes(query.surfaceForOwner());
+    if (indexBytes == null || queryBytes == null) return null;
+    return withCompositionHeadroom(Math.addExact(indexBytes, queryBytes));
+  }
+
+  private static Long sourceArenaCapBytes(InferenceSurface surface) {
+    Map<EncoderRole, SessionHandle> assemblies = new EnumMap<>(EncoderRole.class);
+    surface.embedding().ifPresent(a -> assemblies.put(EncoderRole.EMBEDDING, a.sessions()));
+    surface.ner().ifPresent(a -> assemblies.put(EncoderRole.NER, a.sessions()));
+    surface.bgeM3().ifPresent(a -> assemblies.put(EncoderRole.BGE_M3, a.sessions()));
+    surface.splade().ifPresent(a -> assemblies.put(EncoderRole.SPLADE, a.sessions()));
+    surface.reranker().ifPresent(a -> assemblies.put(EncoderRole.RERANKER, a.sessions()));
+    surface.citation().ifPresent(a -> assemblies.put(EncoderRole.CITATION, a.sessions()));
+    long arenaCapBytes = 0L;
+    for (SessionHandle handle : surface.handles()) {
+      if (!handle.isGpuAvailable()) continue;
+      EncoderRole role = assemblies.entrySet().stream()
+          .filter(entry -> entry.getValue() == handle).map(Map.Entry::getKey)
+          .findFirst().orElse(null);
+      ModelSessionPolicy policy = role == null || surface.policies() == null ? null
+          : surface.policies().models().get(role);
+      if (policy == null) return null;
+      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
+    }
+    return arenaCapBytes;
+  }
+
   private static long withCompositionHeadroom(long arenaCapBytes) {
     long headroomBytes = arenaCapBytes / 10L + (arenaCapBytes % 10L == 0L ? 0L : 1L);
     return Math.addExact(arenaCapBytes, headroomBytes);
@@ -825,8 +857,9 @@ public final class InferenceCompositionRoot {
               + " search disabled.");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
-      SessionHandle sessions =
+      sessions =
           composeCapturedHandle(
               EncoderRole.EMBEDDING.consumerName(),
               runtime,
@@ -834,14 +867,15 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
+      handles.add(sessions);
+      policies.put(EncoderRole.EMBEDDING, rolePlan.policy());
       EmbeddingAssembly assembly = OnnxEmbeddingEncoder.buildAssembly(sessions,
           rolePlan.metadataDirectory(), embedCfg.contextLength(),
           embedCfg.lateChunkingContextLength(), cfg.ai().capabilityContractStrict(),
           variant.modelFile());
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.EMBEDDING, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedIndexHandle(sessions, e);
       // Tempdoc 710 Wave 2 Move 1: widened from OrtException — ModelCapabilityResolver throws
       // IllegalStateException under justsearch.models.capability_contract_strict, and that must
       // degrade this lane to Optional.empty() the same way a session-creation failure does, not
@@ -872,17 +906,19 @@ public final class InferenceCompositionRoot {
       log.info("NER: no variant resolved; NER will be unavailable.");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
-      SessionHandle sessions =
+      sessions =
           composeCapturedHandle(EncoderRole.NER.consumerName(), runtime, rolePlan.policy(),
               variant, arbiter, events);
+      handles.add(sessions);
+      policies.put(EncoderRole.NER, rolePlan.policy());
       NerAssembly assembly = io.justsearch.indexerworker.ner.BertNerInference.buildAssembly(
           sessions, rolePlan.metadataDirectory(), nerCfg.maxSequenceLength(),
           cfg.ai().capabilityContractStrict(), variant.modelFile());
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.NER, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedIndexHandle(sessions, e);
       log.error("NER composition failed — NER will be unavailable", e);
       return Optional.empty();
     }
@@ -905,8 +941,9 @@ public final class InferenceCompositionRoot {
       log.warn("BGE-M3: no variant resolved; falling back to SPLADE");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
-      SessionHandle sessions =
+      sessions =
           composeCapturedHandle(
               EncoderRole.BGE_M3.consumerName(),
               runtime,
@@ -914,14 +951,15 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
+      handles.add(sessions);
+      policies.put(EncoderRole.BGE_M3, rolePlan.policy());
       BgeM3Config capturedConfig = new BgeM3Config(bgeCfg.enabled(),
           rolePlan.metadataDirectory(), bgeCfg.maxSequenceLength(), bgeCfg.gpuEnabled(),
           bgeCfg.gpuDeviceId(), bgeCfg.gpuMemLimitBytes());
       BgeM3Assembly assembly = BgeM3Encoder.buildAssembly(sessions, capturedConfig);
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.BGE_M3, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedIndexHandle(sessions, e);
       log.warn(
           "Failed to initialize BGE-M3 encoder, falling back to SPLADE: {}", e.getMessage());
       log.debug("Failed to initialize BGE-M3 encoder (stack trace)", e);
@@ -946,8 +984,9 @@ public final class InferenceCompositionRoot {
       log.info("SPLADE: no variant resolved; sparse retrieval disabled.");
       return Optional.empty();
     }
+    SessionHandle sessions = null;
     try {
-      SessionHandle sessions =
+      sessions =
           composeCapturedHandle(
               EncoderRole.SPLADE.consumerName(),
               runtime,
@@ -955,16 +994,17 @@ public final class InferenceCompositionRoot {
               variant,
               arbiter,
               events);
+      handles.add(sessions);
+      policies.put(EncoderRole.SPLADE, rolePlan.policy());
       SpladeConfig capturedConfig = new SpladeConfig(spladeCfg.enabled(),
           rolePlan.metadataDirectory(), spladeCfg.maxSequenceLength(), spladeCfg.gpuEnabled(),
           spladeCfg.gpuDeviceId(), spladeCfg.gpuMemLimitBytes(), spladeCfg.queryMode(),
           spladeCfg.activation());
       SpladeAssembly assembly = SpladeEncoder.buildAssembly(sessions, capturedConfig,
           variant.modelFile());
-      handles.add(assembly.sessions());
-      policies.put(EncoderRole.SPLADE, rolePlan.policy());
       return Optional.of(assembly);
     } catch (Exception e) {
+      retireFailedIndexHandle(sessions, e);
       log.warn("Failed to initialize SPLADE encoder (non-fatal): {}", e.getMessage());
       log.debug("Failed to initialize SPLADE encoder (stack trace)", e);
       return Optional.empty();
@@ -1151,6 +1191,16 @@ public final class InferenceCompositionRoot {
       Objects.requireNonNull(attemptedRole, "attemptedRole");
     }
 
+  }
+
+  private static void retireFailedIndexHandle(SessionHandle sessions, Exception cause) {
+    if (sessions == null) return;
+    try {
+      sessions.close();
+    } catch (RuntimeException closeFailure) {
+      cause.addSuppressed(closeFailure);
+    }
+    // The surface already owns the handle, including a refused close, for shutdown/recovery retry.
   }
 
   private static void retireFailedQueryHandle(SessionHandle sessions, Exception cause) {

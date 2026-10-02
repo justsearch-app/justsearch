@@ -4,9 +4,13 @@ package io.justsearch.ort;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -20,10 +24,137 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Focused semaphore-ownership tests using a mocked native ORT session boundary. */
 final class NativeSessionHandleGpuWaiterCancellationTest {
+
+  @Test
+  void gpuReleaseWaitsForCreationAndClosesPublishedSession() throws Exception {
+    OrtSession gpu = mock(OrtSession.class);
+    OrtSession cpu = mock(OrtSession.class);
+    NativeSessionHandle handle = gpuHandle(null);
+    set(handle, "gpuSessionAttempted", false);
+    set(handle, "gpuAvailable", false);
+    set(handle, "cpuSession", cpu);
+    CountDownLatch creating = new CountDownLatch(1);
+    CountDownLatch publish = new CountDownLatch(1);
+    CountDownLatch released = new CountDownLatch(1);
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    Thread creator = new Thread(() -> {
+      try (var cuda = mockStatic(OrtCudaHelper.class);
+          var options = mockConstruction(OrtSession.SessionOptions.class);
+          var provider = mockConstruction(ai.onnxruntime.providers.OrtCUDAProviderOptions.class);
+          var applier = mockStatic(SessionOptionsApplier.class);
+          var cache = mockStatic(OnnxSessionCache.class)) {
+        cuda.when(() -> OrtCudaHelper.checkMissingCudaRuntimeDlls(any()))
+            .thenReturn(java.util.List.of());
+        cache.when(() -> OnnxSessionCache.createCachedGpuSession(any(), any(), any()))
+            .thenAnswer(ignored -> {
+              creating.countDown();
+              assertTrue(publish.await(2, TimeUnit.SECONDS));
+              return gpu;
+            });
+        try (var lease = handle.acquire(request())) {
+          // Release may win the inference semaphore after creation publishes.
+          assertTrue(lease.session() == gpu || lease.session() == cpu);
+        }
+      } catch (Throwable thrown) {
+        failure.compareAndSet(null, thrown);
+      }
+    }, "native-gpu-creator-test");
+    Thread releaser = new Thread(() -> {
+      try {
+        handle.releaseGpu();
+      } catch (Throwable thrown) {
+        failure.compareAndSet(null, thrown);
+      } finally {
+        released.countDown();
+      }
+    }, "native-gpu-release-test");
+    try {
+      creator.start();
+      assertTrue(creating.await(2, TimeUnit.SECONDS), String.valueOf(failure.get()));
+      releaser.start();
+      awaitOwnerQueued(handle, releaser, released);
+      assertEquals(1L, released.getCount(), "handoff cannot finish before native publication");
+      verify(gpu, never()).close();
+      publish.countDown();
+      creator.join(2000);
+      releaser.join(2000);
+      assertFalse(creator.isAlive());
+      assertFalse(releaser.isAlive());
+      assertNull(failure.get());
+      assertFalse(handle.isGpuAvailable());
+      verify(gpu).close();
+    } finally {
+      publish.countDown();
+      creator.join(2000);
+      if (releaser.getState() != Thread.State.NEW) releaser.join(2000);
+      handle.close();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void creatorQueuedBeforeCompletedReleaseCannotRecreateGpu(boolean retry) throws Exception {
+    NativeSessionHandle handle = gpuHandle(null);
+    set(handle, "gpuAvailable", false);
+    set(handle, "gpuSessionAttempted", retry);
+    if (retry) set(handle, "gpuFailedAtMs", 1L);
+    set(handle, "cpuSession", mock(OrtSession.class));
+    ReentrantLock owner = ownerLock(handle);
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    CountDownLatch finished = new CountDownLatch(1);
+    Thread creator = new Thread(() -> {
+      try (var cuda = mockStatic(OrtCudaHelper.class)) {
+        try (var lease = handle.acquire(request())) {
+          assertTrue(lease.isCpu(), "the acquisition began before the handoff");
+        }
+        cuda.verifyNoInteractions();
+      } catch (Throwable thrown) {
+        failure.set(thrown);
+      } finally {
+        finished.countDown();
+      }
+    }, "native-gpu-stale-creator-test");
+    owner.lock();
+    try {
+      creator.start();
+      awaitOwnerQueued(handle, creator, finished);
+      handle.releaseGpu();
+    } finally {
+      owner.unlock();
+    }
+    try {
+      assertTrue(finished.await(2, TimeUnit.SECONDS));
+      assertNull(failure.get());
+      assertFalse(handle.isGpuAvailable());
+    } finally {
+      creator.join(2000);
+      handle.close();
+    }
+  }
+
+  private static ReentrantLock ownerLock(NativeSessionHandle handle) throws Exception {
+    Field field = NativeSessionHandle.class.getDeclaredField("gpuSessionLock");
+    field.setAccessible(true);
+    return (ReentrantLock) field.get(handle);
+  }
+
+  private static void awaitOwnerQueued(NativeSessionHandle handle, Thread thread,
+      CountDownLatch finished) throws Exception {
+    ReentrantLock lock = ownerLock(handle);
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+    while (!lock.hasQueuedThread(thread) && finished.getCount() != 0
+        && System.nanoTime() < deadline) {
+      Thread.sleep(1);
+    }
+    assertTrue(lock.hasQueuedThread(thread), "native action did not wait for GPU creation owner");
+  }
 
   @Test
   void interruptedWaiterExitsWithoutReleasingActiveGpuLease() throws Exception {
