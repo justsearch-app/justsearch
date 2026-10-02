@@ -100,6 +100,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
 
   /** The initial index start may outlive the API's bounded wait; it still owns its opening. */
   private volatile CompletableFuture<?> initialStartup;
+  private volatile long initialOwnerObservedAtNanos;
   private volatile boolean initialHandoverPending;
   private volatile EngineComponentRegistry componentRegistry;
   private volatile Map<String, ComponentRecoveryBinding> recoveryBindings;
@@ -113,6 +114,10 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   private Consumer<EngineComponentSnapshot.Component> onEscalation;
   private final AtomicBoolean escalationRequested = new AtomicBoolean();
   private final AtomicBoolean recoveryAttemptRunning = new AtomicBoolean();
+  // Slot retention is bounded independently of progress/deadline publications in the registry.
+  private volatile RecoveryOwner recoveryOwner;
+
+  private record RecoveryOwner(String component, long startedAtNanos) {}
 
   private static final class ComponentEpisode {
     int recoveredBaseline;
@@ -383,6 +388,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
 
   /** Arms a late handover without adding another timer or a second recovery authority. */
   public void observeInitialStartup(CompletableFuture<?> startup) {
+    this.initialOwnerObservedAtNanos = System.nanoTime();
     this.initialStartup = Objects.requireNonNull(startup, "startup");
     this.initialHandoverPending = true;
   }
@@ -428,10 +434,12 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   }
 
   private void tickComponents() {
+    if (escalationRequested.get()) return;
     for (var row : componentRegistry.snapshot().components()) {
       long deadline = row.spec().startDeadline().toNanos();
       if (deadline != 0 && row.state() == ComponentState.STARTING
-          && System.nanoTime() - row.stateSinceMonotonicNanos() >= deadline) {
+          && (System.nanoTime() - row.stateSinceMonotonicNanos() >= deadline
+              || retainedOwnerDeadlineExceeded(row, true))) {
         String awaited = row.evidence() == null ? "unknown startup resource" : row.evidence();
         var retention = LifecycleReasonCode.retentionClassOf(row.reasonCode());
         boolean causeHeld = retention == RetentionClass.FAULT
@@ -452,7 +460,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       }
     }
     emitPendingComponentOccurrences();
-    if (recoveryAttemptRunning.get()) return;
+    if (escalateRetainedFailures() || escalationRequested.get() || recoveryAttemptRunning.get()) return;
     var rows = componentRegistry.snapshot().components();
     int first = 0;
     for (int i = 0; i < rows.size(); i++) {
@@ -475,6 +483,58 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
             || recoveryAttemptRunning.get() || escalationRequested.get()) return;
       }
     }
+  }
+
+  /** An occupied physical slot prevents replacement, but cannot indefinitely prevent restart. */
+  private boolean retainedOwnerDeadlineExceeded(
+      EngineComponentSnapshot.Component row, boolean sameComponentOnly) {
+    long deadline = row.spec().startDeadline().toNanos();
+    if (deadline == 0) return false;
+    if ("index".equals(row.spec().name()) && initialOwnerPending()
+        && System.nanoTime() - initialOwnerObservedAtNanos >= deadline) return true;
+    var owner = recoveryOwner;
+    return owner != null && recoveryAttemptRunning.get()
+        && (!sameComponentOnly || owner.component().equals(row.spec().name()))
+        && System.nanoTime() - owner.startedAtNanos() >= deadline;
+  }
+
+  private boolean recoveryBudgetExhausted(
+      EngineComponentSnapshot.Component row, ComponentEpisode episode) {
+    int budget = Math.min(2, Math.min(row.spec().recoveryBudget(), recoveryPolicy.maxAttempts()));
+    return Math.max(0, row.recoveryAttempts() - episode.recoveredBaseline) >= budget;
+  }
+
+  /** Evaluate essential failures despite an occupied physical slot, without admitting replacement. */
+  private boolean escalateRetainedFailures() {
+    if (!recoveryAttemptRunning.get() && !initialOwnerPending()) return false;
+    for (var row : componentRegistry.snapshot().components()) {
+      if (!row.spec().essential() || !eligibleForComponentRecovery(row)) continue;
+      boolean exhausted;
+      synchronized (componentRecoveryLock) {
+        var episode = componentEpisodes.get(row.spec().name());
+        exhausted = recoveryBudgetExhausted(row, episode);
+      }
+      boolean retained = retainedOwnerDeadlineExceeded(row, false);
+      if (!exhausted && !retained && !immediateEscalation(row)) continue;
+      String reason = row.reasonCode();
+      String evidence = row.evidence();
+      if (exhausted
+          && !LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code().equals(reason)) {
+        reason = LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code();
+        evidence = "Component recovery attempt budget exhausted";
+      } else if (!exhausted && retained && !immediateEscalation(row)) {
+        var retention = LifecycleReasonCode.retentionClassOf(reason);
+        if (retention != RetentionClass.FAULT && retention != RetentionClass.STICKY) {
+          reason = LifecycleReasonCode.COMPONENT_START_DEADLINE.code();
+        }
+        evidence = "Physical owner retained beyond component start deadline; restart required";
+      }
+      var terminal = recoveryBindings.get(row.spec().name()).handle()
+          .tryTransitionIfUnchanged(row, ComponentState.FAILED, reason, evidence);
+      terminal.ifPresent(this::requestEscalation);
+      if (terminal.isPresent()) return true;
+    }
+    return false;
   }
 
   /** Listener delivery can run under a physical owner lock: update projections only. */
@@ -550,9 +610,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       boolean budgetExhausted;
       synchronized (componentRecoveryLock) {
         var episode = componentEpisodes.computeIfAbsent(name, ignored -> new ComponentEpisode());
-        int budget = Math.min(2, Math.min(row.spec().recoveryBudget(), recoveryPolicy.maxAttempts()));
         int attempts = Math.max(0, row.recoveryAttempts() - episode.recoveredBaseline);
-        budgetExhausted = attempts >= budget;
+        budgetExhausted = recoveryBudgetExhausted(row, episode);
         if (!budgetExhausted && !operatorRequested && immediateEscalation(row)) {
           if (row.spec().essential() && binding.handle().snapshot().equals(row)) escalation = row;
           return ComponentRecoveryAuthority.Outcome.EXHAUSTED;
@@ -575,6 +634,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
         return ComponentRecoveryAuthority.Outcome.EXHAUSTED;
       }
       if (binding.action() == null) return ComponentRecoveryAuthority.Outcome.OWNER_UNAVAILABLE;
+      recoveryOwner = new RecoveryOwner(name, System.nanoTime());
       recoveryExecutor.execute(() -> attemptComponentRecovery(binding, operatorRequested));
       handedOff = true;
       return ComponentRecoveryAuthority.Outcome.ACCEPTED;
@@ -592,13 +652,17 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       if (closed || recoveryExecutor.isShutdown()) return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
       throw refusal;
     } finally {
-      if (!handedOff) recoveryAttemptRunning.set(false);
+      if (!handedOff) {
+        recoveryOwner = null;
+        recoveryAttemptRunning.set(false);
+      }
       if (escalation != null) requestEscalation(escalation);
     }
   }
 
   private void requestEscalation(EngineComponentSnapshot.Component row) {
-    if (closed || !escalationRequested.compareAndSet(false, true)) return;
+    if (closed || !recoveryBindings.get(row.spec().name()).handle().snapshot().equals(row)) return;
+    if (!escalationRequested.compareAndSet(false, true)) return;
     try {
       onEscalation.accept(row);
     } catch (RuntimeException failure) {
@@ -655,7 +719,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       }
       @Override public boolean cancelled() { return closed; }
       @Override public boolean begin() {
-        if (closed || (!operatorRequested && immediateEscalation(expected))
+        if (closed || escalationRequested.get() || (!operatorRequested && immediateEscalation(expected))
             || !claimed.compareAndSet(false, true)) return false;
         var publication = handle.tryBeginRecovery(expected,
             LifecycleReasonCode.COMPONENT_RECOVERING.code(), "Recomposing the applied configuration");
@@ -678,12 +742,12 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
         return true;
       }
     };
-      if (closed || !eligibleForComponentRecovery(expected)
+      if (closed || escalationRequested.get() || !eligibleForComponentRecovery(expected)
           || ("index".equals(handle.spec().name()) && initialOwnerPending())) return;
       awaitGenerativeRecoveryBarrier(expected, operatorRequested);
       var result = binding.action().recover(request);
       var begun = admitted.get();
-      if (closed || begun == null) return;
+      if (closed || escalationRequested.get() || begun == null) return;
       var terminal = completed.get();
       if (terminal == null || !terminal.equals(result.observation())
           || !terminal.equals(handle.snapshot())) return;
@@ -702,6 +766,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       try {
         emitPendingComponentOccurrences();
       } finally {
+        recoveryOwner = null;
         recoveryAttemptRunning.set(false);
       }
     }

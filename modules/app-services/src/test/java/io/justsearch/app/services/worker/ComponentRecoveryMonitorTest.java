@@ -432,6 +432,196 @@ final class ComponentRecoveryMonitorTest {
   }
 
   @Test
+  void pendingInitialOwnerEscalatesAfterRetentionDeadlineWithoutReplacingOrCancellingIt()
+      throws Exception {
+    for (var state : new ComponentState[] {ComponentState.STARTING, ComponentState.FAILED}) {
+      try (var components = new TestEngineComponents()) {
+        var index = components.register(spec("index", true, Duration.ofMillis(1), 2));
+        index.transition(state, LifecycleReasonCode.INDEX_STARTING.code(), "initial open");
+        var startup = new CompletableFuture<Void>();
+        var escalations = new AtomicInteger();
+        try (var monitor = monitor(components, bootstrapWithoutClient())) {
+          monitor.componentRecoveryBindings(bindings(components, request -> {
+            throw new AssertionError("the stuck initial owner must never be replaced");
+          }), row -> {
+            assertEquals(ComponentState.FAILED, row.state());
+            escalations.incrementAndGet();
+          });
+          monitor.observeInitialStartup(startup);
+          Thread.sleep(5);
+
+          monitor.tick();
+          monitor.tick();
+
+          assertEquals(1, escalations.get());
+          assertEquals(0, index.snapshot().recoveryAttempts());
+          assertFalse(startup.isDone(), "escalation must retain the actual physical owner");
+          assertEquals(LifecycleReasonCode.COMPONENT_START_DEADLINE.code(),
+              index.snapshot().reasonCode());
+        }
+      }
+    }
+  }
+
+  @Test
+  void stuckAdmittedEssentialRecoveryEscalatesDespiteProgressAndRetainsItsSlot()
+      throws Exception {
+    try (var components = new TestEngineComponents()) {
+      var index = components.register(spec("index", true, Duration.ofMillis(1), 2));
+      index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(), "open failed");
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      var physicalCalls = new AtomicInteger();
+      var escalations = new AtomicInteger();
+      var actionFailure = new AtomicReference<Throwable>();
+      ComponentRecoveryAction action = request -> {
+        assertTrue(request.begin());
+        physicalCalls.incrementAndGet();
+        entered.countDown();
+        assertTrue(release.await(5, TimeUnit.SECONDS));
+        return failed(request, index, LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code(),
+            "owner eventually returned");
+      };
+      try (var monitor = monitor(components, bootstrapWithoutClient())) {
+        monitor.componentRecoveryBindings(bindings(components, observed(actionFailure, action)),
+            ignored -> escalations.incrementAndGet());
+        try {
+          assertEquals(ComponentRecoveryAuthority.Outcome.ACCEPTED,
+              monitor.requestComponentRecovery("index"));
+          assertTrue(entered.await(5, TimeUnit.SECONDS));
+          Thread.sleep(5);
+          // A physical progress publication starts a new state clock, but retains the same owner.
+          index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
+              "intermediate failure");
+          index.transition(ComponentState.STARTING, LifecycleReasonCode.COMPONENT_RECOVERING.code(),
+              "still opening");
+
+          monitor.tick();
+          monitor.tick();
+
+          assertEquals(1, escalations.get());
+          assertEquals(ComponentState.FAILED, index.snapshot().state());
+          assertEquals(1, index.snapshot().recoveryAttempts());
+          assertEquals(1, physicalCalls.get());
+          assertTrue(monitor.recoveryAttemptRunningForTest(),
+              "restart dispatch must not release or cancel a retained recovery owner");
+          assertEquals(ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE,
+              monitor.requestComponentRecovery("index"));
+        } finally {
+          release.countDown();
+          awaitIdle(monitor);
+        }
+        assertNoAsyncFailure(actionFailure);
+      }
+    }
+  }
+
+  @Test
+  void essentialFailuresEscalateWhileAnOptionalOwnerHoldsTheOnlySlot() throws Exception {
+    for (String failure : new String[] {"fatal", "exhausted", "blocked"}) {
+      try (var components = new TestEngineComponents()) {
+        var index = components.register(spec("index", true, Duration.ofMillis(1), 2));
+        var optional = components.register(spec("generative", false, Duration.ofMillis(1), 2));
+        optional.transition(ComponentState.FAILED, LifecycleReasonCode.INFERENCE_CRASHED.code(),
+            "optional owner lost");
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var physicalCalls = new AtomicInteger();
+        var escalations = new AtomicInteger();
+        var actionFailure = new AtomicReference<Throwable>();
+        ComponentRecoveryAction action = request -> {
+          assertEquals("generative", request.expected().spec().name());
+          assertTrue(request.begin());
+          physicalCalls.incrementAndGet();
+          entered.countDown();
+          assertTrue(release.await(5, TimeUnit.SECONDS));
+          return failed(request, optional, LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code(),
+              "optional owner eventually returned");
+        };
+        try (var monitor = monitor(components, bootstrapWithoutClient())) {
+          monitor.componentRecoveryBindings(bindings(components, observed(actionFailure, action)),
+              row -> {
+                assertEquals("index", row.spec().name());
+                escalations.incrementAndGet();
+              });
+          try {
+            assertEquals(ComponentRecoveryAuthority.Outcome.ACCEPTED,
+                monitor.requestComponentRecovery("generative"));
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            Thread.sleep(5);
+            monitor.tick();
+            assertEquals(0, escalations.get(), "a stuck optional owner alone cannot escalate");
+            assertTrue(monitor.recoveryAttemptRunningForTest());
+
+            index.transition(ComponentState.FAILED, "fatal".equals(failure)
+                ? LifecycleReasonCode.INDEX_CORRUPT.code() : LifecycleReasonCode.INDEX_FAILED.code(),
+                "essential owner lost");
+            if ("exhausted".equals(failure)) {
+              index.recordRecoveryAttempt("first physical attempt");
+              index.recordRecoveryAttempt("second physical attempt");
+            }
+            monitor.tick();
+            monitor.tick();
+
+            assertEquals(1, escalations.get(), failure);
+            assertTrue(monitor.recoveryAttemptRunningForTest());
+            assertEquals(1, physicalCalls.get());
+            assertEquals("exhausted".equals(failure) ? 2 : 0, index.snapshot().recoveryAttempts());
+            assertEquals("exhausted".equals(failure)
+                ? LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code()
+                : "fatal".equals(failure) ? LifecycleReasonCode.INDEX_CORRUPT.code()
+                    : LifecycleReasonCode.INDEX_FAILED.code(), index.snapshot().reasonCode());
+          } finally {
+            release.countDown();
+            awaitIdle(monitor);
+          }
+          assertNoAsyncFailure(actionFailure);
+        }
+      }
+    }
+  }
+
+  @Test
+  void retainedOwnerEscalationRetriesOnNextTickAndHonorsConcurrentReady() throws Exception {
+    for (boolean recoverDuringPublication : new boolean[] {false, true}) {
+      try (var components = new TestEngineComponents()) {
+        var index = components.register(spec("index", true, Duration.ofMillis(1), 2));
+        index.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_STARTING.code(),
+            "initial open timed out");
+        var startup = new CompletableFuture<Void>();
+        var escalations = new AtomicInteger();
+        try (var monitor = monitor(components, bootstrapWithoutClient())) {
+          monitor.componentRecoveryBindings(bindings(components, null), ignored -> {
+            if (escalations.incrementAndGet() == 1) {
+              throw new IllegalStateException("restart dispatch temporarily unavailable");
+            }
+          });
+          monitor.observeInitialStartup(startup);
+          components.subscribe(snapshot -> {
+            var row = snapshot.components().get(0);
+            if (recoverDuringPublication
+                && LifecycleReasonCode.COMPONENT_START_DEADLINE.code().equals(row.reasonCode())) {
+              index.transition(ComponentState.READY, null, "late physical open succeeded");
+            }
+          });
+          Thread.sleep(5);
+
+          monitor.tick();
+          assertEquals(recoverDuringPublication ? 0 : 1, escalations.get());
+          monitor.tick();
+          monitor.tick();
+
+          assertEquals(recoverDuringPublication ? 0 : 2, escalations.get());
+          assertEquals(recoverDuringPublication ? ComponentState.READY : ComponentState.FAILED,
+              index.snapshot().state());
+          assertFalse(startup.isDone());
+          assertEquals(0, index.snapshot().recoveryAttempts());
+        }
+      }
+    }
+  }
+
+  @Test
   void completedInitialFutureHandsOverLateClientExactlyOnce() {
     try (var components = new TestEngineComponents()) {
       var index = components.register(spec("index", true, Duration.ZERO, 2));
