@@ -28,8 +28,10 @@ import io.justsearch.app.api.mcp.McpContractVersions;
 import io.justsearch.app.observability.operations.PendingAuthorizationChangeRegistry;
 import io.justsearch.app.services.intent.PendingAuthorizationStore;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
+import io.justsearch.agent.tools.BrowseTool;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.ui.api.KnowledgeSearchController;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -69,6 +71,76 @@ class McpProtocolHandlerTest {
             "justsearch://resource/some-id")) {
           assertDownstreamAdmissionResponse(protocol, "resources/read", Map.of("uri", uri), reason);
         }
+      }
+    }
+  }
+
+  @Test
+  void realBrowseHandlerPreservesAdmissionRefusalsAcrossListingBranches() throws Exception {
+    Path root = Path.of(".").toAbsolutePath().normalize();
+    String parent = root.resolve("q13-browse").toString();
+    for (var reason : List.of(
+        io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
+        io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN)) {
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+      for (RuntimeException failure : List.of(
+          refusal, new java.util.concurrent.CompletionException(refusal),
+          new java.util.concurrent.CompletionException(
+              new java.util.concurrent.ExecutionException(refusal)))) {
+        for (String branch : List.of("files", "folders", "fallback")) {
+          var adapter = mock(KnowledgeHttpApiAdapter.class);
+          if (branch.equals("folders")) {
+            when(adapter.listFolders(any(), any(EngineContext.class))).thenThrow(failure);
+          } else {
+            when(adapter.listFolderFiles(any(), any(EngineContext.class))).thenThrow(failure);
+            if (branch.equals("fallback")) {
+              when(adapter.listFolders(any(), any(EngineContext.class))).thenReturn(
+                  new io.justsearch.app.api.knowledge.FolderBrowseResponse(List.of(), 0, false));
+            }
+          }
+          var browse = new BrowseTool(adapter::listFolders, adapter::listFolderFiles,
+              context -> List.of(new BrowseTool.RootInfo(root.toString(), "docs")));
+          when(dispatcher.dispatch(any(), anyString(), any(), any(EngineContext.class)))
+              .thenAnswer(invocation -> browse.execute(
+                  invocation.getArgument(1, String.class),
+                  invocation.getArgument(3, EngineContext.class)));
+          var surface = new McpToolSurface(List.of(new AgentToolsOperationCatalog()), dispatcher,
+              () -> null, () -> null, FIXED_CLOCK);
+          var protocol = new McpProtocolHandler(surface, List.of(), FIXED_CLOCK);
+          try {
+            assertDownstreamAdmissionResponse(protocol, "tools/call",
+                Map.of("name", "justsearch_browse", "arguments",
+                    Map.of("parent_path", parent, "list_files", branch.equals("files"))), reason);
+          } finally {
+            if (branch.equals("folders")) {
+              verify(adapter).listFolders(any(), any(EngineContext.class));
+            } else {
+              verify(adapter).listFolderFiles(any(), any(EngineContext.class));
+              if (branch.equals("fallback")) {
+                verify(adapter).listFolders(any(), any(EngineContext.class));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void directStatusPreservesDirectAndWrappedAdmissionRefusals() throws Exception {
+    for (var reason : List.of(
+        io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
+        io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN)) {
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+      for (RuntimeException failure : List.of(
+          refusal, new java.util.concurrent.CompletionException(refusal),
+          new java.util.concurrent.CompletionException(
+              new java.util.concurrent.ExecutionException(refusal)))) {
+        var adapter = mock(KnowledgeHttpApiAdapter.class);
+        when(adapter.status(any(EngineContext.class))).thenThrow(failure);
+        assertDownstreamAdmissionResponse(handlerOver(adapter), "tools/call",
+            Map.of("name", "justsearch_status", "arguments", Map.of()), reason);
+        verify(adapter).status(any(EngineContext.class));
       }
     }
   }
