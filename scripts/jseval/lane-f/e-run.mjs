@@ -239,8 +239,9 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
     });
 }
 
+const E1_QUALITY_NOISE_ABS = 0.01;
 const CLAUSES = {
-  E1: ['baseline-quality', 'SearchTrace-shape', 'workflow-evidence-citations-cancellation', 'allowed-differences'],
+  E1: ['baseline-quality', 'paired-quality', 'SearchTrace-shape', 'workflow-evidence-citations-cancellation', 'allowed-differences'],
   E2: ['indexing-window-valid', 'foreground-p95', 'agent-api-p95', 'idle-rejections', 'scripted-rejections', 'no-timeout-or-5xx'],
   E3: ['indexing-window-valid', 'stage-completion-rates-under-foreground-load', 'chunk-progress-under-foreground-load'],
   E4: ['no-timeout-or-5xx', 'component-commit-budget', 'launch-flag-compliance', 'machine-wide-commit-vs-main', 'working-set', 'live-after-GC-trend',
@@ -470,8 +471,10 @@ export function tableVerdicts(records, values) {
     // it is compared against (2026-10-01: main timed out a chat stream and its searches after the
     // scripted window); they are reported in the reason, not counted as a failed comparison.
     const branchOnly = BRANCH_ONLY_CLAUSES.has(clause);
-    const checks = branchOnly ? [arms[1]?.clauses?.[clause], arms[0] ? true : undefined]
-      : arms.map(r => r?.clauses?.[clause]);
+    // Paired quality is computed from both measured metrics, never per-arm pass booleans.
+    const checks = group === 'E1' && clause === 'paired-quality' ? arms.map(r => r ? true : undefined)
+      : branchOnly ? [arms[1]?.clauses?.[clause], arms[0] ? true : undefined]
+        : arms.map(r => r?.clauses?.[clause]);
     if (evaluate && arms.every(Boolean)) checks.push(evaluate(arms[1], arms[0]));
     if (arms[1]?.failure || arms[0]?.failure && !branchOnly && !['E2', 'E3'].includes(group)) checks.push(false);
     if (arms.every(Boolean)) {
@@ -495,10 +498,16 @@ export function tableVerdicts(records, values) {
       reason: [...(projectionMismatch ? ['Projection identity mismatch: reproject both arms with the current scorer before comparing'] : []),
         ...(clause === 'no-timeout-or-5xx' && arms[0] ? [`main baseline outcomes ${JSON.stringify(arms[0].metrics?.wireOutcomesByWorkload ?? arms[0].metrics?.wireOutcomes)}`] : []),
         ...(clause === 'zero-crashes' && arms[0] ? [`main baseline crashes ${JSON.stringify(arms[0].metrics?.crashesByWindow ?? arms[0].metrics?.crashEvidence?.events)}`] : []),
+        ...(group === 'E1' && clause === 'paired-quality' ? [arms.every(r => finite(r?.metrics?.scifactHybridNdcg10))
+          ? `hybrid beir/scifact nDCG@10: branch ${arms[1].metrics.scifactHybridNdcg10} >= MAIN ${arms[0].metrics.scifactHybridNdcg10} - ${E1_QUALITY_NOISE_ABS}`
+          : 'Missing hybrid beir/scifact nDCG@10 for MAIN or branch'] : []),
         ...arms.map(r => r?.gaps?.[clause]).filter(Boolean)].join('; ') || 'paired clause and frozen values' });
   };
   for (const [group, clauses] of Object.entries(CLAUSES)) for (const clause of clauses) {
     let evaluate;
+    if (group === 'E1' && clause === 'paired-quality') evaluate = (b, m) =>
+      finite(b.metrics?.scifactHybridNdcg10) && finite(m.metrics?.scifactHybridNdcg10)
+        ? b.metrics.scifactHybridNdcg10 >= m.metrics.scifactHybridNdcg10 - E1_QUALITY_NOISE_ABS : undefined;
     if (group === 'E2' && clause === 'foreground-p95') evaluate = b => {
       if (values.foregroundSearchP95Ceiling.ceilingByWorkload) {
         const checks = ['agent-idle', 'scripted-agent'].flatMap(w => ['hybrid', 'lexical'].map(m => {
@@ -671,7 +680,16 @@ export function collect(context) {
   if (r.groups.includes('E1')) {
     r.clauses['baseline-quality'] = undefined;
     const gate = path.join(context.raw, 'relevance-gate.json');
-    if (fs.existsSync(gate)) r.clauses['baseline-quality'] = qualityGateVerdict(read(gate));
+    delete r.metrics.scifactHybridNdcg10;
+    if (fs.existsSync(gate)) {
+      const report = read(gate);
+      r.clauses['baseline-quality'] = qualityGateVerdict(report);
+      if (report.dataset === 'beir/scifact' && report.mode === 'hybrid' && finite(report.current))
+        r.metrics.scifactHybridNdcg10 = report.current;
+    }
+    r.clauses['paired-quality'] = undefined;
+    if (finite(r.metrics.scifactHybridNdcg10)) r.gaps['paired-quality'] = 'Paired quality must be recomputed by table from both retained metrics';
+    else r.gaps['paired-quality'] = 'Missing hybrid beir/scifact nDCG@10 in raw relevance-gate.json';
     const fixtures = filesUnder(path.join(context.raw, 'fixture')).filter(f => /^capture-\d+\.json$/.test(path.basename(f))).map(read);
     r.clauses['SearchTrace-shape'] = fixtures.length === context.values.noisePairGate.capturesPerSide
       ? fixtures.every(c => Object.values(c.queries ?? {}).length > 0 && Object.values(c.queries).every(q =>
