@@ -336,6 +336,34 @@ impl EngineHost {
         !inner.closing && !inner.replacement_held
     }
 
+    /// Production startup wait. Cancellation leaves shutdown ownership with the host/updater.
+    pub(crate) fn await_ready(
+        &self,
+        deadline_ms: u64,
+        mut monotonic_ms: impl FnMut() -> u64,
+        mut responds: impl FnMut(u16) -> bool,
+    ) -> Result<supervisor::Ready, String> {
+        loop {
+            if !self.should_continue() {
+                return Err("supervision cancelled while awaiting startup".into());
+            }
+            if self.has_spawn_error() {
+                return Err("the incarnation reported a spawn error".into());
+            }
+            if let Some(binding) = self.observe_current_binding(&mut responds) {
+                return Ok(supervisor::Ready {
+                    pid: self.child_pid(),
+                    api_port: binding.port,
+                    instance_id: binding.instance_id,
+                });
+            }
+            if monotonic_ms() >= deadline_ms {
+                return Err("the incarnation did not publish a port and answer in time".into());
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+
     /// Own exactly one supervision loop. Replacement waits for this loop to end before proceeding.
     pub(crate) fn start_supervisor(&self, run: impl FnOnce() + Send + 'static) -> Result<(), String> {
         self.install_supervisor(run, || {})
@@ -769,6 +797,94 @@ mod tests {
         host.begin_close();
     }
 
+    struct StartupWaitActuator {
+        host: Arc<EngineHost>,
+        clock_origin: Instant,
+        entered: Option<std::sync::mpsc::Sender<()>>,
+        restart_first: bool,
+        shutdown_actions: Arc<AtomicUsize>,
+    }
+
+    impl supervisor::Actuator for StartupWaitActuator {
+        fn spawn_engine(&mut self) -> Result<u32, String> {
+            self.host.reset_for_successor()?;
+            self.host.admit(sleeper()).map(|child| child.pid)
+        }
+        fn await_ready(&mut self, deadline_ms: u64) -> Result<supervisor::Ready, String> {
+            self.host.await_ready(deadline_ms, || {
+                if let Some(entered) = self.entered.take() {
+                    entered.send(()).unwrap();
+                }
+                self.clock_origin.elapsed().as_millis() as u64
+            }, |_| panic!("an unbound Engine has no port to probe"))
+        }
+        fn poll_exit(&mut self) -> Option<i32> {
+            if self.restart_first {
+                self.restart_first = false;
+                self.host.kill_and_reap();
+                Some(1)
+            } else {
+                self.host.try_reap()
+            }
+        }
+        fn probe_health(&mut self) -> bool { panic!("still starting") }
+        fn probe_essential_ready(&mut self) -> Option<crate::engine_probe::ReadyEpoch> {
+            panic!("still starting")
+        }
+        fn observed_shutdown_reason(&mut self, _current: &supervisor::Ready) -> Option<String> {
+            None
+        }
+        fn write_shutdown_request(&mut self, _reason: &str, _deadline: u64) -> Result<(), String> {
+            self.shutdown_actions.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+        fn force_kill(&mut self) { self.shutdown_actions.fetch_add(1, Ordering::SeqCst); }
+        fn wait_for_handle_release(&mut self) -> bool { true }
+        fn sleep(&mut self, ms: u64) { thread::sleep(Duration::from_millis(ms)); }
+        fn monotonic_ms(&mut self) -> u64 { self.clock_origin.elapsed().as_millis() as u64 }
+        fn publish_state(&mut self, _record: &StateRecord) {}
+        fn should_continue(&mut self) -> bool { self.host.should_continue() }
+    }
+
+    #[test]
+    fn replacement_hold_cancels_production_startup_wait_without_shutdown_work() {
+        for restart_first in [false, true] {
+            let host = Arc::new(EngineHost::default());
+            host.admit(sleeper()).unwrap();
+            if restart_first {
+                host.record_spawn_error("initial incarnation failed".into());
+            }
+            let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+            let (outcome_tx, outcome_rx) = std::sync::mpsc::channel();
+            let shutdown_actions = Arc::new(AtomicUsize::new(0));
+            let mut actuator = StartupWaitActuator {
+                host: host.clone(), clock_origin: Instant::now(), entered: Some(entered_tx),
+                restart_first, shutdown_actions: shutdown_actions.clone(),
+            };
+            host.start_supervisor(move || {
+                let mut policy = supervisor::load_policy();
+                policy.cooldown_increment_ms = 0;
+                policy.max_cooldown_ms = 0;
+                let mut supervisor = supervisor::Supervisor::new(policy);
+                outcome_tx.send(supervisor::run_supervision(&mut supervisor, &mut actuator)).unwrap();
+            }).unwrap();
+            entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            // Use a bound far below the product's 120-second startup deadline.
+            let held = host.acquire_replacement_hold(Duration::from_secs(2));
+            let outcome = outcome_rx.recv_timeout(Duration::from_millis(100));
+            let child_alive = host.child_pid().is_some() && host.try_reap().is_none();
+            // Cleanup even when the hold fails, so the negative control leaves no live child.
+            host.kill_and_reap();
+            host.record_spawn_error("test cleanup".into());
+            assert!(held.is_ok(), "{held:?}");
+            assert!(matches!(outcome.unwrap(), supervisor::Outcome::Cancelled));
+            assert!(child_alive, "only the updater may stop the child after cancellation");
+            assert_eq!(shutdown_actions.load(Ordering::SeqCst), 0);
+            host.release_replacement_hold().unwrap();
+            host.acquire_replacement_hold(Duration::from_secs(2)).unwrap();
+        }
+    }
+
     #[test]
     fn admitted_child_is_visible_to_close_and_reaped() {
         let host = Arc::new(EngineHost::default());
@@ -957,7 +1073,7 @@ mod tests {
         fn sleep(&mut self, ms: u64) {
             self.now += ms;
         }
-        fn now_ms(&mut self) -> u64 {
+        fn monotonic_ms(&mut self) -> u64 {
             self.now
         }
         fn publish_state(&mut self, record: &StateRecord) {
@@ -1031,7 +1147,7 @@ mod tests {
             self.now += ms;
         }
 
-        fn now_ms(&mut self) -> u64 {
+        fn monotonic_ms(&mut self) -> u64 {
             self.now
         }
 

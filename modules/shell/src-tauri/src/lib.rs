@@ -1094,6 +1094,7 @@ struct ShellActuator {
     app: tauri::AppHandle,
     state: Arc<BackendState>,
     data_dir: PathBuf,
+    clock_origin: std::time::Instant,
 }
 
 impl ShellActuator {
@@ -1143,24 +1144,13 @@ impl supervisor::Actuator for ShellActuator {
     }
 
     fn await_ready(&mut self, deadline_ms: u64) -> Result<supervisor::Ready, String> {
-        loop {
-            if self.state.has_spawn_error() {
-                return Err("the incarnation reported a spawn error".into());
-            }
-            if let Some(binding) = self.state.host.observe_current_binding(|port| {
+        self.state.host.await_ready(
+            deadline_ms,
+            || self.clock_origin.elapsed().as_millis() as u64,
+            |port| {
                 engine_probe::responds(port, "/api/health", Duration::from_millis(800))
-            }) {
-                return Ok(supervisor::Ready {
-                    pid: self.state.child_pid(),
-                    api_port: binding.port,
-                    instance_id: binding.instance_id,
-                });
-            }
-            if self.now_ms() >= deadline_ms {
-                return Err("the incarnation did not publish a port and answer in time".into());
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
+            },
+        )
     }
 
     fn poll_exit(&mut self) -> Option<i32> {
@@ -1251,11 +1241,8 @@ impl supervisor::Actuator for ShellActuator {
         }
     }
 
-    fn now_ms(&mut self) -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0)
+    fn monotonic_ms(&mut self) -> u64 {
+        self.clock_origin.elapsed().as_millis() as u64
     }
 
     fn publish_state(&mut self, record: &supervisor::StateRecord) {
@@ -1287,7 +1274,9 @@ pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>
         return Err("supervisor: no app data dir; the Engine will not be supervised".into());
     };
     let host = state.host.clone();
-    let mut actuator = ShellActuator { app: app.clone(), state, data_dir };
+    let mut actuator = ShellActuator {
+        app: app.clone(), state, data_dir, clock_origin: std::time::Instant::now(),
+    };
     host.start_supervisor(move || {
         let policy = supervisor::load_policy();
         let mut sup = supervisor::Supervisor::new(policy);

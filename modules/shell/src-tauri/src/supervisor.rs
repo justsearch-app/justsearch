@@ -511,7 +511,7 @@ pub enum Outcome {
     Stopped { reason: String, exit_code: i32 },
     /// design 7.1's terminal state.
     Exhausted { reason: String, exit_code: i32 },
-    /// The actuator asked to stop supervising (the shell is quitting).
+    /// The actuator asked to stop supervising (the shell is quitting or replacing the Engine).
     Cancelled,
 }
 
@@ -524,7 +524,7 @@ pub enum Outcome {
 pub trait Actuator {
     /// Start the next incarnation. Returns its pid.
     fn spawn_engine(&mut self) -> Result<u32, String>;
-    /// Wait until this incarnation publishes a port and answers, or the deadline elapses.
+    /// Wait until this incarnation answers, the monotonic deadline elapses, or the host cancels.
     fn await_ready(&mut self, deadline_ms: u64) -> Result<Ready, String>;
     /// The child's exit code, or `None` while it is alive.
     fn poll_exit(&mut self) -> Option<i32>;
@@ -546,10 +546,18 @@ pub trait Actuator {
     fn wait_for_handle_release(&mut self) -> bool;
     /// The linear step above the floor.
     fn sleep(&mut self, ms: u64);
-    fn now_ms(&mut self) -> u64;
+    /// Host monotonic clock for every elapsed-time decision and enforcement deadline.
+    fn monotonic_ms(&mut self) -> u64;
+    /// Wall-clock timestamp for display and IPC only; never used for elapsed-time decisions.
+    fn epoch_ms(&mut self) -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
+    }
     /// Publish a transition where a reader outside this process can see it.
     fn publish_state(&mut self, record: &StateRecord);
-    /// False when the host is shutting down; the loop returns [`Outcome::Cancelled`].
+    /// False when the host is closing or held for replacement; returns [`Outcome::Cancelled`].
     fn should_continue(&mut self) -> bool {
         true
     }
@@ -564,6 +572,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
 
     let mut ready_at: Option<u64> = None;
     let mut ready_epoch = None;
+    // Host enforcement uses a monotonic fence; shutdown-request IPC carries a separate epoch.
     let mut request_deadline: Option<u64> = None;
     let mut next_health_poll: u64 = 0;
     let mut current = Ready::default();
@@ -576,7 +585,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
 
     macro_rules! publish {
         ($reason:expr) => {{
-            let now = actuator.now_ms();
+            let now = actuator.epoch_ms();
             let record = supervisor.record(
                 current.pid,
                 current.api_port,
@@ -591,14 +600,18 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
     // The first incarnation: `lib.rs` has already spawned it (the shell spawns the Engine at setup),
     // so `await_ready` is the entry point rather than `spawn_engine`.
     publish!(None);
-    let start_deadline = actuator.now_ms() + supervisor.policy.start_deadline_ms;
-    match actuator.await_ready(start_deadline) {
+    let start_deadline = actuator.monotonic_ms() + supervisor.policy.start_deadline_ms;
+    let startup = actuator.await_ready(start_deadline);
+    if !actuator.should_continue() {
+        return Outcome::Cancelled;
+    }
+    match startup {
         Ok(ready) => {
             current = ready;
             supervisor.observe(Event::Ready, None);
             ready_at = None;
             ready_epoch = None;
-            next_health_poll = actuator.now_ms() + supervisor.policy.hang_poll_interval_ms;
+            next_health_poll = actuator.monotonic_ms() + supervisor.policy.hang_poll_interval_ms;
             publish!(None);
         }
         Err(_) => {
@@ -607,8 +620,9 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 let decision = supervisor.observe(Event::StartDeadlineElapsed, None);
                 if decision.action == Action::RequestShutdown {
                     let reason = decision.reason.clone().unwrap_or_else(|| "hang".into());
-                    let deadline = actuator.now_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                    let _ = actuator.write_shutdown_request(&reason, deadline);
+                    let deadline = actuator.monotonic_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                    let epoch_deadline = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                    let _ = actuator.write_shutdown_request(&reason, epoch_deadline);
                     request_deadline = Some(deadline);
                     publish!(Some(reason));
                 }
@@ -664,8 +678,12 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                             };
                         }
                     }
-                    let deadline = actuator.now_ms() + supervisor.policy.start_deadline_ms;
-                    match actuator.await_ready(deadline) {
+                    let deadline = actuator.monotonic_ms() + supervisor.policy.start_deadline_ms;
+                    let startup = actuator.await_ready(deadline);
+                    if !actuator.should_continue() {
+                        return Outcome::Cancelled;
+                    }
+                    match startup {
                         Ok(ready) => {
                             let pid = current.pid;
                             current = ready;
@@ -676,7 +694,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                             ready_at = None;
                             ready_epoch = None;
                             next_health_poll =
-                                actuator.now_ms() + supervisor.policy.hang_poll_interval_ms;
+                                actuator.monotonic_ms() + supervisor.policy.hang_poll_interval_ms;
                             publish!(None);
                         }
                         Err(_) => {
@@ -694,8 +712,9 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                             if d.action == Action::RequestShutdown {
                                 let r = d.reason.clone().unwrap_or_else(|| "hang".into());
                                 let dl =
-                                    actuator.now_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                                let _ = actuator.write_shutdown_request(&r, dl);
+                                    actuator.monotonic_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                                let epoch_deadline = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                                let _ = actuator.write_shutdown_request(&r, epoch_deadline);
                                 request_deadline = Some(dl);
                                 publish!(Some(r));
                             }
@@ -707,7 +726,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
             continue;
         }
 
-        let now = actuator.now_ms();
+        let now = actuator.monotonic_ms();
 
         if let Some(deadline) = request_deadline {
             if now >= deadline {
@@ -732,7 +751,8 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 supervisor.state = State::Stopping;
                 let deadline = now + supervisor.policy.graceful_stop_deadline_ms;
                 request_deadline = Some(deadline);
-                let _ = actuator.write_shutdown_request(&reason, deadline);
+                let epoch_deadline = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                let _ = actuator.write_shutdown_request(&reason, epoch_deadline);
                 publish!(Some(reason));
             } else if let Some(reason) = actuator.observed_shutdown_reason(&current) {
                 // Stopping is the latch: later writes, deletion, or changedAt refresh cannot
@@ -749,7 +769,7 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                 if actuator.probe_health() {
                     supervisor.consecutive_misses = 0;
                     if let Some(epoch) = actuator.probe_essential_ready() {
-                        let observed_at = actuator.now_ms();
+                        let observed_at = actuator.monotonic_ms();
                         if ready_epoch.as_ref() != Some(&epoch) {
                             ready_epoch = Some(epoch);
                             ready_at = Some(observed_at);
@@ -773,8 +793,9 @@ pub fn run_supervision<A: Actuator>(supervisor: &mut Supervisor, actuator: &mut 
                     if decision.action == Action::RequestShutdown {
                         let reason = decision.reason.clone().unwrap_or_else(|| "hang".into());
                         let deadline =
-                            actuator.now_ms() + supervisor.policy.graceful_stop_deadline_ms;
-                        let _ = actuator.write_shutdown_request(&reason, deadline);
+                            actuator.monotonic_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                        let epoch_deadline = actuator.epoch_ms() + supervisor.policy.graceful_stop_deadline_ms;
+                        let _ = actuator.write_shutdown_request(&reason, epoch_deadline);
                         request_deadline = Some(deadline);
                         publish!(Some(reason));
                     }
@@ -952,6 +973,138 @@ pub fn conformance_cases() -> Vec<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum ClockScenario { Stability, HostStop, LocalStop, HangStop, StartupTimeout }
+
+    struct ClockJumpActuator {
+        now: u64,
+        jump_ms: i64,
+        scenario: ClockScenario,
+        exit_pending: bool,
+        host_request_sent: bool,
+        spent_restart: bool,
+        reset_at: Option<u64>,
+        killed_at: Option<u64>,
+        requests: Vec<(u64, u64)>,
+        records: Vec<(u64, StateRecord)>,
+    }
+
+    impl ClockJumpActuator {
+        fn new(scenario: ClockScenario, jump_ms: i64) -> Self {
+            Self {
+                now: 0, jump_ms, scenario, exit_pending: scenario == ClockScenario::Stability,
+                host_request_sent: false, spent_restart: false, reset_at: None, killed_at: None,
+                requests: Vec::new(), records: Vec::new(),
+            }
+        }
+
+        fn wall_at(&self, now: u64) -> u64 {
+            (1_700_000_000_000_i64 + now as i64 + if now >= 100 { self.jump_ms } else { 0 }) as u64
+        }
+    }
+
+    impl Actuator for ClockJumpActuator {
+        fn spawn_engine(&mut self) -> Result<u32, String> { Ok(43) }
+        fn await_ready(&mut self, deadline_ms: u64) -> Result<Ready, String> {
+            assert_eq!(deadline_ms, self.now + 200, "startup receives a monotonic deadline");
+            if self.scenario == ClockScenario::StartupTimeout {
+                while self.now < deadline_ms { self.sleep(50); }
+                return Err("alive but unbound".into());
+            }
+            Ok(Ready { pid: Some(43), api_port: Some(9000), instance_id: Some("boot".into()) })
+        }
+        fn poll_exit(&mut self) -> Option<i32> {
+            self.exit_pending.then(|| { self.exit_pending = false; 1 })
+        }
+        fn probe_health(&mut self) -> bool { self.scenario != ClockScenario::HangStop }
+        fn probe_essential_ready(&mut self) -> Option<crate::engine_probe::ReadyEpoch> {
+            crate::engine_probe::ReadyEpoch::parse("2026-09-21T12:00:00Z")
+        }
+        fn observed_shutdown_reason(&mut self, _current: &Ready) -> Option<String> {
+            (self.scenario == ClockScenario::LocalStop).then(|| "restart".into())
+        }
+        fn take_host_request(&mut self) -> Option<String> {
+            if self.scenario == ClockScenario::HostStop && !self.host_request_sent {
+                self.host_request_sent = true;
+                Some("quit".into())
+            } else { None }
+        }
+        fn write_shutdown_request(&mut self, _reason: &str, deadline_epoch_ms: u64) -> Result<(), String> {
+            self.requests.push((self.now, deadline_epoch_ms));
+            Ok(())
+        }
+        fn force_kill(&mut self) { self.killed_at = Some(self.now); }
+        fn wait_for_handle_release(&mut self) -> bool { true }
+        fn sleep(&mut self, ms: u64) { self.now += ms; }
+        fn monotonic_ms(&mut self) -> u64 { self.now }
+        fn epoch_ms(&mut self) -> u64 { self.wall_at(self.now) }
+        fn publish_state(&mut self, record: &StateRecord) {
+            if record.restart_count > 0 { self.spent_restart = true; }
+            if self.spent_restart && record.restart_count == 0 {
+                self.reset_at = Some(self.now);
+            }
+            self.records.push((self.now, record.clone()));
+        }
+        fn should_continue(&mut self) -> bool {
+            self.reset_at.is_none() && self.killed_at.is_none() && self.now <= 1000
+        }
+    }
+
+    fn run_clock_jump(scenario: ClockScenario, jump_ms: i64) -> ClockJumpActuator {
+        let mut policy = load_policy();
+        policy.cooldown_increment_ms = 0;
+        policy.max_cooldown_ms = 0;
+        policy.start_deadline_ms = 200;
+        policy.graceful_stop_deadline_ms = 200;
+        policy.hang_poll_interval_ms = 50;
+        policy.hang_unhealthy_threshold = 1;
+        policy.stability_window_ms = 300;
+        let mut supervisor = Supervisor::new(policy);
+        let mut actuator = ClockJumpActuator::new(scenario, jump_ms);
+        assert!(matches!(run_supervision(&mut supervisor, &mut actuator), Outcome::Cancelled));
+        for (at, record) in &actuator.records {
+            assert_eq!(record.updated_at, epoch_ms_to_iso(actuator.wall_at(*at)),
+                "display timestamps remain wall-clock values");
+        }
+        for (at, deadline) in &actuator.requests {
+            assert_eq!(*deadline, actuator.wall_at(*at) + 200,
+                "deadlineEpochMs remains a wall-clock IPC value");
+        }
+        actuator
+    }
+
+    #[test]
+    fn wall_clock_jumps_do_not_change_the_continuous_ready_budget_window() {
+        for jump_ms in [600_000, -600_000] {
+            let actuator = run_clock_jump(ClockScenario::Stability, jump_ms);
+            assert!(actuator.spent_restart);
+            assert_eq!(actuator.reset_at, Some(350), "first READY at 50 plus 300 ms: {jump_ms}");
+            assert!(actuator.requests.is_empty());
+        }
+    }
+
+    #[test]
+    fn wall_clock_jumps_do_not_change_latched_shutdown_enforcement() {
+        for jump_ms in [600_000, -600_000] {
+            for (scenario, kill_at) in [(ClockScenario::HostStop, 200),
+                (ClockScenario::LocalStop, 200), (ClockScenario::HangStop, 250)] {
+                let actuator = run_clock_jump(scenario, jump_ms);
+                assert_eq!(actuator.killed_at, Some(kill_at), "{scenario:?}: {jump_ms}");
+                assert_eq!(actuator.requests.len(), usize::from(scenario != ClockScenario::LocalStop));
+            }
+        }
+    }
+
+    #[test]
+    fn wall_clock_jumps_do_not_change_startup_and_following_stop_deadlines() {
+        for jump_ms in [600_000, -600_000] {
+            let actuator = run_clock_jump(ClockScenario::StartupTimeout, jump_ms);
+            assert_eq!(actuator.requests.len(), 1);
+            assert_eq!(actuator.requests[0].0, 200, "startup deadline: {jump_ms}");
+            assert_eq!(actuator.killed_at, Some(400), "startup then graceful-stop deadline: {jump_ms}");
+        }
+    }
 
     #[test]
     fn handoff_requires_current_identity_and_a_known_state_and_reason() {
