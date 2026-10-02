@@ -193,8 +193,11 @@ final class EngineRootRetirementTest {
         assertBlocked(removalThread, removal);
         assertFalse(fixture.roots().watchedPaths().isEmpty());
         release.countDown();
-        assertEquals(110, removal.get(5, TimeUnit.SECONDS).intValue());
-        assertTrue(admissions.get() > 0, "the timed-out producer really resumes and admits files");
+        // S6 (ee0f0806b) checks cancellation before draining the reconciliation spool. The
+        // paced walk admits nothing after expiry; force mode already entered queue admission.
+        assertEquals(force ? 110 : 0, removal.get(5, TimeUnit.SECONDS).intValue());
+        assertEquals(force ? 1 : 0, admissions.get(),
+            "only a queue admission already entered before expiry may complete");
         assertRemoved(fixture);
       } finally {
         release.countDown();

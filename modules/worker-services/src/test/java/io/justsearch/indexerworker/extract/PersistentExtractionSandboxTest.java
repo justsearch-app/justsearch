@@ -360,9 +360,10 @@ final class PersistentExtractionSandboxTest {
           @Override public void register(ManagedChild child) { owned.add(child); }
           @Override public void remove(String childId) { owned.removeIf(c -> c.id().equals(childId)); }
         };
+    List<String> declaredArgv = javaCommand(ExtractionSandboxChild.class);
     PersistentExtractionSandbox sandbox =
         new PersistentExtractionSandbox(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
-            javaCommand(ExtractionSandboxChild.class), TikaExtractionPolicy.defaults(),
+            declaredArgv, TikaExtractionPolicy.defaults(),
             OcrRoutingConfig.disabled(), Duration.ofSeconds(30), 1, 500, null, registry);
     ManagedChild child;
     try (sandbox) {
@@ -370,7 +371,9 @@ final class PersistentExtractionSandboxTest {
       assertEquals(1, owned.size());
       child = owned.getFirst();
       assertEquals(ManagedChild.Kind.EXTRACTION, child.kind());
-      String declaredCommand = String.join("\0", javaCommand(ExtractionSandboxChild.class)) + "\0";
+      // P1 (de539aa77) retains exact declared child identity. A fresh argfile has a fresh path,
+      // so hash the command actually handed to the sandbox rather than generating another one.
+      String declaredCommand = String.join("\0", declaredArgv) + "\0";
       String expectedDeclaredHash =
           java.util.HexFormat.of()
               .formatHex(

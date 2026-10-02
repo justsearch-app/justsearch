@@ -22,6 +22,27 @@ class ContainerExpansionBudgetTest {
   @TempDir Path tempDir;
 
   @Test
+  void malformedZipIsAParserFailureRatherThanAnIoFailure() throws Exception {
+    Path file = tempDir.resolve("truncated.zip");
+    Files.write(file, new byte[] {'P', 'K', 3, 4, 20, 0});
+    var budget = new ContainerExpansionBudget(TikaExtractionPolicy.defaults(), Files.size(file));
+
+    var failure = assertThrows(ContentExtractor.ExtractionException.class,
+        () -> budget.inspect(file));
+
+    assertEquals(ContentExtractor.ExtractionException.class, failure.getClass());
+    assertTrue(failure.getCause() instanceof java.util.zip.ZipException);
+  }
+
+  @Test
+  void missingContainerRemainsAnIoFailure() {
+    var budget = new ContainerExpansionBudget(TikaExtractionPolicy.defaults(), 1);
+
+    assertThrows(java.nio.file.NoSuchFileException.class,
+        () -> budget.inspect(tempDir.resolve("missing.zip")));
+  }
+
+  @Test
   void manyTinyMembersRefuseAtFirstExcessBeforeAnyInflation() throws Exception {
     Map<String, byte[]> members = new LinkedHashMap<>();
     for (int i = 0; i < 4096; i++) members.put("member-" + i + ".txt", new byte[] {1});

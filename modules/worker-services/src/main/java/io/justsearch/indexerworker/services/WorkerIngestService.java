@@ -294,7 +294,9 @@ public final class WorkerIngestService {
         if (serving == null || indexGenerationManager == null) {
           throw WorkerServiceException.unavailable("Serving projection writer is unavailable");
         }
-        String generationId = captureServingGeneration(ctx);
+        // Accepted no-file writes target active Blue and are also buffered for Green during a
+        // build. Recorded file preparation's IDLE requirement does not apply to this port.
+        String generationId = requireCapturedActiveGeneration(false);
         boolean semanticDeferred = projectionSemanticDeferral.getAsBoolean();
         String building = switchBufferOps.buildingGenerationForFileAdmission();
         if (building != null) {
