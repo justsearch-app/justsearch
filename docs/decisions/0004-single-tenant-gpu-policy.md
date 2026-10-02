@@ -2,35 +2,56 @@
 title: "ADR-0004: Single-Tenant GPU Policy"
 type: decision
 status: superseded
-description: "Mutual exclusion between embedding and generative models for VRAM safety."
+description: "Historical GPU mutual-exclusion proposal; shipped builds allow ONNX encoders and llama-server to be co-resident."
 date: 2026-02-03
 superseded_by: "GGUF→ONNX embedding migration (tempdocs 268, 286, 327)"
 probes:
   - adr-0004-gpu-mutual-exclusion
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-02
 ---
 
 # ADR-0004: Single-Tenant GPU Policy
+
+## Amendment — 2026-10-02: shipped behavior is GPU co-residence
+
+The mutual-exclusion policy below was **never applied in shipped builds** and is
+not applied by the merged one-JVM Engine. In the shipped split architecture,
+`HeadlessApp` passed a null index bootstrap to `InferenceWiring`, whose wiring
+returned early; the Head therefore never registered a GPU-status listener.
+The merged Engine likewise does not publish an Online GPU claim that causes
+encoders to yield. `llama-server` and the ONNX encoders remain co-resident on
+the GPU while Chat is Online. The historical MMF design and the later in-JVM
+gauge description below record intended mechanisms, not enforced shipped
+behavior.
+
+Measurements on a 12 GB card found `llama-server` at 7.5 GB plus co-resident
+encoders at 3.3 GB p95 / 5.5 GB peak: 11.9 GB of 12.28 GB, leaving about
+0.4 GB headroom. That narrow margin carries OOM risk as workload and model
+memory vary. Applying the exclusion policy made every encoder run on CPU and
+raised hybrid-search p95 from 0.26 s to 9.8 s. A budget-aware policy—keeping
+query encoders on CUDA while allowing bulk work to yield on small devices—is a
+follow-up lane and is outside this merge. The diagnosis file cited in the
+2026-10-02 owner decision is absent from this checkout; the measurements and
+disposition are recorded here from that decision.
 
 ## Status
 
 Superseded — the GGUF embedding system (in-process llama.cpp via FFM)
 was deleted in March 2026 (~10,000 LOC). Embeddings now use ONNX Runtime
 via `NativeSessionHandle` (formerly `OrtSessionManager`; renamed in tempdoc 397 §14.23).
-The mutual exclusion protocol is still used for VRAM coordination between
-ORT GPU sessions and llama-server, but the framing below (GGUF embedding
-model, `nomic-embed-text`, `EMBED_GPU_LAYERS`) is no longer accurate.
+The mutual-exclusion policy was not active in shipped builds and is not the
+merged Engine's GPU policy. The design below is historical; its GGUF framing
+and operational claims do not describe current behavior.
 
-**Correction, 2026-09-08 (ADR-0049).** The Context and Decision below describe
+**Historical correction, 2026-09-08 (ADR-0049).** The Context and Decision below describe
 this policy across a Head/Worker process split that no longer exists. Lane F
 stage A merged the application half and the index half into one JVM — the
 Engine — so the ORT encoders and the process that serves the API are now the
 same process, and the GPU activity state is held by the in-process
 `GpuSchedulingGauge` (`modules/core`), not a memory-mapped flag: the historical
-signal bus was deleted at item A10. What survives unchanged is the policy itself and
-the boundary it coordinates across — `llama-server` is still a separate process
-owning VRAM (ADR-0049 keeps it), so mutual exclusion between ORT GPU sessions
-and the generative LLM is still cross-process and still required. Read every
+signal bus was deleted at item A10. The `llama-server` process boundary survives
+ADR-0049, but the proposed mutual-exclusion policy did not become a shipped
+invariant. Read every
 **Historical Head process / Worker process terminology** below means "the Engine".
 
 ## Historical Context (pre-Engine architecture)
@@ -104,12 +125,12 @@ Split available VRAM between models based on runtime detection.
 
 See also: [AI Architecture](../explanation/05-ai-architecture.md) for the full inference architecture and mode transition protocol.
 
-## Update — tempdoc 598 R4 (2026-06-17): query-embed is exempt from full eviction
+## Historical update — 2026-06-17: query-embed was designed to use CPU while Online
 
 The historical Decision above states that on Online Mode the Worker "unloads the embedding
 backend to release VRAM." As of tempdoc 598 R4 this is **narrowed**: on the
 At the GPU-active rising edge the Engine now **releases the embedder's GPU
-session** (freeing VRAM, preserving GPU single-tenancy for the chat LLM) but
+session** (intended to free VRAM for the chat LLM) but
 **keeps the `EmbeddingService` alive** so a single **query embedding** continues
 on the CPU fallback session. Bulk embedding **backfill** stays paused exactly as
 before (`LoopPacingPolicy.shouldRunBackfill` still gates on `mainGpuActive`).
@@ -119,7 +140,6 @@ sustained **bulk backfill** (correctly deferred under Online) and a single,
 bounded **query embed** (latency-critical, needed for dense search and RAG
 *during* chat). Evicting the embedder for the latter made semantic search and
 grounded Q&A silently degrade to keyword the moment chat loaded. The refinement
-is: **mutual exclusion governs bulk GPU work; a bounded query embed is exempt
-and runs on CPU while Online.** This preserves the single-tenant-GPU invariant
-(no second GPU resident model) — it does not overturn it. See tempdoc 598
-PART XII for the as-built and live verification.
+was: **mutual exclusion governs bulk GPU work; a bounded query embed is exempt
+and runs on CPU while Online.** This was a design claim, not shipped runtime
+behavior; ONNX encoders and `llama-server` are co-resident while Online.

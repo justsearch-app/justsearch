@@ -77,7 +77,7 @@
     {
       "id": "adr-0004-gpu-mutual-exclusion",
       "adr": "0004",
-      "premise": "Backfill yields the GPU when Main has claimed it, and the energy reason stays distinct from the VRAM-conflict reason.",
+      "premise": "LoopPacingPolicy has unit coverage distinguishing GPU-conflict yield from energy yield; this probe does not establish that shipped Online mode publishes a GPU claim or enforces exclusion.",
       "kind": "test",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/LoopPacingPolicyTest.java",
       "test": "io.justsearch.indexerworker.loop.ops.LoopPacingPolicyTest#gpuYieldIsConflictOnly"

@@ -154,7 +154,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0001](0001-three-process-architecture.md) | Use three separate OS processes | Superseded by [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | 2026-02-03 |
 | [0002](0002-grpc-mmf-hybrid-ipc.md) | Use gRPC + MMF hybrid for IPC | Superseded by [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | 2026-02-03 |
 | [0003](0003-direct-lucene-no-elasticsearch.md) | Use Lucene directly without search platform | Accepted | 2026-02-03 |
-| [0004](0004-single-tenant-gpu-policy.md) | Single-tenant GPU policy | Accepted | 2026-02-03 |
+| [0004](0004-single-tenant-gpu-policy.md) | Historical single-tenant GPU policy; shipped builds allow encoder/LLM co-residence | Superseded (amended 2026-10-02) | 2026-02-03 |
 | [0005](0005-manual-ffm-bindings.md) | Manual FFM bindings for llama.cpp | Accepted | 2026-02-03 |
 | [0006](0006-two-pronged-citation-strategy.md) | Two-pronged citation strategy | Accepted | 2026-02-07 |
 | [0007](0007-entity-faceting-over-knowledge-graph.md) | Entity faceting over full knowledge graph | Accepted | 2026-01-22 |
