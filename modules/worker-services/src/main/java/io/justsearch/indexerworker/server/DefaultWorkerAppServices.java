@@ -790,18 +790,20 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       DefaultWorkerAppServices incumbent, InfraContext greenContext, RunningRuntime greenRuntime,
       RerankerConfig.ChunkRerankerConfig queryChunkConfig,
       CitationScorerConfig queryCitationConfig) {
-    this.candidateConfiguration = incumbent.candidateConfiguration;
-    this.resolvedConfig = candidateConfiguration == null
-        ? incumbent.resolvedConfig : candidateConfiguration.snapshot();
-    this.extractionConfiguration = candidateConfiguration == null
-        ? incumbent.extractionConfiguration : candidateConfiguration.extraction();
+    // This is the ordinary serving owner of Green. Keep its applied configuration, but
+    // candidate-only restrictions belong to the detached producer that still serves A.
+    WorkerServiceConfiguration applied = incumbent.candidateConfiguration;
+    this.candidateConfiguration = null;
+    this.resolvedConfig = applied == null ? incumbent.resolvedConfig : applied.snapshot();
+    this.extractionConfiguration = applied == null
+        ? incumbent.extractionConfiguration : applied.extraction();
     this.detailedTracing = !"none".equalsIgnoreCase(resolvedConfig.index().tracingLevel());
     this.chunkRerankerConfig = queryChunkConfig != null ? queryChunkConfig
-        : candidateConfiguration == null
-        ? incumbent.chunkRerankerConfig : candidateConfiguration.chunkReranker();
+        : applied == null
+        ? incumbent.chunkRerankerConfig : applied.chunkReranker();
     this.citationScorerConfig = queryCitationConfig != null ? queryCitationConfig
-        : candidateConfiguration == null
-            ? incumbent.citationScorerConfig : candidateConfiguration.citationScorer();
+        : applied == null
+            ? incumbent.citationScorerConfig : applied.citationScorer();
     this.indexingPacing = incumbent.indexingPacing;
     this.indexingLoop = incumbent.indexingLoop;
     this.producerRuntime = greenRuntime;
@@ -845,8 +847,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             greenRuntime.indexCountOps(),
             provider,
             this::indexingLoopState,
-            candidateConfiguration == null ? incumbent.healthService.discoveredModels()
-                : candidateConfiguration.discoveredModels());
+            applied == null ? incumbent.healthService.discoveredModels()
+                : applied.discoveredModels());
 
     searchService.setChunkRerankerConfig(chunkRerankerConfig);
     searchService.setCitationScorerConfig(citationScorerConfig);

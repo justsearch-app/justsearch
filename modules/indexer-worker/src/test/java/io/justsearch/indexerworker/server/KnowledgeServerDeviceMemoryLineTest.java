@@ -177,7 +177,7 @@ final class KnowledgeServerDeviceMemoryLineTest {
   @Test
   void sourceReleaseTooSmallRefusesBeforeRetiringA(@TempDir Path dir) throws Exception {
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
-        var composition = mockStatic(InferenceCompositionRoot.class)) {
+        var composition = capturingComposition()) {
       // B needs 1024 with 512 free; A's own footprint (256) cannot cover the 512 shortfall.
       composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
           any(), any(), any(), any(), any())).thenReturn(FOOTPRINT, 256L);
@@ -232,7 +232,7 @@ final class KnowledgeServerDeviceMemoryLineTest {
   @Test
   void sourceReleaseCoveringTheShortfallStillBuildsInPlace(@TempDir Path dir) throws Exception {
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
-        var composition = mockStatic(InferenceCompositionRoot.class)) {
+        var composition = capturingComposition()) {
       composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
           any(), any(), any(), any(), any())).thenReturn(FOOTPRINT, 512L);
       composition.when(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
@@ -428,8 +428,27 @@ final class KnowledgeServerDeviceMemoryLineTest {
     }
   }
 
+  private static MockedStatic<InferenceCompositionRoot> capturingComposition() {
+    return mockStatic(InferenceCompositionRoot.class, invocation -> {
+      if (invocation.getMethod().getName().equals("compose") && invocation.getArguments().length == 10) {
+        EncoderConfigurationProjection projection = invocation.getArgument(0);
+        var plan = new IndexCompositionPlan(projection, invocation.getArgument(1),
+            io.justsearch.ort.RuntimePolicy.defaults(), Map.of(), false);
+        java.util.function.Consumer<InferenceCompositionRoot.CapturedCompositionPlan> witness =
+            invocation.getArgument(9);
+        witness.accept(new InferenceCompositionRoot.CapturedCompositionPlan(plan, projection,
+            emptySurface().componentObservation()));
+        // Preserve the device-line tests' configured surfaces and transition assertions.
+        return InferenceCompositionRoot.compose(projection, invocation.getArgument(1),
+            invocation.getArgument(2), invocation.getArgument(3), invocation.getArgument(4),
+            invocation.getArgument(5), invocation.getArgument(6), invocation.getArgument(7));
+      }
+      return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+    });
+  }
+
   private static MockedStatic<InferenceCompositionRoot> mockedComposition() {
-    var composition = mockStatic(InferenceCompositionRoot.class);
+    var composition = capturingComposition();
     composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
         any(), any(), any(), any(), any())).thenReturn(FOOTPRINT);
     return composition;

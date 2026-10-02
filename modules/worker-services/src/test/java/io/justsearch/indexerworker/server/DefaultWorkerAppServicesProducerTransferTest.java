@@ -344,6 +344,47 @@ final class DefaultWorkerAppServicesProducerTransferTest {
   }
 
   @Test
+  void installerServingSuccessorKeepsAppliedConfigurationAndAllowsEncoderRecovery(
+      @TempDir Path tempDir) throws Exception {
+    try (Fixture fixture = new Fixture(tempDir)) {
+      DefaultWorkerAppServices incumbent = fixture.newCandidateIncumbent();
+      incumbent.wireCandidateProducer(null, EncoderBindings.Snapshot.empty());
+      DefaultWorkerAppServices successor = incumbent.prepareServingSuccessor(fixture.greenContext());
+      try {
+        assertNull(field(successor, "candidateConfiguration"));
+        assertSame(fixture.candidateConfiguration.snapshot(), field(successor, "resolvedConfig"));
+        assertSame(fixture.candidateConfiguration.extraction(), field(successor, "extractionConfiguration"));
+        assertSame(fixture.candidateConfiguration, field(incumbent, "candidateConfiguration"));
+        try (var fence = incumbent.mutationAdmission().beginFinalFence(
+            incumbent.mutationOwnerToken(), 1_000);
+             var transfer = incumbent.prepareProducerTransferTo(successor)) {
+          assertNotNull(fence);
+          fence.install(successor.mutationOwnerToken());
+          transfer.install();
+          fence.certifySuccessor();
+        }
+        assertNotNull(successor.prepareTextOnlyEncoderRecoveryView(fixture.runtime));
+        successor.parkProducerModelsForEncoderRecovery();
+        var recovered = mock(EmbeddingProvider.class);
+        successor.wireRecoveredEncoders(recovered, EncoderBindings.Snapshot.empty(), null,
+            null, null, new GpuDiagnosticSuppliers(null, null, null, null, null, null, null, null, null));
+        assertSame(recovered, producerEmbeddingProvider(successor));
+        assertSame(recovered, queryEmbeddingProvider(successor));
+        var querySuccessor = successor.prepareQueryServingSuccessor(fixture.greenContext(),
+            fixture.candidateConfiguration.chunkReranker(), fixture.candidateConfiguration.citationScorer());
+        try {
+          assertNull(field(querySuccessor, "candidateConfiguration"));
+          assertSame(fixture.candidateConfiguration.snapshot(), field(querySuccessor, "resolvedConfig"));
+        } finally {
+          querySuccessor.close();
+        }
+      } finally {
+        successor.close();
+      }
+    }
+  }
+
+  @Test
   void candidateProducerBindingsStayDetachedUntilTransfer(@TempDir Path tempDir)
       throws Exception {
     try (Fixture fixture = new Fixture(tempDir)) {
