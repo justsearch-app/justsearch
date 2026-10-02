@@ -154,7 +154,7 @@ final class EngineKnowledgeClientExecutorTest {
       var specs =
           registry.snapshot().registrations().stream()
               .collect(java.util.stream.Collectors.toMap(row -> row.spec().name(), row -> row.spec()));
-      assertEquals(7, specs.size());
+      assertEquals(8, specs.size());
       assertEquals(Kind.BACKGROUND, specs.get("knowledge-client-root-walk").kind());
       assertEquals(Mode.PLATFORM, specs.get("knowledge-client-root-walk").mode());
       assertEquals(Kind.BACKGROUND, specs.get("knowledge-client-periodic-sync").kind());
@@ -194,13 +194,13 @@ final class EngineKnowledgeClientExecutorTest {
       var failure = assertThrows(firstFailure.getClass(), client::close);
       assertTrue(registry.snapshot().registrations().isEmpty(),
           "all base and transport owners must retire despite multiple close failures");
-      assertEquals(7, attempted.size());
+      assertEquals(8, attempted.size());
       org.junit.jupiter.api.Assertions.assertSame(firstFailure, failure);
       org.junit.jupiter.api.Assertions.assertArrayEquals(new Throwable[] {secondFailure},
           failure.getSuppressed());
       // Base close is one-shot: cleanup must complete on the first attempt, not rely on retry.
       client.close();
-      assertEquals(7, attempted.size());
+      assertEquals(8, attempted.size());
       org.mockito.Mockito.reset(registry);
       newClient(registry, services, new EngineAdmissionController(8, 8, 1)).close();
       assertTrue(registry.snapshot().registrations().isEmpty());
@@ -343,6 +343,103 @@ final class EngineKnowledgeClientExecutorTest {
     } finally {
       releaseForeground.countDown();
       callers.shutdownNow();
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
+  void expiredNativeCallsLeaveTextSearchAndFetchAvailableWithoutReleasingOwnership(int variant)
+      throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new java.util.concurrent.CompletableFuture<Void>();
+    var search = mock(WorkerSearchService.class);
+    when(search.search(any(), any())).thenAnswer(invocation -> {
+      var request = (io.justsearch.ipc.SearchRequest) invocation.getArgument(0);
+      if (request.getQuery().equals("native")) {
+        entered.countDown();
+        release.join(); // Native work ignores caller cancellation and interruption.
+      }
+      return SearchResponse.getDefaultInstance();
+    });
+    when(search.fetchDocuments(any(), any()))
+        .thenReturn(io.justsearch.ipc.FetchDocumentsResponse.getDefaultInstance());
+    var services = mock(WorkerAppServices.class);
+    when(services.searchService()).thenReturn(search);
+    var admission = new EngineAdmissionController(8, 8, 1);
+    try (var registry = registry(1, 1, 1, 4);
+        var client = new EngineKnowledgeClient(registry, () -> services,
+            new ForegroundLoadGate(new ForegroundLoad()), 1_000, 100, IpcTelemetry.noop(),
+            () -> {}, admission)) {
+      try {
+        var request = inferenceRequest(variant);
+        var caller = new java.util.concurrent.FutureTask<>(
+            () -> client.search(request, TestEngineContexts.FOREGROUND));
+        Thread.ofVirtual().start(caller);
+        assertTrue(entered.await(2, TimeUnit.SECONDS));
+        var timeout = assertThrows(java.util.concurrent.ExecutionException.class,
+            () -> caller.get(3, TimeUnit.SECONDS));
+        assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+            ((io.justsearch.app.api.knowledge.KnowledgeClientException) timeout.getCause()).status());
+        assertEquals(1, admission.activeWorkCount(), "Issued native work still owns admission");
+
+        var text = new java.util.concurrent.FutureTask<>(() -> {
+          client.search("keyword", 10, TestEngineContexts.FOREGROUND);
+          client.fetchDocuments(java.util.List.of("doc"), TestEngineContexts.FOREGROUND);
+          return true;
+        });
+        Thread.ofVirtual().start(text);
+        assertTrue(text.get(2, TimeUnit.SECONDS), "Text-only APIs must execute while native work stays blocked");
+        assertFalse(release.isDone());
+        assertEquals(1, admission.activeWorkCount());
+        assertThrows(EngineAdmissionException.class,
+            () -> client.search(request, TestEngineContexts.FOREGROUND));
+        assertThrows(EngineAdmissionException.class,
+            () -> client.rerank("q", java.util.List.of("doc"), 0, TestEngineContexts.FOREGROUND));
+        assertThrows(EngineAdmissionException.class,
+            () -> client.retrieveContext("q", java.util.Set.of("doc"), 1, TestEngineContexts.FOREGROUND));
+        assertThrows(EngineAdmissionException.class,
+            () -> client.matchCitations("answer", java.util.List.of("doc"), java.util.List.of(0),
+                java.util.List.of("passage"), 0.5, TestEngineContexts.FOREGROUND));
+        assertEquals(1, admission.activeWorkCount(), "Refusals must release only never-issued work");
+      } finally {
+        release.complete(null);
+      }
+    } finally {
+      release.complete(null);
+    }
+  }
+
+  private static io.justsearch.ipc.SearchRequest inferenceRequest(int variant) {
+    var request = io.justsearch.ipc.SearchRequest.newBuilder().setQuery("native").setLimit(10);
+    var pipeline = io.justsearch.ipc.PipelineConfig.newBuilder();
+    switch (variant) {
+      case 0 -> request.setPipeline(pipeline.setDenseEnabled(true));
+      case 1 -> request.setPipeline(pipeline.setDenseAuto(true));
+      case 2 -> request.setPipeline(pipeline.setSpladeEnabled(true));
+      case 3 -> request.setPipeline(pipeline.setSparseEnabled(true).setCrossEncoderEnabled(true));
+      case 4 -> request.setMode(io.justsearch.ipc.SearchMode.SEARCH_MODE_HYBRID);
+      case 5 -> request.setMode(io.justsearch.ipc.SearchMode.SEARCH_MODE_VECTOR);
+      case 6 -> request.setMode(io.justsearch.ipc.SearchMode.SEARCH_MODE_SPLADE);
+      default -> throw new IllegalArgumentException("Unknown variant");
+    }
+    return request.build();
+  }
+
+  @Test
+  void inferencePartitionUsesExistingForegroundThreadBudgetAndRefusesWithoutQueueing() {
+    try (var registry = registry(16, 32, 1, 4);
+        var client = newClient(registry, mock(WorkerAppServices.class),
+            new EngineAdmissionController(8, 8, 1))) {
+      var specs = registry.snapshot().registrations().stream().collect(
+          java.util.stream.Collectors.toMap(row -> row.spec().name(), row -> row.spec()));
+      var text = specs.get("engine-knowledge-call-foreground");
+      var inference = specs.get("engine-knowledge-inference-foreground");
+      assertEquals(16, text.threadCount() + inference.threadCount());
+      assertEquals(8, inference.threadCount());
+      assertEquals(0, inference.queueCapacity());
+      assertEquals(32, text.queueCapacity());
+      assertEquals(Kind.FOREGROUND, inference.kind());
+      assertEquals(1, inference.maxInstances());
     }
   }
 

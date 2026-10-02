@@ -38,9 +38,11 @@ import java.util.Set;
 final class SearchRpcOps {
 
     private final SearchRpcExecutor rpc;
+    private final SearchRpcExecutor inferenceRpc;
 
-    SearchRpcOps(SearchRpcExecutor rpc) {
+    SearchRpcOps(SearchRpcExecutor rpc, SearchRpcExecutor inferenceRpc) {
         this.rpc = Objects.requireNonNull(rpc, "rpc");
+        this.inferenceRpc = Objects.requireNonNull(inferenceRpc, "inferenceRpc");
     }
 
     // ========== Search ==========
@@ -81,10 +83,23 @@ final class SearchRpcOps {
      */
     SearchResponse search(SearchRequest request, EngineContext engineContext) {
         SearchRequest req = request == null ? SearchRequest.newBuilder().build() : request;
-        return rpc.execute(
+        return (mayRunInference(req) ? inferenceRpc : rpc).execute(
                 "search",
                 KnowledgeClient.RpcDeadlineCategory.STANDARD,
                 stub -> stub.search(req), engineContext);
+    }
+
+    /** Classify before dispatch: AUTO and legacy semantic modes can enter native query encoders. */
+    static boolean mayRunInference(SearchRequest request) {
+        if (!request.hasPipeline()) {
+            return switch (request.getMode()) {
+                case SEARCH_MODE_VECTOR, SEARCH_MODE_HYBRID, SEARCH_MODE_SPLADE -> true;
+                default -> false;
+            };
+        }
+        PipelineConfig pipeline = request.getPipeline();
+        return pipeline.getDenseEnabled() || pipeline.getDenseAuto()
+                || pipeline.getSpladeEnabled() || pipeline.getCrossEncoderEnabled();
     }
 
     /**
@@ -100,7 +115,7 @@ final class SearchRpcOps {
                 .setLimit(limit)
                 .setPipeline(PipelineConfigs.VECTOR)
                 .build();
-        return rpc.execute(
+        return inferenceRpc.execute(
                 "searchVector",
                 KnowledgeClient.RpcDeadlineCategory.STANDARD,
                 stub -> stub.search(request), engineContext);
@@ -234,7 +249,7 @@ final class SearchRpcOps {
             builder.setMaxContextTokens(maxContextTokens);
         }
         RetrieveContextRequest request = builder.build();
-        return rpc.execute(
+        return inferenceRpc.execute(
                 "retrieveContext",
                 // Tempdoc 806 B.2 (round-12): this RPC runs a cross-encoder rerank inside the Worker
                 // (RagContextOps.executeRetrieval), so CONTENT_FETCH (2x base = 10s) budgeted it below
@@ -326,7 +341,7 @@ final class SearchRpcOps {
         }
 
         RetrieveContextRequest request = builder.build();
-        return rpc.execute(
+        return inferenceRpc.execute(
                 "retrieveContext",
                 // Tempdoc 806 B.2 — see the sibling overload above: this RPC reranks, so it takes the
                 // RERANK budget rather than CONTENT_FETCH's 10s.
@@ -399,7 +414,7 @@ final class SearchRpcOps {
                 .addAllDocumentTexts(documentTexts)
                 .setDeadlineMs(deadlineMs)
                 .build();
-        return rpc.execute(
+        return inferenceRpc.execute(
                 "rerank",
                 KnowledgeClient.RpcDeadlineCategory.RERANK,
                 stub -> stub.rerank(request), engineContext);
@@ -431,7 +446,7 @@ final class SearchRpcOps {
                 .addAllPassageTexts(passageTexts)
                 .setSimilarityThreshold(threshold)
                 .build();
-        return rpc.execute(
+        return inferenceRpc.execute(
                 "matchCitations",
                 KnowledgeClient.RpcDeadlineCategory.CONTENT_FETCH,
                 stub -> stub.matchCitations(request), engineContext);

@@ -1465,7 +1465,7 @@ public final class WorkerIngestService {
         return unavailable;
       }
 
-      return syncOps.execute(rootPath, force, provenance);
+      return syncOps.execute(rootPath, force, provenance, ctx::cancelled);
     }
   }
 

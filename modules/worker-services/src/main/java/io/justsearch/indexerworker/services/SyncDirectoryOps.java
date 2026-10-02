@@ -51,6 +51,7 @@ final class SyncDirectoryOps {
    * load-bearing fix is that the skip is observable, not that the cap is gone.
    */
   private static final int MAX_INDEXED_PATHS_FOR_MISSING_SCAN = 200_000;
+  private static final int MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN = 16 * 1024 * 1024;
 
   private static final boolean HAS_DOS_ATTRIBUTES =
       java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("dos");
@@ -343,6 +344,12 @@ final class SyncDirectoryOps {
    */
   SyncDirectoryResponse execute(
       String rootPath, boolean force, JobQueue.EnqueueProvenance provenance) {
+    return execute(rootPath, force, provenance, () -> false);
+  }
+
+  SyncDirectoryResponse execute(String rootPath, boolean force,
+      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled) {
+    if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
     if (root == null) {
       return syncDirectoryErrorResponse("Root path does not exist or is not a directory");
@@ -353,7 +360,7 @@ final class SyncDirectoryOps {
 
     try {
       // STEP 1: Prune orphans (reuse existing logic with throttle + abort)
-      int pruneResult = pruneOrphansForSync(rootPath, force);
+      int pruneResult = pruneOrphansForSync(rootPath, force, cancelled);
 
       SyncDirectoryResponse pruneAbort = handleSyncPruneAbortIfNeeded(pruneResult, force);
       if (pruneAbort != null) {
@@ -364,7 +371,9 @@ final class SyncDirectoryOps {
       // STEP 2: For force=true (OVERFLOW/burst), we do not attempt to compute the full indexed
       // set (can be large). We enqueue all disk files and rely on IndexingLoop's "unchanged"
       // fast-path.
-      Set<String> indexedPaths = indexedPathsForSync(rootPath, force);
+      if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
+      Set<String> indexedPaths = indexedPathsForSync(rootPath, force, cancelled);
+      if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
       SyncDirectoryResponse scanSkip =
           handleSyncIndexedPathsScanSkipIfNeeded(rootPath, force, indexedPaths, filesDeleted);
       if (scanSkip != null) {
@@ -376,8 +385,12 @@ final class SyncDirectoryOps {
 
       // STEP 3: Walk disk and find missing files
       SyncWalkPhaseResult walk =
-          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance);
+          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled);
       filesAdded = walk.filesAdded();
+
+      if (cancelled.getAsBoolean()) {
+        return syncDirectoryErrorResponse(filesDeleted, filesAdded, "Cancelled");
+      }
 
       SyncDirectoryResponse walkTerminal =
           handleSyncWalkTerminalState(walk, filesDeleted, filesAdded);
@@ -420,7 +433,7 @@ final class SyncDirectoryOps {
     }
     log.warn(
         "syncDirectory: skipping missing-file detection for {} "
-            + "(too many indexed paths; still pruned {} orphans) — marking delete-detection UNVERIFIED",
+            + "(indexed path budget exceeded; still pruned {} orphans); marking delete-detection UNVERIFIED",
         rootPath,
         filesDeleted);
     // Tempdoc 626 §Axis-B/C — surface the skip instead of returning a silent skipped/healthy result.
@@ -446,7 +459,8 @@ final class SyncDirectoryOps {
     return root;
   }
 
-  private int pruneOrphansForSync(String rootPath, boolean force) {
+  private int pruneOrphansForSync(String rootPath, boolean force,
+      java.util.function.BooleanSupplier cancelled) {
     if (pruneOps == null) {
       return 0;
     }
@@ -469,16 +483,17 @@ final class SyncDirectoryOps {
     // above has already refused to run at all when the whole root is unavailable.
     return pruneOps.pruneByPathPrefix(
         rootPath,
-        force ? () -> false : indexingPacing::paceAndContinue,
+        () -> cancelled.getAsBoolean() || (!force && indexingPacing.paceAndContinue()),
         SYNC_PRUNE_THROTTLE_BATCH_SIZE,
         deletionMarker::markIfAbsent);
   }
 
-  private Set<String> indexedPathsForSync(String rootPath, boolean force) {
+  private Set<String> indexedPathsForSync(String rootPath, boolean force,
+      java.util.function.BooleanSupplier cancelled) {
     if (force) {
       return null;
     }
-    return getIndexedPathsUnderPrefix(rootPath);
+    return getIndexedPathsUnderPrefix(rootPath, cancelled);
   }
 
   // ==================== Walk logic ====================
@@ -488,119 +503,99 @@ final class SyncDirectoryOps {
   @SuppressWarnings("PMD.CognitiveComplexity")
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
       Path root, boolean force, Set<String> indexedPaths,
-      JobQueue.EnqueueProvenance provenance) throws IOException {
-    // 391/E-J-N12: collect the full list first, sort by absolute path, then
-    // enqueue in deterministic batches. Filesystem-order enumeration varies
-    // across runs of the same unchanged corpus (NTFS MFT state, OS cache),
-    // which causes non-deterministic chunk-boundary placement downstream
-    // (ner_total observed to vary 5300-7300 across back-to-back scifact runs).
-    // Sorting up-front costs O(n log n) and ~200 B per path — ~1 MB extra
-    // for 5K files; negligible for benchmarking corpora.
-    //
-    // Scalability trade-off (tempdoc 393 § 3.4): collect-all-then-sort delays
-    // the first enqueue by the walk-complete time, losing pipelining with the
-    // indexing loop. At ~5K-10K files this is invisible (<1 s walk). At ~100K
-    // files the walk can run 10-30 s and the loop sits idle during it. If a
-    // user-facing workload ever pushes past ~50K files per sync, switch to a
-    // streaming approach: hash-bucket the path space and sort per-bucket so
-    // enqueue can start after the first bucket settles. The current approach
-    // is intentional for determinism; this note exists so the next agent
-    // doesn't rediscover the trade-off by accident.
-    List<JobQueue.EnqueueEntry> collected = new ArrayList<>();
-    int[] counters = {0}; // [0]=fileCount (for throttle)
-    boolean[] walkInterrupted = {false};
-    final Set<String> indexedPathsFinal = indexedPaths;
+      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled)
+      throws IOException {
+    // Preserve globally deterministic enqueue order without retaining the root in shared heap.
+    // The spool maintains its ordering index on disk while the walk streams one path at a time.
+    try (var spool = new ReconciliationSpool()) {
+      int[] counters = {0}; // [0]=fileCount (for throttle)
+      boolean[] walkInterrupted = {false};
+      final Set<String> indexedPathsFinal = indexedPaths;
 
-    Files.walkFileTree(
-        root,
-        new SimpleFileVisitor<Path>() {
-          @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-            if (dir.equals(root)) return FileVisitResult.CONTINUE;
-            String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
-            if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
-              return FileVisitResult.SKIP_SUBTREE;
-            }
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-            if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
-            if (!Files.isReadable(file)) return FileVisitResult.CONTINUE;
-            if (IngestionSkipPolicy.shouldSkip(file)) return FileVisitResult.CONTINUE;
-            if (isCloudPlaceholder(file)) {
-              recordCloudPlaceholderObservation(file, provenance);
+      Files.walkFileTree(
+          root,
+          new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+              if (stopped()) return FileVisitResult.TERMINATE;
+              if (dir.equals(root)) return FileVisitResult.CONTINUE;
+              String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
+              if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
+                return FileVisitResult.SKIP_SUBTREE;
+              }
               return FileVisitResult.CONTINUE;
             }
 
-            counters[0]++;
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+              if (stopped()) return FileVisitResult.TERMINATE;
+              if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
+              if (!Files.isReadable(file)) return FileVisitResult.CONTINUE;
+              if (IngestionSkipPolicy.shouldSkip(file)) return FileVisitResult.CONTINUE;
+              if (isCloudPlaceholder(file)) {
+                recordCloudPlaceholderObservation(file, provenance);
+                return FileVisitResult.CONTINUE;
+              }
 
-            // Throttle: check abort + yield periodically.
-            if (counters[0] % SYNC_WALK_THROTTLE_EVERY_N_FILES == 0) {
-              if (Thread.interrupted()) {
-                log.info("syncDirectory interrupted after {} files", counters[0]);
-                walkInterrupted[0] = true;
-                return FileVisitResult.TERMINATE;
+              counters[0]++;
+
+              // Throttle: check abort + yield periodically.
+              if (counters[0] % SYNC_WALK_THROTTLE_EVERY_N_FILES == 0) {
+                if (Thread.interrupted()) {
+                  log.info("syncDirectory interrupted after {} files", counters[0]);
+                  walkInterrupted[0] = true;
+                  return FileVisitResult.TERMINATE;
+                }
+                // Tempdoc 885 item 3: the walk yields to foreground load instead of terminating on
+                // it. The 1 ms courtesy sleep stays for the uncontended case.
+                if (!force) {
+                  indexingPacing.pace();
+                }
+                try {
+                  Thread.sleep(1);
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  walkInterrupted[0] = true;
+                  return FileVisitResult.TERMINATE;
+                }
               }
-              // Tempdoc 885 item 3: the walk yields to foreground load instead of terminating on
-              // it. The 1 ms courtesy sleep stays for the uncontended case.
-              if (!force) {
-                indexingPacing.pace();
+
+              String normalizedPath =
+                  PathNormalizer.normalizePath(file.toAbsolutePath().toString());
+              if (force
+                  || (indexedPathsFinal != null && !indexedPathsFinal.contains(normalizedPath))) {
+                // 813 Slice B: the walk already holds the size — no extra stat.
+                if (stopped()) return FileVisitResult.TERMINATE;
+                spool.add(file, attrs.size());
               }
-              try {
-                Thread.sleep(1);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                walkInterrupted[0] = true;
-                return FileVisitResult.TERMINATE;
-              }
+              return FileVisitResult.CONTINUE;
             }
 
-            String normalizedPath =
-                PathNormalizer.normalizePath(file.toAbsolutePath().toString());
-            if (force
-                || (indexedPathsFinal != null && !indexedPathsFinal.contains(normalizedPath))) {
-              // 813 Slice B: the walk already holds the size — no extra stat.
-              collected.add(new JobQueue.EnqueueEntry(file, attrs.size(), provenance));
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException exc) {
+              if (stopped()) return FileVisitResult.TERMINATE;
+              log.debug(
+                  "Skipping inaccessible path: {} ({})",
+                  file,
+                  exc != null ? exc.getMessage() : "unknown");
+              return FileVisitResult.CONTINUE;
             }
-            return FileVisitResult.CONTINUE;
-          }
 
-          @Override
-          public FileVisitResult visitFileFailed(Path file, IOException exc) {
-            log.debug(
-                "Skipping inaccessible path: {} ({})",
-                file,
-                exc != null ? exc.getMessage() : "unknown");
-            return FileVisitResult.CONTINUE;
-          }
-        });
+            private boolean stopped() {
+              if (Thread.currentThread().isInterrupted()) walkInterrupted[0] = true;
+              return walkInterrupted[0] || cancelled.getAsBoolean();
+            }
+          });
 
-    // Sort once, after the walk, for a stable enqueue order across runs.
-    // Uses the normalized absolute path string so the ordering is independent
-    // of the Path implementation's natural ordering (which could change
-    // between JDKs).
-    collected.sort(
-        Comparator.comparing(
-            e -> PathNormalizer.normalizePath(e.path().toAbsolutePath().toString())));
-
-    int filesAdded = 0;
-    List<JobQueue.EnqueueEntry> batch = new ArrayList<>(SYNC_ENQUEUE_BATCH_SIZE);
-    for (JobQueue.EnqueueEntry entry : collected) {
-      batch.add(entry);
-      if (batch.size() >= SYNC_ENQUEUE_BATCH_SIZE) {
-        filesAdded += jobQueue.enqueueEntries(batch);
-        batch.clear();
+      int filesAdded = spool.drain(SYNC_ENQUEUE_BATCH_SIZE, provenance,
+          () -> cancelled.getAsBoolean() || walkInterrupted[0]
+              || Thread.currentThread().isInterrupted(), jobQueue::enqueueEntries);
+      walkInterrupted[0] |= Thread.currentThread().isInterrupted();
+      if (!walkInterrupted[0] && !cancelled.getAsBoolean() && filesAdded > 0) {
+        log.info("syncDirectory: enqueued {} missing files for indexing", filesAdded);
       }
+      return new SyncWalkPhaseResult(filesAdded, walkInterrupted[0]);
     }
-    if (!batch.isEmpty()) {
-      filesAdded += jobQueue.enqueueEntries(batch);
-    }
-    if (!walkInterrupted[0] && filesAdded > 0) {
-      log.info("syncDirectory: enqueued {} missing files for indexing", filesAdded);
-    }
-    return new SyncWalkPhaseResult(filesAdded, walkInterrupted[0]);
   }
 
   // ==================== Index path query ====================
@@ -612,7 +607,8 @@ final class SyncDirectoryOps {
    * field-based filtering (is_chunk != true) to exclude chunk documents rather than string
    * matching on doc_id, which can misclassify legitimate paths.
    */
-  private Set<String> getIndexedPathsUnderPrefix(String prefix) {
+  private Set<String> getIndexedPathsUnderPrefix(String prefix,
+      java.util.function.BooleanSupplier cancelled) {
     Set<String> paths = new HashSet<>();
     if (readPathOps == null) {
       return paths;
@@ -634,8 +630,10 @@ final class SyncDirectoryOps {
               .build();
 
       String cursor = null;
-      final int batchSize = 10_000;
+      final int batchSize = 256;
+      long pathChars = 0;
       while (true) {
+        if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) return null;
         var result =
             readPathOps.search(
                 query,
@@ -645,10 +643,12 @@ final class SyncDirectoryOps {
                 cursor);
 
         for (var hit : result.hits()) {
+          if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) return null;
           String path = hit.docId();
           if (path != null) {
-            paths.add(path);
-            if (paths.size() >= MAX_INDEXED_PATHS_FOR_MISSING_SCAN) {
+            if (paths.add(path)) pathChars += path.length();
+            if (paths.size() >= MAX_INDEXED_PATHS_FOR_MISSING_SCAN
+                || pathChars >= MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN) {
               return null;
             }
           }
