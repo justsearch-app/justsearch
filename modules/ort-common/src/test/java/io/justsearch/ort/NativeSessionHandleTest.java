@@ -46,7 +46,7 @@ class NativeSessionHandleTest {
         io.justsearch.configuration.resolved.TestResolvedConfigHelper.withDefaults(),
         io.justsearch.configuration.model.HardwareProfile.gpuFull(12_000_000_000L), variant);
     var cpu = mock(OrtSession.class);
-    try (var options = org.mockito.Mockito.mockConstruction(OrtSession.SessionOptions.class);
+    try (var _ = org.mockito.Mockito.mockConstruction(OrtSession.SessionOptions.class);
         var cache = org.mockito.Mockito.mockStatic(OnnxSessionCache.class);
         var handle = NativeSessionHandle.builder("cold-fp16-fallback", model)
             .gpuModelPath(model).shouldUseGpu(() -> true)

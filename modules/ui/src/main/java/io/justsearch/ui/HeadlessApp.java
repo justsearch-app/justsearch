@@ -1070,7 +1070,7 @@ public class HeadlessApp {
     long tPrev;
     log.info("Starting JustSearch HeadlessApp...");
 
-    io.justsearch.app.api.operations.OperationStore operations = null;
+    io.justsearch.app.api.operations.OperationStore operations;
     var operationsCleanupOwner =
         new java.util.concurrent.atomic.AtomicReference<io.justsearch.app.api.operations.OperationStore>();
     io.justsearch.app.engine.EngineRoot processRoot = null;

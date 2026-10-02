@@ -1,18 +1,17 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
-import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
 
 import io.justsearch.agent.EngineContextTestFixtures;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.api.EngineAdmissionException;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -20,6 +19,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tempdoc 877 §2.6 — the error classifier's contract.
@@ -30,6 +30,8 @@ import org.junit.jupiter.api.Test;
  * those distinctions.
  */
 class AgentToolErrorsTest {
+
+  @TempDir Path tempDir;
 
   private static ApiErrorCode codeOf(OperationResult r) {
     return ApiErrorCode.valueOf(r.errorCode().orElseThrow(() -> new AssertionError("no errorCode")));
@@ -184,7 +186,7 @@ class AgentToolErrorsTest {
 
       var files = new FileOperationsTool(context -> { throw failure; },
           (mappings, context) -> { throw new AssertionError("Refusal must prevent file effects"); },
-          mock(FileOperationLog.class));
+          new FileOperationLog(tempDir.resolve("file-operations")));
       String fileArguments = "{\"operations\":[{\"op\":\"MKDIR\",\"destination\":\"" + path + "\"}]}";
       assertSame(refusal, assertThrows(EngineAdmissionException.class,
           () -> files.execute(fileArguments, EngineContextTestFixtures.AGENT_LOOP)));

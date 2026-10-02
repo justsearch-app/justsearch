@@ -1267,8 +1267,8 @@ final class JobQueueMigrationTest {
       try (SqliteJobQueue queue = new SqliteJobQueue(path)) {
         SQLException failure = assertThrows(SQLException.class, queue::open);
         assertTrue(failure.getMessage().contains(Integer.toString(SqliteSchema.TARGET_VERSION + 1)));
-        org.junit.jupiter.api.Assertions.assertArrayEquals(mainBefore, Files.readAllBytes(path));
-        org.junit.jupiter.api.Assertions.assertArrayEquals(walBefore, Files.readAllBytes(wal));
+        assertArrayEquals(mainBefore, Files.readAllBytes(path));
+        assertArrayEquals(walBefore, Files.readAllBytes(wal));
       }
     }
   }

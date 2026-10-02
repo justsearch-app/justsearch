@@ -51,7 +51,7 @@ final class AgentSessionRegistryDetachTest {
         assertFalse(run.retired());
       } finally {
         release.countDown();
-        var failed = org.junit.jupiter.api.Assertions.assertThrows(
+        var failed = assertThrows(
             java.util.concurrent.ExecutionException.class, () -> attaching.get(5, TimeUnit.SECONDS));
         org.junit.jupiter.api.Assertions.assertInstanceOf(IllegalStateException.class, failed.getCause());
         observation.retire();
@@ -84,7 +84,7 @@ final class AgentSessionRegistryDetachTest {
         assertTrue(entered.await(5, TimeUnit.SECONDS));
         run.publish(RunFrame.of("live"));
         release.countDown();
-        var failure = org.junit.jupiter.api.Assertions.assertThrows(
+        var failure = assertThrows(
             java.util.concurrent.ExecutionException.class, () -> attached.get(5, TimeUnit.SECONDS));
         assertEquals("raw socket failed during primer", failure.getCause().getMessage());
         org.junit.jupiter.api.Assertions.assertInstanceOf(IllegalStateException.class, failure.getCause());

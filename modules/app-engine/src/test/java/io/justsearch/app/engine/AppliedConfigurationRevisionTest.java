@@ -392,7 +392,7 @@ final class AppliedConfigurationRevisionTest {
           return;
         }
         List<EngineComponentSnapshot.Component> ready = new ArrayList<>();
-        try (var subscription = registry.subscribe(snapshot -> {
+        try (var _ = registry.subscribe(snapshot -> {
           var row = snapshot.components().stream()
               .filter(component -> component.spec().name().equals("generative"))
               .findFirst().orElseThrow();

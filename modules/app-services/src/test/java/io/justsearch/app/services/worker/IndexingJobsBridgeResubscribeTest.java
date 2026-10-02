@@ -367,16 +367,16 @@ final class IndexingJobsBridgeResubscribeTest {
   }
 
   private static final class ControlledReconnects {
-    final io.justsearch.core.execution.EngineExecutorRegistry registry =
-        org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.class);
+    final EngineExecutorRegistry registry =
+        org.mockito.Mockito.mock(EngineExecutorRegistry.class);
     final java.util.ArrayDeque<Runnable> pending = new java.util.ArrayDeque<>();
     final List<Long> delays = new java.util.ArrayList<>();
 
     ControlledReconnects() {
-      var registration = org.mockito.Mockito.mock(io.justsearch.core.execution.EngineExecutorRegistry.Registration.class);
-      var scheduler = org.mockito.Mockito.mock(java.util.concurrent.ScheduledExecutorService.class);
+      var registration = org.mockito.Mockito.mock(EngineExecutorRegistry.Registration.class);
+      var scheduler = org.mockito.Mockito.mock(ScheduledExecutorService.class);
       org.mockito.Mockito.when(registry.limits(org.mockito.ArgumentMatchers.any()))
-          .thenReturn(new io.justsearch.core.execution.EngineExecutorRegistry.Limits(1, 32));
+          .thenReturn(new EngineExecutorRegistry.Limits(1, 32));
       org.mockito.Mockito.when(registry.register(org.mockito.ArgumentMatchers.any())).thenReturn(registration);
       org.mockito.Mockito.when(registration.openScheduled(org.mockito.ArgumentMatchers.any())).thenReturn(scheduler);
       var retryWorker = org.mockito.Mockito.mock(java.util.concurrent.ExecutorService.class);

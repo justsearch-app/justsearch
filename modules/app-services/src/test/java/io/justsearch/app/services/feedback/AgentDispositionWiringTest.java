@@ -147,7 +147,7 @@ class AgentDispositionWiringTest {
       throws IOException {
     var listener = new AtomicReference<BiConsumer<String, Map<String, Object>>>();
     AgentDispositionWiring.register(listener::set, dataDir,
-        io.justsearch.agent.api.encryption.StoreCipher.disabled(), new FeedbackCaptureSettings(dataDir));
+        StoreCipher.disabled(), new FeedbackCaptureSettings(dataDir));
     Path archive = dataDir.resolve("feedback/feature-snapshots.ndjson");
     new NdjsonAppendStore<>(archive, FeatureSnapshot.class).append(new FeatureSnapshot(
         "session", "q", 1L,
@@ -169,7 +169,7 @@ class AgentDispositionWiringTest {
     AgentDispositionWiring.register(
         ref::set,
         dataDir,
-        io.justsearch.agent.api.encryption.StoreCipher.disabled(),
+        StoreCipher.disabled(),
         new FeedbackCaptureSettings(dataDir));
     assertNotNull(ref.get(), "a listener must be registered");
 
@@ -202,7 +202,7 @@ class AgentDispositionWiringTest {
     AgentDispositionWiring.register(
         ref::set,
         dataDir,
-        io.justsearch.agent.api.encryption.StoreCipher.disabled(),
+        StoreCipher.disabled(),
         new FeedbackCaptureSettings(dataDir));
 
     // (1) a search tool completed — carries the per-leg feedbackFeatures + the run's sessionId.

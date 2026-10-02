@@ -221,7 +221,7 @@ final class EngineKnowledgeClientExecutorTest {
       }
     });
     assertEquals(EngineAdmissionException.Reason.ENGINE_LIMIT, refusal.reason());
-    try (var text = admission.attach(TestEngineContexts.FOREGROUND)) {
+    try (var _ = admission.attach(TestEngineContexts.FOREGROUND)) {
       assertEquals(2, admission.activeWorkCount(), "The reserved text slot must stay available");
     }
     assertEquals(1, admission.activeWorkCount(), "The native waiter still owns inference admission");
@@ -807,7 +807,7 @@ final class EngineKnowledgeClientExecutorTest {
   @Test
   void inferencePartitionUsesExistingForegroundThreadBudgetAndRefusesWithoutQueueing() {
     try (var registry = registry(16, 32, 1, 4);
-        var client = newClient(registry, mock(WorkerAppServices.class),
+        var _ = newClient(registry, mock(WorkerAppServices.class),
             new EngineAdmissionController(8, 8, 1))) {
       var specs = registry.snapshot().registrations().stream().collect(
           java.util.stream.Collectors.toMap(row -> row.spec().name(), row -> row.spec()));

@@ -84,7 +84,7 @@ final class EngineRootInProcessPortsTest {
   }
 
   private static void publishConfig(Path dataDir, Path indexBase) throws Exception {
-    EngineTestHarness.publishConfig(dataDir, indexBase, java.util.Map.of());
+    EngineTestHarness.publishConfig(dataDir, indexBase, Map.of());
   }
 
   @Test

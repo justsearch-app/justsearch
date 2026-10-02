@@ -180,21 +180,21 @@ final class HeadlessAppShutdownWiringTest {
         .action().run(Reason.QUIT);
     assertEquals("FAILED", indexStep.action().run(Reason.QUIT));
     assertThrows(IllegalStateException.class, () -> tracingStep.action().run(Reason.QUIT));
-    org.mockito.Mockito.verifyNoInteractions(tracing);
+    Mockito.verifyNoInteractions(tracing);
     assertThrows(IllegalStateException.class, () -> lockStep.action().run(Reason.QUIT));
-    org.mockito.Mockito.verifyNoInteractions(instanceLock);
+    Mockito.verifyNoInteractions(instanceLock);
     assertThrows(IllegalStateException.class, () -> storeStep.action().run(Reason.QUIT));
     assertThrows(IllegalStateException.class, () -> resourceStep.action().run(Reason.QUIT));
-    org.mockito.Mockito.verifyNoInteractions(resources);
-    org.mockito.Mockito.verifyNoInteractions(operations);
+    Mockito.verifyNoInteractions(resources);
+    Mockito.verifyNoInteractions(operations);
     assertEquals("GRACEFUL", indexStep.action().run(Reason.QUIT));
     storeStep.action().run(Reason.QUIT);
     tracingStep.action().run(Reason.QUIT);
-    org.mockito.Mockito.verify(tracing).close();
+    Mockito.verify(tracing).close();
     resourceStep.action().run(Reason.QUIT);
     lockStep.action().run(Reason.QUIT);
     var order = inOrder(index, operations, resources, instanceLock);
-    order.verify(index, org.mockito.Mockito.times(2)).closeForUpgrade();
+    order.verify(index, Mockito.times(2)).closeForUpgrade();
     order.verify(operations).close();
     order.verify(resources).close();
     order.verify(instanceLock).close();
@@ -268,15 +268,15 @@ final class HeadlessAppShutdownWiringTest {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
   void failedStartupRetainsTracingUntilEveryProducerDrains(int completedDrains) {
     var tracing = mock(TracingBootstrap.class);
     assertThrows(IllegalStateException.class, () -> HeadlessApp.closeTracingAfterDrain(tracing,
         (completedDrains & 1) != 0, (completedDrains & 2) != 0, (completedDrains & 4) != 0));
-    org.mockito.Mockito.verifyNoInteractions(tracing);
+    Mockito.verifyNoInteractions(tracing);
     HeadlessApp.closeTracingAfterDrain(tracing, true, true, true);
-    org.mockito.Mockito.verify(tracing).close();
+    Mockito.verify(tracing).close();
   }
 
   @Test
@@ -298,19 +298,19 @@ final class HeadlessAppShutdownWiringTest {
 
     assertFalse(result.clean());
     assertTrue(result.errors().stream().anyMatch(error -> error.contains("live-work-drain")));
-    org.mockito.Mockito.verify(attempts).beginClosing();
-    org.mockito.Mockito.verifyNoInteractions(head, resources, instanceLock);
-    org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
+    Mockito.verify(attempts).beginClosing();
+    Mockito.verifyNoInteractions(head, resources, instanceLock);
+    Mockito.verify(operations, Mockito.never()).close();
   }
 
   @Test
   void failedHeadDrainRetainsDependenciesAndProducesUncleanExit(@TempDir Path tempDir) throws Exception {
     var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
     var head = mock(HeadAssembly.class);
-    org.mockito.Mockito.doThrow(new IllegalStateException("procedure still running")).when(head).close();
+    Mockito.doThrow(new IllegalStateException("procedure still running")).when(head).close();
     var index = mock(KnowledgeServerBootstrap.class);
     var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
-    var tracing = mock(io.justsearch.telemetry.TracingBootstrap.class);
+    var tracing = mock(TracingBootstrap.class);
     var telemetry = mock(Telemetry.class);
     var instanceLock = mock(AppInstanceLock.class);
     var exitCode = new AtomicInteger(-1);
@@ -324,9 +324,9 @@ final class HeadlessAppShutdownWiringTest {
     assertEquals(1, exitCode.get());
     assertTrue(result.errors().stream().anyMatch(error -> error.contains("head-assembly")));
     assertTrue(result.errors().stream().anyMatch(error -> error.contains("operations-store")));
-    org.mockito.Mockito.verify(operations).checkpointDurableOperations();
-    org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
-    org.mockito.Mockito.verifyNoInteractions(index, tracing, telemetry, resources, instanceLock);
+    Mockito.verify(operations).checkpointDurableOperations();
+    Mockito.verify(operations, Mockito.never()).close();
+    Mockito.verifyNoInteractions(index, tracing, telemetry, resources, instanceLock);
   }
 
   @Test
@@ -347,9 +347,9 @@ final class HeadlessAppShutdownWiringTest {
 
     assertEquals(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT, exitCode.get());
     assertFalse(sequence.run(Reason.RESTART).clean());
-    org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
-    org.mockito.Mockito.verifyNoInteractions(resources, instanceLock);
-    org.mockito.Mockito.verify(index).closeForUpgrade();
+    Mockito.verify(operations, Mockito.never()).close();
+    Mockito.verifyNoInteractions(resources, instanceLock);
+    Mockito.verify(index).closeForUpgrade();
   }
 
   @Test
@@ -367,7 +367,7 @@ final class HeadlessAppShutdownWiringTest {
     var health = mock(io.justsearch.app.services.worker.KnowledgeServerHealthMonitor.class);
     HeadAssembly assembly = mock(HeadAssembly.class);
     KnowledgeServerBootstrap knowledge = mock(KnowledgeServerBootstrap.class);
-    var tracing = mock(io.justsearch.telemetry.TracingBootstrap.class);
+    var tracing = mock(TracingBootstrap.class);
     Telemetry telemetry = mock(Telemetry.class);
     var processResources = mock(io.justsearch.app.api.EngineProcessResources.class);
     AppInstanceLock instanceLock = mock(AppInstanceLock.class);
@@ -440,8 +440,8 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(manifest).completeShutdown(Reason.RESTART.wire(), true, "GRACEFUL");
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
   @org.junit.jupiter.api.Timeout(20)
   void recoveryIsRevokedBeforeApiTeardownEvenWhenStartOutlivesMonitorClose(boolean fatalCleanup)
       throws Exception {
@@ -665,7 +665,7 @@ final class HeadlessAppShutdownWiringTest {
     var watcherStarted = new java.util.concurrent.atomic.AtomicBoolean();
 
     assertThrows(
-        java.io.IOException.class,
+        IOException.class,
         () -> {
           HeadlessApp.clearPriorShutdownRequest(runtime, ignored -> false);
           watcherStarted.set(true);
@@ -687,11 +687,11 @@ final class HeadlessAppShutdownWiringTest {
       @TempDir Path tempDir) throws Exception {
     Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
     var watcherRef =
-        new java.util.concurrent.atomic.AtomicReference<
+        new AtomicReference<
             io.justsearch.app.engine.ShutdownRequestWatcher>();
     var laterStep = new CountDownLatch(1);
     var laterStepInterrupted = new java.util.concurrent.atomic.AtomicBoolean(true);
-    var callbackThread = new java.util.concurrent.atomic.AtomicReference<Thread>();
+    var callbackThread = new AtomicReference<Thread>();
     AppInstanceLock instanceLock = mock(AppInstanceLock.class);
     doAnswer(
             ignored -> {
@@ -738,7 +738,7 @@ final class HeadlessAppShutdownWiringTest {
   }
   /** Host-file fixture only; the Engine has no production request writer. */
   static void writeRequest(io.justsearch.app.engine.ShutdownRequest request, Path runtimeDir)
-      throws java.io.IOException {
+      throws IOException {
     var fields = new java.util.LinkedHashMap<String, Object>();
     fields.put("reason", request.reason().wire());
     fields.put("deadlineEpochMs", request.deadlineEpochMs());

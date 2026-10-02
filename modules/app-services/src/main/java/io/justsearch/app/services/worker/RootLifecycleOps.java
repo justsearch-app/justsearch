@@ -457,7 +457,7 @@ final class RootLifecycleOps {
         }
 
         // 2. Call the index port to delete indexed data
-        int deletedJobs = 0;
+        int deletedJobs;
         try {
             DeleteByPathResponse response = deleteByPathFn.apply(normalized, engineContext);
 

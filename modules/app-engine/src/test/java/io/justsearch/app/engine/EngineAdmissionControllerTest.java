@@ -38,7 +38,7 @@ final class EngineAdmissionControllerTest {
       owner.close();
       assertEquals(EngineAdmissionException.Reason.CONTEXT_LIMIT,
           assertThrows(EngineAdmissionException.class, () -> admission.attachInference(context)).reason());
-      try (var text = admission.attach(context)) {
+      try (var _ = admission.attach(context)) {
         assertEquals(2, admission.activeWorkCount());
       }
       assertEquals(1, admission.activeWorkCount());
@@ -46,7 +46,7 @@ final class EngineAdmissionControllerTest {
       owner.close();
       child.close();
     }
-    try (var replacement = admission.attachInference(context)) {
+    try (var _ = admission.attachInference(context)) {
       assertEquals(1, admission.activeWorkCount());
     }
     assertEquals(0, admission.activeWorkCount());

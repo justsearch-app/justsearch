@@ -69,7 +69,7 @@ final class WorkerScanOpsTest {
   void explicitlyRequestedExcludedNameRootKeepsItsOwnBoundary() throws Exception {
     io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(
         new io.justsearch.indexerworker.ingest.IngestionSkipPolicy(null, null,
-            java.util.Set.of("private")));
+            Set.of("private")));
     try {
       Path root = Files.createDirectories(tempDir.resolve("private").resolve("private"));
       Path publicFile = Files.writeString(root.resolve("notes.txt"), "public content");

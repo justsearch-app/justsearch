@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -69,7 +70,7 @@ class SqliteOperationStoreStartupContentionTest {
         return faulting;
       });
       try {
-        Throwable observed = assertThrows(busy ? OperationStoreException.class : IOException.class, store::open);
+        Throwable observed = assertFailure(busy ? OperationStoreException.class : IOException.class, store::open);
         assertSame(busy ? busyFailure : ioFailure, observed);
         assertEquals(2, observed.getSuppressed().length, "both startup cleanup attempts must remain visible");
         for (Throwable suppressed : observed.getSuppressed()) assertSame(closeFailure, suppressed);
@@ -79,7 +80,7 @@ class SqliteOperationStoreStartupContentionTest {
         verify(faulting, times(2)).close();
         assertThrows(OperationStoreException.class, store::historySinceMillis);
         assertThrows(SQLException.class, store::open);
-        assertThrows(cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
+        assertFailure(cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
         verify(faulting, times(3)).close();
 
         doAnswer(invocation -> {
@@ -298,5 +299,10 @@ class SqliteOperationStoreStartupContentionTest {
       assertTrue(result.next());
       return result.getLong(1);
     }
+  }
+
+  private static Throwable assertFailure(
+      Class<? extends Throwable> type, Executable action) {
+    return assertThrows(type, action);
   }
 }

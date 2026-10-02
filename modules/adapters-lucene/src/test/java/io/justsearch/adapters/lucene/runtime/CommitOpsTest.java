@@ -147,8 +147,8 @@ class CommitOpsTest extends LuceneExecutorTestBase {
   @Test
   void commitCompletedListenerFiresAfterSuccessfulCommitWithReason() throws IOException {
     AtomicInteger callCount = new AtomicInteger();
-    java.util.concurrent.atomic.AtomicReference<CommitReason> received =
-        new java.util.concurrent.atomic.AtomicReference<>();
+    AtomicReference<CommitReason> received =
+        new AtomicReference<>();
     try (MMapDirectory dir = new MMapDirectory(tempDir);
         IndexWriter writer = new IndexWriter(dir, new IndexWriterConfig())) {
       RuntimeSession session = new RuntimeSession(schemaWith(() -> () -> Map.of(), metadata -> {}));

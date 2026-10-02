@@ -246,7 +246,7 @@ public final class OpenAiCompatController implements AutoCloseable {
     } catch (ConnectException ce) {
       respondOffline(ctx, "llama-server connect refused on port " + port);
       return;
-    } catch (java.io.IOException | InterruptedException ex) {
+    } catch (IOException | InterruptedException ex) {
       if (ex instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }

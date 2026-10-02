@@ -64,7 +64,7 @@ class WorkerIngestionAuthorityTest {
     Path file = Files.writeString(Files.createDirectory(root.resolve("private")).resolve("notes.txt"),
         "private content");
     var authority = new WorkerIngestionAuthority();
-    var claim = new io.justsearch.indexerworker.queue.JobQueue.IndexJob(
+    var claim = new JobQueue.IndexJob(
         file, null, null, null, null, null, false, null, root);
     assertEquals(SourceAdmissionAction.ADMIT, authority.admit(claim).action());
     IngestionSkipPolicy.installResolved(new IngestionSkipPolicy(null, null, Set.of("private")));

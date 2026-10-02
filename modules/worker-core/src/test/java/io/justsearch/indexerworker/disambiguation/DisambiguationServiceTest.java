@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -130,8 +131,7 @@ class DisambiguationServiceTest {
             assertThrows(SQLException.class, candidate::open,
                 "reopen must not replace an unconfirmed owner");
             assertEquals(1, openAttempts.get());
-            Throwable shutdownFailure = assertThrows(
-                failureKind.equals("sql") ? IOException.class : closeFailure.getClass(), candidate::close);
+            Throwable shutdownFailure = assertFailure(failureKind.equals("sql") ? IOException.class : closeFailure.getClass(), candidate::close);
             assertSame(closeFailure,
                 failureKind.equals("sql") ? shutdownFailure.getCause() : shutdownFailure);
             assertEquals(2, closeAttempts.get());
@@ -386,5 +386,10 @@ class DisambiguationServiceTest {
       Set<String> variants = snap.expandCanonical("PERSON", canonical);
       assertTrue(variants.size() >= 2, "Should have at least 2 variants: " + variants);
     }
+  }
+
+  private static Throwable assertFailure(
+      Class<? extends Throwable> type, Executable action) {
+    return assertThrows(type, action);
   }
 }

@@ -327,7 +327,7 @@ class NdjsonAppendStoreTest {
       var rows = files.filter(file -> file.getFileName().toString().endsWith(".json")).toList();
       assertEquals(1, rows.size());
       for (Path file : rows) {
-        org.junit.jupiter.api.Assertions.assertTrue(cipher.isSealed(Files.readString(file)));
+        assertTrue(cipher.isSealed(Files.readString(file)));
       }
     }
     assertEquals(java.util.Optional.of("uid"), store.resolveStableDocId("iid", "path"));

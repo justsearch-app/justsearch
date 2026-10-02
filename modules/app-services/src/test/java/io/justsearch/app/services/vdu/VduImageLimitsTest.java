@@ -585,7 +585,7 @@ class VduImageLimitsTest {
       attributes.setBoolean(COSName.I, true);
       group.getCOSObject().setItem(COSName.GROUP, attributes);
       // No painting operators: incidental getPaint/drawImage calls cannot charge this mask.
-      try (var empty = group.getCOSObject().createOutputStream()) {}
+      try (var _ = group.getCOSObject().createOutputStream()) {}
       var mask = new COSDictionary();
       mask.setItem(COSName.S, maskSubtype);
       mask.setItem(COSName.G, group);

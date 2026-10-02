@@ -441,7 +441,7 @@ final class IndexReadinessPublicationTest {
   @Test
   void staleReadReportsBlockedSamplerWithoutRepublishingLifecycle() throws Exception {
     try (var fixture = fixture();
-        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var executors = new TestEngineExecutors();
         var trigger = new io.justsearch.app.services.observability.health.ReadinessReconciliationTrigger(executors)) {
       var initial = new java.util.concurrent.CountDownLatch(1);
       var blocked = new java.util.concurrent.CountDownLatch(1);
@@ -487,7 +487,7 @@ final class IndexReadinessPublicationTest {
             "cached age reporting cannot become a second lifecycle publisher");
         release.countDown();
         assertTrue(refreshed.await(5, java.util.concurrent.TimeUnit.SECONDS));
-        org.junit.jupiter.api.Assertions.assertNull(failure.get());
+        assertNull(failure.get());
         samplerExecutor.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         assertEquals(2, calls.get(), "cached reads cannot enqueue lifecycle feedback samples");
         assertFalse(freshResponse.get().meta().workerRpcStale());

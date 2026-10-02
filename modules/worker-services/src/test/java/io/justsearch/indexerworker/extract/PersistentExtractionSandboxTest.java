@@ -151,7 +151,7 @@ final class PersistentExtractionSandboxTest {
         org.mockito.Mockito.mock(
             Process.class, org.mockito.AdditionalAnswers.delegatesTo(realChild));
     try (var sandbox = sandbox(javaCommand(ExtractionSandboxChild.class), Duration.ofSeconds(30))) {
-      try (var spawns =
+      try (var _ =
           org.mockito.Mockito.mockConstruction(
               ProcessBuilder.class,
               (builder, context) ->
@@ -212,7 +212,7 @@ final class PersistentExtractionSandboxTest {
         .when(observed)
         .destroyForcibly();
     try (var sandbox = sandbox(javaCommand(IgnoringShutdownChild.class), Duration.ofSeconds(30))) {
-      try (var spawns =
+      try (var _ =
           org.mockito.Mockito.mockConstruction(
               ProcessBuilder.class,
               (builder, context) ->
@@ -279,7 +279,7 @@ final class PersistentExtractionSandboxTest {
     var sandbox = sandbox(javaCommand(ScriptedChild.class), Duration.ofSeconds(30));
     Thread writer = null;
     try {
-      try (var spawns =
+      try (var _ =
           org.mockito.Mockito.mockConstruction(
               ProcessBuilder.class,
               (builder, context) ->
@@ -710,9 +710,9 @@ final class PersistentExtractionSandboxTest {
       executor.set(pool);
       return pool;
     }).when(observed).open(org.mockito.ArgumentMatchers.any());
-    var entered = new java.util.concurrent.CountDownLatch(1);
-    var release = new java.util.concurrent.CountDownLatch(1);
-    var queuedDone = new java.util.concurrent.CountDownLatch(1);
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var queuedDone = new CountDownLatch(1);
     var firstPid = new java.util.concurrent.atomic.AtomicLong();
     ManagedChildRegistry children = new ManagedChildRegistry() {
       @Override public List<ManagedChild> snapshot() { return List.of(); }

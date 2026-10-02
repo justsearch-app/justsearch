@@ -160,7 +160,7 @@ final class ContainerExpansionBudget {
     long metadataBytes = 0;
     byte[] buffer = new byte[8192];
     try (var input = new ZipInputStream(Files.newInputStream(file))) {
-      java.util.zip.ZipEntry entry;
+      ZipEntry entry;
       while ((entry = input.getNextEntry()) != null) {
         MemberLimit admitted = entryLimits.get(entry.getName());
         if (admitted == null) {

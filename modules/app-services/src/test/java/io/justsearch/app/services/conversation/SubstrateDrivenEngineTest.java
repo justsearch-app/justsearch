@@ -512,7 +512,7 @@ final class SubstrateDrivenEngineTest {
       var docs = summaryDocuments(new IllegalStateException("index unavailable"), false);
       var llm = new ScriptedAi(List.of("ordinary fallback"));
       var shape = summaryShape(path);
-      var body = new java.util.LinkedHashMap<>(summaryBody(path));
+      var body = new LinkedHashMap<>(summaryBody(path));
       if (path.equals("single") || path.equals("hierarchical")) body.put("content", "inline fallback");
       var events = new ArrayList<SseEvent>();
       summaryEngine(shape, docs, llm).run(shape.id(), body, Audience.USER, events::add,
@@ -556,7 +556,7 @@ final class SubstrateDrivenEngineTest {
           .thenAnswer(call -> {
             String id = call.getArgument(0);
             if (id.equals("doc")) throw failure;
-            return java.util.concurrent.CompletableFuture.completedFuture(
+            return CompletableFuture.completedFuture(
                 new io.justsearch.app.api.DocumentService.DocumentRecord(id, "healthy document", Map.of()));
           });
       org.mockito.Mockito.when(docs.fetchBatch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any()))

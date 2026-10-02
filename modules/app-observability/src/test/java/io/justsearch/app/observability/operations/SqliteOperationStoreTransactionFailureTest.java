@@ -33,6 +33,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -60,8 +61,7 @@ final class SqliteOperationStoreTransactionFailureTest {
       doThrow(closeFailure).when(faulting).close();
       setConnection(store, faulting);
       try {
-        Throwable observed = assertThrows(
-            cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
+        Throwable observed = assertFailure(cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
         assertSame(closeFailure, cleanupKind.equals("sql") ? observed.getCause() : observed);
         assertFalse(realConnection.isClosed());
         OperationStoreException refused = assertThrows(OperationStoreException.class,
@@ -131,8 +131,7 @@ final class SqliteOperationStoreTransactionFailureTest {
             () -> store.find(key), "later store calls must not reuse the uncertain connection");
         assertEquals(OperationStoreException.Code.STORAGE_FAILED, unavailable.code());
         assertTrue(unavailable.getCause().getMessage().contains("closed"));
-        Throwable shutdownFailure = assertThrows(
-            cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
+        Throwable shutdownFailure = assertFailure(cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
         assertSame(closeFailure,
             cleanupKind.equals("sql") ? shutdownFailure.getCause() : shutdownFailure);
         verify(faultingConnection, times(2)).close();
@@ -192,5 +191,10 @@ final class SqliteOperationStoreTransactionFailureTest {
     Field field = SqliteOperationStore.class.getDeclaredField("connection");
     field.setAccessible(true);
     return field;
+  }
+
+  private static Throwable assertFailure(
+      Class<? extends Throwable> type, Executable action) {
+    return assertThrows(type, action);
   }
 }

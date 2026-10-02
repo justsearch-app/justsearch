@@ -69,9 +69,9 @@ final class NativeSessionHandleGpuWaiterCancellationTest {
     AtomicReference<Throwable> failure = new AtomicReference<>();
     Thread creator = new Thread(() -> {
       try (var cuda = mockStatic(OrtCudaHelper.class);
-          var options = mockConstruction(OrtSession.SessionOptions.class);
-          var provider = mockConstruction(ai.onnxruntime.providers.OrtCUDAProviderOptions.class);
-          var applier = mockStatic(SessionOptionsApplier.class);
+          var _ = mockConstruction(OrtSession.SessionOptions.class);
+          var _ = mockConstruction(ai.onnxruntime.providers.OrtCUDAProviderOptions.class);
+          var _ = mockStatic(SessionOptionsApplier.class);
           var cache = mockStatic(OnnxSessionCache.class)) {
         cuda.when(() -> OrtCudaHelper.checkMissingCudaRuntimeDlls(any()))
             .thenReturn(java.util.List.of());

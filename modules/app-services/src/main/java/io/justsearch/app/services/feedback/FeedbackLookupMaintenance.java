@@ -8,6 +8,7 @@ import io.justsearch.core.execution.EngineExecutorRegistry;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +23,7 @@ public final class FeedbackLookupMaintenance implements AutoCloseable {
   private final long baseBackoffMs;
   private final CompletableFuture<Void> ready = new CompletableFuture<>();
   private volatile boolean closed;
-  private volatile Thread worker;
+  private final AtomicReference<Thread> worker = new AtomicReference<>();
 
   public FeedbackLookupMaintenance(
       EngineExecutorRegistry executors, Path archive, StoreCipher cipher, DataKeyManager keys) {
@@ -47,7 +48,7 @@ public final class FeedbackLookupMaintenance implements AutoCloseable {
   }
 
   private void initializeWithRetry() {
-    worker = Thread.currentThread();
+    worker.set(Thread.currentThread());
     long backoffMs = baseBackoffMs;
     try {
       while (!closed && !Thread.currentThread().isInterrupted()) {
@@ -68,14 +69,14 @@ public final class FeedbackLookupMaintenance implements AutoCloseable {
         backoffMs = Math.min(MAX_BACKOFF_MS, backoffMs * 2);
       }
     } finally {
-      worker = null;
+      worker.set(null);
     }
   }
 
   @Override
   public void close() {
     closed = true;
-    Thread active = worker;
+    Thread active = worker.get();
     if (active != null && active != Thread.currentThread()) active.interrupt();
     stopWatching.run();
     scans.close();

@@ -4,76 +4,79 @@ package io.justsearch.adapters.lucene.runtime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
+import io.justsearch.configuration.FieldCatalogDef;
+import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.SearcherFactory;
+import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.junit.jupiter.api.Test;
 
 class CorpusProfileCacheTest {
   @Test
   void refreshBetweenVersionProbeAndProfilingUsesTheProfiledReadersVersion() throws Exception {
+    var scans = new AtomicInteger();
+    var session = new RuntimeSession(IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)));
+    session.nrtMode = NrtMode.ON_DEMAND;
     try (var directory = new ByteBuffersDirectory();
         var writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()));
-        var original = DirectoryReader.open(writer)) {
+        var original = new SearcherManager(writer, new SearcherFactory())) {
       writer.addDocument(new Document());
-      try (var refreshed = DirectoryReader.openIfChanged(original, writer)) {
-        var originalSearcher = new IndexSearcher(original);
-        var refreshedSearcher = spy(new IndexSearcher(refreshed));
+      try (var refreshed = new SearcherManager(writer, countingFactory(scans, () -> {}))) {
+        session.snapshot = snapshot(original);
         var acquisitions = new AtomicInteger();
-        var bridge = mock(SearcherBridge.class);
-        doAnswer(invocation -> {
-          ReadPathOps.SearcherOperation<?> operation = invocation.getArgument(0);
-          // Both staleness probes borrow the old reader; the profiling acquisition sees refresh.
-          return operation.execute(acquisitions.incrementAndGet() <= 2 ? originalSearcher : refreshedSearcher);
-        }).when(bridge).withSearcher(any());
-        var counts = new IndexCountOps(bridge);
+        session.foregroundActive = () -> {
+          // The bridge captures the manager before consulting the foreground predicate.
+          // Both probes therefore borrow the old reader; profiling sees the new snapshot.
+          if (acquisitions.incrementAndGet() == 2) session.snapshot = snapshot(refreshed);
+          return true;
+        };
+        var counts = new IndexCountOps(new SearcherBridge(session));
         var profile = counts.getOrComputeCorpusProfile();
         assertEquals(1, profile.parentDocCount(), "the traversal must use the refreshed reader");
         assertSame(profile, counts.getOrComputeCorpusProfile(),
             "an unchanged profiled reader must hit the cache, even when the preceding probe was older");
-        verify(refreshedSearcher, times(1)).count(any(Query.class));
+        assertEquals(1, scans.get(), "the refreshed reader must be counted exactly once");
       }
     }
   }
 
   @Test
   void concurrentMissesScanOnceAndReaderRefreshInvalidatesTheProfile() throws Exception {
+    var scans = new AtomicInteger();
+    var scanEntered = new CountDownLatch(1);
+    var releaseScan = new CountDownLatch(1);
+    var secondVersionRead = new CountDownLatch(1);
+    var session = new RuntimeSession(IndexSchema.fromCatalog(FieldCatalogDef.forTesting(4)));
+    session.nrtMode = NrtMode.ON_DEMAND;
     try (var directory = new ByteBuffersDirectory();
         var writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()));
-        var reader = DirectoryReader.open(writer)) {
-      var searcher = spy(new IndexSearcher(reader));
-      var current = new AtomicReference<>(searcher);
-      var scans = new AtomicInteger();
-      var scanEntered = new CountDownLatch(1);
-      var releaseScan = new CountDownLatch(1);
-      var secondVersionRead = new CountDownLatch(1);
-      doAnswer(invocation -> {
-        scans.incrementAndGet();
-        scanEntered.countDown();
-        assertTrue(releaseScan.await(2, TimeUnit.SECONDS));
-        return invocation.callRealMethod();
-      }).when(searcher).count(any(Query.class));
-      var bridge = mock(SearcherBridge.class);
-      doAnswer(invocation -> {
-        ReadPathOps.SearcherOperation<?> operation = invocation.getArgument(0);
-        Object result = operation.execute(current.get());
+        var manager = new SearcherManager(writer, countingFactory(scans, () -> {
+          scanEntered.countDown();
+          try {
+            assertTrue(releaseScan.await(2, TimeUnit.SECONDS));
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("corpus scan interrupted", interrupted);
+          }
+        }))) {
+      session.snapshot = snapshot(manager);
+      session.foregroundActive = () -> {
         if (Thread.currentThread().getName().equals("second-profile")) secondVersionRead.countDown();
-        return result;
-      }).when(bridge).withSearcher(any());
-      var counts = new IndexCountOps(bridge);
+        return true;
+      };
+      var counts = new IndexCountOps(new SearcherBridge(session));
       var first = new FutureTask<>(counts::getOrComputeCorpusProfile);
       var second = new FutureTask<>(counts::getOrComputeCorpusProfile);
       Thread.ofPlatform().daemon().name("first-profile").start(first);
@@ -89,10 +92,29 @@ class CorpusProfileCacheTest {
       assertSame(first.get(), counts.getOrComputeCorpusProfile());
 
       writer.addDocument(new Document());
-      try (var refreshed = DirectoryReader.openIfChanged(reader, writer)) {
-        current.set(new IndexSearcher(refreshed));
-        assertEquals(1, counts.getOrComputeCorpusProfile().parentDocCount());
-      }
+      manager.maybeRefreshBlocking();
+      assertEquals(1, counts.getOrComputeCorpusProfile().parentDocCount());
+      assertEquals(2, scans.get(), "reader refresh must trigger another corpus traversal");
     }
+  }
+
+  private static LifecycleSnapshot snapshot(SearcherManager manager) {
+    return new LifecycleSnapshot(null, null, manager, null, false, null);
+  }
+
+  private static SearcherFactory countingFactory(AtomicInteger scans, Runnable beforeCount) {
+    return new SearcherFactory() {
+      @Override
+      public IndexSearcher newSearcher(IndexReader reader, IndexReader previousReader) {
+        return new IndexSearcher(reader) {
+          @Override
+          public int count(Query query) throws IOException {
+            scans.incrementAndGet();
+            beforeCount.run();
+            return super.count(query);
+          }
+        };
+      }
+    };
   }
 }

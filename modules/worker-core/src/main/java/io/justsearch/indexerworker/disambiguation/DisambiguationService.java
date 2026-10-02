@@ -319,8 +319,12 @@ public final class DisambiguationService implements Closeable {
   public synchronized void close() throws IOException {
     initialized.set(false);
     snapshot = EntityClusterSnapshot.EMPTY;
-    needsClose = true;
-    store.close();
+    try {
+      store.close();
+    } catch (IOException | RuntimeException | Error failure) {
+      needsClose = true;
+      throw failure;
+    }
     needsClose = false;
   }
 }
