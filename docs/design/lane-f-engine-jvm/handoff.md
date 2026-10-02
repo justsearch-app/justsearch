@@ -5,6 +5,213 @@ Start with the [2026-09-26 takeover](takeover-2026-09-26.md), then the
 the current queue, revision, lease, and blocking decisions; D1 owns design and
 acceptance evidence. The brief does not narrow the remaining lane scope.
 
+## Takeover 2026-10-02 (next root starts here)
+
+The owner is handing the lane from the Claude root (session `73335075`, 2026-09-30 to 2026-10-02) to a
+new agent. This section is self-contained. The dated sections below are history: where they differ,
+this one wins.
+
+### Owner instructions, verbatim
+
+These are the owner's instructions from the start of the previous root's thread. They still bind,
+except where a later owner decision below overrides them.
+
+1. Takeover (2026-09-30):
+   > ive stopped the previous active lane F agent. now i want you to takeover and proceed as you
+   > mentioned. also ive made it possible for you to use codex agents. luna is very cheap but a bit more
+   > stupid, sol is nearly as intelligent as you but much cheaper overall. try to remember these
+   > instructiuons, tips and how you planned on taking over the lane. then proceed autonomously. dont
+   > report to me unless i tell you to, or you actually need my input. following is the previous agents
+   > handoff: docs/design/lane-f-engine-jvm/handoff.md
+
+   "As you mentioned" refers to the re-plan in [Re-plan](#re-plan-owner-authorized-2026-09-30):
+   - move the merge boundary to D1 close, so D2 becomes follow-on work on main;
+   - triage D1 into merge-critical items versus enabled-capability items;
+   - run installed proof at item closure, not on every correction;
+   - keep this handoff compact.
+2. Models (2026-09-30): "ensure the configured codex models for you are luna 6 and sol 6.1". That
+   means Luna `gpt-6-luna` and Sol `gpt-6.1-sol`. Always pass `-m` explicitly.
+3. Search v3 deadline (2026-09-30): "no agent told me anything about the search v3 deadline issue
+   directly so far". If an issue keeps recurring, report it to the owner directly. Do not move the
+   deadline.
+4. Background processes (2026-09-30): fix memory reaping of background processes; do not let it
+   recur.
+5. Codex cost fix (2026-09-30), verbatim:
+   > Cost fix for your Codex delegation. Do this before launching any new Codex work, then continue
+   > autonomously.
+   > Findings: since the takeover, Codex cost about $114. Only ~$24 was the runs you launched. ~$90 was
+   > sub-agents your Sol workers spawned themselves under the repo roles in .codex/agents/*.toml, which
+   > still pin gpt-5.6-sol / gpt-5.6-luna. About 70% of Codex spend is cached-input re-reads. Workers
+   > waited up to 3 hours for a Gradle grant and polled with their full context loaded. Your status table
+   > showed 5 workers when about 11 Codex sessions were actually running. Codex weekly quota went from
+   > 12% to 20% in 4 hours.
+   > Fixes:
+   > 1. No nested spawning. Add `-c agents.enabled=false` to every `codex exec` and `codex exec resume`,
+   >    and add one line to every brief: "Do not spawn sub-agents; do the work yourself." [...]
+   > 2. Stale role pins. In a separate small worktree and branch, update .codex/agents/{complex_worker,
+   >    reviewer}.toml to gpt-6.1-sol and {worker,explorer}.toml plus default_subagent_model in
+   >    .codex/config.toml to gpt-6-luna, keeping each role's current effort. [...] Open a PR, and do
+   >    not merge until I say so. Leave the unrelated uncommitted edits to .codex/config.toml in the
+   >    main checkout alone.
+   > 3. No idle waiting. A worker must never poll for a Gradle grant. Split build-bound work into
+   >    phases: the worker edits, then stops with a "READY FOR BUILD: <exact commands>" final message
+   >    and exits. When the grant is free, you issue it and run `codex exec resume <id>` with "you hold
+   >    the grant, run: ...". Only launch a worker while it has non-build work to do.
+   > 4. Currently running workers: [...] Do not kill anything that holds the Gradle grant or is
+   >    mid-edit.
+   > 5. Visibility and budget. Every status report counts actual Codex sessions, children included.
+   >    After each worker finishes, record its API-equivalent cost in the handoff [...] Also note the
+   >    Codex weekly used_percent. Tell me if it passes 50% before the week resets.
+   > 6. Model tiering: send every read-only inventory, contract check, doc edit and mechanical change
+   >    to Luna (about 20x cheaper). Keep Sol for design, non-trivial implementation and refute-first
+   >    review.
+   > 7. Write rules 1, 3, 5 and 6 into handoff.md's active-resume section so they survive compaction.
+
+   The operational form is [Codex cost rules](#codex-cost-rules-owner-2026-09-30-binding-for-every-launch-and-resume).
+   That section also has the prices, the status script and the brief template.
+6. Stopping (2026-10-02): "well then just resume work now and don't stop without reason". This was
+   said after the previous root stopped overnight work without a reason. Stop only:
+   - when the scope is complete;
+   - when the owner pauses or hands off;
+   - when no useful work can proceed without an external dependency.
+
+   Long queues are not a reason to stop. Run other non-congesting work beside them.
+7. Resource sharing (2026-10-01): long E runs are best run overnight. During the day, run work that
+   does not fully congest the GPU or CPU. The owner pauses and resumes explicitly; obey the exact
+   window they name.
+8. Merges: never merge without an explicit, per-action go-ahead from the owner:
+   - PR #735 (the Codex role pins) is open and waits for the owner;
+   - PR727 (draft, this lane) merges only at stage F, with an explicit "merge it".
+
+### Owner decisions still in force
+
+- **GPU policy (2026-10-02, final).** Match shipped behaviour: the chat model and the encoders are
+  co-resident on the GPU, and chat going Online never yields the encoders (`6d1d9edd5`).
+  - The ADR-0004 amendment, ADR-0019, and the RISK-001 and register docs are in `16dfd5adc`.
+  - A budget-aware or split policy is a post-merge follow-up lane. Branch `codex/lane-f-gpu-yield`
+    (`54b0a8893` plus uncommitted split edits) and the reviews `C:/Users/Elias/AppData/Local/Temp/cx/gpurev{,2,3,4,5}-findings.md`
+    are inputs for that lane. They are not mergeable.
+- **E acceptance.** Timeouts, 5xx and crash clauses are branch-only acceptance properties; main's
+  failures are recorded baseline facts.
+- **E7 / WP2 signing.** The signed predecessor-to-target installed proof needs the external
+  signing/AppControl environment. It is still open and needs an owner deferral decision before F.
+- **Search v3 deadline.** Owned by tempdoc 852 / decision 851. Do not move the date, and do not
+  fabricate `governance/window-cutover.done`.
+
+### State at handoff (2026-10-02 ~13:30)
+
+- **Lane:** `codex/lane-f-pr1` at `413023d8b`, worktree `.claude/worktrees/lane-f-pr1-verify`.
+  - Local is 48 commits ahead of `origin` (`259e022da`). The 48 commits are E evidence and docs, the
+    GPU parity change, and the investigation.
+  - Push the lane (a plain `git push`, never force) to update draft PR727 before the next hosted run.
+- **Build and tests:** the full suite is green at `6d1d9edd5`: 12,590 tests. The only red XML is a
+  stale `installedApiPortRestartTest` result from 2026-09-29.
+  - Hosted CI was last checked at 14/14 green on `0e47164c0`.
+  - `259e022da` was pushed, but its CI result has not been read.
+- **Processes:** no stack is running and no E queue is running.
+  - Codex sessions launched by the previous root: 0 live.
+  - The `codex.exe` processes visible on the machine belong to the owner's own Codex app. Do not
+    kill them; the previous root once killed the owner's exec-server.
+  - Codex API-equivalent spend so far is $189.70. Weekly `used_percent` was 30 at 13:30 on
+    2026-10-02.
+- **Stage E, main arm:** complete with the final tooling.
+
+  | Group | Record | Result |
+  | --- | --- | --- |
+  | E1 | `16-27-42-378Z` | captured |
+  | E2 agent-idle | `16-42-58-581Z` | captured |
+  | E2 scripted | `17-05-11-968Z` | captured |
+  | E0 | frozen from `47e9fe12e` | hybrid p95 ceilings 285 ms (agent-idle) and 1,707 ms (scripted); agent p95 ceiling 6.1 s |
+  | E5 | `2026-10-02T06-41-36-093Z-0ef8ea83` | API restored after kill in 0.87 s; index restored in 16.9 s vs a 13.6 s budget; orphaned child; child-policy failures (baseline facts) |
+  | E4 w1, w2, w3 | `2026-10-02T06-46-11`, `07-42-03`, `08-37-53` | workload measured; memory clauses pass; main's live-after-GC trend fails (~0.8 MB/min) |
+
+  Records are under `docs/design/lane-f-engine-jvm/evidence/E/`.
+- **Stage E, branch arm:** not measured on the parity build.
+  - Earlier branch E2 and E4 w1 records ran encoders on CPU and are invalid.
+  - Branch E1 passed earlier (`19-34-15-984Z`) but must be rerun on the parity build.
+- **Build/test-time fixes:** branch `codex/lane-f-buildfix` (worktree `.claude/worktrees/lane-f-buildfix`,
+  `9b8412533`, based on `103946f6f`).
+  - What it does:
+    - fixes the 180 s wrong-reason green in `EngineNativePointerBootMutationTest`;
+    - adds `:modules:app-engine:test` to the CI platform-contracts shard (it never ran in CI);
+    - removes the PMD integration-test config-cache opt-out;
+    - makes `NativeInferenceContainmentTest` reuse its ArchUnit import.
+  - It is unverified. The verify script `tmp/bf-verify.cmd` was generated with `printf`, which turned
+    `\b` into a backspace, so none of its commands ran. Delete that script.
+  - Investigation: [build-test-time-investigation](evidence/F/build-test-time-investigation-2026-10-02.md).
+    Fix list and commands: `evidence/F/build-test-time-fixes-2026-10-02.md` on that branch.
+
+### Next steps, in order
+
+1. **Verify the build-fix branch** in its worktree, one Gradle build at a time:
+   - `./gradlew.bat spotlessCheck`;
+   - the focused tests named in its evidence file, including a negative check that the old barrier
+     timeout now fails;
+   - the CI shard checks: `node scripts/ci/check-workflow-triggers.mjs` and the unit-test shard
+     policy check;
+   - `./gradlew.bat build -x test`.
+
+   Then merge it into `codex/lane-f-pr1` (a local merge, not a PR). Use Write/Edit for any script
+   that contains backslashes.
+2. **Branch re-measurement,** about 4 h plus fix rounds. Run it overnight or when the owner allows
+   GPU/CPU congestion.
+   - Start: `node tmp/lane-f-e-queue.mjs tmp/q-branch.txt --continue`. Run it detached (a `Start-Process`
+     driver), never as a tracked background task.
+   - Optionally restart `tmp/gpu-mem-sampler.ps1` first.
+   - Stop it between items by creating `tmp/lane-f-e-queue-q-branch.stop`. Never kill the runner: its
+     e-run child dies with the pipe and leaves an owned stack.
+   - The runner commits E evidence between items with `git commit`, which takes the whole index. Do
+     not leave unrelated files staged while it runs.
+   - Tooling is frozen during E. Editing any hashed acquisition instrument changes pair identity and
+     forces main recapture. Scoring code (`e-run.mjs` scoring, `analyze-head-run.cjs`) is exempt; use
+     `reproject`.
+   - Known risk: branch E5 failed earlier with "Managed child identity/configuration unavailable"
+     (the `sampleOnce` managed-child check in `scripts/jseval/lane-f/e456-live.mjs`). The manifest is
+     deleted at shutdown, so inspect it on a live branch stack before or while E5 runs. Fixing an
+     instrument means recapturing main E5, and main E4 if that instrument is shared.
+3. **E6 and the table:** `e4-hang-values`, `e6-hang` on both arms, then `table`. These are the tail
+   of `q-branch.txt`. Judge every branch failure against E0 and the frozen policies in
+   `stages/E.md` §2.
+4. **Stage F:**
+   - final installed-scenario round on the final revision;
+   - final full suite (preserve the XML);
+   - F-6;
+   - F-7: insert the E measurements table;
+   - F-8: PR body, managed review record (`preview-squash-message`, `pr-review-record check`), squash
+     preview, and exact-SHA hosted CI;
+   - an independent refute-first review of the final diff.
+
+   Then report to the owner and wait for the merge go-ahead. Get the owner's E7 deferral decision
+   before F-8.
+5. **Follow-ups after merge (record them, do not start them):**
+   - the GPU budget-aware or split policy lane;
+   - splitting the Engine source guards (saves about 11 minutes on script-only edits);
+   - the duplicate installed migration scenario;
+   - a review of CI shard budgets.
+
+### Practical notes for the new root
+
+- **Stack:**
+  - Check `quick_health` first.
+  - E stacks are started by `e-run.mjs` itself, with the session id `lane-f-e-<id>`.
+  - Stop a leftover stack with `node scripts/dev/dev-runner.cjs stop --run <id> --session-id lane-f-e-<id>`,
+    run from the arm's tree (main arm: worktree `lane-f-e-main`).
+- **Codex launch form:**
+  ```
+  codex exec -C <worktree> -s read-only|workspace-write -m gpt-6.1-sol|gpt-6-luna -c model_reasoning_effort=<e> -c agents.enabled=false -o <out> - < <brief>
+  ```
+  - Use the brief template at `C:/Users/Elias/AppData/Local/Temp/cx/brief-rules.md`.
+  - Check status with `node C:/Users/Elias/AppData/Local/Temp/cx/codex-status.js`.
+- **Avoid:**
+  - Bash heredocs with backslashes or apostrophes;
+  - `printf` with `\b`;
+  - piping a command whose exit code matters;
+  - trusting a `--rerun` total that finishes in seconds (it came from the build cache).
+- **Preserve:**
+  - the WIP in the main checkout;
+  - the foreign `modules/app-inference/logs/`;
+  - the local-only branch `codex/lane-f-d2-drafts`.
+
 ## Orchestrator takeover (2026-09-30, Claude root)
 
 The owner stopped the previous root and handed the lane to a Claude root with
