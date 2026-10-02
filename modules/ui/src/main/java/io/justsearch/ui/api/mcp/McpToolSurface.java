@@ -1252,6 +1252,7 @@ public final class McpToolSurface {
     try {
       return session.statusFacts(engineContext);
     } catch (Exception e) {
+      rethrowWorkRefusal(e);
       log.debug("MCP search: retained status unavailable", e);
       return null;
     }
@@ -1732,6 +1733,7 @@ public final class McpToolSurface {
       sb.append(" ").append(TOOL_SELECTION_GUIDANCE);
       return sb.toString();
     } catch (Exception e) {
+      rethrowWorkRefusal(e);
       return "JustSearch index status unknown. " + TOOL_SELECTION_GUIDANCE;
     }
   }
@@ -1826,7 +1828,7 @@ public final class McpToolSurface {
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "text/plain", "text", sb.toString())));
     } catch (Exception e) {
-      return resourceError(uri, e.getMessage());
+      return resourceFailureContent(uri, e);
     }
   }
 
@@ -1840,7 +1842,7 @@ public final class McpToolSurface {
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "text/plain", "text", text)));
     } catch (Exception e) {
-      return resourceError(uri, e.getMessage());
+      return resourceFailureContent(uri, e);
     }
   }
 
@@ -1858,7 +1860,7 @@ public final class McpToolSurface {
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "application/json", "text", text)));
     } catch (Exception e) {
-      return resourceError(uri, e.getMessage());
+      return resourceFailureContent(uri, e);
     }
   }
 
@@ -1878,7 +1880,7 @@ public final class McpToolSurface {
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "application/json", "text", text)));
     } catch (Exception e) {
-      return resourceError(uri, e.getMessage());
+      return resourceFailureContent(uri, e);
     }
   }
 
@@ -1903,6 +1905,7 @@ public final class McpToolSurface {
       boolean lowSplade = extras.get("spladeCoveragePercent") instanceof Number n && n.doubleValue() < 100;
       return (lowEmbedding || lowSplade) ? message : null;
     } catch (Exception e) {
+      rethrowWorkRefusal(e);
       return null;
     }
   }
@@ -2151,8 +2154,8 @@ public final class McpToolSurface {
       "Knowledge server is not available (worker offline or still starting)."
           + " State is reported by the justsearch_status tool.";
 
-  /** Project the existing API classification and sanitizer, without a parallel retry policy. */
-  private static Map<String, Object> toolFailureContent(String tool, Exception e) {
+  /** Preserve work refusals for the protocol boundary before applying any content fallback. */
+  private static Exception rethrowWorkRefusal(Exception e) {
     var executorRefusal = ApiErrorHandler.executorRefusal(e);
     if (executorRefusal != null) throw executorRefusal;
     // Future.get/join transport the cause in wrappers with no failure policy of their own.
@@ -2164,6 +2167,17 @@ public final class McpToolSurface {
       e = cause;
     }
     if (e instanceof io.justsearch.app.api.EngineAdmissionException refused) throw refused;
+    return e;
+  }
+
+  private static Map<String, Object> resourceFailureContent(String uri, Exception e) {
+    rethrowWorkRefusal(e);
+    return resourceError(uri, e.getMessage());
+  }
+
+  /** Project the existing API classification and sanitizer, without a parallel retry policy. */
+  private static Map<String, Object> toolFailureContent(String tool, Exception e) {
+    e = rethrowWorkRefusal(e);
     String detail = e.getMessage() != null ? e.getMessage() : "no additional detail";
     String message = tool
         + " failed: "

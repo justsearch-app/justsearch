@@ -44,6 +44,78 @@ import tools.jackson.databind.json.JsonMapper;
 class McpProtocolHandlerTest {
 
   @Test
+  void resourcesReadPreservesDirectAndWrappedAdmissionRefusals() throws Exception {
+    for (var reason : List.of(
+        io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
+        io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN)) {
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+      for (RuntimeException failure : List.of(
+          refusal, new java.util.concurrent.CompletionException(refusal),
+          new java.util.concurrent.CompletionException(
+              new java.util.concurrent.ExecutionException(refusal)))) {
+        var adapter = mock(KnowledgeHttpApiAdapter.class);
+        when(adapter.search(any(), any(EngineContext.class))).thenThrow(failure);
+        when(adapter.status(any(EngineContext.class))).thenThrow(failure);
+        when(dispatcher.dispatch(any(), anyString(), any(), any(EngineContext.class)))
+            .thenThrow(failure);
+        var ctrl = mock(KnowledgeSearchController.class);
+        when(ctrl.getAdapter()).thenReturn(adapter);
+        var surface = new McpToolSurface(List.of(new AgentToolsOperationCatalog()), dispatcher,
+            () -> ctrl, () -> null, FIXED_CLOCK);
+        var protocol = new McpProtocolHandler(surface, List.of(), FIXED_CLOCK);
+        for (String uri : List.of(
+            "justsearch://index/summary", "justsearch://index/roots",
+            "justsearch://index/top-sources", "justsearch://index/top-entities",
+            "justsearch://resource/some-id")) {
+          assertDownstreamAdmissionResponse(protocol, "resources/read", Map.of("uri", uri), reason);
+        }
+      }
+    }
+  }
+
+  @Test
+  void promptAndRetainedSearchStatusPreserveAdmissionRefusals() throws Exception {
+    var reason = io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+    var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+    var adapter = mock(KnowledgeHttpApiAdapter.class);
+    when(adapter.status(any(EngineContext.class))).thenThrow(
+        new java.util.concurrent.CompletionException(
+            new java.util.concurrent.ExecutionException(refusal)));
+    McpSearchSessionFixture.stub(adapter, cannedSearchResponse());
+    var protocol = handlerOver(adapter);
+    assertDownstreamAdmissionResponse(protocol, "prompts/get",
+        Map.of("name", "search_files", "arguments", Map.of("topic", "test")), reason);
+    assertDownstreamAdmissionResponse(protocol, "tools/call",
+        Map.of("name", "justsearch_search", "arguments", Map.of("query", "test")), reason);
+  }
+
+  private void assertDownstreamAdmissionResponse(
+      McpProtocolHandler protocol, String method, Map<String, Object> params,
+      io.justsearch.app.api.EngineAdmissionException.Reason reason) throws Exception {
+    var ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
+    when(ctx.body()).thenReturn(MAPPER.writeValueAsString(
+        Map.of("jsonrpc", "2.0", "id", "resource-refusal", "method", method, "params", params)));
+    when(ctx.contentType(anyString())).thenReturn(ctx);
+    when(ctx.status(anyInt())).thenReturn(ctx);
+    var response = ArgumentCaptor.forClass(String.class);
+    when(ctx.result(response.capture())).thenReturn(ctx);
+    protocol.handlePost(ctx);
+    var wire = MAPPER.readTree(response.getValue());
+    assertEquals("resource-refusal", wire.path("id").asString());
+    assertFalse(wire.has("result"), method + ": " + params);
+    assertEquals(-32000, wire.at("/error/code").asInt());
+    boolean frozen = reason == io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN;
+    assertEquals(frozen ? "UPGRADE_PREPARING" : "ADMISSION_ENGINE_LIMIT",
+        wire.at("/error/data/errorCode").asString());
+    assertTrue(wire.at("/error/data/retrySafe").isBoolean());
+    assertFalse(wire.at("/error/data/retrySafe").asBoolean());
+    verify(ctx).status(frozen ? 503 : 429);
+    if (frozen) verify(ctx, never()).header(eq("Retry-After"), anyString());
+    else verify(ctx).header("Retry-After", "7");
+  }
+
+  @Test
   @SuppressWarnings("unchecked")
   void downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay() throws Exception {
     for (var reason : io.justsearch.app.api.EngineAdmissionException.Reason.values()) {

@@ -33,6 +33,9 @@ also returns an API-error body with `503`. Readiness's `503` uses
 `runtime-ready-unavailable-response.v1.json`, a union of the readiness probe body and
 the API-error body; its `200` retains `runtime-ready-response.v1.json`. Health is
 exempt from Engine admission and retains its lifecycle snapshot body for `503`.
+The readiness union has local `$defs` generated from the canonical branch schemas;
+refresh both canonical and served copies with
+`node contracts/runtime/generate-readiness-schema.mjs` (`--check` detects drift).
 
 The projection currently contains exactly six read-only operations: runtime manifest and mirror,
 readiness, liveness, health, and status. See [Runtime Contract](runtime-contract.md#generated-node-client)

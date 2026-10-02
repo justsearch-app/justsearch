@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readinessUnavailableSchema } from '../../../contracts/runtime/generate-readiness-schema.mjs';
 
 const read = path => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
 const sdk = read('../openapi/runtime-client.openapi.json');
@@ -39,16 +40,42 @@ test('readiness 503 bundles both canonical bodies while 200 remains a readiness 
   const served = read('../../../modules/ui/src/main/resources/SSOT/schemas/' + name);
   assert.deepEqual(served, canonical);
   assert.deepEqual(canonical.oneOf, [
-    { $ref: 'runtime-ready-response.v1.json' }, { $ref: 'api-error-response.v1.json' },
+    { $ref: '#/$defs/ReadinessResponse' }, { $ref: '#/$defs/ApiErrorResponse' },
   ]);
   assert.deepEqual(sdk.components.schemas['runtime-ready-unavailable-response'].oneOf,
-    canonical.oneOf.map(branch => ({ $ref: componentRef(branch.$ref) })));
-  for (const filename of canonical.oneOf.map(branch => branch.$ref)) {
+    canonical.oneOf.map(branch => ({
+      $ref: '#/components/schemas/runtime-ready-unavailable-response' + branch.$ref.slice(1),
+    })));
+  for (const [definition, filename] of Object.entries({
+    ReadinessResponse: 'runtime-ready-response.v1.json',
+    ApiErrorResponse: 'api-error-response.v1.json',
+  })) {
     const source = read('../../../SSOT/schemas/' + filename);
     delete source.$schema;
     delete source.$id;
+    assert.deepEqual(canonical.$defs[definition], source);
+    assert.deepEqual(sdk.components.schemas['runtime-ready-unavailable-response'].$defs[definition], source);
     assert.deepEqual(sdk.components.schemas[filename.replace(/\.v\d+\.json$/, '')], source);
   }
   assert.equal(sdk.paths['/api/runtime/ready'].get.responses['200']
     .content['application/json'].schema.$ref, '#/components/schemas/runtime-ready-response');
+});
+
+test('served readiness union has only resolvable internal references', () => {
+  const served = read('../../../modules/ui/src/main/resources/SSOT/schemas/runtime-ready-unavailable-response.v1.json');
+  const readiness = read('../../../SSOT/schemas/runtime-ready-response.v1.json');
+  const apiError = read('../../../SSOT/schemas/api-error-response.v1.json');
+  assert.deepEqual(served, readinessUnavailableSchema(readiness, apiError));
+  const visit = (value, nested = false) => {
+    if (!value || typeof value !== 'object') return;
+    if (value.$ref) {
+      assert.ok(value.$ref.startsWith('#/'), 'external schema dependency: ' + value.$ref);
+      let target = served;
+      for (const segment of value.$ref.slice(2).split('/')) target = target?.[segment];
+      assert.ok(target, 'unresolved internal schema dependency: ' + value.$ref);
+    }
+    if (nested) assert.equal(value.$id, undefined, 'embedded branches must retain root scope');
+    for (const child of Object.values(value)) visit(child, true);
+  };
+  visit(served);
 });

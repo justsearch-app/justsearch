@@ -262,7 +262,21 @@ export interface RuntimeReadyResponse {
 /**
  * A readiness probe failure or an Engine admission refusal.
  */
-export type RuntimeReadyUnavailableResponse = RuntimeReadyResponse | ApiErrorResponse;
+export type RuntimeReadyUnavailableResponse = {
+  /** @nullable */
+  instanceId: string | null;
+  /** @nullable */
+  lifecycle: string | null;
+  ready: boolean;
+} | {
+  error: string;
+  errorClass?: string;
+  errorCode: string;
+  i18nKey?: string;
+  requestId?: string;
+  retrySafe?: boolean;
+  retryable?: boolean;
+};
 
 export type getWellKnownRuntimeManifestResponse200 = {
   data: RuntimeManifestPublic
