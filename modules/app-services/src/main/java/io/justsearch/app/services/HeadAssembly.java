@@ -168,6 +168,7 @@ public final class HeadAssembly implements AutoCloseable {
   // Tempdoc 778 — the default-on local feedback-capture flag, shared by every capture site + the
   // /api/feedback/capture surface.
   private io.justsearch.app.services.feedback.FeedbackCaptureSettings feedbackCaptureSettings;
+  private io.justsearch.app.services.feedback.FeedbackObserver feedbackObserver;
 
   /** Tempdoc 629 (LAYER): the data-at-rest key manager (owns the DEK lifecycle for AUTHORED stores). */
   private final io.justsearch.app.services.encryption.DataKeyManager dataKeyManager;
@@ -760,9 +761,21 @@ public final class HeadAssembly implements AutoCloseable {
         PlatformPaths.resolveDataDir().resolve("feedback");
     // Tempdoc 778 — the default-on local capture flag (loopback-privacy: nothing captured leaves the
     // machine, and the user can turn even local capture off).
+    this.feedbackObserver = new io.justsearch.app.services.feedback.FeedbackObserver(executors);
+    acquiredOwners.add(this.feedbackObserver);
     this.feedbackCaptureSettings =
         new io.justsearch.app.services.feedback.FeedbackCaptureSettings(
             PlatformPaths.resolveDataDir());
+    this.feedbackObserver.observe(() -> {
+      try {
+        new io.justsearch.app.services.feedback.NdjsonAppendStore<>(
+            feedbackDir.resolve("feature-snapshots.ndjson"),
+            io.justsearch.app.services.feedback.FeatureSnapshot.class, feedbackCipher)
+            .initializeLookup();
+      } catch (java.io.IOException failure) {
+        log.debug("Feedback identity lookup backfill failed (non-fatal)", failure);
+      }
+    });
 
     // Tempdoc 580 §17 P4 — the agent-citation contributor: each agent answer's grounding sources +
     // citations project to the ONE canonical disposition stream (CITED/SHOWN). Best-effort.
@@ -771,7 +784,7 @@ public final class HeadAssembly implements AutoCloseable {
           agentRunStore::addEventListener,
           PlatformPaths.resolveDataDir(),
           feedbackCipher,
-          this.feedbackCaptureSettings);
+          this.feedbackCaptureSettings, this.feedbackObserver);
     }
 
     // Tempdoc 778 — enroll the AUTHORED feedback store in the encrypted backup/restore path. The
@@ -1295,6 +1308,10 @@ public final class HeadAssembly implements AutoCloseable {
    */
   public AgentRunStore agentRunStore() {
     return agentRunStore;
+  }
+
+  public io.justsearch.app.services.feedback.FeedbackObserver feedbackObserver() {
+    return feedbackObserver;
   }
 
   /**
@@ -1830,7 +1847,11 @@ public final class HeadAssembly implements AutoCloseable {
         }
       } finally {
         try {
-          if (perSourceSearch != null) perSourceSearch.close();
+          try {
+            if (feedbackObserver != null) feedbackObserver.close();
+          } finally {
+            if (perSourceSearch != null) perSourceSearch.close();
+          }
         } finally {
           try { foregroundDocumentOwner.close(); } finally { backgroundDocumentOwner.close(); }
         }

@@ -48,6 +48,16 @@ public final class AgentDispositionWiring {
    */
   public static void register(
       Consumer<BiConsumer<String, Map<String, Object>>> addEventListener,
+      Path dataDir, StoreCipher cipher, FeedbackCaptureSettings captureSettings,
+      FeedbackObserver observer) {
+    register(listener -> addEventListener.accept((type, payload) -> {
+      Map<String, Object> captured = new java.util.HashMap<>(payload);
+      observer.observe(() -> listener.accept(type, captured));
+    }), dataDir, cipher, captureSettings);
+  }
+
+  public static void register(
+      Consumer<BiConsumer<String, Map<String, Object>>> addEventListener,
       Path dataDir,
       StoreCipher cipher,
       FeedbackCaptureSettings captureSettings) {
@@ -134,19 +144,16 @@ public final class AgentDispositionWiring {
     if (sessionId == null || sessionId.isBlank()) {
       return;
     }
-    List<FeatureSnapshot> captured;
-    try {
-      captured = snapshots.readAll();
-    } catch (Exception e) {
-      log.debug("agent feedback UID resolution failed (non-fatal): {}", e.toString());
-      return;
-    }
     int unresolved = 0;
     for (ResultDisposition disposition :
         AgentCitationContributor.fromDoneEvent(sessionId, payload, now)) {
-      var stableDocId =
-          FeatureSnapshots.resolveStableDocId(
-              captured, disposition.interactionId(), disposition.docId());
+      java.util.Optional<String> stableDocId;
+      try {
+        stableDocId = snapshots.resolveStableDocId(disposition.interactionId(), disposition.docId());
+      } catch (Exception failure) {
+        log.debug("agent feedback UID resolution failed (non-fatal): {}", failure.toString());
+        continue;
+      }
       if (stableDocId.isEmpty()) {
         unresolved++;
         continue;

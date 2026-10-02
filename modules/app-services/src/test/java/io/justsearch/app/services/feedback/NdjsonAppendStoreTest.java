@@ -15,6 +15,78 @@ import org.junit.jupiter.api.io.TempDir;
 class NdjsonAppendStoreTest {
 
   @Test
+  void legacyLookupBackfillRunsOnceAndPreservesHistoricalIdentity(@TempDir Path dir)
+      throws Exception {
+    Path archive = dir.resolve("feature-snapshots.ndjson");
+    Files.writeString(archive, new tools.jackson.databind.ObjectMapper()
+        .writeValueAsString(snapshot("legacy-iid", "legacy-uid")) + "\n");
+    new NdjsonAppendStore<>(archive, FeatureSnapshot.class).initializeLookup();
+    Files.writeString(archive, "invalid historical JSON\n");
+    var reopened = new NdjsonAppendStore<>(archive, FeatureSnapshot.class);
+    // A completed persistent backfill must not open the archive again, even after restart.
+    reopened.initializeLookup();
+    assertEquals(java.util.Optional.of("legacy-uid"), reopened.resolveStableDocId("legacy-iid", "path"));
+  }
+
+  @Test
+  void keyedLookupSurvivesReopenWithoutOpeningTheArchiveOrWaitingOnItsMonitor(@TempDir Path dir)
+      throws Exception {
+    Path archive = dir.resolve("feature-snapshots.ndjson");
+    var cipher = org.mockito.Mockito.spy(io.justsearch.agent.api.encryption.StoreCipher.disabled());
+    var store = new NdjsonAppendStore<>(archive, FeatureSnapshot.class, cipher);
+    for (int i = 0; i < 50; i++) store.append(snapshot("iid-" + i, "uid-" + i));
+    // Reading the archive cannot produce a row now. The keyed projection must stand alone.
+    Files.writeString(archive, "invalid historical JSON\n");
+    var reopened = new NdjsonAppendStore<>(archive, FeatureSnapshot.class, cipher);
+    org.mockito.Mockito.clearInvocations(cipher);
+    synchronized (reopened) {
+      org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () ->
+          assertEquals(java.util.Optional.of("uid-49"), reopened.resolveStableDocId("iid-49", "path")));
+    }
+    org.mockito.Mockito.verify(cipher, org.mockito.Mockito.times(1)).open(org.mockito.ArgumentMatchers.anyString());
+    assertEquals(java.util.Optional.empty(), reopened.resolveStableDocId("missing", "path"));
+  }
+
+  @Test
+  void keyedLookupKeepsConflictingEvidenceUnresolvedAcrossHandles(@TempDir Path dir) throws Exception {
+    Path archive = dir.resolve("feature-snapshots.ndjson");
+    var first = new NdjsonAppendStore<>(archive, FeatureSnapshot.class);
+    var second = new NdjsonAppendStore<>(archive, FeatureSnapshot.class);
+    first.append(snapshot("iid", "uid-1"));
+    second.append(snapshot("iid", "uid-2"));
+    first.append(snapshot("iid", "uid-1"));
+    assertEquals(java.util.Optional.empty(), second.resolveStableDocId("iid", "path"));
+  }
+
+  @Test
+  void keyedLookupUsesTheArchiveCipherAndFailsClosedWhileLocked(@TempDir Path dir) throws Exception {
+    var locked = new java.util.concurrent.atomic.AtomicBoolean();
+    var cipher = new io.justsearch.agent.api.encryption.StoreCipher(
+        new io.justsearch.agent.api.encryption.DataKeyState() {
+          public boolean enabled() { return true; }
+          public boolean locked() { return locked.get(); }
+          public byte[] dek() { return new byte[32]; }
+        });
+    var store = new NdjsonAppendStore<>(dir.resolve("feature-snapshots.ndjson"), FeatureSnapshot.class, cipher);
+    store.append(snapshot("iid", "uid"));
+    try (var files = Files.walk(dir.resolve("feature-snapshots.ndjson.lookup"))) {
+      var rows = files.filter(file -> file.getFileName().toString().endsWith(".json")).toList();
+      assertEquals(1, rows.size());
+      for (Path file : rows) {
+        org.junit.jupiter.api.Assertions.assertTrue(cipher.isSealed(Files.readString(file)));
+      }
+    }
+    assertEquals(java.util.Optional.of("uid"), store.resolveStableDocId("iid", "path"));
+    locked.set(true);
+    assertEquals(java.util.Optional.empty(), store.resolveStableDocId("iid", "path"));
+  }
+
+  private static FeatureSnapshot snapshot(String interaction, String uid) {
+    return new FeatureSnapshot(interaction, "q", 1L,
+        List.of(new FeatureSnapshot.HitFeatures(uid, "path", 1, 1f, 0f, 0f, 1f, null)));
+  }
+
+  @Test
   void featureSnapshot_roundtripsWithNullableTokenCount(@TempDir Path dir) throws IOException {
     var store =
         new NdjsonAppendStore<>(dir.resolve("feature-snapshots.ndjson"), FeatureSnapshot.class);

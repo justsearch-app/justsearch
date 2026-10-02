@@ -3,6 +3,7 @@ package io.justsearch.app.services.worker;
 
 import io.justsearch.app.api.indexing.IndexingJobView;
 import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.core.execution.EngineExecutorSpec;
 import io.justsearch.ipc.IndexingJobsDelta;
 import io.justsearch.ipc.IndexingJobsFrame;
@@ -87,6 +88,9 @@ public final class RemoteIndexingJobsBridge {
   private final Supplier<IndexingJobsSource> sourceSupplier;
   private final EngineExecutorRegistry.Registration reconnectRegistration;
   private final java.util.concurrent.ScheduledExecutorService reconnects;
+  private final EngineExecutorRegistry.Registration reconnectRetryRegistration;
+  private final java.util.concurrent.ExecutorService reconnectRetries;
+  private final AtomicBoolean reconnectPending = new AtomicBoolean();
   private volatile KnowledgeClient.IndexingJobsStream stream;
   private final List<Consumer<Delta>> listeners = new CopyOnWriteArrayList<>();
   /**
@@ -167,6 +171,22 @@ public final class RemoteIndexingJobsBridge {
       }
       throw failure;
     }
+    EngineExecutorRegistry.Registration retries = null;
+    try {
+      retries = processExecutors.register(new EngineExecutorSpec(
+          "head.indexing-jobs-bridge-reconnect-retry", EngineExecutorSpec.Kind.BACKGROUND,
+          EngineExecutorSpec.Mode.PLATFORM, 1, Math.min(1, background.maxQueue()), 1));
+      this.reconnectRetryRegistration = retries;
+      this.reconnectRetries = retries.open(runnable -> {
+        Thread thread = new Thread(runnable, "indexing-jobs-bridge-reconnect-retry");
+        thread.setDaemon(true);
+        return thread;
+      });
+    } catch (RuntimeException | Error failure) {
+      if (retries != null) retries.close();
+      registration.close();
+      throw failure;
+    }
   }
 
   /**
@@ -230,6 +250,8 @@ public final class RemoteIndexingJobsBridge {
    */
   public void stop() {
     stopped = true;
+    reconnectPending.set(false);
+    reconnectRetries.shutdownNow();
     reconnects.shutdownNow();
     listeners.clear();
     KnowledgeClient.IndexingJobsStream open = stream;
@@ -241,7 +263,11 @@ public final class RemoteIndexingJobsBridge {
         log.warn("RemoteIndexingJobsBridge: closing the indexing-jobs flow failed", e);
       }
     }
-    reconnectRegistration.close();
+    try {
+      reconnectRetryRegistration.close();
+    } finally {
+      reconnectRegistration.close();
+    }
   }
 
   /**
@@ -299,17 +325,49 @@ public final class RemoteIndexingJobsBridge {
     // The reset that makes start() actually re-open. See this method's javadoc.
     started.set(false);
 
-    try {
-      reconnects.schedule(
-          () -> {
-            if (stopped) return;
-            start();
-          },
-          delay,
-          java.util.concurrent.TimeUnit.MILLISECONDS);
-    } catch (java.util.concurrent.RejectedExecutionException shuttingDown) {
-      log.debug("RemoteIndexingJobsBridge: reconnect scheduler is shut down; not re-subscribing");
+    if (!stopped && reconnectPending.compareAndSet(false, true)) {
+      try {
+        // This worker needs no timer credit. One retained obligation survives timer saturation.
+        reconnectRetries.execute(() -> retryReconnectSchedule(delay));
+      } catch (java.util.concurrent.RejectedExecutionException closed) {
+        reconnectPending.set(false);
+        log.debug("RemoteIndexingJobsBridge: reconnect retry owner is closed", closed);
+      }
     }
+  }
+
+  private void retryReconnectSchedule(long delay) {
+    long backoff = RECONNECT_BASE_DELAY_MS;
+    while (!stopped) {
+      try {
+        reconnects.schedule(() -> {
+          reconnectPending.set(false);
+          if (!stopped) start();
+        }, delay, java.util.concurrent.TimeUnit.MILLISECONDS);
+        return;
+      } catch (EngineExecutorRejectedException refused) {
+        if (refused.reason() != EngineExecutorRejectedException.Reason.TIMER_LIMIT
+            && refused.reason() != EngineExecutorRejectedException.Reason.QUEUE_LIMIT) {
+          reconnectPending.set(false);
+          log.debug("RemoteIndexingJobsBridge: reconnect scheduler is closed", refused);
+          return;
+        }
+        backoff = Math.max(backoff, java.util.concurrent.TimeUnit.SECONDS.toMillis(refused.retryAfterSeconds()));
+      } catch (java.util.concurrent.RejectedExecutionException closed) {
+        reconnectPending.set(false);
+        log.debug("RemoteIndexingJobsBridge: reconnect scheduler is shut down", closed);
+        return;
+      }
+      try {
+        Thread.sleep(Math.min(backoff, RECONNECT_MAX_DELAY_MS));
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        reconnectPending.set(false);
+        return;
+      }
+      backoff = Math.min(RECONNECT_MAX_DELAY_MS, backoff * 2);
+    }
+    reconnectPending.set(false);
   }
 
   private void openStream(CompletableFuture<Void> snapshotDelivered) {

@@ -902,6 +902,7 @@ public class LocalApiServer {
           this.core.configStore());
       // Tempdoc 778 — seal the disposition + feature-snapshot streams with the AUTHORED feedback key.
       if (this.HeadAssemblyRef != null) {
+        ctrl.setFeedbackObserver(this.HeadAssemblyRef.feedbackObserver());
         ctrl.setFeedbackCipher(
             this.HeadAssemblyRef.storeCipher(
                 io.justsearch.agent.api.encryption.StoreCatalog.FEEDBACK.recoverability()));

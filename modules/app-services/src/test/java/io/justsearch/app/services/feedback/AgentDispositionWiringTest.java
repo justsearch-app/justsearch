@@ -18,6 +18,25 @@ import org.junit.jupiter.api.io.TempDir;
 class AgentDispositionWiringTest {
 
   @Test
+  void doneEventUsesKeyedIdentityWithoutReadingHistoricalSnapshots(@TempDir Path dataDir)
+      throws IOException {
+    var listener = new AtomicReference<BiConsumer<String, Map<String, Object>>>();
+    AgentDispositionWiring.register(listener::set, dataDir,
+        io.justsearch.agent.api.encryption.StoreCipher.disabled(), new FeedbackCaptureSettings(dataDir));
+    Path archive = dataDir.resolve("feedback/feature-snapshots.ndjson");
+    new NdjsonAppendStore<>(archive, FeatureSnapshot.class).append(new FeatureSnapshot(
+        "session", "q", 1L,
+        List.of(new FeatureSnapshot.HitFeatures("uid", "path", 1, 1f, 0f, 0f, 1f, null))));
+    java.nio.file.Files.writeString(archive, "invalid historical JSON\n");
+    listener.get().accept("done", Map.of("sessionId", "session", "sources",
+        List.of(Map.of("parentDocId", "path", "chunkIndex", 0))));
+    var rows = new NdjsonAppendStore<>(dataDir.resolve("feedback/result-dispositions.ndjson"),
+        ResultDisposition.class).readAll();
+    assertEquals(1, rows.size());
+    assertEquals("uid", rows.getFirst().docId());
+  }
+
+  @Test
   void register_omitsDispositionWithoutUidBearingSnapshot(@TempDir Path dataDir) throws IOException {
     AtomicReference<BiConsumer<String, Map<String, Object>>> ref = new AtomicReference<>();
     AgentDispositionWiring.register(

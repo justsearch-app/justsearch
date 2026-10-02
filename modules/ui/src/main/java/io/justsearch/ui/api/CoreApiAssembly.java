@@ -528,6 +528,7 @@ final class CoreApiAssembly {
       knowledgeSearchController.getAdapter().setWorkerCapability(headAssemblyRef.capabilities().worker());
       // Tempdoc 778 — seal the search-interaction disposition + feature-snapshot streams with the
       // AUTHORED feedback-store key (passthrough when at-rest encryption is off).
+      knowledgeSearchController.setFeedbackObserver(headAssemblyRef.feedbackObserver());
       knowledgeSearchController.setFeedbackCipher(
           headAssemblyRef.storeCipher(
               io.justsearch.agent.api.encryption.StoreCatalog.FEEDBACK.recoverability()));

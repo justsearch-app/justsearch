@@ -104,6 +104,12 @@ public class KnowledgeSearchController {
     this.feedbackCaptureSettings = settings;
   }
 
+  private volatile io.justsearch.app.services.feedback.FeedbackObserver feedbackObserver;
+
+  public void setFeedbackObserver(io.justsearch.app.services.feedback.FeedbackObserver observer) {
+    this.feedbackObserver = observer;
+  }
+
   private boolean captureEnabled() {
     var s = feedbackCaptureSettings;
     return s == null || s.isEnabled();
@@ -126,14 +132,11 @@ public class KnowledgeSearchController {
    */
   private void captureFeatureSnapshot(
       String interactionId, String query, KnowledgeSearchResponse response) {
-    try {
-      featureSnapshotStore()
-          .append(
-          FeatureSnapshots.capture(
-              interactionId, query, java.time.Instant.now().toEpochMilli(), response));
-    } catch (Exception e) {
-      log.debug("feature snapshot capture failed (non-fatal): {}", e.toString());
-    }
+    var observer = feedbackObserver;
+    if (observer == null) return;
+    long occurredAtMs = java.time.Instant.now().toEpochMilli();
+    observer.observe(() -> featureSnapshotStore().append(
+        FeatureSnapshots.capture(interactionId, query, occurredAtMs, response)));
   }
 
   /**
@@ -174,26 +177,29 @@ public class KnowledgeSearchController {
       }
       String contributorStr = body.get("contributor") instanceof String s ? s : null;
       ResultDisposition.Contributor contributor = contributorFor(contributorStr);
-      var stableDocId =
-          FeatureSnapshots.resolveStableDocId(
-              featureSnapshotStore().readAll(), interactionId, docId);
-      if (stableDocId.isEmpty()) {
-        log.debug(
-            "omitting feedback row without stable document UID: interactionId={} docId={}",
-            interactionId,
-            docId);
-        ctx.status(204);
-        return;
+      var observer = feedbackObserver;
+      long occurredAtMs = java.time.Instant.now().toEpochMilli();
+      if (observer != null) {
+        observer.observe(() -> persistDisposition(interactionId, docId, kind, contributor, occurredAtMs));
       }
-      dispositionStore()
-          .append(
-              new ResultDisposition(
-                  interactionId, stableDocId.get(), kind, contributor,
-                  java.time.Instant.now().toEpochMilli()));
       ctx.status(204);
     } catch (Exception e) {
       log.debug("disposition capture failed (non-fatal): {}", e.toString());
       ctx.status(204); // never fail the FE on feedback
+    }
+  }
+
+  private void persistDisposition(
+      String interactionId, String docId, ResultDisposition.Kind kind,
+      ResultDisposition.Contributor contributor, long occurredAtMs) {
+    if (!captureEnabled()) return;
+    try {
+      var stableDocId = featureSnapshotStore().resolveStableDocId(interactionId, docId);
+      if (stableDocId.isEmpty()) return;
+      dispositionStore().append(new ResultDisposition(
+          interactionId, stableDocId.get(), kind, contributor, occurredAtMs));
+    } catch (Exception failure) {
+      log.debug("disposition capture failed (non-fatal): {}", failure.toString());
     }
   }
 
