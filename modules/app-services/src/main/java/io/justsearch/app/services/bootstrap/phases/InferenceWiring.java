@@ -52,9 +52,16 @@ public final class InferenceWiring {
     // Read the current authority under the same lock as publication. A delayed mode callback or
     // connect-time seed must not overwrite a newer mode with the event's historical value.
     synchronized (gauge) {
-      boolean gpuActive = manager.isOnline();
-      gauge.setMainGpuActive(gpuActive);
-      log.debug("GPU status broadcast: {}", gpuActive ? "ACTIVE" : "FREE");
+      // Owner decision 2026-10-02 (lane F, ADR-0004 amendment): chat going Online does NOT claim the
+      // GPU from the encoders. Shipped split JustSearch never applied ADR-0004's single tenancy -- its
+      // Head registered no GPU listener (HeadlessApp passed a null bootstrap, so InferenceWiring
+      // returned early) -- and users run chat and encoders co-resident. The merged Engine keeps that
+      // behaviour; publishing Online here made every encoder fall back to CPU (stage E: hybrid search
+      // p95 9.8 s vs 0.26 s). A budget-aware policy is a follow-up lane, not part of the merge.
+      boolean chatOnline = manager.isOnline();
+      gauge.setMainGpuActive(false);
+      log.debug("GPU status broadcast: chat {}; encoders keep the GPU (shipped co-residence)",
+          chatOnline ? "online" : "offline");
     }
   }
 
