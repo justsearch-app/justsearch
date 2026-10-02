@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -70,11 +71,8 @@ final class NativeInferenceContainmentTest {
     assertTrue(violation.getMessage().contains("SessionHandle"));
   }
 
-  @Test
-  void productionImporterSeesTheEncoderOwner() {
-    var production = new ClassFileImporter()
-        .withImportOption(new ImportOption.DoNotIncludeTests())
-        .importPackages("io.justsearch");
+  @ArchTest
+  static void productionImporterSeesTheEncoderOwner(JavaClasses production) {
     assertTrue(production.stream().anyMatch(type -> type.getName().equals(
         "io.justsearch.indexerworker.server.EncoderSet")),
         "the containment rule must import the concrete encoder owner it protects");

@@ -1039,9 +1039,13 @@ jobs:
             # the lane wants history, because a silent shallow-clone regression is exactly the
             # class the checkout comment below is about.
             fetch_depth: 0
+            # Engine recovery coverage was missing from every shard. This is the lightest
+            # measured lane; the expected 9-12 min addition fits the 25 min hard timeout,
+            # but exceeds the current 360s advisory budget (review after hosted measurement).
             gradle_tasks: >-
               :modules:ai-backend:test
               :modules:api-contract-projection-java:test
+              :modules:app-engine:test
               :modules:app-inference:test
               :modules:benchmarks:test
               :modules:dead-code-audit:test
