@@ -28,10 +28,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class KnowledgeSearchControllerFeedbackObserverTest {
+  private ConfigStore previousConfigStore;
+
+  @BeforeEach
+  void configure() {
+    // S4 (b09a94364) uses the real controller, whose reranker requires startup configuration.
+    previousConfigStore = ConfigStore.globalOrNull();
+    TestResolvedConfigHelper.storeWithDefaults();
+  }
+
+  @AfterEach
+  void restore() {
+    TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
+  }
+
   @Test
   void searchCaptureSurvivesFailedHistoricalLookup(@TempDir Path dir) throws Exception {
     Path archive = dir.resolve("snapshots.ndjson");

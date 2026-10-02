@@ -220,10 +220,12 @@ final class SchemaControllerTest {
     assertTrue(names.contains("runtime-live-response.v1.json"));
     assertTrue(names.contains("runtime-manifest-public.v2.json"));
     assertTrue(names.contains("runtime-ready-response.v1.json"));
+    // Q13 (e9c57ca08): readiness 503 also serves the self-contained refusal union schema.
+    assertTrue(names.contains("runtime-ready-unavailable-response.v1.json"));
     assertTrue(names.contains("operation-outcome-view.v1.json"));
     assertTrue(names.contains("condition-recovery-index.v1.json"));
     assertTrue(names.contains("component-recovery-response.v1.json"));
-    assertEquals(20, names.size());
+    assertEquals(21, names.size());
     assertFalse(names.contains("nonexistent.v1.json"));
   }
 }

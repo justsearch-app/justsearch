@@ -27,6 +27,8 @@ import io.justsearch.app.services.HeadAssembly;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.RemoteDocumentService;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.ipc.RetrieveContextResponse;
@@ -42,6 +44,8 @@ import java.util.Set;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -49,6 +53,20 @@ import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
 
 final class McpAnswerRefusalTest {
+  private ConfigStore previousConfigStore;
+
+  @BeforeEach
+  void configure() {
+    // Q4 (f09566a32) exercises real pre-search, including its configured hybrid preset.
+    previousConfigStore = ConfigStore.globalOrNull();
+    TestResolvedConfigHelper.storeWithDefaults();
+  }
+
+  @AfterEach
+  void restore() {
+    TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
+  }
+
   static Stream<Arguments> refusalPaths() {
     return Stream.of("preSearch", "retrieval", "fallback")
         .flatMap(path -> Stream.of("engine", "context", "executor")

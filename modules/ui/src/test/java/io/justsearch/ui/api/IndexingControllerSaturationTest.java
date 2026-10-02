@@ -79,13 +79,16 @@ final class IndexingControllerSaturationTest {
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var callPool = new AtomicReference<ThreadPoolExecutor>();
+    // S6 (ee0f0806b): open retrieval now dispatches through the isolated inference pool.
+    String poolName = endpoint.equals("openRetrieve")
+        ? "engine-knowledge-inference-foreground" : "engine-knowledge-call-foreground";
     var services = mock(WorkerAppServices.class);
     try (var registry = spy(new DefaultEngineExecutorRegistry())) {
       doReturn(new EngineExecutorRegistry.Limits(1, 1))
           .when(registry).limits(EngineExecutorSpec.Kind.FOREGROUND);
       doAnswer(invocation -> {
         var registration = (EngineExecutorRegistry.Registration) invocation.callRealMethod();
-        if (!registration.spec().name().equals("engine-knowledge-call-foreground")) return registration;
+        if (!registration.spec().name().equals(poolName)) return registration;
         var observed = spy(registration);
         doAnswer(open -> {
           var pool = (ThreadPoolExecutor) open.callRealMethod();
@@ -108,8 +111,12 @@ final class IndexingControllerSaturationTest {
             }
           });
           assertTrue(entered.await(2, TimeUnit.SECONDS));
-          pool.execute(() -> {});
-          assertEquals(1, pool.getQueue().size());
+          if (!endpoint.equals("openRetrieve")) {
+            pool.execute(() -> {});
+            assertEquals(1, pool.getQueue().size());
+          }
+          assertEquals(1, pool.getActiveCount());
+          assertEquals(0, pool.getQueue().remainingCapacity(), "the selected pool must be saturated");
 
           // Share the public client's admission owner, as EngineRoot and EngineObserverPacingTest do.
           var admissionField = EngineKnowledgeClient.class.getDeclaredField("admission");
