@@ -265,7 +265,7 @@ export function buildMatrixModel(opts = {}) {
       precedenceNotes: entry.constant === "API_PORT" && hasTypedApiPort
         ? "sysprop > env > settings.json > default; bound port is runtime evidence"
         : hasYaml
-        ? "YAML > sysprop > env > default"
+        ? "sysprop > env > YAML > default"
         : "sysprop > env > default",
     });
   }
@@ -329,7 +329,7 @@ export function renderMatrixMarkdown(model) {
   );
   lines.push("");
   lines.push("Precedence note:");
-  lines.push("1. `YAML > sysprop > env > default` where a YAML key and env/sysprop fallback both exist.");
+  lines.push("1. `sysprop > env > YAML > default` where a YAML key and env/sysprop override both exist.");
   lines.push("2. `YAML > default` for YAML-only keys (ConfigKey entries, no env var override).");
   lines.push("3. `sysprop > env > default` for env/sysprop-only runtime knobs.");
   lines.push("4. Every declaration explicitly carries `permanent`, `experimental`, or `deprecated`; non-permanent rows require joined review metadata in `governance/config-lifecycle.v1.json`.");

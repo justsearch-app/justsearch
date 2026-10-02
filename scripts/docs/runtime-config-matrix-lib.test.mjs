@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -150,4 +150,63 @@ test("API-port row projects the typed settings contributor and separates bound-p
     assert.match(row.precedenceNotes, /bound port is runtime evidence/);
     assert.match(renderMatrixMarkdown(model), /typed nullable `apiPort` contributes/);
   });
+});
+
+test("mixed YAML and operator sources project operator precedence in rows and prose", () => {
+  withFixture(({ root, envRegistryPath, configKeyPath, builderPath, configApplyPath }) => {
+    const model = buildMatrixModel({ repoRoot: root, envRegistryPath, configKeyPath,
+      builderPath, configApplyPath });
+    const row = model.rows.find((item) => item.declaration === "EnvRegistry.NORMAL");
+    assert.equal(row.yamlKey, "justsearch.normal");
+    assert.equal(row.sysprop, "justsearch.normal");
+    assert.equal(row.envVar, "JUSTSEARCH_NORMAL");
+    assert.equal(row.precedenceNotes, "sysprop > env > YAML > default");
+    const markdown = renderMatrixMarkdown(model);
+    assert.match(markdown, /1\. `sysprop > env > YAML > default`/);
+    assert.doesNotMatch(markdown, /YAML > sysprop/);
+  });
+});
+
+function readRepoFile(relativePath) {
+  return readFileSync(new URL(`../../${relativePath}`, import.meta.url), "utf8");
+}
+
+test("schema recovery guide uses emitted lifecycle reasons and preserves marker compatibility", () => {
+  const guide = readRepoFile("docs/explanation/11-index-schema-migration.md");
+  const section = guide.split("### A `FAIL_CLOSED` refusal")[1].split("\n### ")[0];
+  const reasons = readRepoFile(
+    "modules/app-api/src/main/java/io/justsearch/app/api/lifecycle/LifecycleReasonCode.java");
+  for (const constant of ["INDEX_SCHEMA_OPEN_REFUSED", "INDEX_CORRUPT", "INDEX_FAILED"]) {
+    const wire = reasons.match(new RegExp(`${constant}\\("([^"\\n]+)"\\)`))[1];
+    assert.ok(section.includes(`\`${wire}\``), `guide must document ${constant} as ${wire}`);
+  }
+  assert.doesNotMatch(section, /worker\.(?:index_schema_mismatch|index_corrupt|spawn\.failed)/);
+  assert.ok(section.includes("`<dataDir>/worker-fatal-reason`"));
+  assert.ok(section.includes("`index_schema_mismatch`"));
+  assert.ok(section.includes("`index_corrupt`"));
+});
+
+test("RAG streaming contract names registered routes and the producer's metadata event", () => {
+  const doc = readRepoFile("docs/reference/contracts/search-and-rag-reason-codes.md");
+  const routes = readRepoFile("modules/ui/src/main/java/io/justsearch/ui/api/routes/AiRoutes.java");
+  for (const route of ["/api/chat/ask", "/api/chat/batch-summarize"]) {
+    assert.ok(routes.includes(`"${route}"`));
+    assert.ok(doc.includes(`POST ${route}`), `contract must name ${route}`);
+  }
+  const producer = readRepoFile(
+    "modules/app-services/src/main/java/io/justsearch/app/services/conversation/spi/RAGContext.java");
+  const event = producer.match(/events\.add\(new SseEvent\("([^"]+)", ragMeta\)\)/)[1];
+  assert.ok(doc.includes(`\`${event}\``), `contract must name metadata event ${event}`);
+  assert.doesNotMatch(doc, /rag_meta|SummaryController|POST \/api\/ask\/stream|POST \/api\/summarize\/batch\/stream/);
+  for (const field of ["retrieval_mode", "retrieval_mode_reason", "context_truncated", "chunks_used", "chunks_found"]) {
+    assert.ok(producer.includes(`ragMeta.put("${field}"`));
+    assert.ok(doc.includes(`"${field}"`));
+  }
+  for (const field of ["best_chunk_score", "score_gap", "retrieval_coverage", "chunks_considered"]) {
+    assert.ok(producer.includes(`ragMeta.put("${field}"`));
+    assert.ok(doc.includes(`\`${field}\``));
+  }
+  assert.match(doc, /event: rag\.meta\ndata: /);
+  assert.ok(doc.includes("finalResponse"));
+  assert.ok(doc.includes("iterationsUsed"));
 });

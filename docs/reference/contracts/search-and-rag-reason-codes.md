@@ -2,7 +2,7 @@
 title: Search & RAG Reason Codes (Degradation)
 type: reference
 status: stable
-description: 'Degradation signaling contract for the search/RAG port responses and `rag_meta`.'
+description: 'Degradation signaling contract for the search/RAG port responses and conversation SSE retrieval metadata.'
 ---
 
 # Search & RAG Reason Codes (Degradation)
@@ -120,24 +120,36 @@ The Head may fall back to a full-document fetch when the `retrieveContext` port 
 - `GRPC_FAILED`: the retrieval call failed; Head used full-document fallback with a character budget. **The ID keeps its historical spelling** — it is a wire-visible string emitted verbatim at `RemoteDocumentService.java:535` and consumed by FE/MCP surfaces, so it outlived the gRPC channel it was named for. Renaming it is a breaking change, not a cleanup.
 - `FALLBACK_FAILED`: both the retrieval call and the fallback failed (context is empty)
 
-## SSE: `rag_meta` (UI streaming endpoints)
+## SSE: conversation routes and `rag.meta`
 
-`SummaryController` emits a `rag_meta` Server-Sent Event before streaming the final text for:
+`AiRoutes` registers the conversation routes handled by `ChatController`:
 
-- `POST /api/ask/stream`
-- `POST /api/summarize/batch/stream` (and related summarize flows)
+- `POST /api/chat/ask`: `RAGAskShape`, with retrieval through `RAGContext`.
+- `POST /api/chat/batch-summarize`: `BatchSummarizeShape`, with whole-document access through
+  `BatchDocAccess`. This shape emits `progress` with `phase: "files"` rather than RAG retrieval metadata.
 
-Payload shape:
+The response is `text/event-stream`. Each frame carries an `event:` name and a JSON `data:`
+payload. `ConversationEngine` streams `chunk` events with `{"text":"..."}` and optional
+`reasoning_chunk` events, then emits `done` with `finalResponse`, `iterationsUsed`, and
+shape-specific enrichment. Failures emit `error` with an `error` message, `errorCode`, and `i18nKey`.
 
-```json
-{
-  "retrieval_mode": "HYBRID",
-  "retrieval_mode_reason": "HYBRID_AVAILABLE",
-  "context_truncated": false,
-  "chunks_used": 5,
-  "chunks_found": 12
-}
+On the ask route, `RAGContext` emits `rag.meta` when a retrieval result is available, before
+`rag.citations` and the first answer `chunk`. Mode and degradation reasons appear in this
+event's payload. `context_truncated` includes both retrieval-side and local input-budget
+truncation. Clients must handle terminal errors without assuming that metadata was emitted.
+An example frame (showing the core metadata fields) is:
+
+```text
+event: rag.meta
+data: {"retrieval_mode":"HYBRID","retrieval_mode_reason":"HYBRID_AVAILABLE","context_truncated":false,"chunks_used":5,"chunks_found":12}
+
 ```
+
+The payload also includes retrieval quality signals: `best_chunk_score`, `score_gap`,
+`retrieval_coverage` and `chunks_considered`. `RAGDoneEnricher` contributes
+`usedRag`, `chunksUsed`, `chunksFound`, `citations`, and available `calibration` to `done`;
+the mode and reason fields remain in `rag.meta`. Batch summarization instead enriches `done`
+with `fileCount`, `docIds`, and `fullCoverage`.
 
 ## Reason-code governance
 
