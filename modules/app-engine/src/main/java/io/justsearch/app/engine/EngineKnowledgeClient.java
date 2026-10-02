@@ -87,12 +87,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private volatile Consumer<String> liveMigrationStarter;
   private final EngineExecutorRegistry.Registration deadlineRegistration;
   private final EngineExecutorRegistry.Registration foregroundCallRegistration;
+  private final EngineExecutorRegistry.Registration foregroundInferenceRegistration;
   private final EngineExecutorRegistry.Registration backgroundCallRegistration;
   private final EngineExecutorRegistry.Registration foregroundStreamRegistration;
   private final EngineExecutorRegistry.Registration backgroundStreamRegistration;
   private final ScheduledExecutorService deadlines;
   private final io.justsearch.app.services.worker.WatchedRootsState roots;
   private final ExecutorService foregroundCallThreads;
+  private final ExecutorService foregroundInferenceThreads;
   private final ExecutorService backgroundCallThreads;
   private final ExecutorService foregroundStreamThreads;
   private final ExecutorService backgroundStreamThreads;
@@ -181,11 +183,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }
     this.deadlineRegistration = owners.deadlineRegistration();
     this.foregroundCallRegistration = owners.foregroundCallRegistration();
+    this.foregroundInferenceRegistration = owners.foregroundInferenceRegistration();
     this.backgroundCallRegistration = owners.backgroundCallRegistration();
     this.foregroundStreamRegistration = owners.foregroundStreamRegistration();
     this.backgroundStreamRegistration = owners.backgroundStreamRegistration();
     this.deadlines = owners.deadlines();
     this.foregroundCallThreads = owners.foregroundCallThreads();
+    this.foregroundInferenceThreads = owners.foregroundInferenceThreads();
     this.backgroundCallThreads = owners.backgroundCallThreads();
     this.foregroundStreamThreads = owners.foregroundStreamThreads();
     this.backgroundStreamThreads = owners.backgroundStreamThreads();
@@ -194,11 +198,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private record ExecutorOwners(
       EngineExecutorRegistry.Registration deadlineRegistration,
       EngineExecutorRegistry.Registration foregroundCallRegistration,
+      EngineExecutorRegistry.Registration foregroundInferenceRegistration,
       EngineExecutorRegistry.Registration backgroundCallRegistration,
       EngineExecutorRegistry.Registration foregroundStreamRegistration,
       EngineExecutorRegistry.Registration backgroundStreamRegistration,
       ScheduledExecutorService deadlines,
       ExecutorService foregroundCallThreads,
+      ExecutorService foregroundInferenceThreads,
       ExecutorService backgroundCallThreads,
       ExecutorService foregroundStreamThreads,
       ExecutorService backgroundStreamThreads) {}
@@ -216,9 +222,18 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               1,
               background.maxQueue());
       registrations.add(deadline);
+      // Split the existing foreground capacity, reserving text-only dispatch when ORT never exits.
+      // Each lane needs at least one worker even under a one-thread test/minimal policy.
+      int inferenceThreads = Math.max(1, foreground.maxThreads() / 2);
+      var textLimits = new EngineExecutorRegistry.Limits(
+          Math.max(1, foreground.maxThreads() - inferenceThreads), foreground.maxQueue());
+      var inferenceLimits = new EngineExecutorRegistry.Limits(inferenceThreads, 0);
       var foregroundCall =
-          platform(executors, "engine-knowledge-call-foreground", Kind.FOREGROUND, foreground);
+          platform(executors, "engine-knowledge-call-foreground", Kind.FOREGROUND, textLimits);
       registrations.add(foregroundCall);
+      var foregroundInference = platform(executors, "engine-knowledge-inference-foreground",
+          Kind.FOREGROUND, inferenceLimits);
+      registrations.add(foregroundInference);
       var backgroundCall =
           platform(executors, "engine-knowledge-call-background", Kind.BACKGROUND, background);
       registrations.add(backgroundCall);
@@ -233,6 +248,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           deadline.openScheduled(daemonFactory("engine-call-deadlines"));
       ExecutorService foregroundCallExecutor =
           foregroundCall.open(daemonFactory("engine-call-foreground"));
+      ExecutorService foregroundInferenceExecutor =
+          foregroundInference.open(daemonFactory("engine-inference-foreground"));
       ExecutorService backgroundCallExecutor =
           backgroundCall.open(daemonFactory("engine-call-background"));
       ExecutorService foregroundStreamExecutor =
@@ -242,11 +259,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       return new ExecutorOwners(
           deadline,
           foregroundCall,
+          foregroundInference,
           backgroundCall,
           foregroundStream,
           backgroundStream,
           deadlineExecutor,
           foregroundCallExecutor,
+          foregroundInferenceExecutor,
           backgroundCallExecutor,
           foregroundStreamExecutor,
           backgroundStreamExecutor);
@@ -290,8 +309,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     return context.urgency() == EngineContext.Urgency.FOREGROUND;
   }
 
-  private ExecutorService callThreads(EngineContext context) {
-    return foreground(context) ? foregroundCallThreads : backgroundCallThreads;
+  private ExecutorService callThreads(EngineContext context, boolean inference) {
+    return foreground(context)
+        ? inference ? foregroundInferenceThreads : foregroundCallThreads
+        : backgroundCallThreads;
   }
 
   private ExecutorService streamThreads(EngineContext context) {
@@ -734,7 +755,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
    */
   private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
       Function<Budget, T> body) {
-    var work = admission.attach(engineContext);
+    return withBudget(operation, budgetMs, engineContext, false, body);
+  }
+
+  private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
+      boolean inference, Function<Budget, T> body) {
+    var work = inference ? admission.attachInference(engineContext) : admission.attach(engineContext);
     CallView view;
     try {
       view = captureCallView();
@@ -808,7 +834,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         }
         if (failure instanceof Error error) throw error;
       }, releaseView);
-      ExecutorService executor = callThreads(work.context());
+      ExecutorService executor = callThreads(work.context(), inference);
       budget.submitted(task);
       task.executeOn(executor);
     } catch (java.util.concurrent.RejectedExecutionException e) {
@@ -876,6 +902,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       return reason;
     }
     return cancelled;
+  }
+
+  @Override
+  protected <T> T executeInferenceRpc(String operation, RpcDeadlineCategory category,
+      Function<SearchServiceCalls, T> rpc, EngineContext engineContext) {
+    return withBudget(operation, deadline(category), engineContext, true,
+        budget -> rpc.apply(new WorkerSearchCalls(
+            requireService(WorkerAppServices::searchService), budget.context())));
   }
 
   @Override
@@ -1658,7 +1692,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       }
     }
     for (var registration : List.of(foregroundStreamRegistration,
-        backgroundStreamRegistration, foregroundCallRegistration, backgroundCallRegistration,
+        backgroundStreamRegistration, foregroundCallRegistration, foregroundInferenceRegistration,
+        backgroundCallRegistration,
         deadlineRegistration)) {
       try {
         registration.close();

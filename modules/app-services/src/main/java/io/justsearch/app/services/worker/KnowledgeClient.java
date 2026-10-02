@@ -227,7 +227,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                      batchSize, DEFAULT_BATCH_SIZE, MAX_BATCH_SIZE);
         }
         this.telemetry = telemetry != null ? telemetry : IpcTelemetry.noop();
-        this.searchRpcOps = new SearchRpcOps(this::executeSearchRpc);
+        this.searchRpcOps = new SearchRpcOps(this::executeSearchRpc, this::executeInferenceRpc);
         this.ingestRpcExecutor = this::executeIngestRpc;
         this.migrationOps = new MigrationOps(ingestRpcExecutor);
         this.vduOps = new VduOps(ingestRpcExecutor);
@@ -353,6 +353,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             String operation,
             RpcDeadlineCategory category,
             java.util.function.Function<SearchServiceCalls, T> rpc, EngineContext engineContext);
+
+    /** Dispatch seam for calls that may enter native inference, separate from text-only calls. */
+    protected <T> T executeInferenceRpc(
+            String operation, RpcDeadlineCategory category,
+            java.util.function.Function<SearchServiceCalls, T> rpc,
+            EngineContext engineContext) {
+        return executeSearchRpc(operation, category, rpc, engineContext);
+    }
 
     /** Runs one unary {@code IngestService} call. See {@link #executeSearchRpc}. */
     protected abstract <T> T executeIngestRpc(

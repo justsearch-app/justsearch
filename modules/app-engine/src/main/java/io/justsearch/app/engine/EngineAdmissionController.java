@@ -41,6 +41,8 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private final ReentrantReadWriteLock publication;
   private final Map<UUID, Work> active = new LinkedHashMap<>();
   private final Map<Bucket, Integer> counts = new HashMap<>();
+  private final Map<Bucket, Integer> inferenceCounts = new HashMap<>();
+  private int inferenceCount;
   private String preparationId;
   private boolean closing;
 
@@ -159,6 +161,33 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
       }
       work.references++;
       return new Reference(work, context);
+    }
+  }
+
+  @Override
+  public EngineWorkHandle attachInference(EngineContext context) {
+    synchronized (lock) {
+      Reference reference = (Reference) attach(context);
+      Work work = reference.work;
+      try {
+        if (!work.inference) {
+          // An issued native run cannot surrender ownership at its caller's deadline. Reserve
+          // one text slot in both envelopes, across all inference lanes and exact work references.
+          if (inferenceCount >= aggregateLimit - 1) {
+            refuse(EngineAdmissionException.Reason.ENGINE_LIMIT);
+          }
+          if (inferenceCounts.getOrDefault(work.bucket, 0) >= perContextLimit - 1) {
+            refuse(EngineAdmissionException.Reason.CONTEXT_LIMIT);
+          }
+          work.inference = true;
+          inferenceCount++;
+          inferenceCounts.merge(work.bucket, 1, Integer::sum);
+        }
+        return reference;
+      } catch (RuntimeException | Error failure) {
+        reference.close();
+        throw failure;
+      }
     }
   }
 
@@ -292,6 +321,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     private String cancelReason;
     private boolean detached;
     private boolean completed;
+    private boolean inference;
 
     private Work(EngineContext initial, Bucket bucket) {
       this.initial = initial;
@@ -385,6 +415,10 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
           work.completed = true;
           active.remove(work.initial.workId().orElseThrow());
           counts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);
+          if (work.inference) {
+            inferenceCount--;
+            inferenceCounts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);
+          }
           lock.notifyAll();
           callbacks = new ArrayList<>(work.completion);
           work.completion.clear();

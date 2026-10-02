@@ -168,7 +168,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     // Remove repeated headers/footers for multi-page documents
     doc = doc.removeHeadersFooters();
 
-    String content = doc.toAnnotatedText();
+    StructuredDocument.AnnotatedText annotated = doc.toAnnotatedText(maxContentLength);
+    String content = annotated.text();
     String mimeType = metadata.get(Metadata.CONTENT_TYPE);
     String title = metadata.get(TikaCoreProperties.TITLE);
 
@@ -191,7 +192,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
 
     return new StructuredExtractionResult(
         new ContentExtractor.ExtractionResult(content, title, mimeType, null, frontmatterMeta),
-        handler.isLimitReached(),
+        handler.isLimitReached() || annotated.truncated(),
         StructuredDocumentSummary.fromDocument(doc));
   }
 
