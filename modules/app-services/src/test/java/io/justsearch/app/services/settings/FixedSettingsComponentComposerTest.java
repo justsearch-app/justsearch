@@ -45,7 +45,7 @@ final class FixedSettingsComponentComposerTest {
       ComposeEvidence.Mode.IN_PLACE, "candidate_fits_after_source_release", 10L, 20L);
 
   @Test
-  void sharedPolicyDispatchesEveryDeclaredOwnerInOneBatch() {
+  void sharedPolicyDispatchesExplicitApplyOwnersInOneBatch() {
     String key = "policy.gpu_acceleration_enabled";
     var before = ResolvedConfig.builder().putDefault(key, "true").build();
     var after = ResolvedConfig.builder().putDefault(key, "false").build();
@@ -54,7 +54,7 @@ final class FixedSettingsComponentComposerTest {
     var registry = emptyRegistry();
     when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0, List.of(
         declared("encoders", Set.of(key)), declared("generative", Set.of(key)),
-        declared("index", Set.of("unrelated")))));
+        declared("index", Set.of(key)))));
     var lease = mock(EngineComponentRegistry.ApplyLease.class);
     var batch = mock(EngineComponentRegistry.PreparedBatch.class);
     when(registry.tryApply()).thenReturn(new Acquired(lease));
@@ -94,8 +94,7 @@ final class FixedSettingsComponentComposerTest {
   void missingSharedConsumerRefusesBeforeTakingApplyPermit() {
     String key = "policy.gpu_acceleration_enabled";
     var registry = emptyRegistry();
-    when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0,
-        List.of(declared("generative", Set.of(key)))));
+    // Required shared dispatch is independent of registry snapshots and owner availability.
     var composer = new FixedSettingsComponentComposer(registry);
     composer.register("encoders", new RecordingOwner("encoders"));
     composer.seal();

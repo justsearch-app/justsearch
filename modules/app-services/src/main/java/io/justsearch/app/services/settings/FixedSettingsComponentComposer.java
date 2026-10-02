@@ -5,6 +5,7 @@ import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.QueryRoleSelection;
+import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentRegistry;
@@ -23,6 +24,11 @@ import org.slf4j.LoggerFactory;
 /** Fixed boot composition for owner-created settings candidates and one registry publication. */
 public final class FixedSettingsComponentComposer implements SettingsComponentComposer {
   private static final Logger LOG = LoggerFactory.getLogger(FixedSettingsComponentComposer.class);
+  // Apply relationships are distinct from captured-value/digest dependencies. In particular,
+  // query model paths appear in the index's boot projection, but QueryRoleSet replacement is
+  // owned by encoders and retains the serving Lucene runtime and index-time EncoderSet.
+  private static final Map<String, Set<String>> SHARED_APPLY_OWNERS = Map.of(
+      EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED.configKey(), Set.of("encoders", "generative"));
   public interface Owner {
     PreparedOwner prepare(UiSettings candidate, ResolvedConfig desired, Set<String> changedKeys);
 
@@ -164,13 +170,11 @@ public final class FixedSettingsComponentComposer implements SettingsComponentCo
       expanded.put(name, new TreeSet<>(keys));
       changed.addAll(keys);
     });
-    // The governed scope names the primary owner. Shared inputs must prepare every declared
-    // consumer in the same transaction; GPU policy, for example, shapes encoders and inference.
-    for (var component : registry.snapshot().components()) {
-      Set<String> keys = new TreeSet<>(component.spec().dependencyKeys());
-      keys.retainAll(changed);
-      if (!keys.isEmpty()) {
-        expanded.computeIfAbsent(component.spec().name(), ignored -> new TreeSet<>()).addAll(keys);
+    // Only explicit shared apply relationships add owners. A missing required owner still
+    // refuses preparation; registered owner availability never determines dispatch semantics.
+    for (String key : changed) {
+      for (String name : SHARED_APPLY_OWNERS.getOrDefault(key, Set.of())) {
+        expanded.computeIfAbsent(name, ignored -> new TreeSet<>()).add(key);
       }
     }
     expanded.replaceAll((name, keys) -> Set.copyOf(keys));

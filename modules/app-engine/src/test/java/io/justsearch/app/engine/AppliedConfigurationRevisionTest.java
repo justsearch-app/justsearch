@@ -44,6 +44,8 @@ import io.justsearch.core.component.ComposeEvidence;
 import io.justsearch.core.component.EngineComponentSnapshot;
 import io.justsearch.core.context.RetainedStateBudget;
 import io.justsearch.core.execution.TestEngineExecutors;
+import io.justsearch.indexerworker.server.InferenceCompositionRoot;
+import io.justsearch.indexerworker.server.KnowledgeServer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Files;
@@ -148,9 +150,17 @@ final class AppliedConfigurationRevisionTest {
     exerciseDeferredRefresh(key, value, null);
   }
 
-  @Test
-  void onlinePolicyRefreshPublishesVerifiedIdentityAndRecoversRetainedPolicy() throws Exception {
-    exerciseRefresh("policy.gpu_acceleration_enabled", "false", null, false);
+  @ParameterizedTest
+  @CsvSource({
+      "justsearch.llm.slots,3",
+      "justsearch.llm.kv_type,f16",
+      "justsearch.llm.use_thinking,false",
+      "justsearch.llm.reasoning_budget,256",
+      "policy.gpu_acceleration_enabled,false"
+  })
+  void onlineRefreshPublishesVerifiedIdentityAndRecoversRetainedControls(String key, String value)
+      throws Exception {
+    exerciseRefresh(key, value, null, false);
   }
 
   @ParameterizedTest
@@ -186,11 +196,11 @@ final class AppliedConfigurationRevisionTest {
         var manager = new InferenceLifecycleManager(executors, inference,
             InferenceTelemetryEvents.noop(), ManagedChildRegistry.noop(), resolvedA)) {
       for (String name : List.of("api", "index", "encoders")) {
-        registry.register(refreshSpec(name, key))
+        registry.register(refreshSpec(name))
             .setAppliedVersion(name + "-applied");
       }
       var handle = new ReasonRetainingComponentHandle(
-          registry.register(refreshSpec("generative", key)));
+          registry.register(refreshSpec("generative")));
       String versionA = HeadAssembly.generativeAppliedVersion(inference, resolvedA);
       handle.setAppliedVersion(versionA);
       handle.setDesiredVersion(versionA);
@@ -316,11 +326,15 @@ final class AppliedConfigurationRevisionTest {
     }
   }
 
-  private static ComponentSpec refreshSpec(String name, String key) {
+  private static ComponentSpec refreshSpec(String name) {
+    if (name.equals("generative")) return HeadAssembly.generativeSpec();
     var spec = component(name, name + "-applied", false).spec();
-    boolean consumes = name.equals("generative")
-        || name.equals("encoders") && key.equals("policy.gpu_acceleration_enabled");
-    return new ComponentSpec(name, spec.essential(), consumes ? Set.of(key) : spec.dependencyKeys(),
+    Set<String> keys = switch (name) {
+      case "index" -> KnowledgeServer.componentDependencies();
+      case "encoders" -> InferenceCompositionRoot.componentDependencies();
+      default -> spec.dependencyKeys();
+    };
+    return new ComponentSpec(name, spec.essential(), keys,
         spec.composeCapability(), spec.startDeadline(), spec.recoveryBudget());
   }
 
@@ -331,6 +345,16 @@ final class AppliedConfigurationRevisionTest {
     assertEquals(Integer.toString(resolved.ai().llmSlots()), command.get(command.indexOf("-np") + 1));
     assertEquals(resolved.ai().llmKvType(), command.get(command.indexOf("-ctk") + 1));
     assertEquals(resolved.ai().llmKvType(), command.get(command.indexOf("-ctv") + 1));
+    if (resolved.ai().useThinking()) {
+      assertTrue(command.contains("--reasoning-format"));
+      assertEquals("deepseek", command.get(command.indexOf("--reasoning-format") + 1));
+      assertTrue(command.contains("--reasoning-budget"));
+      assertEquals(Integer.toString(resolved.ai().reasoningBudget()),
+          command.get(command.indexOf("--reasoning-budget") + 1));
+    } else {
+      assertFalse(command.contains("--reasoning-format"));
+      assertFalse(command.contains("--reasoning-budget"));
+    }
   }
 
   private ResolvedConfig launchConfiguration(Map<String, String> controls, Path executable, Path model) {

@@ -41,6 +41,16 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Physical query-owner rollback coverage through the real settings transaction. */
 final class KnowledgeServerQueryPreparationTransactionTest {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void supportedQueryPathCommitsWithProductionDependencyOverlaps(boolean citation, @TempDir Path dir)
+      throws Exception {
+    try (var f = new TransactionFixture(dir, Failure.NONE, null, citation)) {
+      f.apply();
+      f.assertQueryBCommitted();
+    }
+  }
+
   @Test
   void laterPhysicalOwnerFailureRestoresExactQueryA(@TempDir Path dir) throws Exception {
     var marker = new IllegalStateException("later generative owner rejected B");
@@ -85,7 +95,7 @@ final class KnowledgeServerQueryPreparationTransactionTest {
     }
   }
 
-  private enum Failure { LATER_OWNER, VALIDATION, CANCELLATION, REPLACEMENT }
+  private enum Failure { NONE, LATER_OWNER, VALIDATION, CANCELLATION, REPLACEMENT }
 
   private static final class TransactionFixture implements AutoCloseable {
     private final KnowledgeServerQuerySettingsOwnerTest.QueryFixture query;
@@ -106,9 +116,16 @@ final class KnowledgeServerQueryPreparationTransactionTest {
     private final SettingsCommitOwner.Reservation reservation;
     private final org.mockito.MockedStatic<InferenceCompositionRoot> composition;
     private final UiSettings candidate;
+    private final boolean citationPath;
     private final long reservationId = 1L;
 
     TransactionFixture(Path dir, Failure failure, Throwable marker) throws Exception {
+      this(dir, failure, marker, false);
+    }
+
+    TransactionFixture(Path dir, Failure failure, Throwable marker, boolean citationPath)
+        throws Exception {
+      this.citationPath = citationPath;
       query = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 512L);
       composition = query.composition();
       composition.when(() -> InferenceCompositionRoot.composeQueryRoles(
@@ -116,10 +133,16 @@ final class KnowledgeServerQueryPreparationTransactionTest {
             var projection = call.<EncoderConfigurationProjection>getArgument(0);
             var selection = call.<QueryRoleSelection>getArgument(1);
             var fresh = query.freshSurface(false);
+            boolean citationSelected = selection.citation().state() == QueryRoleSelection.State.SELECTED;
+            var citation = citationSelected ? query.freshSurface(true) : null;
+            var handles = new ArrayList<>(fresh.handles());
+            if (citation != null) handles.addAll(citation.handles());
             var adapted = new InferenceSurface(Optional.empty(), Optional.empty(), fresh.reranker(),
-                Optional.empty(), Optional.empty(), Optional.empty(), null, fresh.handles(),
+                citation == null ? Optional.empty() : citation.reranker(),
+                Optional.empty(), Optional.empty(), null, handles,
                 new InferenceSurface.ComponentObservation(Optional.of(projection.queryDigest()),
-                    Set.of(EncoderRole.RERANKER), Set.of(), Optional.of(selection)));
+                    citationSelected ? Set.of(EncoderRole.RERANKER, EncoderRole.CITATION)
+                        : Set.of(EncoderRole.RERANKER), Set.of(), Optional.of(selection)));
             composed.add(adapted);
             return adapted;
           });
@@ -132,7 +155,23 @@ final class KnowledgeServerQueryPreparationTransactionTest {
       config = new ConfigStore(exactA);
 
       var registry = mock(EngineComponentRegistry.class);
-      when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0, List.of()));
+      var encoderA = query.component.snapshot();
+      var indexSpec = new io.justsearch.core.component.ComponentSpec("index", true,
+          KnowledgeServer.componentDependencies(),
+          io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
+          java.time.Duration.ofSeconds(60), 2);
+      when(registry.snapshot()).thenReturn(new EngineComponentSnapshot(0, List.of(
+          new EngineComponentSnapshot.Component(indexSpec,
+              io.justsearch.core.component.ComponentState.READY, null,
+              encoderA.stateSince(), encoderA.stateSinceMonotonicNanos(), "index-a", "index-a",
+              null, 0, null),
+          new EngineComponentSnapshot.Component(
+              new io.justsearch.core.component.ComponentSpec("encoders", false,
+                  InferenceCompositionRoot.componentDependencies(),
+                  encoderA.spec().composeCapability(), encoderA.spec().startDeadline(), 2),
+              encoderA.state(), encoderA.reasonCode(), encoderA.stateSince(),
+              encoderA.stateSinceMonotonicNanos(), encoderA.appliedVersion(),
+              encoderA.desiredVersion(), null, 0, null))));
       when(registry.tryApply())
           .thenReturn(new EngineComponentRegistry.ApplyAttempt.Acquired(applyLease));
       when(registry.prepareBatch(anyMap())).thenReturn(registryBatch);
@@ -154,13 +193,15 @@ final class KnowledgeServerQueryPreparationTransactionTest {
           reservationId, OperationKeys.generate(Clock.systemUTC()), witnessA);
       attemptControl = attemptControl(failure != Failure.CANCELLATION);
       candidate = settings.load();
-      Path modelDir = dir.resolve("candidate-reranker");
+      Path modelDir = dir.resolve(citationPath ? "candidate-citation" : "candidate-reranker");
       Files.createDirectories(modelDir);
       Files.writeString(
-          modelDir.resolve("model_fp16.onnx"), "candidate-model", StandardCharsets.UTF_8);
+          modelDir.resolve(citationPath ? "model.onnx" : "model_fp16.onnx"),
+          "candidate-model", StandardCharsets.UTF_8);
       Files.writeString(
           modelDir.resolve("tokenizer.json"), "candidate-tokenizer", StandardCharsets.UTF_8);
-      candidate.setRerankerModelPath(modelDir.toString());
+      if (citationPath) candidate.setCitationScorerModelPath(modelDir.toString());
+      else candidate.setRerankerModelPath(modelDir.toString());
     }
 
     private FixedSettingsComponentComposer.Owner queryOwner() {
@@ -214,6 +255,7 @@ final class KnowledgeServerQueryPreparationTransactionTest {
       Function<UiSettings, ResolvedConfig> prepareConfig = ui -> new ResolvedConfigBuilder()
           .putDefault("justsearch.data.dir", dir.toString())
           .putSettings("justsearch.rerank.model_path", ui.getRerankerModelPath())
+          .putSettings("justsearch.citation.scorer.model_path", ui.getCitationScorerModelPath())
           .build();
       Function<UiSettings, OperationResult> prepareResponse =
           ignored -> OperationResult.success("prepared");
@@ -282,6 +324,32 @@ final class KnowledgeServerQueryPreparationTransactionTest {
       }
       assertTrue(query.queryA.isClosed());
       assertFalse(query.index.isClosed());
+    }
+
+    void assertQueryBCommitted() throws Exception {
+      assertTrue(committed.get());
+      assertFalse(uncertain.get());
+      assertEquals(1, settings.inspect().witness().acceptedRevision());
+      var selectedB = settings.inspect().queryRoles();
+      assertNotEquals(query.selection, selectedB);
+      Path selectedPath = Path.of(citationPath ? candidate.getCitationScorerModelPath()
+          : candidate.getRerankerModelPath());
+      var selectedRole = citationPath ? selectedB.citation() : selectedB.reranker();
+      assertEquals(selectedPath.toAbsolutePath().normalize(), selectedRole.model().path().getParent());
+      assertEquals(selectedPath, citationPath ? config.get().ai().citationScorer().modelPath()
+          : config.get().ai().reranker().modelPath());
+      assertEquals(1, composed.size());
+      try (var serving = query.server.captureServingView()) {
+        assertSame(query.candidate, serving.services());
+        assertSame(query.index, serving.encoderSet());
+        assertEquals(selectedB, querySet(serving).surfaceForOwner().componentObservation()
+            .querySelection().orElseThrow());
+      }
+      assertTrue(query.queryA.isClosed());
+      assertFalse(query.index.isClosed());
+      verify(registryBatch).install();
+      verify(query.transfer).install();
+      verify(applyLease).close();
     }
 
     @Override public void close() throws Exception {

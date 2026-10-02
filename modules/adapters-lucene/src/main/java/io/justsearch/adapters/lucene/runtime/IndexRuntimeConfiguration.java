@@ -141,6 +141,37 @@ public final class IndexRuntimeConfiguration {
   }
 
   private static void addHybrid(Map<String, Object> result, ResolvedConfig.HybridSearch hs) {
+    // These controls are captured by SearchPlanner/SearchExecutor through this serving runtime.
+    // Restart-required is an apply lifecycle, not an exemption from applied-value identity.
+    put(result, EnvRegistry.HYBRID_VECTOR_SKIP_MIN_CHARS, hs.vectorSkipMinChars());
+    put(result, EnvRegistry.HYBRID_VECTOR_SKIP_MIN_DF_FRACTION, hs.vectorSkipMinDfFraction());
+    put(result, EnvRegistry.HYBRID_CC_WEIGHT_SPARSE, hs.ccWeightSparse());
+    put(result, EnvRegistry.HYBRID_CC_WEIGHT_DENSE, hs.ccWeightDense());
+    put(result, EnvRegistry.HYBRID_CC_WEIGHT_SPLADE, hs.ccWeightSplade());
+    put(result, EnvRegistry.HYBRID_ADAPTIVE_WEIGHTS_ENABLED, hs.adaptiveWeightsEnabled());
+    put(result, EnvRegistry.HYBRID_BRANCH_FUSION_STRATEGY, hs.branchFusionStrategy());
+    boolean branchCc = !"rrf".equals(hs.branchFusionStrategy());
+    put(result, EnvRegistry.HYBRID_BRANCH_CC_ZERO_EXCLUDE,
+        branchCc ? hs.branchCcZeroExclude() : null);
+    put(result, EnvRegistry.HYBRID_BRANCH_CC_WEIGHT_WHOLE,
+        branchCc ? hs.branchCcWeightWhole() : null);
+    put(result, EnvRegistry.HYBRID_BRANCH_CC_WEIGHT_CHUNK,
+        branchCc ? hs.branchCcWeightChunk() : null);
+    put(result, EnvRegistry.HYBRID_BRANCH_CHUNK_MIN_WEIGHT_MULTIPLIER,
+        branchCc ? hs.branchChunkMinWeightMultiplier() : null);
+    put(result, EnvRegistry.HYBRID_BRANCH_RAMP_FULL_WEIGHT_MAX_TOKENS,
+        branchCc ? hs.branchRampFullWeightMaxTokens() : null);
+    put(result, EnvRegistry.HYBRID_BRANCH_RAMP_ZERO_WEIGHT_MIN_TOKENS,
+        branchCc ? hs.branchRampZeroWeightMinTokens() : null);
+    put(result, EnvRegistry.HYBRID_CHUNK_CC_WEIGHT_SPARSE, hs.chunkCcWeightSparse());
+    put(result, EnvRegistry.HYBRID_CHUNK_CC_WEIGHT_DENSE, hs.chunkCcWeightDense());
+    put(result, EnvRegistry.HYBRID_CHUNK_CC_WEIGHT_SPLADE, hs.chunkCcWeightSplade());
+    put(result, EnvRegistry.HYBRID_CHUNK_CC_ZERO_EXCLUDE, hs.chunkCcZeroExclude());
+    put(result, EnvRegistry.HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER, hs.chunkCollapseLimitMultiplier());
+    put(result, EnvRegistry.HYBRID_CHUNK_LEG_RECALL_COMPLETE_ENABLED, hs.chunkLegRecallCompleteEnabled());
+    put(result, EnvRegistry.HYBRID_CHUNK_LEG_RECALL_COMPLETE_TOP_N,
+        hs.chunkLegRecallCompleteEnabled() ? hs.chunkLegRecallCompleteTopN() : null);
+    put(result, EnvRegistry.HYBRID_CHUNK_BRANCH_REQUIRES_BASE_RESULTS, hs.chunkBranchRequiresBaseResults());
     put(result, EnvRegistry.HYBRID_CANDIDATE_LIMIT_MAX, hs.candidateLimitMax());
     put(result, EnvRegistry.HYBRID_TEXT_CANDIDATE_MULTIPLIER, hs.textCandidateMultiplier());
     put(result, EnvRegistry.HYBRID_VECTOR_CANDIDATE_MULTIPLIER, hs.vectorCandidateMultiplier());
@@ -244,6 +275,27 @@ public final class IndexRuntimeConfiguration {
         EnvRegistry.INDEX_NRT_BACKGROUND_REOPEN_MS,
         EnvRegistry.INDEX_NRT_ON_DEMAND_MAX_STALE_MS,
         EnvRegistry.INDEX_COMMIT_TIMER_INTERVAL_MS,
+        EnvRegistry.HYBRID_VECTOR_SKIP_MIN_CHARS,
+        EnvRegistry.HYBRID_VECTOR_SKIP_MIN_DF_FRACTION,
+        EnvRegistry.HYBRID_CC_WEIGHT_SPARSE,
+        EnvRegistry.HYBRID_CC_WEIGHT_DENSE,
+        EnvRegistry.HYBRID_CC_WEIGHT_SPLADE,
+        EnvRegistry.HYBRID_ADAPTIVE_WEIGHTS_ENABLED,
+        EnvRegistry.HYBRID_BRANCH_FUSION_STRATEGY,
+        EnvRegistry.HYBRID_BRANCH_CC_ZERO_EXCLUDE,
+        EnvRegistry.HYBRID_BRANCH_CC_WEIGHT_WHOLE,
+        EnvRegistry.HYBRID_BRANCH_CC_WEIGHT_CHUNK,
+        EnvRegistry.HYBRID_BRANCH_CHUNK_MIN_WEIGHT_MULTIPLIER,
+        EnvRegistry.HYBRID_BRANCH_RAMP_FULL_WEIGHT_MAX_TOKENS,
+        EnvRegistry.HYBRID_BRANCH_RAMP_ZERO_WEIGHT_MIN_TOKENS,
+        EnvRegistry.HYBRID_CHUNK_CC_WEIGHT_SPARSE,
+        EnvRegistry.HYBRID_CHUNK_CC_WEIGHT_DENSE,
+        EnvRegistry.HYBRID_CHUNK_CC_WEIGHT_SPLADE,
+        EnvRegistry.HYBRID_CHUNK_CC_ZERO_EXCLUDE,
+        EnvRegistry.HYBRID_CHUNK_COLLAPSE_LIMIT_MULTIPLIER,
+        EnvRegistry.HYBRID_CHUNK_LEG_RECALL_COMPLETE_ENABLED,
+        EnvRegistry.HYBRID_CHUNK_LEG_RECALL_COMPLETE_TOP_N,
+        EnvRegistry.HYBRID_CHUNK_BRANCH_REQUIRES_BASE_RESULTS,
         EnvRegistry.HYBRID_CANDIDATE_LIMIT_MAX,
         EnvRegistry.HYBRID_TEXT_CANDIDATE_MULTIPLIER,
         EnvRegistry.HYBRID_VECTOR_CANDIDATE_MULTIPLIER,
