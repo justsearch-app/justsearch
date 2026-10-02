@@ -195,14 +195,22 @@ public interface SessionHandle extends AutoCloseable {
    * @param isCpu true if the lease is backed by the CPU session; false for the GPU session
    * @param recorder recording hook bound via {@link SessionHandle#setOrtRunRecorder} at the time
    *     this lease was acquired; never null ({@link OrtRunRecorder#NOOP} by default)
+   * @param acquisition authority checked before each native run; null only for compatibility leases
    */
   record Lease(
       OrtSession session,
       OrtSession.RunOptions runOptions,
       Runnable release,
       boolean isCpu,
-      OrtRunRecorder recorder)
+      OrtRunRecorder recorder,
+      SessionAcquisitionRequest acquisition)
       implements AutoCloseable {
+
+    /** Compatibility constructor for leases without admitted request authority. */
+    public Lease(OrtSession session, OrtSession.RunOptions runOptions, Runnable release,
+        boolean isCpu, OrtRunRecorder recorder) {
+      this(session, runOptions, release, isCpu, recorder, null);
+    }
 
     public Lease {
       recorder = recorder != null ? recorder : OrtRunRecorder.NOOP;
@@ -220,6 +228,7 @@ public interface SessionHandle extends AutoCloseable {
      * @return the ORT result; caller owns its lifecycle (try-with-resources)
      */
     public OrtSession.Result run(Map<String, OnnxTensor> inputs) throws OrtException {
+      if (acquisition != null) acquisition.remainingNanos();
       long start = System.nanoTime();
       OrtSession.Result result =
           runOptions != null ? session.run(inputs, runOptions) : session.run(inputs);
@@ -238,6 +247,7 @@ public interface SessionHandle extends AutoCloseable {
      */
     public void runPinned(Map<String, OnnxTensor> inputs, Map<String, OnnxValue> pinnedOutputs)
         throws OrtException {
+      if (acquisition != null) acquisition.remainingNanos();
       long start = System.nanoTime();
       session.run(inputs, Collections.emptySet(), pinnedOutputs, runOptions).close();
       recorder.recordOrtRunNs(System.nanoTime() - start);

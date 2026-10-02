@@ -263,6 +263,13 @@ public final class SpladeEncoder implements Closeable {
    * @throws OrtException if ONNX inference fails
    */
   public Map<String, Float> encode(String text) throws OrtException {
+    return encode(text, LocalSessionAcquisition.foreground());
+  }
+
+  /** Encodes a query using its admitted scheduling and cancellation authority. */
+  public Map<String, Float> encode(String text, SessionAcquisitionRequest acquisition)
+      throws OrtException {
+    acquisition.remainingNanos();
     long tTok = System.nanoTime();
     Encoding encoding = tokenizer.encode(text);
     truncationEvidence.record(encoding.getIds().length);
@@ -273,7 +280,7 @@ public final class SpladeEncoder implements Closeable {
     long[] tokenTypeIds = truncate(encoding.getTypeIds(), seqLen);
     profiler.addPhaseNs("tokenize", System.nanoTime() - tTok);
 
-    return runOnnxInferenceSingle(inputIds, attentionMask, tokenTypeIds);
+    return runOnnxInferenceSingle(inputIds, attentionMask, tokenTypeIds, acquisition);
   }
 
   /**
@@ -687,8 +694,8 @@ public final class SpladeEncoder implements Closeable {
    * path has no performance penalty.
    */
   private Map<String, Float> runOnnxInferenceSingle(
-      long[] inputIds, long[] attentionMask, long[] tokenTypeIds) throws OrtException {
-    var acquisition = LocalSessionAcquisition.foreground();
+      long[] inputIds, long[] attentionMask, long[] tokenTypeIds,
+      SessionAcquisitionRequest acquisition) throws OrtException {
     try (var lease = sessions.acquire(acquisition)) {
       if (!firstEncodeLogged) {
         firstEncodeLogged = true;

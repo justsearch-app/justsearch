@@ -32,6 +32,17 @@ class ModelSessionPolicyResolverTest {
 
   private static final long BYTES_PER_MB = 1024L * 1024L;
 
+  @Test
+  void fp16CudaSelectionUsesBasicOptimizationForEveryCpuFallback() {
+    var variant = fp16OnCuda();
+    for (EncoderRole role : EncoderRole.values()) {
+      var policy = ModelSessionPolicyResolver.resolve(role, CFG, HW, variant);
+      assertEquals(OptLevel.BASIC_OPT, policy.cpu().optLevel(), role.name());
+      org.junit.jupiter.api.Assertions.assertSame(variant, policy.variant(),
+          "CPU fallback policy must not substitute a variant or generation identity");
+    }
+  }
+
   /** Creates an optimal FP16-on-CUDA variant for use in most tests. */
   private static VariantSelection fp16OnCuda() {
     return VariantSelection.optimal(

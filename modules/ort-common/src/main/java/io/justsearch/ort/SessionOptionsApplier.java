@@ -119,7 +119,8 @@ final class SessionOptionsApplier {
   static OrtSession.RunOptions buildGpuRunOptions(ModelSessionPolicy policy) throws OrtException {
     OrtSession.RunOptions runOptions = new OrtSession.RunOptions();
     if (policy.runOptions().arenaShrinkage()) {
-      runOptions.addRunConfigEntry("memory.enable_memory_arena_shrinkage", "gpu:0");
+      runOptions.addRunConfigEntry(
+          "memory.enable_memory_arena_shrinkage", "gpu:" + policy.gpu().cudaDeviceId());
     }
     return runOptions;
   }

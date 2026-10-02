@@ -16,8 +16,20 @@ public interface EmbeddingProvider {
   /** Embeds a document text for indexing. */
   float[] embedDocument(String text);
 
+  /** Embeds a candidate document within an admitted query's authority. */
+  default float[] embedDocument(String text, io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+    acquisition.remainingNanos();
+    return embedDocument(text);
+  }
+
   /** Embeds a query text for search. */
   float[] embedQuery(String text);
+
+  /** Embeds a query with admitted native acquisition authority. */
+  default float[] embedQuery(String text, io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+    acquisition.remainingNanos();
+    return embedQuery(text);
+  }
 
   /** Batch-embeds multiple document texts. */
   List<float[]> embedDocumentBatch(List<String> texts);

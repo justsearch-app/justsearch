@@ -247,7 +247,9 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     return embed(text, LocalSessionAcquisition.foreground());
   }
 
-  private EmbedResult embed(String text, SessionAcquisitionRequest acquisition) throws OrtException {
+  /** Embeds a query with one admitted authority shared by all of its chunks. */
+  public EmbedResult embed(String text, SessionAcquisitionRequest acquisition) throws OrtException {
+    acquisition.remainingNanos();
     Encoding encoding = tokenizer.encode(text);
     long[] ids = encoding.getIds();
     long[] mask = encoding.getAttentionMask();

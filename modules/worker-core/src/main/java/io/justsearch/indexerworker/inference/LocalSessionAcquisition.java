@@ -5,11 +5,11 @@ import io.justsearch.ort.SessionAcquisitionRequest;
 import java.time.Duration;
 
 /**
- * Bounded scheduling inputs used until D2 propagates admitted request authority into encoders.
+ * Bounded scheduling inputs for local work without admitted Engine request authority.
  *
  * <p>The generous local horizon preserves the former wait behavior while making every native
- * session acquisition monotonic, interrupt-cancellable, and finite. D2 replaces these factories at
- * the encoder boundary with the caller's urgency, deadline, and cancellation authority.
+ * session acquisition monotonic, interrupt-cancellable, and finite. Engine query paths instead pass
+ * the caller's urgency, absolute deadline, and cooperative cancellation authority explicitly.
  */
 public final class LocalSessionAcquisition {
   private static final Duration ACQUIRE_TIMEOUT = Duration.ofMinutes(5);

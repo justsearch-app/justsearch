@@ -158,7 +158,13 @@ public class BgeM3Encoder implements AutoCloseable {
    * @throws OrtException if ONNX inference fails
    */
   public BgeM3Output encode(String text) throws OrtException {
-    return encodeBatchInternal(List.of(text), LocalSessionAcquisition.foreground()).get(0);
+    return encode(text, LocalSessionAcquisition.foreground());
+  }
+
+  /** Encodes a query using its admitted scheduling and cancellation authority. */
+  public BgeM3Output encode(String text, SessionAcquisitionRequest acquisition) throws OrtException {
+    acquisition.remainingNanos();
+    return encodeBatchInternal(List.of(text), acquisition).get(0);
   }
 
   /**

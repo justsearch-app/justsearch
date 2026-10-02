@@ -36,6 +36,40 @@ class NativeSessionHandleTest {
 
   private static final RuntimePolicy DEFAULT_RUNTIME = RuntimePolicy.defaults();
 
+  @Test
+  void coldFp16CudaCpuFallbackUsesBasicOptimizationWithoutReplacingArtifact() throws Exception {
+    Path model = Path.of("missing", "model_fp16.onnx");
+    var variant = io.justsearch.configuration.model.VariantSelection.optimal(model,
+        io.justsearch.configuration.model.ModelPrecision.FP16,
+        io.justsearch.configuration.model.ExecutionProvider.CUDA);
+    var policy = ModelSessionPolicyResolver.resolve(EncoderRole.EMBEDDING,
+        io.justsearch.configuration.resolved.TestResolvedConfigHelper.withDefaults(),
+        io.justsearch.configuration.model.HardwareProfile.gpuFull(12_000_000_000L), variant);
+    var cpu = mock(OrtSession.class);
+    try (var options = org.mockito.Mockito.mockConstruction(OrtSession.SessionOptions.class);
+        var cache = org.mockito.Mockito.mockStatic(OnnxSessionCache.class);
+        var handle = NativeSessionHandle.builder("cold-fp16-fallback", model)
+            .gpuModelPath(model).shouldUseGpu(() -> true)
+            .runtime(DEFAULT_RUNTIME).policy(policy).build()) {
+      assertNull(handle.peekCpuSession(), "fallback must start cold");
+      cache.when(() -> OnnxSessionCache.createCachedSession(
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(model),
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+          .thenReturn(cpu);
+      try (var lease = handle.acquireCpu(SessionAcquisitionRequest.within(
+          SessionAcquisitionRequest.Urgency.FOREGROUND, Duration.ofSeconds(2)))) {
+        assertTrue(lease.isCpu());
+        assertSame(cpu, lease.session());
+      }
+      cache.verify(() -> OnnxSessionCache.createCachedSession(
+          org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(model),
+          org.mockito.ArgumentMatchers.any(),
+          org.mockito.ArgumentMatchers.eq(OrtSession.SessionOptions.OptLevel.BASIC_OPT)));
+      assertSame(variant, policy.variant());
+    }
+    verify(cpu).close();
+  }
+
   private static ModelSessionPolicy cpuOnlyDeferred() {
     return ModelSessionPolicy.forFallback(
         /* gpuConfig= */ null,

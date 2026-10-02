@@ -370,7 +370,8 @@ public final class NativeSessionHandle implements SessionHandle {
                   gpuRunOptions,
                   idempotentRelease(instance, gpuInferenceSemaphore::release),
                   /* isCpu= */ false,
-                  ortRunRecorder);
+                  ortRunRecorder,
+                  request);
           acquired = false;
           return lease;
         } finally {
@@ -841,7 +842,8 @@ public final class NativeSessionHandle implements SessionHandle {
               null,
               idempotentRelease(instance, () -> {}),
               /* isCpu= */ true,
-              ortRunRecorder);
+              ortRunRecorder,
+              request);
         }
       }
       session = getCpuSession(request);

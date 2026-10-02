@@ -364,10 +364,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     private final io.justsearch.app.api.EngineWorkHandle.Registration cancellation;
     private final AtomicReference<OwnedCallTask> submission = new AtomicReference<>();
     private final ScheduledFuture<?> alarm;
+    private final long deadlineNanos;
 
     Budget(long budgetMs, io.justsearch.app.api.EngineWorkHandle work, Consumer<Throwable> fail) {
       this.work = work;
       this.fail = fail;
+      this.deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs);
       this.alarm = scheduleDeadline(this::expire, budgetMs);
       try {
         this.cancellation = work.onCancel(this::cancel);
@@ -433,7 +435,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           traceId,
           requestId,
           signal, engineContext, enqueueProvenance(engineContext),
-          Objects.requireNonNull(childLifetime, "unary childLifetime"));
+          Objects.requireNonNull(childLifetime, "unary childLifetime"), deadlineNanos);
     }
 
     @Override
