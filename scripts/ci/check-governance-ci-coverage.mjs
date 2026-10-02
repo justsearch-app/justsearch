@@ -37,6 +37,58 @@ export function workflowJobs(text) {
   return jobs;
 }
 
+// Credit only plain commands whose arguments the runner accepts. Shell operators,
+// substitutions and escaping need shell evaluation, so they cannot prove enforcement.
+function gateCommand(command, known) {
+  if (/[;&|<>`$\\]/.test(command)) return null;
+  const words = [];
+  let word = '';
+  let quote = null;
+  let started = false;
+  for (const char of command.trim()) {
+    if (quote) {
+      if (char === quote) quote = null;
+      else word += char;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+      started = true;
+    } else if (/\s/.test(char)) {
+      if (started) words.push(word);
+      word = '';
+      started = false;
+    } else {
+      word += char;
+      started = true;
+    }
+  }
+  if (quote) return null;
+  if (started) words.push(word);
+  if (words[0] !== 'node' || words[1] !== 'scripts/governance/run.mjs') return null;
+
+  let mode = 'warn';
+  let format = 'sarif';
+  let registry = 'governance/registry.v1.json';
+  let fixtures = false;
+  const ids = [];
+  for (let i = 2; i < words.length; i++) {
+    const flag = words[i];
+    if (['-h', '--help', '--explain', '--preflight', '--suggest-changeset'].includes(flag)) return null;
+    if (['--mode', '--out', '--registry', '--gate', '--format'].includes(flag)) {
+      const value = words[++i];
+      if (value === undefined) return null;
+      if (flag === '--mode') mode = value;
+      else if (flag === '--format') format = value;
+      else if (flag === '--registry') registry = value;
+      else if (flag === '--gate') ids.push(value);
+    } else if (flag === '--self-test') fixtures = true;
+    else if (!['--skip-self-test', '--produce-inputs', '--rebalance'].includes(flag)) return null;
+  }
+  if (!['gate', 'warn'].includes(mode) || !['sarif', 'compact'].includes(format)
+      || registry.replace(/^\.\//, '') !== 'governance/registry.v1.json'
+      || ids.some((id) => !known.includes(id))) return null;
+  return { ids: ids.length ? ids : known, fixtures, production: !fixtures && mode === 'gate' };
+}
+
 export function checkCoverage({ workflowText, registry, consultRegister, requiredChecks, exemptions = [] }) {
   const production = new Set();
   const fixtures = new Set();
@@ -58,13 +110,9 @@ export function checkCoverage({ workflowText, registry, consultRegister, require
       commands.push(...parseUiWebGateCommands(consultRegister).map((c) => c.join(' ')));
     }
     for (const command of commands) {
-      if (!/^node scripts\/governance\/run\.mjs(?:\s|$)/.test(command.trim())) continue;
-      const ids = [...command.matchAll(/--gate\s+([\w,-]+)/g)].flatMap((m) => m[1].split(','));
-      if (/--self-test\b/.test(command)) {
-        for (const id of ids.length ? ids : known) fixtures.add(id);
-      } else if (/--mode\s+gate\b/.test(command) && !/--(?:fixture|repo-root|preflight|explain|suggest-changeset|help)\b/.test(command)) {
-        for (const id of ids.length ? ids : known) production.add(id);
-      }
+      const parsed = gateCommand(command, known);
+      if (parsed?.fixtures) for (const id of parsed.ids) fixtures.add(id);
+      if (parsed?.production) for (const id of parsed.ids) production.add(id);
     }
   }
   const issues = [];

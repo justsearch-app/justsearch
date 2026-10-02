@@ -64,6 +64,11 @@
       "commands": ["./gradlew.bat :modules:ai-backend:test :modules:api-contract-projection-java:test :modules:app-inference:test :modules:benchmarks:test :modules:dead-code-audit:test :modules:extension-substrate:test :modules:gpu-bridge:test :modules:infra-core:test :modules:ort-common:test :modules:prompt-support:test :modules:reranker:test :modules:ssot-tools:test :modules:system-tests:test :modules:telemetry:test :modules:test-support:test -PskipWebBuild=true --console=plain"]
     },
     {
+      "check": "Engine lifecycle tests (model-free)",
+      "mode": "local-subset",
+      "commands": ["./gradlew.bat :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain"]
+    },
+    {
       "check": "Windows-native tests",
       "mode": "hosted-only",
       "reason": "Requires the pinned windows-latest runner image and Windows-only test selection; a developer workstation is not the hosted runner contract."
