@@ -11,6 +11,7 @@ import io.justsearch.ipc.HealthCheckResponse;
 import io.justsearch.ipc.OnnxDiscoveredModel;
 import io.justsearch.ort.OnnxSessionCache;
 import io.justsearch.reranker.WorkerModelDiscovery;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -212,7 +213,8 @@ public final class WorkerHealthService {
     if (jobQueue != null) {
       try {
         // Try to read queue depth - this exercises the SQLite connection
-        long depth = jobQueue.queueDepth();
+        JobQueue.JobStateCounts counts = jobQueue.jobStateCountsStrict();
+        long depth = counts.pendingCount() + counts.processingCount();
         log.trace("JobQueue healthy, depth={}", depth);
       } catch (RuntimeException e) {
         log.warn("JobQueue health check failed: {}", e.getMessage());
@@ -226,9 +228,9 @@ public final class WorkerHealthService {
     if (indexCountOps != null) {
       try {
         // Try to get doc count - this exercises the index reader
-        long docCount = indexCountOps.docCount();
+        long docCount = indexCountOps.docCountOrThrow();
         log.trace("Lucene index healthy, docCount={}", docCount);
-      } catch (RuntimeException e) {
+      } catch (IOException | RuntimeException e) {
         log.warn("Lucene health check failed: {}", e.getMessage());
         log.debug("Lucene health check failed (stack trace)", e);
         issues.add("Lucene: " + e.getMessage());

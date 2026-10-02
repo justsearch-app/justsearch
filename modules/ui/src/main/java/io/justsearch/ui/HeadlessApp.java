@@ -1077,6 +1077,7 @@ public class HeadlessApp {
     boolean fatalStartup = false;
     boolean orderedShutdownComplete = false;
     Telemetry telemetry = null;
+    io.justsearch.telemetry.TracingBootstrap tracing = null;
     KnowledgeServerHealthMonitor healthMonitor = null;
     HeadAssembly bootstrap = null;
     LocalApiServer apiServer = null;
@@ -1222,6 +1223,7 @@ public class HeadlessApp {
       // Phase 1: infrastructure (telemetry, policy)
       InfraPhaseResult infraPhase = setupInfra(configPhase, engineRoot.executors());
       telemetry = infraPhase.telemetry();
+      tracing = infraPhase.tracingBootstrap();
 
       tPhase = System.nanoTime();
       long telemetryMs = (tPhase - tPrev) / 1_000_000;
@@ -1521,6 +1523,12 @@ public class HeadlessApp {
           log.warn("Failed to close operations store during cleanup", closeFailure);
         }
         try {
+          closeTracingAfterDrain(tracing, workCleanupComplete, headCleanupComplete,
+              indexCleanupComplete);
+        } catch (RuntimeException failure) {
+          log.warn("Tracing cleanup incomplete", failure);
+        }
+        try {
           if (telemetry != null && headCleanupComplete) {
             telemetry.close();
           }
@@ -1589,6 +1597,18 @@ public class HeadlessApp {
       if (healthMonitor != null) healthMonitor.close();
     } finally {
       if (apiServer != null) apiServer.stop();
+    }
+  }
+
+  /** Normal and failed-start teardown close tracing only after every span producer drains. */
+  static void closeTracingAfterDrain(io.justsearch.telemetry.TracingBootstrap tracing,
+      boolean workDrained, boolean headClosed, boolean indexClosed) {
+    if (!workDrained || !headClosed || !indexClosed) throw new IllegalStateException(
+        "Tracing retained until work, Head and index finish");
+    try {
+      if (tracing != null) tracing.close();
+    } finally {
+      io.justsearch.telemetry.TracingBootstrap.shutdownIndexing();
     }
   }
 
@@ -1789,9 +1809,7 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "tracing",
             reason -> {
-              if (!headClosed.get()) throw new IllegalStateException(
-                  "Tracing retained until Head procedure termination");
-              if (tracing != null) tracing.close();
+              closeTracingAfterDrain(tracing, workDrained.get(), headClosed.get(), indexClosed.get());
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(

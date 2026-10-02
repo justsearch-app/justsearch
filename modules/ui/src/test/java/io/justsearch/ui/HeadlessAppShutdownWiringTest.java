@@ -20,8 +20,10 @@ import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.ShutdownOutcome;
 import io.justsearch.app.util.AppInstanceLock;
 import io.justsearch.telemetry.Telemetry;
+import io.justsearch.telemetry.TracingBootstrap;
 import io.justsearch.ui.api.LocalApiServer;
 import io.justsearch.ui.runtime.RuntimeManifestPublisher;
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -55,22 +57,26 @@ final class HeadlessAppShutdownWiringTest {
   }
 
   @Test
-  void failedIndexDrainRetainsOperationsUntilSuccessfulRetry() throws Exception {
+  void failedIndexDrainRetainsOperationsAndTracingUntilSuccessfulRetry() throws Exception {
     var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
     var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
     var index = mock(KnowledgeServerBootstrap.class);
     var instanceLock = mock(AppInstanceLock.class);
+    var tracing = mock(TracingBootstrap.class);
     when(index.closeForUpgrade()).thenReturn(ShutdownOutcome.FAILED, ShutdownOutcome.GRACEFUL);
-    var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, null, null, null, instanceLock,
+    var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, null, tracing, null, instanceLock,
         mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
         resources, () -> null, operations, null, null);
     var indexStep = steps.stream().filter(step -> EngineShutdownSequence.INDEX_HALF_STEP.equals(step.name())).findFirst().orElseThrow();
     var storeStep = steps.stream().filter(step -> "operations-store".equals(step.name())).findFirst().orElseThrow();
+    var tracingStep = steps.stream().filter(step -> "tracing".equals(step.name())).findFirst().orElseThrow();
     var resourceStep = steps.stream().filter(step -> "process-resources".equals(step.name())).findFirst().orElseThrow();
     var lockStep = steps.stream().filter(step -> "app-instance-lock".equals(step.name())).findFirst().orElseThrow();
     steps.stream().filter(step -> "head-assembly".equals(step.name())).findFirst().orElseThrow()
         .action().run(Reason.QUIT);
     assertEquals("FAILED", indexStep.action().run(Reason.QUIT));
+    assertThrows(IllegalStateException.class, () -> tracingStep.action().run(Reason.QUIT));
+    org.mockito.Mockito.verifyNoInteractions(tracing);
     assertThrows(IllegalStateException.class, () -> lockStep.action().run(Reason.QUIT));
     org.mockito.Mockito.verifyNoInteractions(instanceLock);
     assertThrows(IllegalStateException.class, () -> storeStep.action().run(Reason.QUIT));
@@ -79,6 +85,8 @@ final class HeadlessAppShutdownWiringTest {
     org.mockito.Mockito.verifyNoInteractions(operations);
     assertEquals("GRACEFUL", indexStep.action().run(Reason.QUIT));
     storeStep.action().run(Reason.QUIT);
+    tracingStep.action().run(Reason.QUIT);
+    org.mockito.Mockito.verify(tracing).close();
     resourceStep.action().run(Reason.QUIT);
     lockStep.action().run(Reason.QUIT);
     var order = inOrder(index, operations, resources, instanceLock);
@@ -86,6 +94,85 @@ final class HeadlessAppShutdownWiringTest {
     order.verify(operations).close();
     order.verify(resources).close();
     order.verify(instanceLock).close();
+  }
+
+  @Test
+  @org.junit.jupiter.api.Timeout(20)
+  void jvmShutdownSequenceExportsSpansEndingDuringDrainBeforeClosingTracing(@TempDir Path tempDir)
+      throws Exception {
+    var previous = GlobalOpenTelemetry.get();
+    GlobalOpenTelemetry.resetForTest();
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    CompletableFuture<Void> shutdown = null;
+    try {
+      var owner = TracingBootstrap.forIndexing(tempDir, null, "detailed");
+      var tracer = GlobalOpenTelemetry.get().getTracer("shutdown-order-test");
+      var drainingSpan = tracer.spanBuilder("work-drain-span").startSpan();
+      var attempts = mock(io.justsearch.app.api.operations.OperationAttemptRunner.class);
+      var admission = mock(EngineAdmissionService.class);
+      when(admission.awaitDrained(java.time.Duration.ofSeconds(5))).thenReturn(true);
+      when(attempts.awaitDrained(java.time.Duration.ofSeconds(5))).thenAnswer(ignored -> {
+        entered.countDown();
+        assertTrue(release.await(5, TimeUnit.SECONDS));
+        drainingSpan.end();
+        return true;
+      });
+      var head = mock(HeadAssembly.class);
+      doAnswer(ignored -> {
+        tracer.spanBuilder("head-drain-span").startSpan().end();
+        return null;
+      }).when(head).close();
+      var index = mock(KnowledgeServerBootstrap.class);
+      when(index.closeForUpgrade()).thenAnswer(ignored -> {
+        tracer.spanBuilder("index-drain-span").startSpan().end();
+        owner.close(); // Physical index closure flushes, preserving process-owned tracing.
+        return ShutdownOutcome.GRACEFUL;
+      });
+      var sequence = new EngineShutdownSequence(tempDir,
+          HeadlessApp.orderedShutdownSteps(null, head, null, index, null, null, null,
+              mock(AppInstanceLock.class), mock(OperationLeaseService.class), admission,
+              mock(io.justsearch.app.api.EngineProcessResources.class), () -> null,
+              mock(io.justsearch.app.api.operations.OperationStore.class), attempts, null),
+          ignored -> {});
+
+      shutdown = CompletableFuture.runAsync(() -> sequence.runFromJvmShutdownHook(Reason.QUIT));
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      var during = tracer.spanBuilder("during-work-drain").startSpan();
+      assertTrue(during.isRecording(), "tracing remains live while shutdown drains work");
+      during.end();
+      release.countDown();
+      shutdown.get(10, TimeUnit.SECONDS);
+      assertTrue(sequence.run(Reason.QUIT).clean());
+      var after = tracer.spanBuilder("after-shutdown").startSpan();
+      assertFalse(after.isRecording(), "ordered tracing teardown must close the index provider");
+      after.end();
+      String exported = Files.readString(tempDir.resolve("telemetry/traces.ndjson"));
+      assertTrue(exported.contains("work-drain-span"));
+      assertTrue(exported.contains("head-drain-span"));
+      assertTrue(exported.contains("index-drain-span"));
+      assertTrue(exported.contains("during-work-drain"));
+    } finally {
+      release.countDown();
+      try {
+        if (shutdown != null) shutdown.get(10, TimeUnit.SECONDS);
+      } finally {
+        TracingBootstrap.shutdownIndexing();
+        GlobalOpenTelemetry.resetForTest();
+        GlobalOpenTelemetry.set(previous);
+      }
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
+  void failedStartupRetainsTracingUntilEveryProducerDrains(int completedDrains) {
+    var tracing = mock(TracingBootstrap.class);
+    assertThrows(IllegalStateException.class, () -> HeadlessApp.closeTracingAfterDrain(tracing,
+        (completedDrains & 1) != 0, (completedDrains & 2) != 0, (completedDrains & 4) != 0));
+    org.mockito.Mockito.verifyNoInteractions(tracing);
+    HeadlessApp.closeTracingAfterDrain(tracing, true, true, true);
+    org.mockito.Mockito.verify(tracing).close();
   }
 
   @Test
