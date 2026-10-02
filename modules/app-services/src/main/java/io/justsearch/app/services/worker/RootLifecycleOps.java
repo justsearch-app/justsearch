@@ -233,6 +233,14 @@ final class RootLifecycleOps {
      */
     private void walkAndSubmit(
             Path normalized, String collection, io.justsearch.ipc.ScanMode mode, EngineContext engineContext) {
+        // Removal must wait for the actual producer exit before deleting its last batch.
+        synchronized (watchedRootsState.lifecycleLock()) {
+            walkAndSubmitOwned(normalized, collection, mode, engineContext);
+        }
+    }
+
+    private void walkAndSubmitOwned(
+            Path normalized, String collection, io.justsearch.ipc.ScanMode mode, EngineContext engineContext) {
         if (!watchedRoots.containsKey(normalized)) {
             log.debug("Walk cancelled before start: root {} removed", normalized);
             return;
@@ -315,8 +323,11 @@ final class RootLifecycleOps {
         // path (reindexWatchedRoots/markIndexed) and never reaches this method.
         if (!watchedRootsState.register(normalized,
                 IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collectionName) ? null : collectionName, true)) {
-            log.debug("addWatchedRoot: {} already watched — no-op (idempotent re-add)", normalized);
-            return;
+            if (!watchedRootsState.isInitializationPending(normalized)) {
+                log.debug("addWatchedRoot: {} already watched — no-op (idempotent re-add)", normalized);
+                return;
+            }
+            collectionName = collectionOf(normalized);
         }
 
         // 1. Register root immediately so getWatchedRoots() returns it and
@@ -325,6 +336,7 @@ final class RootLifecycleOps {
         //    this the caller's collection was unreadable the moment this method returned —
         //    GET /api/indexing/roots reported "default" for a labelled root (885 §UL.6) and every
         //    re-walk after a restart re-tagged its documents as the default (821 §L.3).
+        watchedRootsState.markInitializationPending(normalized);
         watchedRootsState.persist();
 
         // 2. Start file watcher (does not depend on walk completion)
@@ -334,9 +346,12 @@ final class RootLifecycleOps {
         //    are handled by walkAndSubmit() on the walk-bg thread. Tempdoc 821 §3-C2 — the scan arm
         //    carries the SAME label the watcher arm just got, so the root's own initial scan admits
         //    documents under its collection instead of dropping the tag.
+        String initialCollection = collectionName;
         submitWalk.accept(
                 ownedContext -> walkAndSubmit(
-                        normalized, collectionName, io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, ownedContext), engineContext);
+                        normalized, initialCollection, io.justsearch.ipc.ScanMode.SCAN_MODE_INITIAL, ownedContext), engineContext);
+        watchedRootsState.finishInitialization(normalized);
+        watchedRootsState.persist();
     }
 
     int deleteDocsByPathPrefix(Path pathPrefix, EngineContext engineContext) {
@@ -395,6 +410,14 @@ final class RootLifecycleOps {
         Path normalized = path.toAbsolutePath().normalize();
         log.info("Removing watched root: {} (stopping watcher, deleting from index)", normalized);
 
+        // A retained ancestor still owns a watcher/reconciler for this subtree. Its future
+        // effects would recreate the deleted documents, so removal cannot complete yet.
+        if (watchedRoots.keySet().stream()
+                .anyMatch(root -> !root.equals(normalized) && normalized.startsWith(root))) {
+            log.warn("Root removal incomplete for {}: a watched ancestor still owns this subtree", normalized);
+            return -1;
+        }
+
         // Stop every watcher whose persisted root will be removed, including nested roots.
         try {
             var rootsToUnwatch = new java.util.TreeSet<Path>();
@@ -440,8 +463,7 @@ final class RootLifecycleOps {
         }
 
         // Retain persisted roots until all cleanup succeeds so incomplete removal can be retried.
-        watchedRootsState.removeRootAndNested(normalized);
-        watchedRootsState.persist();
+        watchedRootsState.removeRootAndNestedAndPersist(normalized);
 
         return deletedJobs;
     }
@@ -494,10 +516,13 @@ final class RootLifecycleOps {
             // force=false without excludes: prefer Worker-side syncDirectory which streams
             // the disk walk and enqueues in batches internally.
             if (!force && !hasExcludes) {
-                SyncDirectoryResponse r = syncOps.syncDirectory(root.toString(), true, engineContext);
-                if (r != null && r.getError().isEmpty()) {
-                    synchronized (watchedRootsState) {
-                        if (watchedRoots.containsKey(root)) watchedRootsState.markIndexed(root);
+                synchronized (watchedRootsState.lifecycleLock()) {
+                    if (!watchedRoots.containsKey(root)) continue;
+                    SyncDirectoryResponse r = syncOps.syncDirectory(root.toString(), true, engineContext);
+                    if (r != null && r.getError().isEmpty()) {
+                        synchronized (watchedRootsState) {
+                            if (watchedRoots.containsKey(root)) watchedRootsState.markIndexed(root);
+                        }
                     }
                 }
                 continue;

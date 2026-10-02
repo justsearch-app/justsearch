@@ -241,7 +241,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         this.syncOps = new SyncOps(executors, ingestRpcExecutor, watchedRoots,
             this.watchedRootsState::setDeleteDetectionUnverified,
             (root, count) ->
-                this.watchedRootsState.recordDriftCorrected(root, count, System.currentTimeMillis()));
+                this.watchedRootsState.recordDriftCorrected(root, count, System.currentTimeMillis()),
+            this.watchedRootsState);
         EngineExecutorRegistry.Limits background = executors.limits(Kind.BACKGROUND);
         EngineExecutorRegistry.Registration newWalkRegistration = null;
         ExecutorService newWalkExecutor;

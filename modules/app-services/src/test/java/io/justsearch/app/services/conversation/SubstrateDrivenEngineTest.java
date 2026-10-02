@@ -406,6 +406,73 @@ final class SubstrateDrivenEngineTest {
   }
 
   @Test
+  void realRagProducerRefusalsTerminateDispatchBeforeLlm() {
+    for (String stage : List.of("search", "retrieve", "fetch")) {
+      for (boolean admission : List.of(false, true)) {
+        for (boolean wrapped : List.of(false, true)) {
+          RuntimeException refusal = admission
+              ? new io.justsearch.app.api.EngineAdmissionException(
+                  io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3)
+              : new io.justsearch.core.execution.EngineExecutorRejectedException(
+                  io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+                  "retrieval", 3);
+          RuntimeException failure = wrapped
+              ? new java.util.concurrent.CompletionException(
+                  new java.util.concurrent.ExecutionException(refusal)) : refusal;
+          var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+          org.mockito.Mockito.when(client.search(
+              org.mockito.ArgumentMatchers.any(io.justsearch.ipc.SearchRequest.class),
+              org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+              .thenAnswer(invocation -> {
+                if (stage.equals("search")) throw failure;
+                return io.justsearch.ipc.SearchResponse.getDefaultInstance();
+              });
+          org.mockito.Mockito.when(client.retrieveContext(
+              org.mockito.ArgumentMatchers.any(io.justsearch.app.api.RetrieveContextParams.class),
+              org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+              .thenAnswer(invocation -> {
+                if (stage.equals("retrieve")) throw failure;
+                if (stage.equals("fetch")) throw new IllegalStateException("chunks unavailable");
+                return io.justsearch.ipc.RetrieveContextResponse.getDefaultInstance();
+              });
+          org.mockito.Mockito.when(client.fetchDocuments(
+              org.mockito.ArgumentMatchers.anyList(),
+              org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+              .thenThrow(failure);
+          var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+              Runnable::run, Runnable::run, () -> client);
+          var rag = new io.justsearch.app.services.conversation.spi.RAGContext(docs);
+          var llm = new ScriptedAi(List.of("ungrounded"));
+          var engine = newEngine(oneShotShape(List.of(), List.of(rag.id()), List.of()),
+              List.of(), List.of(rag), List.of(), List.of(), llm);
+          // Exercise open retrieval and selected-document retrieval through the actual dispatcher.
+          List<Map<String, Object>> bodies = stage.equals("search")
+              ? List.of(Map.of("question", "q"))
+              : stage.equals("fetch")
+                  ? List.of(Map.of("question", "q", "docIds", List.of("doc")))
+                  : List.of(Map.of("question", "q"), Map.of("question", "q", "docIds", List.of("doc")));
+          for (Map<String, Object> body : bodies) {
+            var events = new ArrayList<SseEvent>();
+            engine.run(SHAPE_ID, body, Audience.USER, events::add,
+                io.justsearch.app.services.TestEngineContexts.internal());
+            assertEquals(0, llm.calls.size(), stage + ": refusal must prevent an ungrounded answer");
+            assertEquals(1, events.size());
+            assertEquals("error", events.get(0).name());
+            assertEquals("ADMISSION_ENGINE_LIMIT", events.get(0).payload().get("errorCode"));
+            assertEquals(3, events.get(0).payload().get("retryAfterSeconds"));
+            assertEquals(false, events.get(0).payload().get("retrySafe"));
+          }
+          if (!stage.equals("fetch")) {
+            org.mockito.Mockito.verify(client, org.mockito.Mockito.never()).fetchDocuments(
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   @DisplayName("E1: StreamConsumer donePayloadEntries merge into the done event payload")
   void doneEntriesMerged() {
     var enricher =

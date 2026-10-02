@@ -47,6 +47,7 @@ public final class WatchedRootsState {
 
   // Shared across client instances; do not hold the state monitor while calling the Engine.
   private final Object lifecycleLock = new Object();
+  private static final String INITIALIZATION_PENDING = "ROOT_INITIALIZATION_PENDING";
 
   Object lifecycleLock() {
     return lifecycleLock;
@@ -177,6 +178,18 @@ public final class WatchedRootsState {
     return walkErrors.get(root);
   }
 
+  synchronized void markInitializationPending(Path root) {
+    walkErrors.put(root, INITIALIZATION_PENDING);
+  }
+
+  boolean isInitializationPending(Path root) {
+    return INITIALIZATION_PENDING.equals(walkErrors.get(root));
+  }
+
+  synchronized void finishInitialization(Path root) {
+    walkErrors.remove(root, INITIALIZATION_PENDING);
+  }
+
   boolean isWalkCompleted(Path root) {
     return walkCompleted.contains(root);
   }
@@ -226,6 +239,7 @@ public final class WatchedRootsState {
   }
 
   synchronized void removeRootAndNested(Path normalizedRoot) {
+    walkErrors.keySet().removeIf(p -> p.startsWith(normalizedRoot));
     watchedRoots.remove(normalizedRoot);
     walkCompleted.remove(normalizedRoot);
     deleteDetectionUnverified.remove(normalizedRoot);
@@ -238,6 +252,14 @@ public final class WatchedRootsState {
     deleteDetectionUnverified.removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
     driftCorrected.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
     lastVerifiedAt.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
+  }
+
+  synchronized void removeRootAndNestedAndPersist(Path normalizedRoot) {
+    var remaining = new java.util.HashMap<>(watchedRoots);
+    remaining.keySet().removeIf(p -> p.startsWith(normalizedRoot));
+    // Publish durable removal first. A failed write retains the live retry obligation too.
+    rootsStore.persistRoots(remaining, walkErrors, walkCompleted, collections);
+    removeRootAndNested(normalizedRoot);
   }
 
   synchronized void persist() {

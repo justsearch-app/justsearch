@@ -32,6 +32,71 @@ final class RootLifecycleOpsIdempotencyTest {
   @TempDir Path tempDir;
 
   @Test
+  void refusedInitializationResumesOnReAddIncludingAfterReload() throws Exception {
+    for (String stage : java.util.List.of("watch", "submit")) {
+      for (boolean reload : java.util.List.of(false, true)) {
+        Path root = Files.createDirectories(tempDir.resolve(stage + reload));
+        Path rootsFile = tempDir.resolve(stage + reload + ".json");
+        Map<Path, Instant> roots = new ConcurrentHashMap<>();
+        var state = new WatchedRootsState(roots, new WatchedRootsStore(rootsFile, null));
+        var failing = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var watchers = new java.util.HashSet<String>();
+        var queued = new java.util.concurrent.atomic.AtomicInteger();
+        var refusal = new io.justsearch.app.api.EngineAdmissionException(
+            io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3);
+        var watcher = new RootLifecycleOps.WorkerWatchFn() {
+          @Override
+          public void watch(String path, String collection, io.justsearch.core.context.EngineContext context) {
+            assertEquals("original", collection, "retry must preserve the persisted collection");
+            if (failing.get() && stage.equals("watch")) throw refusal;
+            watchers.add(path);
+          }
+
+          @Override
+          public void unwatch(String path, io.justsearch.core.context.EngineContext context) {
+            watchers.remove(path);
+          }
+        };
+        java.util.function.BiConsumer<java.util.function.Consumer<io.justsearch.core.context.EngineContext>,
+            io.justsearch.core.context.EngineContext> submit = (body, context) -> {
+              if (failing.get() && stage.equals("submit")) {
+                throw new java.util.concurrent.CompletionException(refusal);
+              }
+              queued.incrementAndGet();
+            };
+        var ops = new RootLifecycleOps(roots, state, ExcludeMatcher::empty,
+            (path, collection, mode, globs, progress, context) -> null, watcher,
+            (path, context) -> null, (id, context) -> null,
+            mock(SyncOps.class), mock(ExecutorService.class), submit);
+        var context = io.justsearch.app.services.TestEngineContexts.internal();
+        var initialOps = ops;
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+            () -> initialOps.addWatchedRoot("original", root, context));
+        assertTrue(roots.containsKey(root), "incomplete initialization retains its owner");
+        assertTrue(state.isInitializationPending(root));
+        assertEquals(0, queued.get());
+        if (reload) {
+          roots = new ConcurrentHashMap<>();
+          state = new WatchedRootsState(roots, new WatchedRootsStore(rootsFile, null));
+          state.loadPersistedRoots();
+          assertTrue(state.isInitializationPending(root));
+          ops = new RootLifecycleOps(roots, state, ExcludeMatcher::empty,
+              (path, collection, mode, globs, progress, owned) -> null, watcher,
+              (path, owned) -> null, (id, owned) -> null,
+              mock(SyncOps.class), mock(ExecutorService.class), submit);
+        }
+        failing.set(false);
+        ops.addWatchedRoot("changed-on-retry", root, context);
+        assertEquals(java.util.Set.of(root.toString()), watchers);
+        assertEquals(1, queued.get(), "retry must submit the missed initial walk");
+        org.junit.jupiter.api.Assertions.assertFalse(state.isInitializationPending(root));
+        ops.addWatchedRoot("changed-again", root, context);
+        assertEquals(1, queued.get(), "completed initialization remains idempotent");
+      }
+    }
+  }
+
+  @Test
   void incompleteRemovalRetainsPersistedRootsUntilExplicitRetry() {
     for (String failure : java.util.List.of(
         "unwatch", "nestedUnwatch", "delete", "error", "negativeCount", "capacityUnwatch", "capacityDelete")) {

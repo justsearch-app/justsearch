@@ -44,6 +44,7 @@ final class SyncOps {
 
     private final IngestRpcExecutor rpc;
     private final Map<Path, Instant> watchedRoots;
+    private final WatchedRootsState rootsState;
     private final EngineExecutorRegistry.Registration schedulerRegistration;
     /**
      * Tempdoc 626 §Axis-C — records the per-root delete-detection verification outcome of a force=false
@@ -82,9 +83,20 @@ final class SyncOps {
         Map<Path, Instant> watchedRoots,
         java.util.function.BiConsumer<Path, Boolean> recordUnverified,
         java.util.function.BiConsumer<Path, Integer> recordDriftCorrected) {
+        this(executors, rpc, watchedRoots, recordUnverified, recordDriftCorrected, null);
+    }
+
+    SyncOps(
+        EngineExecutorRegistry executors,
+        IngestRpcExecutor rpc,
+        Map<Path, Instant> watchedRoots,
+        java.util.function.BiConsumer<Path, Boolean> recordUnverified,
+        java.util.function.BiConsumer<Path, Integer> recordDriftCorrected,
+        WatchedRootsState rootsState) {
         Objects.requireNonNull(executors, "executors");
         this.rpc = Objects.requireNonNull(rpc, "rpc");
         this.watchedRoots = Objects.requireNonNull(watchedRoots, "watchedRoots");
+        this.rootsState = rootsState;
         this.recordUnverified =
             recordUnverified == null ? (root, unverified) -> {} : recordUnverified;
         this.recordDriftCorrected =
@@ -151,6 +163,17 @@ final class SyncOps {
     }
 
     SyncDirectoryResponse syncDirectory(String rootPath, boolean force, EngineContext engineContext) {
+        if (rootsState == null) return syncDirectoryOwned(rootPath, force, engineContext);
+        synchronized (rootsState.lifecycleLock()) {
+            Path root = Path.of(rootPath).toAbsolutePath().normalize();
+            if (!watchedRoots.containsKey(root)) {
+                return SyncDirectoryResponse.newBuilder().setSkipped(true).build();
+            }
+            return syncDirectoryOwned(rootPath, force, engineContext);
+        }
+    }
+
+    private SyncDirectoryResponse syncDirectoryOwned(String rootPath, boolean force, EngineContext engineContext) {
         try {
             SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext);
 

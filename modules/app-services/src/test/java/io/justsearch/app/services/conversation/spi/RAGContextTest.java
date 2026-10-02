@@ -364,7 +364,7 @@ final class RAGContextTest {
   }
 
   @Test
-  void realDocumentProducerRefusalPropagatesThroughConversation() {
+  void realDocumentProducerRefusalEscapesInjector() {
     for (boolean scoped : List.of(false, true)) {
       for (boolean wrapped : List.of(false, true)) {
         var refusal = new io.justsearch.app.api.EngineAdmissionException(
