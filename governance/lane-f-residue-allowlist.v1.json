@@ -4488,9 +4488,10 @@
       "term": "restart-worker",
       "category": "d",
       "reason": "Negative guard, updater compatibility fixture, or frozen pre-migration comparison arm/captured query. The retired spelling is the subject being detected or compared.",
-      "occurrenceCount": 1,
+      "occurrenceCount": 2,
       "anchors": [
-        "await requestLive(context, '/api/operations/core.restart-worker/invoke', { args: {}, idempotencyKey: createOperationKey() }, 30000);"
+        "// MAIN gates core.restart-worker behind a typed confirmation: the invoke answers 428",
+        "await invokeOperatorConfirmed(context, 'core.restart-worker', { args: {}, idempotencyKey: createOperationKey() });"
       ]
     },
     {
