@@ -143,6 +143,7 @@ final class SyncOps {
             log.debug("pruneMissing rejected by circuit breaker for {}", pathPrefix);
             return false;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.warn("pruneMissing RPC failed for {}", pathPrefix, e);
             // Don't fail reindex if prune fails - still submit current files
             return false;
@@ -197,6 +198,7 @@ final class SyncOps {
             log.debug("syncDirectory rejected by circuit breaker for {}", rootPath);
             return null;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.warn("syncDirectory RPC failed for {}", rootPath, e);
             return null;
         }

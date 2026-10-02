@@ -163,6 +163,29 @@ final class ExcludePatternsResolutionTest {
         "and it must be the user's own pattern, not a default");
   }
 
+  @Test
+  void applyExcludesPreservesWrappedDeletionRefusal(@TempDir Path root) throws Exception {
+    Files.writeString(root.resolve("noisy.log"), "x");
+    publishSettings(List.of("**/*.log"));
+    var refusal = new io.justsearch.app.api.EngineAdmissionException(
+        io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3);
+    var indexing = org.mockito.Mockito.mock(IndexingService.class);
+    org.mockito.Mockito.when(indexing.getWatchedRoots(
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenReturn(List.of(new IndexingService.WatchedRoot("default", root)));
+    org.mockito.Mockito.when(indexing.deleteDocById(
+        org.mockito.ArgumentMatchers.anyString(),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenThrow(new java.util.concurrent.CompletionException(
+            new java.util.concurrent.ExecutionException(refusal)));
+
+    var handler = new io.justsearch.app.services.registry.operations.handlers.ApplyExcludesHandler(
+        () -> new ExcludesServiceImpl(() -> indexing));
+    org.junit.jupiter.api.Assertions.assertSame(refusal,
+        assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
+            () -> handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal())));
+  }
+
   private static final class RecordingIndexingService implements IndexingService {
     private final List<WatchedRoot> roots;
 

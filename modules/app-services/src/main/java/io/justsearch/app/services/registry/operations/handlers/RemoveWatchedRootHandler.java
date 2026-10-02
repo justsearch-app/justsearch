@@ -62,6 +62,7 @@ public final class RemoveWatchedRootHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("RemoveWatchedRootHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -85,6 +86,7 @@ public final class RemoveWatchedRootHandler implements OperationHandler {
         | io.justsearch.core.execution.EngineExecutorRejectedException e) {
       throw e;
     } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("RemoveWatchedRootHandler: removeWatchedRoot threw", e);
       return OperationResult.failure("Remove watched root failed: " + e.getMessage());
     }

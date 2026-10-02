@@ -82,6 +82,7 @@ public final class AddWatchedRootHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("AddWatchedRootHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -104,6 +105,7 @@ public final class AddWatchedRootHandler implements OperationHandler {
       return OperationResult.success(
           "Added watched root " + p, Map.of("path", p.toString(), "collection", collection));
     } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("AddWatchedRootHandler: addWatchedRoot threw", e);
       return OperationResult.failure("Add watched root failed: " + e.getMessage());
     }

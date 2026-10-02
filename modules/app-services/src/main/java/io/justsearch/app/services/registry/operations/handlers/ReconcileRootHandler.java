@@ -46,6 +46,7 @@ public final class ReconcileRootHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("ReconcileRootHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -61,6 +62,7 @@ public final class ReconcileRootHandler implements OperationHandler {
       indexing.flush(engineContext);
       return OperationResult.success("Folder verification started");
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("ReconcileRootHandler: reconcileRoot threw", e);
       return OperationResult.failure("Folder verification failed: " + e.getMessage());
     }

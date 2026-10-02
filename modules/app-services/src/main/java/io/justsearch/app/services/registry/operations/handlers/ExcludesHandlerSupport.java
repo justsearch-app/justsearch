@@ -30,6 +30,7 @@ final class ExcludesHandlerSupport {
     try {
       excludes = supplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("{}: excludes supplier threw", handlerLabel, e);
       return OperationResult.failure("Excludes service unavailable: " + e.getMessage());
     }
@@ -41,6 +42,7 @@ final class ExcludesHandlerSupport {
     try {
       result = excludes.applyExcludes(dryRun, engineContext);
     } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("{}: applyExcludes threw (dryRun={})", handlerLabel, dryRun, e);
       return OperationResult.failure(
           (dryRun ? "Preview excludes failed: " : "Apply excludes failed: ")

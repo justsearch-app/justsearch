@@ -45,6 +45,13 @@ public final class WatchedRootsState {
 
   Map<Path, Instant> rootsMap() { return watchedRoots; }
 
+  // Shared across client instances; do not hold the state monitor while calling the Engine.
+  private final Object lifecycleLock = new Object();
+
+  Object lifecycleLock() {
+    return lifecycleLock;
+  }
+
   private final Map<Path, Instant> watchedRoots;
   private final Map<Path, String> walkErrors;
   /**

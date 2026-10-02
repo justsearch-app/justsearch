@@ -723,6 +723,7 @@ public class KnowledgeSearchController {
           cachedStatus = new CachedStatus(view, System.currentTimeMillis());
           ctx.json(view);
         } catch (Exception e) {
+          if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
           log.warn("Failed to get index status", e);
           ctx.json(serveStaleOrSparse(workerStateName(), true));
         }

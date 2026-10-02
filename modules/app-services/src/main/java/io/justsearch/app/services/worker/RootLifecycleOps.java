@@ -194,6 +194,12 @@ final class RootLifecycleOps {
     // ========== Root Add/Remove ==========
 
     void addWatchedPath(Path path, EngineContext engineContext) {
+        synchronized (watchedRootsState.lifecycleLock()) {
+            addWatchedPathOwned(path, engineContext);
+        }
+    }
+
+    private void addWatchedPathOwned(Path path, EngineContext engineContext) {
         if (path == null || !Files.exists(path)) {
             return;
         }
@@ -264,12 +270,12 @@ final class RootLifecycleOps {
         } catch (RuntimeException e) {
             log.error("Walk aborted for root {} after submission failure", normalized, e);
             synchronized (watchedRootsState) {
-                if (!watchedRoots.containsKey(normalized)) {
-                    return;
+                if (watchedRoots.containsKey(normalized)) {
+                    watchedRootsState.markWalkFailed(normalized, e.getMessage());
+                    watchedRootsState.persist();
                 }
-                watchedRootsState.markWalkFailed(normalized, e.getMessage());
-                watchedRootsState.persist();
             }
+            EngineRefusals.rethrow(e);
         }
     }
 
@@ -284,6 +290,12 @@ final class RootLifecycleOps {
      * @param path the root path to watch
      */
     void addWatchedRoot(String collection, Path path, EngineContext engineContext) {
+        synchronized (watchedRootsState.lifecycleLock()) {
+            addWatchedRootOwned(collection, path, engineContext);
+        }
+    }
+
+    private void addWatchedRootOwned(String collection, Path path, EngineContext engineContext) {
         if (path == null || !Files.exists(path)) {
             return;
         }
@@ -346,6 +358,7 @@ final class RootLifecycleOps {
             log.debug("deleteByPath rejected by circuit breaker for {}", normalized);
             return 0;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.warn("deleteByPath RPC failed for {}", normalized, e);
             return 0;
         }
@@ -362,12 +375,19 @@ final class RootLifecycleOps {
             log.debug("deleteDocById rejected by circuit breaker for {}", docId);
             return false;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.warn("deleteById RPC failed for {}", docId, e);
             return false;
         }
     }
 
     int removeWatchedPath(Path path, EngineContext engineContext) {
+        synchronized (watchedRootsState.lifecycleLock()) {
+            return removeWatchedPathOwned(path, engineContext);
+        }
+    }
+
+    private int removeWatchedPathOwned(Path path, EngineContext engineContext) {
         if (path == null) {
             return 0;
         }
@@ -388,6 +408,7 @@ final class RootLifecycleOps {
                 | io.justsearch.core.execution.EngineExecutorRejectedException e) {
             throw e;
         } catch (RuntimeException e) {
+            EngineRefusals.rethrow(e);
             log.warn("Worker unwatch failed for {}", normalized, e);
             return -1;
         }
@@ -413,6 +434,7 @@ final class RootLifecycleOps {
                     "removeWatchedPath deleteByPath rejected by circuit breaker for {}", normalized);
             return -1;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("deleteByPath RPC failed for: {}", normalized, e);
             return -1;
         }
@@ -547,12 +569,21 @@ final class RootLifecycleOps {
     }
 
     private void startWatcherIfAvailable(String collection, Path normalized, EngineContext engineContext) {
+        synchronized (watchedRootsState.lifecycleLock()) {
+            if (watchedRoots.containsKey(normalized)) {
+                startWatcherOwned(collection, normalized, engineContext);
+            }
+        }
+    }
+
+    private void startWatcherOwned(String collection, Path normalized, EngineContext engineContext) {
         // Tempdoc 626 §Axis-A (the 418 Phase-C cutover) — the Worker-side watcher is now the SOLE
         // file-event source; the redundant Head-side watcher stack was deleted. The reconciler
         // (periodic syncDirectory + reindexPersistedRoots) remains the source-of-truth backstop.
         try {
             workerWatchFn.watch(normalized.toString(), collection, engineContext);
         } catch (RuntimeException e) {
+            EngineRefusals.rethrow(e);
             log.debug(
                     "Worker watch registration failed for {}: {}", normalized, e.getMessage());
         }

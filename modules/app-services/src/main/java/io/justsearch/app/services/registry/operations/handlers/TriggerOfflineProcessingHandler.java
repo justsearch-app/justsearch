@@ -7,7 +7,6 @@ import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.BrainRuntimeService;
-import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.app.api.OfflineProcessingOutcome;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.EngineFutures;
@@ -43,7 +42,7 @@ public final class TriggerOfflineProcessingHandler implements OperationHandler {
     } catch (RuntimeException failure) {
       EngineFutures.rethrowCancellation(failure);
       EngineFutures.rethrowExecutorRefusal(failure);
-      if (failure instanceof EngineAdmissionException) throw failure;
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(failure);
       return OperationExecution.finished(OperationResult.failure(
           "Unable to start enrichment: " + failure.getMessage(),
           "ENRICHMENT_START_FAILED", Map.of(), true));

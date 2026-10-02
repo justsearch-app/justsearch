@@ -342,6 +342,71 @@ final class RAGContextTest {
   }
 
   @Test
+  void openRetrievalWithUnavailableIndexIsFetchFailed() {
+    var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+    org.mockito.Mockito.when(client.search(
+        org.mockito.ArgumentMatchers.any(io.justsearch.ipc.SearchRequest.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenThrow(new IllegalStateException("index unavailable"));
+    org.mockito.Mockito.when(client.retrieveContext(
+        org.mockito.ArgumentMatchers.any(RetrieveContextParams.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenThrow(new IllegalStateException("index unavailable"));
+    var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+        Runnable::run, Runnable::run, () -> client);
+
+    var result = new RAGContext(docs).inject(stubCtx(Map.of("question", "q")));
+
+    assertEquals("FETCH_FAILED", result.terminalError().orElseThrow().payload().get("errorCode"));
+    org.mockito.Mockito.verify(client, org.mockito.Mockito.never()).fetchDocuments(
+        org.mockito.ArgumentMatchers.anyList(),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
+  }
+
+  @Test
+  void realDocumentProducerRefusalPropagatesThroughConversation() {
+    for (boolean scoped : List.of(false, true)) {
+      for (boolean wrapped : List.of(false, true)) {
+        var refusal = new io.justsearch.app.api.EngineAdmissionException(
+            io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3);
+        RuntimeException failure = wrapped
+            ? new java.util.concurrent.CompletionException(
+                new java.util.concurrent.ExecutionException(refusal)) : refusal;
+        var client = org.mockito.Mockito.mock(
+            io.justsearch.app.services.worker.KnowledgeClient.class, invocation -> { throw failure; });
+        var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+            Runnable::run, Runnable::run, () -> client);
+        var ctx = stubCtx(scoped
+            ? Map.of("question", "q", "docIds", List.of("doc")) : Map.of("question", "q"));
+
+        org.junit.jupiter.api.Assertions.assertSame(refusal,
+            org.junit.jupiter.api.Assertions.assertThrows(
+                io.justsearch.app.api.EngineAdmissionException.class,
+                () -> new RAGContext(docs).inject(ctx)));
+      }
+    }
+  }
+
+  @Test
+  void successfulOpenRetrievalWithNoHitsIsStillNoContent() {
+    var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+    org.mockito.Mockito.when(client.search(
+        org.mockito.ArgumentMatchers.any(io.justsearch.ipc.SearchRequest.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenReturn(io.justsearch.ipc.SearchResponse.getDefaultInstance());
+    org.mockito.Mockito.when(client.retrieveContext(
+        org.mockito.ArgumentMatchers.any(RetrieveContextParams.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenReturn(io.justsearch.ipc.RetrieveContextResponse.getDefaultInstance());
+    var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+        Runnable::run, Runnable::run, () -> client);
+
+    var result = new RAGContext(docs).inject(stubCtx(Map.of("question", "q")));
+
+    assertEquals("NO_CONTENT", result.terminalError().orElseThrow().payload().get("errorCode"));
+  }
+
+  @Test
   @DisplayName("Both retrieval and fallback empty → terminalError NO_CONTENT")
   void retrievalAndFallbackEmpty() {
     var emptyRetrieval =
