@@ -196,6 +196,12 @@ final class AgentSessionRegistry {
    * replays everything and is the guaranteed path.
    */
   boolean attachToRun(String sessionId, long sinceSeq, Consumer<RunObservation.WireFrame> observer) {
+    return attachToRun(sessionId, sinceSeq, observer, AgentTimeouts.sessionAttachMs());
+  }
+
+  /** Explicit wait budget for deterministic attachment timeout tests. */
+  boolean attachToRun(
+      String sessionId, long sinceSeq, Consumer<RunObservation.WireFrame> observer, long timeoutMs) {
     var session = sessions.get(sessionId);
     if (session == null) {
       return false; // not a live run — the caller replays events.ndjson instead
@@ -204,25 +210,37 @@ final class AgentSessionRegistry {
     // The run being retired IS the end of the stream, and the loop retires it immediately after
     // publishing the terminal event — so latching on retirement needs no terminal-event vocabulary
     // here, and cannot miss a run that ends without one.
-    session.observation().onRetire(done::countDown);
-    java.util.Optional<Runnable> unsubscribe =
-        session.observation().observe(sinceSeq, observer, done::countDown);
-    if (unsubscribe.isEmpty()) {
-      // The cursor fell outside the retained window and NOTHING was registered. Falling back to a
-      // full replay is the guaranteed path; silently returning an empty stream is the failure mode.
-      unsubscribe = session.observation().observe(0L, observer, done::countDown);
-      if (unsubscribe.isEmpty()) {
-        return false;
-      }
-    }
+    Runnable unregisterRetirement = session.observation().onRetire(done::countDown);
+    Runnable onDetached =
+        () -> {
+          try {
+            unregisterRetirement.run();
+          } finally {
+            done.countDown();
+          }
+        };
+    java.util.Optional<Runnable> unsubscribe = java.util.Optional.empty();
     try {
+      unsubscribe = session.observation().observe(sinceSeq, observer, onDetached);
+      if (unsubscribe.isEmpty()) {
+        // The cursor fell outside the retained window and NOTHING was registered. Falling back to a
+        // full replay is the guaranteed path; silently returning an empty stream is the failure mode.
+        unsubscribe = session.observation().observe(0L, observer, onDetached);
+        if (unsubscribe.isEmpty()) {
+          return false;
+        }
+      }
       // Block the attach (SSE) handler thread while streaming. The timeout is a safety net against a
       // run that never terminates (it then falls back like a closed stream).
-      done.await(AgentTimeouts.sessionAttachMs(), java.util.concurrent.TimeUnit.MILLISECONDS);
+      done.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
     } finally {
-      unsubscribe.get().run();
+      try {
+        unsubscribe.ifPresent(Runnable::run);
+      } finally {
+        unregisterRetirement.run();
+      }
     }
     return true;
   }
