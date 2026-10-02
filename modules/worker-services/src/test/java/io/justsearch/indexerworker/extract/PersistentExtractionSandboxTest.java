@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.telemetry.catalog.TestMetricRegistry;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -20,6 +21,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -174,8 +177,35 @@ final class PersistentExtractionSandboxTest {
         org.mockito.Mockito.mock(
             Process.class, org.mockito.AdditionalAnswers.delegatesTo(realChild));
     var forcedAt = new java.util.concurrent.atomic.AtomicLong();
+    var evidence = new ByteArrayOutputStream();
+    String intentPrefix = "JUSTSEARCH_MANAGED_CHILD_TERMINATION ";
+    PrintStream originalErr = System.err;
+    System.setErr(new PrintStream(evidence, true, StandardCharsets.UTF_8));
     org.mockito.Mockito.doAnswer(
             kill -> {
+              String marker =
+                  evidence
+                      .toString(StandardCharsets.UTF_8)
+                      .lines()
+                      .filter(line -> line.startsWith(intentPrefix))
+                      .findFirst()
+                      .orElseThrow();
+              var intent =
+                  JsonMapper.builder().build().readTree(marker.substring(intentPrefix.length()));
+              assertEquals(ProcessHandle.current().pid(), intent.get("enginePid").asLong());
+              assertEquals(
+                  ProcessHandle.current().info().startInstant().orElseThrow().toString(),
+                  intent.get("engineStartedAt").asString());
+              assertEquals(realChild.pid(), intent.get("child").get("pid").asLong());
+              assertEquals(
+                  realChild.info().startInstant().orElseThrow().toString(),
+                  intent.get("child").get("startedAt").asString());
+              assertEquals(
+                  ManagedChild.normalizePath(Path.of(realChild.info().command().orElseThrow())),
+                  intent.get("child").get("executable").asString());
+              assertFalse(intent.get("child").get("id").asString().isBlank());
+              assertEquals("graceful-close-fallback", intent.get("reason").asString());
+              assertTrue(intent.get("requestedAtMs").asLong() <= System.currentTimeMillis());
               forcedAt.set(System.nanoTime());
               return realChild.destroyForcibly();
             })
@@ -201,12 +231,102 @@ final class PersistentExtractionSandboxTest {
         assertTrue(
             System.nanoTime() - started < TimeUnit.SECONDS.toNanos(15),
             "child cleanup must fit the host stop budget");
-        assertNotEquals(0, realChild.exitValue(), "forced child exit must remain abnormal");
+        assertNotEquals(
+            0, realChild.exitValue(), "retain the real OS exit code beside termination intent");
         if (File.separatorChar == '\\') assertEquals(1, realChild.exitValue());
       }
     } finally {
+      System.setErr(originalErr);
       if (realChild.isAlive()) realChild.destroyForcibly();
       assertTrue(realChild.waitFor(5, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  @Timeout(40)
+  void gracefulCloseBoundsBlockedRequestWriteAndEofClose() throws Exception {
+    Process realChild = new ProcessBuilder(javaCommand(ScriptedChild.class)).start();
+    Process observed =
+        org.mockito.Mockito.mock(
+            Process.class, org.mockito.AdditionalAnswers.delegatesTo(realChild));
+    CountDownLatch writing = new CountDownLatch(1);
+    CountDownLatch writerFinished = new CountDownLatch(1);
+    OutputStream pipe = realChild.getOutputStream();
+    OutputStream observedPipe =
+        new OutputStream() {
+          @Override
+          public void write(int value) throws java.io.IOException {
+            pipe.write(value);
+          }
+
+          @Override
+          public void write(byte[] bytes, int offset, int length) throws java.io.IOException {
+            if (length > 65536) writing.countDown();
+            pipe.write(bytes, offset, length);
+          }
+
+          @Override
+          public void flush() throws java.io.IOException {
+            pipe.flush();
+          }
+
+          @Override
+          public void close() throws java.io.IOException {
+            pipe.close();
+          }
+        };
+    org.mockito.Mockito.doReturn(observedPipe).when(observed).getOutputStream();
+    var sandbox = sandbox(javaCommand(ScriptedChild.class), Duration.ofSeconds(30));
+    Thread writer = null;
+    try {
+      try (var spawns =
+          org.mockito.Mockito.mockConstruction(
+              ProcessBuilder.class,
+              (builder, context) ->
+                  org.mockito.Mockito.when(builder.start()).thenReturn(observed))) {
+        sandbox.extract(file("stop-consuming.txt"));
+      }
+      // Only serialized into a protocol frame; this path is never opened on the filesystem.
+      Path oversized = tempDir.resolve("blocked-" + "x".repeat(1_000_000));
+      writer =
+          Thread.ofPlatform()
+              .daemon()
+              .start(
+                  () -> {
+                    try {
+                      sandbox.extract(oversized);
+                    } catch (Exception expectedOnTermination) {
+                      /* Broken pipe is the expected shutdown result. */
+                    } finally {
+                      writerFinished.countDown();
+                    }
+                  });
+      assertTrue(
+          writing.await(5, TimeUnit.SECONDS), "the request must reach the native pipe write");
+      writer.interrupt(); // The outer extraction timebox cannot interrupt a native pipe write.
+      assertFalse(
+          writerFinished.await(100, TimeUnit.MILLISECONDS),
+          "exercise an outstanding blocked writer");
+      FutureTask<Void> close =
+          new FutureTask<>(
+              () -> {
+                sandbox.close();
+                return null;
+              });
+      long started = System.nanoTime();
+      Thread.ofPlatform().daemon().start(close);
+      close.get(12, TimeUnit.SECONDS);
+      assertTrue(
+          System.nanoTime() - started < TimeUnit.SECONDS.toNanos(15),
+          "respect the host stop budget");
+      assertFalse(
+          realChild.isAlive(), "close must confirm death even while EOF waits for the writer");
+      assertTrue(writerFinished.await(5, TimeUnit.SECONDS));
+    } finally {
+      if (realChild.isAlive()) realChild.destroyForcibly();
+      assertTrue(realChild.waitFor(5, TimeUnit.SECONDS));
+      if (writer != null) assertTrue(writerFinished.await(5, TimeUnit.SECONDS));
+      sandbox.close();
     }
   }
 
@@ -975,6 +1095,7 @@ final class PersistentExtractionSandboxTest {
         byte[] payload = response.getBytes(StandardCharsets.UTF_8);
         SandboxFrames.write(protocolOut, payload);
         if (name.contains("duplicate")) SandboxFrames.write(protocolOut, payload);
+        if (name.contains("stop-consuming")) Thread.sleep(60_000L);
       }
     }
 

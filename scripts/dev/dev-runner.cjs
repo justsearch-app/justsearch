@@ -2279,12 +2279,94 @@ async function cmdStart(opts) {
     return { apiPort: discovered, instanceId: manifestInstanceId };
   };
 
-  const firstIncarnation = await awaitEngineIncarnation({
-    initialDiscovery: true,
-    portTimeoutMs: portEmitTimeoutMs,
-    readyTimeoutMs: backendReadyTimeoutMs,
-  });
-  apiPortActual = firstIncarnation.apiPort;
+  const supervisionPolicy = engineSupervisor.loadPolicy();
+  const { ACTIONS, STATES } = engineSupervisor;
+
+  let supervisorState = STATES.STARTING;
+  let incarnation = 1;
+  let restartCount = 0;
+  let readyAt = null;
+  let essentialReadySince = null;
+  let essentialEpoch = null;
+  let hangTimer = null;
+  let handoffWatchTimer = null;
+  let requestDeadlineTimer = null;
+  let consecutiveHealthMisses = 0;
+  let observedRequestReason = null;
+  let lastExitRecord = null;
+  let supervising = true;
+  const publishSupervisorRecord = createSupervisorStateWriter(dataDir);
+
+  const publishSupervisorState = async (state, extra = {}) => {
+    supervisorState = state;
+    await publishSupervisorRecord(buildSupervisorState({
+      state,
+      runId,
+      incarnation,
+      pid: backend?.pid ?? null,
+      apiPort: apiPortActual,
+      instanceId: manifestInstanceId,
+      restartCount,
+      policy: supervisionPolicy,
+      lastExit: lastExitRecord,
+      requestedReason: observedRequestReason,
+      readyAt,
+      updatedAt: nowIso(),
+      ...extra,
+    }));
+  };
+
+  // Discovery precedes run.json and the frontend, but an observed death still belongs to
+  // this supervisor's restart budget. Preserve evidence before the next boot appends to it.
+  for (;;) {
+    await publishSupervisorState(STATES.STARTING);
+    try {
+      const firstIncarnation = await awaitEngineIncarnation({
+        initialDiscovery: true,
+        portTimeoutMs: portEmitTimeoutMs,
+        readyTimeoutMs: backendReadyTimeoutMs,
+      });
+      apiPortActual = firstIncarnation.apiPort;
+      break;
+    } catch (error) {
+      if (error.code !== 'ENGINE_EXITED_DURING_DISCOVERY') throw error;
+      const code = backend.exitCode;
+      const decision = engineSupervisor.decide(
+        { event: 'exit', exitCode: code, restartCount, state: STATES.STARTING }, supervisionPolicy);
+      lastExitRecord = {
+        code,
+        reason: decision.reason ?? engineSupervisor.describeExit(code, supervisionPolicy),
+        class: decision.exitClass ?? engineSupervisor.classifyExit(code, supervisionPolicy),
+        codeReason: engineSupervisor.describeExit(code, supervisionPolicy),
+        codeClass: engineSupervisor.classifyExit(code, supervisionPolicy),
+        counted: decision.counted === true,
+        requestedReason: null,
+        incarnation,
+        at: nowIso(),
+      };
+      const bootstrapRun = { dataDir };
+      const bootstrapPath = path.join(runDir, 'run.json');
+      await preserveEngineLog(bootstrapRun, bootstrapPath, {
+        destSubdir: path.join('incarnations', String(incarnation)),
+      });
+      await writeSelfExitStopReport({ runId, runPath: bootstrapPath, run: bootstrapRun,
+        backendExitCode: code, interactive: false, incarnation });
+      if (decision.action === ACTIONS.EXHAUSTED || decision.action === ACTIONS.STOP) {
+        const terminal = decision.action === ACTIONS.EXHAUSTED ? STATES.EXHAUSTED : STATES.STOPPING;
+        cleanupRegisteredChildrenForSupervisorState(terminal, dataDir);
+        await publishSupervisorState(terminal, { reason: decision.reason });
+        throw error;
+      }
+      if (decision.counted) restartCount += 1;
+      await publishSupervisorState(STATES.RESTARTING, { reason: decision.reason });
+      await waitForEngineHandleRelease({ pid: backend.pid, dataDir });
+      if (decision.cooldownMs > 0) await new Promise(resolve => setTimeout(resolve, decision.cooldownMs));
+      incarnation += 1;
+      clearStaleDiscoveryFiles();
+      backend = spawnEngineChild(apiPortRequested);
+      backendExitObserver = observeEngineExit(backend);
+    }
+  }
 
   const apiBaseUrl = `http://127.0.0.1:${apiPortActual}`;
   const uiUrl = `http://localhost:${uiPort}`;
@@ -2603,43 +2685,6 @@ async function cmdStart(opts) {
   // the Tauri shell answers the same question with the same table read from the same register. What
   // is here is the part a pure function cannot do: spawn, wait for the handle, sleep, kill.
   // ============================================================================================
-  const supervisionPolicy = engineSupervisor.loadPolicy();
-  const { ACTIONS, STATES } = engineSupervisor;
-
-  let supervisorState = STATES.STARTING;
-  let incarnation = 1;
-  let restartCount = 0;
-  let readyAt = null;
-  let essentialReadySince = null;
-  let essentialEpoch = null;
-  let hangTimer = null;
-  let handoffWatchTimer = null;
-  let requestDeadlineTimer = null;
-  let consecutiveHealthMisses = 0;
-  let observedRequestReason = null;
-  let lastExitRecord = null;
-  let supervising = true;
-  const publishSupervisorRecord = createSupervisorStateWriter(dataDir);
-
-  const publishSupervisorState = async (state, extra = {}) => {
-    supervisorState = state;
-    await publishSupervisorRecord(buildSupervisorState({
-      state,
-      runId,
-      incarnation,
-      pid: backend?.pid ?? null,
-      apiPort: apiPortActual,
-      instanceId: manifestInstanceId,
-      restartCount,
-      policy: supervisionPolicy,
-      lastExit: lastExitRecord,
-      requestedReason: observedRequestReason,
-      readyAt,
-      updatedAt: nowIso(),
-      ...extra,
-    }));
-  };
-
   const clearSupervisorTimers = () => {
     for (const timer of [hangTimer, handoffWatchTimer, requestDeadlineTimer]) {
       if (!timer) continue;

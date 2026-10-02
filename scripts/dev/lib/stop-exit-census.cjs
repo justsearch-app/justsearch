@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const identity = require('./process-identity.cjs');
+const TERMINATION_INTENT_PREFIX = 'JUSTSEARCH_MANAGED_CHILD_TERMINATION ';
 
 function fileTimeFromInstant(instant) {
   const match = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$/.exec(instant ?? '');
@@ -60,6 +61,40 @@ function exitTargets(run, manifest, observed = []) {
   }
   return { targets: unique, gaps };
 }
+function readEngineTerminationIntents(file, offset = 0) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const length = fs.fstatSync(fd).size - offset;
+    if (length <= 0 || length > 16 * 1024 * 1024) return []; // Missing/oversize evidence grants no exemption.
+    const bytes = Buffer.alloc(length);
+    const size = fs.readSync(fd, bytes, 0, length, offset);
+    return bytes.subarray(0, size).toString('utf8').split(/\r?\n/).flatMap((line, index, lines) => {
+      if (index === lines.length - 1 || !line.startsWith(TERMINATION_INTENT_PREFIX)) return [];
+      try { return [{ ...JSON.parse(line.slice(TERMINATION_INTENT_PREFIX.length)), source: file }]; }
+      catch { return []; }
+    });
+  } catch { return []; }
+  finally { if (fd !== undefined) fs.closeSync(fd); }
+}
+function matchingEngineTerminationIntent(input, target, exit, intents = []) {
+  const engine = input.targets.find(t => t.role === 'engine');
+  if (!engine || target.kind !== 'EXTRACTION' || !Array.isArray(intents)) return null;
+  return intents.find(intent => {
+    if (!intent || typeof intent !== 'object') return false;
+    const child = intent.child, ownerBirth = fileTimeFromInstant(intent.engineStartedAt);
+    return intent.reason === 'graceful-close-fallback' && intent.enginePid === engine.pid
+      && ownerBirth && typeof engine.creationFileTimeUtc === 'string' && /^\d+$/.test(engine.creationFileTimeUtc)
+      && BigInt(ownerBirth) / 10000n === BigInt(engine.creationFileTimeUtc) / 10000n
+      && child && typeof child.id === 'string' && child.id.trim() && child.id === target.id && child.kind === 'EXTRACTION' && child.pid === target.pid
+      && fileTimeFromInstant(child.startedAt) && fileTimeFromInstant(child.startedAt) === fileTimeFromInstant(target.startedAt)
+      && path.isAbsolute(child.executable ?? '')
+      && path.resolve(child.executable).toLowerCase() === path.resolve(target.executable).toLowerCase()
+      && Number.isSafeInteger(intent.requestedAtMs)
+      && intent.requestedAtMs >= Math.max(Date.parse(child.startedAt), Date.parse(intent.engineStartedAt), input.observedAfterMs ?? 0)
+      && intent.requestedAtMs <= exit.atMs;
+  }) ?? null;
+}
 function exitResult(input, output, source) {
   const gaps = [...input.gaps, ...(output.gaps ?? [])], processExits = [];
   for (const target of input.targets) {
@@ -68,9 +103,12 @@ function exitResult(input, output, source) {
     if (!exit || !Number.isInteger(exit.exitCode) || !Number.isFinite(exit.atMs)) {
       gaps.push({ pid: target.pid, role: target.role, reason: 'identity-bound OS exit code/time unavailable through teardown' }); continue;
     }
+    const intent = matchingEngineTerminationIntent(input, target, exit, output.engineTerminationIntents);
     // Only the documented forced-stop code is expected; a native exception remains abnormal.
     processExits.push({ ...exit, role: target.role, source,
-      expectedTermination: exit.exitCode === 0 || exit.exitCode === 1 && output.forcedPids?.includes(exit.pid) === true });
+      ...(intent ? { terminationIntent: intent } : {}),
+      expectedTermination: exit.exitCode === 0 || exit.exitCode === 1
+        && (output.forcedPids?.includes(exit.pid) === true || intent !== null) });
   }
   return { processExits, exitAccountingComplete: input.targets.length > 0 && !gaps.length,
     exitAccountingGaps: gaps, exitCensusFile: source,
@@ -86,6 +124,10 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     } catch (error) { scopeError = { reason: `owned-process census unavailable: ${error.message}` }; }
   }
   const input = exitTargets(run, manifest, observed);
+  input.observedAfterMs = (runtime.now ?? Date.now)();
+  const terminationLog = path.join(runDir, 'logs', 'backend.stderr.log');
+  let terminationLogOffset = 0;
+  try { terminationLogOffset = fs.statSync(terminationLog).size; } catch { /* no prior log */ }
   if (scopeError) input.gaps.push(scopeError);
   if (!scopeFile) input.gaps.push({ reason: 'no historical owned-process census supplied; B11 is a current registry, not an exit history' });
   const outputFile = path.join(runDir, 'process-exits.json');
@@ -113,7 +155,8 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     while (!fs.existsSync(outputFile) && !launchError && proc.exitCode == null && now() < end) await pause(50);
     let output;
     try { output = read(outputFile); } catch { output = { gaps: [{ reason: 'exit observer did not finish through teardown' }] }; proc.kill(); }
-    return exitResult(input, output, outputFile);
+    return exitResult(input, { ...output,
+      engineTerminationIntents: readEngineTerminationIntents(terminationLog, terminationLogOffset) }, outputFile);
   } };
 }
-module.exports = { fileTimeFromInstant, engineIdentity, engineIdentityAsync, exitTargets, exitResult, startStopExitCensus };
+module.exports = { TERMINATION_INTENT_PREFIX, readEngineTerminationIntents, fileTimeFromInstant, engineIdentity, engineIdentityAsync, exitTargets, exitResult, startStopExitCensus };

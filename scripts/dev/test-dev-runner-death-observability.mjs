@@ -295,7 +295,7 @@ function testBuildHeadJavaOptsOverride() {
  *
  * About 6 seconds, no Gradle, no Engine dist, no network.
  */
-async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identityDelayMs = 0, terminalCleanup = false) {
+async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identityDelayMs = 0, terminalCleanup = false, initialDiscoveryCrash = false) {
   const repoRoot = path.resolve(__dirname, '..', '..');
   const root = fs.mkdtempSync(path.join(repoRoot, 'tmp', 'dev-runner-b9-'));
   const dataDir = path.join(root, 'data');
@@ -306,7 +306,8 @@ async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identity
   fs.writeFileSync(
     planPath,
     JSON.stringify({
-      incarnations: [{ mode: 'crash', exitCode: terminalCleanup ? 2 : 1, exitAfterMs: 1500 }, { mode: 'honour' }],
+      incarnations: [{ mode: initialDiscoveryCrash ? 'boot-fail' : 'crash',
+        exitCode: terminalCleanup ? 2 : 1, exitAfterMs: initialDiscoveryCrash ? 250 : 1500 }, { mode: 'honour' }],
     }),
     'utf8',
   );
@@ -471,6 +472,7 @@ async function main() {
   testBuildHeadJavaOptsOverride();
   await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence();
   await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(1800);
+  await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(0, false, true);
   if (process.platform === 'win32') {
     await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(0, true);
   }
