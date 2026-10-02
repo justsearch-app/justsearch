@@ -211,15 +211,15 @@ Override sources:
 the incompatible index. Before startup fails, it records a fatal reason in
 `<dataDir>/worker-fatal-reason`: `index_schema_mismatch` for a schema refusal or `index_corrupt` for
 an unrecoverable corruption. `KnowledgeServerBootstrap.transitionWorkerDown` consumes that one-shot
-marker, maps it to the current lifecycle reasons `worker.index_schema_mismatch` or
-`worker.index_corrupt`, and latches the verdict until a direct healthy observation. The latch keeps
+marker, maps it to the current lifecycle reasons `index.schema_open_refused` or
+`index.corrupt`, and latches the verdict until a direct healthy observation. The latch keeps
 the specific reason and remedy available while failed start attempts suppress intermediate
 worker-down narration; `knowledgeServerStartError` receives the remedy detail instead of a generic
 spawn symptom.
 
 Initial opening uses the bounded `KnowledgeServerBootstrap.startWithRetry` loop: three `start()`
 attempts with a 500 ms backoff by default. Intermediate failures remain suppressed while another
-attempt is pending. When the budget is exhausted, the final fallback reason is `worker.spawn.failed`,
+attempt is pending. When the budget is exhausted, the final fallback reason is `index.failed`,
 unless the latched fatal marker supplies one of the two specific index reasons above. There is no
 separate boot-recovery ladder or supervisor subprocess involved in this decision.
 
