@@ -140,23 +140,24 @@ final class EngineKnowledgeClientExecutorTest {
     when(search.search(any(), any())).thenAnswer(invocation -> {
       var call = (io.justsearch.indexerworker.services.CallContext) invocation.getArgument(1);
       context.set(call);
-      var request = ((io.justsearch.ipc.SearchRequest) invocation.getArgument(0)).toBuilder()
-          .setPipeline(io.justsearch.ipc.PipelineConfig.newBuilder().setDenseEnabled(true)).build();
-      return workerService.search(request, call);
+      return workerService.search(invocation.getArgument(0), call);
     });
     var services = mock(WorkerAppServices.class);
     when(services.searchService()).thenReturn(search);
     var view = mock(KnowledgeServer.ServingLease.class);
     when(view.services()).thenReturn(services);
     var load = new ForegroundLoad();
-    var admission = new EngineAdmissionController(1, 1, 1);
-    try (var registry = registry(1, 1, 1, 4);
+    // One inference owner plus the text slot reserved by admission.
+    var admission = new EngineAdmissionController(2, 2, 1);
+    try (var registry = registry(2, 1, 1, 4);
         var client = new EngineKnowledgeClient(registry, () -> services,
             new ForegroundLoadGate(load), 2_000, 100, IpcTelemetry.noop(), () -> {}, admission,
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(), () -> view)) {
       var owner = abandon ? admission.admit(TestEngineContexts.FOREGROUND, false) : null;
       try {
-        var caller = new java.util.concurrent.FutureTask<>(() -> client.search("waiting", 10,
+        var request = io.justsearch.ipc.SearchRequest.newBuilder().setQuery("waiting").setLimit(10)
+            .setPipeline(io.justsearch.ipc.PipelineConfig.newBuilder().setDenseEnabled(true)).build();
+        var caller = new java.util.concurrent.FutureTask<>(() -> client.search(request,
             owner == null ? TestEngineContexts.FOREGROUND : owner.context()));
         Thread.ofVirtual().start(caller);
         var field = nativeHandle.getClass().getDeclaredField("gpuInferenceSemaphore");
@@ -166,6 +167,7 @@ final class EngineKnowledgeClientExecutorTest {
         while (semaphore.getQueueLength() == 0 && !caller.isDone()
             && System.nanoTime() < queueDeadline) Thread.sleep(1);
         assertTrue(semaphore.getQueueLength() > 0, "real encoder must reach native GPU queue");
+        assertInferenceOwnsAdmissionWithTextSlotAvailable(admission);
         assertEquals(1, load.inFlight());
         assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.FOREGROUND,
             context.get().nativeAcquisition().urgency());
@@ -208,6 +210,21 @@ final class EngineKnowledgeClientExecutorTest {
     var field = handle.getClass().getDeclaredField(name);
     field.setAccessible(true);
     field.set(handle, value);
+  }
+
+  private static void assertInferenceOwnsAdmissionWithTextSlotAvailable(
+      EngineAdmissionController admission) {
+    assertEquals(1, admission.activeWorkCount());
+    var refusal = assertThrows(EngineAdmissionException.class, () -> {
+      try (var ignored = admission.attachInference(TestEngineContexts.FOREGROUND)) {
+        // Close a mistakenly admitted reference even when the assertion fails.
+      }
+    });
+    assertEquals(EngineAdmissionException.Reason.ENGINE_LIMIT, refusal.reason());
+    try (var text = admission.attach(TestEngineContexts.FOREGROUND)) {
+      assertEquals(2, admission.activeWorkCount(), "The reserved text slot must stay available");
+    }
+    assertEquals(1, admission.activeWorkCount(), "The native waiter still owns inference admission");
   }
 
   @org.junit.jupiter.params.ParameterizedTest
@@ -288,8 +305,9 @@ final class EngineKnowledgeClientExecutorTest {
     var view = mock(KnowledgeServer.ServingLease.class);
     when(view.services()).thenReturn(services);
     var load = new ForegroundLoad();
-    var admission = new EngineAdmissionController(1, 1, 1);
-    try (var registry = registry(1, 1, 1, 4);
+    // One inference owner plus the text slot reserved by admission.
+    var admission = new EngineAdmissionController(2, 2, 1);
+    try (var registry = registry(2, 1, 1, 4);
         var client = new EngineKnowledgeClient(registry, () -> services,
             new ForegroundLoadGate(load), 1_000, 100, IpcTelemetry.noop(), () -> {}, admission,
             io.justsearch.app.services.worker.WatchedRootsState.inMemory(), () -> view)) {
@@ -307,6 +325,7 @@ final class EngineKnowledgeClientExecutorTest {
         while (semaphore.getQueueLength() == 0 && !caller.isDone()
             && System.nanoTime() < queueDeadline) Thread.sleep(1);
         assertTrue(semaphore.getQueueLength() > 0, "citation encoder must reach native GPU queue");
+        assertInferenceOwnsAdmissionWithTextSlotAvailable(admission);
         assertEquals(1, load.inFlight());
         assertEquals(io.justsearch.ort.SessionAcquisitionRequest.Urgency.FOREGROUND,
             context.get().nativeAcquisition().urgency());
