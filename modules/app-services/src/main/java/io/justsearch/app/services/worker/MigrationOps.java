@@ -20,8 +20,8 @@ import org.slf4j.LoggerFactory;
  * Migration lifecycle RPCs: start, cutover, rollback, pause, resume, GC.
  *
  * <p>All methods follow the same pattern: build proto request, call RPC via {@link
- * IngestRpcExecutor}, log result, swallow circuit breaker and general errors. Extracted from {@link
- * KnowledgeClient}.
+ * IngestRpcExecutor}, log results, preserve capacity refusals and translate other errors.
+ * Extracted from {@link KnowledgeClient}.
  */
 final class MigrationOps {
     private static final Logger log = LoggerFactory.getLogger(MigrationOps.class);
@@ -92,6 +92,7 @@ final class MigrationOps {
             log.debug("startMigration rejected by circuit breaker");
             return new MigrationOutcome(false, false);
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("startMigration RPC failed", e);
             return new MigrationOutcome(false, false);
         }
@@ -118,6 +119,7 @@ final class MigrationOps {
             log.debug("requestCutover rejected by circuit breaker");
             return new MigrationOutcome(false, false);
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("requestCutover RPC failed", e);
             return new MigrationOutcome(false, false);
         }
@@ -146,6 +148,7 @@ final class MigrationOps {
             log.debug("rollbackMigration rejected by circuit breaker");
             return new MigrationOutcome(false, false);
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("rollbackMigration RPC failed", e);
             return new MigrationOutcome(false, false);
         }
@@ -172,6 +175,7 @@ final class MigrationOps {
             log.debug("pauseMigration rejected by circuit breaker");
             return false;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("pauseMigration RPC failed", e);
             return false;
         }
@@ -195,6 +199,7 @@ final class MigrationOps {
             log.debug("resumeMigration rejected by circuit breaker");
             return false;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("resumeMigration RPC failed", e);
             return false;
         }
@@ -235,6 +240,7 @@ final class MigrationOps {
             return new io.justsearch.app.api.IndexingService.IndexGcOutcome(
                     false, 0, 0, "Worker circuit breaker open");
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("runIndexGc RPC failed", e);
             return new io.justsearch.app.api.IndexingService.IndexGcOutcome(
                     false, 0, 0, "RPC failed: " + e.getMessage());
@@ -289,6 +295,7 @@ final class MigrationOps {
             return io.justsearch.app.api.IndexingService.SettleIndexOutcome.refused(
                     "Worker circuit breaker open");
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("settleIndex RPC failed", e);
             return io.justsearch.app.api.IndexingService.SettleIndexOutcome.refused(
                     "RPC failed: " + e.getMessage());

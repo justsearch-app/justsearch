@@ -142,6 +142,7 @@ public class IndexingController {
 
       ctx.json(Map.of("roots", payload));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to list watched roots", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -180,6 +181,7 @@ public class IndexingController {
       indexing.addWatchedRoot(collection, resolved, RequestEngineContext.get(ctx));
       ctx.status(200).json(Map.of("status", "ok"));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to add watched root", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -226,6 +228,7 @@ public class IndexingController {
                         r.path() != null
                             && r.path().toAbsolutePath().normalize().equals(resolved));
       } catch (Exception e) {
+        if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
         log.debug("Preview: watched-roots check failed for {}", resolved, e);
       }
       Map<String, Object> out = new java.util.LinkedHashMap<>();
@@ -236,6 +239,7 @@ public class IndexingController {
       out.put("alreadyWatched", alreadyWatched);
       ctx.status(200).json(out);
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to preview root", e);
       ctx.status(500)
           .json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -253,11 +257,20 @@ public class IndexingController {
       }
       IndexingService indexing = indexingService();
       int deletedJobs = indexing.removeWatchedRoot(collection, Path.of(path), RequestEngineContext.get(ctx));
+      if (deletedJobs < 0) {
+        var response = ApiErrorHandler.toResponse(ApiErrorCode.INDEX_ERROR,
+            "Root removal incomplete; root remains registered. Retry removal.",
+            telemetry, ApiErrorHandler.routeOf(ctx));
+        response.put("retrySafe", false);
+        ctx.status(500).json(response);
+        return;
+      }
       ctx.status(200).json(Map.of(
           "status", "ok",
           "deletedJobs", deletedJobs
       ));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to remove watched root", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -318,6 +331,7 @@ public class IndexingController {
       ctx.status(503)
           .json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE, "Knowledge Server not ready", telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to delete collection", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -358,6 +372,7 @@ public class IndexingController {
       wire.put("capped", result.capped());
       ctx.status(200).json(wire);
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to apply exclude patterns", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -378,6 +393,7 @@ public class IndexingController {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to request cutover", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -395,6 +411,7 @@ public class IndexingController {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to request rollback", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -414,6 +431,7 @@ public class IndexingController {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to pause migration", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -431,6 +449,7 @@ public class IndexingController {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to resume migration", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -473,6 +492,7 @@ public class IndexingController {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to run index GC", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -523,6 +543,7 @@ public class IndexingController {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());
       ctx.status(http).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to settle index", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -564,6 +585,7 @@ public class IndexingController {
 
       ctx.json(Map.of("suggestions", suggestions));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to get suggested roots", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -598,6 +620,7 @@ public class IndexingController {
               .toList();
       ctx.json(new FailedJobsResponse(jobs, jobs.size()));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to list failed jobs", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -643,6 +666,7 @@ public class IndexingController {
           indexing.listFailedJobs(limit, RequestEngineContext.get(ctx)).stream().map(IndexingController::toJobView).toList();
       ctx.json(new FailedIndexingJobsResponse(payload, payload.size()));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to list substrate-shaped failed jobs", e);
       ctx.status(500)
           .json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -712,6 +736,7 @@ public class IndexingController {
               .toList();
       ctx.json(new FailedIndexingJobsResponse(payload, payload.size()));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to list folder-scoped failed jobs", e);
       ctx.status(500)
           .json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -780,6 +805,10 @@ public class IndexingController {
                     try {
                       jobCounts = indexing.countJobsByPathPrefix(root.path(), RequestEngineContext.get(ctx));
                     } catch (Exception e) {
+                      var admission = ApiErrorHandler.admissionRefusal(e);
+                      if (admission != null) throw admission;
+                      var executor = ApiErrorHandler.executorRefusal(e);
+                      if (executor != null) throw executor;
                       log.warn("Failed to count jobs under {}", root.path(), e);
                     }
                     String lastIndexedIsoTime =
@@ -840,6 +869,7 @@ public class IndexingController {
               .toList();
       ctx.json(Map.of("items", payload, "count", payload.size()));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to list substrate-shaped indexed roots", e);
       ctx.status(500)
           .json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -912,6 +942,7 @@ public class IndexingController {
       int deleted = indexing.clearFailedJobs(RequestEngineContext.get(ctx));
       ctx.json(Map.of("status", "ok", "deletedCount", deleted));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to clear failed jobs", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -941,6 +972,7 @@ public class IndexingController {
       List<Map<String, Object>> events = indexing.recentIngestionEvents(limit, RequestEngineContext.get(ctx));
       ctx.json(Map.of("events", events, "count", events.size()));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to fetch recent ingestion events", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -970,6 +1002,7 @@ public class IndexingController {
       List<Map<String, Object>> rollups = indexing.ingestionOutcomeSummary(sinceMs, RequestEngineContext.get(ctx));
       ctx.json(Map.of("rollups", rollups, "count", rollups.size()));
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to fetch ingestion outcome summary", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
@@ -1000,6 +1033,7 @@ public class IndexingController {
       Map<String, Object> result = indexing.resolvePathHash((String) hashValue, RequestEngineContext.get(ctx));
       ctx.json(result);
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       log.error("Failed to resolve path hash", e);
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }

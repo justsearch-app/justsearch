@@ -4,7 +4,6 @@ package io.justsearch.app.services.registry.operations.handlers;
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ApiErrorCode;
-import io.justsearch.app.api.EngineAdmissionException;
 import io.justsearch.app.services.worker.ComponentRecoveryAuthority;
 import io.justsearch.core.context.EngineContext;
 import java.util.Map;
@@ -33,13 +32,7 @@ public final class RecoverComponentHandler implements OperationHandler {
       return failure(ApiErrorCode.SERVICE_UNAVAILABLE, "Component recovery is still initializing");
     }
 
-    ComponentRecoveryAuthority.Outcome outcome;
-    try {
-      outcome = authority.requestComponentRecovery(name);
-    } catch (EngineAdmissionException refused) {
-      return failure(ApiErrorCode.ADMISSION_ENGINE_LIMIT,
-          "A component recovery is already running");
-    }
+    ComponentRecoveryAuthority.Outcome outcome = authority.requestComponentRecovery(name);
     return switch (outcome) {
       case ACCEPTED -> OperationResult.success(
           "Component recovery accepted",

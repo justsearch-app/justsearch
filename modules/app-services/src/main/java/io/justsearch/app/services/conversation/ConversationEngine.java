@@ -1047,8 +1047,8 @@ public final class ConversationEngine {
    *   <li>If any injector signals a terminal error, the engine emits that error event and
    *       returns {@code terminated = true}; downstream injectors are skipped and no LLM
    *       call is made.
-   *   <li>An injector that throws is logged and skipped (non-fatal — the conversation
-   *       continues with whatever context remains).
+   *   <li>An Engine refusal terminates with a typed error before any LLM call. Other throwing
+   *       injectors are logged and skipped; the conversation continues with the remaining context.
    * </ul>
    */
   private static InjectorRunResult runInjectors(
@@ -1061,6 +1061,11 @@ public final class ConversationEngine {
       try {
         result = inj.inject(ctx);
       } catch (Exception e) {
+        SseEvent refusal = refusalEvent(e);
+        if (refusal != null) {
+          sink.accept(refusal);
+          return new InjectorRunResult(out, true);
+        }
         LOG.warn("ContextInjector {} threw; skipping injection", inj.id(), e);
         continue;
       }
@@ -1079,6 +1084,30 @@ public final class ConversationEngine {
 
   /** Output of {@link #runInjectors}: accumulated messages + whether any injector aborted. */
   private record InjectorRunResult(List<Map<String, Object>> messages, boolean terminated) {}
+
+  static SseEvent refusalEvent(Throwable failure) {
+    RuntimeException refused = io.justsearch.app.services.worker.EngineRefusals.find(failure);
+    String code;
+    int retryAfter;
+    if (refused instanceof io.justsearch.app.api.EngineAdmissionException admission) {
+      code = switch (admission.reason()) {
+        case CONTEXT_LIMIT -> "ADMISSION_CONTEXT_LIMIT";
+        case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+        case FROZEN -> "UPGRADE_PREPARING";
+        case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
+      };
+      retryAfter = admission.retryAfterSeconds();
+    } else if (refused instanceof io.justsearch.core.execution.EngineExecutorRejectedException executor) {
+      code = executor.reason() == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED
+          ? "SERVICE_UNAVAILABLE" : "ADMISSION_ENGINE_LIMIT";
+      retryAfter = executor.retryAfterSeconds();
+    } else {
+      return null;
+    }
+    return new SseEvent("error", Map.of(
+        "error", refused.getMessage(), "errorCode", code, "i18nKey", "errors." + code,
+        "retryAfterSeconds", retryAfter, "retrySafe", false));
+  }
 
   /**
    * The keys the model's message contract actually defines. Everything else a context message

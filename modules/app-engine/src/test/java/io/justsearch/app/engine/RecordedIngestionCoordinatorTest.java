@@ -64,6 +64,34 @@ final class RecordedIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   @TempDir Path temp;
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer(boolean reindex) throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var ingestCalls = new AtomicInteger();
+      var watchedCalls = new AtomicInteger();
+      f.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+        ingestCalls.incrementAndGet();
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      }, (plan, key, epoch, context, cancellation) -> {
+        watchedCalls.incrementAndGet();
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var seed = f.request();
+      var request = reindex ? new OperationAttemptRunner.Request(seed.key(),
+          OperationDescriptor.invocation(OperationKind.REINDEX, "core.reindex", "{}", false),
+          seed.context(), seed.provenance()) : seed;
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        f.coordinator.maintain();
+        assertEquals(reindex ? 0 : 1, ingestCalls.get());
+        assertEquals(reindex ? 1 : 0, watchedCalls.get(),
+            "a frozen watched-root plan must not reach the unrestricted ingestion adapter");
+      }
+    }
+  }
+
   @Test
   void servicePublicationResumesAcceptedParentOnceWithoutSpendingAnotherAttempt() throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {

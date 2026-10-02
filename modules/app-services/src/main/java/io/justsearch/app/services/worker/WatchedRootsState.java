@@ -45,6 +45,59 @@ public final class WatchedRootsState {
 
   Map<Path, Instant> rootsMap() { return watchedRoots; }
 
+  // Shared across client instances; do not hold the state monitor while calling the Engine.
+  private final Object lifecycleLock = new Object();
+  private static final String INITIALIZATION_PENDING = "ROOT_INITIALIZATION_PENDING";
+
+  Object lifecycleLock() {
+    return lifecycleLock;
+  }
+
+  private long retirementRevision;
+  private final Map<Path, Long> retiredRoots = new java.util.HashMap<>();
+  private final Map<Path, Object> initializations = new java.util.HashMap<>();
+
+  synchronized Object beginInitialization(Path root) {
+    if (initializations.containsKey(root)) return null;
+    Object ticket = new Object();
+    initializations.put(root, ticket);
+    return ticket;
+  }
+
+  synchronized void endInitialization(Path root, Object ticket) {
+    initializations.remove(root, ticket);
+  }
+
+  /** Capture before submission; the fence belongs to the actual producer, not its caller's wait. */
+  public synchronized RootProducerFence captureRootProducer(Path root, boolean watchedOnly) {
+    return new RootProducerFence(root.toAbsolutePath().normalize(), watchedOnly, retirementRevision);
+  }
+
+  public final class RootProducerFence {
+    private final Path root;
+    private final boolean watchedOnly;
+    private final long revision;
+
+    private RootProducerFence(Path root, boolean watchedOnly, long revision) {
+      this.root = root;
+      this.watchedOnly = watchedOnly;
+      this.revision = revision;
+    }
+
+    /** Hold removal off until every admission in the synchronous worker body has exited. */
+    public <T> T run(java.util.function.Supplier<T> producer, java.util.function.Supplier<T> retired) {
+      synchronized (lifecycleLock) {
+        boolean stale;
+        synchronized (WatchedRootsState.this) {
+          stale = (watchedOnly && !watchedRoots.containsKey(root))
+              || retiredRoots.entrySet().stream().anyMatch(entry -> entry.getValue() > revision
+                  && (root.startsWith(entry.getKey()) || entry.getKey().startsWith(root)));
+        }
+        return stale ? retired.get() : producer.get();
+      }
+    }
+  }
+
   private final Map<Path, Instant> watchedRoots;
   private final Map<Path, String> walkErrors;
   /**
@@ -170,6 +223,18 @@ public final class WatchedRootsState {
     return walkErrors.get(root);
   }
 
+  synchronized void markInitializationPending(Path root) {
+    walkErrors.put(root, INITIALIZATION_PENDING);
+  }
+
+  boolean isInitializationPending(Path root) {
+    return INITIALIZATION_PENDING.equals(walkErrors.get(root));
+  }
+
+  synchronized void finishInitialization(Path root) {
+    walkErrors.remove(root, INITIALIZATION_PENDING);
+  }
+
   boolean isWalkCompleted(Path root) {
     return walkCompleted.contains(root);
   }
@@ -219,6 +284,9 @@ public final class WatchedRootsState {
   }
 
   synchronized void removeRootAndNested(Path normalizedRoot) {
+    retiredRoots.put(normalizedRoot, ++retirementRevision);
+    initializations.keySet().removeIf(root -> root.startsWith(normalizedRoot));
+    walkErrors.keySet().removeIf(p -> p.startsWith(normalizedRoot));
     watchedRoots.remove(normalizedRoot);
     walkCompleted.remove(normalizedRoot);
     deleteDetectionUnverified.remove(normalizedRoot);
@@ -233,6 +301,14 @@ public final class WatchedRootsState {
     lastVerifiedAt.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
   }
 
+  synchronized void removeRootAndNestedAndPersist(Path normalizedRoot) {
+    var remaining = new java.util.HashMap<>(watchedRoots);
+    remaining.keySet().removeIf(p -> p.startsWith(normalizedRoot));
+    // Publish durable removal first. A failed write retains the live retry obligation too.
+    rootsStore.persistRoots(remaining, walkErrors, walkCompleted, collections);
+    removeRootAndNested(normalizedRoot);
+  }
+
   synchronized void persist() {
     rootsStore.persistRoots(watchedRoots, walkErrors, walkCompleted, collections);
   }
@@ -240,6 +316,7 @@ public final class WatchedRootsState {
   /** Clears all watched roots and walk errors, then persists the empty state. */
   synchronized void clearAll() {
     watchedRoots.clear();
+    initializations.clear();
     walkErrors.clear();
     walkCompleted.clear();
     deleteDetectionUnverified.clear();

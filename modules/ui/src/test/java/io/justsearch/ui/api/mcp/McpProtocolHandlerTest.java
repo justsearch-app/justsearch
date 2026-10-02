@@ -44,6 +44,85 @@ import tools.jackson.databind.json.JsonMapper;
 class McpProtocolHandlerTest {
 
   @Test
+  void surfaceRefusalsReachProtocolAcrossToolsAndResources() throws Exception {
+    for (String endpoint : List.of("status", "summary", "facets", "entities", "searchStatus")) {
+      for (boolean admission : List.of(false, true)) {
+        RuntimeException refused = admission
+            ? new io.justsearch.app.api.EngineAdmissionException(
+                io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 7)
+            : new io.justsearch.core.execution.EngineExecutorRejectedException(
+                io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+                "mcp", 7);
+        var failure = new java.util.concurrent.CompletionException(
+            new java.util.concurrent.ExecutionException(refused));
+        var adapter = mock(KnowledgeHttpApiAdapter.class);
+        when(adapter.status(any(EngineContext.class))).thenThrow(failure);
+        when(adapter.search(any(), any(EngineContext.class))).thenThrow(failure);
+        if (endpoint.equals("searchStatus")) {
+          McpSearchSessionFixture.stub(adapter, cannedSearchResponse());
+        }
+        String request = switch (endpoint) {
+          case "status" -> "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"tools/call\","
+              + "\"params\":{\"name\":\"justsearch_status\",\"arguments\":{}}}";
+          case "searchStatus" -> "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"tools/call\","
+              + "\"params\":{\"name\":\"justsearch_search\",\"arguments\":{\"query\":\"q\"}}}";
+          default -> "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"resources/read\","
+              + "\"params\":{\"uri\":\"justsearch://index/"
+              + (endpoint.equals("facets") ? "top-sources"
+                  : endpoint.equals("entities") ? "top-entities" : "summary") + "\"}}";
+        };
+        var ctx = mock(Context.class);
+        when(ctx.path()).thenReturn("/mcp");
+        when(ctx.body()).thenReturn(request);
+        when(ctx.contentType(anyString())).thenReturn(ctx);
+        when(ctx.status(anyInt())).thenReturn(ctx);
+        var response = ArgumentCaptor.forClass(String.class);
+        when(ctx.result(response.capture())).thenReturn(ctx);
+        handlerOver(adapter).handlePost(ctx);
+        var wire = MAPPER.readTree(response.getValue());
+        assertEquals(42, wire.path("id").asInt(), endpoint);
+        assertFalse(wire.has("result"), endpoint);
+        assertEquals("ADMISSION_ENGINE_LIMIT", wire.path("error").path("data").path("errorCode").asText());
+        assertFalse(wire.path("error").path("data").path("retrySafe").asBoolean(true));
+        verify(ctx).status(429);
+        verify(ctx).header("Retry-After", "7");
+      }
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void wrappedAdmissionRefusalKeepsRpcIdentityAndRetryDelay() throws Exception {
+    var adapter = mock(KnowledgeHttpApiAdapter.class);
+    when(adapter.openSearch(any(), any(EngineContext.class))).thenThrow(
+        new java.util.concurrent.CompletionException(new java.util.concurrent.ExecutionException(
+            new io.justsearch.app.api.EngineAdmissionException(
+                io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 7))));
+    var ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
+    when(ctx.body()).thenReturn("""
+        {"jsonrpc":"2.0","id":"admission-7","method":"tools/call",
+         "params":{"name":"justsearch_search","arguments":{"query":"test"}}}
+        """);
+    when(ctx.contentType(anyString())).thenReturn(ctx);
+    when(ctx.status(anyInt())).thenReturn(ctx);
+    var response = ArgumentCaptor.forClass(String.class);
+    when(ctx.result(response.capture())).thenReturn(ctx);
+
+    handlerOver(adapter).handlePost(ctx);
+
+    var wire = MAPPER.readValue(response.getValue(), Map.class);
+    assertEquals("admission-7", wire.get("id"));
+    assertFalse(wire.containsKey("result"));
+    var error = (Map<String, Object>) wire.get("error");
+    var data = (Map<String, Object>) error.get("data");
+    assertEquals("ADMISSION_ENGINE_LIMIT", data.get("errorCode"));
+    assertEquals(false, data.get("retrySafe"));
+    verify(ctx).status(429);
+    verify(ctx).header("Retry-After", "7");
+  }
+
+  @Test
   @SuppressWarnings("unchecked")
   void wrappedExecutorRefusalKeepsRpcIdentityAndExplicitlyDisallowsAutomaticReplay() throws Exception {
     for (var reason : List.of(

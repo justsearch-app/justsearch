@@ -172,6 +172,7 @@ public final class BatchDocAccess implements ContextInjector {
           .toCompletableFuture()
           .get(fetchTimeout.toMillis(), TimeUnit.MILLISECONDS);
     } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       LOG.warn("BatchDocAccess: fetchBatch failed for {} docIds", docIds.size(), e);
       return Map.of();
     }

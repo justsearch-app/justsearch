@@ -112,6 +112,7 @@ private static final int MAX_WALK_FILES = 500_000;
           }
         });
       } catch (Exception ignored) {
+        io.justsearch.app.services.worker.EngineRefusals.rethrow(ignored);
         // Best-effort: continue with other roots.
       }
     }

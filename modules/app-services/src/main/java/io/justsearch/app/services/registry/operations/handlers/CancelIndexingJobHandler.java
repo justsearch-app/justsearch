@@ -50,6 +50,7 @@ public final class CancelIndexingJobHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("CancelIndexingJobHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -65,6 +66,7 @@ public final class CancelIndexingJobHandler implements OperationHandler {
           : OperationResult.failure(
               "Job not cancelled (state: " + previousState + ")");
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("CancelIndexingJobHandler: cancelIndexingJob threw", e);
       return OperationResult.failure("Cancel indexing job failed: " + e.getMessage());
     }

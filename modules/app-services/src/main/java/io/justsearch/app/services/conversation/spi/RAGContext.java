@@ -419,7 +419,7 @@ public final class RAGContext implements ContextInjector {
 
     // Fallback to whole-document fetch when chunks are unavailable or empty.
     if (context == null || context.isBlank() || chunksUsed == 0) {
-      if ("FALLBACK_FAILED".equals(retrievalMode)) {
+      if ("FALLBACK_FAILED".equals(retrievalModeReason)) {
         Map<String, Object> err = errorPayload("RAG context retrieval failed", "FETCH_FAILED");
         err.put("docIds", docIds);
         return InjectorResult.terminalError(new SseEvent("error", err));
@@ -759,6 +759,7 @@ public final class RAGContext implements ContextInjector {
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS));
     } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       LOG.warn("RAGContext: scoped retrieveContext failed; will fall back to batch fetch", e);
       return RetrievalAttempt.from(e);
     }
@@ -787,6 +788,7 @@ public final class RAGContext implements ContextInjector {
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS));
     } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       LOG.warn("RAGContext: open-retrieval failed (no docIds, pre-search path)", e);
       return RetrievalAttempt.from(e);
     }
@@ -836,6 +838,7 @@ public final class RAGContext implements ContextInjector {
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       return formatDocuments(docs, docIds);
     } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       LOG.warn("RAGContext: fetchBatch fallback failed for {} docIds", docIds.size(), e);
       return null;
     }

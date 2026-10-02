@@ -532,6 +532,7 @@ public final class McpToolSurface {
                   ApiErrorCode.INVALID_REQUEST))
           .orElse(null);
     } catch (Exception e) {
+      rethrowRefusal(e);
       log.warn("MCP boundary validation failed to run for {}: {}", cacheKey, e.getMessage());
       return errorContent(
           "Argument validation could not run for "
@@ -562,6 +563,7 @@ public final class McpToolSurface {
       return errorContent(Map.of("error", failure.message(), "errorCode", failure.errorCode(),
           "errorClass", failure.errorClass(), "retryable", failure.retryable()));
     } catch (Exception e) {
+      rethrowRefusal(e);
       log.warn("MCP operation outcome query failed", e);
       return toolFailureContent("Operation outcome query", e);
     }
@@ -587,6 +589,7 @@ public final class McpToolSurface {
       content.put("structuredContent", publicView);
       return content;
     } catch (Exception e) {
+      rethrowRefusal(e);
       log.warn("MCP runtime manifest serialization failed", e);
       return toolFailureContent("Runtime manifest", e);
     }
@@ -677,6 +680,7 @@ public final class McpToolSurface {
           "isError",
           false);
     } catch (Exception e) {
+      rethrowRefusal(e);
       log.warn("MCP answer failed", e);
       return toolFailureContent("Answer", e);
     }
@@ -1024,6 +1028,7 @@ public final class McpToolSurface {
           resp.results().size(), includeDetail, resolveDeliveryBudgetBytes(session.config()), MAPPER, view);
       }
     } catch (Exception e) {
+      rethrowRefusal(e);
       // The AGENT-facing message (below) keeps the query — the agent sent it. This SERVER log does
       // not: a rejected LUCENE-syntax search surfaces a Lucene ParseException whose message quotes
       // the query verbatim, and the Engine log is bundled into the diagnostics export. Full detail
@@ -1251,6 +1256,7 @@ public final class McpToolSurface {
     try {
       return session.statusFacts(engineContext);
     } catch (Exception e) {
+      rethrowRefusal(e);
       log.debug("MCP search: retained status unavailable", e);
       return null;
     }
@@ -1499,6 +1505,7 @@ public final class McpToolSurface {
       return Map.of(
           "content", List.of(Map.of("type", "text", "text", sb.toString())), "isError", false);
     } catch (Exception e) {
+      rethrowRefusal(e);
       log.warn("MCP status failed", e);
       return toolFailureContent("Status", e);
     }
@@ -1577,6 +1584,7 @@ public final class McpToolSurface {
       return errorContent(Map.of("error", failure.message(), "errorCode", failure.errorCode(),
           "errorClass", failure.errorClass(), "retryable", failure.retryable()));
     } catch (Exception e) {
+      rethrowRefusal(e);
       log.warn("MCP operation dispatch error for {}", opIdValue, e);
       return toolFailureContent("Operation " + opIdValue, e);
     }
@@ -1731,6 +1739,7 @@ public final class McpToolSurface {
       sb.append(" ").append(TOOL_SELECTION_GUIDANCE);
       return sb.toString();
     } catch (Exception e) {
+      rethrowRefusal(e);
       return "JustSearch index status unknown. " + TOOL_SELECTION_GUIDANCE;
     }
   }
@@ -1825,6 +1834,7 @@ public final class McpToolSurface {
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "text/plain", "text", sb.toString())));
     } catch (Exception e) {
+      rethrowRefusal(e);
       return resourceError(uri, e.getMessage());
     }
   }
@@ -1839,6 +1849,7 @@ public final class McpToolSurface {
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "text/plain", "text", text)));
     } catch (Exception e) {
+      rethrowRefusal(e);
       return resourceError(uri, e.getMessage());
     }
   }
@@ -1857,6 +1868,7 @@ public final class McpToolSurface {
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "application/json", "text", text)));
     } catch (Exception e) {
+      rethrowRefusal(e);
       return resourceError(uri, e.getMessage());
     }
   }
@@ -1877,6 +1889,7 @@ public final class McpToolSurface {
       return Map.of("contents",
           List.of(orderedMap("uri", uri, "mimeType", "application/json", "text", text)));
     } catch (Exception e) {
+      rethrowRefusal(e);
       return resourceError(uri, e.getMessage());
     }
   }
@@ -1902,6 +1915,7 @@ public final class McpToolSurface {
       boolean lowSplade = extras.get("spladeCoveragePercent") instanceof Number n && n.doubleValue() < 100;
       return (lowEmbedding || lowSplade) ? message : null;
     } catch (Exception e) {
+      rethrowRefusal(e);
       return null;
     }
   }
@@ -2150,10 +2164,16 @@ public final class McpToolSurface {
       "Knowledge server is not available (worker offline or still starting)."
           + " State is reported by the justsearch_status tool.";
 
+  private static void rethrowRefusal(Exception failure) {
+    var admission = ApiErrorHandler.admissionRefusal(failure);
+    if (admission != null) throw admission;
+    var executor = ApiErrorHandler.executorRefusal(failure);
+    if (executor != null) throw executor;
+  }
+
   /** Project the existing API classification and sanitizer, without a parallel retry policy. */
   private static Map<String, Object> toolFailureContent(String tool, Exception e) {
-    var executorRefusal = ApiErrorHandler.executorRefusal(e);
-    if (executorRefusal != null) throw executorRefusal;
+    rethrowRefusal(e);
     // Future.get/join transport the cause in wrappers with no failure policy of their own.
     // Use the same cause for wording and classification, retaining the fallback for absent
     // or non-Exception causes. Identity tracking also bounds malformed cyclic cause chains.

@@ -18,6 +18,37 @@ import org.junit.jupiter.api.Test;
 final class ApiErrorHandlerResolveTest {
 
   @Test
+  @SuppressWarnings("unchecked")
+  void wrappedAdmissionRefusalsUseFrontDoorCodesAndNeverPromiseSafeReplay() {
+    for (var reason : io.justsearch.app.api.EngineAdmissionException.Reason.values()) {
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+      var failure = new java.util.concurrent.CompletionException(
+          new java.util.concurrent.ExecutionException(refusal));
+      var ctx = org.mockito.Mockito.mock(io.javalin.http.Context.class);
+      org.mockito.Mockito.when(ctx.path()).thenReturn("/test");
+      assertTrue(ApiErrorHandler.writeExecutorRefusal(ctx, failure, null));
+      boolean capacity = reason == io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
+          || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+      org.mockito.Mockito.verify(ctx).status(capacity ? 429 : 503);
+      if (capacity) org.mockito.Mockito.verify(ctx).header("Retry-After", "7");
+      else org.mockito.Mockito.verify(ctx, org.mockito.Mockito.never())
+          .header(org.mockito.ArgumentMatchers.eq("Retry-After"), org.mockito.ArgumentMatchers.anyString());
+      var response = org.mockito.ArgumentCaptor.forClass(Object.class);
+      org.mockito.Mockito.verify(ctx).json(response.capture());
+      var body = (Map<String, Object>) response.getValue();
+      assertEquals(RequestEngineWork.errorCode(refusal), body.get("errorCode"));
+      assertEquals(false, body.get("retrySafe"));
+      assertEquals(switch (reason) {
+        case CONTEXT_LIMIT -> ApiErrorCode.ADMISSION_CONTEXT_LIMIT;
+        case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT;
+        case FROZEN, WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE;
+      }, ApiErrorHandler.resolve(failure));
+      assertEquals(false, ApiErrorHandler.toResponse(ApiErrorHandler.resolve(failure), failure).get("retrySafe"));
+      assertNull(ApiErrorHandler.admissionRefusal(new RuntimeException(refusal)));
+    }
+  }
+
+  @Test
   void wrappedExecutorRefusalWritesBoundedRetryHeaderButNeverPromisesSafeReplay() {
     var refusal = new io.justsearch.core.execution.EngineExecutorRejectedException(
         io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT, "test.http", 7);

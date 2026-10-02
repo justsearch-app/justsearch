@@ -61,6 +61,7 @@ public final class ResolvePathHashHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("ResolvePathHashHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -87,6 +88,7 @@ public final class ResolvePathHashHandler implements OperationHandler {
       return OperationResult.success(
           found ? "Path resolved" : "No path on record for that hash", result);
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("ResolvePathHashHandler: resolvePathHash threw", e);
       return OperationResult.failure("Resolve path-hash failed: " + e.getMessage());
     }
@@ -110,6 +112,7 @@ public final class ResolvePathHashHandler implements OperationHandler {
         }
       }
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.debug("ResolvePathHashHandler: watched-roots fallback threw", e);
     }
     return Map.of("found", false);
