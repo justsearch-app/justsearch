@@ -139,16 +139,19 @@ final class RootLifecycleOpsConcurrencyTest {
       var release = new CountDownLatch(1);
       var calls = new java.util.concurrent.atomic.AtomicInteger();
       Set<String> documents = ConcurrentHashMap.newKeySet();
+      var service = mock(IngestServiceCalls.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+      doAnswer(invocation -> {
+        calls.incrementAndGet();
+        entered.countDown();
+        await(release);
+        documents.add("reconciled file");
+        return io.justsearch.ipc.SyncDirectoryResponse.newBuilder().setFilesAdded(1).build();
+      }).when(service).syncDirectory(org.mockito.ArgumentMatchers.any());
       IngestRpcExecutor rpc = new IngestRpcExecutor() {
         @Override
-        @SuppressWarnings("unchecked")
         public <T> T execute(String operation, KnowledgeClient.RpcDeadlineCategory category,
             java.util.function.Function<IngestServiceCalls, T> fn, EngineContext context) {
-          calls.incrementAndGet();
-          entered.countDown();
-          await(release);
-          documents.add("reconciled file");
-          return (T) io.justsearch.ipc.SyncDirectoryResponse.newBuilder().setFilesAdded(1).build();
+          return fn.apply(service);
         }
       };
       var sync = new SyncOps(new io.justsearch.core.execution.TestEngineExecutors(), rpc,
@@ -160,7 +163,7 @@ final class RootLifecycleOpsConcurrencyTest {
           });
       var context = TestEngineContexts.internal();
       var reconcile = new FutureTask<Void>(() -> {
-        sync.syncDirectory(root.toString(), force, context);
+        sync.syncWatchedDirectory(root.toString(), force, context);
         return null;
       });
       var remove = new FutureTask<Integer>(() -> removing.removeWatchedPath(root, context));
@@ -174,7 +177,7 @@ final class RootLifecycleOpsConcurrencyTest {
         release.countDown();
         reconcile.get(2, TimeUnit.SECONDS);
         assertEquals(1, remove.get(2, TimeUnit.SECONDS).intValue());
-        assertTrue(sync.syncDirectory(root.toString(), force, context).getSkipped());
+        assertTrue(sync.syncWatchedDirectory(root.toString(), force, context).getSkipped());
         assertEquals(1, calls.get(), "stale periodic/explicit reconciliation must not call the Engine");
         assertTrue(documents.isEmpty());
         assertTrue(roots.isEmpty());

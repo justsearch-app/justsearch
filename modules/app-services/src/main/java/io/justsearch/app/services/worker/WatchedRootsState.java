@@ -53,6 +53,39 @@ public final class WatchedRootsState {
     return lifecycleLock;
   }
 
+  private long retirementRevision;
+  private final Map<Path, Long> retiredRoots = new java.util.HashMap<>();
+
+  /** Capture before submission; the fence belongs to the actual producer, not its caller's wait. */
+  public synchronized RootProducerFence captureRootProducer(Path root, boolean watchedOnly) {
+    return new RootProducerFence(root.toAbsolutePath().normalize(), watchedOnly, retirementRevision);
+  }
+
+  public final class RootProducerFence {
+    private final Path root;
+    private final boolean watchedOnly;
+    private final long revision;
+
+    private RootProducerFence(Path root, boolean watchedOnly, long revision) {
+      this.root = root;
+      this.watchedOnly = watchedOnly;
+      this.revision = revision;
+    }
+
+    /** Hold removal off until every admission in the synchronous worker body has exited. */
+    public <T> T run(java.util.function.Supplier<T> producer, java.util.function.Supplier<T> retired) {
+      synchronized (lifecycleLock) {
+        boolean stale;
+        synchronized (WatchedRootsState.this) {
+          stale = (watchedOnly && !watchedRoots.containsKey(root))
+              || retiredRoots.entrySet().stream().anyMatch(entry -> entry.getValue() > revision
+                  && (root.startsWith(entry.getKey()) || entry.getKey().startsWith(root)));
+        }
+        return stale ? retired.get() : producer.get();
+      }
+    }
+  }
+
   private final Map<Path, Instant> watchedRoots;
   private final Map<Path, String> walkErrors;
   /**
@@ -239,6 +272,7 @@ public final class WatchedRootsState {
   }
 
   synchronized void removeRootAndNested(Path normalizedRoot) {
+    retiredRoots.put(normalizedRoot, ++retirementRevision);
     walkErrors.keySet().removeIf(p -> p.startsWith(normalizedRoot));
     watchedRoots.remove(normalizedRoot);
     walkCompleted.remove(normalizedRoot);

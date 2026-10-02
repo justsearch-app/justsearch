@@ -91,6 +91,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private final EngineExecutorRegistry.Registration foregroundStreamRegistration;
   private final EngineExecutorRegistry.Registration backgroundStreamRegistration;
   private final ScheduledExecutorService deadlines;
+  private final io.justsearch.app.services.worker.WatchedRootsState roots;
   private final ExecutorService foregroundCallThreads;
   private final ExecutorService backgroundCallThreads;
   private final ExecutorService foregroundStreamThreads;
@@ -160,6 +161,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
           servingLeaseSupplier) {
     super(executors, deadlineMs, batchSize, telemetry, roots);
+    this.roots = Objects.requireNonNull(roots, "roots");
     Objects.requireNonNull(executors, "executors");
     this.admission = Objects.requireNonNull(admission, "admission");
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
@@ -1203,16 +1205,45 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     CallView view = captureCallView();
     try {
       return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
-          WorkerIngestService.RecordedScanMode.STREAMING, view);
+          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, false));
     } catch (RuntimeException | Error failure) {
       view.release();
       throw failure;
     }
   }
 
+  /** Reindex consumes a frozen watched-root plan, including when execution starts after removal. */
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateWatchedRecordedRoot(RecordedRootPlan plan,
+      String childKey, long epoch, EngineContext context, CancelToken cancellation) {
+    CallView view = captureCallView();
+    try {
+      return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
+          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, true));
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
+  }
+
+  private io.justsearch.app.services.worker.WatchedRootsState.RootProducerFence capturedRootFence(
+      RecordedRootPlan plan, boolean watchedOnly) {
+    if (plan.roots().size() != 1) throw new IllegalArgumentException("Recorded producer requires one root");
+    return roots.captureRootProducer(plan.roots().getFirst().path(), watchedOnly);
+  }
+
   /** One captured epoch spans every frozen root; each stage waits for its actual walk and delivery exit. */
   CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateCapturedRoots(RecordedRootPlan plan,
       String operationKey, long epoch, EngineContext context, CancelToken cancellation) {
+    return enumerateCapturedRoots(plan, operationKey, epoch, context, cancellation, false);
+  }
+
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateWatchedCapturedRoots(RecordedRootPlan plan,
+      String operationKey, long epoch, EngineContext context, CancelToken cancellation) {
+    return enumerateCapturedRoots(plan, operationKey, epoch, context, cancellation, true);
+  }
+
+  private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateCapturedRoots(RecordedRootPlan plan,
+      String operationKey, long epoch, EngineContext context, CancelToken cancellation, boolean watchedOnly) {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");
     var owner = admission.attach(context);
@@ -1227,13 +1258,18 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     try {
       CompletionStage<JobQueue.WalkEnumerationOutcome> result = CompletableFuture.completedFuture(
           cancellation.isCancelled() ? JobQueue.WalkEnumerationOutcome.CANCELLED : JobQueue.WalkEnumerationOutcome.COMPLETE);
+      // Capture every root before starting any producer; later roots may wait behind an earlier one.
+      var fences = plan.roots().stream()
+          .map(root -> roots.captureRootProducer(root.path(), watchedOnly)).toList();
+      int rootIndex = 0;
       for (var root : plan.roots()) {
         var singleRoot = new RecordedRootPlan(plan.generation(), List.of(root));
+        var fence = fences.get(rootIndex++);
         result = result.thenCompose(outcome -> {
           if (outcome != JobQueue.WalkEnumerationOutcome.COMPLETE) return CompletableFuture.completedFuture(outcome);
           if (cancellation.isCancelled()) return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
           return enumerateRecordedRoot(singleRoot, operationKey, epoch, owner.context(), cancellation,
-              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork());
+              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork(), fence);
         });
       }
       return result.whenComplete((ignored, failure) -> {
@@ -1253,7 +1289,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation,
-      WorkerIngestService.RecordedScanMode mode, CallView view) {
+      WorkerIngestService.RecordedScanMode mode, CallView view,
+      io.justsearch.app.services.worker.WatchedRootsState.RootProducerFence fence) {
     try {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");
@@ -1272,14 +1309,20 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     var delivery = new AtomicReference<CompletionStage<Void>>(CompletableFuture.completedFuture(null));
     var outcome = new AtomicReference<>(JobQueue.WalkEnumerationOutcome.FAILED);
     var walk = scheduleRootWalk(rootWalkExecutor(), ownedContext -> {
-      try (var work = admission.attach(ownedContext)) {
-        var terminal = foregroundLoad.call(work, () ->
-            scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery));
-        outcome.set(cancellation.isCancelled() || "CLIENT_CANCELLED".equals(terminal.getTerminalReasonCode())
-            ? JobQueue.WalkEnumerationOutcome.CANCELLED
-            : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
-                ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
-      }
+      fence.run(() -> {
+        try (var work = admission.attach(ownedContext)) {
+          var terminal = foregroundLoad.call(work, () ->
+              scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery));
+          outcome.set(cancellation.isCancelled() || "CLIENT_CANCELLED".equals(terminal.getTerminalReasonCode())
+              ? JobQueue.WalkEnumerationOutcome.CANCELLED
+              : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
+                  ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
+        }
+        return null;
+      }, () -> {
+        outcome.set(JobQueue.WalkEnumerationOutcome.CANCELLED);
+        return null;
+      });
     }, context, cancellation, view);
     // handle + thenCompose waits for delivery even when the walk failed; allOf with a separately
     // captured default would miss a delivery task scheduled after the producer returned.

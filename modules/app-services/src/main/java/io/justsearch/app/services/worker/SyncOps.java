@@ -123,13 +123,17 @@ final class SyncOps {
                 stub -> stub.pruneMissing(request), engineContext);
     }
 
-    private SyncDirectoryResponse executeSyncDirectory(String rootPath, boolean force, EngineContext engineContext) {
+    private SyncDirectoryResponse executeSyncDirectory(String rootPath, boolean force,
+            EngineContext engineContext, boolean watchedOnly) {
         SyncDirectoryRequest request =
                 SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
+        var fence = rootsState == null ? null
+                : rootsState.captureRootProducer(Path.of(rootPath), watchedOnly);
         return rpc.execute(
                 "syncDirectory",
                 KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.syncDirectory(request), engineContext);
+                stub -> fence == null ? stub.syncDirectory(request)
+                        : stub.syncDirectory(request, fence), engineContext);
     }
 
     // ========== Public operations ==========
@@ -163,19 +167,21 @@ final class SyncOps {
     }
 
     SyncDirectoryResponse syncDirectory(String rootPath, boolean force, EngineContext engineContext) {
-        if (rootsState == null) return syncDirectoryOwned(rootPath, force, engineContext);
-        synchronized (rootsState.lifecycleLock()) {
-            Path root = Path.of(rootPath).toAbsolutePath().normalize();
-            if (!watchedRoots.containsKey(root)) {
-                return SyncDirectoryResponse.newBuilder().setSkipped(true).build();
-            }
-            return syncDirectoryOwned(rootPath, force, engineContext);
-        }
+        return syncDirectoryOwned(rootPath, force, engineContext, false);
     }
 
-    private SyncDirectoryResponse syncDirectoryOwned(String rootPath, boolean force, EngineContext engineContext) {
+    SyncDirectoryResponse syncWatchedDirectory(String rootPath, boolean force, EngineContext engineContext) {
+        Path root = Path.of(rootPath).toAbsolutePath().normalize();
+        if (!watchedRoots.containsKey(root)) {
+            return SyncDirectoryResponse.newBuilder().setSkipped(true).build();
+        }
+        return syncDirectoryOwned(rootPath, force, engineContext, true);
+    }
+
+    private SyncDirectoryResponse syncDirectoryOwned(String rootPath, boolean force,
+            EngineContext engineContext, boolean watchedOnly) {
         try {
-            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext);
+            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext, watchedOnly);
 
             // Tempdoc 626 §Axis-C/§Recency — update the per-root verification state from this reconcile.
             if (response.getError().isEmpty()) {
@@ -266,7 +272,7 @@ final class SyncOps {
                                         root);
 
                                 // force=false: Worker will skip if user is actively searching
-                                syncDirectory(root.toString(), /* force= */ false, engineContext);
+                                syncWatchedDirectory(root.toString(), /* force= */ false, engineContext);
 
                             } catch (Exception e) {
                                 log.warn("Periodic sync failed", e);

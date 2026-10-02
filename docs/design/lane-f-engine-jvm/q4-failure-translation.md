@@ -43,11 +43,24 @@ Incomplete cleanup retains durable membership and an explicit retry repeats clea
   obligation, watcher creation, walk submission, initialization completion. A refusal leaves
   ROOT_INITIALIZATION_PENDING in the existing persisted walkError field. Re-add resumes with
   the original collection; completed-root re-add stays idempotent, including during a queued walk.
-- `worker/RootLifecycleOps.java:234,242,244,508,556`: initial, forced/excluded, synchronous sync
-  and restored scans; membership check and producer call now share removal's lock. Removal drains
-  rather than cancelling; it can wait for a long scan. `worker/SyncOps.java:165` applies the same
-  fence to periodic and explicit reconciliation and skips stale root snapshots.
-- `engine/EngineKnowledgeClient.java:1302,1384,1393`: scan producer runs synchronously; return
+- `worker/RootLifecycleOps.java:234,242,244,508,554`: initial, forced/excluded and restored scans;
+  membership check and actual producer call share removal's lock. Removal drains rather than
+  cancelling; it can wait for a long scan.
+- `worker/WatchedRootsState.java:60,64,275`: capture producer fences before submission; their
+  worker bodies own the shared lifecycle lock until actual exit. Successful removal advances a
+  retirement revision for the removed subtree. Queued overlapping producers reject intervening
+  retirement, including a remove/re-add, rather than recreating documents from a stale submission.
+- `worker/SyncOps.java:126,169,173,275`; `worker/IngestServiceCalls.java:57`: reconciliation
+  captures its fence before the Engine unary submission and acquires it inside the worker call.
+  Caller timeout cannot release it. Periodic and legacy watched-root reindex additionally require
+  current membership; explicit reconciliation retains support for unwatched paths.
+- `engine/RecordedIngestionCoordinator.java:450,1031`; `engine/EngineRoot.java:578,579`:
+  accepted core.reindex selects the watched producer, and bulk rebuild binds the watched captured
+  producer. Both frozen watched plans reject missing membership even if submission follows removal.
+- `engine/EngineKnowledgeClient.java:1216,1240,1263,1312`: recorded streaming and captured scans
+  use the actual producer fence. Every captured root gets its fence before the first root starts.
+  Explicit ingestion retains unwatched-root support and rejects queued work invalidated by removal.
+- `engine/EngineKnowledgeClient.java`: scan producer runs synchronously; return
   follows its exit. `worker-services/RootWatcherRegistry.java:109,192`: unwatch invalidates the
   registration and drains issued event effects before returning.
 - `worker/RootLifecycleOps.java:399,414,423,442,466`: lock removal, reject incomplete nested
@@ -55,7 +68,7 @@ Incomplete cleanup retains durable membership and an explicit retry repeats clea
   negative count, then publish removal. Ancestor coverage requires removing the ancestor first.
 - `worker-services/WorkerIngestService.java:1177,1203,1219`:
   fenced deletion/commit or failure response, including null-message negative sentinel.
-- `worker/WatchedRootsState.java:257`: persist remaining roots before dropping live metadata;
+- `worker/WatchedRootsState.java:291`: persist remaining roots before dropping live metadata;
   failed persistence retains both retry owners. Removal also clears obsolete walk errors.
 - `http/IndexingController.java:260`; `handlers/RemoveWatchedRootHandler.java:76`:
   negative cleanup result is incomplete failure, never successful removal.
@@ -72,6 +85,23 @@ Incomplete cleanup retains durable membership and an explicit retry repeats clea
 | Review 3 I2 | RootLifecycleOpsConcurrencyTest#removalDrainsActiveAndFencesQueuedRootScans pauses an actual scan callback between batches across initial/forced/restored entry points; removal waits, last batch is deleted, queued callbacks cannot scan removed membership. Removing the membership guard fails its oracle. #removalDrainsReconciliationAndFencesStaleRootSnapshots covers reconciliation. #failedPersistenceRetainsLiveAndDurableRemovalObligation and #retainedAncestorPreventsFalseCompletedSubtreeRemoval cover the additional invariant gaps. |
 | Review 3 I3 | RootLifecycleOpsIdempotencyTest#refusedInitializationResumesOnReAddIncludingAfterReload covers watch/submission refusal, recovery, original collection, live/reloaded pending state, resumed watcher/walk, and completed idempotency. Draft code performs no watcher/walk on retry. |
 | W13-F3; review 2 I2 | Retain reason-field agreement and no-empty-fallback-on-failure. RAGContextTest#fallbackFailedTerminal and #openRetrievalWithUnavailableIndexIsFetchFailed use the real producer. #successfulOpenRetrievalWithNoHitsIsStillNoContent distinguishes successful empty retrieval from dependency failure, guarding against an overbroad FETCH_FAILED fix. |
+| Q4n I1 | EngineRootRetirementTest#reconciliationDeadlineDoesNotReleaseActualProducerFence pauses the real Worker reconciliation during its disk walk or admission, expires the Engine caller, then removes the root. Removal must wait for worker exit and delete all resumed admissions. The prior caller-only fence permits early success and orphaned jobs. The synchronous lifecycle regression now invokes the actual fenced port instead of bypassing its function. |
+| Q4n I2 | EngineRootRetirementTest#removalDrainsRealRecordedReindexBetweenBatches pauses actual SQLite admission between 2,000-file batches; parent and nested-root removal must drain it. #queuedRecordedProducersCannotAdmitAfterRemoval covers streaming ingestion, watched reindex, captured rebuild, submission after removal and new explicit unwatched ingestion. RecordedIngestionCoordinatorTest#dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer exercises accepted runner dispatch. Prior code bypasses removal ownership and routes reindex through unrestricted ingestion. |
+
+## Q4n build handoff
+
+```text
+./gradlew.bat :modules:app-engine:test --tests '*EngineRootRetirementTest' --tests '*RecordedIngestionCoordinatorTest' --tests '*EngineRecordedIngestionProducerTest' --tests '*EngineRecordedProducerExitTest' --tests '*EngineKnowledgeClientServingViewLifetimeTest' --tests '*EngineSyncDirectoryTest'
+./gradlew.bat :modules:app-services:test --tests '*RootLifecycleOpsConcurrencyTest' --tests '*RootLifecycleOpsIdempotencyTest' --tests '*SyncOps*'
+./gradlew.bat :modules:app-engine:test :modules:app-services:test
+./gradlew.bat :modules:app-engine:spotlessCheck :modules:app-services:spotlessCheck
+```
+
+Gradle/JUnit execution remains with the orchestrator. Signature inspection and compiler parsing
+are static checks, not compilation or evidence that these regressions passed.
+Observed Q4n checks: `git diff --check` passed; the temporary Java 25 compiler parser reported
+`Parsed 10 Java files; syntax errors=0`; Node whitespace/final-newline checks passed for all 11
+changed files. The parser scratch directory was removed. No Gradle, JUnit or Node unit tests ran.
 
 ## Files changed in this uncommitted correction
 

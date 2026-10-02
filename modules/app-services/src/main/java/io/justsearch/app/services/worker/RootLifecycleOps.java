@@ -516,13 +516,11 @@ final class RootLifecycleOps {
             // force=false without excludes: prefer Worker-side syncDirectory which streams
             // the disk walk and enqueues in batches internally.
             if (!force && !hasExcludes) {
-                synchronized (watchedRootsState.lifecycleLock()) {
-                    if (!watchedRoots.containsKey(root)) continue;
-                    SyncDirectoryResponse r = syncOps.syncDirectory(root.toString(), true, engineContext);
-                    if (r != null && r.getError().isEmpty()) {
-                        synchronized (watchedRootsState) {
-                            if (watchedRoots.containsKey(root)) watchedRootsState.markIndexed(root);
-                        }
+                // The Engine worker owns the producer fence; a caller may time out before it exits.
+                SyncDirectoryResponse r = syncOps.syncWatchedDirectory(root.toString(), true, engineContext);
+                if (r != null && !r.getSkipped() && r.getError().isEmpty()) {
+                    synchronized (watchedRootsState) {
+                        if (watchedRoots.containsKey(root)) watchedRootsState.markIndexed(root);
                     }
                 }
                 continue;
