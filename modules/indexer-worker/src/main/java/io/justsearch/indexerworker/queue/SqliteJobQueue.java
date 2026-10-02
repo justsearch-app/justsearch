@@ -3533,6 +3533,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       Path tmp = dbPath.resolveSibling(dbPath.getFileName() + ".bak.tmp");
       Path bak = dbPath.resolveSibling(dbPath.getFileName() + ".bak");
 
+      // An interrupted VACUUM INTO may leave a nonempty scratch file. Only discard
+      // that scratch file; the live database and last completed backup remain owned.
+      Files.deleteIfExists(tmp);
+
       // Escape single quotes in path for SQL literal
       String escapedPath = tmp.toAbsolutePath().toString().replace("'", "''");
 

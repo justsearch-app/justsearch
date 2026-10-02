@@ -1,19 +1,30 @@
 package io.justsearch.indexerworker.disambiguation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("EntityClusterStore")
 class EntityClusterStoreTest {
@@ -61,8 +72,75 @@ class EntityClusterStoreTest {
         statement.execute("PRAGMA user_version = 2");
       }
 
-      store = new EntityClusterStore(db);
-      assertThrows(java.sql.SQLException.class, store::open);
+      Connection acquired = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+      store = new EntityClusterStore(db, ignored -> acquired);
+      try {
+        SQLException failure = assertThrows(SQLException.class, store::open);
+        assertTrue(failure.getMessage().contains("schema version 2"));
+        assertTrue(acquired.isClosed(), "failed initialization must close before returning");
+        assertThrows(SQLException.class, store::loadAll);
+      } finally {
+        acquired.close();
+      }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sql", "runtime", "error"})
+    void failedInitializationRetainsCleanupFailureAndAllowsCloseRetry(String failureKind)
+        throws Exception {
+      Path db = tempDir.resolve("failed-open.db");
+      Connection acquired = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+      Throwable initializationFailure = switch (failureKind) {
+        case "sql" -> new SQLException("injected initialization failure");
+        case "runtime" -> new IllegalStateException("injected initialization failure");
+        case "error" -> new AssertionError("injected initialization failure");
+        default -> throw new IllegalArgumentException(failureKind);
+      };
+      SQLException closeFailure = new SQLException("injected native close failure");
+      AtomicBoolean failClose = new AtomicBoolean(true);
+      AtomicInteger closeAttempts = new AtomicInteger();
+      Connection faulting = (Connection) Proxy.newProxyInstance(
+          Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+          (proxy, method, args) -> {
+            if (method.getName().equals("createStatement")) throw initializationFailure;
+            if (method.getName().equals("close")) {
+              closeAttempts.incrementAndGet();
+              if (failClose.get()) throw closeFailure;
+            }
+            try {
+              return method.invoke(acquired, args);
+            } catch (InvocationTargetException failure) {
+              throw failure.getCause();
+            }
+          });
+      EntityClusterStore candidate = new EntityClusterStore(db, ignored -> faulting);
+      try {
+        Throwable observed = assertThrows(initializationFailure.getClass(), candidate::open);
+        assertSame(initializationFailure, observed);
+        assertEquals(1, observed.getSuppressed().length);
+        assertSame(closeFailure, observed.getSuppressed()[0]);
+        assertEquals(1, closeAttempts.get());
+        assertFalse(acquired.isClosed());
+        assertThrows(SQLException.class, candidate::loadAll);
+        assertThrows(SQLException.class, candidate::open, "reopen must not overwrite retained ownership");
+        IOException shutdownFailure = assertThrows(IOException.class, candidate::close);
+        assertSame(closeFailure, shutdownFailure.getCause());
+        assertEquals(2, closeAttempts.get());
+
+        failClose.set(false);
+        candidate.close();
+        assertTrue(acquired.isClosed());
+        assertEquals(3, closeAttempts.get());
+        candidate.close();
+        assertEquals(3, closeAttempts.get());
+      } finally {
+        failClose.set(false);
+        try {
+          candidate.close();
+        } finally {
+          acquired.close();
+        }
+      }
     }
   }
 

@@ -78,6 +78,7 @@ public final class SqliteOperationStore implements OperationStore {
   private final Clock clock;
   private final OpenStepHook hook;
   private Connection connection;
+  private boolean unusable;
   private Recovery recovery;
 
   @Override
@@ -1405,7 +1406,7 @@ public final class SqliteOperationStore implements OperationStore {
   private <T> T locked(SqlWork<T> work) {
     lock.lock();
     try {
-      if (connection == null || connection.isClosed()) throw new SQLException("Operations store is closed");
+      if (unusable || connection == null || connection.isClosed()) throw new SQLException("Operations store is closed");
       return work.run();
     } catch (SQLException failure) {
       LOG.warn("Operations store SQL failure (code={})", failure.getErrorCode(), failure);
@@ -1431,11 +1432,12 @@ public final class SqliteOperationStore implements OperationStore {
           control.execute("ROLLBACK");
         } catch (SQLException | RuntimeException | Error rollbackFailure) {
           if (rollbackFailure != failure) failure.addSuppressed(rollbackFailure);
-          // Retire the uncertain handle before close, even if cleanup itself fails.
-          Connection uncertain = connection;
-          connection = null;
-          try { uncertain.close(); }
-          catch (SQLException | RuntimeException | Error closeFailure) {
+          // Refuse reuse, but retain ownership until native close succeeds.
+          unusable = true;
+          try {
+            connection.close();
+            connection = null;
+          } catch (SQLException | RuntimeException | Error closeFailure) {
             if (closeFailure != failure) failure.addSuppressed(closeFailure);
           }
         }
@@ -1467,15 +1469,19 @@ public final class SqliteOperationStore implements OperationStore {
     lock.lock();
     try {
       if (connection == null) return;
-      try {
-        try (Statement statement = connection.createStatement();
-            ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(FULL)")) {
-          if (!result.next() || result.getInt(1) != 0) {
-            LOG.warn("Operations WAL remains replayable after close; a reader held its checkpoint");
+      boolean checkpoint = !unusable;
+      unusable = true;
+      if (checkpoint) {
+        try {
+          try (Statement statement = connection.createStatement();
+              ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(FULL)")) {
+            if (!result.next() || result.getInt(1) != 0) {
+              LOG.warn("Operations WAL remains replayable after close; a reader held its checkpoint");
+            }
           }
+        } catch (SQLException checkpointFailure) {
+          LOG.warn("Operations WAL checkpoint failed; retaining WAL for replay", checkpointFailure);
         }
-      } catch (SQLException checkpointFailure) {
-        LOG.warn("Operations WAL checkpoint failed; retaining WAL for replay", checkpointFailure);
       }
       try {
         connection.close();

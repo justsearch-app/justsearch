@@ -33,29 +33,54 @@ public final class EntityClusterStore implements Closeable {
   public static final int CURRENT_SCHEMA_VERSION = 1;
 
   private final Path dbPath;
+  private final ConnectionFactory connectionFactory;
   private final ReentrantLock lock = new ReentrantLock();
   private Connection connection;
+  private boolean initialized;
+
+  @FunctionalInterface
+  interface ConnectionFactory {
+    Connection open(String jdbcUrl) throws SQLException;
+  }
 
   public EntityClusterStore(Path dbPath) {
+    this(dbPath, DriverManager::getConnection);
+  }
+
+  EntityClusterStore(Path dbPath, ConnectionFactory connectionFactory) {
     this.dbPath = dbPath;
+    this.connectionFactory = connectionFactory;
   }
 
   /** Opens the database connection and initializes the schema. */
   public void open() throws SQLException, IOException {
     lock.lock();
     try {
+      if (connection != null) {
+        throw new SQLException("EntityClusterStore already owns a connection");
+      }
       Files.createDirectories(dbPath.getParent());
       String jdbcUrl = "jdbc:sqlite:" + dbPath.toAbsolutePath();
-      connection = DriverManager.getConnection(jdbcUrl);
+      connection = connectionFactory.open(jdbcUrl);
+      try {
+        try (Statement stmt = connection.createStatement()) {
+          stmt.execute("PRAGMA busy_timeout = " + BUSY_TIMEOUT_MS);
+          stmt.execute("PRAGMA journal_mode = WAL");
+          stmt.execute("PRAGMA synchronous = NORMAL");
+        }
 
-      try (Statement stmt = connection.createStatement()) {
-        stmt.execute("PRAGMA busy_timeout = " + BUSY_TIMEOUT_MS);
-        stmt.execute("PRAGMA journal_mode = WAL");
-        stmt.execute("PRAGMA synchronous = NORMAL");
+        initSchema();
+        log.info("EntityClusterStore opened: {}", dbPath);
+        initialized = true;
+      } catch (SQLException | RuntimeException | Error failure) {
+        try {
+          connection.close();
+          connection = null;
+        } catch (SQLException | RuntimeException | Error closeFailure) {
+          if (closeFailure != failure) failure.addSuppressed(closeFailure);
+        }
+        throw failure;
       }
-
-      initSchema();
-      log.info("EntityClusterStore opened: {}", dbPath);
     } finally {
       lock.unlock();
     }
@@ -240,7 +265,7 @@ public final class EntityClusterStore implements Closeable {
   }
 
   private void ensureOpen() throws SQLException {
-    if (connection == null || connection.isClosed()) {
+    if (!initialized || connection == null || connection.isClosed()) {
       throw new SQLException("EntityClusterStore is not open");
     }
   }
@@ -249,14 +274,15 @@ public final class EntityClusterStore implements Closeable {
   public void close() throws IOException {
     lock.lock();
     try {
-      if (connection != null && !connection.isClosed()) {
+      initialized = false;
+      if (connection != null) {
         connection.close();
+        connection = null;
         log.info("EntityClusterStore closed: {}", dbPath);
       }
     } catch (SQLException e) {
       throw new IOException("Failed to close EntityClusterStore", e);
     } finally {
-      connection = null;
       lock.unlock();
     }
   }
