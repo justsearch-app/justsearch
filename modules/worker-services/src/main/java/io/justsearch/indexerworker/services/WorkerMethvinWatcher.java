@@ -122,7 +122,11 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       Consumer<String> deletePathSink,
       BiConsumer<Path, Boolean> reconcileSink) {
     this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, reconcileSink,
-        (collection, path) -> jobQueue.enqueueEntries(List.of(entryForLiveEvent(path)), collection));
+        (collection, path) -> jobQueue.enqueueEntries(List.of(entryForLiveEvent(path)), collection),
+        ignored -> {}, (ignored, effect) -> effect.run(),
+        (ignored, path) -> deletePathSink.accept(path),
+        (witness, collection, path) -> jobQueue.enqueueEntries(
+            List.of(entryForLiveEvent(path).withinRoot(witness.root())), collection));
   }
 
   /** The composed Worker supplies an admission-aware sink across generation cutover. */

@@ -562,7 +562,7 @@ final class SyncDirectoryOps {
             if (force
                 || (indexedPathsFinal != null && !indexedPathsFinal.contains(normalizedPath))) {
               // 813 Slice B: the walk already holds the size — no extra stat.
-              collected.add(new JobQueue.EnqueueEntry(file, attrs.size(), provenance));
+              collected.add(new JobQueue.EnqueueEntry(file, attrs.size(), provenance).withinRoot(root));
             }
             return FileVisitResult.CONTINUE;
           }

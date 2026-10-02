@@ -27,6 +27,38 @@ final class SwitchBufferVersionTest {
   @TempDir Path tempDir;
 
   @Test
+  void admittingBoundarySurvivesCandidateJournalRestartAndReplay() throws Exception {
+    Path db = tempDir.resolve("boundary-journal.db");
+    Path root = Files.createDirectory(tempDir.resolve("root"));
+    Path file = Files.writeString(root.resolve("notes.txt"), "content");
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      assertTrue(queue.enqueueAndBufferFileForGeneration(
+          "green", JobQueue.EnqueueEntry.stat(file).withinRoot(root), null, null));
+    }
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      var upsert = SwitchBufferUpsert.decode(
+          queue.listSwitchBufferOpsStrictForGeneration("green").getFirst().payload());
+      assertEquals(root, upsert.ingestionRoot());
+      assertEquals(root, upsert.entry().ingestionRoot());
+      queue.enqueueEntries(List.of(upsert.entry()));
+      assertEquals(root, queue.pollPending(1).getFirst().ingestionRoot());
+    }
+  }
+
+  @Test
+  void boundaryPayloadWithoutSourceWitnessRoundTripsAndRejectsOutsideRoot() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("payload-root"));
+    Path file = root.resolve("notes.txt");
+    var upsert = new SwitchBufferUpsert(file.toString(), null, null, null, null, root);
+    assertEquals(upsert, SwitchBufferUpsert.decode(upsert.encode()));
+    assertEquals(root, SwitchBufferUpsert.decode(upsert.encode()).entry().ingestionRoot());
+    assertThrows(IllegalArgumentException.class,
+        () -> new SwitchBufferUpsert(file.toString(), null, null, null, null, root.resolve("other")));
+  }
+
+  @Test
   void staleSnapshotCannotRemoveAnIdenticalReinsertedKey() throws Exception {
     try (var queue = new SqliteJobQueue(tempDir.resolve("reinsert.db"))) {
       queue.open();

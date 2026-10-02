@@ -5,7 +5,6 @@ import io.justsearch.app.util.TempFileManager;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +60,7 @@ public class PdfImageRenderer implements AutoCloseable {
         renderedImages.clear();
 
         try (PDDocument document = Loader.loadPDF(pdfPath.toFile())) {
-            PDFRenderer renderer = new PDFRenderer(document);
+            BoundedPdfRenderer renderer = new BoundedPdfRenderer(document);
             int totalPages = document.getNumberOfPages();
             int pageCount = Math.min(totalPages, MAX_PAGES);
 
@@ -87,6 +86,9 @@ public class PdfImageRenderer implements AutoCloseable {
 
             for (int page = 0; page < pageCount; page++) {
                 BufferedImage image = renderer.renderImageWithDPI(page, DEFAULT_DPI, ImageType.RGB);
+                // PDFBox may catch an operator's IOException. A refused image must reject the
+                // document even if the renderer returned a page with that image omitted.
+                renderer.requireWithinLimits();
                 Path tempPath = tempFileManager.createTempFile("vdu_page_" + page + "_", ".png");
                 ImageIO.write(image, "PNG", tempPath.toFile());
                 renderedImages.add(tempPath);

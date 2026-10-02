@@ -13,15 +13,14 @@ import java.nio.file.Path;
 
 /** Single Worker-side authority for source admission and freshness classification. */
 final class WorkerIngestionAuthority {
-  private volatile java.util.function.Function<Path, Path> rootResolver = path -> path.getRoot();
-
-  void setRootResolver(java.util.function.Function<Path, Path> resolver) {
-    rootResolver = java.util.Objects.requireNonNull(resolver);
+  SourceAdmission admit(Path filePath) throws IOException {
+    // Legacy rows and explicit file submissions have no directory boundary. Do not invent one
+    // from the volume or from a watcher whose registration may have changed since admission.
+    return admit(filePath, null);
   }
 
-  SourceAdmission admit(Path filePath) throws IOException {
-    Path absolute = filePath.toAbsolutePath().normalize();
-    return admit(filePath, rootResolver.apply(absolute));
+  SourceAdmission admit(io.justsearch.indexerworker.queue.JobQueue.IndexJob job) throws IOException {
+    return admit(job.path(), job.ingestionRoot());
   }
 
   SourceAdmission admit(Path filePath, Path root) throws IOException {

@@ -60,6 +60,8 @@ final class WorkerScanOpsTest {
     assertEquals(2L, queue.enqueuedPaths.size(), "Both regular files enqueued");
     assertTrue(queue.enqueuedPaths.contains(a));
     assertTrue(queue.enqueuedPaths.contains(b));
+    assertTrue(queue.enqueuedEntries.stream().allMatch(entry -> root.equals(entry.ingestionRoot())),
+        "Every admitted descendant carries the scan boundary");
     assertEquals("docs", queue.lastCollection);
   }
 

@@ -1,6 +1,7 @@
 package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
@@ -60,6 +61,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
 
     assertEquals("", resp.getError(), "the walk must not have terminated with an error");
     assertEquals(2, queue.enqueuedEntries.size(), "Both files enqueued as sized entries");
+    assertTrue(queue.enqueuedEntries.stream().allMatch(entry -> root.equals(entry.ingestionRoot())));
     for (JobQueue.EnqueueEntry entry : queue.enqueuedEntries) {
       assertEquals(
           Files.size(entry.path()),

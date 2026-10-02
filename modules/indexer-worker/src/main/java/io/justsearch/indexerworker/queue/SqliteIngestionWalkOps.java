@@ -198,8 +198,8 @@ final class SqliteIngestionWalkOps {
       try (var insert = connection.prepareStatement("""
           INSERT OR REPLACE INTO jobs
             (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator,
-             transport, unit_revision, walk_seen_epoch, planned_source_sha256)
-          VALUES (?, 'PENDING', 0, ?, ?, ?, ?, ?, ?, lower(hex(randomblob(16))), ?, ?)
+             transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
+          VALUES (?, 'PENDING', 0, ?, ?, ?, ?, ?, ?, lower(hex(randomblob(16))), ?, ?, ?)
           """)) {
         insert.setString(1, path); insert.setLong(2, now);
         insert.setString(3, declaredCollection != null ? declaredCollection : priorCollection);
@@ -209,6 +209,7 @@ final class SqliteIngestionWalkOps {
         insert.setString(6, entry.provenance() == null ? null : entry.provenance().originator());
         insert.setString(7, entry.provenance() == null ? null : entry.provenance().transport());
         insert.setLong(8, epoch); insert.setString(9, entry.plannedSourceSha256());
+        insert.setString(10, io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(entry.ingestionRoot()));
         if (insert.executeUpdate() != 1) throw new SQLException("Recorded admission was not written");
         changed = true;
       }

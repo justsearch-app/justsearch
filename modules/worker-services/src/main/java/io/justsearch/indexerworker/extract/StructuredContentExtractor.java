@@ -84,6 +84,13 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   public StructuredExtractionResult extractWithStatus(Path file)
       throws IOException, ContentExtractor.ExtractionException {
     Objects.requireNonNull(file, "file");
+    try (PreparedExtractionInput input = PreparedExtractionInput.prepare(file, policy)) {
+      return extractWithStatus(input.file(), input.expansion());
+    }
+  }
+
+  StructuredExtractionResult extractWithStatus(Path file, ContainerExpansionBudget expansion)
+      throws IOException, ContentExtractor.ExtractionException {
     validateFileForExtraction(file);
 
     if (Files.size(file) == 0) {
@@ -94,7 +101,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     }
 
     ParseContext context = parseContextWithMarkedPdfContent();
-    EmbeddedResourceBudget budget = new EmbeddedResourceBudget(policy, Files.size(file), context);
+    EmbeddedResourceBudget budget =
+        new EmbeddedResourceBudget(policy, Files.size(file), context, expansion);
     context.set(org.apache.tika.parser.Parser.class, parser);
     try {
       StructuredExtractionResult result = extractStructured(file, context);

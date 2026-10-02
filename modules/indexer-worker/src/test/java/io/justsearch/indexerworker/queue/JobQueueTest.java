@@ -49,6 +49,25 @@ final class JobQueueTest {
   }
 
   @Test
+  void admittingBoundarySurvivesMaintenanceAndExplicitReenqueue() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("root"));
+    Path file = Files.writeString(root.resolve("notes.txt"), "content");
+    jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root)));
+    var original = jobQueue.pollPending(1).getFirst();
+    assertEquals(root, original.ingestionRoot());
+    jobQueue.returnUnfinishedClaims(List.of(original));
+
+    jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file)));
+    var maintenance = jobQueue.pollPending(1).getFirst();
+    assertEquals(root, maintenance.ingestionRoot());
+    jobQueue.markDone(maintenance.path());
+    var retry = jobQueue.reenqueue(JobQueue.EnqueueEntry.stat(file));
+    assertEquals(1, retry.accepted());
+    assertEquals("DONE", retry.previousState());
+    assertEquals(root, jobQueue.pollPending(1).getFirst().ingestionRoot());
+  }
+
+  @Test
   void enqueueAddsJobsToQueue() {
     List<Path> paths = List.of(
         Path.of("/path/to/file1.txt"),

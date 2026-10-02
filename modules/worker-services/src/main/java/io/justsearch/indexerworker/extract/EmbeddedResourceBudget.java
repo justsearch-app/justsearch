@@ -19,6 +19,7 @@ final class EmbeddedResourceBudget implements EmbeddedDocumentExtractor {
   private final TikaExtractionPolicy policy;
   private final long maxExpandedBytes;
   private final ParsingEmbeddedDocumentExtractor delegate;
+  private final ContainerExpansionBudget expansion;
   private long expandedBytes;
   private int resources;
   private int depth;
@@ -26,11 +27,17 @@ final class EmbeddedResourceBudget implements EmbeddedDocumentExtractor {
   private String exceeded;
 
   EmbeddedResourceBudget(TikaExtractionPolicy policy, long inputBytes, ParseContext context) {
+    this(policy, inputBytes, context, new ContainerExpansionBudget(policy, inputBytes));
+  }
+
+  EmbeddedResourceBudget(TikaExtractionPolicy policy, long inputBytes, ParseContext context,
+      ContainerExpansionBudget expansion) {
     this.policy = policy;
     // Bound cumulative expansion work as well as expansion relative to the original input.
     this.maxExpandedBytes = (long) Math.min(
         policy.maxInputBytes(), Math.max(1, inputBytes) * policy.maxCompressionRatio());
     this.delegate = new ParsingEmbeddedDocumentExtractor(context);
+    this.expansion = expansion;
     context.set(EmbeddedDocumentExtractor.class, this);
   }
 
@@ -63,6 +70,11 @@ final class EmbeddedResourceBudget implements EmbeddedDocumentExtractor {
           if (expandedBytes > maxExpandedBytes) fail("ARCHIVE_EXPANSION_LIMIT");
           output.write(buffer, 0, read);
         }
+      }
+      try {
+        expansion.inspect(spool);
+      } catch (ContentExtractor.BudgetExceededException limit) {
+        fail(limit.reasonCode());
       }
       try (TikaInputStream bounded = TikaInputStream.get(spool)) {
         delegate.parseEmbedded(bounded, handler, metadata, outputHtml);

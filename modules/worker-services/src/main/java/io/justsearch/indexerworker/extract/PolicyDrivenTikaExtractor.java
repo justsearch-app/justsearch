@@ -100,6 +100,13 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
 
   public ExtractionArtifact extractArtifact(Path file) throws IOException, ExtractionException {
     Objects.requireNonNull(file, "file");
+    try (PreparedExtractionInput input = PreparedExtractionInput.prepare(file, policy)) {
+      return extractPreparedArtifact(input.file(), input.expansion());
+    }
+  }
+
+  private ExtractionArtifact extractPreparedArtifact(Path file, ContainerExpansionBudget expansion)
+      throws IOException, ExtractionException {
     long documentStartedAtNanos = System.nanoTime();
     if (!Files.exists(file)) {
       throw new IOException("File does not exist: " + file);
@@ -126,7 +133,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     }
 
     StructuredContentExtractor.StructuredExtractionResult structured =
-        structuredExtractor.extractWithStatus(file);
+        structuredExtractor.extractWithStatus(file, expansion);
     ExtractionResult result = structured.result();
     StructuredDocumentSummary summary = structured.summary();
     if (isPdfFile(file, detectedMime)) {

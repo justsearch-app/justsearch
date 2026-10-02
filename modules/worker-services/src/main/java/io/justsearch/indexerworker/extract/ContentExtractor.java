@@ -76,10 +76,14 @@ public final class ContentExtractor implements ContentExtractorProvider {
    */
   @Override
   public ExtractionResult extract(Path file) throws IOException, ExtractionException {
-    org.apache.tika.parser.ParseContext context = new org.apache.tika.parser.ParseContext();
-    EmbeddedResourceBudget budget = new EmbeddedResourceBudget(
-        TikaExtractionPolicy.defaults(), Files.size(file), context);
-    return extract(file, context, budget);
+    Objects.requireNonNull(file, "file");
+    TikaExtractionPolicy policy = TikaExtractionPolicy.defaults();
+    try (PreparedExtractionInput input = PreparedExtractionInput.prepare(file, policy)) {
+      org.apache.tika.parser.ParseContext context = new org.apache.tika.parser.ParseContext();
+      EmbeddedResourceBudget budget = new EmbeddedResourceBudget(
+          policy, Files.size(input.file()), context, input.expansion());
+      return extract(input.file(), context, budget);
+    }
   }
 
   ExtractionResult extract(Path file, org.apache.tika.parser.ParseContext context,

@@ -348,6 +348,7 @@ final class WorkerMethvinWatcherTest {
       assertEquals(1, queue.enqueuedEntries.size(), "The event must produce exactly one entry");
       JobQueue.EnqueueEntry entry = queue.enqueuedEntries.get(0);
       assertEquals(stillEmpty, entry.path(), "The entry must carry the event's path");
+      assertEquals(root, entry.ingestionRoot(), "The immutable registration supplies the boundary");
       assertEquals(
           JobQueue.UNKNOWN_SIZE_BYTES,
           entry.sizeBytes(),
