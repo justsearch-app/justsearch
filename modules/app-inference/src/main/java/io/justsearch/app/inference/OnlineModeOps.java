@@ -80,6 +80,8 @@ final class OnlineModeOps {
   // Priority queue for Online Mode (Chat > VDU)
   private final ReentrantLock onlineRequestLock = new ReentrantLock();
   private final GenerativeRequestGate requestGate;
+  private final java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable>
+      generationLifetime;
   private final ExecutorService foregroundRequests;
   private final ExecutorService backgroundRequests;
 
@@ -142,6 +144,21 @@ final class OnlineModeOps {
       Supplier<String> configModelFileName,
       InferenceTelemetryEvents events,
       GenerativeRequestGate requestGate) {
+    this(executors, httpClient, objectMapper, currentMode, serverPort, lastKnownModelId,
+        configModelFileName, events, requestGate, ignored -> () -> {});
+  }
+
+  OnlineModeOps(
+      InferenceExecutorRegistrations executors,
+      HttpClient httpClient,
+      ObjectMapper objectMapper,
+      Supplier<Mode> currentMode,
+      Supplier<Integer> serverPort,
+      Supplier<String> lastKnownModelId,
+      Supplier<String> configModelFileName,
+      InferenceTelemetryEvents events,
+      GenerativeRequestGate requestGate,
+      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.currentMode = currentMode;
@@ -150,6 +167,7 @@ final class OnlineModeOps {
     this.configModelFileName = configModelFileName;
     this.events = events == null ? InferenceTelemetryEvents.noop() : events;
     this.requestGate = Objects.requireNonNull(requestGate, "requestGate");
+    this.generationLifetime = Objects.requireNonNull(generationLifetime, "generationLifetime");
     ExecutorService foregroundRequestExecutor = null;
     ExecutorService backgroundRequestExecutor = null;
     ExecutorService foregroundCallbackExecutor = null;
@@ -273,10 +291,12 @@ final class OnlineModeOps {
       io.justsearch.app.api.EngineWorkHandle owned,
       ExecutorService executor) {
     requireOnline("Chat");
+    GenerationTask generation = new GenerationTask();
 
     return io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
           checkCancelled(owned);
+          generation.start(owned);
           long enqueueNanos = System.nanoTime();
           emitRequestEnqueued(RequestKind.CHAT);
           RequestOutcome outcome = RequestOutcome.ERROR;
@@ -298,7 +318,10 @@ final class OnlineModeOps {
           }
         },
         executor,
-        owned == null ? () -> {} : owned::close);
+        () -> {
+          try { generation.close(); }
+          finally { if (owned != null) owned.close(); }
+        });
   }
 
   CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
@@ -346,10 +369,12 @@ final class OnlineModeOps {
     requireOnline("Vision");
 
     String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+    GenerationTask generation = new GenerationTask();
 
     return io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
           checkCancelled(owned);
+          generation.start(owned);
           long enqueueNanos = System.nanoTime();
           emitRequestEnqueued(RequestKind.VISION);
           RequestOutcome outcome = RequestOutcome.ERROR;
@@ -386,7 +411,10 @@ final class OnlineModeOps {
           }
         },
         executor,
-        owned == null ? () -> {} : owned::close);
+        () -> {
+          try { generation.close(); }
+          finally { if (owned != null) owned.close(); }
+        });
   }
 
   CompletableFuture<String> visionCompletion(
@@ -904,6 +932,7 @@ final class OnlineModeOps {
         };
 
     StreamWorkOwner owner = new StreamWorkOwner(work, trackedOnComplete, trackedOnError);
+    GenerationTask generation = new GenerationTask();
     if (currentMode.get() != Mode.ONLINE) {
       try (owner) {
         owner.fail(new IllegalStateException("Not in Online Mode, current mode is " + currentMode.get()));
@@ -926,6 +955,7 @@ final class OnlineModeOps {
             () -> {
               try {
                 owner.start();
+                generation.start(owner.work());
               // The lock covers the llama-server exchange only; consumer callbacks are pumped off
               // it, and the body read carries an idle deadline so it can never park forever.
               StreamCallbackPump pump =
@@ -1116,7 +1146,10 @@ final class OnlineModeOps {
               return null;
             },
             requestExecutor(owner.work()),
-            owner::close);
+            () -> {
+              try { generation.close(); }
+              finally { owner.close(); }
+            });
       unused.isDone();
     } catch (RuntimeException | Error failure) {
       try (owner) {
@@ -1126,6 +1159,20 @@ final class OnlineModeOps {
   }
 
   // ==================== Unified Streaming (Tempdoc 499) ====================
+
+  /** EngineFutures closes this only on actual producer exit, including cancellation. */
+  private final class GenerationTask implements AutoCloseable {
+    private final java.util.concurrent.atomic.AtomicReference<Runnable> release =
+        new java.util.concurrent.atomic.AtomicReference<>(() -> {});
+
+    private void start(io.justsearch.app.api.EngineWorkHandle work) {
+      if (work != null) {
+        release.set(Objects.requireNonNull(generationLifetime.apply(work), "generation release"));
+      }
+    }
+
+    @Override public void close() { release.getAndSet(() -> {}).run(); }
+  }
 
   /**
    * Unified streaming method. Supports all channels, optional tools, and lenient sentinel mode.

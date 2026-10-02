@@ -213,6 +213,17 @@ public class InferenceLifecycleManager
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       ResolvedConfig resolvedConfig) {
+    this(executorRegistry, config, events, childRegistry, resolvedConfig, ignored -> () -> {});
+  }
+
+  public InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+      InferenceConfig config,
+      InferenceTelemetryEvents events,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      ResolvedConfig resolvedConfig,
+      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+    Objects.requireNonNull(generationLifetime, "generationLifetime");
     this.executorRegistrations = new InferenceExecutorRegistrations(executorRegistry);
     this.events = Objects.requireNonNull(events, "events");
     this.configured = new ConfiguredInference(
@@ -274,7 +285,8 @@ public class InferenceLifecycleManager
               () -> runner.view().lastKnownModelId(),
               () -> servingInference().modelPath().getFileName().toString(),
               this.events,
-              requestGate);
+              requestGate,
+              generationLifetime);
       openedServer =
           new LlamaServerOps(
               executorRegistrations,

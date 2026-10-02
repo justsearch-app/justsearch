@@ -73,12 +73,46 @@ public final class EngineRoot implements WorkerHost {
   private final EngineResourcePolicy resources;
   private final EngineAdmissionController admission;
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
+  private volatile ForegroundLoadGate foregroundLoadGate;
   private final io.justsearch.core.component.EngineComponentRegistry components;
   private final io.justsearch.core.component.ComponentHandle indexComponent;
   private final io.justsearch.core.component.ComponentHandle encoderComponent;
 
   /** Process lifetime, deliberately independent of the restartable index-half close. */
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
+
+  /** Carries the pacing callback through existing bootstrap wiring without exposing the gauge. */
+  private final class GenerationExecutors implements io.justsearch.core.execution.EngineExecutorRegistry,
+      io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.GenerationLifetimeSource {
+    private final io.justsearch.core.execution.EngineExecutorRegistry delegate;
+
+    private GenerationExecutors(io.justsearch.core.execution.EngineExecutorRegistry delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override public java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable>
+        generationLifetime() {
+      return work -> {
+        ForegroundLoadGate gate = foregroundLoadGate;
+        // Before index composition there is no indexing loop to pace. Once composed, generation
+        // and retrieval use this same gate, and each release stays bound to its captured gate.
+        return gate == null ? () -> {} : gate.callOwned(work, lifetime -> lifetime.retain());
+      };
+    }
+
+    @Override public Registration register(io.justsearch.core.execution.EngineExecutorSpec spec) {
+      return delegate.register(spec);
+    }
+    @Override public Limits limits(io.justsearch.core.execution.EngineExecutorSpec.Kind kind) {
+      return delegate.limits(kind);
+    }
+    @Override public int maxConcurrentWork() { return delegate.maxConcurrentWork(); }
+    @Override public int retryAfterSeconds() { return delegate.retryAfterSeconds(); }
+    @Override public io.justsearch.core.execution.EngineExecutorSnapshot snapshot() {
+      return delegate.snapshot();
+    }
+    @Override public void close() { delegate.close(); }
+  }
 
   /** Final process teardown is separate from this host's restartable index close. */
   public io.justsearch.app.api.EngineProcessResources processResources() { return processResources; }
@@ -461,7 +495,7 @@ public final class EngineRoot implements WorkerHost {
       return owner == null ? null : owner.retainedEncoderCount();
     });
     this.admission = processResources.admission();
-    this.executors = processResources.executors();
+    this.executors = new GenerationExecutors(processResources.executors());
     this.components = processResources.components();
     this.indexComponent = new io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle(
         components.register(new io.justsearch.core.component.ComponentSpec("index", true,
@@ -530,6 +564,9 @@ public final class EngineRoot implements WorkerHost {
       }
       this.server = started;
     }
+    // THE gauge the indexing loop paces off, rather than IndexingPacing's pre-start orphan.
+    ForegroundLoadGate gate = new ForegroundLoadGate(started.foregroundLoad());
+    foregroundLoadGate = gate;
     started.onTerminalWriterFailure(
         failure -> acceptTerminalWriterFailure(started, failure));
     started.onMigrationRestart(() -> requestRestart(started));
@@ -552,16 +589,15 @@ public final class EngineRoot implements WorkerHost {
       }
       if (closed) {
         synchronized (terminalWriterFaultOwnerLock) {
-          if (this.server == started) this.server = null;
+          if (this.server == started) {
+            this.server = null;
+            foregroundLoadGate = null;
+          }
         }
       }
       throw failure;
     }
 
-    // THE gauge the indexing loop paces off, read from the field that owns it rather than from
-    // IndexingPacing: the pacing field starts as IndexingPacing.unthrottled(), whose gauge is a
-    // fresh orphan, and is only replaced with the real policy partway through start().
-    ForegroundLoadGate gate = new ForegroundLoadGate(started.foregroundLoad());
     EngineKnowledgeClient built =
         new EngineKnowledgeClient(executors, started::appServices, gate, deadlineMs, batchSize, telemetry,
             () -> requestRestart(started), admission, authority.roots(),
@@ -1007,7 +1043,10 @@ public final class EngineRoot implements WorkerHost {
         throw new IllegalStateException("Interrupted confirming in-process index close", e);
       }
       synchronized (terminalWriterFaultOwnerLock) {
-        if (server == s) server = null;
+        if (server == s) {
+          server = null;
+          foregroundLoadGate = null;
+        }
       }
     }
   }

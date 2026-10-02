@@ -17,6 +17,19 @@ import org.slf4j.Logger;
 public final class BootstrapInferenceFactory {
   private BootstrapInferenceFactory() {}
 
+  /** Optional composition capability carried by the process-owned executor dependency. */
+  public interface GenerationLifetimeSource {
+    /** Begin at producer entry; the returned single-use release belongs to actual producer exit. */
+    java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime();
+  }
+
+  /** Fixtures without an index half have no indexing pacing consumer. */
+  public static java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable>
+      generationLifetime(io.justsearch.core.execution.EngineExecutorRegistry executors) {
+    return executors instanceof GenerationLifetimeSource source
+        ? source.generationLifetime() : ignored -> () -> {};
+  }
+
   /**
    * Creates the InferenceLifecycleManager from captured configuration. Tempdoc 412 Phase 4
    * overload: now takes a {@link Telemetry} reference so the catalog adapter can be wired. The
@@ -76,7 +89,8 @@ public final class BootstrapInferenceFactory {
       InferenceTelemetryEvents events = buildEvents(telemetry);
       // Note: the persistent InferenceTransitionLog is installed downstream in the
       // composition root (AppFacadeBootstrap) where the head's dataDir is known.
-      return new InferenceLifecycleManager(executors, config, events, childRegistry, resolvedConfig);
+      return new InferenceLifecycleManager(executors, config, events, childRegistry, resolvedConfig,
+          generationLifetime(executors));
 
     } catch (Exception e) {
       if (e instanceof io.justsearch.core.execution.EngineExecutorRejectedException refusal) throw refusal;
