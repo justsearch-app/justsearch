@@ -2288,11 +2288,21 @@ public class InferenceLifecycleManager
   /** Closes this manager and releases all resources. */
   @Override
   public void close() {
-    if (stopServerOnClose) stopServerForTerminalShutdown(Duration.ofSeconds(12));
+    // The lock-independent physical stop must not skip the ordinary cleanup below: a failed
+    // pre-stop (survivor past the deadline, failed exit observation) is carried into the same
+    // aggregation as a failed in-lock stop and rethrown only after every resource is closed.
+    RuntimeException preStopFailure = null;
+    if (stopServerOnClose) {
+      try {
+        stopServerForTerminalShutdown(Duration.ofSeconds(12));
+      } catch (RuntimeException failure) {
+        preStopFailure = failure;
+      }
+    }
     synchronized (runner.lock()) {
       closed = true;
       LOG.info("Closing InferenceLifecycleManager (stopServer={})...", stopServerOnClose);
-      RuntimeException terminationFailure = null;
+      RuntimeException terminationFailure = preStopFailure;
       try {
         serverOps.closeUnregisteredChild();
         if (stopServerOnClose) {
@@ -2304,7 +2314,8 @@ public class InferenceLifecycleManager
                   + " registry rather than reloading the model.");
         }
       } catch (RuntimeException failure) {
-        terminationFailure = failure;
+        if (terminationFailure == null) terminationFailure = failure;
+        else terminationFailure.addSuppressed(failure);
       }
       onlineOps.shutdown();
       serverOps.shutdown();

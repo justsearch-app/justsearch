@@ -128,6 +128,26 @@ final class InferenceLifecycleManagerShutdownTest {
     }
   }
 
+  @Test
+  @DisplayName("a failed terminal pre-stop still runs ordinary cleanup before it is reported")
+  void failedTerminalPreStopStillClosesManagerResources() {
+    try (MockedConstruction<LlamaServerOps> construction =
+        Mockito.mockConstruction(LlamaServerOps.class, (ops, context) ->
+            Mockito.doThrow(new IllegalStateException("child survived the deadline"))
+                .when(ops).stopServerForTerminalShutdown(Mockito.any()))) {
+      InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
+      LlamaServerOps fakeServerOps = construction.constructed().getFirst();
+      manager.setStopServerOnClose(true);
+
+      var failure = assertThrows(IllegalStateException.class, manager::close);
+
+      assertTrue(failure.getMessage().contains("child survived the deadline"), failure.getMessage());
+      // Ordinary cleanup ran despite the pre-stop failure.
+      verify(fakeServerOps).stopLlamaServer();
+      verify(fakeServerOps).shutdown();
+    }
+  }
+
   private static void assertCloseStopsServer(boolean stop) {
     try (MockedConstruction<LlamaServerOps> construction =
         Mockito.mockConstruction(LlamaServerOps.class)) {
