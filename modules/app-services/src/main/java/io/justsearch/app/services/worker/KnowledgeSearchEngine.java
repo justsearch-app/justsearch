@@ -676,8 +676,11 @@ final class KnowledgeSearchEngine {
     statusCache.refreshFacetSnapshotIfStale(engineContext, client);
 
     int requestedLimit = req.limit() == null ? 10 : Math.max(1, req.limit());
-    // When reranking is enabled, fetch more candidates to improve reranking quality
-    int searchLimit = rerankConfig.isReady()
+    SearchSort searchSort = SearchPipelinePresets.parseSortOrDefault(req.sort());
+    boolean relevanceSort = searchSort == SearchSort.SEARCH_SORT_RELEVANCE;
+    // Field-sorted pages must keep the worker's page boundary: overfetching then trimming
+    // either loses the lookahead cursor or leaves it positioned after undisplayed candidates.
+    int searchLimit = relevanceSort && rerankConfig.isReady()
         ? Math.max(requestedLimit, rerankConfig.topK())
         : requestedLimit;
 
@@ -781,7 +784,7 @@ final class KnowledgeSearchEngine {
             // Tempdoc 549 Phase D2: the REST `debug` flag requests the numeric per-hit detail
             // tier — map it to include_detail (the deprecated gRPC debug field retires in E1).
             .setIncludeDetail(Boolean.TRUE.equals(req.debug()))
-            .setSort(SearchPipelinePresets.parseSortOrDefault(req.sort()))
+            .setSort(searchSort)
             .setQuerySyntax(querySyntax)
             .setIncludeExcerpts(Boolean.TRUE.equals(req.includeExcerpts()))
             .setPipeline(SearchPipelinePresets.toProtoPipelineConfig(pipelineConfig, denseAuto));
@@ -944,7 +947,7 @@ final class KnowledgeSearchEngine {
     boolean lambdaMartApplied = false;
     String lambdaMartSkipReason = null;
     long lambdaMartNs = 0;
-    if (!pipelineConfig.lambdamartEnabled()) {
+    if (!relevanceSort || !pipelineConfig.lambdamartEnabled()) {
       lambdaMartSkipReason = "PIPELINE_NOT_ELIGIBLE";
     } else if (lambdaMartReranker == null) {
       lambdaMartSkipReason = "NO_MODEL";
@@ -1004,7 +1007,9 @@ final class KnowledgeSearchEngine {
 
     // 256-F2: LambdaMART + cross-encoder co-execution — cross-encoder runs on LambdaMART's
     // reordered output (standard 2-stage cascaded reranking pattern).
-    if (!isRerankerEligible(
+    if (!relevanceSort) {
+      crossEncoderSkipReason = CrossEncoderSkipReason.PIPELINE_NOT_ELIGIBLE;
+    } else if (!isRerankerEligible(
         pipelineConfig, rerankConfig, results.size(), statusCache.avgContentLengthChars(), effectiveQueryType)) {
       if (effectiveQueryType == QueryType.NAVIGATIONAL) {
         crossEncoderSkipReason = CrossEncoderSkipReason.NAVIGATIONAL_QUERY;
