@@ -20,7 +20,7 @@ import { exerciseReconfigureRefresh } from './reconfigure-refresh-scenario.mjs';
 import { exerciseQueryReconfigure } from './query-reconfigure.mjs';
 import { exerciseQueryRoleScenario } from './query-role-scenario.mjs';
 import { exerciseIndexLockRecovery } from './index-lock-recovery-scenario.mjs';
-import { assertFixtureFreeSpace, pruneInstallerModelTrees, pruneRegenerableModelCaches } from './prune-model-caches.mjs';
+import { assertFixtureFreeSpace, pruneInstallerModelTrees } from './prune-model-caches.mjs';
 import {
   exerciseGenerativeRecovery,
   stagePrivateGenerativeRuntime,
@@ -984,9 +984,6 @@ try {
     throw new Error(`identity-checked dev-runner cleanup failed: ${stopped.stdout} ${stopped.stderr}`);
   }
   if (process.env.JUSTSEARCH_FIXTURE_KEEP_MODEL_CACHES !== '1') {
-    if (modelLiveAB) {
-      console.log('MODEL_CACHE_PRUNED', JSON.stringify(pruneRegenerableModelCaches(work)));
-    }
     // Installed model trees are per-run hard links. When this script chose the work directory it
     // owns it and removes them once the owned run has stopped. A caller-provided directory
     // (JUSTSEARCH_WRITER_RECOVERY_WORK) may be reused by the caller's next scenario, so that

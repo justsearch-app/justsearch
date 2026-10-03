@@ -904,7 +904,7 @@ final class EngineSupervisedRecoveryE2ETest {
       throw failure;
     } finally {
       try {
-        pruneStoppedModelCaches(repo, work);
+        pruneStoppedInstalledModelTrees(repo, work);
       } catch (Exception cleanupFailure) {
         if (primary == null) throw cleanupFailure;
         primary.addSuppressed(cleanupFailure);
@@ -912,7 +912,7 @@ final class EngineSupervisedRecoveryE2ETest {
     }
   }
 
-  private static void pruneStoppedModelCaches(Path repo, Path work) throws Exception {
+  private static void pruneStoppedInstalledModelTrees(Path repo, Path work) throws Exception {
     Path runs = work.resolve("state/runs");
     if (Files.isDirectory(runs)) {
       try (var entries = Files.list(runs)) {
@@ -920,13 +920,13 @@ final class EngineSupervisedRecoveryE2ETest {
           Path report = run.resolve("stop-report.json");
           if (!Files.isRegularFile(report)
               || !MAPPER.readTree(Files.readString(report)).path("portsClosed").asBoolean(false)) {
-            throw new IllegalStateException("Cannot prune model caches before owned run has stopped: " + run);
+            throw new IllegalStateException("Cannot prune installed model trees before owned run has stopped: " + run);
           }
         }
       }
     }
     if ("1".equals(System.getenv("JUSTSEARCH_FIXTURE_KEEP_MODEL_CACHES"))) return;
-    Path outputFile = work.resolve("model-cache-prune-output.txt");
+    Path outputFile = work.resolve("installed-model-tree-prune-output.txt");
     ProcessBuilder prune = new ProcessBuilder("node",
         repo.resolve("scripts/supervisor-conformance/prune-model-caches.mjs").toString(),
         work.toString()).directory(repo.toFile()).redirectErrorStream(true)
@@ -935,11 +935,11 @@ final class EngineSupervisedRecoveryE2ETest {
     if (!process.waitFor(30, TimeUnit.SECONDS)) {
       process.destroyForcibly();
       process.waitFor(10, TimeUnit.SECONDS);
-      throw new IllegalStateException("Model cache prune exceeded 30 seconds");
+      throw new IllegalStateException("Installed model tree prune exceeded 30 seconds");
     }
     String output = Files.readString(outputFile, StandardCharsets.UTF_8);
     if (process.exitValue() != 0 || !output.contains("MODEL_CACHE_PRUNED ")) {
-      throw new IllegalStateException("Model cache prune failed: " + output);
+      throw new IllegalStateException("Installed model tree prune failed: " + output);
     }
     System.out.print(output);
   }
@@ -1270,7 +1270,7 @@ final class EngineSupervisedRecoveryE2ETest {
       try {
         stopOwnedRun(repo, work);
         if ("writer".equals(scenario) || scenario.startsWith("installer-")) {
-          pruneStoppedModelCaches(repo, work);
+          pruneStoppedInstalledModelTrees(repo, work);
         }
       } catch (Exception cleanupFailure) {
         if (primaryFailure == null) {
