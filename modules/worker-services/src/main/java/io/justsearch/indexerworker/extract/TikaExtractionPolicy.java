@@ -121,6 +121,11 @@ public record TikaExtractionPolicy(
         base.excludedMimeTypes());
   }
 
+  /** Explicit exclusion only (no allow-list), for supplemental types such as a declared OPC main type. */
+  public boolean excludesMimeType(String mimeType) {
+    return excludedMimeTypes.contains(normalizeMime(mimeType));
+  }
+
   public boolean permitsMimeType(String mimeType) {
     String normalized = normalizeMime(mimeType);
     if (excludedMimeTypes.contains(normalized)) {

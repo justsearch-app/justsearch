@@ -26,30 +26,95 @@ class PreparedExtractionInputTest {
   @TempDir Path tempDir;
 
   @Test
-  void nonContainersExtractWithoutSnapshotFilesThroughEveryEntryPoint() throws Exception {
+  void streamTextAvoidsSnapshotsAndPdfReusesOneThroughEveryEntryPoint() throws Exception {
     List<Path> files = List.of(
-        Files.writeString(tempDir.resolve("plain.txt"), "searchable ordinary text"),
+        Files.writeString(tempDir.resolve("plain.txt"), "searchable ordinary text ".repeat(512)
+            .substring(0, 10 * 1024)),
         Files.writeString(tempDir.resolve("page.html"), "<html><body>searchable html</body></html>"),
         Files.write(tempDir.resolve("document.pdf"), pdf()));
     for (Path file : files) {
+      int expectedSnapshots = file.getFileName().toString().endsWith(".pdf") ? 1 : 0;
       var factory = new ObservedFactory();
       try (var flat = new ContentExtractor(100_000, factory)) {
         assertFalse(flat.extract(file).content().isBlank());
         assertEquals(1, factory.preparations);
-        assertTrue(factory.snapshots.isEmpty());
+        assertEquals(expectedSnapshots, factory.snapshots.size());
+        for (Path snapshot : factory.snapshots) assertFalse(Files.exists(snapshot));
       }
       factory = new ObservedFactory();
       try (var structured = new StructuredContentExtractor(100_000,
           TikaExtractionPolicy.defaults(), factory)) {
         assertFalse(structured.extract(file).content().isBlank());
         assertEquals(1, factory.preparations);
-        assertTrue(factory.snapshots.isEmpty());
+        assertEquals(expectedSnapshots, factory.snapshots.size());
+        for (Path snapshot : factory.snapshots) assertFalse(Files.exists(snapshot));
       }
       factory = new ObservedFactory();
       try (var extractor = extractor(TikaExtractionPolicy.defaults(), factory)) {
         assertFalse(extractor.extractArtifact(file).result().content().isBlank());
         assertEquals(1, factory.preparations);
-        assertTrue(factory.snapshots.isEmpty(), "Includes PDF visual evidence, with OCR disabled");
+        assertEquals(expectedSnapshots, factory.snapshots.size(),
+            "PDF parsing and visual evidence must share one private file");
+        for (Path snapshot : factory.snapshots) assertFalse(Files.exists(snapshot));
+      }
+    }
+  }
+
+
+  @Test
+  void fileLazilyMaterializesCapturedBytesOnceAndDeletesThemOnClose() throws Exception {
+    byte[] original = bytes("captured private text ".repeat(512));
+    Path source = Files.write(tempDir.resolve("Original.TXT"), original);
+    var factory = new ObservedFactory();
+    try (factory) {
+      try (var input = factory.prepare(source, TikaExtractionPolicy.defaults())) {
+        assertTrue(factory.snapshots.isEmpty());
+        assertFalse(input.isDiskBacked());
+        assertEquals("Original.TXT", input.name());
+        assertEquals(original.length, input.size());
+        Files.delete(source);
+        Path snapshot = input.file();
+        assertEquals(snapshot, input.file());
+        assertEquals(1, factory.snapshots.size());
+        assertFalse(source.equals(snapshot));
+        assertArrayEquals(original, Files.readAllBytes(snapshot));
+        for (int replay = 0; replay < 2; replay++) {
+          try (var stream = input.openStream()) {
+            assertArrayEquals(original, stream.readAllBytes());
+          }
+        }
+      }
+      assertFalse(Files.exists(factory.snapshots.getFirst()));
+    }
+    assertFalse(Files.exists(factory.snapshots.getFirst().getParent()));
+  }
+
+  @Test
+  void allowListedDetectionMatchesFileDetectionWithOriginalNameAndCapturedLength() throws Exception {
+    var samples = java.util.Map.of(
+        "plain.txt", "searchable ordinary text",
+        "notes.md", "# Searchable heading\n\nordinary text",
+        "table.csv", "name,value\nsearchable,1\n",
+        "page.html", "<html><body>searchable html</body></html>",
+        "document.xml", "<?xml version=\"1.0\"?><document>searchable xml</document>",
+        "document.json", "{\"text\":\"searchable json\"}");
+    var tika = new org.apache.tika.Tika(TextNameMagicConflictDetector.wrapDefault());
+    for (var sample : samples.entrySet()) {
+      Path source = Files.writeString(tempDir.resolve(sample.getKey()), sample.getValue());
+      String expected = tika.detect(source);
+      assertTrue(PreparedExtractionInput.STREAM_ONLY_MIME_TYPES.contains(expected), expected);
+      var factory = new ObservedFactory();
+      try (factory; var input = factory.prepare(source, TikaExtractionPolicy.defaults())) {
+        Files.delete(source);
+        assertEquals(sample.getKey(), input.metadata().get(
+            org.apache.tika.metadata.TikaCoreProperties.RESOURCE_NAME_KEY));
+        assertEquals(Long.toString(input.size()), input.metadata().get(
+            org.apache.tika.metadata.Metadata.CONTENT_LENGTH));
+        assertEquals(expected, input.detect(tika));
+        try (var stream = input.openParserStream(tika)) {
+          assertArrayEquals(bytes(sample.getValue()), stream.readAllBytes());
+        }
+        assertTrue(factory.snapshots.isEmpty(), sample.getKey());
       }
     }
   }
@@ -176,7 +241,8 @@ class PreparedExtractionInputTest {
   void exactByteBoundaryIsAcceptedAndReplaysWithoutReopeningSource() throws Exception {
     byte[] original = bytes("x".repeat(8192));
     Path source = Files.write(tempDir.resolve("boundary.txt"), original);
-    try (var input = PreparedExtractionInput.prepare(source, sizePolicy(original.length))) {
+    try (var factory = new PreparedExtractionInput.Factory();
+        var input = factory.prepare(source, sizePolicy(original.length))) {
       Files.delete(source);
       assertEquals(original.length, input.size());
       for (int attempt = 0; attempt < 2; attempt++) {

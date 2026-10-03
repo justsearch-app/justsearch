@@ -70,7 +70,8 @@ class ArchiveExtractionLimitsTest {
   @Test
   void preparedInputCannotBeReplacedBetweenInspectionAndParsing() throws Exception {
     Path source = archive("source.zip", Map.of("ok.txt", bytes("original text")));
-    try (var input = PreparedExtractionInput.prepare(source, TikaExtractionPolicy.defaults())) {
+    try (var factory = new PreparedExtractionInput.Factory();
+        var input = factory.prepare(source, TikaExtractionPolicy.defaults())) {
       Files.write(source, zip(Map.of("large.txt", bytes("Z".repeat(128 * 1024)))));
       var context = new org.apache.tika.parser.ParseContext();
       var budget = new EmbeddedResourceBudget(TikaExtractionPolicy.defaults(),

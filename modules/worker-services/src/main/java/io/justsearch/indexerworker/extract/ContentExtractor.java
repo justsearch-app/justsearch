@@ -109,7 +109,7 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
 
     // Stricter limit for Office documents — POI expands them 10-20x in memory.
     // Only pay the tika.detect() cost for files that exceed the Office threshold.
-    if (fileSize > MAX_OFFICE_FILE_SIZE && isOfficeMimeType(detectPrepared(input))) {
+    if (fileSize > MAX_OFFICE_FILE_SIZE && input.isOfficeForLimits(tika)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
       throw new BudgetExceededException(
           "Office file too large: "
@@ -126,10 +126,9 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
 
     log.debug("Extracting content from: {} ({} bytes)", file.getFileName(), fileSize);
 
-    Metadata metadata = new Metadata();
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.getFileName().toString());
+    Metadata metadata = input.metadata();
 
-    try (InputStream is = input.openStream()) {
+    try (InputStream is = input.openParserStream(tika)) {
       org.apache.tika.sax.BodyContentHandler handler =
           new org.apache.tika.sax.BodyContentHandler(maxContentLength);
       context.set(org.apache.tika.parser.Parser.class, tika.getParser());
@@ -168,12 +167,6 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
     } catch (RuntimeException | IOException e) {
       budget.check();
       throw e;
-    }
-  }
-
-  private String detectPrepared(PreparedExtractionInput input) throws IOException {
-    try (InputStream stream = input.openStream()) {
-      return tika.detect(stream, input.source().getFileName().toString());
     }
   }
 
@@ -323,6 +316,7 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
     return mimeType != null
         && (mimeType.contains("officedocument")
             || mimeType.contains("msword")
+            || mimeType.contains("ms-word")
             || mimeType.contains("ms-excel")
             || mimeType.contains("ms-powerpoint"));
   }
