@@ -349,6 +349,21 @@ class PreparedExtractionConsumerTest {
           declared);
       assertFalse(policy.excludesMimeType(declared));
     }
+    // Through production admission: the extractor must not refuse it as an excluded MIME type.
+    try (var extractor = extractor(policy, sourceDeletingFactory())) {
+      var structuredField = PolicyDrivenTikaExtractor.class.getDeclaredField("structuredExtractor");
+      structuredField.setAccessible(true);
+      var parserField = StructuredContentExtractor.class.getDeclaredField("parser");
+      parserField.setAccessible(true);
+      parserField.set(structuredField.get(extractor),
+          org.mockito.Mockito.mock(org.apache.tika.parser.AutoDetectParser.class));
+      try {
+        extractor.extract(source);
+      } catch (ContentExtractor.ExtractionException e) {
+        org.junit.jupiter.api.Assertions.assertNotEquals(
+            "MIME type excluded by extraction policy", e.getMessage());
+      }
+    }
   }
 
   @Test
