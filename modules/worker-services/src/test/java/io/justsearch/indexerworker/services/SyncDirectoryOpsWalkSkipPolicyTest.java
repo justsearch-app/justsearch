@@ -42,7 +42,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     RecordingQueue queue = new RecordingQueue();
     SyncDirectoryOps ops = new SyncDirectoryOps(reads, null, null, queue, null);
 
-    var response = ops.execute(root.toString(), false, null);
+    var response = ops.execute(root.toString(), false, null, () -> false);
 
     assertTrue(response.getSkipped());
     assertTrue(response.getDeleteDetectionUnverified());
@@ -105,7 +105,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
 
     // force=true so the walk enqueues every non-skipped file unconditionally (no indexed-path
     // lookup, which would require a real readPathOps).
-    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null);
+    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null, () -> false);
 
     assertEquals("", resp.getError(), "the walk must not have terminated with an error");
     assertEquals(List.of(keep), queue.enqueuedPaths, "Only the non-policy-skipped file is enqueued");
@@ -125,7 +125,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     RecordingQueue queue = new RecordingQueue();
     SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, null);
 
-    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null);
+    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null, () -> false);
 
     assertEquals("", resp.getError(), "the walk must not have terminated with an error");
     assertEquals(2, queue.enqueuedEntries.size(), "Both files enqueued as sized entries");
@@ -156,7 +156,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     JobQueue.EnqueueProvenance provenance =
         new JobQueue.EnqueueProvenance("agent", "AGENT_LOOP");
 
-    SyncDirectoryResponse response = ops.execute(root.toString(), true, provenance);
+    SyncDirectoryResponse response = ops.execute(root.toString(), true, provenance, () -> false);
 
     assertEquals("", response.getError());
     assertEquals(2, queue.enqueuedEntries.size());
