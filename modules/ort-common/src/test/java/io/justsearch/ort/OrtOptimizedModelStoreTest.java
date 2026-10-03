@@ -221,22 +221,15 @@ final class OrtOptimizedModelStoreTest {
   }
 
   @Test
-  void windowsJunctionAncestorRefusesLegacyAndVersionDeletion() throws Exception {
+  void windowsJunctionAncestorRefusesLegacyDeletion() throws Exception {
     Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Windows"));
     Path source = model("junction-target", 65);
     Path legacy = Files.writeString(source.resolveSibling("model.onnx.optimized"), "keep");
-    Files.createDirectories(temp.resolve("cache"));
-    Files.createDirectory(temp.resolve("cache/.ort-optimized-store-v1"));
-    Path junction = temp.resolve("cache/old");
-    Process process = new ProcessBuilder("cmd.exe", "/c", "mklink", "/J",
-        junction.toString(), source.getParent().toString()).redirectErrorStream(true).start();
-    assertTrue(process.waitFor(10, TimeUnit.SECONDS));
-    assertEquals(0, process.exitValue());
+    Path junction = temp.resolve("linked-source");
+    windowsJunction(junction, source.getParent());
     try {
       assertThrows(IOException.class,
           () -> OrtOptimizedModelStore.cleanupLegacy(junction.resolve("model.onnx")));
-      load(store("1.0", 4096), model("source", 66), "cpu", OptLevel.EXTENDED_OPT,
-          new AtomicInteger());
       assertTrue(Files.exists(junction, java.nio.file.LinkOption.NOFOLLOW_LINKS));
       assertEquals("keep", Files.readString(legacy));
     } finally {
@@ -247,14 +240,45 @@ final class OrtOptimizedModelStoreTest {
 
   @Test
   void oldVersionCleanupRefusesLinkedTreesWithoutDeletingTheirTargets() throws Exception {
-    Path outside = model("outside", 65).getParent();
-    Files.createDirectories(temp.resolve("cache"));
+    assertOldVersionLinkPreserved(false);
+  }
+
+  @Test
+  void oldVersionCleanupRefusesWindowsJunctionsWithOtherwiseDeletableLayouts() throws Exception {
+    Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Windows"));
+    assertOldVersionLinkPreserved(true);
+  }
+
+  private void assertOldVersionLinkPreserved(boolean junction) throws Exception {
+    Path outside = temp.resolve("outside/0.9");
+    Path control = temp.resolve("cache/0.8");
+    List<Path> targets = new ArrayList<>();
+    String metadata = "{\"sourceSize\":5,\"created\":1,\"lastUsed\":1}";
+    for (Path version : List.of(outside, control)) {
+      for (String provider : List.of("cpu-BASIC_OPT", "cpu-EXTENDED_OPT", "cuda-EXTENDED_OPT")) {
+        Path entry = Files.createDirectories(version.resolve(provider).resolve("a".repeat(64)));
+        Path graph = Files.writeString(entry.resolve("model.onnx"), "keep");
+        Files.writeString(entry.resolve("entry.json"), metadata);
+        if (version.equals(outside)) targets.add(graph);
+      }
+    }
     Files.createDirectory(temp.resolve("cache/.ort-optimized-store-v1"));
-    symbolicLink(temp.resolve("cache/old"), outside);
-    Path model = model("source", 66);
-    load(store("1.0", 4096), model, "cpu", OptLevel.EXTENDED_OPT, new AtomicInteger());
-    assertTrue(Files.isRegularFile(outside.resolve("model.onnx")));
-    assertTrue(Files.isSymbolicLink(temp.resolve("cache/old")));
+    Path link = temp.resolve("cache/0.9");
+    if (junction) windowsJunction(link, outside);
+    else symbolicLink(link, outside);
+    try {
+      load(store("1.0", 4096), model("source", 66), "cpu", OptLevel.EXTENDED_OPT,
+          new AtomicInteger());
+      assertFalse(Files.exists(control, java.nio.file.LinkOption.NOFOLLOW_LINKS));
+      assertTrue(Files.exists(link, java.nio.file.LinkOption.NOFOLLOW_LINKS));
+      if (!junction) assertTrue(Files.isSymbolicLink(link));
+      for (Path graph : targets) {
+        assertEquals("keep", Files.readString(graph));
+        assertEquals(metadata, Files.readString(graph.resolveSibling("entry.json")));
+      }
+    } finally {
+      Files.deleteIfExists(link);
+    }
   }
 
   @Test
@@ -809,6 +833,13 @@ final class OrtOptimizedModelStoreTest {
     try (var walk = Files.walk(temp.resolve("cache"))) {
       assertFalse(walk.anyMatch(p -> p.getFileName().toString().contains(".tmp")));
     }
+  }
+
+  private static void windowsJunction(Path link, Path target) throws IOException, InterruptedException {
+    Process process = new ProcessBuilder("cmd.exe", "/c", "mklink", "/J",
+        link.toString(), target.toString()).redirectErrorStream(true).start();
+    assertTrue(process.waitFor(10, TimeUnit.SECONDS));
+    assertEquals(0, process.exitValue());
   }
 
   private static void symbolicLink(Path link, Path target) {
