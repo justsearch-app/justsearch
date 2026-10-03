@@ -577,17 +577,20 @@
     },
     {
       "id": "feedback-records",
-      "pathVerification": "LITERAL",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "HeadAssembly resolves the feedback NDJSON archives under DATA_DIR. FeatureSnapshotLookup derives the sibling lookup directory by appending .lookup to the archive filename, then composes generation UUID directories and SHA-256-keyed row paths.",
       "encryption": "SEALED_BY_STORE_CIPHER",
+      "encryptionNote": "Archive records and lookup identity rows use the same feedback StoreCipher. Lookup CURRENT, ready-v1 and archive-size-v1 metadata contain only generation identifiers, readiness and archive byte length; lookup filenames are SHA-256 keys.",
       "catalogDirName": "feedback",
       "owner": "HEAD",
       "root": "DATA_DIR",
       "ownedPaths": [
-        "feedback/*.ndjson"
+        "feedback/*.ndjson",
+        "feedback/*.ndjson.lookup/**"
       ],
       "recoverability": "AUTHORED",
       "upgradeHandling": "READ_IN_PLACE",
-      "format": "encrypted append-only NDJSON record envelope v1",
+      "format": "encrypted append-only NDJSON record envelope v1 with a derived sealed identity lookup row schema v1 and generation/coverage metadata",
       "currentVersion": 1,
       "readableLegacyVersions": [
         0
@@ -595,13 +598,15 @@
       "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/feedback/NdjsonAppendStore.java",
       "versionSource": { "file": "modules/app-services/src/main/java/io/justsearch/app/services/feedback/NdjsonAppendStore.java", "symbol": "CURRENT_SCHEMA_VERSION" },
       "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/feedback/NdjsonAppendStoreTest.java",
-      "writeMode": "APPEND_ONLY",
-      "atomicity": "SINGLE_APPEND",
+      "writeMode": "APPEND_WITH_DERIVED_LOOKUP_REPLACEMENT",
+      "atomicity": "SINGLE_ARCHIVE_APPEND_AND_ATOMIC_LOOKUP_REPLACE",
       "corruptionPolicy": "FAIL_LOUD_ON_UNREADABLE_OR_FUTURE_LINE",
+      "corruptionNote": "The authored archive retains its fail-loud line policy. The lookup is a durable DERIVED projection, not temp scratch: missing, invalid or stale generation/coverage metadata triggers backfill from the archive; unreadable rows refuse lookup and unsupported row versions return no identity. Locked encryption refuses lookup. Failed projection maintenance preserves the archive and invalidates coverage. Unpublished generations are deleted on backfill retry, and replacement temp files are deleted in finally.",
       "reconciliation": "PRESERVE_OLD_LINES_AND_VERSION_NEW_LINES",
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/feedback/NdjsonAppendStore.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/feedback/FeatureSnapshotLookup.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java"
       ],
       "tests": [
@@ -1784,6 +1789,18 @@
     }
   ],
   "nonDurableWriteSites": [
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/EmbeddedResourceBudget.java",
+      "reason": "JVM/OS temp scratch: each justsearch-embedded-*.bin file materializes a budget-bounded embedded resource for the current parse only. parseEmbedded deletes it in finally after closing streams, including on budget or parser failure; losing it costs only re-extraction from the source document."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/PreparedExtractionInput.java",
+      "reason": "JVM/OS temp scratch: justsearch-parse-input-* holds a bounded private source snapshot for container inspection and parsing. Failed preparation deletes the snapshot and directory in finally; successful preparation is owned by try-with-resources in ContentExtractor, PolicyDrivenTikaExtractor and StructuredContentExtractor, whose close deletes both. The original document remains the authority; losing the copy costs only re-extraction."
+    },
+    {
+      "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/ReconciliationSpool.java",
+      "reason": "JVM/OS temp scratch: justsearch-reconciliation-*.db is a per-sync SQLite path/size ordering spool, not the durable job queue. SyncDirectoryOps owns it with try-with-resources; close closes the statement and connection and attempts deletion even if closing fails, while failed construction also deletes the file. Journaling is disabled and the spool is never reopened for recovery; losing it costs another source-directory reconciliation scan."
+    },
     {
       "path": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
       "reason": "Included only under cfg(test). The updater coordinator fixtures write staged artifacts, intents, witnesses and manifests in test-owned temporary directories; this module cannot write from a production binary. Production updater stores retain their existing classifications."
