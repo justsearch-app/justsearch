@@ -5,9 +5,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.model.VariantSelection;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,11 +21,25 @@ import org.junit.jupiter.api.io.TempDir;
  * Unit tests for {@link DevModeVariantProbe}. Tempdoc 397 §14.26 T2-A1.
  *
  * <p>Covers the four probe cases (missing dir, CPU-only file, CUDA-only file, both present on
- * CUDA hardware) the plan named, plus the {@code .optimized} sidecar fallback that the extracted
- * {@code KnowledgeServer.resolveVariant} code already supports.
+ * CUDA hardware), plus rejection of legacy optimized siblings without a source content identity.
  */
 @DisplayName("DevModeVariantProbe")
 class DevModeVariantProbeTest {
+
+  @TempDir Path cacheRoot;
+  private ConfigStore previousStore;
+
+  @BeforeEach
+  void isolateOptimizedStore() {
+    previousStore = ConfigStore.globalOrNull();
+    ConfigStore.setGlobal(new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
+        "justsearch.ort.optimized_cache_dir", cacheRoot.toString()))));
+  }
+
+  @AfterEach
+  void restoreConfig() {
+    TestResolvedConfigHelper.restoreGlobal(previousStore);
+  }
 
   @Test
   void missingDirReturnsNull() {
@@ -126,12 +145,10 @@ class DevModeVariantProbeTest {
   }
 
   @Test
-  void optimizedSidecarAcceptedInPlaceOfBareFile(@TempDir Path modelDir) throws IOException {
-    // ORT graph-optimisation cache can exist without the original when a build was incremental.
+  void legacyOptimizedSiblingCannotReplaceMissingSource(@TempDir Path modelDir) throws IOException {
     Files.createFile(modelDir.resolve("model.onnx.optimized"));
 
     VariantSelection variant = DevModeVariantProbe.probe(modelDir, /* gpuEnabled= */ false);
-    assertNotNull(variant);
-    assertEquals(ExecutionProvider.CPU, variant.executionProvider());
+    assertNull(variant);
   }
 }

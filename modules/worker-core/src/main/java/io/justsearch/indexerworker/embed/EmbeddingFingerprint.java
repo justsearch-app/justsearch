@@ -2,7 +2,7 @@
 package io.justsearch.indexerworker.embed;
 
 import io.justsearch.ort.ModelManifest;
-import io.justsearch.indexerworker.util.Sha256SidecarCache;
+import io.justsearch.core.util.Sha256SidecarCache;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;

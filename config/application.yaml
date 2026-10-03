@@ -5,6 +5,11 @@ app:
   #   - Linux: ~/.justsearch
   # Override with: JUSTSEARCH_DATA_DIR env var or -Djustsearch.data.dir system property
 
+ort:
+  # optimized_cache_dir: defaults to PlatformPaths.getPlatformDefault()/cache/ort-optimized
+  # Override with JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR or -Djustsearch.ort.optimized_cache_dir
+  optimized_cache_max_mb: 16384
+
 llm:
   enabled: true
   # model_path: override via JUSTSEARCH_LLM_MODEL_PATH if needed (defaults resolved from models dir)

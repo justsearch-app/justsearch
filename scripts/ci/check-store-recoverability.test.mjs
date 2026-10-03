@@ -528,6 +528,7 @@ for (const root of [
   'DATA_DIR',
   'AI_HOME',
   'PROGRAM_DATA_OR_DATA_DIR',
+  'PLATFORM_DEFAULT_OR_CONFIGURED_ORT_CACHE',
   'USER_INDEXED_ROOTS',
 ]) {
   test(`the enumerated root ${root} is accepted`, () => {

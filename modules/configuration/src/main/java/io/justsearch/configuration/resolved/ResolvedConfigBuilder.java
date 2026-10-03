@@ -254,6 +254,8 @@ public final class ResolvedConfigBuilder {
     contributeYamlIndexComposite(root);
     contributeYamlCollections(root);
     contributeYamlInfra(root);
+    putYaml("justsearch.ort.optimized_cache_dir", root, "ort.optimized_cache_dir");
+    putYamlLong("justsearch.ort.optimized_cache_max_mb", root, "ort.optimized_cache_max_mb");
     // YAML key app.data_dir -> justsearch.data.dir (a yaml-tier source for paths resolution; the
     // retired sysprop aliases of the same name are a different thing, tempdoc 882 item 26)
     putYaml(EnvRegistry.DATA_DIR.sysProp(), root, "app.data_dir");
@@ -1022,7 +1024,10 @@ public final class ResolvedConfigBuilder {
         resolvePolicyGpuAllowed(),
         // D1-14: absent leaves the GPU capability line unchanged; zero is an explicit floor
         // forcing cap, so preserve it rather than treating it as missing.
-        resolveNonNegativeNullableLong("justsearch.gpu.device_memory_ceiling_mb"));
+        resolveNonNegativeNullableLong("justsearch.gpu.device_memory_ceiling_mb"),
+        new ResolvedConfig.Ai.OptimizedCache(
+            resolvePath("justsearch.ort.optimized_cache_dir", null),
+            resolveLong("justsearch.ort.optimized_cache_max_mb", 16_384L)));
   }
 
   /**

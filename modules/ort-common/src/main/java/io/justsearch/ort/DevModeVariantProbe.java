@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ort;
 
+import ai.onnxruntime.OrtSession.SessionOptions.OptLevel;
 import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.model.VariantSelection;
@@ -64,12 +65,15 @@ public final class DevModeVariantProbe {
     boolean gpuFileExists = gpuEnabled && Files.exists(gpuModelFile);
     boolean cpuFileExists = Files.exists(cpuModelFile);
 
-    // Also check for optimized cache (model.onnx may not exist but model.onnx.optimized does).
+    // A content-keyed graph is reusable only while its source identity is available.
+    // The owned store is the sole authority for cache presence; legacy siblings are irrelevant.
     if (!cpuFileExists) {
-      cpuFileExists = Files.exists(Path.of(cpuModelFile + ".optimized"));
+      cpuFileExists = OrtOptimizedModelStore.configured().contains(cpuModelFile, "cpu",
+          OptLevel.EXTENDED_OPT);
     }
     if (!gpuFileExists && gpuEnabled) {
-      gpuFileExists = Files.exists(Path.of(gpuModelFile + ".optimized"));
+      gpuFileExists = OrtOptimizedModelStore.configured().contains(gpuModelFile, "cuda",
+          OptLevel.EXTENDED_OPT);
     }
 
     if (gpuFileExists) {

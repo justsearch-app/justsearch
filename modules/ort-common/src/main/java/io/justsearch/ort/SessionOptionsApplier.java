@@ -5,6 +5,7 @@ import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtLoggingLevel;
 import ai.onnxruntime.OrtSession;
 import ai.onnxruntime.OrtSession.SessionOptions;
+import ai.onnxruntime.OrtSession.SessionOptions.OptLevel;
 import ai.onnxruntime.providers.OrtCUDAProviderOptions;
 
 /**
@@ -25,6 +26,15 @@ import ai.onnxruntime.providers.OrtCUDAProviderOptions;
 final class SessionOptionsApplier {
 
   private SessionOptionsApplier() {}
+
+  /** Applies the store's graph plan without introducing a second ORT option setter site. */
+  static void applyGraphPlan(OrtOptimizedModelStore.GraphPlan plan, SessionOptions opts)
+      throws OrtException {
+    opts.setOptimizationLevel(plan.cached() ? OptLevel.NO_OPT : plan.optimizationLevel());
+    // An empty output path disables serialization when caller-owned options are reused.
+    opts.setOptimizedModelFilePath(
+        plan.optimizedOutput() == null ? "" : plan.optimizedOutput().toString());
+  }
 
   /**
    * Applies the base session options shared by every session (CPU + GPU): inter-op threads,

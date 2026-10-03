@@ -217,7 +217,17 @@ public record ResolvedConfig(
       boolean gpuAccelerationAllowed,
       // D1-14: optional nonnegative cap for the device-memory line used by encoder composition.
       // Null means the reported device capacity is unmodified; zero is an explicit cap.
-      Long deviceMemoryCeilingMb) {
+      Long deviceMemoryCeilingMb,
+      OptimizedCache optimizedCache) {
+
+    /** Machine-wide regenerable ORT graphs; a null directory selects the platform default. */
+    public record OptimizedCache(Path directory, long maxMb) {
+      public OptimizedCache {
+        if (maxMb < 0 || maxMb > Long.MAX_VALUE / (1024 * 1024)) {
+          throw new IllegalArgumentException("ORT optimized cache size must be nonnegative MiB");
+        }
+      }
+    }
 
     /** BGE-M3 multi-vector retrieval configuration. */
     public record BgeM3(

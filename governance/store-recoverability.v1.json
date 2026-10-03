@@ -1024,14 +1024,48 @@
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/DownloadExecutor.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/DownloadResume.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/RuntimeRestoreUtil.java",
-        "modules/ort-common/src/main/java/io/justsearch/ort/OnnxSessionCache.java",
-        "modules/worker-core/src/main/java/io/justsearch/indexerworker/util/Sha256SidecarCache.java"
+        "modules/core/src/main/java/io/justsearch/core/util/Sha256SidecarCache.java"
       ],
       "tests": [
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/pack/AiPackImportServiceTest.java"
       ],
       "fixtures": [],
-      "derivedCacheNote": "Beyond the manifest-named assets, three APP-GENERATED caches live under models/** beside the file they derive from: <model>.optimized / .opt-meta / .cuda.* (OnnxSessionCache.java:29-32) and <model>.sha256 (Sha256SidecarCache.java:31,48). They are not manifest-named and are not user-supplied, so neither this row's ownershipRule nor byo-ai-assets described them. They are rebuildable at a cost (a 30s+ re-optimization, a 100-400ms rehash), never user data. Recorded here rather than split into a row of their own; splitting is the open option."
+      "hashSidecarNote": "The shared Sha256SidecarCache still writes regenerable .sha256 fingerprint sidecars for worker callers. Optimized graphs have their own machine-wide registered store and hash fresh bytes without writing source sidecars."
+    },
+    {
+      "id": "ort-optimized-models",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "OrtOptimizedModelStore.fromConfig resolves the configured optimized_cache_dir or PlatformPaths.getPlatformDefault()/cache/ort-optimized; entryPath appends ORT version, execution-provider and optimization-level tag, SHA-256, then model.onnx and entry.json. The config override names the entire cache root.",
+      "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
+      "encryptionNote": "Optimized ONNX weights derived from the selected model, including user-supplied models; plaintext and regenerable, covered by OS disk encryption. No source paths or user documents are persisted in entry metadata.",
+      "owner": "WORKER",
+      "root": "PLATFORM_DEFAULT_OR_CONFIGURED_ORT_CACHE",
+      "ownedPaths": [
+        "**/model.onnx",
+        "**/entry.json",
+        "**/*.tmp",
+        "**/*.tmp-*/**"
+      ],
+      "ownershipRule": "Only optimized graphs and staged entries below the explicitly resolved machine cache root. Source model directories are never the optimized graph store. Every deletion checks all ancestors and refuses symlinks and junctions.",
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "opaque optimized ONNX graph plus JSON sourceSize/created/lastUsed commit marker; identity is model SHA-256 + ORT version + EP + optimization level",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "STAGED_MOVE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "IGNORE_INCOMPLETE_OR_INVALID_ENTRY_AND_REOPTIMIZE_SOURCE",
+      "reconciliation": "REGENERATE_FROM_SOURCE; REMOVE_OLD_ORT_VERSIONS_ON_FIRST_USE; EVICT_LRU_AFTER_SUCCESSFUL_WRITE",
+      "status": "READY",
+      "implementationSources": [
+        "modules/ort-common/src/main/java/io/justsearch/ort/OrtOptimizedModelStore.java",
+        "modules/ort-common/src/main/java/io/justsearch/ort/OnnxSessionCache.java"
+      ],
+      "fixtures": [],
+      "tests": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/OrtOptimizedModelStoreTest.java",
+        "modules/ort-common/src/test/java/io/justsearch/ort/OnnxSessionCacheTest.java"
+      ]
     },
     {
       "id": "byo-ai-assets",
